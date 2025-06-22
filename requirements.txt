@@ -21,3 +21,4 @@ SpeechRecognition
 pywhatkit
 watchdog
 PyAudio
+h11>=0.12.0 # Required by Uvicorn for HTTP tooling
