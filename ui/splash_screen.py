@@ -3,12 +3,19 @@ import random
 import logging
 from PyQt5.QtWidgets import QLabel, QVBoxLayout, QWidget, QApplication
 from PyQt5.QtGui import QPixmap, QMovie, QFont, QPalette, QColor, QBrush
-from PyQt5.QtCore import Qt, QSize, QTimer
+from PyQt5.QtCore import Qt, QSize, QTimer, QLocale, QPropertyAnimation, QEasingCurve, pyqtProperty
+
+# Assuming db connection and GenericCRUD are accessible
+# This might require adjusting imports based on your project structure
+# For example, if db.cruds.generic_crud is the path:
+from db.cruds.generic_crud import GenericCRUD, get_db_connection
+
 
 class SplashWindow(QWidget):
-    def __init__(self, app_root_dir):
+    def __init__(self, app_root_dir, language_code=None):
         super().__init__()
         self.app_root_dir = app_root_dir
+        self.language_code = language_code or QLocale.system().name().split('_')[0] # e.g., 'en', 'fr'
         self.default_static_pixmap = QPixmap(os.path.join(self.app_root_dir, "icons", "leopard_logo.svg"))
         
         # Configure window properties for splash-like behavior
@@ -20,17 +27,48 @@ class SplashWindow(QWidget):
         self.setStyleSheet("QWidget { background-color: transparent; }")
 
         self.gif_movie = None # To keep QMovie instance alive
+        self.animation = None # For fade animations
 
         self._setup_ui()
+        self.setWindowOpacity(0.0) # Start fully transparent for fade-in
 
     def _get_random_motivational_message(self):
-        motivational_messages = [
-            "Chaque jour est une nouvelle opportunité.", "Croyez en vous et tout deviendra possible.",
-            "Le succès commence par un état d'esprit.", "Soyez le changement que vous voulez voir.",
-            "La persévérance est la clé.", "N'ayez peur de ne pas essayer.",
-            "Le futur appartient aux rêveurs."
-        ]
-        return random.choice(motivational_messages)
+        conn = None
+        try:
+            conn = get_db_connection()
+            messages_crud = GenericCRUD(conn, 'motivational_messages', 'id')
+            
+            # Prioritize messages for the current language
+            # Fetch messages where day_of_year is NULL (generic messages) and is_active is TRUE
+            messages = messages_crud.get_by_attributes(
+                {"language_code": self.language_code, "is_active": True, "day_of_year": None}
+            )
+            
+            if not messages:
+                # Fallback to English if no messages for current language or if current lang is not 'en'
+                logging.warning(f"No motivational messages found for language '{self.language_code}'. Falling back to 'en'.")
+                messages = messages_crud.get_by_attributes(
+                    {"language_code": "en", "is_active": True, "day_of_year": None}
+                )
+
+            if not messages:
+                # Ultimate fallback if English also has no messages
+                logging.error("No motivational messages found for 'en' or the specified language. Using hardcoded default.")
+                return "Welcome! / Bienvenue !"
+                
+            return random.choice(messages)['message']
+            
+        except Exception as e:
+            logging.error(f"Error fetching motivational message from DB: {e}", exc_info=True)
+            # Fallback to a hardcoded message in case of any DB error
+            hardcoded_fallback_messages = [
+                "Chaque jour est une nouvelle opportunité.", "Croyez en vous et tout deviendra possible.",
+                "Every day is a new opportunity.", "Believe in yourself and anything is possible."
+            ]
+            return random.choice(hardcoded_fallback_messages)
+        finally:
+            if conn:
+                conn.close()
 
     def _get_random_gif_path(self):
         gif_folder = os.path.join(self.app_root_dir, "resources", "gifs")
@@ -145,10 +183,35 @@ class SplashWindow(QWidget):
         screen_geo = QApplication.instance().desktop().availableGeometry(self)
         self.move(screen_geo.center() - self.rect().center())
 
+    def _start_fade_in(self):
+        self.animation = QPropertyAnimation(self, b"windowOpacity")
+        self.animation.setDuration(700) # milliseconds
+        self.animation.setStartValue(0.0)
+        self.animation.setEndValue(1.0)
+        self.animation.setEasingCurve(QEasingCurve.InOutQuad)
+        self.animation.start()
+
+    def show_splash(self):
+        super().show() # Call QWidget's show method
+        self._center_on_screen()
+        self._start_fade_in() # Start fade-in after showing and centering
+        QApplication.instance().processEvents()
+
+
     def finish_splash(self, main_window):
-        # main_window is passed but not strictly needed for QWidget.hide/close
-        self.hide() # or self.close() to destroy
-        # If self.close() is used, ensure QMovie is stopped if running
+        self.animation = QPropertyAnimation(self, b"windowOpacity")
+        self.animation.setDuration(700) # milliseconds
+        self.animation.setStartValue(1.0)
+        self.animation.setEndValue(0.0)
+        self.animation.setEasingCurve(QEasingCurve.InOutQuad)
+        
+        # Connect finished signal to actually close/hide the window
+        # Important: Use self.close to ensure widget is destroyed and resources are freed.
+        # If using self.hide(), the widget remains in memory.
+        self.animation.finished.connect(self.close) 
+        self.animation.start()
+
+        # Stop the GIF movie when starting fade out, not after it's hidden
         if self.gif_movie:
             self.gif_movie.stop()
 

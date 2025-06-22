@@ -218,8 +218,21 @@ def main():
 
     # Display Splash Screen using the new SplashWindow
     from ui.splash_screen import SplashWindow # Import the new class
+    
+    # Determine current language for splash screen
+    # This duplicates some logic from later in main() for translations, consider refactoring
+    current_app_lang = QLocale.system().name().split('_')[0]
+    language_code_from_db_for_splash = db.get_setting('user_selected_language') # Use db.get_setting
+    if language_code_from_db_for_splash and isinstance(language_code_from_db_for_splash, str) and language_code_from_db_for_splash.strip():
+        current_app_lang = language_code_from_db_for_splash.strip()
+    else:
+        # Use system lang if available in config, else default from config, else 'en'
+        sys_lang = QLocale.system().name().split('_')[0]
+        current_app_lang = CONFIG.get("language", sys_lang if sys_lang in ["en", "fr", "ar"] else "en")
+
+
     # APP_ROOT_DIR is available here from app_setup import
-    splash = SplashWindow(app_root_dir=APP_ROOT_DIR)
+    splash = SplashWindow(app_root_dir=APP_ROOT_DIR, language_code=current_app_lang)
     splash.show_splash()
 
     # 5. Set Application Name and Style
