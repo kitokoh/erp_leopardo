@@ -981,8 +981,15 @@ class DocumentManager(QMainWindow):
         logging.info(f"main_window.open_client_tab_by_id: Attempting to create ClientWidget for client_id: {client_id_to_open}")
         try:
             notification_manager = QApplication.instance().notification_manager
-            client_widget = ClientWidget(client_data_to_show, self.config, self.app_root_dir, notification_manager, parent=self)
-            logging.info(f"main_window.open_client_tab_by_id: Successfully created ClientWidget for client_id: {client_id_to_open}")
+            client_widget = ClientWidget(
+                client_info=client_data_to_show,
+                config=self.config,
+                app_root_dir=self.app_root_dir,
+                notification_manager=notification_manager,
+                current_user_id=self.current_user_id, # Pass current_user_id
+                parent=self
+            )
+            logging.info(f"main_window.open_client_tab_by_id: Successfully created ClientWidget for client_id: {client_id_to_open} with user_id: {self.current_user_id}")
         except Exception as e:
             logging.error(f"main_window.open_client_tab_by_id: Error instantiating ClientWidget for client_id: {client_id_to_open} - {e}", exc_info=True)
             QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("Impossible de créer l'onglet client. Erreur: {0}").format(str(e)))

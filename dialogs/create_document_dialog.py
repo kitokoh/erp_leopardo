@@ -24,10 +24,11 @@ from utils import populate_docx_template
 import icons_rc # Import for Qt resource file
 
 class CreateDocumentDialog(QDialog):
-    def __init__(self, client_info, config, parent=None, template_data=None): # Added template_data
+    def __init__(self, client_info, config, current_user_id, parent=None, template_data=None): # Added current_user_id
         super().__init__(parent)
         self.client_info = client_info
         self.config = config # Store config passed from main
+        self.current_user_id = current_user_id # Store current_user_id
         self.template_data = template_data # Store template_data
         self.setWindowTitle(self.tr("Créer des Documents"))
         self.setMinimumSize(600, 500)
@@ -496,7 +497,7 @@ class CreateDocumentDialog(QDialog):
                         'file_path_relative': file_path_relative_for_db, # Corrected relative path
                         'document_type_generated': template_type,
                         'source_template_id': template_id_for_db,
-                        'created_by_user_id': None # Placeholder for user ID, to be implemented
+                        'user_id': self.current_user_id # Use stored current_user_id
                     }
                     logging.info(f"Attempting to add document to DB with data: {doc_db_data}")
                     new_document_id_from_db = db_manager.add_client_document(doc_db_data)

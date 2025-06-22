@@ -362,7 +362,12 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
 
             # CreateDocumentDialog call
             logging.info(f"Attempting to show CreateDocumentDialog for client ID {actual_new_client_id}. Client info (ui_map_data) being passed: {ui_map_data}")
-            create_document_dialog = CreateDocumentDialog(client_info=ui_map_data, config=doc_manager.config, parent=doc_manager)
+            create_document_dialog = CreateDocumentDialog(
+                client_info=ui_map_data,
+                config=doc_manager.config,
+                current_user_id=doc_manager.current_user_id, # Pass current_user_id
+                parent=doc_manager
+            )
             if create_document_dialog.exec_() == QDialog.Accepted: logging.info("CreateDocumentDialog accepted.")
             else: logging.info("CreateDocumentDialog cancelled.")
 
