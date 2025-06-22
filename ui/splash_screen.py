@@ -17,12 +17,12 @@ class SplashWindow(QWidget):
         self.app_root_dir = app_root_dir
         self.language_code = language_code or QLocale.system().name().split('_')[0] # e.g., 'en', 'fr'
         self.default_static_pixmap = QPixmap(os.path.join(self.app_root_dir, "icons", "leopard_logo.svg"))
-        
+
         # Configure window properties for splash-like behavior
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool) # Qt.Tool helps it float like a splash
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setAutoFillBackground(False)
-        
+
         # Ensure the widget itself has a transparent background style
         self.setStyleSheet("QWidget { background-color: transparent; }")
 
@@ -37,13 +37,13 @@ class SplashWindow(QWidget):
         try:
             conn = get_db_connection()
             messages_crud = GenericCRUD(conn, 'motivational_messages', 'id')
-            
+
             # Prioritize messages for the current language
             # Fetch messages where day_of_year is NULL (generic messages) and is_active is TRUE
             messages = messages_crud.get_by_attributes(
                 {"language_code": self.language_code, "is_active": True, "day_of_year": None}
             )
-            
+
             if not messages:
                 # Fallback to English if no messages for current language or if current lang is not 'en'
                 logging.warning(f"No motivational messages found for language '{self.language_code}'. Falling back to 'en'.")
@@ -55,9 +55,10 @@ class SplashWindow(QWidget):
                 # Ultimate fallback if English also has no messages
                 logging.error("No motivational messages found for 'en' or the specified language. Using hardcoded default.")
                 return "Welcome! / Bienvenue !"
-                
+
             return random.choice(messages)['message']
-            
+
+
         except Exception as e:
             logging.error(f"Error fetching motivational message from DB: {e}", exc_info=True)
             # Fallback to a hardcoded message in case of any DB error
@@ -92,13 +93,14 @@ class SplashWindow(QWidget):
         self.message_label.setAlignment(Qt.AlignCenter | Qt.AlignTop)
         self.message_label.setWordWrap(True)
         self.message_label.setStyleSheet("""
-            QLabel { 
-                color: white; 
-                font-size: 20px; 
-                font-weight: bold; 
+            QLabel {
+                color: white;
+                font-size: 20px;
+                font-weight: bold;
                 background-color: rgba(0, 0, 0, 0.0); /* Fully transparent background for label itself */
-                padding: 10px; 
-                text-align: center; 
+                padding: 10px;
+                text-align: center;
+
             }
         """)
         # To avoid text repainting issues, ensure labels don't auto-fill their background
@@ -138,7 +140,7 @@ class SplashWindow(QWidget):
                 self._set_static_media_pixmap(DEFAULT_MEDIA_WIDTH, DEFAULT_MEDIA_HEIGHT)
         else:
             self._set_static_media_pixmap(DEFAULT_MEDIA_WIDTH, DEFAULT_MEDIA_HEIGHT)
-        
+
         self.media_label.setFixedSize(target_media_width, target_media_height)
         self.message_label.setFixedWidth(target_media_width) # Match message width to media
 
@@ -204,11 +206,12 @@ class SplashWindow(QWidget):
         self.animation.setStartValue(1.0)
         self.animation.setEndValue(0.0)
         self.animation.setEasingCurve(QEasingCurve.InOutQuad)
-        
+
         # Connect finished signal to actually close/hide the window
         # Important: Use self.close to ensure widget is destroyed and resources are freed.
         # If using self.hide(), the widget remains in memory.
-        self.animation.finished.connect(self.close) 
+        self.animation.finished.connect(self.close)
+
         self.animation.start()
 
         # Stop the GIF movie when starting fade out, not after it's hidden
@@ -221,10 +224,10 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     # Assuming script is in ui/ and resources/ & icons/ are in parent dir
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    
+
     splash = SplashWindow(app_root_dir=project_root)
     splash.show_splash()
-    
+
     # Simulate app loading and main window appearance
     main_win_dummy = QWidget() # Dummy main window for finish_splash
     QTimer.singleShot(6000, lambda: splash.finish_splash(main_win_dummy)) # Show for 6s

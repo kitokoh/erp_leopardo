@@ -218,7 +218,7 @@ def main():
 
     # Display Splash Screen using the new SplashWindow
     from ui.splash_screen import SplashWindow # Import the new class
-    
+
     # Determine current language for splash screen
     # This duplicates some logic from later in main() for translations, consider refactoring
     current_app_lang = QLocale.system().name().split('_')[0]

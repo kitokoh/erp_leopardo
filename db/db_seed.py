@@ -397,13 +397,13 @@ def _seed_motivational_messages(cursor: sqlite3.Cursor, conn: sqlite3.Connection
             # The UNIQUE constraint on (language_code, message) should handle this,
             # but a more explicit check might be useful if we want to avoid trying to insert.
             # For now, rely on the UNIQUE constraint and catch the IntegrityError.
-            
+
             # Create a dictionary for insertion, ensuring all necessary fields are present
             # even if some are defaulted by the DB (like is_active, created_at, updated_at)
             # For GenericCRUD, we only need to provide non-defaulted fields.
             # The schema has UNIQUE(language_code, message) and UNIQUE(language_code, day_of_year)
             # If day_of_year is None, the second constraint won't prevent multiple generic messages per language.
-            
+
             # Let's ensure we don't insert duplicates for generic messages (day_of_year is None)
             existing = None
             if msg_data["day_of_year"] is None:
