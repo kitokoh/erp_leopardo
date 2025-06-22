@@ -58,6 +58,7 @@ class SplashWindow(QWidget):
 
             return random.choice(messages)['message']
 
+
         except Exception as e:
             logging.error(f"Error fetching motivational message from DB: {e}", exc_info=True)
             # Fallback to a hardcoded message in case of any DB error
@@ -99,6 +100,7 @@ class SplashWindow(QWidget):
                 background-color: rgba(0, 0, 0, 0.0); /* Fully transparent background for label itself */
                 padding: 10px;
                 text-align: center;
+
             }
         """)
         # To avoid text repainting issues, ensure labels don't auto-fill their background
@@ -209,6 +211,7 @@ class SplashWindow(QWidget):
         # Important: Use self.close to ensure widget is destroyed and resources are freed.
         # If using self.hide(), the widget remains in memory.
         self.animation.finished.connect(self.close)
+
         self.animation.start()
 
         # Stop the GIF movie when starting fade out, not after it's hidden
