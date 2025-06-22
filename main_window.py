@@ -75,6 +75,7 @@ from camera_management.camera_management_widget import CameraManagementWidget # 
 
 from recruitment.recruitment_dashboard import RecruitmentDashboard # Import RecruitmentDashboard
 
+from home_page_widget import HomePageWidget # Added for new Home Page
 from experience_module_widget import ExperienceModuleWidget # Added
 from download_monitor_service import DownloadMonitorService
 from dialogs.assign_document_dialog import AssignDocumentToClientDialog
@@ -190,7 +191,10 @@ class DocumentManager(QMainWindow):
         else:
             self.experience_management_widget_instance = None
 
-        self.main_area_stack.setCurrentWidget(self.documents_page_widget) # Default view
+        self.home_page_widget_instance = HomePageWidget(parent=self) # Create Home Page instance
+        self.main_area_stack.addWidget(self.home_page_widget_instance) # Add Home Page to stack
+
+        self.main_area_stack.setCurrentWidget(self.home_page_widget_instance) # Set Home Page as default view
         self.create_actions_main(); self.create_menus_main()
         
         self.voice_input_service = VoiceInputService() # Instantiate VoiceInputService
@@ -606,6 +610,14 @@ class DocumentManager(QMainWindow):
                                      self.tr("Une erreur inattendue est survenue lors de la reconnaissance vocale: {0}").format(error_message))
 
     def create_actions_main(self): 
+        # Assuming a home.svg icon will be added to icons/ directory and qrc
+        # For now, using a placeholder if home.svg is not yet available in resources
+        home_icon_path = ":/icons/home.svg"
+        # A fallback icon if home.svg is not found in resources, for testing
+        # if not QIcon.hasThemeIcon("home"): home_icon_path = ":/icons/dashboard.svg" # Example fallback
+        self.home_action = QAction(QIcon(home_icon_path), self.tr("Accueil"), self)
+        self.home_action.triggered.connect(self.show_home_view)
+
         self.settings_action = QAction(QIcon(":/icons/modern/settings.svg"), self.tr("Paramètres"), self); self.settings_action.triggered.connect(self.show_settings_page) # Changed to show_settings_page
         # self.template_action removed
         self.status_action = QAction(QIcon(":/icons/check-square.svg"), self.tr("Gérer les Statuts"), self); self.status_action.triggered.connect(self.open_status_management_dialog_slot); self.status_action.setEnabled(False); self.status_action.setToolTip(self.tr("Fonctionnalité de gestion des statuts prévue pour une future version."))
@@ -632,6 +644,7 @@ class DocumentManager(QMainWindow):
 
 
         # Populate searchable_actions_map
+        self.searchable_actions_map[self.tr("Accueil")] = self.home_action # Added Home action
         self.searchable_actions_map[self.tr("Paramètres")] = self.settings_action
         # self.searchable_actions_map[self.tr("Gérer les Modèles")] removed
         self.searchable_actions_map[self.tr("Gérer les Statuts")] = self.status_action
@@ -654,7 +667,9 @@ class DocumentManager(QMainWindow):
         file_menu.addSeparator(); file_menu.addAction(self.exit_action)
 
         modules_menu = menu_bar.addMenu(self.tr("Modules"))
+        modules_menu.addAction(self.home_action) # Added Home action to Modules menu
         modules_menu.addAction(self.documents_view_action) # Documents view is core, always added
+        modules_menu.addSeparator() # Separator after Home and Documents
 
         for module_info in CONFIGURABLE_MODULES:
             action_name = module_info['action_attr']
@@ -733,6 +748,14 @@ class DocumentManager(QMainWindow):
             QMessageBox.information(self, self.tr("Module Désactivé"), self.tr("Le module 'Carrier Map' est actuellement désactivé."))
             logging.info("Carrier Map module is disabled. Dialog not opened.")
 
+
+    def show_home_view(self):
+        if self.home_page_widget_instance:
+            self.main_area_stack.setCurrentWidget(self.home_page_widget_instance)
+        else:
+            # This case should ideally not happen if initialization is correct
+            logging.error("HomePageWidget instance is None. Cannot show home view.")
+            QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("La page d'accueil n'a pas pu être chargée."))
 
     def show_project_management_view(self):
         if self.project_management_widget_instance:

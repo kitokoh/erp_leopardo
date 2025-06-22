@@ -56,6 +56,7 @@
     <file alias="plus-square.svg">icons/plus-square.svg</file>
     <file alias="users.svg">icons/users.svg</file>
     <file alias="placeholder_icon.svg">icons/placeholder_icon.svg</file>
+    <file alias="home.svg">icons/home.svg</file>
 
     <file alias="modern/templates.svg">icons/placeholder_icon.svg</file>
     <file alias="modern/link.svg">icons/placeholder_icon.svg</file>
