@@ -1,6 +1,12 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
+# Assuming main_window.py is in the project root, its directory is the project root.
+# If main_window.py is in a subdirectory, this needs to be adjusted (e.g., os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+PROJECT_ROOT_FROM_MAIN_WINDOW = os.path.dirname(os.path.abspath(__file__))
+if PROJECT_ROOT_FROM_MAIN_WINDOW not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT_FROM_MAIN_WINDOW)
+
 # import logging # logging is already imported
 import logging
 from datetime import datetime # Added datetime import

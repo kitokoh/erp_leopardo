@@ -7,6 +7,8 @@ PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
+from main_window import DocumentManager # The main application window
+
 import logging # For main.py's own logging needs, and for translator parts if setup_logging isn't called first
 import icons_rc # Import the compiled resource file
 import subprocess # Added for starting API server
@@ -39,7 +41,6 @@ from auth.login_window import LoginWindow # Added for authentication
 from PyQt5.QtWidgets import QDialog # Required for QDialog.Accepted check (already present, but good to note)
 # from initial_setup_dialog import InitialSetupDialog # Redundant import, already imported above
 # import db as db_manager # For db initialization - already imported above, now using 'import db'
-from main_window import DocumentManager # The main application window
 from notifications import NotificationManager # Added for notifications
 from db.cruds.users_crud import users_crud_instance # Added for default operational user
 from PyQt5.QtWidgets import QMessageBox # Added for error dialog
