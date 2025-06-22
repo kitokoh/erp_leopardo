@@ -64,7 +64,7 @@ api_server_process = None
 # WARNING: This will log in as the default admin user with super_admin privileges
 # and should ONLY be used for development/testing purposes.
 # Ensure this is set to False for production or normal use.
-BYPASS_LOGIN_FOR_TESTING = True
+BYPASS_LOGIN_FOR_TESTING = False
 # --- End Development/Testing: Bypass Login Flag ---
 
 # Old database initialization block removed as it's now called directly in main()
@@ -85,26 +85,52 @@ def start_api_server():
         # For basic logging, we can capture them or redirect to DEVNULL if not needed.
         api_server_process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-        # Small delay to check if process started, then check poll()
-        # This is a very basic check. A more robust check would involve
-        # trying to connect to the server's health endpoint if available.
-        # Or, monitoring its output for a startup confirmation message.
-        # For now, we assume if Popen doesn't raise an error and poll() is None, it's starting.
-        if api_server_process.poll() is None:
-            logging.info(f"FastAPI server process started successfully with PID: {api_server_process.pid}. Command: {' '.join(command)}")
-        else:
-            # This means the process terminated quickly, likely an error.
-            stdout, stderr = api_server_process.communicate() # Get output
-            logging.error(f"FastAPI server process failed to start. Exit code: {api_server_process.returncode}")
-            logging.error(f"Stdout: {stdout.decode().strip()}")
-            logging.error(f"Stderr: {stderr.decode().strip()}")
+        # Try to communicate with the process to get output.
+        # This will wait for the process to terminate if it does so quickly.
+        # If it's a long-running server, communicate() won't return until it's done,
+        # so we need a timeout for the initial check.
+        try:
+            stdout, stderr = api_server_process.communicate(timeout=2) # Wait 2 seconds for initial output / quick failure
+            # If communicate() returns, the process has terminated.
+            logging.error(f"FastAPI server process terminated unexpectedly. Exit code: {api_server_process.returncode}")
+            stdout_str = stdout.decode(errors='replace').strip()
+            stderr_str = stderr.decode(errors='replace').strip()
+            if stdout_str:
+                logging.error(f"FastAPI Server Stdout:\n{stdout_str}")
+            if stderr_str:
+                logging.error(f"FastAPI Server Stderr:\n{stderr_str}")
             api_server_process = None # Reset as it failed
+        except subprocess.TimeoutExpired:
+            # This is the expected path for a successfully started server.
+            # The process is still running after the timeout.
+            if api_server_process.poll() is None:
+                logging.info(f"FastAPI server process started successfully with PID: {api_server_process.pid}. Command: {' '.join(command)}")
+                # Optionally, you could start threads here to monitor api_server_process.stdout and api_server_process.stderr
+                # and log their output in real-time if continuous logging is needed.
+            else:
+                # Process terminated after TimeoutExpired was raised but before poll() - less likely but possible
+                stdout, stderr = api_server_process.communicate() # get any final output
+                logging.error(f"FastAPI server process failed to start or terminated shortly after. Exit code: {api_server_process.returncode}")
+                stdout_str = stdout.decode(errors='replace').strip()
+                stderr_str = stderr.decode(errors='replace').strip()
+                if stdout_str:
+                    logging.error(f"FastAPI Server Stdout (after timeout check):\n{stdout_str}")
+                if stderr_str:
+                    logging.error(f"FastAPI Server Stderr (after timeout check):\n{stderr_str}")
+                api_server_process = None
+        except Exception as e_comm:
+            # Other errors during communicate
+            logging.error(f"Error communicating with FastAPI server process: {e_comm}", exc_info=True)
+            if api_server_process.poll() is not None:
+                logging.error(f"FastAPI server process also terminated with exit code: {api_server_process.returncode}")
+            api_server_process = None
+
 
     except FileNotFoundError:
         logging.error("Error starting FastAPI server: 'uvicorn' command not found. Ensure uvicorn is installed and in PATH.")
         api_server_process = None
     except Exception as e:
-        logging.error(f"An unexpected error occurred while starting the FastAPI server: {e}", exc_info=True)
+        logging.error(f"An unexpected error occurred while starting the FastAPI server process: {e}", exc_info=True)
         api_server_process = None
 
 def stop_api_server():

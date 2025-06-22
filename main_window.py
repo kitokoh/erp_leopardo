@@ -3,6 +3,7 @@ import sys
 import os
 # import logging # logging is already imported
 import logging
+from datetime import datetime # Added datetime import
 from PyQt5.QtCore import QStringListModel
 
 from PyQt5.QtWidgets import (
@@ -923,6 +924,19 @@ class DocumentManager(QMainWindow):
         logging.info(f"open_client_tab_by_id: Called with client_id_to_open={client_id_to_open}")
         client_data_to_show = clients_crud_instance.get_client_by_id(client_id_to_open, include_deleted=False)
         logging.info(f"open_client_tab_by_id: client_data_to_show after fetching from DB: {client_data_to_show}")
+
+        if client_data_to_show and 'created_at' in client_data_to_show and client_data_to_show['created_at']:
+            try:
+                created_at_str = client_data_to_show['created_at']
+                # Python's fromisoformat handles 'Z' correctly in 3.7+
+                # If older version, might need: created_at_str = created_at_str.replace('Z', '+00:00')
+                dt_object = datetime.fromisoformat(created_at_str.replace('Z', '+00:00')) # Ensure Z is handled
+                client_data_to_show['creation_date'] = dt_object.strftime('%Y-%m-%d')
+            except ValueError as e:
+                logging.error(f"Error parsing 'created_at' timestamp: {client_data_to_show['created_at']} - {e}")
+                client_data_to_show['creation_date'] = 'N/A' # Default on error
+        elif client_data_to_show:
+            client_data_to_show['creation_date'] = 'N/A' # Default if 'created_at' is missing or None
 
         if not client_data_to_show:
             # If fetching from DB fails, show an error and return.
