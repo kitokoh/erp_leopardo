@@ -1,5 +1,4 @@
 from .add_new_client_dialog import AddNewClientDialog
-from .settings_dialog import SettingsDialog
 from .template_dialog import TemplateDialog
 from .contact_dialog import ContactDialog
 from .product_dialog import ProductDialog
