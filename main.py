@@ -218,7 +218,11 @@ def main():
 
     # Display Splash Screen using the new SplashWindow
     from ui.splash_screen import SplashWindow # Import the new class
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> 5c22293e263e4757a6a3615ff68d48649634215e
     # APP_ROOT_DIR is available here from app_setup import
     splash = SplashWindow(app_root_dir=APP_ROOT_DIR)
     splash.show_splash()
