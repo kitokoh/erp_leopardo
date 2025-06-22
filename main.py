@@ -13,9 +13,9 @@ import subprocess # Added for starting API server
 import atexit # Added for stopping API server on exit
 
 # Core PyQt5 imports for application execution
-from PyQt5.QtWidgets import QApplication
-from PyQt5.QtCore import QLocale, QLibraryInfo, QTranslator, Qt
-from PyQt5.QtGui import QFont, QPixmap
+from PyQt5.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
+from PyQt5.QtCore import QLocale, QLibraryInfo, QTranslator, Qt, QSize
+from PyQt5.QtGui import QFont, QPixmap, QMovie
 from PyQt5.QtCore import QStringListModel
 
 # Imports from project structure
@@ -216,11 +216,12 @@ def main():
     # 4. Create QApplication Instance
     app = QApplication(sys.argv)
 
-    # Display Splash Screen
-    splash_pix = QPixmap(os.path.join(APP_ROOT_DIR, "icons", "leopard_logo.svg"))
-    splash = QSplashScreen(splash_pix, Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
-    splash.show()
-    app.processEvents() # Ensure splash screen is displayed promptly
+    # Display Splash Screen using the new SplashWindow
+    from ui.splash_screen import SplashWindow # Import the new class
+    
+    # APP_ROOT_DIR is available here from app_setup import
+    splash = SplashWindow(app_root_dir=APP_ROOT_DIR)
+    splash.show_splash()
 
     # 5. Set Application Name and Style
     app.setApplicationName("ClientDocManager")
@@ -584,7 +585,7 @@ def main():
         QApplication.instance().notification_manager = notification_manager
 
         main_window.show()
-        splash.finish(main_window) # Close splash screen
+        splash.finish_splash(main_window) # Use the correct method in SplashWindow
         logging.info("Main window shown. Application is running.")
         sys.exit(app.exec_())
     else:
