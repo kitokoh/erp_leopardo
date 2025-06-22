@@ -1513,6 +1513,19 @@ CREATE TABLE IF NOT EXISTS Templates (
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
+
+-- Table for motivational messages
+CREATE TABLE IF NOT EXISTS motivational_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    language_code TEXT NOT NULL,
+    message TEXT NOT NULL,
+    day_of_year INTEGER, -- Optional: For unique daily messages, can be NULL
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(language_code, message), -- Avoid duplicate messages per language
+    UNIQUE(language_code, day_of_year) -- Avoid multiple messages for the same day in the same language
+);
     """)
 
     # ItemStorageLocations Table

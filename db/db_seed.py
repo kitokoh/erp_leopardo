@@ -14,7 +14,7 @@ from app_setup import CONFIG
 
 
 # Import necessary functions directly from their new CRUD module locations
-from db.cruds.generic_crud import get_db_connection
+from db.cruds.generic_crud import get_db_connection, GenericCRUD
 
 # Import CRUD instances for refactored modules
 from db.cruds.users_crud import users_crud_instance
@@ -361,6 +361,80 @@ def seed_initial_data_master(cursor: sqlite3.Cursor):
     _original_seed_initial_data_func_placeholder(cursor, conn, logger_passed=logger) 
     _seed_main_document_templates(cursor, conn, logger_passed=logger)
     _seed_default_utility_templates(cursor, conn, logger_passed=logger)
+    _seed_motivational_messages(cursor, conn, logger_passed=logger)
+
+
+def _seed_motivational_messages(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
+    logger = logger_passed
+    logger.info("Attempting to seed motivational messages...")
+
+    messages_crud = GenericCRUD(conn, 'motivational_messages', 'id')
+
+    default_messages = [
+        # French
+        {"language_code": "fr", "message": "Chaque jour est une nouvelle opportunité.", "day_of_year": None},
+        {"language_code": "fr", "message": "Croyez en vous et tout deviendra possible.", "day_of_year": None},
+        {"language_code": "fr", "message": "Le succès commence par un état d'esprit.", "day_of_year": None},
+        {"language_code": "fr", "message": "Soyez le changement que vous voulez voir dans le monde.", "day_of_year": None},
+        {"language_code": "fr", "message": "La persévérance est la clé de la réussite.", "day_of_year": None},
+        # English
+        {"language_code": "en", "message": "Every day is a new opportunity.", "day_of_year": None},
+        {"language_code": "en", "message": "Believe in yourself and anything is possible.", "day_of_year": None},
+        {"language_code": "en", "message": "Success begins with a state of mind.", "day_of_year": None},
+        {"language_code": "en", "message": "Be the change you wish to see in the world.", "day_of_year": None},
+        {"language_code": "en", "message": "Perseverance is the key to success.", "day_of_year": None},
+        # Arabic (Example - ensure your DB/system handles UTF-8 correctly)
+        {"language_code": "ar", "message": "كل يوم هو فرصة جديدة.", "day_of_year": None},
+        {"language_code": "ar", "message": "آمن بنفسك وكل شيء سيصبح ممكنًا.", "day_of_year": None},
+    ]
+
+    added_count = 0
+    skipped_count = 0
+
+    for msg_data in default_messages:
+        try:
+            # Check if a similar message (ignoring day_of_year for general messages) already exists
+            # The UNIQUE constraint on (language_code, message) should handle this,
+            # but a more explicit check might be useful if we want to avoid trying to insert.
+            # For now, rely on the UNIQUE constraint and catch the IntegrityError.
+
+            # Create a dictionary for insertion, ensuring all necessary fields are present
+            # even if some are defaulted by the DB (like is_active, created_at, updated_at)
+            # For GenericCRUD, we only need to provide non-defaulted fields.
+            # The schema has UNIQUE(language_code, message) and UNIQUE(language_code, day_of_year)
+            # If day_of_year is None, the second constraint won't prevent multiple generic messages per language.
+
+            # Let's ensure we don't insert duplicates for generic messages (day_of_year is None)
+            existing = None
+            if msg_data["day_of_year"] is None:
+                # Query for existing message with same language and text where day_of_year IS NULL
+                query = "SELECT id FROM motivational_messages WHERE language_code = ? AND message = ? AND day_of_year IS NULL"
+                cursor.execute(query, (msg_data["language_code"], msg_data["message"]))
+                existing = cursor.fetchone()
+
+            if existing:
+                logger.debug(f"Motivational message '{msg_data['message'][:30]}...' for lang '{msg_data['language_code']}' already exists. Skipping.")
+                skipped_count += 1
+                continue
+
+            # Prepare data for insertion (GenericCRUD expects a dict)
+            # We don't need to specify 'id', 'created_at', 'updated_at', 'is_active' as they have defaults or are auto.
+            data_to_insert = {
+                "language_code": msg_data["language_code"],
+                "message": msg_data["message"],
+                "day_of_year": msg_data["day_of_year"] # Can be None
+            }
+            messages_crud.create(data_to_insert)
+            added_count += 1
+            logger.debug(f"Added motivational message: {msg_data['message'][:30]}... for lang {msg_data['language_code']}")
+        except sqlite3.IntegrityError as e: # Handles UNIQUE constraint violations
+            logger.warning(f"Skipping motivational message due to integrity error (likely duplicate): {msg_data['message'][:30]}... for lang {msg_data['language_code']}. Error: {e}")
+            skipped_count += 1
+        except Exception as e:
+            logger.error(f"Error adding motivational message '{msg_data['message'][:30]}...': {e}", exc_info=True)
+            skipped_count +=1 # Count as skipped if error
+
+    logger.info(f"Motivational messages seeding complete. Added: {added_count}, Skipped/Existing: {skipped_count}")
 
 
 def run_seed():
