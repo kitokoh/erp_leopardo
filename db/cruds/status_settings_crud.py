@@ -1,5 +1,5 @@
 import sqlite3
-from .generic_crud import _manage_conn, get_db_connection
+from .generic_crud import _manage_conn # get_db_connection is not used directly
 import logging
 
 # --- StatusSettings CRUD ---
@@ -80,62 +80,25 @@ def add_status_setting(status_name: str, status_type: str, color_hex: str = None
     Returns:
         The ID of the newly inserted status if successful, False otherwise.
     """
-    # If conn is not provided, get_db_connection will be called by the decorator @_manage_conn
-    # However, if we want to use this function without the decorator in some specific cases,
-    # or if the decorator is not applied, we might need manual connection handling.
-    # For now, assuming @_manage_conn will handle the connection.
-    # If direct call (without decorator) is needed, conn must be passed.
-
-    # The @_manage_conn decorator handles the connection and cursor creation,
-    # and also commit/rollback and closing the connection.
-    # So, we just need to get the cursor from the conn and execute the query.
-
-    if conn is None:
-        # This case should ideally be handled by @_manage_conn
-        # or the calling function should ensure conn is provided if not using the decorator.
-        logging.error("Database connection not provided to add_status_setting.")
-        # Attempt to establish a connection if none is provided and not managed by decorator
-        # This is a fallback, ideally connection is managed by decorator or passed explicitly
-        try:
-            conn = get_db_connection()
-            if conn is None:
-                logging.error("Failed to establish a fallback database connection.")
-                return False
-            # We are not in a managed context here, so manual commit/close would be needed.
-            # This path is getting complex and indicates a potential design issue
-            # if the decorator is not consistently used.
-            # For simplicity, let's rely on the decorator or explicit passing of 'conn'.
-            # If decorator is not used, the caller MUST pass an active connection.
-        except Exception as e:
-            logging.error(f"Error establishing fallback connection: {e}")
-            return False
-
-        # If we manually created a connection, we need to manually manage it.
-        # This is not ideal. The decorator @_manage_conn is preferred.
-        manual_connection_management = True
-    else:
-        manual_connection_management = False
+    # The @_manage_conn decorator handles the connection, cursor creation,
+    # commit/rollback, and closing the connection.
+    # The `conn` parameter is provided by the decorator.
 
     try:
         cur = conn.cursor()
         sql = """INSERT INTO StatusSettings (status_name, status_type, color_hex, sort_order)
                  VALUES (?, ?, ?, ?)"""
         cur.execute(sql, (status_name, status_type, color_hex, sort_order))
-
-        if manual_connection_management:
-            conn.commit()
+        # commit is handled by _manage_conn
 
         last_id = cur.lastrowid
-        cur.close() # Close cursor
+        # cur.close() # cursor closing might be handled by _manage_conn or when conn closes
         return last_id if last_id is not None else True # lastrowid is None if no row was inserted or backend doesn't support it well, but True indicates it likely worked if no error
     except sqlite3.Error as e:
         logging.error(f"Database error in add_status_setting for '{status_name}'/'{status_type}': {e}")
-        if manual_connection_management and conn:
-            conn.rollback()
+        # rollback is handled by _manage_conn
         return False
-    finally:
-        if manual_connection_management and conn:
-            conn.close()
+    # finally: # connection closing handled by _manage_conn
 
 
 @_manage_conn

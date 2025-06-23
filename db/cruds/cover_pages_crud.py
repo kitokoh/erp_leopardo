@@ -2,7 +2,7 @@ import sqlite3
 import uuid
 import json # For custom_style_config_json
 from datetime import datetime
-from .generic_crud import _manage_conn, get_db_connection
+from .generic_crud import _manage_conn # get_db_connection is not used directly
 import logging
 
 # --- CoverPages CRUD ---

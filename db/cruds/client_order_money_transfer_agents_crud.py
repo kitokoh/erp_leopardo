@@ -5,11 +5,12 @@ import logging
 from typing import List, Dict, Optional, Any
 
 # Ensure get_db_connection can be resolved.
-# Assuming it's in ..utils relative to the cruds directory.
+# Assuming it's in ..connection relative to the cruds directory.
 try:
-    from ..utils import get_db_connection
+    from ..connection import get_db_connection # Corrected import path
 except ImportError:
-    logging.critical("Failed to import get_db_connection from ..utils. This is a critical error for client_order_money_transfer_agents_crud.")
+    # This block should ideally not be hit if db/connection.py is present and correct
+    logging.critical("Failed to import get_db_connection from ..connection. This is a critical error for client_order_money_transfer_agents_crud.")
     # Fallback or re-raise, depending on desired behavior when setup is incorrect.
     # For now, let it fail loudly if get_db_connection is not found.
     raise
