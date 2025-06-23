@@ -20,7 +20,7 @@ except ImportError:
         APP_ROOT_DIR = project_root # Best guess fallback
     config = config_fallback_templates
 
-from .generic_crud import _manage_conn, get_db_connection # db_config removed from this import
+from .generic_crud import _manage_conn # get_db_connection is not used directly
 from .template_categories_crud import add_template_category, get_template_category_by_name
 from .application_settings_crud import get_setting # Added for visibility check
 
@@ -417,8 +417,12 @@ def get_all_templates(
 
     fetched_templates = []
     try:
+        logging.info(f"Executing get_all_templates SQL: {sql} with params: {params}")
         cursor.execute(sql, tuple(params))
         fetched_templates = [dict(row) for row in cursor.fetchall()]
+        logging.info(f"Raw templates fetched from DB (before visibility filter): {len(fetched_templates)}")
+        if len(fetched_templates) < 10 and fetched_templates: # Log details only if few rows, to avoid log spam
+            logging.info(f"Raw templates details: {fetched_templates}")
     except sqlite3.Error as e:
         logging.error(
             f"Failed to get all templates with filters type='{template_type_filter if not template_type_filter_list else template_type_filter_list}', "

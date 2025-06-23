@@ -1,0 +1,239 @@
+from sqlalchemy.orm import Session
+from sqlalchemy import select, update, delete, and_
+from typing import List, Optional, Type, TypeVar, Generic, Any, Dict
+from decimal import Decimal
+import uuid
+
+from . import models
+# Assuming your Pydantic models are also in models.py for now
+# from .models import (ChartOfAccountsCreate, ChartOfAccountsUpdate,
+#                      JournalEntryCreate, JournalEntryUpdate, /* etc. */)
+
+# Generic CRUD base (optional, but can reduce boilerplate)
+ModelType = TypeVar("ModelType", bound=models.Base)
+CreateSchemaType = TypeVar("CreateSchemaType", bound=models.BaseModel)
+UpdateSchemaType = TypeVar("UpdateSchemaType", bound=models.BaseModel)
+
+class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
+    def __init__(self, model: Type[ModelType]):
+        self.model = model
+
+    def get(self, db: Session, id: Any) -> Optional[ModelType]:
+        return db.query(self.model).filter(self.model.id == id).first()
+
+    def get_multi(
+        self, db: Session, *, skip: int = 0, limit: int = 100
+    ) -> List[ModelType]:
+        return db.query(self.model).offset(skip).limit(limit).all()
+
+    def create(self, db: Session, *, obj_in: CreateSchemaType) -> ModelType:
+        obj_in_data = obj_in.model_dump()
+        db_obj = self.model(**obj_in_data)
+        db.add(db_obj)
+        db.commit()
+        db.refresh(db_obj)
+        return db_obj
+
+    def update(
+        self, db: Session, *, db_obj: ModelType, obj_in: UpdateSchemaType | dict[str, Any]
+    ) -> ModelType:
+        obj_data = db_obj.__dict__ # Get existing data
+        if isinstance(obj_in, dict):
+            update_data = obj_in
+        else:
+            update_data = obj_in.model_dump(exclude_unset=True)
+        for field in obj_data:
+            if field in update_data:
+                setattr(db_obj, field, update_data[field])
+        db.add(db_obj)
+        db.commit()
+        db.refresh(db_obj)
+        return db_obj
+
+    def remove(self, db: Session, *, id: Any) -> ModelType | None: # Changed to Any for ID type flexibility
+        obj = db.query(self.model).get(id)
+        if obj:
+            db.delete(obj)
+            db.commit()
+        return obj
+
+# --- FiscalYear CRUD ---
+class CRUDFiscalYear(CRUDBase[models.FiscalYear, models.FiscalYearCreate, models.FiscalYearUpdate]):
+    def get_by_name(self, db: Session, *, name: str) -> Optional[models.FiscalYear]:
+        return db.query(self.model).filter(self.model.name == name).first()
+
+    def get_by_date(self, db: Session, *, target_date: models.date) -> Optional[models.FiscalYear]:
+        return db.query(self.model).filter(
+            self.model.start_date <= target_date,
+            self.model.end_date >= target_date
+        ).first()
+
+fiscal_year = CRUDFiscalYear(models.FiscalYear)
+
+# --- Currency CRUD ---
+class CRUDCurrency(CRUDBase[models.Currency, models.CurrencyCreate, models.CurrencyUpdate]):
+    def get(self, db: Session, id: str) -> Optional[models.Currency]: # Override ID type
+        return db.query(self.model).filter(self.model.code == id).first()
+
+    def get_base_currency(self, db: Session) -> Optional[models.Currency]:
+        return db.query(self.model).filter(self.model.is_base_currency == True).first()
+
+    def set_base_currency(self, db: Session, *, currency_code: str) -> Optional[models.Currency]:
+        # Ensure only one base currency
+        db.execute(update(self.model).values(is_base_currency=False))
+        target_currency = self.get(db, currency_code)
+        if target_currency:
+            target_currency.is_base_currency = True
+            db.commit()
+            db.refresh(target_currency)
+        return target_currency
+
+currency = CRUDCurrency(models.Currency)
+
+# --- TaxRate CRUD ---
+class CRUDTaxRate(CRUDBase[models.TaxRate, models.TaxRateCreate, models.TaxRateUpdate]):
+    def get_by_name(self, db: Session, *, name: str) -> Optional[models.TaxRate]:
+        return db.query(self.model).filter(self.model.name == name).first()
+
+tax_rate = CRUDTaxRate(models.TaxRate)
+
+# --- ChartOfAccounts CRUD ---
+class CRUDChartOfAccounts(CRUDBase[models.ChartOfAccounts, models.ChartOfAccountsCreate, models.ChartOfAccountsUpdate]):
+    def get_by_code(self, db: Session, *, code: str) -> Optional[models.ChartOfAccounts]:
+        return db.query(self.model).filter(self.model.code == code).first()
+
+    def get_children(self, db: Session, *, parent_id: str) -> List[models.ChartOfAccounts]:
+        return db.query(self.model).filter(self.model.parent_id == parent_id).all()
+
+chart_of_accounts = CRUDChartOfAccounts(models.ChartOfAccounts)
+
+
+# --- JournalEntry and JournalItem CRUD ---
+# JournalEntry creation involves JournalItems, so it's more complex than base CRUD
+class CRUDJournalEntry(CRUDBase[models.JournalEntry, models.JournalEntryCreate, models.JournalEntryUpdate]):
+
+    def create_with_items(self, db: Session, *, obj_in: models.JournalEntryCreate) -> models.JournalEntry:
+        # Validate items (debits == credits) - This should ideally be in a service layer or Pydantic model validator
+        total_debits = sum(item.debit_amount for item in obj_in.items)
+        total_credits = sum(item.credit_amount for item in obj_in.items)
+        if total_debits != total_credits:
+            raise ValueError("Total debits must equal total credits for the journal entry.")
+        if not obj_in.items:
+            raise ValueError("Journal entry must have at least one item.")
+        for item_in in obj_in.items:
+            if item_in.debit_amount < 0 or item_in.credit_amount < 0:
+                 raise ValueError("Debit and credit amounts cannot be negative.")
+            if item_in.debit_amount > 0 and item_in.credit_amount > 0:
+                raise ValueError("An item cannot have both debit and credit amounts.")
+
+        # Create JournalEntry
+        journal_entry_data = obj_in.model_dump(exclude={'items'})
+        db_journal_entry = models.JournalEntry(**journal_entry_data)
+        db.add(db_journal_entry)
+        # We need to commit here if JournalItem has FK to JournalEntry and ID is generated by DB
+        # Or, if using UUIDs generated by app, we can add items then commit once.
+        # Assuming UUIDs are app-generated or FK is deferrable / items added before commit.
+        # For simplicity now, let's assume we can add items before final commit.
+
+        # Create JournalItems
+        for item_in in obj_in.items:
+            item_data = item_in.model_dump()
+            db_item = models.JournalItem(**item_data, journal_entry_id=db_journal_entry.id) # Link item to entry
+            db_journal_entry.items.append(db_item) # Add to relationship for ORM convenience
+            # db.add(db_item) # Not strictly necessary if using cascade and relationship append
+
+        db.commit()
+        db.refresh(db_journal_entry)
+        # db.refresh each item if needed, but usually refreshing parent is enough if items are loaded via relationship
+        return db_journal_entry
+
+    def get_entries_for_period(self, db: Session, *, start_date: models.date, end_date: models.date) -> List[models.JournalEntry]:
+        return db.query(self.model).filter(
+            self.model.entry_date >= start_date,
+            self.model.entry_date <= end_date
+        ).order_by(self.model.entry_date).all()
+
+journal_entry = CRUDJournalEntry(models.JournalEntry)
+
+# JournalItem CRUD might be mostly managed via JournalEntry, but basic standalone ops can be useful
+class CRUDJournalItem(CRUDBase[models.JournalItem, models.JournalItemCreate, models.BaseModel]): # Update might not be typical
+    def get_items_for_entry(self, db: Session, *, journal_entry_id: str) -> List[models.JournalItem]:
+        return db.query(self.model).filter(self.model.journal_entry_id == journal_entry_id).all()
+
+    def get_items_for_account(self, db: Session, *, account_id: str, start_date: Optional[models.date]=None, end_date: Optional[models.date]=None) -> List[models.JournalItem]:
+        query = db.query(models.JournalItem).join(models.JournalEntry).filter(models.JournalItem.account_id == account_id)
+        if start_date:
+            query = query.filter(models.JournalEntry.entry_date >= start_date)
+        if end_date:
+            query = query.filter(models.JournalEntry.entry_date <= end_date)
+        return query.order_by(models.JournalEntry.entry_date).all()
+
+journal_item = CRUDJournalItem(models.JournalItem)
+
+
+# --- FinancialStatement CRUD ---
+class CRUDFinancialStatement(CRUDBase[models.FinancialStatement, models.FinancialStatementCreate, models.FinancialStatementUpdate]):
+    def get_by_type_and_period(self, db: Session, *,
+                               statement_type: models.FinancialStatementTypeEnum,
+                               fiscal_year_id: str,
+                               period_end_date: models.date) -> Optional[models.FinancialStatement]:
+        return db.query(self.model).filter(
+            self.model.statement_type == statement_type,
+            self.model.fiscal_year_id == fiscal_year_id,
+            self.model.period_end_date == period_end_date
+        ).first()
+
+financial_statement = CRUDFinancialStatement(models.FinancialStatement)
+
+
+# --- Reporting Functions (Examples) ---
+
+def get_trial_balance(db: Session, fiscal_year_id: str, until_date: models.date) -> List[Dict[str, Any]]:
+    """
+    Generates a simple trial balance.
+    Returns a list of dictionaries: {'account_code', 'account_name', 'total_debit', 'total_credit', 'balance'}
+    """
+    # This is a simplified example. A real trial balance requires careful summation.
+    # It might be better to use raw SQL for performance on large datasets.
+
+    stmt = (
+        select(
+            models.ChartOfAccounts.code.label("account_code"),
+            models.ChartOfAccounts.name.label("account_name"),
+            models.ChartOfAccounts.account_type,
+            func.sum(models.JournalItem.debit_amount).label("total_debit"),
+            func.sum(models.JournalItem.credit_amount).label("total_credit"),
+        )
+        .join(models.JournalItem.account)
+        .join(models.JournalItem.journal_entry)
+        .filter(models.JournalEntry.fiscal_year_id == fiscal_year_id)
+        .filter(models.JournalEntry.entry_date <= until_date)
+        .group_by(models.ChartOfAccounts.id, models.ChartOfAccounts.code, models.ChartOfAccounts.name, models.ChartOfAccounts.account_type)
+        .order_by(models.ChartOfAccounts.code)
+    )
+    results = db.execute(stmt).all()
+
+    trial_balance_data = []
+    for row in results:
+        debit = row.total_debit or Decimal("0.00")
+        credit = row.total_credit or Decimal("0.00")
+        balance = debit - credit # General calculation; specific account types might invert this
+
+        # Adjust balance sign based on typical account type behavior
+        # Assets & Expenses typically have debit balances
+        # Liabilities, Equity, Revenue typically have credit balances (so debit - credit would be negative)
+        if row.account_type in (models.AccountTypeEnum.LIABILITY, models.AccountTypeEnum.EQUITY, models.AccountTypeEnum.REVENUE, models.AccountTypeEnum.OTHER_INCOME):
+            balance = credit - debit # Show as positive if it's a credit balance
+
+        trial_balance_data.append({
+            "account_code": row.account_code,
+            "account_name": row.account_name,
+            "account_type": row.account_type.value,
+            "total_debit": debit,
+            "total_credit": credit,
+            "balance": balance,
+        })
+    return trial_balance_data
+
+# Placeholder for other report functions like Balance Sheet, P&L, etc.
+# These would require more complex logic to correctly categorize accounts and sum them up.

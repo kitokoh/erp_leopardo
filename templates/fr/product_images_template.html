@@ -2,80 +2,37 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Images des Produits</title>
+    <title>{{ lang.product_images_title }} - {{ client_name }}</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        .logo-container {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .logo {
-            max-width: 150px;
-            height: auto;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
-        .product-image {
-            max-width: 100px;
-            height: auto;
-        }
+        body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
+        .product-grid { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
+        .product-card { border: 1px solid #ddd; border-radius: 8px; padding: 15px; width: 200px; text-align: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); }
+        .product-card img { max-width: 100%; height: auto; max-height: 150px; margin-bottom: 10px; border-radius: 4px; }
+        .product-card h3 { font-size: 1.1em; margin: 10px 0 5px 0; color: #0056b3; }
+        .product-card p { font-size: 0.9em; margin: 5px 0; }
     </style>
 </head>
 <body>
-    <div class="logo-container">
-        <!-- Placeholder for company logo. The 'seller.company_logo_path' variable should be provided in the context -->
-        {% if seller.company_logo_path %}
-            <img src="{{ seller.company_logo_path }}" alt="Company Logo" class="logo">
-        {% else %}
-            <p>(Logo de l'entreprise)</p>
-        {% endif %}
+    <h1>{{ lang.product_images_header }}</h1>
+    <p><strong>{{ lang.client_label }}:</strong> {{ client_name }}</p>
+    {{#if project_name}}
+    <p><strong>{{ lang.project_label }}:</strong> {{ project_name }}</p>
+    {{/if}}
+    <hr>
+    <div class="product-grid">
+        {{#each products}}
+        <div class="product-card">
+            {{#if main_image_path}}
+            <img src="{{ main_image_path }}" alt="{{ name }}">
+            {{else}}
+            <p><em>{{ ../lang.no_image_available }}</em></p>
+            {{/if}}
+            <h3>{{ name }}</h3>
+            <p><strong>{{ ../lang.code_label }}:</strong> {{ code }}</p>
+        </div>
+        {{else}}
+        <p>{{ ../lang.no_products_to_display }}</p>
+        {{/each}}
     </div>
-
-    <h1>Liste des Images des Produits</h1>
-
-    <table>
-        <thead>
-            <tr>
-                <th>Image Produit</th>
-                <th>Nom Produit</th>
-                <th>Code Produit</th>
-            </tr>
-        </thead>
-        <tbody>
-            <!-- Loop through products. The 'products' variable should be a list of product objects provided in the context -->
-            <!-- Each product object should have 'image_url', 'name', and 'code' attributes -->
-            {% for product in products %}
-            <tr>
-                <td>
-                    {% if product.image_url %}
-                        <img src="{{ product.image_url }}" alt="Image de {{ product.name }}" class="product-image">
-                    {% else %}
-                        <span>(Pas d'image)</span>
-                    {% endif %}
-                </td>
-                <td>{{ product.name }}</td>
-                <td>{{ product.code }}</td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="3" style="text-align:center;">Aucun produit à afficher.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
 </body>
 </html>
