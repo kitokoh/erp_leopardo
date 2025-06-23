@@ -84,15 +84,16 @@ def _import_main_elements():
 class ClientWidget(QWidget):
     CONTACT_PAGE_LIMIT = 15 # Class attribute for page limit
 
-    def __init__(self, client_info, config, app_root_dir, notification_manager, parent=None): # Add notification_manager
+    def __init__(self, client_info, config, app_root_dir, notification_manager, current_user_id, parent=None): # Add current_user_id
         super().__init__(parent)
-        logging.info(f"ClientWidget.__init__: INSTANTIATION STARTED for client_id={client_info.get('client_id')}")
+        logging.info(f"ClientWidget.__init__: INSTANTIATION STARTED for client_id={client_info.get('client_id')}, user_id={current_user_id}")
         logging.info(f"ClientWidget.__init__: Received client_info: {client_info}")
-        logging.info(f"ClientWidget initialized with client_info: {client_info}")
+        # logging.info(f"ClientWidget initialized with client_info: {client_info}") # Redundant with above
         logging.info(f"ClientWidget __init__: client_id={client_info.get('client_id')}, client_name={client_info.get('client_name')}")
         self.client_info = client_info
-        self.notification_manager = notification_manager # Store notification_manager
-        # self.config = config # Original config passed
+        self.notification_manager = notification_manager
+        self.current_user_id = current_user_id # Store current_user_id
+        # self.config = config # Original config passed, will be set by _import_main_elements
 
         # Dynamically import main elements to avoid circular import at module load time
         logging.info("ClientWidget.__init__: Calling _import_main_elements()...")
@@ -3110,11 +3111,11 @@ class ClientWidget(QWidget):
                     if current_order_data not in ["ALL", "NONE"]:
                         order_identifier = current_order_data
 
-                created_by_user_id = None # ClientWidget does not have self.current_user_id
+                # created_by_user_id = None # ClientWidget does not have self.current_user_id - Now it does
                 notes = None
                 version_tag = "1.0"
 
-                doc_db_data = {
+                doc_db_data_for_crud = {
                     "client_id": client_id,
                     "document_name": document_name,
                     "file_name_on_disk": file_name_on_disk,
@@ -3123,15 +3124,15 @@ class ClientWidget(QWidget):
                     "language_code": language_code,
                     "source_template_id": source_template_id,
                     "order_identifier": order_identifier,
-                    "created_by_user_id": created_by_user_id, # Corrected key for db_manager
+                    "user_id": self.current_user_id, # Use the stored current_user_id
                     "notes": notes,
                     "version_tag": version_tag,
                     # project_id is not explicitly gathered here, will be None if not in dict
                 }
                 # The key in add_client_document is 'user_id', not 'created_by_user_id'
                 # Let's adjust doc_db_data to use 'user_id' for the CRUD function based on its definition.
-                doc_db_data_for_crud = doc_db_data.copy()
-                doc_db_data_for_crud['user_id'] = doc_db_data_for_crud.pop('created_by_user_id')
+                # doc_db_data_for_crud = doc_db_data.copy() # No longer needed, dict created directly
+                # doc_db_data_for_crud['user_id'] = doc_db_data_for_crud.pop('created_by_user_id') # No longer needed
 
 
                 db_success = False
@@ -4330,6 +4331,28 @@ class ClientWidget(QWidget):
 
             if products_list_data or processed_count > 0:
                 self.load_products()
+
+                # After products are added and table reloaded, update client's total price
+                client_uuid = self.client_info.get("client_id")
+                if client_uuid:
+                    try:
+                        linked_prods = db_manager.get_products_for_client_or_project(client_uuid, project_id=None)
+                        if linked_prods is None: linked_prods = []
+                        new_total_client_price = sum(
+                            p.get('total_price_calculated', 0.0) for p in linked_prods if p.get('total_price_calculated') is not None
+                        )
+
+                        if db_manager.update_client(client_uuid, {'price': new_total_client_price}):
+                            self.client_info['price'] = new_total_client_price
+                            logging.info(f"Client {client_uuid} total price updated to {new_total_client_price} after adding product(s).")
+                            # Refresh the main details display if not in edit mode
+                            if not self.is_editing_client and hasattr(self, 'populate_details_layout'):
+                                self.populate_details_layout()
+                        else:
+                            logging.error(f"Failed to update client {client_uuid} total price in DB after adding product(s).")
+                    except Exception as e:
+                        logging.error(f"Error updating client total price after adding product(s) for client {client_uuid}: {e}", exc_info=True)
+
 
     def edit_product(self):
         selected_row = self.products_table.currentRow();

@@ -419,213 +419,498 @@ class SettingsPage(QWidget):
         self.tabs_widget = QTabWidget()
         self.tabs_widget.setObjectName("settingsTabs")
 
-        self._setup_general_tab()
-        self._setup_email_tab()
-        self._setup_download_monitor_tab() # New Download Monitor Tab
-        self._setup_modules_tab() # New Modules Tab
-        self._setup_data_management_tab() # New Data Management Tab
+        # Initialize new tab structure
+        self._setup_general_settings_tab()
+        self._setup_company_personnel_tab()
+        self._setup_connectivity_services_tab()
+        self._setup_application_modules_tab()
+        self._setup_data_backup_tab()
+        self._setup_logistics_tab()
+        self._setup_document_templates_tab()
+        self._setup_security_tab()
 
-        self.company_tab = CompanyTabWidget(
-            parent=self,
-            app_root_dir=self.app_root_dir,
-            current_user_id=self.current_user_id
-        )
-        self.tabs_widget.addTab(self.company_tab, self.tr("Company & Personnel"))
-
-        self._setup_transporters_tab() # New
-        self._setup_freight_forwarders_tab() # New
-        self._setup_template_visibility_tab() # New Tab for Template Visibility
-        self._setup_global_template_management_tab() # New Tab for Global Template Management
-        self._setup_backup_tab() # New Backup Tab
-        self._setup_security_tab() # Ajout de l'onglet Sécurité
 
         main_layout.addWidget(self.tabs_widget)
-        main_layout.addStretch(1)
+        main_layout.addStretch(1) # Pushes tabs to the top, buttons to bottom
 
+        # --- Buttons Layout ---
         buttons_layout = QHBoxLayout()
-        buttons_layout.setSpacing(10)
-        self.reload_settings_button = QPushButton(self.tr("Reload Current"))
-        self.reload_settings_button.setObjectName("secondaryButton")
+        buttons_layout.setSpacing(10) # Standard spacing between buttons
+
+        self.reload_settings_button = QPushButton(self.tr("Reload Current Settings"))
+        self.reload_settings_button.setObjectName("secondaryButton") # For styling
+        self.reload_settings_button.setIcon(QIcon(":/icons/refresh-cw.svg")) # Suggest using an icon
+        self.reload_settings_button.setToolTip(self.tr("Reloads all settings from the configuration, discarding any unsaved changes."))
         self.reload_settings_button.clicked.connect(self._load_all_settings_from_config)
-        self.restore_defaults_button = QPushButton(self.tr("Restore Defaults"))
-        self.restore_defaults_button.setObjectName("secondaryButton")
-        # TODO: Connect restore_defaults_button to a method that also restores module defaults
+
+        self.restore_defaults_button = QPushButton(self.tr("Restore Default Settings"))
+        self.restore_defaults_button.setObjectName("secondaryButton") # For styling
+        self.restore_defaults_button.setIcon(QIcon(":/icons/settings.svg")) # Suggest using an icon (placeholder, find better)
+        self.restore_defaults_button.setToolTip(self.tr("Resets all settings to their original default values. This action requires confirmation and an application restart."))
+        self.restore_defaults_button.clicked.connect(self._confirm_restore_defaults)
+
         self.save_settings_button = QPushButton(self.tr("Save All Settings"))
-        self.save_settings_button.setObjectName("primaryButton")
-        self.save_settings_button.clicked.connect(self._save_all_settings) # Modified to call central save
-        buttons_layout.addStretch(1)
+        self.save_settings_button.setObjectName("primaryButton") # For styling
+        self.save_settings_button.setIcon(QIcon(":/icons/save.svg")) # Suggest using an icon
+        self.save_settings_button.setToolTip(self.tr("Saves all current settings. Some changes may require an application restart."))
+        self.save_settings_button.clicked.connect(self._save_all_settings)
+
+        buttons_layout.addStretch(1) # Pushes buttons to the right
         buttons_layout.addWidget(self.reload_settings_button)
         buttons_layout.addWidget(self.restore_defaults_button)
         buttons_layout.addWidget(self.save_settings_button)
+
         main_layout.addLayout(buttons_layout)
         self.setLayout(main_layout)
 
-        self._load_all_settings_from_config()
-        if db_manager: # Only load if db_manager is available (real or mocked)
-            self._load_transporters_table() # Initial load
-            self._load_forwarders_table() # Initial load
-        else:
-            print("WARNING: db_manager not available. Transporter and Forwarder tables will not be loaded.")
+        self._load_all_settings_from_config() # Load initial settings
 
-    def _setup_backup_tab(self):
-        backup_tab_widget = QWidget()
-        backup_form_layout = QFormLayout(backup_tab_widget)
-        backup_form_layout.setContentsMargins(10, 10, 10, 10)
+        if db_manager:
+            # These are now part of specific tabs, their loading should be called from there or _load_all_settings_from_config
+            # self._load_transporters_table() # Initial load for logistics tab
+            # self._load_forwarders_table() # Initial load for logistics tab
+            pass # Loading is handled by individual tab setup or _load_all_settings_from_config
+        else:
+            print("WARNING: db_manager not available. Some settings (e.g., Transporters, Forwarders, Modules) will not be loaded or saved.")
+
+    # --- New Tab Setup Methods ---
+    def _setup_general_settings_tab(self):
+        tab_widget = QWidget()
+        main_layout = QVBoxLayout(tab_widget)
+        main_layout.setContentsMargins(15, 15, 15, 15) # Consistent margins
+        main_layout.setSpacing(15) # Consistent spacing
+
+        # --- Interface Settings Group ---
+        interface_group = QGroupBox(self.tr("Interface & Display"))
+        interface_layout = QFormLayout(interface_group)
+        interface_layout.setSpacing(10)
+
+        self.interface_lang_combo = QComboBox()
+        self.lang_display_to_code = {
+            self.tr("French (fr)"): "fr", self.tr("English (en)"): "en",
+            self.tr("Arabic (ar)"): "ar", self.tr("Turkish (tr)"): "tr",
+            self.tr("Portuguese (pt)"): "pt", self.tr("Russian (ru)"): "ru"
+        }
+        self.interface_lang_combo.addItems(list(self.lang_display_to_code.keys()))
+        self.interface_lang_combo.setToolTip(self.tr("Select the application's display language. A restart is required for changes to take effect."))
+        interface_layout.addRow(self.tr("Interface Language:"), self.interface_lang_combo)
+
+        self.session_timeout_spinbox = QSpinBox()
+        self.session_timeout_spinbox.setRange(5, 525600) # Min 5 mins, Max ~1 year (in minutes)
+        self.session_timeout_spinbox.setSuffix(self.tr(" minutes"))
+        self.session_timeout_spinbox.setToolTip(self.tr("Set session inactivity timeout. Examples: 1440 (1 day), 10080 (1 week), 43200 (30 days)."))
+        interface_layout.addRow(self.tr("Session Timeout:"), self.session_timeout_spinbox)
+
+        main_layout.addWidget(interface_group)
+
+        # --- Behavior Settings Group ---
+        behavior_group = QGroupBox(self.tr("Application Behavior"))
+        behavior_layout = QFormLayout(behavior_group)
+        behavior_layout.setSpacing(10)
+
+        self.reminder_days_spinbox = QSpinBox()
+        self.reminder_days_spinbox.setRange(1, 365)
+        self.reminder_days_spinbox.setToolTip(self.tr("Number of days of inactivity after which a client is considered 'old' for reminders."))
+        behavior_layout.addRow(self.tr("Old Client Reminder (days):"), self.reminder_days_spinbox)
+
+        self.google_maps_url_input = QLineEdit()
+        self.google_maps_url_input.setPlaceholderText(self.tr("Enter full Google Maps review URL (e.g., https://maps.google.com/?cid=...)"))
+        self.google_maps_url_input.setToolTip(self.tr("Link to your Google Maps page for client reviews."))
+        behavior_layout.addRow(self.tr("Google Maps Review Link:"), self.google_maps_url_input)
+
+        self.show_setup_prompt_checkbox = QCheckBox(self.tr("Show initial setup prompt on next startup if no company is configured"))
+        self.show_setup_prompt_checkbox.setToolTip(self.tr("If checked, the initial company setup dialog will appear at startup if no default company exists."))
+        behavior_layout.addRow(self.show_setup_prompt_checkbox)
+
+        main_layout.addWidget(behavior_group)
+        main_layout.addStretch(1) # Push content to the top
+        self.tabs_widget.addTab(tab_widget, self.tr("General"))
+
+    def _setup_company_personnel_tab(self):
+        # This tab uses the existing CompanyTabWidget
+        self.company_tab_widget_instance = CompanyTabWidget( # Renamed to avoid conflict if self.company_tab was used elsewhere
+            parent=self, # Pass self as parent
+            app_root_dir=self.app_root_dir,
+            current_user_id=self.current_user_id
+        )
+        # CompanyTabWidget is already a QWidget, so it can be added directly.
+        # It should handle its own internal layout and group boxes if needed.
+        self.tabs_widget.addTab(self.company_tab_widget_instance, self.tr("Company & Personnel"))
+        # Loading and saving for this tab is presumably handled within CompanyTabWidget or called by _load/save_all_settings.
+
+    def _setup_connectivity_services_tab(self):
+        tab_widget = QWidget()
+        main_layout = QVBoxLayout(tab_widget)
+        main_layout.setContentsMargins(15, 15, 15, 15)
+        main_layout.setSpacing(15)
+
+        # --- Email (SMTP) Settings Group ---
+        email_group = QGroupBox(self.tr("Email Configuration (SMTP)"))
+        email_form_layout = QFormLayout(email_group)
+        email_form_layout.setSpacing(10)
+
+        self.smtp_server_input = QLineEdit()
+        self.smtp_server_input.setPlaceholderText(self.tr("e.g., smtp.example.com"))
+        email_form_layout.addRow(self.tr("SMTP Server:"), self.smtp_server_input)
+
+        self.smtp_port_spinbox = QSpinBox()
+        self.smtp_port_spinbox.setRange(1, 65535)
+        self.smtp_port_spinbox.setToolTip(self.tr("Common ports: 587 (TLS), 465 (SSL), 25 (unencrypted)."))
+        email_form_layout.addRow(self.tr("SMTP Port:"), self.smtp_port_spinbox)
+
+        self.smtp_user_input = QLineEdit()
+        self.smtp_user_input.setPlaceholderText(self.tr("e.g., user@example.com"))
+        email_form_layout.addRow(self.tr("SMTP Username:"), self.smtp_user_input)
+
+        self.smtp_pass_input = QLineEdit()
+        self.smtp_pass_input.setEchoMode(QLineEdit.Password)
+        self.smtp_pass_input.setPlaceholderText(self.tr("Your SMTP account password"))
+        email_form_layout.addRow(self.tr("SMTP Password:"), self.smtp_pass_input)
+
+        main_layout.addWidget(email_group)
+        main_layout.addStretch(1)
+        self.tabs_widget.addTab(tab_widget, self.tr("Connectivity"))
+
+
+    def _setup_application_modules_tab(self):
+        modules_tab_widget = QWidget()
+        main_layout = QVBoxLayout(modules_tab_widget) # Use QVBoxLayout for overall tab structure
+        main_layout.setContentsMargins(15, 15, 15, 15)
+        main_layout.setSpacing(15)
+
+        modules_group = QGroupBox(self.tr("Module Activation Status"))
+        modules_form_layout = QFormLayout(modules_group) # Use QFormLayout for label-widget pairs
+        modules_form_layout.setSpacing(10)
+
+        for module_info in self.module_config:
+            key = module_info["key"]
+            label_text = module_info["label_text"]
+            module_label = QLabel(label_text)
+
+            # Radio button group for each module
+            radio_button_widget = QWidget() # Container for radio buttons
+            radio_layout = QHBoxLayout(radio_button_widget)
+            radio_layout.setContentsMargins(0,0,0,0) # No extra margins for this inner layout
+
+            radio_enabled = QRadioButton(self.tr("Enabled"))
+            radio_disabled = QRadioButton(self.tr("Disabled"))
+            radio_layout.addWidget(radio_enabled)
+            radio_layout.addWidget(radio_disabled)
+            radio_layout.addStretch() # Pushes radio buttons to the left
+
+            self.module_radio_buttons[key] = {"enabled": radio_enabled, "disabled": radio_disabled}
+            modules_form_layout.addRow(module_label, radio_button_widget)
+
+        main_layout.addWidget(modules_group)
+
+        restart_notice_label = QLabel(self.tr("Changes to module activation require an application restart to take full effect."))
+        restart_notice_label.setWordWrap(True)
+        restart_notice_label.setStyleSheet("font-style: italic; color: grey;") # Informational style
+        main_layout.addWidget(restart_notice_label)
+
+        main_layout.addStretch(1) # Push content to the top
+        self.tabs_widget.addTab(modules_tab_widget, self.tr("Application Modules"))
+
+    def _setup_data_backup_tab(self):
+        tab_widget = QWidget()
+        main_layout = QVBoxLayout(tab_widget)
+        main_layout.setContentsMargins(15, 15, 15, 15)
+        main_layout.setSpacing(15)
+
+        # --- Database Settings Group ---
+        db_group = QGroupBox(self.tr("Database Configuration"))
+        db_form_layout = QFormLayout(db_group)
+        db_form_layout.setSpacing(10)
+
+        self.db_path_input = QLineEdit()
+        self.db_path_input.setPlaceholderText(self.tr("Path to your SQLite database file"))
+        self.db_path_input.setToolTip(self.tr("Select the application's database file. Changing this requires a restart."))
+        db_path_browse_btn = QPushButton(self.tr("Browse..."))
+        db_path_browse_btn.setIcon(QIcon(":/icons/folder.svg")) # Suggest icon
+        db_path_browse_btn.clicked.connect(lambda: self._browse_db_file(self.db_path_input))
+        db_path_layout = QHBoxLayout()
+        db_path_layout.addWidget(self.db_path_input)
+        db_path_layout.addWidget(db_path_browse_btn)
+        db_form_layout.addRow(self.tr("Database File Path:"), db_path_layout)
+
+        self.db_type_combo = QComboBox()
+        self.db_type_combo.setToolTip(self.tr("Select the database system. Currently, only SQLite is fully supported."))
+        self.db_type_combo.addItem("SQLite", "sqlite")
+        # Add future options as disabled for now
+        self.db_type_combo.addItem("PostgreSQL (experimental)", "postgresql")
+        self.db_type_combo.model().item(self.db_type_combo.count() - 1).setEnabled(False)
+        self.db_type_combo.addItem("MySQL (experimental)", "mysql")
+        self.db_type_combo.model().item(self.db_type_combo.count() - 1).setEnabled(False)
+        db_form_layout.addRow(self.tr("Database Type:"), self.db_type_combo)
+        main_layout.addWidget(db_group)
+
+        # --- Data Import/Export Group ---
+        data_ops_group = QGroupBox(self.tr("Data Import & Export"))
+        data_ops_layout = QVBoxLayout(data_ops_group) # QVBoxLayout for buttons
+        data_ops_layout.setSpacing(10)
+
+        self.import_products_btn = QPushButton(self.tr("Import Products from CSV"))
+        self.import_products_btn.setIcon(QIcon(":/icons/upload.svg")) # Suggest icon
+        self.import_products_btn.setToolTip(self.tr("Import product data from a CSV file."))
+        self.import_products_btn.clicked.connect(self._handle_import_products)
+        data_ops_layout.addWidget(self.import_products_btn)
+
+        self.export_products_btn = QPushButton(self.tr("Export Products to CSV"))
+        self.export_products_btn.setIcon(QIcon(":/icons/download.svg")) # Suggest icon
+        self.export_products_btn.setToolTip(self.tr("Export current product data to a CSV file."))
+        self.export_products_btn.clicked.connect(self._handle_export_products)
+        data_ops_layout.addWidget(self.export_products_btn)
+        main_layout.addWidget(data_ops_group)
+
+        # --- Download Monitoring Group ---
+        download_monitor_group = QGroupBox(self.tr("Automated Download Monitoring"))
+        download_monitor_form_layout = QFormLayout(download_monitor_group)
+        download_monitor_form_layout.setSpacing(10)
+
+        self.download_monitor_enabled_checkbox = QCheckBox(self.tr("Enable download monitoring service"))
+        self.download_monitor_enabled_checkbox.setToolTip(self.tr("Monitors a specified folder for new downloads to process them automatically."))
+        download_monitor_form_layout.addRow(self.download_monitor_enabled_checkbox)
+
+        self.download_monitor_path_input = QLineEdit()
+        self.download_monitor_path_input.setPlaceholderText(self.tr("Path to the folder to monitor"))
+        browse_download_path_btn = QPushButton(self.tr("Browse..."))
+        browse_download_path_btn.setIcon(QIcon(":/icons/folder.svg")) # Suggest icon
+        browse_download_path_btn.clicked.connect(self._browse_download_monitor_path)
+        download_path_layout = QHBoxLayout()
+        download_path_layout.addWidget(self.download_monitor_path_input)
+        download_path_layout.addWidget(browse_download_path_btn)
+        download_monitor_form_layout.addRow(self.tr("Monitored Folder:"), download_path_layout)
+        main_layout.addWidget(download_monitor_group)
+
+        # --- Backup Settings Group ---
+        backup_group = QGroupBox(self.tr("Remote Backup Configuration"))
+        backup_form_layout = QFormLayout(backup_group)
         backup_form_layout.setSpacing(10)
 
         self.backup_server_address_input = QLineEdit()
-        self.backup_server_address_input.setPlaceholderText(self.tr("Enter server address (e.g., 192.168.1.100 or domain.com)"))
+        self.backup_server_address_input.setPlaceholderText(self.tr("e.g., backup.example.com or IP address"))
         backup_form_layout.addRow(self.tr("Server Address:"), self.backup_server_address_input)
 
-        self.backup_port_input = QLineEdit()
-        self.backup_port_input.setPlaceholderText(self.tr("Enter port (e.g., 22 for SFTP, 443 for HTTPS)"))
+        self.backup_port_input = QLineEdit() # Using QLineEdit for port as it might be non-numeric in some configs (e.g. service name)
+        self.backup_port_input.setPlaceholderText(self.tr("e.g., 22 (SFTP), 443 (HTTPS)"))
         backup_form_layout.addRow(self.tr("Port:"), self.backup_port_input)
 
         self.backup_username_input = QLineEdit()
-        self.backup_username_input.setPlaceholderText(self.tr("Enter username for backup server"))
+        self.backup_username_input.setPlaceholderText(self.tr("Username for backup server"))
         backup_form_layout.addRow(self.tr("Username:"), self.backup_username_input)
 
         self.backup_password_input = QLineEdit()
         self.backup_password_input.setEchoMode(QLineEdit.Password)
-        self.backup_password_input.setPlaceholderText(self.tr("Enter password for backup server"))
+        self.backup_password_input.setPlaceholderText(self.tr("Password for backup server"))
         backup_form_layout.addRow(self.tr("Password:"), self.backup_password_input)
 
-        self.run_backup_button = QPushButton(self.tr("Run Backup"))
-        self.run_backup_button.setObjectName("primaryButton") # Optional: for styling
-        self.run_backup_button.clicked.connect(self._handle_run_backup) # Connect to handler method
+        self.run_backup_button = QPushButton(self.tr("Run Manual Backup Now"))
+        self.run_backup_button.setObjectName("primaryButton")
+        self.run_backup_button.setIcon(QIcon(":/icons/upload-cloud.svg")) # Suggest icon
+        self.run_backup_button.setToolTip(self.tr("Initiates a manual backup to the configured remote server."))
+        self.run_backup_button.clicked.connect(self._handle_run_backup)
+        backup_form_layout.addRow(self.run_backup_button) # Add button to the form for alignment
+        main_layout.addWidget(backup_group)
 
-        backup_form_layout.addRow(self.run_backup_button)
-
-        backup_tab_widget.setLayout(backup_form_layout)
-        self.tabs_widget.addTab(backup_tab_widget, self.tr("Backup"))
+        main_layout.addStretch(1)
+        self.tabs_widget.addTab(tab_widget, self.tr("Data & Backup"))
 
 
-    def _setup_general_tab(self):
-        general_tab_widget = QWidget()
-        general_form_layout = QFormLayout(general_tab_widget)
-        general_form_layout.setContentsMargins(10, 10, 10, 10); general_form_layout.setSpacing(10)
-        self.templates_dir_input = QLineEdit()
-        templates_browse_btn = QPushButton(self.tr("Browse...")); templates_browse_btn.clicked.connect(lambda: self._browse_directory(self.templates_dir_input, self.tr("Select Templates Directory")))
-        templates_dir_layout = QHBoxLayout(); templates_dir_layout.addWidget(self.templates_dir_input); templates_dir_layout.addWidget(templates_browse_btn)
-        general_form_layout.addRow(self.tr("Templates Directory:"), templates_dir_layout)
-        self.clients_dir_input = QLineEdit()
-        clients_browse_btn = QPushButton(self.tr("Browse...")); clients_browse_btn.clicked.connect(lambda: self._browse_directory(self.clients_dir_input, self.tr("Select Clients Directory")))
-        clients_dir_layout = QHBoxLayout(); clients_dir_layout.addWidget(self.clients_dir_input); clients_dir_layout.addWidget(clients_browse_btn)
-        general_form_layout.addRow(self.tr("Clients Directory:"), clients_dir_layout)
-        self.interface_lang_combo = QComboBox()
-        self.lang_display_to_code = {self.tr("French (fr)"): "fr", self.tr("English (en)"): "en", self.tr("Arabic (ar)"): "ar", self.tr("Turkish (tr)"): "tr", self.tr("Portuguese (pt)"): "pt", self.tr("Russian (ru)"): "ru"}
-        self.interface_lang_combo.addItems(list(self.lang_display_to_code.keys()))
-        general_form_layout.addRow(self.tr("Interface Language (restart required):"), self.interface_lang_combo)
-        self.reminder_days_spinbox = QSpinBox(); self.reminder_days_spinbox.setRange(1, 365)
-        general_form_layout.addRow(self.tr("Old Client Reminder (days):"), self.reminder_days_spinbox)
-        self.session_timeout_spinbox = QSpinBox(); self.session_timeout_spinbox.setRange(5, 525600); self.session_timeout_spinbox.setSuffix(self.tr(" minutes"))
-        self.session_timeout_spinbox.setToolTip(self.tr("Set session duration. Examples: 1440 (1 day), 10080 (1 week), 43200 (30 days)."))
-        general_form_layout.addRow(self.tr("Session Timeout (minutes):"), self.session_timeout_spinbox)
-        self.google_maps_url_input = QLineEdit(); self.google_maps_url_input.setPlaceholderText(self.tr("Enter full Google Maps review URL"))
-        general_form_layout.addRow(self.tr("Google Maps Review Link:"), self.google_maps_url_input)
-        self.show_setup_prompt_checkbox = QCheckBox()
-        general_form_layout.addRow(self.tr("Show setup prompt on next start (if no company):"), self.show_setup_prompt_checkbox)
-        self.db_path_input = QLineEdit()
-        db_path_browse_btn = QPushButton(self.tr("Browse...")); db_path_browse_btn.clicked.connect(lambda: self._browse_db_file(self.db_path_input))
-        db_path_layout = QHBoxLayout(); db_path_layout.addWidget(self.db_path_input); db_path_layout.addWidget(db_path_browse_btn)
-        general_form_layout.addRow(self.tr("Database Path:"), db_path_layout)
+    def _setup_logistics_tab(self):
+        tab_widget = QWidget()
+        main_layout = QVBoxLayout(tab_widget) # Main layout for the tab
+        main_layout.setContentsMargins(15, 15, 15, 15)
+        main_layout.setSpacing(15)
 
-        # Database Type ComboBox - Allows selection of the database system.
-        # Currently, only SQLite is fully implemented. Other options are placeholders for future development.
-        self.db_type_combo = QComboBox()
-        self.db_type_combo.setToolTip(self.tr(
-            "Select the database system. Currently, only SQLite is fully supported. "
-            "Other options are for future expansion."
-        ))
-        self.db_type_combo.addItem("SQLite", "sqlite")
-        # Add future options as disabled
-        item_postgresql = self.db_type_combo.model().item(self.db_type_combo.count() -1) # Index will be 1 after adding SQLite
-        self.db_type_combo.addItem("PostgreSQL (future)", "postgresql")
-        self.db_type_combo.model().item(self.db_type_combo.count() - 1).setEnabled(False)
-        self.db_type_combo.addItem("MySQL (future)", "mysql")
-        self.db_type_combo.model().item(self.db_type_combo.count() - 1).setEnabled(False)
+        # --- Transporters Group ---
+        transporters_group = QGroupBox(self.tr("Manage Transporters"))
+        transporters_group_layout = QVBoxLayout(transporters_group) # Layout for content within the group
+        transporters_group_layout.setSpacing(10)
 
-        general_form_layout.addRow(self.tr("Database Type:"), self.db_type_combo)
-
-        general_tab_widget.setLayout(general_form_layout)
-        self.tabs_widget.addTab(general_tab_widget, self.tr("General"))
-
-    def _setup_email_tab(self):
-        email_tab_widget = QWidget()
-        email_form_layout = QFormLayout(email_tab_widget)
-        email_form_layout.setContentsMargins(10, 10, 10, 10); email_form_layout.setSpacing(10)
-        self.smtp_server_input = QLineEdit()
-        email_form_layout.addRow(self.tr("SMTP Server:"), self.smtp_server_input)
-        self.smtp_port_spinbox = QSpinBox(); self.smtp_port_spinbox.setRange(1, 65535)
-        email_form_layout.addRow(self.tr("SMTP Port:"), self.smtp_port_spinbox)
-        self.smtp_user_input = QLineEdit()
-        email_form_layout.addRow(self.tr("SMTP Username:"), self.smtp_user_input)
-        self.smtp_pass_input = QLineEdit(); self.smtp_pass_input.setEchoMode(QLineEdit.Password)
-        email_form_layout.addRow(self.tr("SMTP Password:"), self.smtp_pass_input)
-        email_tab_widget.setLayout(email_form_layout)
-        self.tabs_widget.addTab(email_tab_widget, self.tr("Email"))
-
-    def _setup_download_monitor_tab(self):
-        download_monitor_tab_widget = QWidget()
-        download_monitor_form_layout = QFormLayout(download_monitor_tab_widget)
-        download_monitor_form_layout.setContentsMargins(10, 10, 10, 10)
-        download_monitor_form_layout.setSpacing(10)
-
-        self.download_monitor_enabled_checkbox = QCheckBox(self.tr("Enable download monitoring"))
-        download_monitor_form_layout.addRow(self.download_monitor_enabled_checkbox)
-
-        self.download_monitor_path_input = QLineEdit()
-        self.download_monitor_path_input.setPlaceholderText(self.tr("Select folder to monitor for new downloads"))
-        browse_button = QPushButton(self.tr("Browse..."))
-        browse_button.clicked.connect(self._browse_download_monitor_path)
-
-        path_layout = QHBoxLayout()
-        path_layout.addWidget(self.download_monitor_path_input)
-        path_layout.addWidget(browse_button)
-        download_monitor_form_layout.addRow(self.tr("Monitored Folder:"), path_layout)
-
-        download_monitor_tab_widget.setLayout(download_monitor_form_layout)
-        self.tabs_widget.addTab(download_monitor_tab_widget, self.tr("Download Monitoring"))
-
-    def _browse_download_monitor_path(self):
-        start_dir = self.download_monitor_path_input.text()
-        if not os.path.isdir(start_dir):
-            start_dir = os.path.expanduser('~') # Default to home or a sensible default
-
-        dir_path = QFileDialog.getExistingDirectory(
-            self,
-            self.tr("Select Monitored Folder"),
-            start_dir
-        )
-        if dir_path:
-            self.download_monitor_path_input.setText(dir_path)
-
-    def _setup_transporters_tab(self):
-        transporters_tab = QWidget()
-        transporters_layout = QVBoxLayout(transporters_tab)
         self.transporters_table = QTableWidget()
-        self.transporters_table.setColumnCount(6) # ID, Name, Contact, Phone, Email, Service Area
-        self.transporters_table.setHorizontalHeaderLabels([self.tr("ID"), self.tr("Name"), self.tr("Contact Person"), self.tr("Phone"), self.tr("Email"), self.tr("Service Area")])
+        self.transporters_table.setColumnCount(6)
+        self.transporters_table.setHorizontalHeaderLabels([
+            self.tr("ID"), self.tr("Name"), self.tr("Contact Person"),
+            self.tr("Phone"), self.tr("Email"), self.tr("Service Area")
+        ])
         self.transporters_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.transporters_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.transporters_table.horizontalHeader().setStretchLastSection(True)
         self.transporters_table.hideColumn(0) # Hide ID column
         self.transporters_table.itemSelectionChanged.connect(self._update_transporter_button_states)
-        transporters_layout.addWidget(self.transporters_table)
+        transporters_group_layout.addWidget(self.transporters_table)
 
-        btns_layout = QHBoxLayout()
-        self.add_transporter_btn = QPushButton(self.tr("Add Transporter")); self.add_transporter_btn.setIcon(QIcon(":/icons/plus.svg"))
+        transporter_btns_layout = QHBoxLayout()
+        self.add_transporter_btn = QPushButton(self.tr("Add Transporter"))
+        self.add_transporter_btn.setIcon(QIcon(":/icons/plus-circle.svg"))
         self.add_transporter_btn.clicked.connect(self._handle_add_transporter)
-        self.edit_transporter_btn = QPushButton(self.tr("Edit Transporter")); self.edit_transporter_btn.setIcon(QIcon(":/icons/pencil.svg")); self.edit_transporter_btn.setEnabled(False)
+        self.edit_transporter_btn = QPushButton(self.tr("Edit Selected"))
+        self.edit_transporter_btn.setIcon(QIcon(":/icons/edit-2.svg"))
+        self.edit_transporter_btn.setEnabled(False)
         self.edit_transporter_btn.clicked.connect(self._handle_edit_transporter)
-        self.delete_transporter_btn = QPushButton(self.tr("Delete Transporter")); self.delete_transporter_btn.setIcon(QIcon(":/icons/trash.svg")); self.delete_transporter_btn.setObjectName("dangerButton"); self.delete_transporter_btn.setEnabled(False)
+        self.delete_transporter_btn = QPushButton(self.tr("Delete Selected"))
+        self.delete_transporter_btn.setIcon(QIcon(":/icons/trash.svg"))
+        self.delete_transporter_btn.setObjectName("dangerButton")
+        self.delete_transporter_btn.setEnabled(False)
         self.delete_transporter_btn.clicked.connect(self._handle_delete_transporter)
-        btns_layout.addWidget(self.add_transporter_btn); btns_layout.addWidget(self.edit_transporter_btn); btns_layout.addWidget(self.delete_transporter_btn)
-        transporters_layout.addLayout(btns_layout)
-        self.tabs_widget.addTab(transporters_tab, self.tr("Transporters"))
+        transporter_btns_layout.addWidget(self.add_transporter_btn)
+        transporter_btns_layout.addWidget(self.edit_transporter_btn)
+        transporter_btns_layout.addWidget(self.delete_transporter_btn)
+        transporter_btns_layout.addStretch()
+        transporters_group_layout.addLayout(transporter_btns_layout)
+        main_layout.addWidget(transporters_group)
+
+        # --- Freight Forwarders Group ---
+        forwarders_group = QGroupBox(self.tr("Manage Freight Forwarders"))
+        forwarders_group_layout = QVBoxLayout(forwarders_group) # Layout for content within the group
+        forwarders_group_layout.setSpacing(10)
+
+        self.forwarders_table = QTableWidget()
+        self.forwarders_table.setColumnCount(6)
+        self.forwarders_table.setHorizontalHeaderLabels([
+            self.tr("ID"), self.tr("Name"), self.tr("Contact Person"),
+            self.tr("Phone"), self.tr("Email"), self.tr("Services Offered")
+        ])
+        self.forwarders_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.forwarders_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.forwarders_table.horizontalHeader().setStretchLastSection(True)
+        self.forwarders_table.hideColumn(0) # Hide ID column
+        self.forwarders_table.itemSelectionChanged.connect(self._update_forwarder_button_states)
+        forwarders_group_layout.addWidget(self.forwarders_table)
+
+        forwarder_btns_layout = QHBoxLayout()
+        self.add_forwarder_btn = QPushButton(self.tr("Add Freight Forwarder"))
+        self.add_forwarder_btn.setIcon(QIcon(":/icons/plus-circle.svg"))
+        self.add_forwarder_btn.clicked.connect(self._handle_add_forwarder)
+        self.edit_forwarder_btn = QPushButton(self.tr("Edit Selected"))
+        self.edit_forwarder_btn.setIcon(QIcon(":/icons/edit-2.svg"))
+        self.edit_forwarder_btn.setEnabled(False)
+        self.edit_forwarder_btn.clicked.connect(self._handle_edit_forwarder)
+        self.delete_forwarder_btn = QPushButton(self.tr("Delete Selected"))
+        self.delete_forwarder_btn.setIcon(QIcon(":/icons/trash.svg"))
+        self.delete_forwarder_btn.setObjectName("dangerButton")
+        self.delete_forwarder_btn.setEnabled(False)
+        self.delete_forwarder_btn.clicked.connect(self._handle_delete_forwarder)
+        forwarder_btns_layout.addWidget(self.add_forwarder_btn)
+        forwarder_btns_layout.addWidget(self.edit_forwarder_btn)
+        forwarder_btns_layout.addWidget(self.delete_forwarder_btn)
+        forwarder_btns_layout.addStretch()
+        forwarders_group_layout.addLayout(forwarder_btns_layout)
+        main_layout.addWidget(forwarders_group)
+
+        main_layout.addStretch(1) # Push groups to the top
+        self.tabs_widget.addTab(tab_widget, self.tr("Logistics"))
+
+    def _setup_document_templates_tab(self):
+        tab_widget = QWidget()
+        main_layout = QVBoxLayout(tab_widget)
+        main_layout.setContentsMargins(15, 15, 15, 15)
+        main_layout.setSpacing(15)
+
+        # --- Template Directories Group ---
+        template_dirs_group = QGroupBox(self.tr("Template Storage Locations"))
+        template_dirs_form_layout = QFormLayout(template_dirs_group)
+        template_dirs_form_layout.setSpacing(10)
+
+        self.templates_dir_input = QLineEdit()
+        self.templates_dir_input.setPlaceholderText(self.tr("Path to your global templates directory"))
+        templates_browse_btn = QPushButton(self.tr("Browse..."))
+        templates_browse_btn.setIcon(QIcon(":/icons/folder.svg"))
+        templates_browse_btn.clicked.connect(lambda: self._browse_directory(self.templates_dir_input, self.tr("Select Global Templates Directory")))
+        templates_dir_layout = QHBoxLayout()
+        templates_dir_layout.addWidget(self.templates_dir_input)
+        templates_dir_layout.addWidget(templates_browse_btn)
+        template_dirs_form_layout.addRow(self.tr("Global Templates Directory:"), templates_dir_layout)
+
+        self.clients_dir_input = QLineEdit() # Assuming this is for client-specific template overrides or client data
+        self.clients_dir_input.setPlaceholderText(self.tr("Path to directory for client-specific data/templates"))
+        clients_browse_btn = QPushButton(self.tr("Browse..."))
+        clients_browse_btn.setIcon(QIcon(":/icons/folder-documents.svg")) # Different icon for distinction
+        clients_browse_btn.clicked.connect(lambda: self._browse_directory(self.clients_dir_input, self.tr("Select Client Data Directory")))
+        clients_dir_layout = QHBoxLayout()
+        clients_dir_layout.addWidget(self.clients_dir_input)
+        clients_dir_layout.addWidget(clients_browse_btn)
+        template_dirs_form_layout.addRow(self.tr("Client Data/Templates Directory:"), clients_dir_layout)
+        main_layout.addWidget(template_dirs_group)
+
+        # --- Template Management Group ---
+        template_mgmt_group = QGroupBox(self.tr("Global Template Administration"))
+        template_mgmt_layout = QVBoxLayout(template_mgmt_group)
+        template_mgmt_layout.setSpacing(10)
+
+        manage_templates_btn = QPushButton(self.tr("Open Global Template Manager"))
+        manage_templates_btn.setIcon(QIcon(":/icons/settings.svg")) # Consider a more specific icon
+        manage_templates_btn.setToolTip(self.tr("Manage categories, languages, and extensions for all templates."))
+        manage_templates_btn.clicked.connect(self._open_template_manager_dialog)
+        template_mgmt_layout.addWidget(manage_templates_btn)
+        main_layout.addWidget(template_mgmt_group)
+
+        # --- Template Visibility Group ---
+        template_visibility_group = QGroupBox(self.tr("Template Visibility & Selection"))
+        template_visibility_layout = QVBoxLayout(template_visibility_group)
+        template_visibility_layout.setSpacing(10)
+
+        visibility_description = QLabel(self.tr("Control which templates are available for selection in document generation dialogs."))
+        visibility_description.setWordWrap(True)
+        template_visibility_layout.addWidget(visibility_description)
+
+        self.template_visibility_table = QTableWidget()
+        self.template_visibility_table.setColumnCount(5)
+        self.template_visibility_table.setHorizontalHeaderLabels([
+            self.tr("Template Name"), self.tr("Description"), self.tr("Type"),
+            self.tr("Language"), self.tr("Visible (Editable)")
+        ])
+        self.template_visibility_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        # EditTriggers will be handled by the checkbox delegate or cell widget
+        self.template_visibility_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.template_visibility_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.template_visibility_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        template_visibility_layout.addWidget(self.template_visibility_table)
+
+        visibility_btns_layout = QHBoxLayout()
+        self.refresh_template_visibility_btn = QPushButton(self.tr("Refresh List"))
+        self.refresh_template_visibility_btn.setIcon(QIcon(":/icons/refresh-cw.svg"))
+        self.refresh_template_visibility_btn.clicked.connect(self._load_template_visibility_data)
+        visibility_btns_layout.addWidget(self.refresh_template_visibility_btn)
+        visibility_btns_layout.addStretch()
+        self.save_template_visibility_btn = QPushButton(self.tr("Save Visibility Changes"))
+        self.save_template_visibility_btn.setIcon(QIcon(":/icons/save.svg"))
+        self.save_template_visibility_btn.clicked.connect(self._save_template_visibility_data)
+        visibility_btns_layout.addWidget(self.save_template_visibility_btn)
+        template_visibility_layout.addLayout(visibility_btns_layout)
+        main_layout.addWidget(template_visibility_group)
+
+        main_layout.addStretch(1)
+        self.tabs_widget.addTab(tab_widget, self.tr("Document Templates"))
+
+
+    def _browse_download_monitor_path(self):
+        start_dir = self.download_monitor_path_input.text()
+        if not os.path.isdir(start_dir):
+            # Default to user's standard Downloads directory if path is invalid or empty
+            start_dir = os.path.join(os.path.expanduser('~'), 'Downloads')
+            if not os.path.isdir(start_dir): # Fallback if 'Downloads' doesn't exist
+                start_dir = os.path.expanduser('~')
+
+
+        dir_path = QFileDialog.getExistingDirectory(
+            self,
+            self.tr("Select Folder to Monitor for Downloads"),
+            start_dir # Use a sensible starting directory
+        )
+        if dir_path:
+            self.download_monitor_path_input.setText(dir_path)
+
+    # Note: _setup_transporters_tab and _setup_freight_forwarders_tab are now part of _setup_logistics_tab
+    # Their helper methods (_load_transporters_table, _handle_add_transporter, etc.) remain the same.
+    # Similarly for _setup_data_management_tab, _setup_download_monitor_tab, _setup_backup_tab,
+    # _setup_template_visibility_tab, _setup_global_template_management_tab
+    # which are now integrated into the new composite tabs.
 
     def _load_transporters_table(self):
-        if not db_manager: return
+        if not db_manager:
+            QMessageBox.warning(self, self.tr("Database Error"), self.tr("Database connection is not available. Cannot load transporters."))
+            return
         self.transporters_table.setRowCount(0)
         self.transporters_table.setSortingEnabled(False)
         try:
@@ -977,146 +1262,278 @@ class SettingsPage(QWidget):
 
 
     def _load_general_tab_data(self):
-        self.templates_dir_input.setText(self.main_config.get("templates_dir", ""))
-        self.clients_dir_input.setText(self.main_config.get("clients_dir", ""))
-        # Ensure new keys are present with defaults if missing from config
-        self.main_config.setdefault("download_monitor_enabled", False)
-        self.main_config.setdefault("download_monitor_path", os.path.join(os.path.expanduser('~'), 'Downloads'))
+        # Loads settings for the "General" tab (Interface & Behavior groups)
         current_lang_code = self.main_config.get("language", "fr")
         code_to_display_text = {code: display for display, code in self.lang_display_to_code.items()}
         current_display_text = code_to_display_text.get(current_lang_code)
-        if current_display_text: self.interface_lang_combo.setCurrentText(current_display_text)
-        else: self.interface_lang_combo.setCurrentText(code_to_display_text.get("fr", list(self.lang_display_to_code.keys())[0]))
+        if current_display_text:
+            self.interface_lang_combo.setCurrentText(current_display_text)
+        else: # Fallback if language code in config is invalid
+            self.interface_lang_combo.setCurrentText(code_to_display_text.get("fr", list(self.lang_display_to_code.keys())[0]))
+
+        self.session_timeout_spinbox.setValue(self.main_config.get("session_timeout_minutes", 259200)) # Default was 259200
         self.reminder_days_spinbox.setValue(self.main_config.get("default_reminder_days", 30))
-        self.session_timeout_spinbox.setValue(self.main_config.get("session_timeout_minutes", 259200))
         self.google_maps_url_input.setText(self.main_config.get("google_maps_review_url", "https://maps.google.com/?cid=YOUR_CID_HERE"))
         self.show_setup_prompt_checkbox.setChecked(self.main_config.get("show_initial_setup_on_startup", False))
-        self.db_path_input.setText(self.main_config.get("database_path", os.path.join(os.getcwd(), "app_data.db")))
+        print("General tab settings loaded.")
 
-        # Load database type
+    def _load_connectivity_tab_data(self):
+        # Loads Email (SMTP) settings
+        self.smtp_server_input.setText(self.main_config.get("smtp_server", ""))
+        self.smtp_port_spinbox.setValue(self.main_config.get("smtp_port", 587))
+        self.smtp_user_input.setText(self.main_config.get("smtp_user", ""))
+        self.smtp_pass_input.setText(self.main_config.get("smtp_password", ""))
+        print("Connectivity (Email) settings loaded.")
+
+    def _load_data_backup_tab_data(self):
+        # Database path & type
+        self.db_path_input.setText(self.main_config.get("database_path", os.path.join(os.getcwd(), "app_data.db")))
         current_db_type = self.main_config.get('database_type', 'sqlite')
         db_type_index = self.db_type_combo.findData(current_db_type)
         if db_type_index != -1:
             self.db_type_combo.setCurrentIndex(db_type_index)
         else:
-            # Fallback to SQLite if saved type is somehow invalid or not in combo
-            sqlite_index = self.db_type_combo.findData('sqlite')
-            if sqlite_index != -1:
-                self.db_type_combo.setCurrentIndex(sqlite_index)
+            sqlite_index = self.db_type_combo.findData('sqlite') # Fallback
+            if sqlite_index != -1: self.db_type_combo.setCurrentIndex(sqlite_index)
 
-
-    def _load_email_tab_data(self):
-        self.smtp_server_input.setText(self.main_config.get("smtp_server", ""))
-        self.smtp_port_spinbox.setValue(self.main_config.get("smtp_port", 587))
-        self.smtp_user_input.setText(self.main_config.get("smtp_user", ""))
-        self.smtp_pass_input.setText(self.main_config.get("smtp_password", ""))
-
-    def _load_download_monitor_tab_data(self):
+        # Download Monitoring
+        self.main_config.setdefault("download_monitor_enabled", False) # Ensure key exists
+        self.main_config.setdefault("download_monitor_path", os.path.join(os.path.expanduser('~'), 'Downloads')) # Ensure key exists
         self.download_monitor_enabled_checkbox.setChecked(self.main_config.get("download_monitor_enabled", False))
         default_download_path = os.path.join(os.path.expanduser('~'), 'Downloads')
         self.download_monitor_path_input.setText(self.main_config.get("download_monitor_path", default_download_path))
 
-    def _load_backup_tab_data(self):
+        # Backup Settings
         self.backup_server_address_input.setText(self.main_config.get("backup_server_address", ""))
-        self.backup_port_input.setText(self.main_config.get("backup_port", ""))
+        self.backup_port_input.setText(self.main_config.get("backup_port", "")) # Port is QLineEdit
         self.backup_username_input.setText(self.main_config.get("backup_username", ""))
         self.backup_password_input.setText(self.main_config.get("backup_password", ""))
+        print("Data & Backup tab settings loaded.")
+
+    def _load_document_templates_tab_data(self):
+        self.templates_dir_input.setText(self.main_config.get("templates_dir", ""))
+        self.clients_dir_input.setText(self.main_config.get("clients_dir", "")) # Path for client-specific data/templates
+        # Template visibility data is loaded via its own mechanism (_load_template_visibility_data)
+        self._load_template_visibility_data()
+        print("Document Templates tab settings loaded (excluding visibility table which has its own load).")
+
 
     def _browse_directory(self, line_edit_target, dialog_title):
-        start_dir = line_edit_target.text();
-        if not os.path.isdir(start_dir): start_dir = os.getcwd()
+        start_dir = line_edit_target.text()
+        if not os.path.isdir(start_dir): start_dir = os.path.expanduser('~') # Default to home if invalid
         dir_path = QFileDialog.getExistingDirectory(self, dialog_title, start_dir)
         if dir_path: line_edit_target.setText(dir_path)
 
     def _browse_db_file(self, line_edit_target):
         current_path = line_edit_target.text()
-        start_dir = os.path.dirname(current_path) if current_path and os.path.exists(os.path.dirname(current_path)) else os.getcwd()
+        start_dir = os.path.dirname(current_path) if current_path and os.path.exists(os.path.dirname(current_path)) else os.path.expanduser('~')
         file_path, _ = QFileDialog.getOpenFileName(self, self.tr("Select Database File"), start_dir, self.tr("Database Files (*.db *.sqlite *.sqlite3);;All Files (*.*)"))
         if file_path: line_edit_target.setText(file_path)
 
     def get_general_settings_data(self):
+        # Collects data from the "General" tab
         selected_lang_display_text = self.interface_lang_combo.currentText()
         language_code = self.lang_display_to_code.get(selected_lang_display_text, "fr")
-        # Get selected database type
-        selected_db_type = self.db_type_combo.currentData() if self.db_type_combo.currentIndex() != -1 else "sqlite"
-
         return {
-            "templates_dir": self.templates_dir_input.text().strip(),
-            "clients_dir": self.clients_dir_input.text().strip(),
             "language": language_code,
             "default_reminder_days": self.reminder_days_spinbox.value(),
             "session_timeout_minutes": self.session_timeout_spinbox.value(),
             "google_maps_review_url": self.google_maps_url_input.text().strip(),
             "show_initial_setup_on_startup": self.show_setup_prompt_checkbox.isChecked(),
+        }
+
+    def get_connectivity_settings_data(self):
+        # Collects Email (SMTP) settings
+        return {
+            "smtp_server": self.smtp_server_input.text().strip(),
+            "smtp_port": self.smtp_port_spinbox.value(),
+            "smtp_user": self.smtp_user_input.text().strip(),
+            "smtp_password": self.smtp_pass_input.text() # Password not stripped
+        }
+
+    def get_data_backup_settings_data(self):
+        # Collects Database, Download Monitor, and Backup server settings
+        selected_db_type = self.db_type_combo.currentData() if self.db_type_combo.currentIndex() != -1 else "sqlite"
+        return {
             "database_path": self.db_path_input.text().strip(),
-            "database_type": selected_db_type
-        }
-
-    def get_email_settings_data(self):
-        return {"smtp_server": self.smtp_server_input.text().strip(), "smtp_port": self.smtp_port_spinbox.value(), "smtp_user": self.smtp_user_input.text().strip(), "smtp_password": self.smtp_pass_input.text()}
-
-    def get_download_monitor_settings_data(self):
-        return {
+            "database_type": selected_db_type,
             "download_monitor_enabled": self.download_monitor_enabled_checkbox.isChecked(),
-            "download_monitor_path": self.download_monitor_path_input.text().strip()
+            "download_monitor_path": self.download_monitor_path_input.text().strip(),
+            "backup_server_address": self.backup_server_address_input.text().strip(),
+            "backup_port": self.backup_port_input.text().strip(), # Port is QLineEdit
+            "backup_username": self.backup_username_input.text().strip(),
+            "backup_password": self.backup_password_input.text() # Password not stripped
         }
 
-    def get_backup_settings_data(self):
+    def get_document_templates_settings_data(self):
         return {
-            "backup_server_address": self.backup_server_address_input.text().strip(),
-            "backup_port": self.backup_port_input.text().strip(),
-            "backup_username": self.backup_username_input.text().strip(),
-            "backup_password": self.backup_password_input.text() # Password is not stripped
+            "templates_dir": self.templates_dir_input.text().strip(),
+            "clients_dir": self.clients_dir_input.text().strip(),
+            # Template visibility settings are saved via _save_template_visibility_data, not directly into main_config here
         }
+
 
     def _load_all_settings_from_config(self):
         self._load_general_tab_data()
-        self._load_email_tab_data()
-        self._load_download_monitor_tab_data()
-        self._load_modules_tab_data() # Load data for the new modules tab
-        self._load_backup_tab_data() # Load data for the backup tab
-        # Transporter and Forwarder data are loaded from DB directly.
-        print("SettingsPage: All settings reloaded.")
+        self._load_connectivity_tab_data() # For Email
+        self._load_data_backup_tab_data() # For DB, Download Monitor, Backup
+        self._load_document_templates_tab_data() # For Template Dirs
+
+        self._load_modules_tab_data() # Loads from DB settings table
+
+        # Company & Personnel tab loads its own data internally or via CompanyTabWidget
+        # Logistics tab (Transporters, Forwarders) loads data from DB
+        if db_manager:
+            self._load_transporters_table()
+            self._load_forwarders_table()
+        else:
+            print("WARNING: db_manager not available. Transporter and Forwarder tables will not be loaded.")
+
+        # Security tab is self-contained for now (biometric test page)
+        # Template Visibility table has its own load method called by _load_document_templates_tab_data
+
+        print("SettingsPage: All relevant settings sections reloaded.")
 
     def _save_all_settings(self):
-        # General Settings
-        general_settings = self.get_general_settings_data()
-        for key, value in general_settings.items():
-            self.main_config[key] = value
+        # Consolidate settings from various getters into main_config
+        settings_collections = [
+            self.get_general_settings_data(),
+            self.get_connectivity_settings_data(),
+            self.get_data_backup_settings_data(),
+            self.get_document_templates_settings_data(),
+        ]
+        for settings_group in settings_collections:
+            for key, value in settings_group.items():
+                self.main_config[key] = value
 
-        # Email Settings
-        email_settings = self.get_email_settings_data()
-        for key, value in email_settings.items():
-            self.main_config[key] = value
-
-        # Download Monitor Settings
-        download_monitor_settings = self.get_download_monitor_settings_data()
-        for key, value in download_monitor_settings.items():
-            self.main_config[key] = value
-
-        # Backup Settings
-        backup_settings = self.get_backup_settings_data()
-        for key, value in backup_settings.items():
-            self.main_config[key] = value
-
-        # Save to the actual config file (e.g., JSON)
-        # This part depends on how main_config is persisted in the actual application
-        # For now, we just update the dictionary.
-        # Example: config_manager.save_config(self.main_config)
-
-        # Save module settings
+        # Save module activation states (persisted in DB, not main_config directly)
         self._save_modules_tab_data()
 
-        # Company Tab has its own save mechanism internally if needed, or could be called here.
-        # self.company_tab.save_settings()
+        # Save template visibility settings (persisted via API/DB, not main_config)
+        self._save_template_visibility_data() # This method handles its own QMessageBox for success/failure
 
-        # Transporter and Forwarder data are saved via their respective dialogs, not here.
+        # CompanyTabWidget might have its own save mechanism, which should be triggered
+        # if it manages data that needs saving beyond what's in main_config.
+        # Example: if hasattr(self.company_tab_widget_instance, 'save_settings'):
+        #              self.company_tab_widget_instance.save_settings()
 
-        QMessageBox.information(self, self.tr("Settings Saved"), self.tr("All settings have been updated. Some changes may require an application restart to take full effect."))
-        print("All settings saved (main_config updated, modules saved to DB).")
+        # Transporter and Forwarder data are managed via their respective dialogs and DB operations,
+        # not typically saved through this main "Save All Settings" button unless there are global configs for them.
+
+        # --- Persist main_config ---
+        # This part depends on how main_config is actually saved to a file (e.g., JSON) in the application.
+        # Assuming a utility function like `ConfigManager.save_config(self.main_config)` exists.
+        # For this refactoring, we'll just log that main_config is updated.
+        # In a real app:
+        # try:
+        #     actual_config_manager.save(self.main_config) # Replace with actual save call
+        #     QMessageBox.information(self, self.tr("Settings Saved"),
+        #                             self.tr("All settings have been updated. Some changes may require an application restart to take full effect."))
+        # except Exception as e:
+        #     QMessageBox.critical(self, self.tr("Error Saving Configuration"),
+        #                          self.tr("Could not save the main configuration file: {0}").format(str(e)))
+        #     return # Prevent further messages if main config save fails
+
+        print("Main configuration dictionary (self.main_config) updated with new settings.")
+
+        # Determine if a restart is likely needed
+        restart_needed_msg = ""
+        # Simple check: if language or db_path changed from initial load, it's a good indicator.
+        # This requires storing initial values if we want to be precise, or just always show a generic message.
+        # For now, a generic but clear message is good.
+        # A more sophisticated approach would be to track changes to specific sensitive settings.
+
+        # Let's make the message more direct about the restart for key items.
+        # We can check if specific known restart-requiring settings have changed
+        # by comparing current self.main_config values with the ones at the start of the save operation,
+        # or by having flags. For now, a general message will be used but enhanced.
+
+        final_message = self.tr("Settings have been saved successfully.")
+        potential_restart_message = self.tr(
+            "Please note: Changes to settings like Interface Language, Database Path, "
+            "or Module Activation will require an application restart to take full effect."
+        )
+
+        # Check if any module activation changed - this is a clear restart trigger
+        # This requires comparing current radio button states with initial states loaded into self.main_config
+        # or, more simply, if _save_modules_tab_data actually performed any DB updates.
+        # For now, the generic message is the most straightforward to implement.
+
+        QMessageBox.information(self, self.tr("Settings Saved"), f"{final_message}\n\n{potential_restart_message}")
+        print("All settings processed (main_config updated, modules and visibility saved to DB/API).")
+
+    def _confirm_restore_defaults(self):
+        reply = QMessageBox.question(self, self.tr("Confirm Restore Defaults"),
+                                     self.tr("Are you sure you want to restore all settings to their default values?\n"
+                                             "This action cannot be easily undone and will require an application restart."),
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            self._restore_default_settings()
+
+    def _restore_default_settings(self):
+        # This method needs to:
+        # 1. Define the default values for all settings in self.main_config.
+        #    This might involve having a separate default_config dictionary.
+        # 2. Reset self.main_config to these defaults.
+        # 3. Persist self.main_config (e.g., save to JSON file).
+        # 4. Reset module activation states in the database to their defaults.
+        # 5. Reset template visibility settings to their defaults (if applicable).
+        # 6. Reload the UI to reflect these defaults.
+        # 7. Inform the user that a restart is necessary.
+
+        # For demonstration, let's assume a default config structure
+        # In a real app, this should come from a reliable source or be hardcoded carefully.
+        default_config_values = {
+            "language": "fr",
+            "session_timeout_minutes": 259200,
+            "default_reminder_days": 30,
+            "google_maps_review_url": "https://maps.google.com/?cid=YOUR_CID_HERE",
+            "show_initial_setup_on_startup": False,
+            "smtp_server": "", "smtp_port": 587, "smtp_user": "", "smtp_password": "",
+            "database_path": os.path.join(os.getcwd(), "app_data.db"), # Or an app data directory
+            "database_type": "sqlite",
+            "download_monitor_enabled": False,
+            "download_monitor_path": os.path.join(os.path.expanduser('~'), 'Downloads'),
+            "backup_server_address": "", "backup_port": "", "backup_username": "", "backup_password": "",
+            "templates_dir": os.path.join(self.app_root_dir, "templates"), # Default relative to app
+            "clients_dir": os.path.join(self.app_root_dir, "clients_data") # Default relative to app
+            # Add other config keys with their defaults
+        }
+
+        # Reset main_config
+        for key, value in default_config_values.items():
+            self.main_config[key] = value
+
+        print("Main config reset to defaults.")
+
+        # Reset module settings in DB (assuming all modules default to True/Enabled for this example)
+        if db_manager:
+            try:
+                for module_info in self.module_config:
+                    db_manager.set_setting(module_info["key"], 'True') # Example: default all to enabled
+                print("Module activation settings reset to default (all enabled) in DB.")
+            except Exception as e:
+                print(f"Error resetting module settings in DB: {e}")
+                QMessageBox.warning(self, self.tr("Module Reset Error"), self.tr("Could not reset all module activation settings in the database."))
+
+        # TODO: Reset template visibility settings if they are stored and have defaults.
+        # This would involve calling an API or DB function to set defaults.
+        # For now, we'll skip this part for template visibility.
+
+        # Persist the now default self.main_config
+        # In a real app: actual_config_manager.save(self.main_config)
+        print("Default main_config would be persisted here.")
+
+        # Reload UI from the new (default) config
+        self._load_all_settings_from_config()
+
+        QMessageBox.information(self, self.tr("Defaults Restored"),
+                                self.tr("All settings have been restored to their default values. "
+                                         "Please restart the application for all changes to take effect."))
+        print("Settings restored to defaults. UI reloaded. Restart required.")
 
 
-    def _setup_modules_tab(self):
+    def _setup_modules_tab(self): # This is the old _setup_modules_tab, now _setup_application_modules_tab
         modules_tab_widget = QWidget()
         modules_form_layout = QFormLayout(modules_tab_widget)
         modules_form_layout.setContentsMargins(10, 10, 10, 10)

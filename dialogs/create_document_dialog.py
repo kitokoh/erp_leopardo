@@ -24,10 +24,11 @@ from utils import populate_docx_template
 import icons_rc # Import for Qt resource file
 
 class CreateDocumentDialog(QDialog):
-    def __init__(self, client_info, config, parent=None, template_data=None): # Added template_data
+    def __init__(self, client_info, config, current_user_id, parent=None, template_data=None): # Added current_user_id
         super().__init__(parent)
         self.client_info = client_info
         self.config = config # Store config passed from main
+        self.current_user_id = current_user_id # Store current_user_id
         self.template_data = template_data # Store template_data
         self.setWindowTitle(self.tr("Créer des Documents"))
         self.setMinimumSize(600, 500)
@@ -200,6 +201,7 @@ class CreateDocumentDialog(QDialog):
 
             logging.info(f"Category IDs to filter by (purposes: {desired_purposes}): {category_ids_to_filter}")
 
+
             # If no specific categories are found for the desired purposes,
             # we should probably not filter by category at all, or ensure get_all_templates handles an empty list gracefully.
             # For now, we'll pass None if category_ids_to_filter is empty, assuming get_all_templates
@@ -229,6 +231,7 @@ class CreateDocumentDialog(QDialog):
             templates_from_db = db_manager.get_all_templates(
                 template_type_filter_list=document_template_types, # Reactivate type filter
                 language_code_filter=effective_lang_filter,
+
                 client_id_filter=current_client_id, # Fetches client-specific and global templates
                 category_id_filter=actual_category_id_filter, # Reactivate category filter
                 apply_visibility_filter=True # Ensure visibility is checked
@@ -496,7 +499,7 @@ class CreateDocumentDialog(QDialog):
                         'file_path_relative': file_path_relative_for_db, # Corrected relative path
                         'document_type_generated': template_type,
                         'source_template_id': template_id_for_db,
-                        'created_by_user_id': None # Placeholder for user ID, to be implemented
+                        'user_id': self.current_user_id # Use stored current_user_id
                     }
                     logging.info(f"Attempting to add document to DB with data: {doc_db_data}")
                     new_document_id_from_db = db_manager.add_client_document(doc_db_data)

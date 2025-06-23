@@ -1514,7 +1514,8 @@ CREATE TABLE IF NOT EXISTS Templates (
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
 
--- Table for motivational messages
+    cursor.execute("""
+
 CREATE TABLE IF NOT EXISTS motivational_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     language_code TEXT NOT NULL,
@@ -1525,9 +1526,11 @@ CREATE TABLE IF NOT EXISTS motivational_messages (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(language_code, message), -- Avoid duplicate messages per language
     UNIQUE(language_code, day_of_year) -- Avoid multiple messages for the same day in the same language
-);
+)
+                       """)
 
--- Table for user-customizable motivational messages
+    cursor.execute("""
+
 CREATE TABLE IF NOT EXISTS user_motivational_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     message TEXT NOT NULL,
@@ -1537,7 +1540,8 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(message) -- Avoid globally duplicate user messages, or (created_by_user_id, message) if user-specific
-);
+)
+
     """)
 
     # ItemStorageLocations Table
@@ -1981,9 +1985,176 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     print("DEBUG_INIT_DB: Indexes for Company Expense and Facture tables created or already exist.")
     # --- End Company Expense Module Tables and Indexes ---
 
+    # --- Accounting Module Tables ---
+    try:
+        print("DEBUG_INIT_DB: Creating Accounting Module Tables...")
+        # Need to import accounting models
+        from accounting import models as acc_models
+
+        # Create schema 'accounting' if it doesn't exist (for PostgreSQL, not directly applicable for SQLite)
+        # For SQLite, tables will be prefixed or handled by SQLAlchemy's metadata if schema is used.
+        # If using SQLite and `{'schema': 'accounting'}` in table args, SQLAlchemy creates table as `accounting_tablename`.
+        # If truly needing separate schema for other DBs, that's a DB-level command.
+
+        acc_models.FiscalYear.__table__.create(bind=conn, checkfirst=True)
+        print("DEBUG_INIT_DB: Table acc_fiscal_years created or exists.")
+        acc_models.Currency.__table__.create(bind=conn, checkfirst=True)
+        print("DEBUG_INIT_DB: Table acc_currencies created or exists.")
+        acc_models.TaxRate.__table__.create(bind=conn, checkfirst=True)
+        print("DEBUG_INIT_DB: Table acc_tax_rates created or exists.")
+        acc_models.ChartOfAccounts.__table__.create(bind=conn, checkfirst=True)
+        print("DEBUG_INIT_DB: Table acc_chart_of_accounts created or exists.")
+        acc_models.JournalEntry.__table__.create(bind=conn, checkfirst=True)
+        print("DEBUG_INIT_DB: Table acc_journal_entries created or exists.")
+        acc_models.JournalItem.__table__.create(bind=conn, checkfirst=True)
+        print("DEBUG_INIT_DB: Table acc_journal_items created or exists.")
+        acc_models.FinancialStatement.__table__.create(bind=conn, checkfirst=True)
+        print("DEBUG_INIT_DB: Table acc_financial_statements created or exists.")
+
+        print("DEBUG_INIT_DB: Accounting Module Tables creation attempted.")
+
+        # --- Indexes for Accounting Module ---
+        print("DEBUG_INIT_DB: Creating Accounting Module Indexes...")
+        # FiscalYear
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fiscal_years_name ON acc_fiscal_years(name)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fiscal_years_start_date ON acc_fiscal_years(start_date)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fiscal_years_end_date ON acc_fiscal_years(end_date)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fiscal_years_status ON acc_fiscal_years(status)")
+        # Currency
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_currencies_name ON acc_currencies(name)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_currencies_is_base ON acc_currencies(is_base_currency)")
+        # TaxRate
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_tax_rates_name ON acc_tax_rates(name)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_tax_rates_type ON acc_tax_rates(tax_type)")
+        # ChartOfAccounts
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_coa_code ON acc_chart_of_accounts(code)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_coa_name ON acc_chart_of_accounts(name)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_coa_type ON acc_chart_of_accounts(account_type)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_coa_parent_id ON acc_chart_of_accounts(parent_id)")
+        # JournalEntry
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_journal_entries_date ON acc_journal_entries(entry_date)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_journal_entries_ref ON acc_journal_entries(reference_number)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_journal_entries_fy_id ON acc_journal_entries(fiscal_year_id)")
+        # JournalItem
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_journal_items_entry_id ON acc_journal_items(journal_entry_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_journal_items_account_id ON acc_journal_items(account_id)")
+        # FinancialStatement
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fin_stmt_name ON acc_financial_statements(name)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fin_stmt_type ON acc_financial_statements(statement_type)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fin_stmt_fy_id ON acc_financial_statements(fiscal_year_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fin_stmt_period_end ON acc_financial_statements(period_end_date)")
+        print("DEBUG_INIT_DB: Accounting Module Indexes creation attempted.")
+
+    except Exception as e_acc_schema:
+        print(f"CRITICAL ERROR during Accounting module schema/index creation: {e_acc_schema}")
+        # Depending on policy, might want to rollback or raise
+    # --- End Accounting Module Tables and Indexes ---
+
+    # --- Calendar Module Tables ---
+    print("DEBUG_INIT_DB: Creating Calendar Module Tables...")
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS CompanyCalendarSettings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL UNIQUE, -- Assuming user_id is a string UUID from Users table
+        business_type TEXT, -- B2B, B2C, Both
+        activity_category TEXT,
+        country_iso TEXT NOT NULL, -- ISO 3166-1 alpha-2 country code
+        region TEXT, -- Subdivision of the country
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
+    )
+    """)
+    print("DEBUG_INIT_DB: Table CompanyCalendarSettings created or exists.")
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS UserCalendarEvents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL, -- Assuming user_id is a string UUID from Users table
+        event_date DATE NOT NULL,
+        event_type TEXT NOT NULL, -- Holiday, RemoteWork, WorkDay, OtherPersonal
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
+    )
+    """)
+    print("DEBUG_INIT_DB: Table UserCalendarEvents created or exists.")
+
+    # Indexes for Calendar Module
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_companycalendarsettings_user_id ON CompanyCalendarSettings(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_user_id ON UserCalendarEvents(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_date ON UserCalendarEvents(event_date)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_type ON UserCalendarEvents(event_type)")
+    print("DEBUG_INIT_DB: Indexes for Calendar Module created or already exist.")
+    # --- End Calendar Module Tables ---
+
+
     # --- Seed Data (from db/schema.py, ensuring use of db_config) ---
     try:
         print("DEBUG_INIT_DB: Starting data seeding phase.")
+
+        # Accounting Module Seeding (example: base currency, default fiscal year)
+        try:
+            from accounting import cruds as acc_cruds
+            from accounting import models as acc_models_pydantic # Pydantic models for creation
+
+            # Seed a default base currency if none exists
+            base_curr = acc_cruds.currency.get_base_currency(db=conn)
+            if not base_curr:
+                print("DEBUG_INIT_DB: No base currency found. Seeding USD as base.")
+                usd_currency_in = acc_models_pydantic.CurrencyCreate(
+                    code="USD",
+                    name="US Dollar",
+                    symbol="$",
+                    exchange_rate_to_base=Decimal("1.000000"),
+                    is_base_currency=True
+                )
+                acc_cruds.currency.create(db=conn, obj_in=usd_currency_in)
+                print("DEBUG_INIT_DB: USD seeded as base currency.")
+
+            # Seed a default fiscal year if none exists for the current period (example logic)
+            current_year_name = f"FY{datetime.now().year}"
+            existing_fy = acc_cruds.fiscal_year.get_by_name(db=conn, name=current_year_name)
+            if not existing_fy:
+                print(f"DEBUG_INIT_DB: No fiscal year found for {current_year_name}. Seeding it now.")
+                default_fy_in = acc_models_pydantic.FiscalYearCreate(
+                    name=current_year_name,
+                    start_date=date(datetime.now().year, 1, 1),
+                    end_date=date(datetime.now().year, 12, 31),
+                    status=acc_models_pydantic.FiscalYearStatusEnum.OPEN
+                )
+                acc_cruds.fiscal_year.create(db=conn, obj_in=default_fy_in)
+                print(f"DEBUG_INIT_DB: Fiscal year {current_year_name} seeded.")
+
+            # Seed a basic chart of accounts (very minimal example)
+            # This should ideally come from a configuration file or a more detailed setup
+            if acc_cruds.chart_of_accounts.get_multi(db=conn, limit=1) == []:
+                print("DEBUG_INIT_DB: Chart of Accounts is empty. Seeding minimal accounts.")
+                accounts_to_seed = [
+                    {"code": "1010", "name": "Cash", "account_type": acc_models_pydantic.AccountTypeEnum.ASSET},
+                    {"code": "1020", "name": "Accounts Receivable", "account_type": acc_models_pydantic.AccountTypeEnum.ASSET},
+                    {"code": "2010", "name": "Accounts Payable", "account_type": acc_models_pydantic.AccountTypeEnum.LIABILITY},
+                    {"code": "3010", "name": "Common Stock", "account_type": acc_models_pydantic.AccountTypeEnum.EQUITY},
+                    {"code": "4010", "name": "Sales Revenue", "account_type": acc_models_pydantic.AccountTypeEnum.REVENUE},
+                    {"code": "5010", "name": "Office Supplies Expense", "account_type": acc_models_pydantic.AccountTypeEnum.EXPENSE},
+                ]
+                for acc_data in accounts_to_seed:
+                    acc_in = acc_models_pydantic.ChartOfAccountsCreate(**acc_data)
+                    if not acc_cruds.chart_of_accounts.get_by_code(db=conn, code=acc_in.code):
+                        acc_cruds.chart_of_accounts.create(db=conn, obj_in=acc_in)
+                print("DEBUG_INIT_DB: Minimal Chart of Accounts seeded.")
+
+            conn.commit() # Commit accounting seed data
+            print("DEBUG_INIT_DB: Accounting module specific seed data committed.")
+
+        except ImportError:
+            print("DEBUG_INIT_DB: Could not import accounting cruds/models for seeding. Skipping accounting seed data.")
+        except Exception as e_acc_seed:
+            print(f"DEBUG_INIT_DB: Error during accounting data seeding: {e_acc_seed}")
+            conn.rollback() # Rollback accounting seed data on error
+            print("DEBUG_INIT_DB: Rollback due to accounting seeding error.")
+
 
         # User Seeding (Admin user)
         print("DEBUG_INIT_DB: Checking/Seeding Users...")

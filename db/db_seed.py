@@ -15,6 +15,8 @@ from app_setup import CONFIG
 
 # Import necessary functions directly from their new CRUD module locations
 from db.cruds.generic_crud import get_db_connection, GenericCRUD
+from db.connection import get_db_connection # Corrected import
+from db.cruds.generic_crud import GenericCRUD
 
 # Import CRUD instances for refactored modules
 from db.cruds.users_crud import users_crud_instance
@@ -409,6 +411,7 @@ def _seed_user_motivational_messages(cursor: sqlite3.Cursor, conn: sqlite3.Conne
     logger.info(f"User motivational messages seeding complete. Added: {added_count}, Skipped/Existing: {skipped_count}")
 
 
+
 def _seed_motivational_messages(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
     logger = logger_passed
     logger.info("Attempting to seed motivational messages...")
@@ -449,6 +452,7 @@ def _seed_motivational_messages(cursor: sqlite3.Cursor, conn: sqlite3.Connection
         {"language_code": "ar", "message": "كل يوم هو فرصة جديدة.", "day_of_year": None},
     ]
     default_messages.extend(original_generic_messages)
+
 
     added_count = 0
     skipped_count = 0

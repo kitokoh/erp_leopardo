@@ -1,8 +1,38 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
+
+# --- BEGIN WORKAROUND for ModuleNotFoundError ---
+# Ensure the project root is in sys.path when main_window.py is loaded.
+# This is a targeted fix for environments where main.py's sys.path modification
+# might not be effective for all imports within main_window.py.
+_PROJECT_ROOT_MW = None
+try:
+    _current_file_path_mw = os.path.abspath(__file__)
+    _main_window_dir_mw = os.path.dirname(_current_file_path_mw)
+    # Assuming main_window.py is in the project root.
+    # If main_window.py is in a subdirectory, this logic needs to be adjusted
+    # to find the actual project root (e.g., os.path.dirname(_main_window_dir_mw) for one level up).
+    _PROJECT_ROOT_MW = _main_window_dir_mw
+
+    if _PROJECT_ROOT_MW not in sys.path:
+        sys.path.insert(0, _PROJECT_ROOT_MW)
+        # print(f"[MW_WORKAROUND] Added {_PROJECT_ROOT_MW} to sys.path[0]")
+    elif sys.path[0] != _PROJECT_ROOT_MW:
+        sys.path.remove(_PROJECT_ROOT_MW)
+        sys.path.insert(0, _PROJECT_ROOT_MW)
+        # print(f"[MW_WORKAROUND] Moved {_PROJECT_ROOT_MW} to sys.path[0]")
+    # else:
+        # print(f"[MW_WORKAROUND] {_PROJECT_ROOT_MW} already at sys.path[0]")
+
+except Exception as e_mw_path_setup:
+    # Use basic print here as logging might not be configured yet or could fail.
+    print(f"Error in main_window.py sys.path WORKAROUND: {e_mw_path_setup}. Project root may not be set correctly: {_PROJECT_ROOT_MW}")
+# --- END WORKAROUND ---
+
 # import logging # logging is already imported
 import logging
+
 from datetime import datetime # Added datetime import
 from PyQt5.QtCore import QStringListModel
 
@@ -52,6 +82,24 @@ from dialogs import (
 )
 # Removed: SettingsDialog as OriginalSettingsDialog, TransporterDialog, FreightForwarderDialog
 # from product_management.list_dialog import ProductListDialog # Removed
+
+# --- BEGIN TARGETED sys.path FIX for product_management import ---
+import sys # Ensure sys is imported if not already (it is at the top)
+import os  # Ensure os is imported if not already (it is at the top)
+try:
+    _mw_file_path = os.path.abspath(__file__)
+    _project_root_for_pm = os.path.dirname(_mw_file_path) # Assuming main_window.py is in project root
+
+    if _project_root_for_pm not in sys.path:
+        sys.path.insert(0, _project_root_for_pm)
+    elif sys.path[0] != _project_root_for_pm:
+        sys.path.remove(_project_root_for_pm)
+        sys.path.insert(0, _project_root_for_pm)
+except Exception:
+    # Silently pass on error during this specific fix, relying on global error handling
+    # or allowing the ModuleNotFoundError to naturally occur if this fails.
+    pass
+# --- END TARGETED sys.path FIX ---
 from product_management.page import ProductManagementPage # Added
 
 from dialogs.status_management_dialog import StatusManagementDialog # Added for status management
@@ -75,11 +123,14 @@ from camera_management.camera_management_widget import CameraManagementWidget # 
 
 from recruitment.recruitment_dashboard import RecruitmentDashboard # Import RecruitmentDashboard
 
+from home_page_widget import HomePageWidget # Added for new Home Page
 from experience_module_widget import ExperienceModuleWidget # Added
 from download_monitor_service import DownloadMonitorService
 from dialogs.assign_document_dialog import AssignDocumentToClientDialog
 from db.cruds.client_documents_crud import add_client_document # For assign dialog
 import os # For path checks in download monitor init
+
+from calendar_module.calendar_widget import CalendarWidget # Import CalendarWidget
 
 # Definition of configurable modules
 CONFIGURABLE_MODULES = [
@@ -91,7 +142,9 @@ CONFIGURABLE_MODULES = [
     {'key': 'module_experience_management_enabled', 'name': 'experience_management', 'action_attr': 'experience_management_action', 'widget_attr': 'experience_management_widget_instance'}, # Added
     {'key': 'module_botpress_integration_enabled', 'name': 'botpress_integration', 'action_attr': 'botpress_integration_action', 'widget_attr': 'botpress_integration_ui_instance'},
     {'key': 'module_carrier_map_enabled', 'name': 'carrier_map', 'action_attr': 'open_carrier_map_action', 'widget_attr': None}, # Carrier map is a dialog
-
+    # Add Calendar module here - for now, not making it 'configurable' via DB setting, always enabled.
+    # If it needs to be configurable, add a 'key' and handle its state in _load_module_states and settings.
+    {'key': 'module_calendar_enabled', 'name': 'calendar', 'action_attr': 'calendar_module_action', 'widget_attr': 'calendar_module_widget_instance'},
     {'key': 'module_camera_management_enabled', 'name': 'camera_management', 'action_attr': 'camera_management_action', 'widget_attr': 'camera_management_widget_instance'}
 ]
 
@@ -190,7 +243,18 @@ class DocumentManager(QMainWindow):
         else:
             self.experience_management_widget_instance = None
 
-        self.main_area_stack.setCurrentWidget(self.documents_page_widget) # Default view
+        # Initialize CalendarWidget (assuming always enabled for now)
+        # If made configurable, this would be inside an "if self.module_states.get('calendar', True):" block
+        self.calendar_module_widget_instance = CalendarWidget(parent=self, current_user_id=self.current_user_id)
+        self.main_area_stack.addWidget(self.calendar_module_widget_instance)
+        # else:
+        #     self.calendar_module_widget_instance = None
+
+
+        self.home_page_widget_instance = HomePageWidget(parent=self) # Create Home Page instance
+        self.main_area_stack.addWidget(self.home_page_widget_instance) # Add Home Page to stack
+
+        self.main_area_stack.setCurrentWidget(self.home_page_widget_instance) # Set Home Page as default view
         self.create_actions_main(); self.create_menus_main()
         
         self.voice_input_service = VoiceInputService() # Instantiate VoiceInputService
@@ -606,6 +670,14 @@ class DocumentManager(QMainWindow):
                                      self.tr("Une erreur inattendue est survenue lors de la reconnaissance vocale: {0}").format(error_message))
 
     def create_actions_main(self): 
+        # Assuming a home.svg icon will be added to icons/ directory and qrc
+        # For now, using a placeholder if home.svg is not yet available in resources
+        home_icon_path = ":/icons/home.svg"
+        # A fallback icon if home.svg is not found in resources, for testing
+        # if not QIcon.hasThemeIcon("home"): home_icon_path = ":/icons/dashboard.svg" # Example fallback
+        self.home_action = QAction(QIcon(home_icon_path), self.tr("Accueil"), self)
+        self.home_action.triggered.connect(self.show_home_view)
+
         self.settings_action = QAction(QIcon(":/icons/modern/settings.svg"), self.tr("Paramètres"), self); self.settings_action.triggered.connect(self.show_settings_page) # Changed to show_settings_page
         # self.template_action removed
         self.status_action = QAction(QIcon(":/icons/check-square.svg"), self.tr("Gérer les Statuts"), self); self.status_action.triggered.connect(self.open_status_management_dialog_slot); self.status_action.setEnabled(False); self.status_action.setToolTip(self.tr("Fonctionnalité de gestion des statuts prévue pour une future version."))
@@ -630,8 +702,13 @@ class DocumentManager(QMainWindow):
         self.experience_management_action = QAction(QIcon(":/icons/book.svg"), self.tr("Gestion des Connaissances"), self) # Consider a more specific icon if available
         self.experience_management_action.triggered.connect(self.show_experience_module_view)
 
+        # Action for Calendar Module
+        self.calendar_module_action = QAction(QIcon(":/icons/book.svg"), self.tr("Calendrier"), self) # Placeholder icon
+        self.calendar_module_action.triggered.connect(self.show_calendar_module_view)
+
 
         # Populate searchable_actions_map
+        self.searchable_actions_map[self.tr("Accueil")] = self.home_action # Added Home action
         self.searchable_actions_map[self.tr("Paramètres")] = self.settings_action
         # self.searchable_actions_map[self.tr("Gérer les Modèles")] removed
         self.searchable_actions_map[self.tr("Gérer les Statuts")] = self.status_action
@@ -647,6 +724,7 @@ class DocumentManager(QMainWindow):
         self.searchable_actions_map[self.tr("Recrutement")] = self.recruitment_action
         self.searchable_actions_map[self.tr("Gestion Caméras")] = self.camera_management_action
         self.searchable_actions_map[self.tr("Gestion des Connaissances")] = self.experience_management_action
+        self.searchable_actions_map[self.tr("Calendrier")] = self.calendar_module_action
 
 
     def create_menus_main(self): 
@@ -654,7 +732,9 @@ class DocumentManager(QMainWindow):
         file_menu.addSeparator(); file_menu.addAction(self.exit_action)
 
         modules_menu = menu_bar.addMenu(self.tr("Modules"))
+        modules_menu.addAction(self.home_action) # Added Home action to Modules menu
         modules_menu.addAction(self.documents_view_action) # Documents view is core, always added
+        modules_menu.addSeparator() # Separator after Home and Documents
 
         for module_info in CONFIGURABLE_MODULES:
             action_name = module_info['action_attr']
@@ -733,6 +813,14 @@ class DocumentManager(QMainWindow):
             QMessageBox.information(self, self.tr("Module Désactivé"), self.tr("Le module 'Carrier Map' est actuellement désactivé."))
             logging.info("Carrier Map module is disabled. Dialog not opened.")
 
+
+    def show_home_view(self):
+        if self.home_page_widget_instance:
+            self.main_area_stack.setCurrentWidget(self.home_page_widget_instance)
+        else:
+            # This case should ideally not happen if initialization is correct
+            logging.error("HomePageWidget instance is None. Cannot show home view.")
+            QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("La page d'accueil n'a pas pu être chargée."))
 
     def show_project_management_view(self):
         if self.project_management_widget_instance:
@@ -981,8 +1069,15 @@ class DocumentManager(QMainWindow):
         logging.info(f"main_window.open_client_tab_by_id: Attempting to create ClientWidget for client_id: {client_id_to_open}")
         try:
             notification_manager = QApplication.instance().notification_manager
-            client_widget = ClientWidget(client_data_to_show, self.config, self.app_root_dir, notification_manager, parent=self)
-            logging.info(f"main_window.open_client_tab_by_id: Successfully created ClientWidget for client_id: {client_id_to_open}")
+            client_widget = ClientWidget(
+                client_info=client_data_to_show,
+                config=self.config,
+                app_root_dir=self.app_root_dir,
+                notification_manager=notification_manager,
+                current_user_id=self.current_user_id, # Pass current_user_id
+                parent=self
+            )
+            logging.info(f"main_window.open_client_tab_by_id: Successfully created ClientWidget for client_id: {client_id_to_open} with user_id: {self.current_user_id}")
         except Exception as e:
             logging.error(f"main_window.open_client_tab_by_id: Error instantiating ClientWidget for client_id: {client_id_to_open} - {e}", exc_info=True)
             QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("Impossible de créer l'onglet client. Erreur: {0}").format(str(e)))
@@ -1202,3 +1297,19 @@ class DocumentManager(QMainWindow):
         else:
             logging.warning("Experience Management widget instance is None. Cannot show view.")
             QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Gestion des Connaissances est désactivé."))
+
+    def show_calendar_module_view(self):
+        if self.calendar_module_widget_instance:
+            # Pass current_user_id again or ensure it's updated if it can change during app session
+            if hasattr(self.calendar_module_widget_instance, 'current_user_id'):
+                 self.calendar_module_widget_instance.current_user_id = self.current_user_id
+            # Reload settings and events when the view is shown, in case they changed
+            if hasattr(self.calendar_module_widget_instance, '_load_company_settings'):
+                self.calendar_module_widget_instance._load_company_settings()
+            if hasattr(self.calendar_module_widget_instance, '_load_user_events'):
+                self.calendar_module_widget_instance._load_user_events() # This also calls highlight
+            self.main_area_stack.setCurrentWidget(self.calendar_module_widget_instance)
+        else:
+            # This case would apply if the module was made configurable and then disabled
+            logging.warning("Calendar Module widget instance is None. Cannot show view.")
+            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Calendrier est désactivé ou non initialisé."))

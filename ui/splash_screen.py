@@ -2,6 +2,7 @@ import os
 import random
 import logging
 import datetime # Added for day_of_year calculation
+
 from PyQt5.QtWidgets import QLabel, QVBoxLayout, QWidget, QApplication
 from PyQt5.QtGui import QPixmap, QMovie, QFont, QPalette, QColor, QBrush
 from PyQt5.QtCore import Qt, QSize, QTimer, QLocale, QPropertyAnimation, QEasingCurve, pyqtProperty
@@ -10,6 +11,8 @@ from PyQt5.QtCore import Qt, QSize, QTimer, QLocale, QPropertyAnimation, QEasing
 # This might require adjusting imports based on your project structure
 # For example, if db.cruds.generic_crud is the path:
 from db.cruds.generic_crud import GenericCRUD, get_db_connection
+from db.connection import get_db_connection # Corrected import
+from db.cruds.generic_crud import GenericCRUD
 
 
 class SplashWindow(QWidget):
@@ -98,9 +101,11 @@ class SplashWindow(QWidget):
 
             # Ultimate fallback
             logging.error("No messages found in DB (user, daily system, generic system). Using hardcoded default.")
+
                 return "Welcome! / Bienvenue !"
 
             return random.choice(messages)['message']
+
 
         except Exception as e:
             logging.error(f"Error fetching motivational message from DB: {e}", exc_info=True)
@@ -143,6 +148,7 @@ class SplashWindow(QWidget):
                 background-color: rgba(0, 0, 0, 0.0); /* Fully transparent background for label itself */
                 padding: 10px;
                 text-align: center;
+
             }
         """)
         # To avoid text repainting issues, ensure labels don't auto-fill their background
@@ -253,6 +259,7 @@ class SplashWindow(QWidget):
         # Important: Use self.close to ensure widget is destroyed and resources are freed.
         # If using self.hide(), the widget remains in memory.
         self.animation.finished.connect(self.close)
+
         self.animation.start()
 
         # Stop the GIF movie when starting fade out, not after it's hidden
