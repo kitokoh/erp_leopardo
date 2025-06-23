@@ -1518,9 +1518,9 @@ CREATE TABLE IF NOT EXISTS Templates (
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
+    """) # Added missing closing triple quotes
 
     cursor.execute("""
-
 CREATE TABLE IF NOT EXISTS motivational_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     language_code TEXT NOT NULL,
