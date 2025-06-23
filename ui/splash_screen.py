@@ -40,7 +40,7 @@ class SplashWindow(QWidget):
         conn = None
         try:
             conn = get_db_connection()
-            messages_crud = GenericCRUD(conn, 'motivational_messages', 'id')
+            messages_crud = GenericCRUD(table_name='motivational_messages', primary_key='id')
 
             current_day_of_year = datetime.date.today().timetuple().tm_yday
 
