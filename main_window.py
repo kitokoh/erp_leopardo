@@ -2,31 +2,37 @@
 import sys
 import os
 
-# --- BEGIN WORKAROUND for ModuleNotFoundError: No module named 'product_management' ---
+# --- BEGIN WORKAROUND for ModuleNotFoundError ---
 # Ensure the project root is in sys.path when main_window.py is loaded.
 # This is a targeted fix for environments where main.py's sys.path modification
-# might not be effective for imports within main_window.py.
+# might not be effective for all imports within main_window.py.
+_PROJECT_ROOT_MW = None
 try:
-    MAIN_WINDOW_DIR = os.path.dirname(os.path.abspath(__file__))
-    # Assuming main_window.py is in the project root. If it's in a subdir, adjust path.
-    PROJECT_ROOT_FOR_MW = MAIN_WINDOW_DIR
+    _current_file_path_mw = os.path.abspath(__file__)
+    _main_window_dir_mw = os.path.dirname(_current_file_path_mw)
+    # Assuming main_window.py is in the project root.
+    # If main_window.py is in a subdirectory, this logic needs to be adjusted
+    # to find the actual project root (e.g., os.path.dirname(_main_window_dir_mw) for one level up).
+    _PROJECT_ROOT_MW = _main_window_dir_mw
 
-    if PROJECT_ROOT_FOR_MW not in sys.path:
-        sys.path.insert(0, PROJECT_ROOT_FOR_MW)
-    elif sys.path[0] != PROJECT_ROOT_FOR_MW:
-        sys.path.remove(PROJECT_ROOT_FOR_MW)
-        sys.path.insert(0, PROJECT_ROOT_FOR_MW)
+    if _PROJECT_ROOT_MW not in sys.path:
+        sys.path.insert(0, _PROJECT_ROOT_MW)
+        # print(f"[MW_WORKAROUND] Added {_PROJECT_ROOT_MW} to sys.path[0]")
+    elif sys.path[0] != _PROJECT_ROOT_MW:
+        sys.path.remove(_PROJECT_ROOT_MW)
+        sys.path.insert(0, _PROJECT_ROOT_MW)
+        # print(f"[MW_WORKAROUND] Moved {_PROJECT_ROOT_MW} to sys.path[0]")
+    # else:
+        # print(f"[MW_WORKAROUND] {_PROJECT_ROOT_MW} already at sys.path[0]")
 
-    # For diagnostics (can be removed later)
-    # print(f"[main_window.py] sys.path[0] after modification: {sys.path[0]}")
-    # print(f"[main_window.py] Attempting to import product_management.page...")
-
-except Exception as e_mw_path:
-    print(f"Error in main_window.py sys.path modification: {e_mw_path}")
+except Exception as e_mw_path_setup:
+    # Use basic print here as logging might not be configured yet or could fail.
+    print(f"Error in main_window.py sys.path WORKAROUND: {e_mw_path_setup}. Project root may not be set correctly: {_PROJECT_ROOT_MW}")
 # --- END WORKAROUND ---
 
 # import logging # logging is already imported
 import logging
+
 from datetime import datetime # Added datetime import
 from PyQt5.QtCore import QStringListModel
 
@@ -76,6 +82,24 @@ from dialogs import (
 )
 # Removed: SettingsDialog as OriginalSettingsDialog, TransporterDialog, FreightForwarderDialog
 # from product_management.list_dialog import ProductListDialog # Removed
+
+# --- BEGIN TARGETED sys.path FIX for product_management import ---
+import sys # Ensure sys is imported if not already (it is at the top)
+import os  # Ensure os is imported if not already (it is at the top)
+try:
+    _mw_file_path = os.path.abspath(__file__)
+    _project_root_for_pm = os.path.dirname(_mw_file_path) # Assuming main_window.py is in project root
+
+    if _project_root_for_pm not in sys.path:
+        sys.path.insert(0, _project_root_for_pm)
+    elif sys.path[0] != _project_root_for_pm:
+        sys.path.remove(_project_root_for_pm)
+        sys.path.insert(0, _project_root_for_pm)
+except Exception:
+    # Silently pass on error during this specific fix, relying on global error handling
+    # or allowing the ModuleNotFoundError to naturally occur if this fails.
+    pass
+# --- END TARGETED sys.path FIX ---
 from product_management.page import ProductManagementPage # Added
 
 from dialogs.status_management_dialog import StatusManagementDialog # Added for status management

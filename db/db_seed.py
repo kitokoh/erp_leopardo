@@ -14,7 +14,8 @@ from app_setup import CONFIG
 
 
 # Import necessary functions directly from their new CRUD module locations
-from db.cruds.generic_crud import get_db_connection, GenericCRUD
+from db.connection import get_db_connection # Corrected import
+from db.cruds.generic_crud import GenericCRUD
 
 # Import CRUD instances for refactored modules
 from db.cruds.users_crud import users_crud_instance
