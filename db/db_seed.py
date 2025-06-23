@@ -14,6 +14,7 @@ from app_setup import CONFIG
 
 
 # Import necessary functions directly from their new CRUD module locations
+from db.cruds.generic_crud import get_db_connection, GenericCRUD
 from db.connection import get_db_connection # Corrected import
 from db.cruds.generic_crud import GenericCRUD
 
@@ -363,6 +364,52 @@ def seed_initial_data_master(cursor: sqlite3.Cursor):
     _seed_main_document_templates(cursor, conn, logger_passed=logger)
     _seed_default_utility_templates(cursor, conn, logger_passed=logger)
     _seed_motivational_messages(cursor, conn, logger_passed=logger)
+    _seed_user_motivational_messages(cursor, conn, logger_passed=logger)
+
+
+def _seed_user_motivational_messages(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
+    logger = logger_passed
+    logger.info("Attempting to seed example user motivational messages...")
+
+    user_messages_crud = GenericCRUD(conn, 'user_motivational_messages', 'id')
+
+    example_user_messages = [
+        {"message": "Keep pushing your limits!", "language_code": "en"},
+        {"message": "Aujourd'hui est un cadeau.", "language_code": "fr"},
+        {"message": "Make today amazing.", "language_code": None}, # Example of a language-neutral user message
+    ]
+
+    added_count = 0
+    skipped_count = 0
+
+    for msg_data in example_user_messages:
+        try:
+            # Check for existing message to avoid IntegrityError on UNIQUE constraint
+            query = "SELECT id FROM user_motivational_messages WHERE message = ?"
+            cursor.execute(query, (msg_data["message"],))
+            existing = cursor.fetchone()
+
+            if existing:
+                logger.debug(f"User motivational message '{msg_data['message'][:30]}...' already exists. Skipping.")
+                skipped_count += 1
+                continue
+
+            data_to_insert = {
+                "message": msg_data["message"],
+                "language_code": msg_data.get("language_code") # Handles if language_code is not present
+            }
+            user_messages_crud.create(data_to_insert)
+            added_count += 1
+            logger.debug(f"Added user motivational message: {msg_data['message'][:30]}...")
+        except sqlite3.IntegrityError as e:
+            logger.warning(f"Skipping user motivational message due to integrity error: {msg_data['message'][:30]}.... Error: {e}")
+            skipped_count += 1
+        except Exception as e:
+            logger.error(f"Error adding user motivational message '{msg_data['message'][:30]}...': {e}", exc_info=True)
+            skipped_count += 1
+
+    logger.info(f"User motivational messages seeding complete. Added: {added_count}, Skipped/Existing: {skipped_count}")
+
 
 
 def _seed_motivational_messages(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
@@ -372,22 +419,40 @@ def _seed_motivational_messages(cursor: sqlite3.Cursor, conn: sqlite3.Connection
     messages_crud = GenericCRUD(conn, 'motivational_messages', 'id')
 
     default_messages = [
-        # French
+        # French - Generic
+        {"language_code": "fr", "message": "Chaque effort compte, continuez d'avancer !", "day_of_year": None},
+        {"language_code": "fr", "message": "Votre potentiel est illimité, explorez-le.", "day_of_year": None},
+        {"language_code": "fr", "message": "Les défis sont des opportunités déguisées.", "day_of_year": None},
+        # French - Daily Specific (examples)
+        {"language_code": "fr", "message": "Bonne année ! Que cette nouvelle année vous apporte succès et bonheur.", "day_of_year": 1}, # Jan 1st
+        {"language_code": "fr", "message": "Joyeux Noël ! Paix et joie à vous et vos proches.", "day_of_year": 359}, # Dec 25th (approx for non-leap)
+        {"language_code": "fr", "message": "C'est le printemps, un temps de renouveau et de croissance !", "day_of_year": 80}, # Approx March 21st
+
+        # English - Generic
+        {"language_code": "en", "message": "Every effort counts, keep moving forward!", "day_of_year": None},
+        {"language_code": "en", "message": "Your potential is limitless, explore it.", "day_of_year": None},
+        {"language_code": "en", "message": "Challenges are disguised opportunities.", "day_of_year": None},
+        # English - Daily Specific (examples)
+        {"language_code": "en", "message": "Happy New Year! May this year bring you success and happiness.", "day_of_year": 1},
+        {"language_code": "en", "message": "Merry Christmas! Peace and joy to you and yours.", "day_of_year": 359},
+        {"language_code": "en", "message": "It's springtime, a time for renewal and growth!", "day_of_year": 80},
+
+        # Arabic - Generic
+        {"language_code": "ar", "message": "كل مجهود مهم، استمر في التقدم!", "day_of_year": None},
+        {"language_code": "ar", "message": "إمكانياتك لا حدود لها، استكشفها.", "day_of_year": None},
+        # Arabic - Daily Specific (example)
+        {"language_code": "ar", "message": "سنة جديدة سعيدة! أتمنى لك التوفيق والسعادة.", "day_of_year": 1},
+    ]
+    # Keep some of the original messages as generic fallbacks
+    original_generic_messages = [
         {"language_code": "fr", "message": "Chaque jour est une nouvelle opportunité.", "day_of_year": None},
         {"language_code": "fr", "message": "Croyez en vous et tout deviendra possible.", "day_of_year": None},
-        {"language_code": "fr", "message": "Le succès commence par un état d'esprit.", "day_of_year": None},
-        {"language_code": "fr", "message": "Soyez le changement que vous voulez voir dans le monde.", "day_of_year": None},
-        {"language_code": "fr", "message": "La persévérance est la clé de la réussite.", "day_of_year": None},
-        # English
         {"language_code": "en", "message": "Every day is a new opportunity.", "day_of_year": None},
         {"language_code": "en", "message": "Believe in yourself and anything is possible.", "day_of_year": None},
-        {"language_code": "en", "message": "Success begins with a state of mind.", "day_of_year": None},
-        {"language_code": "en", "message": "Be the change you wish to see in the world.", "day_of_year": None},
-        {"language_code": "en", "message": "Perseverance is the key to success.", "day_of_year": None},
-        # Arabic (Example - ensure your DB/system handles UTF-8 correctly)
         {"language_code": "ar", "message": "كل يوم هو فرصة جديدة.", "day_of_year": None},
-        {"language_code": "ar", "message": "آمن بنفسك وكل شيء سيصبح ممكنًا.", "day_of_year": None},
     ]
+    default_messages.extend(original_generic_messages)
+
 
     added_count = 0
     skipped_count = 0
