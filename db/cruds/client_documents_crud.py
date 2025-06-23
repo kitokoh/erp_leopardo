@@ -59,12 +59,13 @@ def add_client_document(data: dict, conn: sqlite3.Connection = None) -> str | No
     )
 
     try:
+        logging.debug(f"Attempting to add client document. SQL: {sql}, Params: {params}")
         cursor.execute(sql, params)
         # conn.commit() # Handled by _manage_conn decorator if it's configured to do so
         logging.info(f"Successfully added client document with ID: {new_document_id} for client: {data.get('client_id')}")
         return new_document_id
     except sqlite3.Error as e:
-        logging.error(f"Error adding client document for client {data.get('client_id')}: {e} - SQL: {sql} - Params: {params}")
+        logging.error(f"SQLite error adding client document for client {data.get('client_id')}: {e} - SQL: {sql} - Params: {params}", exc_info=True)
         # conn.rollback() # Handled by _manage_conn decorator if it's configured to do so
         return None
 
