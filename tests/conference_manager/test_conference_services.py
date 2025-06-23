@@ -75,6 +75,7 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
     def test_creer_client(self):
         nom_client = "Nouveau Client Gamma"
         coordonnees_client = {"adresse": "3 rue Gamma"}
+
         client = services.creer_client(nom=nom_client, coordonnees=coordonnees_client)
         self.assertIsNotNone(client.id)
         self.assertEqual(client.nom, nom_client)
@@ -316,6 +317,7 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
         self.assertIn(conf3.id, [c.id for c in planned_confs])
 
 
+
         client1_planned_confs = services.lister_conferences(client_id=self.client1.id, statut=Conference.CONFERENCE_STATUT_PLANNED)
         self.assertEqual(len(client1_planned_confs), 2)
 
@@ -340,6 +342,7 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
     def test_supprimer_conference_inexistante(self):
         resultat = services.supprimer_conference("id_conf_vraiment_bidon_suppr")
         self.assertFalse(resultat)
+
 
     # --- Tests pour la Logique de Planification ---
     def test_obtenir_conferences_a_venir(self):
@@ -403,6 +406,7 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
         conf = services.obtenir_details_conference(conf_obj.id)
         self.assertIsNotNone(conf)
 
+
         rapport = services.generer_texte_rapport_conference(conf.id)
 
         self.assertIn(conf.id, rapport)
@@ -412,6 +416,7 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
              self.assertIn(conf.date_heure_creation.strftime('%Y-%m-%d %H:%M:%S'), rapport)
         if date_prog: # Doit exister
             self.assertIn(date_prog.strftime('%Y-%m-%d %H:%M:%S'), rapport)
+
         self.assertIn(Conference.CONFERENCE_STATUT_COMPLETED, rapport)
         self.assertIn("M. Untel", rapport)
         self.assertIn(notes, rapport)

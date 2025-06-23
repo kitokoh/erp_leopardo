@@ -31,3 +31,4 @@ if __name__ == '__main__': # Dans le script principal de l'application
 ```
 Les services utilisent ensuite cette base de données pour toutes les opérations.
 Les tests unitaires gèrent leur propre initialisation de base de données en mémoire.
+

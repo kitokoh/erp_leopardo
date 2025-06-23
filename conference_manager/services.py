@@ -187,6 +187,7 @@ def supprimer_client(client_id: str) -> bool:
 
 # --- Gestion des Conférences (sera adapté ensuite) ---
 
+
 def creer_conference(titre: str,
                      date_heure_programmation: Optional[datetime] = None,
                      notes: str = "",
@@ -201,6 +202,7 @@ def creer_conference(titre: str,
 
     # Crée une instance de Conference pour générer l'ID et la date de création
     nouvelle_conference_obj = Conference(
+
         titre=titre,
         date_heure_programmation=date_heure_programmation,
         notes_rapport=notes,
@@ -692,6 +694,7 @@ def obtenir_conferences_a_venir() -> List[Conference]:
     return conferences_futures_list
 
 
+
 # --- Gestion des Rapports ---
 
 def generer_texte_rapport_conference(conference_id: str) -> str:
@@ -699,6 +702,7 @@ def generer_texte_rapport_conference(conference_id: str) -> str:
     Génère un rapport textuel simple pour une conférence donnée.
     """
     conference = obtenir_details_conference(conference_id) # Utilise déjà SQLite
+
     if not conference:
         raise ValueError(f"Conférence avec ID '{conference_id}' non trouvée.")
 
@@ -717,6 +721,7 @@ def generer_texte_rapport_conference(conference_id: str) -> str:
         rapport_lignes.append("Date de Création: Non disponible")
 
 
+
     if conference.date_heure_programmation:
         rapport_lignes.append(f"Date Programmée: {conference.date_heure_programmation.strftime('%Y-%m-%d %H:%M:%S')}")
     else:
@@ -726,6 +731,7 @@ def generer_texte_rapport_conference(conference_id: str) -> str:
 
     if conference.client_id:
         client = obtenir_client(conference.client_id) # Utilise déjà SQLite
+
         client_nom = client.nom if client else "Client inconnu (ID non trouvé)"
         rapport_lignes.append(f"Client Associé: {client_nom} (ID: {conference.client_id})")
     else:

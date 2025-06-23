@@ -1,43 +1,63 @@
 import os
 import sys
 import sqlite3
-import logging # Added for error logging
+import logging
 
-# Attempt to import app_setup, with a fallback mechanism for sys.path
+_APP_SETUP_IMPORTED = False
 try:
-    import app_setup # Import app_setup directly
+    import app_setup
+    _APP_SETUP_IMPORTED = True
 except ModuleNotFoundError:
-    # This block provides a fallback if app_setup is not found,
-    # which can happen if sys.path is not correctly configured by the entry point.
-    # Calculate the project root relative to this file's location:
-    # __file__ is db/connection.py
-    # os.path.dirname(__file__) is db/
-    # os.path.dirname(os.path.dirname(__file__)) is the project root (e.g., testpy/)
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root_calculated = os.path.dirname(current_dir)
+    _current_dir_db_conn = os.path.dirname(os.path.abspath(__file__))
+    _project_root_db_conn = os.path.dirname(_current_dir_db_conn)
 
-    if project_root_calculated not in sys.path:
-        sys.path.insert(0, project_root_calculated)
+    original_sys_path = list(sys.path) # Keep a copy for reference if needed
+
+    path_manipulation_done = False
+    if _project_root_db_conn not in sys.path:
+        sys.path.insert(0, _project_root_db_conn)
         logging.warning(
-            f"db.connection: Added '{project_root_calculated}' to sys.path to find 'app_setup'."
+            f"db.connection: Added '{_project_root_db_conn}' to sys.path to find 'app_setup'."
         )
+        path_manipulation_done = True
+    elif sys.path[0] != _project_root_db_conn:
+        # It's in sys.path, but not at the front. This is a less common case to handle defensively.
+        try:
+            sys.path.remove(_project_root_db_conn)
+        except ValueError:
+            pass # Should not happen if 'in' check passed, but defensive
+        sys.path.insert(0, _project_root_db_conn)
+        logging.warning(
+            f"db.connection: Moved '{_project_root_db_conn}' to sys.path[0] to find 'app_setup'."
+        )
+        path_manipulation_done = True
 
-    try:
-        import app_setup # Retry import
-    except ModuleNotFoundError as e_retry:
+    if path_manipulation_done or (sys.path[0] == _project_root_db_conn) : # Try importing if path was changed or if it was already correct
+        try:
+            import app_setup # Retry import
+            _APP_SETUP_IMPORTED = True
+        except ModuleNotFoundError as e_retry:
+            logging.critical(
+                "db.connection: CRITICAL - Failed to import 'app_setup' after sys.path adjustment. "
+                f"Path: '{_project_root_db_conn}', Error: {e_retry}. Sys.path was: {original_sys_path}, now: {sys.path}"
+            )
+            # Restore sys.path if we changed it and failed, to minimize side effects, though system is likely unstable.
+            if path_manipulation_done:
+                 sys.path = original_sys_path
+            raise ImportError(
+                "Essential module 'app_setup' could not be imported by db.connection. "
+                "Please check Python path and project structure."
+            ) from e_retry
+    else: # Should not be reached if logic is correct, means path was not manipulated and not already correct.
         logging.critical(
-            "db.connection: CRITICAL - Failed to import 'app_setup' even after "
-            f"attempting to add '{project_root_calculated}' to sys.path. Error: {e_retry}"
+            "db.connection: CRITICAL - Project root '{_project_root_db_conn}' was not added to sys.path and app_setup initially failed. This indicates a logic error in db.connection's path setup."
         )
-        # Re-raise the original error or a new one to halt execution,
-        # as app_setup is essential.
-        raise ImportError(
-            "Essential module 'app_setup' could not be imported. "
-            "Please check Python path and project structure."
-        ) from e_retry
+        raise ImportError("Essential module 'app_setup' could not be imported due to path setup logic error in db.connection.")
 
-# Removed try-except block for config import (original comment)
-# Removed config_fallback class (original comment)
+
+if not _APP_SETUP_IMPORTED:
+    logging.critical("db.connection: 'app_setup' module was not successfully imported. This is a fatal error for database configuration.")
+    raise ImportError("db.connection: Failed to make 'app_setup' available.")
 
 def get_db_connection(db_path_override=None):
     """
@@ -71,6 +91,7 @@ def get_db_connection(db_path_override=None):
             raise ValueError("SQLite connection requires a valid database path.")
         conn = sqlite3.connect(path_to_connect)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON;") # Enforce foreign key constraints
         return conn
     elif database_type == 'postgresql':
         # --- PostgreSQL Connection (Not Implemented) ---
