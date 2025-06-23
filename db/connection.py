@@ -3,10 +3,41 @@ import sys
 import sqlite3
 import logging # Added for error logging
 
-import app_setup # Import app_setup directly
+# Attempt to import app_setup, with a fallback mechanism for sys.path
+try:
+    import app_setup # Import app_setup directly
+except ModuleNotFoundError:
+    # This block provides a fallback if app_setup is not found,
+    # which can happen if sys.path is not correctly configured by the entry point.
+    # Calculate the project root relative to this file's location:
+    # __file__ is db/connection.py
+    # os.path.dirname(__file__) is db/
+    # os.path.dirname(os.path.dirname(__file__)) is the project root (e.g., testpy/)
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root_calculated = os.path.dirname(current_dir)
 
-# Removed try-except block for config import
-# Removed config_fallback class
+    if project_root_calculated not in sys.path:
+        sys.path.insert(0, project_root_calculated)
+        logging.warning(
+            f"db.connection: Added '{project_root_calculated}' to sys.path to find 'app_setup'."
+        )
+    
+    try:
+        import app_setup # Retry import
+    except ModuleNotFoundError as e_retry:
+        logging.critical(
+            "db.connection: CRITICAL - Failed to import 'app_setup' even after "
+            f"attempting to add '{project_root_calculated}' to sys.path. Error: {e_retry}"
+        )
+        # Re-raise the original error or a new one to halt execution,
+        # as app_setup is essential.
+        raise ImportError(
+            "Essential module 'app_setup' could not be imported. "
+            "Please check Python path and project structure."
+        ) from e_retry
+
+# Removed try-except block for config import (original comment)
+# Removed config_fallback class (original comment)
 
 def get_db_connection(db_path_override=None):
     """

@@ -2,10 +2,29 @@
 import sys
 import os
 
-# Determine project root and add to sys.path
+# Determine project root
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-if PROJECT_ROOT not in sys.path:
+
+# Ensure PROJECT_ROOT is at the beginning of sys.path for consistent module resolution
+if PROJECT_ROOT in sys.path:
+    # If it's present but not at the start, remove and re-insert at the front
+    if sys.path[0] != PROJECT_ROOT:
+        sys.path.remove(PROJECT_ROOT)
+        sys.path.insert(0, PROJECT_ROOT)
+        # Optional: log that it was moved
+        # import logging
+        # logging.info(f"Moved {PROJECT_ROOT} to the start of sys.path.")
+else:
+    # If it's not present at all, insert it at the start
     sys.path.insert(0, PROJECT_ROOT)
+    # Optional: log that it was added
+    # import logging
+    # logging.info(f"Added {PROJECT_ROOT} to the start of sys.path.")
+
+# For diagnostics (can be removed or commented out in production)
+# print(f"[{os.path.basename(__file__)}] Effective sys.path[0]: {sys.path[0]}")
+# print(f"[{os.path.basename(__file__)}] Full sys.path: {sys.path}")
+
 
 from main_window import DocumentManager # The main application window
 
