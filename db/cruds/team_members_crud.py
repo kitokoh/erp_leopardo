@@ -2,7 +2,7 @@ import sqlite3
 import uuid # Not used in these specific functions, but good for consistency
 from datetime import datetime
 import logging
-from .generic_crud import _manage_conn, get_db_connection
+from .generic_crud import _manage_conn # get_db_connection is not used directly
 
 logger = logging.getLogger(__name__)
 

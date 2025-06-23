@@ -1,7 +1,7 @@
 import sqlite3
 import uuid
 from datetime import datetime
-from ..utils import get_db_connection
+from ..connection import get_db_connection # Corrected import path
 
 # --- CRUD functions for FreightForwarders ---
 def add_freight_forwarder(data: dict) -> str | None:

@@ -1,7 +1,7 @@
 import sqlite3
 from datetime import datetime
 import logging
-from .generic_crud import _manage_conn, get_db_connection # get_db_connection might not be needed if only using _manage_conn
+from .generic_crud import _manage_conn # get_db_connection is not used directly
 from .contacts_crud import (
     add_contact as central_add_contact,
     get_contact_by_id as central_get_contact_by_id,
