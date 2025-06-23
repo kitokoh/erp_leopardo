@@ -1,4 +1,5 @@
 import sqlite3
+from typing import Union, List, Dict, Any
 import uuid # Required by some CRUD functions, even if not directly in generic
 import hashlib # Required by some CRUD functions, even if not directly in generic
 from datetime import datetime # Required by some CRUD functions, even if not directly in generic
@@ -77,14 +78,14 @@ class GenericCRUD:
     # or if needing to ensure dict conversion at a specific point.
     # However, with conn.row_factory = sqlite3.Row, direct dict(row) works.
     # Let's define it here for explicitness and potential complex object handling later.
-    def _object_to_dict(self, db_row: sqlite3.Row) -> dict | None:
+    def _object_to_dict(self, db_row: sqlite3.Row) -> Union[Dict, None]:
         """Converts a sqlite3.Row object to a dictionary."""
         if db_row is None:
             return None
         return dict(db_row)
 
     @_manage_conn
-    def get_by_id(self, table_name: str, id_column: str, item_id: any, conn: sqlite3.Connection) -> dict | None:
+    def get_by_id(self, table_name: str, id_column: str, item_id: Any, conn: sqlite3.Connection) -> Union[Dict, None]:
         """
         Fetches a single record from a specified table by its ID.
 
@@ -103,7 +104,7 @@ class GenericCRUD:
         return self._object_to_dict(row)
 
     @_manage_conn
-    def delete_by_id(self, table_name: str, id_column: str, item_id: any, conn: sqlite3.Connection) -> bool:
+    def delete_by_id(self, table_name: str, id_column: str, item_id: Any, conn: sqlite3.Connection) -> bool:
         """
         Deletes a record from a specified table by its ID.
         This performs a hard delete.
@@ -122,7 +123,7 @@ class GenericCRUD:
         return cursor.rowcount > 0
 
     @_manage_conn
-    def exists_by_id(self, table_name: str, id_column: str, item_id: any, conn: sqlite3.Connection) -> bool:
+    def exists_by_id(self, table_name: str, id_column: str, item_id: Any, conn: sqlite3.Connection) -> bool:
         """
         Checks if a record exists in a specified table by its ID.
 
@@ -140,7 +141,7 @@ class GenericCRUD:
         return cursor.fetchone() is not None
 
     @_manage_conn
-    def get_all(self, table_name: str, conn: sqlite3.Connection, order_by: str = None) -> list[dict]:
+    def get_all(self, table_name: str, conn: sqlite3.Connection, order_by: str = None) -> List[Dict]:
         """
         Fetches all records from a specified table, with optional ordering.
 
@@ -169,7 +170,7 @@ class GenericCRUD:
     #     pass
 
     @_manage_conn
-    def create(self, data: dict, conn: sqlite3.Connection, table_name: str = None) -> any | None:
+    def create(self, data: Dict, conn: sqlite3.Connection, table_name: str = None) -> Union[Any, None]:
         """
         Inserts a new record into the specified table.
 
@@ -200,7 +201,7 @@ class GenericCRUD:
             raise # Re-raise to be caught by _manage_conn or caller
 
     @_manage_conn
-    def get_by_attributes(self, attributes: dict, conn: sqlite3.Connection, table_name: str = None, logical_operator: str = "AND", order_by: str = None) -> list[dict]:
+    def get_by_attributes(self, attributes: Dict, conn: sqlite3.Connection, table_name: str = None, logical_operator: str = "AND", order_by: str = None) -> List[Dict]:
         """
         Fetches records from the specified table that match given attributes.
 
@@ -253,7 +254,7 @@ class GenericCRUD:
 
 # Utility function, can be outside the class if preferred, or static.
 # Making it a top-level function for easier import/use by other modules if needed.
-def object_to_dict(db_row: sqlite3.Row) -> dict | None:
+def object_to_dict(db_row: sqlite3.Row) -> Union[Dict, None]:
     """Converts a sqlite3.Row object to a dictionary."""
     if db_row is None:
         return None
