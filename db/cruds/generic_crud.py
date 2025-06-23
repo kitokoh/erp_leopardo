@@ -7,19 +7,20 @@ import os # Keep os if used by other parts of the file, but not for path manipul
 import logging
 
 # Configuration and Utilities
-try:
-    # This is the primary and now should be the ONLY way it gets get_db_connection
-    from ..connection import get_db_connection
-except ImportError as e:
-    # If this import fails, it's a problem with db.connection or the package structure.
-    # generic_crud.py should not try to work around it with its own config loading.
-    logging.critical(f"CRITICAL: Failed to import get_db_connection from ..connection in generic_crud.py. Error: {e}")
-    # Re-raise the error as the CRUD operations cannot function without a db connection.
-    raise ImportError(f"Essential import get_db_connection from ..connection failed in generic_crud.py") from e
+# try:
+#     # This is the primary and now should be the ONLY way it gets get_db_connection
+#     from ..connection import get_db_connection ### MOVED INTO _manage_conn.wrapper
+# except ImportError as e:
+#     # If this import fails, it's a problem with db.connection or the package structure.
+#     # generic_crud.py should not try to work around it with its own config loading.
+#     logging.critical(f"CRITICAL: Failed to import get_db_connection from ..connection in generic_crud.py. Error: {e}")
+#     # Re-raise the error as the CRUD operations cannot function without a db connection.
+#     raise ImportError(f"Essential import get_db_connection from ..connection failed in generic_crud.py") from e
 
 # Helper to manage connection lifecycle for CRUD functions
 def _manage_conn(func):
     def wrapper(*args, **kwargs):
+        from ..connection import get_db_connection # DEFERRED IMPORT
         conn_passed = kwargs.get('conn')
         conn_is_external = conn_passed is not None
         conn_to_use = conn_passed if conn_is_external else get_db_connection()

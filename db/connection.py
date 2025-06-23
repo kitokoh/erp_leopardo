@@ -1,17 +1,63 @@
 import os
 import sys
 import sqlite3
-import logging # Added for error logging
+import logging
 
-# Add the project root to sys.path to allow importing app_setup
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+_APP_SETUP_IMPORTED = False
+try:
+    import app_setup
+    _APP_SETUP_IMPORTED = True
+except ModuleNotFoundError:
+    _current_dir_db_conn = os.path.dirname(os.path.abspath(__file__))
+    _project_root_db_conn = os.path.dirname(_current_dir_db_conn)
 
-import app_setup # Import app_setup directly
+    original_sys_path = list(sys.path) # Keep a copy for reference if needed
 
-# Removed try-except block for config import
-# Removed config_fallback class
+    path_manipulation_done = False
+    if _project_root_db_conn not in sys.path:
+        sys.path.insert(0, _project_root_db_conn)
+        logging.warning(
+            f"db.connection: Added '{_project_root_db_conn}' to sys.path to find 'app_setup'."
+        )
+        path_manipulation_done = True
+    elif sys.path[0] != _project_root_db_conn:
+        # It's in sys.path, but not at the front. This is a less common case to handle defensively.
+        try:
+            sys.path.remove(_project_root_db_conn)
+        except ValueError:
+            pass # Should not happen if 'in' check passed, but defensive
+        sys.path.insert(0, _project_root_db_conn)
+        logging.warning(
+            f"db.connection: Moved '{_project_root_db_conn}' to sys.path[0] to find 'app_setup'."
+        )
+        path_manipulation_done = True
+
+    if path_manipulation_done or (sys.path[0] == _project_root_db_conn) : # Try importing if path was changed or if it was already correct
+        try:
+            import app_setup # Retry import
+            _APP_SETUP_IMPORTED = True
+        except ModuleNotFoundError as e_retry:
+            logging.critical(
+                "db.connection: CRITICAL - Failed to import 'app_setup' after sys.path adjustment. "
+                f"Path: '{_project_root_db_conn}', Error: {e_retry}. Sys.path was: {original_sys_path}, now: {sys.path}"
+            )
+            # Restore sys.path if we changed it and failed, to minimize side effects, though system is likely unstable.
+            if path_manipulation_done:
+                 sys.path = original_sys_path
+            raise ImportError(
+                "Essential module 'app_setup' could not be imported by db.connection. "
+                "Please check Python path and project structure."
+            ) from e_retry
+    else: # Should not be reached if logic is correct, means path was not manipulated and not already correct.
+        logging.critical(
+            "db.connection: CRITICAL - Project root '{_project_root_db_conn}' was not added to sys.path and app_setup initially failed. This indicates a logic error in db.connection's path setup."
+        )
+        raise ImportError("Essential module 'app_setup' could not be imported due to path setup logic error in db.connection.")
+
+
+if not _APP_SETUP_IMPORTED:
+    logging.critical("db.connection: 'app_setup' module was not successfully imported. This is a fatal error for database configuration.")
+    raise ImportError("db.connection: Failed to make 'app_setup' available.")
 
 def get_db_connection(db_path_override=None):
     """
@@ -22,13 +68,19 @@ def get_db_connection(db_path_override=None):
     if db_path_override:
         path_to_connect = db_path_override
     else:
-        app_config = app_setup.get_app_config()
-        path_to_connect = app_config.get('database_path') # Used by SQLite and potentially others
-        database_type = app_config.get('database_type', 'sqlite') # Default to 'sqlite' if not set
+        if app_setup:
+            app_config = app_setup.get_app_config()
+            path_to_connect = app_config.get('database_path') # Used by SQLite and potentially others
+            database_type = app_config.get('database_type', 'sqlite') # Default to 'sqlite' if not set
+        else: # app_setup is not available, fall back to defaults or raise error if path not overridden
+            logging.warning("db.connection: app_setup not available. Using default 'sqlite' type. Path must be overridden for non-test scenarios.")
+            path_to_connect = None # Must be overridden by db_path_override
+            database_type = 'sqlite'
 
-        if not path_to_connect and database_type == 'sqlite': # Path is critical for SQLite if no override
+
+        if not path_to_connect and database_type == 'sqlite' and not db_path_override: # Path is critical for SQLite if no override
             logging.critical(
-                "CRITICAL: 'database_path' is missing or empty in the application configuration for SQLite. "
+                "CRITICAL: 'database_path' is missing or empty in the application configuration for SQLite, and no override was provided. "
                 "This path is essential for SQLite database connectivity. "
                 "Please check the configuration setup."
             )
@@ -39,6 +91,7 @@ def get_db_connection(db_path_override=None):
             raise ValueError("SQLite connection requires a valid database path.")
         conn = sqlite3.connect(path_to_connect)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON;") # Enforce foreign key constraints
         return conn
     elif database_type == 'postgresql':
         # --- PostgreSQL Connection (Not Implemented) ---

@@ -20,7 +20,7 @@ except ImportError:
         APP_ROOT_DIR = project_root # Best guess fallback
     config = config_fallback_templates
 
-from .generic_crud import _manage_conn, get_db_connection # db_config removed from this import
+from .generic_crud import _manage_conn # get_db_connection is not used directly
 from .template_categories_crud import add_template_category, get_template_category_by_name
 from .application_settings_crud import get_setting # Added for visibility check
 
