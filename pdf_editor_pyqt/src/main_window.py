@@ -49,6 +49,7 @@ class TextDisplayDialog(QDialog):
                 QMessageBox.information(self, "Enregistré", f"Texte enregistré: {file_path}")
             except Exception as e: QMessageBox.critical(self, "Erreur", f"Erreur: {e}")
 
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -69,6 +70,7 @@ class MainWindow(QMainWindow):
         self.freetext_fontname = "helv"
         self.freetext_fontsize = 11
         self.freetext_color = (0,0,0)
+
         self.selection_start_point = None
         self.selection_rect_item = None
         self.current_ink_stroke = []
@@ -78,6 +80,7 @@ class MainWindow(QMainWindow):
         self.selected_widget = None
         self.property_widget_layout = None
         self.current_prop_widgets = []
+
         self._create_actions()
         self._create_menu_bar()
         self._create_tool_bars()
@@ -328,6 +331,7 @@ class MainWindow(QMainWindow):
         self.pdf_scene.setSceneRect(QRectF(pixmap.rect()))
         doc_name = self.current_pdf_document.name if hasattr(self.current_pdf_document, 'name') and self.current_pdf_document.name else "Nouveau Document"
         self.setWindowTitle(f"Éditeur PDF PyQt - Page {self.current_page_number + 1}/{self.current_pdf_document.page_count} [{doc_name}]")
+
         self.update_navigation_controls()
 
     def update_thumbnails(self):

@@ -1,6 +1,6 @@
 import sqlite3
 from datetime import datetime
-from .generic_crud import GenericCRUD, _manage_conn, get_db_connection # Updated import
+from .generic_crud import GenericCRUD, _manage_conn # get_db_connection is not used directly
 import logging
 from typing import Dict, Any, Optional, List # Added List for type hinting
 

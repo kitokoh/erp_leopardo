@@ -1,7 +1,7 @@
 import sqlite3
 from datetime import datetime, timezone
 import logging
-from .generic_crud import _manage_conn, get_db_connection
+from .generic_crud import _manage_conn # get_db_connection is not used directly
 
 logger = logging.getLogger(__name__)
 

@@ -2,7 +2,7 @@ import sqlite3
 import uuid # Not directly used in current selection but good for consistency
 from datetime import datetime # For add_contact
 import logging # For stub add_contact_list and others
-from .generic_crud import _manage_conn, get_db_connection
+from .generic_crud import _manage_conn # get_db_connection is not used directly
 
 # --- Contacts CRUD ---
 @_manage_conn

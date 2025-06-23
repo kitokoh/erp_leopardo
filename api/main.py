@@ -13,6 +13,7 @@ from . import hr_reports # Import for HR reports router
 from . import recruitment as recruitment_router_module # Import for the recruitment router
 from . import company_expenses_api # Import for the company expenses router
 from . import company_factures_api # Import for the company factures router
+from calendar_module import api as calendar_api_router # Import for the calendar router
 
 
 app = FastAPI(
@@ -44,5 +45,16 @@ app.include_router(hr_reports.router) # Register HR reports router
 app.include_router(recruitment_router_module.router) # Register the recruitment router
 app.include_router(company_expenses_api.router) # Register the company expenses router
 app.include_router(company_factures_api.router) # Register the company factures router
+app.include_router(calendar_api_router.router) # Register the calendar router
+
+# Import and include the accounting router
+try:
+    from accounting import api as accounting_api
+    app.include_router(accounting_api.router) # The prefix "/accounting" is already in accounting_api.router
+    print("INFO:     Accounting API router included.")
+except ImportError:
+    print("WARNING:  Accounting API router not found or could not be imported.")
+except Exception as e:
+    print(f"ERROR:    Failed to include Accounting API router: {e}")
 
 # Further routers will be added here (for documents, auth, etc.)
