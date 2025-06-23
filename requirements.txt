@@ -17,8 +17,11 @@ python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
 pytest>=7.0.0
 httpx>=0.23.0
-SpeechRecognition
-pywhatkit
+# SpeechRecognition
+# pywhatkit
 watchdog
-PyAudio
+# PyAudio
 h11>=0.12.0 # Required by Uvicorn for HTTP tooling
+pytest>=7.0.0 # Added for running tests
+SQLAlchemy>=1.4.0 # Added for ORM
+email-validator>=2.0.0 # Added for Pydantic EmailStr validation

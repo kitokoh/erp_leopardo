@@ -45,4 +45,14 @@ app.include_router(recruitment_router_module.router) # Register the recruitment 
 app.include_router(company_expenses_api.router) # Register the company expenses router
 app.include_router(company_factures_api.router) # Register the company factures router
 
+# Import and include the accounting router
+try:
+    from accounting import api as accounting_api
+    app.include_router(accounting_api.router) # The prefix "/accounting" is already in accounting_api.router
+    print("INFO:     Accounting API router included.")
+except ImportError:
+    print("WARNING:  Accounting API router not found or could not be imported.")
+except Exception as e:
+    print(f"ERROR:    Failed to include Accounting API router: {e}")
+
 # Further routers will be added here (for documents, auth, etc.)
