@@ -1,7 +1,7 @@
 import sqlite3 # Keep for type hinting if conn is directly manipulated, though _manage_conn handles it.
 import logging
 import uuid # For generating document_id
-from .generic_crud import _manage_conn, get_db_connection # get_db_connection might not be needed if _manage_conn is sufficient
+from .generic_crud import _manage_conn # get_db_connection is not used directly
 
 # Configure logging
 # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

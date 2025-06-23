@@ -16,7 +16,6 @@ except ModuleNotFoundError:
     current_dir = os.path.dirname(os.path.abspath(__file__))
     project_root_calculated = os.path.dirname(current_dir)
 
-
     if project_root_calculated not in sys.path:
         sys.path.insert(0, project_root_calculated)
         logging.warning(
