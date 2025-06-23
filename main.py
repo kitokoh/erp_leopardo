@@ -13,9 +13,9 @@ import subprocess # Added for starting API server
 import atexit # Added for stopping API server on exit
 
 # Core PyQt5 imports for application execution
-from PyQt5.QtWidgets import QApplication
-from PyQt5.QtCore import QLocale, QLibraryInfo, QTranslator, Qt
-from PyQt5.QtGui import QFont, QPixmap
+from PyQt5.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
+from PyQt5.QtCore import QLocale, QLibraryInfo, QTranslator, Qt, QSize
+from PyQt5.QtGui import QFont, QPixmap, QMovie
 from PyQt5.QtCore import QStringListModel
 
 # Imports from project structure
@@ -216,11 +216,24 @@ def main():
     # 4. Create QApplication Instance
     app = QApplication(sys.argv)
 
-    # Display Splash Screen
-    splash_pix = QPixmap(os.path.join(APP_ROOT_DIR, "icons", "leopard_logo.svg"))
-    splash = QSplashScreen(splash_pix, Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
-    splash.show()
-    app.processEvents() # Ensure splash screen is displayed promptly
+    # Display Splash Screen using the new SplashWindow
+    from ui.splash_screen import SplashWindow # Import the new class
+
+    # Determine current language for splash screen
+    # This duplicates some logic from later in main() for translations, consider refactoring
+    current_app_lang = QLocale.system().name().split('_')[0]
+    language_code_from_db_for_splash = db.get_setting('user_selected_language') # Use db.get_setting
+    if language_code_from_db_for_splash and isinstance(language_code_from_db_for_splash, str) and language_code_from_db_for_splash.strip():
+        current_app_lang = language_code_from_db_for_splash.strip()
+    else:
+        # Use system lang if available in config, else default from config, else 'en'
+        sys_lang = QLocale.system().name().split('_')[0]
+        current_app_lang = CONFIG.get("language", sys_lang if sys_lang in ["en", "fr", "ar"] else "en")
+
+
+    # APP_ROOT_DIR is available here from app_setup import
+    splash = SplashWindow(app_root_dir=APP_ROOT_DIR, language_code=current_app_lang)
+    splash.show_splash()
 
     # 5. Set Application Name and Style
     app.setApplicationName("ClientDocManager")
@@ -584,7 +597,7 @@ def main():
         QApplication.instance().notification_manager = notification_manager
 
         main_window.show()
-        splash.finish(main_window) # Close splash screen
+        splash.finish_splash(main_window) # Use the correct method in SplashWindow
         logging.info("Main window shown. Application is running.")
         sys.exit(app.exec_())
     else:
