@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 import json
 import logging
-from .generic_crud import _manage_conn, get_db_connection
+from .generic_crud import _manage_conn # get_db_connection is not used directly
 from .products_crud import get_product_by_id # Important dependency
 
 logger = logging.getLogger(__name__)

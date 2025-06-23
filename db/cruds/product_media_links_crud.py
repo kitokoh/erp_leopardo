@@ -3,11 +3,10 @@ from datetime import datetime
 import logging
 from typing import List, Dict, Optional, Any
 
-try:
-    from .generic_crud import _manage_conn, get_db_connection
-except ImportError:
-    logging.warning("Could not import from .generic_crud, attempting direct import (may fail in package).")
-    from generic_crud import _manage_conn, get_db_connection
+# _manage_conn is for most CRUD functions
+from .generic_crud import _manage_conn
+# get_db_connection is needed for update_product_media_display_orders's custom transaction
+from ..connection import get_db_connection
 
 
 @_manage_conn

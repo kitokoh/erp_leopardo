@@ -2,7 +2,7 @@ import sqlite3
 import uuid
 from datetime import datetime
 import logging
-from .generic_crud import GenericCRUD, _manage_conn, get_db_connection # Updated import
+from .generic_crud import GenericCRUD, _manage_conn # get_db_connection is not used directly
 
 # --- Clients CRUD ---
 class ClientsCRUD(GenericCRUD):
