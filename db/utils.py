@@ -32,7 +32,7 @@ except ImportError as e:
 
 
 # get_db_connection moved to db.connection
-from .connection import get_db_connection
+# from .connection import get_db_connection # Removed top-level import to break circular dependency
 
 
 def format_currency(amount: float | None, symbol: str = "€", precision: int = 2) -> str:
@@ -50,6 +50,7 @@ def _get_batch_products_and_equivalents(product_ids: list[int], target_language_
 
     conn_is_internal = False
     if conn_passed is None:
+        from .connection import get_db_connection # Deferred import
         conn = get_db_connection()
         conn_is_internal = True
     else:
@@ -116,6 +117,7 @@ def get_document_context_data(
 
     conn_is_internal = False
     if conn_passed is None:
+        from .connection import get_db_connection # Deferred import
         conn = get_db_connection()
         conn_is_internal = True
     else:
