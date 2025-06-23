@@ -37,7 +37,7 @@ class SplashWindow(QWidget):
         conn = None
         try:
             conn = get_db_connection()
-            messages_crud = GenericCRUD(conn, 'motivational_messages', 'id')
+            messages_crud = GenericCRUD(table_name='motivational_messages', primary_key='id')
 
             # Prioritize messages for the current language
             # Fetch messages where day_of_year is NULL (generic messages) and is_active is TRUE

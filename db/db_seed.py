@@ -140,24 +140,41 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         logger.info("Seeding default countries and cities...")
         countries_cities = {'France': 'Paris', 'USA': 'New York', 'Algeria': 'Algiers'}
         for country_name, city_name in countries_cities.items():
-            country_id = get_or_add_country(country_name, conn=conn) 
-            if country_id: get_or_add_city(city_name, country_id, conn=conn) 
+            country_dict = get_or_add_country(country_name, conn=conn)
+            if country_dict and 'country_id' in country_dict:
+                get_or_add_city(city_name, country_dict['country_id'], conn=conn)
+            elif country_dict:
+                logger.error(f"Country '{country_name}' processed by get_or_add_country but 'country_id' key is missing in returned dict: {country_dict}")
+            else:
+                 logger.error(f"Failed to get or add country '{country_name}', cannot add city '{city_name}'.")
         logger.info(f"Seeded {len(countries_cities)} countries/cities.")
         
         # 7. Clients & 8. Projects (Simplified)
         logger.info("Seeding sample client and project...")
         cursor.execute("SELECT COUNT(*) FROM Clients")
         if cursor.fetchone()[0] == 0:
-            france_id_dict = get_country_by_name("France", conn=conn)
-            paris_id_dict = get_city_by_name_and_country_id("Paris", france_id_dict['country_id'] if france_id_dict else None, conn=conn) if france_id_dict else None
+            # Fetch IDs specifically for client seeding
+            france_country_dict = get_country_by_name("France", conn=conn)
+            actual_france_country_id = france_country_dict['country_id'] if france_country_dict else None
+
+            paris_city_dict = None
+            if actual_france_country_id:
+                paris_city_dict = get_city_by_name_and_country_id("Paris", actual_france_country_id, conn=conn)
+            actual_paris_city_id = paris_city_dict['city_id'] if paris_city_dict else None
+
             actif_status_dict = get_status_setting_by_name("Actif", "Client", conn=conn)
+            actual_actif_status_id = actif_status_dict['status_id'] if actif_status_dict else None
 
-            france_id = france_id_dict['country_id'] if france_id_dict else None
-            paris_id = paris_id_dict['city_id'] if paris_id_dict else None
-            actif_status_id = actif_status_dict['status_id'] if actif_status_dict else None
-
-            if admin_user_id and france_id and paris_id and actif_status_id:
-                client_data = {'client_name': "Sample Client SARL", 'country_id': france_id, 'city_id': paris_id, 'status_id': actif_status_id, 'created_by_user_id': admin_user_id, 'default_base_folder_path': f"clients/{uuid.uuid4()}", 'project_identifier': "SC-PROJ-001"}
+            if admin_user_id and actual_france_country_id and actual_paris_city_id and actual_actif_status_id:
+                client_data = {
+                    'client_name': "Sample Client SARL",
+                    'country_id': actual_france_country_id,
+                    'city_id': actual_paris_city_id,
+                    'status_id': actual_actif_status_id,
+                    'created_by_user_id': admin_user_id,
+                    'default_base_folder_path': f"clients/{uuid.uuid4()}",
+                    'project_identifier': "SC-PROJ-001"
+                }
                 add_client_res = clients_crud_instance.add_client(client_data, conn=conn)
                 if add_client_res['success']:
                     logger.info(f"Seeded sample client ID: {add_client_res['client_id']}")
@@ -168,6 +185,10 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                         cursor.execute("INSERT INTO Projects (project_id, client_id, project_name, status_id, manager_team_member_id) VALUES (?,?,?,?,?)",
                                        (project_data['project_id'], project_data['client_id'], project_data['project_name'], project_data['status_id'], project_data['manager_team_member_id']))
                         logger.info("Seeded sample project.")
+                else:
+                    logger.error(f"Failed to seed sample client. Add client response: {add_client_res}")
+            else:
+                logger.warning(f"One or more required IDs for sample client not found or invalid. Admin: {admin_user_id}, France: {actual_france_country_id}, Paris: {actual_paris_city_id}, ActifStatus: {actual_actif_status_id}. Skipping sample client seeding.")
         else:
             logger.info("Clients table not empty, skipping sample client/project seeding.")
 
@@ -369,7 +390,7 @@ def _seed_motivational_messages(cursor: sqlite3.Cursor, conn: sqlite3.Connection
     logger = logger_passed
     logger.info("Attempting to seed motivational messages...")
 
-    messages_crud = GenericCRUD(conn, 'motivational_messages', 'id')
+    messages_crud = GenericCRUD(table_name='motivational_messages', primary_key='id')
 
     default_messages = [
         # French
