@@ -58,7 +58,7 @@ class FiscalYearStatusEnum(enum.Enum):
 
 class ChartOfAccounts(Base):
     __tablename__ = "acc_chart_of_accounts"
-    __table_args__ = {'schema': 'accounting'} # Optional: if using DB schemas
+    # __table_args__ = {'schema': 'accounting'} # Removed for SQLite compatibility
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     code = Column(String, unique=True, nullable=False, index=True) # e.g., "1010", "4000"
@@ -66,7 +66,7 @@ class ChartOfAccounts(Base):
     account_type = Column(SQLAlchemyEnum(AccountTypeEnum), nullable=False)
     description = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
-    parent_id = Column(String, ForeignKey(f"{__table_args__['schema']}.{__tablename__}.id" if __table_args__.get('schema') else f"{__tablename__}.id"), nullable=True) # Self-referential for hierarchy
+    parent_id = Column(String, ForeignKey(f"{__tablename__}.id"), nullable=True) # Self-referential for hierarchy
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
@@ -79,13 +79,13 @@ class ChartOfAccounts(Base):
 
 class JournalEntry(Base):
     __tablename__ = "acc_journal_entries"
-    __table_args__ = {'schema': 'accounting'}
+    # __table_args__ = {'schema': 'accounting'} # Removed for SQLite compatibility
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     entry_date = Column(Date, nullable=False, index=True)
     description = Column(Text, nullable=False)
     reference_number = Column(String, nullable=True, index=True) # e.g., Invoice number, Payment ID
-    fiscal_year_id = Column(String, ForeignKey(f"{__table_args__['schema']}.acc_fiscal_years.id"), nullable=False)
+    fiscal_year_id = Column(String, ForeignKey("acc_fiscal_years.id"), nullable=False)
     # user_id = Column(String, ForeignKey('users.user_id'), nullable=True) # Assuming a Users table exists in the public schema or similar
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -101,11 +101,11 @@ class JournalEntry(Base):
 
 class JournalItem(Base):
     __tablename__ = "acc_journal_items"
-    __table_args__ = {'schema': 'accounting'}
+    # __table_args__ = {'schema': 'accounting'} # Original schema arg commented out
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    journal_entry_id = Column(String, ForeignKey(f"{__table_args__['schema']}.acc_journal_entries.id"), nullable=False, index=True)
-    account_id = Column(String, ForeignKey(f"{__table_args__['schema']}.acc_chart_of_accounts.id"), nullable=False, index=True)
+    journal_entry_id = Column(String, ForeignKey("acc_journal_entries.id"), nullable=False, index=True)
+    account_id = Column(String, ForeignKey("acc_chart_of_accounts.id"), nullable=False, index=True)
     # Using Numeric for precision with currency values
     debit_amount = Column(Numeric(precision=18, scale=2), nullable=False, default=0.00)
     credit_amount = Column(Numeric(precision=18, scale=2), nullable=False, default=0.00)
@@ -118,7 +118,7 @@ class JournalItem(Base):
 
     __table_args__ = (
         UniqueConstraint('journal_entry_id', 'account_id', 'debit_amount', 'credit_amount', name='uq_journal_item_detail'),
-        {'schema': 'accounting'}
+        # {'schema': 'accounting'} # Removed schema for SQLite
     )
 
     def __repr__(self):
@@ -126,12 +126,12 @@ class JournalItem(Base):
 
 class FinancialStatement(Base):
     __tablename__ = "acc_financial_statements"
-    __table_args__ = {'schema': 'accounting'}
+    # __table_args__ = {'schema': 'accounting'} # Removed for SQLite compatibility
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String, nullable=False) # e.g., "Balance Sheet Q1 2023"
     statement_type = Column(SQLAlchemyEnum(FinancialStatementTypeEnum), nullable=False)
-    fiscal_year_id = Column(String, ForeignKey(f"{__table_args__['schema']}.acc_fiscal_years.id"), nullable=False)
+    fiscal_year_id = Column(String, ForeignKey("acc_fiscal_years.id"), nullable=False)
     period_start_date = Column(Date, nullable=False)
     period_end_date = Column(Date, nullable=False)
     generated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -147,7 +147,7 @@ class FinancialStatement(Base):
 
 class TaxRate(Base):
     __tablename__ = "acc_tax_rates"
-    __table_args__ = {'schema': 'accounting'}
+    # __table_args__ = {'schema': 'accounting'} # Removed for SQLite compatibility
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String, nullable=False, unique=True) # e.g., "Standard VAT", "Reduced Sales Tax"
@@ -165,7 +165,7 @@ class TaxRate(Base):
 
 class Currency(Base):
     __tablename__ = "acc_currencies"
-    __table_args__ = {'schema': 'accounting'}
+    # __table_args__ = {'schema': 'accounting'} # Removed for SQLite compatibility
 
     code = Column(String(3), primary_key=True) # e.g., "USD", "EUR", "JPY"
     name = Column(String, nullable=False, unique=True) # e.g., "US Dollar", "Euro"
@@ -181,7 +181,7 @@ class Currency(Base):
 
 class FiscalYear(Base):
     __tablename__ = "acc_fiscal_years"
-    __table_args__ = {'schema': 'accounting'}
+    # __table_args__ = {'schema': 'accounting'} # Removed for SQLite compatibility
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String, nullable=False, unique=True) # e.g., "FY2023", "Fiscal Year 2023-2024"

@@ -1,6 +1,7 @@
 import sqlite3
 import os
 import json
+import logging # Added missing import
 from datetime import datetime, date # Added date
 import uuid
 import hashlib
@@ -1990,9 +1991,22 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     print("DEBUG_INIT_DB: Indexes for Company Expense and Facture tables created or already exist.")
     # --- End Company Expense Module Tables and Indexes ---
 
-    # --- Accounting Module Tables ---
+    # Commit schema changes made via raw SQLite connection before proceeding to SQLAlchemy part
     try:
-        print("DEBUG_INIT_DB: Creating Accounting Module Tables...")
+        logging.info("DEBUG_INIT_DB: Committing main schema/index changes before accounting module DDL.")
+        conn.commit()
+        logging.info("DEBUG_INIT_DB: Main schema/index changes committed.")
+    except sqlite3.Error as e_commit_main_schema:
+        logging.error(f"DEBUG_INIT_DB: Error committing main schema changes: {e_commit_main_schema}", exc_info=True)
+        conn.rollback()
+        conn.close()
+        raise # Critical to have main schema committed
+
+    # --- Accounting Module Tables ---
+    # SQLAlchemy engine will establish its own connection from the DATABASE_PATH,
+    # or use connection pooling. The previous commit ensures the DB file is up-to-date.
+    try:
+        logging.info("DEBUG_INIT_DB: Creating Accounting Module Tables using SQLAlchemy engine.") # Changed print to logging
         # Need to import accounting models
         from accounting import models as acc_models
 
