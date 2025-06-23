@@ -2049,6 +2049,45 @@ CREATE TABLE IF NOT EXISTS motivational_messages (
         # Depending on policy, might want to rollback or raise
     # --- End Accounting Module Tables and Indexes ---
 
+    # --- Calendar Module Tables ---
+    print("DEBUG_INIT_DB: Creating Calendar Module Tables...")
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS CompanyCalendarSettings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL UNIQUE, -- Assuming user_id is a string UUID from Users table
+        business_type TEXT, -- B2B, B2C, Both
+        activity_category TEXT,
+        country_iso TEXT NOT NULL, -- ISO 3166-1 alpha-2 country code
+        region TEXT, -- Subdivision of the country
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
+    )
+    """)
+    print("DEBUG_INIT_DB: Table CompanyCalendarSettings created or exists.")
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS UserCalendarEvents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL, -- Assuming user_id is a string UUID from Users table
+        event_date DATE NOT NULL,
+        event_type TEXT NOT NULL, -- Holiday, RemoteWork, WorkDay, OtherPersonal
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
+    )
+    """)
+    print("DEBUG_INIT_DB: Table UserCalendarEvents created or exists.")
+
+    # Indexes for Calendar Module
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_companycalendarsettings_user_id ON CompanyCalendarSettings(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_user_id ON UserCalendarEvents(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_date ON UserCalendarEvents(event_date)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_type ON UserCalendarEvents(event_type)")
+    print("DEBUG_INIT_DB: Indexes for Calendar Module created or already exist.")
+    # --- End Calendar Module Tables ---
+
 
     # --- Seed Data (from db/schema.py, ensuring use of db_config) ---
     try:
