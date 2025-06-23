@@ -1,0 +1,13 @@
+Collecting holidays
+  Downloading holidays-0.75-py3-none-any.whl.metadata (41 kB)
+Collecting python-dateutil (from holidays)
+  Using cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl.metadata (8.4 kB)
+Collecting six>=1.5 (from python-dateutil->holidays)
+  Using cached six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)
+Downloading holidays-0.75-py3-none-any.whl (1.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.0/1.0 MB 16.7 MB/s eta 0:00:00
+Using cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+Using cached six-1.17.0-py2.py3-none-any.whl (11 kB)
+Installing collected packages: six, python-dateutil, holidays
+
+Successfully installed holidays-0.75 python-dateutil-2.9.0.post0 six-1.17.0
