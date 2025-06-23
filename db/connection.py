@@ -3,18 +3,11 @@ import sys
 import sqlite3
 import logging # Added for error logging
 
-# Attempt to import app_setup, with a fallback mechanism for sys.path
 try:
     import app_setup # Import app_setup directly
-except ModuleNotFoundError:
-    # This block provides a fallback if app_setup is not found,
-    # which can happen if sys.path is not correctly configured by the entry point.
-    # Calculate the project root relative to this file's location:
-    # __file__ is db/connection.py
-    # os.path.dirname(__file__) is db/
-    # os.path.dirname(os.path.dirname(__file__)) is the project root (e.g., testpy/)
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root_calculated = os.path.dirname(current_dir)
+except ImportError:
+    app_setup = None # Allow running without app_setup, e.g., in isolated tests
+    logging.warning("db.connection: app_setup not found. Database path might need to be overridden for tests.")
 
     if project_root_calculated not in sys.path:
         sys.path.insert(0, project_root_calculated)
@@ -48,13 +41,19 @@ def get_db_connection(db_path_override=None):
     if db_path_override:
         path_to_connect = db_path_override
     else:
-        app_config = app_setup.get_app_config()
-        path_to_connect = app_config.get('database_path') # Used by SQLite and potentially others
-        database_type = app_config.get('database_type', 'sqlite') # Default to 'sqlite' if not set
+        if app_setup:
+            app_config = app_setup.get_app_config()
+            path_to_connect = app_config.get('database_path') # Used by SQLite and potentially others
+            database_type = app_config.get('database_type', 'sqlite') # Default to 'sqlite' if not set
+        else: # app_setup is not available, fall back to defaults or raise error if path not overridden
+            logging.warning("db.connection: app_setup not available. Using default 'sqlite' type. Path must be overridden for non-test scenarios.")
+            path_to_connect = None # Must be overridden by db_path_override
+            database_type = 'sqlite'
 
-        if not path_to_connect and database_type == 'sqlite': # Path is critical for SQLite if no override
+
+        if not path_to_connect and database_type == 'sqlite' and not db_path_override: # Path is critical for SQLite if no override
             logging.critical(
-                "CRITICAL: 'database_path' is missing or empty in the application configuration for SQLite. "
+                "CRITICAL: 'database_path' is missing or empty in the application configuration for SQLite, and no override was provided. "
                 "This path is essential for SQLite database connectivity. "
                 "Please check the configuration setup."
             )
