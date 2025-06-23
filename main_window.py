@@ -1,11 +1,29 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
-# Assuming main_window.py is in the project root, its directory is the project root.
-# If main_window.py is in a subdirectory, this needs to be adjusted (e.g., os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-PROJECT_ROOT_FROM_MAIN_WINDOW = os.path.dirname(os.path.abspath(__file__))
-if PROJECT_ROOT_FROM_MAIN_WINDOW not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT_FROM_MAIN_WINDOW)
+
+# --- BEGIN WORKAROUND for ModuleNotFoundError: No module named 'product_management' ---
+# Ensure the project root is in sys.path when main_window.py is loaded.
+# This is a targeted fix for environments where main.py's sys.path modification
+# might not be effective for imports within main_window.py.
+try:
+    MAIN_WINDOW_DIR = os.path.dirname(os.path.abspath(__file__))
+    # Assuming main_window.py is in the project root. If it's in a subdir, adjust path.
+    PROJECT_ROOT_FOR_MW = MAIN_WINDOW_DIR
+
+    if PROJECT_ROOT_FOR_MW not in sys.path:
+        sys.path.insert(0, PROJECT_ROOT_FOR_MW)
+    elif sys.path[0] != PROJECT_ROOT_FOR_MW:
+        sys.path.remove(PROJECT_ROOT_FOR_MW)
+        sys.path.insert(0, PROJECT_ROOT_FOR_MW)
+
+    # For diagnostics (can be removed later)
+    # print(f"[main_window.py] sys.path[0] after modification: {sys.path[0]}")
+    # print(f"[main_window.py] Attempting to import product_management.page...")
+
+except Exception as e_mw_path:
+    print(f"Error in main_window.py sys.path modification: {e_mw_path}")
+# --- END WORKAROUND ---
 
 # import logging # logging is already imported
 import logging
