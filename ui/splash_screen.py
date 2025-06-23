@@ -10,7 +10,7 @@ from PyQt5.QtCore import Qt, QSize, QTimer, QLocale, QPropertyAnimation, QEasing
 # Assuming db connection and GenericCRUD are accessible
 # This might require adjusting imports based on your project structure
 # For example, if db.cruds.generic_crud is the path:
-from db.cruds.generic_crud import GenericCRUD, get_db_connection
+from db.cruds.generic_crud import GenericCRUD
 from db.connection import get_db_connection # Corrected import
 from db.cruds.generic_crud import GenericCRUD
 
@@ -102,9 +102,9 @@ class SplashWindow(QWidget):
             # Ultimate fallback
             logging.error("No messages found in DB (user, daily system, generic system). Using hardcoded default.")
 
-                return "Welcome! / Bienvenue !"
+            return "Welcome! / Bienvenue !"
 
-            return random.choice(messages)['message']
+            # return random.choice(messages)['message']
 
 
         except Exception as e:
