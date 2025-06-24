@@ -81,21 +81,27 @@ def _import_main_elements():
         MAIN_MODULE_SEND_WHATSAPP_DIALOG = WhatsAppDialogModule
 
 
+from auth.permissions import has_permission, \
+    P_EDIT_CLIENT_FULL, P_EDIT_CLIENT_BASIC, P_MANAGE_CLIENT_CONTACTS, \
+    P_LINK_PRODUCTS_TO_CLIENT, P_MANAGE_CLIENT_DOCUMENTS, P_ARCHIVE_CLIENT, \
+    P_MANAGE_CLIENT_ASSIGNMENTS, P_MANAGE_CLIENT_BILLING # Define more as needed
+
 class ClientWidget(QWidget):
     CONTACT_PAGE_LIMIT = 15 # Class attribute for page limit
 
-    def __init__(self, client_info, config, app_root_dir, notification_manager, current_user_id, parent=None): # Add current_user_id
+    def __init__(self, client_info, config, app_root_dir, notification_manager, current_user_info: dict, parent=None): # Changed to current_user_info
         super().__init__(parent)
-        logging.info(f"ClientWidget.__init__: INSTANTIATION STARTED for client_id={client_info.get('client_id')}, user_id={current_user_id}")
+        self.current_user_info = current_user_info # Store full user info
+        self.current_user_id = self.current_user_info.get('user_id') # Extract for existing code
+
+        logging.info(f"ClientWidget.__init__: INSTANTIATION STARTED for client_id={client_info.get('client_id')}, user: {self.current_user_info.get('username')}")
         logging.info(f"ClientWidget.__init__: Received client_info: {client_info}")
-        # logging.info(f"ClientWidget initialized with client_info: {client_info}") # Redundant with above
         logging.info(f"ClientWidget __init__: client_id={client_info.get('client_id')}, client_name={client_info.get('client_name')}")
         self.client_info = client_info
         self.notification_manager = notification_manager
-        self.current_user_id = current_user_id # Store current_user_id
-        # self.config = config # Original config passed, will be set by _import_main_elements
+        # self.config = config # Will be set by _import_main_elements
 
-        # Dynamically import main elements to avoid circular import at module load time
+        # Dynamically import main elements
         logging.info("ClientWidget.__init__: Calling _import_main_elements()...")
         _import_main_elements()
         logging.info("ClientWidget.__init__: Finished _import_main_elements().")
@@ -293,10 +299,120 @@ class ClientWidget(QWidget):
              self.notes_group_box.toggled.connect(self._handle_notes_section_toggled)
         if hasattr(self, 'tabs_group_box'):
              self.tabs_group_box.toggled.connect(self._handle_tabs_section_toggled)
+
+        # Apply permissions
+        self._apply_permissions()
+
         # Event filter for notes auto-save
         if hasattr(self, 'notes_edit'):
             self.notes_edit.installEventFilter(self)
         logging.info(f"ClientWidget.setup_ui: FULL UI SETUP COMPLETED for client_id={self.client_info.get('client_id')}")
+
+    def _apply_permissions(self):
+        """Applies role-based permissions to UI elements within ClientWidget."""
+        role_name = self.current_user_info.get('role_name') if self.current_user_info else None
+        if not role_name:
+            # Default to least privilege if role_name is somehow not available
+            # This state should ideally not be reached if login is enforced.
+            logging.warning("ClientWidget._apply_permissions: No role_name found, disabling most actions.")
+            can_edit_full = False
+            can_edit_basic = False
+            can_manage_contacts = False
+            can_link_products = False
+            can_manage_documents = False
+            can_manage_assignments = False # New permission P_MANAGE_CLIENT_ASSIGNMENTS
+            can_manage_billing = False     # New permission P_MANAGE_CLIENT_BILLING
+        else:
+            can_edit_full = has_permission(role_name, P_EDIT_CLIENT_FULL)
+            can_edit_basic = has_permission(role_name, P_EDIT_CLIENT_BASIC) # For notes, status
+            can_manage_contacts = has_permission(role_name, P_MANAGE_CLIENT_CONTACTS)
+            can_link_products = has_permission(role_name, P_LINK_PRODUCTS_TO_CLIENT)
+            can_manage_documents = has_permission(role_name, P_MANAGE_CLIENT_DOCUMENTS)
+            # Assuming new permissions P_MANAGE_CLIENT_ASSIGNMENTS, P_MANAGE_CLIENT_BILLING exist in auth.permissions
+            # If not, these will default to False. Add them to auth/permissions.py
+            can_manage_assignments = has_permission(role_name, P_MANAGE_CLIENT_ASSIGNMENTS)
+            can_manage_billing = has_permission(role_name, P_MANAGE_CLIENT_BILLING)
+
+
+        # Client Info Header Buttons
+        if hasattr(self, 'create_docs_btn'): # Send Email
+            self.create_docs_btn.setEnabled(can_manage_documents) # Emailing often tied to doc management
+        if hasattr(self, 'compile_pdf_btn'):
+            self.compile_pdf_btn.setEnabled(can_manage_documents)
+        if hasattr(self, 'edit_save_client_btn'):
+            self.edit_save_client_btn.setEnabled(can_edit_full or can_edit_basic)
+        if hasattr(self, 'send_whatsapp_btn'): # Assuming this is contact related
+            self.send_whatsapp_btn.setEnabled(can_manage_contacts)
+
+        # Status ComboBox
+        if hasattr(self, 'status_combo'):
+            self.status_combo.setEnabled(can_edit_full or can_edit_basic)
+
+        # Notes Section
+        if hasattr(self, 'notes_edit'):
+            self.notes_edit.setReadOnly(not (can_edit_full or can_edit_basic))
+
+        # Documents Tab Buttons
+        if hasattr(self, 'add_doc_btn'): # Import Document
+            self.add_doc_btn.setEnabled(can_manage_documents)
+        if hasattr(self, 'add_template_btn'): # Generate via Template
+            self.add_template_btn.setEnabled(can_manage_documents)
+        # Action buttons within doc_table are handled in populate_doc_table
+
+        # Contacts Tab Buttons
+        if hasattr(self, 'add_contact_btn'):
+            self.add_contact_btn.setEnabled(can_manage_contacts)
+        if hasattr(self, 'edit_contact_btn'):
+            self.edit_contact_btn.setEnabled(can_manage_contacts)
+        if hasattr(self, 'remove_contact_btn'):
+            self.remove_contact_btn.setEnabled(can_manage_contacts)
+
+        # Products Tab Buttons
+        if hasattr(self, 'add_product_btn'):
+            self.add_product_btn.setEnabled(can_link_products)
+        if hasattr(self, 'edit_product_btn'):
+            # Editing a product line might require more specific permissions than just linking
+            # For now, linking implies ability to edit the link details (qty, price_override)
+            self.edit_product_btn.setEnabled(can_link_products)
+        if hasattr(self, 'remove_product_btn'):
+            self.remove_product_btn.setEnabled(can_link_products)
+
+        # Document Notes Tab Buttons
+        if hasattr(self, 'add_doc_note_button'):
+            self.add_doc_note_button.setEnabled(can_manage_documents) # Or a specific P_MANAGE_DOCUMENT_NOTES
+        # Action buttons in document_notes_table handled in load_document_notes_table
+
+        # Product Dimensions Tab
+        if hasattr(self, 'edit_client_product_dimensions_button'):
+            # This modifies client-specific product data, linked to product linking ability.
+            self.edit_client_product_dimensions_button.setEnabled(can_link_products)
+            # The button's enabled state also depends on a product being selected in dim_product_selector_combo,
+            # which is handled by on_dim_product_selected. This RBAC check is an additional layer.
+            if not can_link_products:
+                 self.dim_product_selector_combo.setEnabled(False) # Disable selector if no perm
+            else:
+                 self.dim_product_selector_combo.setEnabled(True)
+
+
+        # Assignments Tab Buttons (Vendors, Techs, Transporters, Forwarders, MTA)
+        # Using P_MANAGE_CLIENT_ASSIGNMENTS as a general permission for all these
+        if hasattr(self, 'add_assigned_vendor_btn'): self.add_assigned_vendor_btn.setEnabled(can_manage_assignments)
+        if hasattr(self, 'remove_assigned_vendor_btn'): self.remove_assigned_vendor_btn.setEnabled(can_manage_assignments) # Initial state also depends on selection
+        if hasattr(self, 'add_assigned_technician_btn'): self.add_assigned_technician_btn.setEnabled(can_manage_assignments)
+        if hasattr(self, 'remove_assigned_technician_btn'): self.remove_assigned_technician_btn.setEnabled(can_manage_assignments)
+        if hasattr(self, 'add_assigned_transporter_btn'): self.add_assigned_transporter_btn.setEnabled(can_manage_assignments)
+        if hasattr(self, 'remove_assigned_transporter_btn'): self.remove_assigned_transporter_btn.setEnabled(can_manage_assignments)
+        if hasattr(self, 'add_assigned_forwarder_btn'): self.add_assigned_forwarder_btn.setEnabled(can_manage_assignments)
+        if hasattr(self, 'remove_assigned_forwarder_btn'): self.remove_assigned_forwarder_btn.setEnabled(can_manage_assignments)
+        if hasattr(self, 'add_assigned_mta_btn'): self.add_assigned_mta_btn.setEnabled(can_manage_assignments) # Initial state also depends on project selection
+        if hasattr(self, 'remove_assigned_mta_btn'): self.remove_assigned_mta_btn.setEnabled(can_manage_assignments)
+
+        # Billing Tab
+        if hasattr(self, 'generate_invoice_button'):
+            self.generate_invoice_button.setEnabled(can_manage_billing)
+
+        logging.info(f"ClientWidget permissions applied for role: {role_name}")
+
 
     def _setup_notes_section(self, main_layout):
         try:
@@ -2926,18 +3042,26 @@ class ClientWidget(QWidget):
                 actions_layout.setContentsMargins(5, 0, 5, 0)
                 actions_layout.setSpacing(5)
 
-                edit_button = QPushButton(QIcon(":/icons/pencil.svg"), "")
-                edit_button.setToolTip(self.tr("Modifier cette note"))
-                edit_button.clicked.connect(lambda checked, n_id=note_id: self.on_edit_document_note_clicked(n_id))
-                actions_layout.addWidget(edit_button)
+                role_name = self.current_user_info.get('role_name') if self.current_user_info else None
+                # Assuming P_MANAGE_CLIENT_DOCUMENTS or a new P_MANAGE_DOCUMENT_NOTES controls this
+                can_manage_doc_notes = has_permission(role_name, P_MANAGE_CLIENT_DOCUMENTS)
 
-                delete_button = QPushButton(QIcon(":/icons/trash.svg"), "")
-                delete_button.setToolTip(self.tr("Supprimer cette note"))
-                delete_button.setObjectName("dangerButton")
-                delete_button.clicked.connect(lambda checked, n_id=note_id: self.on_delete_document_note_clicked(n_id))
-                actions_layout.addWidget(delete_button)
+                if can_manage_doc_notes:
+                    edit_button = QPushButton(QIcon(":/icons/pencil.svg"), "")
+                    edit_button.setToolTip(self.tr("Modifier cette note"))
+                    edit_button.clicked.connect(lambda checked, n_id=note_id: self.on_edit_document_note_clicked(n_id))
+                    actions_layout.addWidget(edit_button)
 
-                actions_layout.addStretch()
+                    delete_button = QPushButton(QIcon(":/icons/trash.svg"), "")
+                    delete_button.setToolTip(self.tr("Supprimer cette note"))
+                    delete_button.setObjectName("dangerButton")
+                    delete_button.clicked.connect(lambda checked, n_id=note_id: self.on_delete_document_note_clicked(n_id))
+                    actions_layout.addWidget(delete_button)
+                else:
+                    # Add spacers or leave empty if no permissions
+                    actions_layout.addStretch()
+
+                actions_layout.addStretch() # Ensure this is outside the conditional if buttons were added
                 self.document_notes_table.setCellWidget(row_idx, 4, actions_widget)
 
 
@@ -3856,44 +3980,58 @@ class ClientWidget(QWidget):
 
             if can_edit_source_template:
                 logging.debug("ClientWidget.populate_doc_table: Creating edit source template button.")
-                edit_source_template_btn = QPushButton("")
-                edit_source_template_btn.setIcon(QIcon(":/icons/edit-2.svg"))
-                edit_source_template_btn.setToolTip(self.tr("Modifier le modèle source de ce document"))
-                edit_source_template_btn.setFixedSize(30,30)
-                edit_source_template_btn.clicked.connect(lambda _, doc_d=doc_data: self.handle_edit_source_template(doc_d))
-                action_layout.addWidget(edit_source_template_btn)
-                logging.debug("ClientWidget.populate_doc_table: Edit source template button created and added.")
-            elif file_type_str.upper() == "PDF":
-                logging.debug("ClientWidget.populate_doc_table: Creating edit PDF button.")
-                edit_pdf_btn = QPushButton(self.tr("Modifier PDF"))
-                edit_pdf_btn.setIcon(QIcon(":/icons/pencil.svg"))
-                edit_pdf_btn.setToolTip(self.tr("Modifier le fichier PDF"))
-                edit_pdf_btn.setFixedSize(30, 30)
-                edit_pdf_btn.clicked.connect(lambda _, p=full_file_path, doc_id=document_id: self._handle_edit_pdf_action(p, doc_id))
-                action_layout.addWidget(edit_pdf_btn)
-                logging.debug("ClientWidget.populate_doc_table: Edit PDF button created and added.")
-            elif doc_name.lower().endswith(('.xlsx', '.html')):
-                logging.debug("ClientWidget.populate_doc_table: Creating direct edit button for office doc.")
-                edit_btn = QPushButton("")
-                edit_btn.setIcon(QIcon(":/icons/pencil.svg"))
-                edit_btn.setToolTip(self.tr("Modifier le contenu du document"))
-                edit_btn.setFixedSize(30,30)
-                edit_btn.clicked.connect(lambda _, p=full_file_path: self.open_document(p))
-                action_layout.addWidget(edit_btn)
-                logging.debug("ClientWidget.populate_doc_table: Direct edit button created and added.")
-            else:
-                logging.debug("ClientWidget.populate_doc_table: Adding spacer widget for action buttons.")
+            # Edit / Modify buttons based on permissions
+            # P_MANAGE_CLIENT_DOCUMENTS can be used as a general permission for editing/deleting documents.
+            # More granular permissions like P_EDIT_DOCUMENT, P_DELETE_DOCUMENT could be introduced if needed.
+            role_name = self.current_user_info.get('role_name') if self.current_user_info else None
+            can_manage_docs = has_permission(role_name, P_MANAGE_CLIENT_DOCUMENTS)
+
+            if can_manage_docs:
+                if can_edit_source_template: # This logic for template editing is specific
+                    edit_source_template_btn = QPushButton("")
+                    edit_source_template_btn.setIcon(QIcon(":/icons/edit-2.svg"))
+                    edit_source_template_btn.setToolTip(self.tr("Modifier le modèle source de ce document"))
+                    edit_source_template_btn.setFixedSize(30,30)
+                    edit_source_template_btn.clicked.connect(lambda _, doc_d=doc_data: self.handle_edit_source_template(doc_d))
+                    action_layout.addWidget(edit_source_template_btn)
+                    logging.debug("ClientWidget.populate_doc_table: Edit source template button created and added.")
+                elif file_type_str.upper() == "PDF": # Specific PDF edit action
+                    edit_pdf_btn = QPushButton("") # Icon only
+                    edit_pdf_btn.setIcon(QIcon(":/icons/pencil.svg"))
+                    edit_pdf_btn.setToolTip(self.tr("Modifier le fichier PDF (métadonnées ou annotations si supporté)"))
+                    edit_pdf_btn.setFixedSize(30, 30)
+                    edit_pdf_btn.clicked.connect(lambda _, p=full_file_path, doc_id=document_id: self._handle_edit_pdf_action(p, doc_id))
+                    action_layout.addWidget(edit_pdf_btn)
+                    logging.debug("ClientWidget.populate_doc_table: Edit PDF button created and added.")
+                elif doc_name.lower().endswith(('.xlsx', '.html')): # Direct edit for office/html
+                    edit_btn = QPushButton("")
+                    edit_btn.setIcon(QIcon(":/icons/pencil.svg"))
+                    edit_btn.setToolTip(self.tr("Modifier le contenu du document"))
+                    edit_btn.setFixedSize(30,30)
+                    edit_btn.clicked.connect(lambda _, p=full_file_path: self.open_document(p))
+                    action_layout.addWidget(edit_btn)
+                    logging.debug("ClientWidget.populate_doc_table: Direct edit button created and added.")
+                else: # No specific edit action, add spacer if other buttons follow
+                    spacer_widget = QWidget(); spacer_widget.setFixedSize(30,30); action_layout.addWidget(spacer_widget)
+                    logging.debug("ClientWidget.populate_doc_table: Spacer added for non-editable type (or no specific edit action).")
+            else: # No permission to manage/edit, add spacer
                 spacer_widget = QWidget(); spacer_widget.setFixedSize(30,30); action_layout.addWidget(spacer_widget)
-                logging.debug("ClientWidget.populate_doc_table: Spacer widget added.")
+                logging.debug("ClientWidget.populate_doc_table: Edit actions skipped due to permissions. Spacer added.")
+
 
             logging.debug("ClientWidget.populate_doc_table: Creating delete button.")
-            delete_btn = QPushButton("")
-            delete_btn.setIcon(QIcon(":/icons/trash.svg"))
-            delete_btn.setToolTip(self.tr("Supprimer le document (fichier et DB)"))
-            delete_btn.setFixedSize(30,30)
-            delete_btn.clicked.connect(lambda _, doc_id=document_id, p=full_file_path: self.delete_client_document_entry(doc_id, p))
-            action_layout.addWidget(delete_btn)
-            logging.debug("ClientWidget.populate_doc_table: Delete button created and added.")
+            if can_manage_docs: # Only add delete button if user has permission
+                delete_btn = QPushButton("")
+                delete_btn.setIcon(QIcon(":/icons/trash.svg"))
+                delete_btn.setToolTip(self.tr("Supprimer le document (fichier et DB)"))
+                delete_btn.setFixedSize(30,30)
+                delete_btn.clicked.connect(lambda _, doc_id=document_id, p=full_file_path: self.delete_client_document_entry(doc_id, p))
+                action_layout.addWidget(delete_btn)
+                logging.debug("ClientWidget.populate_doc_table: Delete button created and added.")
+            else: # No permission to delete, add spacer if it's the last potential button
+                spacer_widget = QWidget(); spacer_widget.setFixedSize(30,30); action_layout.addWidget(spacer_widget)
+                logging.debug("ClientWidget.populate_doc_table: Delete button skipped due to permissions. Spacer added.")
+
 
             action_layout.addStretch(); action_widget.setLayout(action_layout)
             logging.debug("ClientWidget.populate_doc_table: Setting cell widget for actions.")

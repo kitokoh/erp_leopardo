@@ -4,15 +4,40 @@ from PyQt5.QtGui import QIcon
 from .edit_dialog import ProductEditDialog
 from db.cruds.products_crud import products_crud_instance
 import html_to_pdf_util
+# Import for RBAC
+from auth.permissions import has_permission, P_MANAGE_GLOBAL_PRODUCTS, P_VIEW_GLOBAL_PRODUCTS
 
 class ProductManagementPage(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, current_user_info: dict, parent=None): # Added current_user_info
         super().__init__(parent)
         self.parent_window = parent
+        self.current_user_info = current_user_info # Store user info
         self._setup_ui()
+        self._apply_permissions() # Apply permissions after UI is set up
+
+    def _apply_permissions(self):
+        """Applies role-based permissions to UI elements."""
+        role_name = self.current_user_info.get('role_name') if self.current_user_info else None
+
+        can_manage_global_products = has_permission(role_name, P_MANAGE_GLOBAL_PRODUCTS)
+        can_view_global_products = has_permission(role_name, P_VIEW_GLOBAL_PRODUCTS)
+
+        self.add_product_button.setEnabled(can_manage_global_products)
+        # Edit and Delete buttons' initial state is also tied to table selection,
+        # but their overall availability depends on permissions.
+        # _update_button_states will handle selection, here we set base availability.
+        self.edit_product_button.setProperty("base_enabled", can_manage_global_products)
+        self.delete_product_button.setProperty("base_enabled", can_manage_global_products)
+        self._update_button_states() # Re-evaluate based on new base_enabled and current selection
+
+        self.export_pdf_button.setEnabled(can_view_global_products) # Viewing is enough to export
+
+        # Price column editability in the table (handle_price_change)
+        # and double-click to edit will also need checks.
+        # For now, this covers the main buttons.
 
     def _setup_ui(self):
-        # self.setWindowTitle(self.tr("Product Management")) # QWidget doesn't have setWindowTitle, usually set on parent QMainWindow or QDialog
+        # self.setWindowTitle(self.tr("Product Management"))
 
         self.current_offset = 0
         self.limit_per_page = 50
@@ -149,27 +174,29 @@ class ProductManagementPage(QWidget):
 
         self.setLayout(main_layout)
         self.load_products_to_table()
-        self._update_button_states()
+        # self._update_button_states() # Called by _apply_permissions and selectionChanged
 
     def _toggle_filter_visibility(self):
         if self.filter_group_box.isVisible():
             self.filter_group_box.setVisible(False)
             self.toggle_filters_button.setText(self.tr("Show Filters"))
-            # Optionally, set icon for "show" state
-            # self.toggle_filters_button.setIcon(QIcon(":/icons/chevron-right.svg")) # Example
         else:
             self.filter_group_box.setVisible(True)
             self.toggle_filters_button.setText(self.tr("Hide Filters"))
-            # Optionally, set icon for "hide" state
-            # self.toggle_filters_button.setIcon(QIcon(":/icons/chevron-down.svg")) # Example
+
+    def _can_manage_global_products(self) -> bool:
+        """Helper to check P_MANAGE_GLOBAL_PRODUCTS permission."""
+        role_name = self.current_user_info.get('role_name') if self.current_user_info else None
+        return has_permission(role_name, P_MANAGE_GLOBAL_PRODUCTS)
 
     def _open_add_product_dialog(self):
-        # Pass self as parent if ProductEditDialog expects a QWidget parent for modality or window management
-        add_dialog = ProductEditDialog(product_id=None, parent=self)
+        if not self._can_manage_global_products(): return
+        add_dialog = ProductEditDialog(product_id=None, parent=self) # Pass current_user_info to ProductEditDialog if it needs it
         if add_dialog.exec_() == QDialog.Accepted:
             self.apply_filters_and_reload()
 
     def _open_edit_product_dialog(self):
+        if not self._can_manage_global_products(): return
         current_row = self.product_table.currentRow()
         if current_row < 0:
             QMessageBox.information(self, self.tr("No Selection"), self.tr("Please select a product to edit."))
@@ -178,7 +205,7 @@ class ProductManagementPage(QWidget):
         if product_id_item:
             try:
                 product_id = int(product_id_item.text())
-                edit_dialog = ProductEditDialog(product_id=product_id, parent=self)
+                edit_dialog = ProductEditDialog(product_id=product_id, parent=self) # Pass current_user_info if needed
                 if edit_dialog.exec_() == QDialog.Accepted:
                     self.apply_filters_and_reload()
             except ValueError:
@@ -189,17 +216,22 @@ class ProductManagementPage(QWidget):
             QMessageBox.warning(self, self.tr("Error"), self.tr("Could not retrieve product ID for the selected row."))
 
     def _open_edit_product_dialog_from_item(self, item):
-        if item: # Check if a valid item was double-clicked
+        if item and self._can_manage_global_products(): # Check permission before opening edit dialog
             self._open_edit_product_dialog()
 
     def _update_button_states(self):
         has_selection = bool(self.product_table.selectedItems())
-        self.edit_product_button.setEnabled(has_selection)
-        self.delete_product_button.setEnabled(has_selection)
+        # Use the base_enabled property set by _apply_permissions
+        can_edit_base = self.edit_product_button.property("base_enabled")
+        can_delete_base = self.delete_product_button.property("base_enabled")
+
+        self.edit_product_button.setEnabled(has_selection and can_edit_base)
+        self.delete_product_button.setEnabled(has_selection and can_delete_base)
 
     def _delete_selected_product(self):
+        if not self._can_manage_global_products(): return
         current_row = self.product_table.currentRow()
-        if current_row < 0: return # Should not happen if button state is managed
+        if current_row < 0: return
         product_id_item = self.product_table.item(current_row, 0)
         product_name_item = self.product_table.item(current_row, 1)
         if product_id_item and product_name_item:
@@ -315,43 +347,56 @@ class ProductManagementPage(QWidget):
 
     def handle_price_change(self, item):
         # Column index for price is now 4 due to "Product Code" column insertion
-        if item.column() == 4: # Price column index updated
+        # Column index for price is now 4 due to "Product Code" column insertion
+        if item.column() == 4:
+            if not self._can_manage_global_products():
+                # If user cannot manage, revert edit and inform
+                self.product_table.blockSignals(True)
+                self.load_products_to_table() # Reload to revert
+                self.product_table.blockSignals(False)
+                QMessageBox.warning(self, self.tr("Permission Denied"), self.tr("You do not have permission to change product prices here."))
+                return
+
             row = item.row()
-            # Try to get product_id from hidden ID column first
             id_item = self.product_table.item(row, 0)
             product_id = None
             if id_item:
-                product_id = id_item.text() # ID is stored as text
-                try:
-                    product_id = int(product_id)
-                except ValueError:
-                    print(f"Invalid product_id in hidden column: {product_id}")
-                    product_id = None
+                try: product_id = int(id_item.text())
+                except ValueError: product_id = None
 
-            if product_id is None: # Fallback to UserRole data on name item if ID column failed
-                name_item_check = self.product_table.item(row,1) # Name column
+            if product_id is None: # Fallback
+                name_item_check = self.product_table.item(row,1)
                 if name_item_check : product_id = name_item_check.data(Qt.UserRole)
-                if product_id is None:
-                    QMessageBox.warning(self, self.tr("Error"), self.tr("Could not determine product ID for price update."))
-                    return
+
+            if product_id is None:
+                QMessageBox.warning(self, self.tr("Error"), self.tr("Could not determine product ID for price update."))
+                self.product_table.blockSignals(True); self.load_products_to_table(); self.product_table.blockSignals(False) # Revert
+                return
 
             new_price_str = item.text()
             try:
                 new_price_float = float(new_price_str)
                 if new_price_float < 0: raise ValueError(self.tr("Price cannot be negative."))
-                self.product_table.blockSignals(True)
+
+                self.product_table.blockSignals(True) # Block while updating
                 update_result = products_crud_instance.update_product_price(product_id, new_price_float)
-                if update_result['success']: item.setText(f"{new_price_float:.2f}")
+                if update_result['success']:
+                    item.setText(f"{new_price_float:.2f}") # Update cell with formatted price
                 else:
                     QMessageBox.warning(self, self.tr("Update Failed"), update_result.get('error', self.tr("Failed to update price.")))
-                    self.apply_filters_and_reload()
+                    self.load_products_to_table() # Revert on failure
             except ValueError as ve:
                 QMessageBox.warning(self, self.tr("Invalid Price"), str(ve))
-                self.apply_filters_and_reload()
+                self.load_products_to_table() # Revert on invalid input
             finally:
                 self.product_table.blockSignals(False)
 
     def export_to_pdf_placeholder(self):
+        role_name = self.current_user_info.get('role_name') if self.current_user_info else None
+        if not has_permission(role_name, P_VIEW_GLOBAL_PRODUCTS):
+            QMessageBox.warning(self, self.tr("Permission Denied"), self.tr("You do not have permission to export product data."))
+            return
+
         # Use self.title_edit.text() if it was kept, otherwise a fixed title or from parent.
         # For a page, title is often managed by the main window.
         # page_title = self.parent_window.windowTitle() if self.parent_window else self.tr("Product List")

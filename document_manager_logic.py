@@ -326,7 +326,7 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                                 'client_id': actual_new_client_id, 'project_id': None,
                                 'product_id': global_product_id_to_link, 'quantity': product_item_data['quantity'],
                                 'unit_price_override': unit_price_override_val,
-                                'added_by_user_id': doc_manager.current_user_id # Placeholder, as CRUD doesn't take it yet
+                                'added_by_user_id': doc_manager.current_user_id
                             }
                             logging.debug(f"Helper: Attempting to link product_id {global_product_id_to_link} to client {actual_new_client_id} with data: {link_data}")
                             cpp_id = add_product_to_client_or_project(link_data)
@@ -378,6 +378,7 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                 if actual_new_client_id in doc_manager.clients_data_map:
                     doc_manager.clients_data_map[actual_new_client_id]['price'] = calculated_total_sum_after_cancel
                 # CreateDocumentDialog is SKIPPED as per Test Case 3
+
 
 
 
