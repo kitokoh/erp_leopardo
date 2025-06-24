@@ -493,14 +493,24 @@ def _seed_motivational_messages(cursor: sqlite3.Cursor, conn: sqlite3.Connection
 
             # Let's ensure we don't insert duplicates for generic messages (day_of_year is None)
             existing = None
+            # Check for existing message based on UNIQUE constraints
             if msg_data["day_of_year"] is None:
-                # Query for existing message with same language and text where day_of_year IS NULL
+                # Generic message: check language_code and message content (as per existing schema's UNIQUE(language_code, message))
+                # This also implicitly handles the case where multiple generic messages might exist for the same language
+                # if the schema didn't have UNIQUE(language_code, message) but relied on day_of_year IS NULL.
+                # Given UNIQUE(language_code, message), this check is somewhat redundant if we let IntegrityError handle it,
+                # but explicit check can be clearer.
                 query = "SELECT id FROM motivational_messages WHERE language_code = ? AND message = ? AND day_of_year IS NULL"
                 cursor.execute(query, (msg_data["language_code"], msg_data["message"]))
                 existing = cursor.fetchone()
+            else:
+                # Day-specific message: check language_code and day_of_year (as per UNIQUE(language_code, day_of_year))
+                query = "SELECT id FROM motivational_messages WHERE language_code = ? AND day_of_year = ?"
+                cursor.execute(query, (msg_data["language_code"], msg_data["day_of_year"]))
+                existing = cursor.fetchone()
 
             if existing:
-                logger.debug(f"Motivational message '{msg_data['message'][:30]}...' for lang '{msg_data['language_code']}' already exists. Skipping.")
+                logger.debug(f"Motivational message (lang: {msg_data['language_code']}, day: {msg_data['day_of_year']}, text: '{msg_data['message'][:30]}...') already exists. Skipping.")
                 skipped_count += 1
                 continue
 
