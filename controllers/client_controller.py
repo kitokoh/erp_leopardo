@@ -82,19 +82,22 @@ class ClientController:
         adding them to the database if they don't exist.
         Returns the created client data (with IDs) or None on failure.
         """
+        from db.cruds.status_settings_crud import get_status_setting_by_name # Import here
+
         try:
             country_name = client_data.get('country_name', '').strip()
             city_name = client_data.get('city_name', '').strip()
 
             if not country_name:
-                print("Error: Country name is required to create a client.")
-                return None # Or raise ValueError
+                logging.error("Country name is required to create a client.")
+                return {'success': False, 'error': "Country name is required."}
+
 
             # Get or add country
             country_obj = self.add_country(country_name) # add_country handles get_or_add
             if not country_obj or 'country_id' not in country_obj:
-                print(f"Error: Could not get or add country '{country_name}'.")
-                return None
+                logging.error(f"Could not get or add country '{country_name}'.")
+                return {'success': False, 'error': f"Could not get or add country '{country_name}'."}
 
             final_country_id = country_obj['country_id']
 
@@ -102,15 +105,22 @@ class ClientController:
             if city_name:
                 city_obj = self.add_city(city_name, final_country_id)
                 if not city_obj or 'city_id' not in city_obj:
-                    print(f"Warning: Could not get or add city '{city_name}'. Proceeding without city.")
-                    # Depending on requirements, this could be an error or a warning.
-                    # For now, allow client creation without a city if city processing fails.
+                    logging.warning(f"Could not get or add city '{city_name}'. Proceeding without city.")
                 else:
                     final_city_id = city_obj['city_id']
 
-            # Prepare data for db_manager.add_client (or equivalent)
-            # The actual fields for add_client need to be checked against db_manager.py
-            # Assuming db_manager.add_client takes a dictionary similar to this:
+            # Determine default status_id
+            default_status_name = "Actif" # Or "Nouveau" or any other standard active status
+            status_obj = get_status_setting_by_name(default_status_name, "Client")
+            final_status_id = None
+            if status_obj and 'status_id' in status_obj:
+                final_status_id = status_obj['status_id']
+            else:
+                logging.warning(f"Default client status '{default_status_name}' not found. Client will be created without a status or with DB default if any.")
+                # If status_id is strictly required by DB (NOT NULL FK), this path would lead to an error.
+                # For now, allow None if not found, assuming DB might allow NULL or have its own default.
+                # A more robust solution might be to ensure 'Actif' status exists during seeding or configuration.
+
             db_client_data = {
                 'client_name': client_data.get('client_name'),
                 'company_name': client_data.get('company_name'),
@@ -118,14 +128,19 @@ class ClientController:
                 'country_id': final_country_id,
                 'city_id': final_city_id, # Can be None
                 'project_identifier': client_data.get('project_identifier'),
-                'client_status_id': client_data.get('client_status_id', 1), # Default status if applicable
-                'languages': client_data.get('selected_languages') # Assuming this is how languages are stored
-                # 'default_template_id': client_data.get('default_template_id') # Removed
-
-                # Add any other fields required by the database schema for a client
+                'status_id': client_data.get('status_id', final_status_id), # Use fetched default, allow override from client_data
+                'languages': client_data.get('selected_languages'),
+                'default_template_id': client_data.get('default_template_id') # Pass along if provided, will be None otherwise
+                # 'price' and 'notes' etc., are handled by clients_crud if present in client_data
             }
 
-            # Validate required client fields before calling db_manager
+            # Add other fields from client_data that are directly storable
+            for key in ['price', 'notes', 'category', 'created_by_user_id']:
+                if key in client_data:
+                    db_client_data[key] = client_data[key]
+
+
+            # Validate required client fields before calling clients_crud
             if not db_client_data.get('client_name'):
                 print("Error: Client name is required.")
                 return None
