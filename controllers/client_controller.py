@@ -86,6 +86,7 @@ class ClientController:
         from db.cruds.templates_crud import get_all_templates # Import for fallback template ID
         from db.cruds.users_crud import users_crud_instance # Import for fallback user ID
 
+
         try:
             country_name = client_data.get('country_name', '').strip()
             city_name = client_data.get('city_name', '').strip()
@@ -136,6 +137,7 @@ class ClientController:
                 except Exception as e_tpl:
                     logging.error(f"Error fetching fallback template ID: {e_tpl}. default_template_id will be None.")
 
+
             db_client_data = {
                 'client_name': client_data.get('client_name'),
                 'company_name': client_data.get('company_name'),
@@ -146,6 +148,7 @@ class ClientController:
                 'status_id': client_data.get('status_id', final_status_id), # Use fetched default, allow override from client_data
                 'languages': client_data.get('selected_languages'),
                 'default_template_id': final_default_template_id # Use fetched or provided template_id
+
                 # 'price' and 'notes' etc., are handled by clients_crud if present in client_data
             }
 
@@ -175,6 +178,7 @@ class ClientController:
                  return {'success': False, 'error': "Client creator ID could not be determined."}
 
             db_client_data['created_by_user_id'] = final_created_by_user_id
+
 
 
             # Validate required client fields before calling clients_crud

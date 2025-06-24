@@ -7,8 +7,12 @@ This module is responsible for managing conferences, including scheduling, note-
 - Create and schedule conferences.
 - Take notes during conferences.
 - Associate conferences with existing or new clients.
+- Specify location, calendar-specific description, and reminder settings (active, minutes before).
 - List and view conference details.
-- Generate conference reports.
+- Generate conference reports (text format, now including calendar and reminder info).
+- Identify conferences needing imminent reminders.
+- Export conference details to iCalendar (.ics) format, including reminders.
+
 
 ## Structure
 

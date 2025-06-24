@@ -12,7 +12,8 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QAction, QMenu, QMenuBar
                              QRadioButton, QVBoxLayout, QButtonGroup, QComboBox,
                              QDialog, QVBoxLayout as QDialogVBoxLayout, QTextEdit as QDialogTextEdit,
                              QPushButton as QDialogButton, QHBoxLayout as QDialogHBoxLayout,
-                             QAbstractItemView)
+                             QAbstractItemView, QFormLayout, QTreeWidget, QTreeWidgetItem)
+
 from PyQt5.QtCore import Qt, QSize, QRectF, QPointF, QLineF
 from PyQt5.QtGui import QIcon, QPixmap, QImage, QColor, QPen, QPainterPath, QMouseEvent
 
@@ -48,6 +49,39 @@ class TextDisplayDialog(QDialog):
                 with open(file_path, 'w', encoding='utf-8') as f: f.write(self.text_edit.toPlainText())
                 QMessageBox.information(self, "Enregistré", f"Texte enregistré: {file_path}")
             except Exception as e: QMessageBox.critical(self, "Erreur", f"Erreur: {e}")
+
+class PageRangeDialog(QDialog):
+    def __init__(self, total_pages, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Définir les Plages de Pages")
+        self.setMinimumWidth(350)
+
+        layout = QVBoxLayout(self)
+
+        self.instruction_label = QLabel("Entrez les plages de pages (ex: 1-3, 5, 7-fin):")
+        layout.addWidget(self.instruction_label)
+
+        self.range_input_line_edit = QLineEdit(self)
+        self.range_input_line_edit.setObjectName("range_input_line_edit")
+        layout.addWidget(self.range_input_line_edit)
+
+        self.total_pages_label = QLabel(f"Le document a {total_pages} page(s).")
+        self.total_pages_label.setObjectName("total_pages_label")
+        layout.addWidget(self.total_pages_label)
+
+        # Boutons OK et Annuler
+        button_box = QHBoxLayout()
+        self.ok_button = QPushButton("OK", self)
+        self.ok_button.clicked.connect(self.accept)
+        self.cancel_button = QPushButton("Annuler", self)
+        self.cancel_button.clicked.connect(self.reject)
+        button_box.addStretch()
+        button_box.addWidget(self.ok_button)
+        button_box.addWidget(self.cancel_button)
+        layout.addLayout(button_box)
+
+    def get_range_string(self):
+        return self.range_input_line_edit.text()
 
 
 class MainWindow(QMainWindow):
@@ -244,7 +278,15 @@ class MainWindow(QMainWindow):
         self.page_thumbnails_dock = QDockWidget("Miniatures", self); self.page_thumbnails_list = QListWidget(); self.page_thumbnails_list.itemClicked.connect(self.go_to_page_from_thumbnail)
         self.page_thumbnails_list.setDragEnabled(True); self.page_thumbnails_list.setAcceptDrops(True); self.page_thumbnails_list.setDropIndicatorShown(True); self.page_thumbnails_list.setDefaultDropAction(Qt.MoveAction)
         self.page_thumbnails_list.model().rowsMoved.connect(self.on_thumbnail_rows_moved); self.page_thumbnails_dock.setWidget(self.page_thumbnails_list); self.addDockWidget(Qt.LeftDockWidgetArea, self.page_thumbnails_dock)
-        self.bookmarks_dock = QDockWidget("Signets", self); self.bookmarks_tree = QListWidget(); self.bookmarks_dock.setWidget(self.bookmarks_tree); self.addDockWidget(Qt.LeftDockWidgetArea, self.bookmarks_dock)
+
+        self.bookmarks_dock = QDockWidget("Signets", self)
+        self.bookmarks_tree = QTreeWidget() # Changed from QListWidget
+        self.bookmarks_tree.setHeaderLabels(["Titre"]) # Set header label
+        self.bookmarks_tree.itemClicked.connect(self._on_bookmark_clicked) # Connect signal
+        self.bookmarks_dock.setWidget(self.bookmarks_tree)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.bookmarks_dock)
+
+
         self.tabifyDockWidget(self.page_thumbnails_dock, self.bookmarks_dock)
         self.properties_dock = QDockWidget("Propriétés", self); self.properties_widget_container = QWidget(); self.property_widget_layout = QVBoxLayout(self.properties_widget_container)
         self.property_widget_layout.setAlignment(Qt.AlignTop); self.properties_label_info = QLabel("Aucun élément."); self.property_widget_layout.addWidget(self.properties_label_info)
@@ -267,7 +309,11 @@ class MainWindow(QMainWindow):
 
     def _reset_ui_on_error(self): # ... (Ajouter la désactivation de merge_pdfs_action si elle dépendait d'un doc ouvert)
         self.pdf_scene.clear(); self.pdf_view_item = QGraphicsPixmapItem(); self.pdf_scene.addItem(self.pdf_view_item); self.pdf_view_item.setPixmap(QPixmap())
-        self.setWindowTitle("Éditeur PDF PyQt"); self.page_thumbnails_list.clear(); self.update_navigation_controls()
+        self.setWindowTitle("Éditeur PDF PyQt");
+        self.page_thumbnails_list.clear()
+        self.bookmarks_tree.clear() # Clear bookmarks
+        self.update_navigation_controls()
+
         actions_to_disable = [
             self.save_action, self.save_as_action, self.zoom_in_action, self.zoom_out_action, self.zoom_original_action,
             self.delete_page_action, self.insert_blank_page_action, self.import_pages_action, self.rotate_cw_action,
@@ -290,7 +336,10 @@ class MainWindow(QMainWindow):
         if self.current_pdf_document:
             try: self.current_pdf_document.close()
             except Exception as e: logging.warning(f"Erreur fermeture: {e}")
-            self.current_pdf_document = None; self._reset_ui_on_error()
+            self.current_pdf_document = None
+            # _reset_ui_on_error() also clears thumbnails and bookmarks
+            self._reset_ui_on_error() # Call reset which also clears bookmarks
+
         file_path, _ = QFileDialog.getOpenFileName(self, "Ouvrir PDF", "", "Fichiers PDF (*.pdf)")
         if file_path:
             try:
@@ -311,8 +360,71 @@ class MainWindow(QMainWindow):
                 # self.merge_pdfs_action.setEnabled(True) # Toujours active
                 self.statusBar().showMessage(f"Ouvert : {file_path}"); logging.info(f"PDF ouvert : {file_path}")
                 self.setWindowTitle(f"Éditeur PDF PyQt - Page {self.current_page_number + 1}/{self.current_pdf_document.page_count} [{file_path}]")
+                self._load_bookmarks() # Load bookmarks after opening file
             except Exception as e:
                 QMessageBox.critical(self, "Erreur", f"Ouverture impossible '{file_path}'.\nErreur : {e}"); self.current_pdf_document = None; self._reset_ui_on_error()
+
+    def _load_bookmarks(self):
+        self.bookmarks_tree.clear()
+        if not self.current_pdf_document:
+            return
+
+        toc = self.current_pdf_document.get_toc(simple=False)
+        if not toc:
+            # Add a placeholder item if no bookmarks
+            # item = QTreeWidgetItem(self.bookmarks_tree, ["Aucun signet dans ce document."])
+            # item.setDisabled(True)
+            return
+
+        # Helper function to recursively add items
+        def add_items_recursively(parent_item, toc_list, current_level_toc_entries):
+            last_item_at_this_level = None
+
+            for i, entry in enumerate(current_level_toc_entries):
+                level, title, page_num, dest_dict = entry # PyMuPDF 1.19+ uses dict for 4th element
+
+                item = QTreeWidgetItem([title])
+                # Store 0-indexed page and destination details
+                item.setData(0, Qt.UserRole, {'page': page_num - 1, 'dest_details': dest_dict})
+
+                parent_item.addChild(item)
+                last_item_at_this_level = item
+
+                # Find children for this item
+                children_toc_entries = []
+                # Look ahead in the main toc_list for entries that are direct children of the current item
+                start_search_idx = toc_list.index(entry) + 1 # Start searching after current entry
+                for k in range(start_search_idx, len(toc_list)):
+                    next_entry = toc_list[k]
+                    next_level = next_entry[0]
+                    if next_level == level + 1:
+                        children_toc_entries.append(next_entry)
+                    elif next_level <= level: # Reached sibling or ancestor, stop collecting children
+                        break
+
+                if children_toc_entries:
+                    add_items_recursively(item, toc_list, children_toc_entries)
+
+        # Filter top-level items (level 1) to start the recursion
+        top_level_items = [entry for entry in toc if entry[0] == 1]
+        add_items_recursively(self.bookmarks_tree, toc, top_level_items)
+        self.bookmarks_tree.expandAll() # Optionally expand all items
+
+    def _on_bookmark_clicked(self, item: QTreeWidgetItem, column: int):
+        data = item.data(0, Qt.UserRole)
+        if data and isinstance(data, dict) and 'page' in data:
+            page_num_0_indexed = data['page']
+            # dest_details = data.get('dest_details', {}) # For future use with zoom/specific location
+
+            if 0 <= page_num_0_indexed < (self.current_pdf_document.page_count if self.current_pdf_document else 0):
+                logging.info(f"Bookmark clicked: Navigating to page {page_num_0_indexed + 1}")
+                self.go_to_page(page_num_0_indexed)
+            else:
+                logging.warning(f"Bookmark click: Invalid page number {page_num_0_indexed} from item data: {data}")
+        else:
+            logging.warning(f"Bookmark click: No valid page data found for item: {item.text(0)}")
+
+
 
     # ... (Autres méthodes jusqu'à extract_images_from_document)
     def update_page_view(self):
@@ -915,12 +1027,130 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Erreur de Division", f"Une erreur majeure est survenue: {e}")
             if 'new_doc' in locals() and new_doc.is_open: new_doc.close()
 
+    def _parse_page_ranges(self, range_string: str, doc_total_pages: int) -> list | str:
+        output_file_page_lists = []
+        if not range_string.strip():
+            return "Erreur: La chaîne de plages est vide."
+
+        parts = range_string.split(',')
+
+        for part_string in parts:
+            part_string = part_string.strip()
+            if not part_string:
+                continue  # Skip empty parts that might result from "1,,2" or trailing commas
+
+            current_part_pages_set = set()
+
+            if '-' in part_string:
+                if part_string.count('-') > 1:
+                    return f"Erreur: Format de plage invalide dans '{part_string}'. Trop de tirets."
+
+                start_str, end_str = part_string.split('-', 1)
+                start_str = start_str.strip()
+                end_str = end_str.strip()
+
+                if not start_str or not end_str:
+                     return f"Erreur: Numéro de début ou de fin manquant dans la plage '{part_string}'."
+
+                try:
+                    start_num = int(start_str)
+                except ValueError:
+                    return f"Erreur: Numéro de début non valide dans la plage '{part_string}'."
+
+                try:
+                    if end_str.lower() == 'fin': # French 'end'
+                        end_num = doc_total_pages
+                    elif end_str.lower() == 'end': # English 'end'
+                        end_num = doc_total_pages
+                    else:
+                        end_num = int(end_str)
+                except ValueError:
+                    return f"Erreur: Numéro de fin non valide dans la plage '{part_string}'."
+
+                if not (1 <= start_num <= doc_total_pages):
+                    return f"Erreur: Numéro de page de début {start_num} hors limites (1-{doc_total_pages}) dans '{part_string}'."
+                if not (1 <= end_num <= doc_total_pages):
+                    return f"Erreur: Numéro de page de fin {end_num} hors limites (1-{doc_total_pages}) dans '{part_string}'."
+                if start_num > end_num:
+                    return f"Erreur: Le numéro de page de début {start_num} est supérieur au numéro de fin {end_num} dans '{part_string}'."
+
+                for p in range(start_num, end_num + 1):
+                    current_part_pages_set.add(p - 1)
+            else: # Single page number
+                try:
+                    pageNum = int(part_string)
+                except ValueError:
+                    return f"Erreur: Numéro de page non valide '{part_string}'."
+
+                if not (1 <= pageNum <= doc_total_pages):
+                    return f"Erreur: Numéro de page {pageNum} hors limites (1-{doc_total_pages}) dans '{part_string}'."
+                current_part_pages_set.add(pageNum - 1)
+
+            if current_part_pages_set:
+                output_file_page_lists.append(sorted(list(current_part_pages_set)))
+
+        if not output_file_page_lists:
+            return "Erreur: Aucune page ou plage valide n'a été spécifiée pour créer des fichiers de sortie."
+
+        return output_file_page_lists
 
     def split_pdf_by_range(self):
         if not self.current_pdf_document:
-            QMessageBox.warning(self, "Aucun Document", "Veuillez ouvrir un document PDF à diviser.")
+            QMessageBox.warning(self, "Aucun Document", "Veuillez ouvrir un document PDF d'abord.")
             return
-        QMessageBox.information(self, "Fonctionnalité à Venir", "La division par plage de pages sera implémentée prochainement.")
+
+        dialog = PageRangeDialog(self.current_pdf_document.page_count, self)
+        dialog_result = dialog.exec_()
+
+        if dialog_result == QDialog.Accepted:
+            range_str = dialog.get_range_string().strip()
+            if not range_str:
+                QMessageBox.warning(self, "Entrée Requise", "Veuillez entrer les plages de pages.")
+                return
+
+            page_lists_for_files = self._parse_page_ranges(range_str, self.current_pdf_document.page_count)
+
+            if isinstance(page_lists_for_files, str): # Error message returned
+                QMessageBox.critical(self, "Erreur de Plage", page_lists_for_files)
+                return
+
+            if not page_lists_for_files: # Should be caught by parser, but as a safeguard
+                QMessageBox.information(self, "Aucune Page Sélectionnée", "Aucune page valide n'a été sélectionnée avec les plages fournies.")
+                return
+
+            output_dir = QFileDialog.getExistingDirectory(self, "Sélectionner le Dossier de Sortie")
+            if not output_dir:
+                return # User cancelled directory selection
+
+            base_name = os.path.splitext(os.path.basename(self.current_pdf_document.name or "document"))[0]
+            files_created_count = 0
+
+            try:
+                for i, pages_for_one_file in enumerate(page_lists_for_files):
+                    if not pages_for_one_file: # Should not happen if parser is correct
+                        logging.warning(f"Bloc de pages vide rencontré pour la partie {i+1}, ignoré.")
+                        continue
+
+                    new_pdf = fitz.open()
+                    for page_index in pages_for_one_file: # pages are 0-indexed
+                        new_pdf.insert_pdf(self.current_pdf_document, from_page=page_index, to_page=page_index)
+
+                    output_path = os.path.join(output_dir, f"{base_name}_partie_{i+1}.pdf")
+                    new_pdf.save(output_path, garbage=3, deflate=True)
+                    new_pdf.close()
+                    files_created_count += 1
+
+                if files_created_count > 0:
+                    QMessageBox.information(self, "Division Réussie",
+                                            f"{files_created_count} fichier(s) créé(s) avec succès dans {output_dir}.")
+                else:
+                    # This case should ideally be caught by parser returning an error for "No valid pages..."
+                    QMessageBox.information(self, "Division Terminée",
+                                            "Aucun fichier n'a été créé. Veuillez vérifier vos plages de pages.")
+            except Exception as e:
+                logging.error(f"Erreur lors de la division par plage: {e}", exc_info=True)
+                QMessageBox.critical(self, "Erreur de Division", f"Une erreur est survenue: {e}")
+                if 'new_pdf' in locals() and new_pdf.is_open: new_pdf.close()
 
 
 if __name__ == '__main__':

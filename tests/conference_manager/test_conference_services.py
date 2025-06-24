@@ -179,7 +179,12 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
             date_heure_programmation=date_prog,
             client_id=self.client1.id,
             notes="Préparer la présentation.",
-            participants_externes="Consultant Y"
+            participants_externes="Consultant Y",
+            lieu="Salle B01",
+            description_calendrier="Présentation Alpha pour Calendrier",
+            rappel_active=True,
+            minutes_rappel_avant=15
+
         )
         self.assertIsNotNone(conf_obj.id)
         self.assertEqual(conf_obj.titre, titre_conf)
@@ -192,11 +197,35 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
         self.assertEqual(conf_obj.notes_rapport, "Préparer la présentation.")
         self.assertEqual(conf_obj.participants_externes, "Consultant Y")
         self.assertEqual(conf_obj.statut, Conference.CONFERENCE_STATUT_PLANNED)
+        self.assertEqual(conf_obj.lieu, "Salle B01")
+        self.assertEqual(conf_obj.description_calendrier, "Présentation Alpha pour Calendrier")
+        self.assertTrue(conf_obj.rappel_active)
+        self.assertEqual(conf_obj.minutes_rappel_avant, 15)
+
+
 
         retrieved_conf = services.obtenir_details_conference(conf_obj.id)
         self.assertIsNotNone(retrieved_conf)
         self.assertEqual(retrieved_conf.id, conf_obj.id)
         self.assertEqual(retrieved_conf.titre, conf_obj.titre)
+        self.assertEqual(retrieved_conf.lieu, "Salle B01")
+        self.assertTrue(retrieved_conf.rappel_active)
+        self.assertEqual(retrieved_conf.minutes_rappel_avant, 15)
+
+
+    def test_creer_conference_rappel_inactif_pas_de_minutes(self):
+        conf = services.creer_conference(
+            titre="Conf sans rappel actif",
+            rappel_active=False,
+            minutes_rappel_avant=60 # Devrait être ignoré et mis à None
+        )
+        self.assertFalse(conf.rappel_active)
+        self.assertIsNone(conf.minutes_rappel_avant)
+        retrieved_conf = services.obtenir_details_conference(conf.id)
+        self.assertFalse(retrieved_conf.rappel_active)
+        self.assertIsNone(retrieved_conf.minutes_rappel_avant)
+
+
 
     def test_creer_conference_titre_vide(self):
         with self.assertRaisesRegex(ValueError, "Le titre de la conférence ne peut pas être vide."):
@@ -283,6 +312,51 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
         self.assertEqual(updated_conf.client_id, self.client2.id)
         if updated_conf.date_heure_programmation and nouvelle_date_prog:
              self.assertEqual(updated_conf.date_heure_programmation.date(), nouvelle_date_prog.date())
+        # Vérifier aussi les nouveaux champs si on les ajoute ici
+        # Pour l'instant, ce test reste focalisé sur les champs existants plus client_id et date_prog
+
+    def test_mettre_a_jour_conference_champs_calendrier_rappel(self):
+        conf = services.creer_conference(titre="Conf pour MàJ Calendrier")
+
+        # Mise à jour initiale des champs
+        updated_conf = services.mettre_a_jour_conference(
+            conf.id,
+            lieu="Nouveau Lieu",
+            description_calendrier="Description pour le calendrier",
+            rappel_active=True,
+            minutes_rappel_avant=45
+        )
+        self.assertIsNotNone(updated_conf)
+        self.assertEqual(updated_conf.lieu, "Nouveau Lieu")
+        self.assertEqual(updated_conf.description_calendrier, "Description pour le calendrier")
+        self.assertTrue(updated_conf.rappel_active)
+        self.assertEqual(updated_conf.minutes_rappel_avant, 45)
+
+        # Désactiver le rappel
+        updated_conf_rappel_off = services.mettre_a_jour_conference(conf.id, rappel_active=False)
+        self.assertIsNotNone(updated_conf_rappel_off)
+        self.assertFalse(updated_conf_rappel_off.rappel_active)
+        self.assertIsNone(updated_conf_rappel_off.minutes_rappel_avant, "minutes_rappel_avant devrait être None si rappel_active est False")
+
+        # Réactiver le rappel avec une nouvelle durée
+        updated_conf_rappel_on_again = services.mettre_a_jour_conference(conf.id, rappel_active=True, minutes_rappel_avant=10)
+        self.assertIsNotNone(updated_conf_rappel_on_again)
+        self.assertTrue(updated_conf_rappel_on_again.rappel_active)
+        self.assertEqual(updated_conf_rappel_on_again.minutes_rappel_avant, 10)
+
+        # Mettre à jour seulement les minutes (rappel doit rester actif)
+        updated_conf_minutes_only = services.mettre_a_jour_conference(conf.id, minutes_rappel_avant=5)
+        self.assertIsNotNone(updated_conf_minutes_only)
+        self.assertTrue(updated_conf_minutes_only.rappel_active) # Doit rester True
+        self.assertEqual(updated_conf_minutes_only.minutes_rappel_avant, 5)
+
+        # Mettre minutes_rappel_avant à None explicitement (via -1 ou autre convention si nécessaire)
+        # La logique actuelle dans services.py pour minutes_rappel_avant met à None si < 0
+        updated_conf_no_minutes = services.mettre_a_jour_conference(conf.id, minutes_rappel_avant=-1)
+        self.assertIsNotNone(updated_conf_no_minutes)
+        self.assertTrue(updated_conf_no_minutes.rappel_active) # Rappel reste actif
+        self.assertIsNone(updated_conf_no_minutes.minutes_rappel_avant) # Mais sans durée spécifique
+
 
 
     def test_lister_conferences(self):
@@ -390,19 +464,23 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
         date_creation_originale = datetime(2024, 1, 1, 10, 0, 0) # Pour contrôler la date de création
         date_prog = datetime(2025, 1, 15, 14, 30, 0)
         notes = "Points clés:\n- Item 1\n- Item 2"
+        lieu_test = "Salle de Conférence Principale"
+        desc_cal_test = "Session de test pour le rapport iCal."
+        minutes_rappel = 15
 
-        # Pour contrôler la date de création, il faudrait la passer au constructeur de Conference,
-        # mais creer_conference la génère. On va donc la récupérer après création.
         conf_obj = services.creer_conference(
             titre="Rapport Conf Test",
-            client_id=self.client1.id, # self.client1 est créé dans setUp
+            client_id=self.client1.id,
             date_heure_programmation=date_prog,
             notes=notes,
-            participants_externes="M. Untel"
+            participants_externes="M. Untel",
+            lieu=lieu_test,
+            description_calendrier=desc_cal_test,
+            rappel_active=True,
+            minutes_rappel_avant=minutes_rappel
         )
         services.mettre_a_jour_conference(conf_obj.id, statut=Conference.CONFERENCE_STATUT_COMPLETED)
 
-        # Relire la conférence pour avoir l'objet final avec toutes les infos de la BD
         conf = services.obtenir_details_conference(conf_obj.id)
         self.assertIsNotNone(conf)
 
@@ -416,13 +494,21 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
              self.assertIn(conf.date_heure_creation.strftime('%Y-%m-%d %H:%M:%S'), rapport)
         if date_prog: # Doit exister
             self.assertIn(date_prog.strftime('%Y-%m-%d %H:%M:%S'), rapport)
-
         self.assertIn(Conference.CONFERENCE_STATUT_COMPLETED, rapport)
         self.assertIn("M. Untel", rapport)
         self.assertIn(notes, rapport)
+        self.assertIn(f"Lieu: {lieu_test}", rapport)
+        self.assertIn(f"Description Calendrier:\n{desc_cal_test}", rapport)
+        self.assertIn("Rappel Actif: Oui", rapport)
+        self.assertIn(f"Rappel Avant (minutes): {minutes_rappel}", rapport)
+
 
     def test_generer_texte_rapport_conference_minimale(self):
-        conf_obj = services.creer_conference(titre="Conf Rapport Minimal")
+        conf_obj = services.creer_conference(
+            titre="Conf Rapport Minimal",
+            rappel_active=False # Tester avec rappel inactif
+        )
+
         services.mettre_a_jour_conference(conf_obj.id, statut=Conference.CONFERENCE_STATUT_IN_PROGRESS)
 
         conf = services.obtenir_details_conference(conf_obj.id)
@@ -432,10 +518,15 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
         self.assertIn(conf.id, rapport)
         self.assertIn("Conf Rapport Minimal", rapport)
         self.assertIn("Client Associé: Aucun", rapport)
-        self.assertIn("Date Programmée: Non spécifiée", rapport) # Car non fournie à la création
+        self.assertIn("Lieu: Non spécifié", rapport)
+        self.assertIn("Date Programmée: Non spécifiée", rapport)
         self.assertIn("Participants Externes: Aucun", rapport)
-        self.assertIn("Aucune note enregistrée.", rapport)
+        self.assertIn("Description Calendrier:\nAucune description pour calendrier.", rapport)
+        self.assertIn("Notes / Rapport Détaillé:\nAucune note enregistrée.", rapport)
         self.assertIn(Conference.CONFERENCE_STATUT_IN_PROGRESS, rapport)
+        self.assertIn("Rappel Actif: Non", rapport)
+        self.assertNotIn("Rappel Avant (minutes):", rapport) # Ne doit pas apparaître si rappel inactif
+
         if conf.date_heure_creation:
             self.assertIn(conf.date_heure_creation.strftime('%Y-%m-%d %H:%M:%S'), rapport)
 
@@ -443,6 +534,155 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
     def test_generer_texte_rapport_conference_inexistante(self):
         with self.assertRaisesRegex(ValueError, "Conférence avec ID 'id_conf_rapport_bidon' non trouvée."):
             services.generer_texte_rapport_conference("id_conf_rapport_bidon")
+
+    # --- Tests pour la Logique de Rappel ---
+    def test_obtenir_conferences_necessitant_rappel(self):
+        maintenant = datetime.now()
+
+        # Conférence dont le rappel est imminent (dans la fenêtre)
+        conf_rappel_imminent = services.creer_conference(
+            titre="Conf Rappel Imminent",
+            date_heure_programmation=maintenant + timedelta(minutes=10), # Dans 10 mins
+            rappel_active=True, minutes_rappel_avant=8 # Rappel dans 2 mins
+        )
+        # Conférence dont le rappel est déjà passé mais conf pas encore commencée
+        conf_rappel_passe = services.creer_conference(
+            titre="Conf Rappel Passé",
+            date_heure_programmation=maintenant + timedelta(hours=1), # Dans 1 heure
+            rappel_active=True, minutes_rappel_avant=90 # Rappel était il y a 30 mins
+        )
+        # Conférence dont le rappel est trop loin dans le futur
+        conf_rappel_futur_lointain = services.creer_conference(
+            titre="Conf Rappel Futur Lointain",
+            date_heure_programmation=maintenant + timedelta(hours=2), # Dans 2 heures
+            rappel_active=True, minutes_rappel_avant=30 # Rappel dans 1h30
+        )
+        # Conférence avec rappel inactif
+        conf_rappel_inactif = services.creer_conference(
+            titre="Conf Rappel Inactif",
+            date_heure_programmation=maintenant + timedelta(minutes=5),
+            rappel_active=False, minutes_rappel_avant=5
+        )
+        # Conférence passée
+        conf_passee_avec_rappel = services.creer_conference(
+            titre="Conf Passée avec Rappel",
+            date_heure_programmation=maintenant - timedelta(hours=1),
+            rappel_active=True, minutes_rappel_avant=30
+        )
+        # Conférence avec rappel mais sans minutes_rappel_avant
+        conf_rappel_sans_minutes = services.creer_conference(
+            titre="Conf Rappel Sans Minutes",
+            date_heure_programmation=maintenant + timedelta(minutes=20),
+            rappel_active=True, minutes_rappel_avant=None
+        )
+        # Conférence avec rappel et minutes_rappel_avant = 0 (rappel à l'heure de la conf)
+        conf_rappel_zero_minute = services.creer_conference(
+            titre="Conf Rappel Zéro Minute",
+            date_heure_programmation=maintenant + timedelta(minutes=3), # Dans 3 mins
+            rappel_active=True, minutes_rappel_avant=0 # Rappel maintenant/dans 3 mins
+        )
+
+
+        # Utiliser une fenêtre de 5 minutes pour le test
+        conferences_pour_rappel = services.obtenir_conferences_necessitant_rappel(fenetre_proche_futur_minutes=5)
+
+        ids_pour_rappel = [c.id for c in conferences_pour_rappel]
+
+        self.assertIn(conf_rappel_imminent.id, ids_pour_rappel, "Rappel imminent devrait être inclus")
+        self.assertIn(conf_rappel_passe.id, ids_pour_rappel, "Rappel passé (conf future) devrait être inclus")
+        self.assertIn(conf_rappel_zero_minute.id, ids_pour_rappel, "Rappel zéro minute (conf future proche) devrait être inclus")
+
+        self.assertNotIn(conf_rappel_futur_lointain.id, ids_pour_rappel, "Rappel futur lointain ne devrait pas être inclus")
+        self.assertNotIn(conf_rappel_inactif.id, ids_pour_rappel, "Rappel inactif ne devrait pas être inclus")
+        if conf_passee_avec_rappel : self.assertNotIn(conf_passee_avec_rappel.id, ids_pour_rappel, "Conférence passée ne devrait pas être incluse")
+        if conf_rappel_sans_minutes: self.assertNotIn(conf_rappel_sans_minutes.id, ids_pour_rappel, "Conférence avec rappel mais sans minutes ne devrait pas être incluse")
+
+        # Vérifier l'ordre: conf_rappel_passe (son heure de rappel est la plus ancienne),
+        # puis conf_rappel_zero_minute, puis conf_rappel_imminent
+        # Les heures de rappel sont :
+        # Passe: maintenant - 30m
+        # ZeroMinute: maintenant + 3m
+        # Imminent: maintenant + 2m
+        # L'ordre devrait être Passé, Imminent, ZeroMinute
+        expected_order_ids = [
+            conf_rappel_passe.id, # Heure rappel = maintenant - 30m
+            conf_rappel_imminent.id, # Heure rappel = maintenant + 2m
+            conf_rappel_zero_minute.id, # Heure rappel = maintenant + 3m
+        ]
+
+        # Filtrer les expected_order_ids pour ne garder que ceux présents dans ids_pour_rappel, dans le bon ordre
+        actual_ordered_ids_in_expected_subset = [id_val for id_val in expected_order_ids if id_val in ids_pour_rappel]
+
+        self.assertEqual(len(ids_pour_rappel), len(actual_ordered_ids_in_expected_subset), "Nombre d'éléments pour rappel ne correspond pas")
+        if len(ids_pour_rappel) == len(actual_ordered_ids_in_expected_subset): # Pour éviter erreur si tailles differentes
+            self.assertEqual(ids_pour_rappel, actual_ordered_ids_in_expected_subset, "L'ordre des rappels n'est pas correct.")
+
+    # --- Tests pour l'Export iCalendar ---
+    def test_generer_contenu_ics_pour_conference(self):
+        maintenant = datetime.now()
+        date_prog = maintenant + timedelta(days=1, hours=2) # Demain dans 2 heures
+        conf = services.creer_conference(
+            titre="Conférence pour ICS",
+            date_heure_programmation=date_prog,
+            notes="Notes de la conf ICS.",
+            description_calendrier="Description spéciale pour iCal.",
+            lieu="Bureau 101",
+            client_id=self.client1.id,
+            rappel_active=True,
+            minutes_rappel_avant=30
+        )
+        self.assertIsNotNone(conf)
+
+        ics_content = services.generer_contenu_ics_pour_conference(conf.id)
+        self.assertIsNotNone(ics_content)
+
+        # Vérifications basiques du contenu ICS
+        self.assertIn("BEGIN:VCALENDAR", ics_content)
+        self.assertIn("END:VCALENDAR", ics_content)
+        self.assertIn("BEGIN:VEVENT", ics_content)
+        self.assertIn("END:VEVENT", ics_content)
+        self.assertIn(f"UID:{conf.id}@votredomaine.com", ics_content)
+        self.assertIn(f"SUMMARY:Conférence pour ICS", ics_content)
+        # Les dates/heures dans ICS sont au format YYYYMMDDTHHMMSSZ (pour UTC) ou YYYYMMDDTHHMMSS
+        # Notre objet datetime est "naive", donc la librairie icalendar pourrait le formater sans 'Z'.
+        # On va vérifier la présence de la date et de l'heure au moins.
+        self.assertIn(f"DTSTART:{date_prog.strftime('%Y%m%dT%H%M%S')}", ics_content.replace("Z",""))
+
+        # Vérifier la durée par défaut de 60 minutes
+        date_fin_attendue = date_prog + timedelta(minutes=60)
+        self.assertIn(f"DTEND:{date_fin_attendue.strftime('%Y%m%dT%H%M%S')}", ics_content.replace("Z",""))
+
+        self.assertIn(f"LOCATION:Bureau 101", ics_content)
+        self.assertIn(f"DESCRIPTION:Description spéciale pour iCal.", ics_content)
+
+        # Vérifier l'alarme
+        self.assertIn("BEGIN:VALARM", ics_content)
+        self.assertIn("ACTION:DISPLAY", ics_content)
+        self.assertIn("TRIGGER:-PT30M", ics_content) # -PT30M signifie 30 minutes avant
+        self.assertIn("DESCRIPTION:Rappel: Conférence pour ICS", ics_content)
+        self.assertIn("END:VALARM", ics_content)
+
+    def test_generer_contenu_ics_conference_sans_date_programmation(self):
+        conf = services.creer_conference(titre="Conf sans date prog pour ICS")
+        ics_content = services.generer_contenu_ics_pour_conference(conf.id)
+        self.assertIsNone(ics_content, "Devrait retourner None si pas de date de programmation")
+
+    def test_generer_contenu_ics_conference_inexistante(self):
+        ics_content = services.generer_contenu_ics_pour_conference("id-conf-bidon-ics")
+        self.assertIsNone(ics_content, "Devrait retourner None si la conférence n'existe pas")
+
+    def test_generer_contenu_ics_rappel_inactif(self):
+        date_prog = datetime.now() + timedelta(days=1)
+        conf = services.creer_conference(
+            titre="Conf ICS Rappel Inactif",
+            date_heure_programmation=date_prog,
+            rappel_active=False,
+            minutes_rappel_avant=30 # Devrait être ignoré
+        )
+        ics_content = services.generer_contenu_ics_pour_conference(conf.id)
+        self.assertIsNotNone(ics_content)
+        self.assertNotIn("BEGIN:VALARM", ics_content, "Ne devrait pas y avoir d'alarme si rappel_active est False")
+
 
 
 if __name__ == '__main__':
