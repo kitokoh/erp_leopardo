@@ -124,9 +124,10 @@ from Installsweb.installmodules import InstallerDialog
 
 
 class MainDashboard(QWidget): # Changed from QMainWindow to QWidget
-    def __init__(self, parent=None, current_user=None): # Added current_user parameter
+    # Ensure this __init__ signature is what's expected by the caller
+    def __init__(self, parent=None, current_user_info=None):
         super().__init__(parent)
-        self.current_user = current_user # Use passed-in user
+        self.current_user = current_user_info # Use passed-in user_info dict
         self.template_manager = ProjectTemplateManager() # Initialize ProjectTemplateManager
 
         # Task Page Pagination state
