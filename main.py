@@ -2,10 +2,31 @@
 import sys
 import os
 
-# Determine project root and add to sys.path
+# Determine project root
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-if PROJECT_ROOT not in sys.path:
+
+# Ensure PROJECT_ROOT is at the beginning of sys.path for consistent module resolution
+if PROJECT_ROOT in sys.path:
+    # If it's present but not at the start, remove and re-insert at the front
+    if sys.path[0] != PROJECT_ROOT:
+        sys.path.remove(PROJECT_ROOT)
+        sys.path.insert(0, PROJECT_ROOT)
+        # Optional: log that it was moved
+        # import logging
+        # logging.info(f"Moved {PROJECT_ROOT} to the start of sys.path.")
+else:
+    # If it's not present at all, insert it at the start
     sys.path.insert(0, PROJECT_ROOT)
+    # Optional: log that it was added
+    # import logging
+    # logging.info(f"Added {PROJECT_ROOT} to the start of sys.path.")
+
+# For diagnostics (can be removed or commented out in production)
+# print(f"[{os.path.basename(__file__)}] Effective sys.path[0]: {sys.path[0]}")
+# print(f"[{os.path.basename(__file__)}] Full sys.path: {sys.path}")
+
+
+from main_window import DocumentManager # The main application window
 
 import logging # For main.py's own logging needs, and for translator parts if setup_logging isn't called first
 import icons_rc # Import the compiled resource file
@@ -39,7 +60,6 @@ from auth.login_window import LoginWindow # Added for authentication
 from PyQt5.QtWidgets import QDialog # Required for QDialog.Accepted check (already present, but good to note)
 # from initial_setup_dialog import InitialSetupDialog # Redundant import, already imported above
 # import db as db_manager # For db initialization - already imported above, now using 'import db'
-from main_window import DocumentManager # The main application window
 from notifications import NotificationManager # Added for notifications
 from db.cruds.users_crud import users_crud_instance # Added for default operational user
 from PyQt5.QtWidgets import QMessageBox # Added for error dialog

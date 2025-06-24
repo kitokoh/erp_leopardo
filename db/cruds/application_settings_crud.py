@@ -1,7 +1,7 @@
 import sqlite3
 from datetime import datetime
 import logging # Added import
-from .generic_crud import _manage_conn, get_db_connection
+from .generic_crud import _manage_conn # get_db_connection is not used directly
 
 # --- ApplicationSettings CRUD ---
 @_manage_conn

@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import QMessageBox
 
 from docx import Document
 import db as db_manager # For generate_pdf_for_document
-from html_editor import HtmlEditor # For generate_pdf_for_document
+# from html_editor import HtmlEditor # For generate_pdf_for_document - DEFERRED
 from html_to_pdf_util import convert_html_to_pdf # For generate_pdf_for_document
 
 # MAIN_APP_ROOT_DIR import removed as app_root_dir is now passed to generate_pdf_for_document
@@ -153,6 +153,8 @@ def generate_pdf_for_document(source_file_path: str, client_info: dict, app_root
         logging.error(f"Source HTML file not found for PDF generation: {source_file_path}")
         QMessageBox.critical(parent_widget, "File Error", f"Source HTML file not found for PDF generation: {source_file_path}")
         return None
+
+    from html_editor import HtmlEditor # DEFERRED IMPORT
 
     if not client_info or 'client_id' not in client_info:
         QMessageBox.warning(parent_widget, QCoreApplication.translate("utils.generate_pdf", "Erreur Client"),
