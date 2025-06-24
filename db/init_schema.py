@@ -104,37 +104,52 @@ def initialize_database():
     conn.row_factory = sqlite3.Row # Essential for accessing columns by name
     cursor = conn.cursor() # Keep for direct cursor use
 
-    # Create Users table (base from ca.py)
+    # Create Roles table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Roles (
+        role_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        role_name TEXT NOT NULL UNIQUE,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    print("DEBUG_INIT_DB: Table Roles created or exists.")
+
+    # Create Users table (modified)
+    # - Changed 'role' to 'role_id' with FOREIGN KEY
+    # - Renamed 'password_hash' to 'hashed_password'
+    # - Removed 'salt' column (assuming werkzeug handles salt within the hash)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS Users (
         user_id TEXT PRIMARY KEY,
         username TEXT NOT NULL UNIQUE,
-        password_hash TEXT NOT NULL,
-        salt TEXT NOT NULL, -- Added for password salting
+        hashed_password TEXT NOT NULL,
         full_name TEXT,
         email TEXT NOT NULL UNIQUE,
-        role TEXT NOT NULL, -- e.g., 'admin', 'manager', 'member'
+        role_id INTEGER NOT NULL,
         is_active BOOLEAN DEFAULT TRUE,
-        is_deleted INTEGER DEFAULT 0, -- Added for soft delete
-        deleted_at TEXT, -- Added for soft delete
+        is_deleted INTEGER DEFAULT 0,
+        deleted_at TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        last_login_at TIMESTAMP
+        last_login_at TIMESTAMP,
+        FOREIGN KEY (role_id) REFERENCES Roles (role_id)
     )
     """)
+    print("DEBUG_INIT_DB: Table Users created or exists (with role_id FK).")
 
-    # Ensure salt, is_deleted, and deleted_at columns exist in Users table
+    # Ensure is_deleted, and deleted_at columns exist in Users table (for migration from older schemas)
     cursor.execute("PRAGMA table_info(Users)")
     users_columns_info = cursor.fetchall()
     users_column_names = [info['name'] for info in users_columns_info]
 
-    if 'salt' not in users_column_names:
-        try:
-            # Using a temporary default for NOT NULL. Real salting should occur on user creation/update.
-            cursor.execute("ALTER TABLE Users ADD COLUMN salt TEXT NOT NULL DEFAULT 'tempsalt'")
-            print("Added 'salt' column to Users table with a temporary default.")
-        except sqlite3.Error as e_alter_salt:
-            print(f"Error adding 'salt' column to Users table: {e_alter_salt}")
+    # Migration for 'salt' and 'role' columns if they exist from an old schema:
+    # This is complex. For now, we assume a fresh setup or that users_crud handles the new schema.
+    # If 'salt' column exists and needs removal, or 'role' text column needs migration to 'role_id',
+    # that would require more complex ALTER TABLE (rename, create new, copy data, drop old)
+    # which is too risky without knowing existing data.
+    # The CREATE TABLE above defines the target schema.
 
     if 'is_deleted' not in users_column_names:
         try:
