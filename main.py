@@ -77,7 +77,8 @@ CURRENT_USER_ROLE = None
 CURRENT_USER_ID = None
 SESSION_START_TIME = None
 # Initialize from CONFIG, providing a default if key is missing
-SESSION_TIMEOUT_SECONDS = CONFIG.get("session_timeout_minutes", 30) * 60
+# SESSION_TIMEOUT_SECONDS = CONFIG.get("session_timeout_minutes", 30) * 60
+SESSION_TIMEOUT_SECONDS = 12 * 30 * 24 * 60 * 60 # Approx 12 months
 
 # Global variable for the API server process
 api_server_process = None
@@ -213,8 +214,9 @@ def main():
     setup_logging()
     logging.info("Application starting...")
 
-    # Start the API server
-    start_api_server()
+    # Start the API server - Commented out as per user request for local PyQt app
+    # start_api_server()
+    # logging.info("API server auto-start is disabled for local PyQt execution.") # Log message removed
 
     # Register the function to stop the API server on application exit
     # This ensures that if start_api_server() actually started a process,
