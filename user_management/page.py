@@ -101,6 +101,25 @@ class UserManagementPage(QWidget):
         main_layout.addWidget(self.users_table)
         self.setLayout(main_layout)
 
+    def _handle_add_user(self):
+        """Handles the Add User button click. Placeholder for now."""
+        # QMessageBox.information(self, self.tr("Fonctionnalité à venir"), self.tr("L'ajout d'utilisateurs sera implémenté prochainement."))
+        # For now, try to open the EditUserDialog in 'add' mode if it supports it, or a specific AddUserDialog.
+        # Assuming EditUserDialog can handle user_id_to_edit=None for add mode.
+        from dialogs.edit_user_dialog import EditUserDialog # Local import to avoid circular if EditUserDialog imports this module
+
+        role_name = self.current_user_info.get('role_name') if self.current_user_info else None
+        if not has_permission(role_name, P_MANAGE_USERS):
+            QMessageBox.warning(self, self.tr("Permissions Insuffisantes"),
+                                self.tr("Vous n'avez pas la permission d'ajouter des utilisateurs."))
+            return
+
+        add_dialog = EditUserDialog(user_id_to_edit=None, # Indicates 'add' mode
+                                    current_admin_user_info=self.current_user_info,
+                                    parent=self)
+        if add_dialog.exec_() == QDialog.Accepted:
+            self.load_users_to_table() # Refresh list if user was added
+
     def _update_action_buttons_state(self):
         """Enable/disable action buttons based on table selection and base permissions."""
         has_selection = bool(self.users_table.selectedItems())
