@@ -1,7 +1,7 @@
 # dialogs/login_dialog.py
 import logging
 from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
+    QApplication, QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, # Added QApplication
     QLineEdit, QPushButton, QMessageBox, QLabel, QDialogButtonBox
 )
 from PyQt5.QtGui import QIcon, QPixmap
