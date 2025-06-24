@@ -270,4 +270,4 @@ class UserManagementPage(QWidget):
                 QMessageBox.critical(self, self.tr("Erreur"),
                                      self.tr("Impossible de réinitialiser le mot de passe pour '{0}'.").format(username_to_display))
         # --- End Placeholder ---
-```
+# ```
