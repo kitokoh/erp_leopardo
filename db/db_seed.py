@@ -170,11 +170,12 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
             if admin_user_for_tm_dict:
                 cursor.execute("SELECT COUNT(*) FROM TeamMembers WHERE user_id = ?", (admin_user_id,))
                 if cursor.fetchone()[0] == 0:
+                    # Use 'role_name' as fetched from get_user_by_id, and map to 'role_or_title' column in TeamMembers
                     cursor.execute("INSERT OR IGNORE INTO TeamMembers (user_id, full_name, email, role_or_title) VALUES (?, ?, ?, ?)",
-                                   (admin_user_id, admin_user_for_tm_dict['full_name'], admin_user_for_tm_dict['email'], admin_user_for_tm_dict['role']))
+                                   (admin_user_id, admin_user_for_tm_dict['full_name'], admin_user_for_tm_dict['email'], admin_user_for_tm_dict.get('role_name')))
                     logger.info("Seeded admin team member.")
             else:
-                logger.warning(f"Could not retrieve admin user details for ID {admin_user_id}.")
+                logger.warning(f"Could not retrieve admin user details for ID {admin_user_id} to seed into TeamMembers.")
         else:
             logger.warning("Admin user ID not available for TeamMember seeding.")
 
