@@ -10,54 +10,63 @@ if project_root not in sys.path:
 
 import app_setup # Import app_setup directly
 
+# The following block attempting to import app_setup seems to be an older version or a mismerge.
+# The current sys.path manipulation and import is handled above and then checked below.
+# _APP_SETUP_IMPORTED = False
+# try:
+#     import app_setup # Initial import attempt
+#     _APP_SETUP_IMPORTED = True
+# except ImportError as e_initial:
+#     logging.warning(f"db.connection: Initial import of 'app_setup' failed: {e_initial}. Attempting path adjustment.")
+#     _project_root_db_conn = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')) # Adjusted to be project root from db/
+#     original_sys_path = list(sys.path) # Keep a copy for reference if needed
 
-    original_sys_path = list(sys.path) # Keep a copy for reference if needed
+#     path_manipulation_done = False
+#     if _project_root_db_conn not in sys.path:
+#         sys.path.insert(0, _project_root_db_conn)
+#         logging.warning(
+#             f"db.connection: Added '{_project_root_db_conn}' to sys.path to find 'app_setup'."
+#         )
+#         path_manipulation_done = True
+#     elif sys.path[0] != _project_root_db_conn:
+#         # It's in sys.path, but not at the front. This is a less common case to handle defensively.
+#         try:
+#             sys.path.remove(_project_root_db_conn)
+#         except ValueError:
+#             pass # Should not happen if 'in' check passed, but defensive
+#         sys.path.insert(0, _project_root_db_conn)
+#         logging.warning(
+#             f"db.connection: Moved '{_project_root_db_conn}' to sys.path[0] to find 'app_setup'."
+#         )
+#         path_manipulation_done = True
 
-    path_manipulation_done = False
-    if _project_root_db_conn not in sys.path:
-        sys.path.insert(0, _project_root_db_conn)
-        logging.warning(
-            f"db.connection: Added '{_project_root_db_conn}' to sys.path to find 'app_setup'."
-        )
-        path_manipulation_done = True
-    elif sys.path[0] != _project_root_db_conn:
-        # It's in sys.path, but not at the front. This is a less common case to handle defensively.
-        try:
-            sys.path.remove(_project_root_db_conn)
-        except ValueError:
-            pass # Should not happen if 'in' check passed, but defensive
-        sys.path.insert(0, _project_root_db_conn)
-        logging.warning(
-            f"db.connection: Moved '{_project_root_db_conn}' to sys.path[0] to find 'app_setup'."
-        )
-        path_manipulation_done = True
+#     if path_manipulation_done or (sys.path[0] == _project_root_db_conn) : # Try importing if path was changed or if it was already correct
+#         try:
+#             import app_setup # Retry import
+#             _APP_SETUP_IMPORTED = True
+#         except ModuleNotFoundError as e_retry:
+#             logging.critical(
+#                 "db.connection: CRITICAL - Failed to import 'app_setup' after sys.path adjustment. "
+#                 f"Path: '{_project_root_db_conn}', Error: {e_retry}. Sys.path was: {original_sys_path}, now: {sys.path}"
+#             )
+#             # Restore sys.path if we changed it and failed, to minimize side effects, though system is likely unstable.
+#             if path_manipulation_done:
+#                  sys.path = original_sys_path
+#             raise ImportError(
+#                 "Essential module 'app_setup' could not be imported by db.connection. "
+#                 "Please check Python path and project structure."
+#             ) from e_retry
+#     else: # Should not be reached if logic is correct, means path was not manipulated and not already correct.
+#         logging.critical(
+#             "db.connection: CRITICAL - Project root '{_project_root_db_conn}' was not added to sys.path and app_setup initially failed. This indicates a logic error in db.connection's path setup."
+#         )
+#         raise ImportError("Essential module 'app_setup' could not be imported due to path setup logic error in db.connection.")
 
-    if path_manipulation_done or (sys.path[0] == _project_root_db_conn) : # Try importing if path was changed or if it was already correct
-        try:
-            import app_setup # Retry import
-            _APP_SETUP_IMPORTED = True
-        except ModuleNotFoundError as e_retry:
-            logging.critical(
-                "db.connection: CRITICAL - Failed to import 'app_setup' after sys.path adjustment. "
-                f"Path: '{_project_root_db_conn}', Error: {e_retry}. Sys.path was: {original_sys_path}, now: {sys.path}"
-            )
-            # Restore sys.path if we changed it and failed, to minimize side effects, though system is likely unstable.
-            if path_manipulation_done:
-                 sys.path = original_sys_path
-            raise ImportError(
-                "Essential module 'app_setup' could not be imported by db.connection. "
-                "Please check Python path and project structure."
-            ) from e_retry
-    else: # Should not be reached if logic is correct, means path was not manipulated and not already correct.
-        logging.critical(
-            "db.connection: CRITICAL - Project root '{_project_root_db_conn}' was not added to sys.path and app_setup initially failed. This indicates a logic error in db.connection's path setup."
-        )
-        raise ImportError("Essential module 'app_setup' could not be imported due to path setup logic error in db.connection.")
-
-
-if not _APP_SETUP_IMPORTED:
+# This check ensures app_setup was imported, relying on the sys.path modification at the top of the file.
+if 'app_setup' not in sys.modules:
     logging.critical("db.connection: 'app_setup' module was not successfully imported. This is a fatal error for database configuration.")
     raise ImportError("db.connection: Failed to make 'app_setup' available.")
+
 
 def get_db_connection(db_path_override=None):
     """
