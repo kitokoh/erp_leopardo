@@ -25,24 +25,54 @@ import logging
 # Assuming db.py is in the parent directory of project_management
 # and the application is run from a context where 'db' is discoverable.
 # For the __main__ block, this might require db.py to be in PYTHONPATH or similar.
-from db import (
-    get_status_setting_by_id, get_all_status_settings, get_status_setting_by_name,
-    get_all_projects, get_project_by_id, add_project, update_project, delete_project,
-    get_tasks_by_project_id, add_task, update_task, delete_task, get_task_by_id,
-    get_tasks_by_assignee_id,
-    get_kpis_for_project,
-    add_activity_log, get_activity_logs,
-    get_user_by_id, get_all_users, update_user, verify_user_password,
-    get_all_team_members, get_team_member_by_id, add_team_member, update_team_member, delete_team_member,
-    get_all_clients,
-    get_cover_pages_for_client, add_cover_page, update_cover_page, delete_cover_page, get_cover_page_by_id,
-    get_all_file_based_templates, get_cover_page_template_by_id,
-    get_milestones_for_project, add_milestone, get_milestone_by_id, update_milestone, delete_milestone,
-    initialize_database,
-    # Imports for task dependencies (assuming they are in db.py)
-    add_task_dependency, get_predecessor_tasks, remove_task_dependency,
-    get_tasks_by_project_id_ordered_by_sequence # Used by ProductionOrderDetailDialog, EditProductionOrderDialog
+# from db import (
+#     get_status_setting_by_id, get_all_status_settings, get_status_setting_by_name,
+#     get_all_projects, get_project_by_id, add_project, update_project, delete_project,
+#     get_tasks_by_project_id, add_task, update_task, delete_task, get_task_by_id,
+#     get_tasks_by_assignee_id,
+#     get_kpis_for_project,
+#     add_activity_log, get_activity_logs,
+#     get_user_by_id, get_all_users, update_user, verify_user_password,
+#     get_all_team_members, get_team_member_by_id, add_team_member, update_team_member, delete_team_member,
+#     get_all_clients,
+#     get_cover_pages_for_client, add_cover_page, update_cover_page, delete_cover_page, get_cover_page_by_id,
+#     get_all_file_based_templates, get_cover_page_template_by_id,
+#     get_milestones_for_project, add_milestone, get_milestone_by_id, update_milestone, delete_milestone,
+#     initialize_database,
+#     # Imports for task dependencies (assuming they are in db.py)
+#     add_task_dependency, get_predecessor_tasks, remove_task_dependency,
+#     get_tasks_by_project_id_ordered_by_sequence # Used by ProductionOrderDetailDialog, EditProductionOrderDialog
+# )
+
+# Corrected imports from specific CRUD modules
+from db.cruds.status_settings_crud import get_status_setting_by_id, get_all_status_settings, get_status_setting_by_name
+from db.cruds.projects_crud import get_all_projects, get_project_by_id, add_project, update_project, delete_project
+# search_projects, get_projects_by_status, get_projects_by_user # These were missing, import if they exist or comment out usage
+from db.cruds.tasks_crud import (
+    get_task_by_id, add_task, update_task, delete_task,
+    get_tasks_by_project_id, # Use this or get_tasks_by_project_id_ordered_by_sequence for get_tasks_for_project
+    get_tasks_by_project_id_ordered_by_sequence,
+    get_tasks_by_assignee_id, # Use this for get_tasks_by_assignee
+    add_task_dependency, get_predecessor_tasks, remove_task_dependency
+    # get_tasks_by_status, # This was missing, import if it exists or comment out usage
 )
+from db.cruds.kpis_crud import get_kpis_for_project
+from db.cruds.activity_logs_crud import add_activity_log, get_activity_logs # Assuming activity_logs_crud exists
+from db.cruds.users_crud import get_user_by_id, list_users as get_all_users, update_user_password as update_user, verify_user_password
+from db.cruds.team_members_crud import get_all_team_members, get_team_member_by_id, add_team_member, update_team_member, delete_team_member
+from db.cruds.clients_crud import get_all_clients # Assuming this is the correct one
+from db.cruds.cover_pages_crud import get_cover_pages_for_client, add_cover_page, update_cover_page, delete_cover_page, get_cover_page_by_id
+from db.cruds.templates_crud import get_all_file_based_templates
+from db.cruds.cover_page_templates_crud import get_cover_page_template_by_id
+from db.cruds.milestones_crud import get_milestones_for_project, add_milestone, get_milestone_by_id, update_milestone, delete_milestone
+from db.init_schema import initialize_database # initialize_database is usually in init_schema or db module directly
+
+# Missing log/file functions - to be addressed if project_logs_crud and project_files_crud are created
+from db.cruds import project_logs_crud # Assuming this file will be created with add_project_log, get_project_logs
+from db.cruds import project_files_crud # Assuming this file will be created with get_project_files, add_project_file, delete_project_file
+# For specific function imports, if preferred:
+# from db.cruds.project_logs_crud import add_project_log, get_project_logs
+# from db.cruds.project_files_crud import get_project_files, add_project_file, delete_project_file
 
 
 # --- Project-Internal Imports ---
