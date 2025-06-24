@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QAction, QMenu, QMenuBar
                              QRadioButton, QVBoxLayout, QButtonGroup, QComboBox,
                              QDialog, QVBoxLayout as QDialogVBoxLayout, QTextEdit as QDialogTextEdit,
                              QPushButton as QDialogButton, QHBoxLayout as QDialogHBoxLayout,
-                             QAbstractItemView, QFormLayout)
+                             QAbstractItemView, QFormLayout, QTreeWidget, QTreeWidgetItem)
 
 from PyQt5.QtCore import Qt, QSize, QRectF, QPointF, QLineF
 from PyQt5.QtGui import QIcon, QPixmap, QImage, QColor, QPen, QPainterPath, QMouseEvent
@@ -278,7 +278,15 @@ class MainWindow(QMainWindow):
         self.page_thumbnails_dock = QDockWidget("Miniatures", self); self.page_thumbnails_list = QListWidget(); self.page_thumbnails_list.itemClicked.connect(self.go_to_page_from_thumbnail)
         self.page_thumbnails_list.setDragEnabled(True); self.page_thumbnails_list.setAcceptDrops(True); self.page_thumbnails_list.setDropIndicatorShown(True); self.page_thumbnails_list.setDefaultDropAction(Qt.MoveAction)
         self.page_thumbnails_list.model().rowsMoved.connect(self.on_thumbnail_rows_moved); self.page_thumbnails_dock.setWidget(self.page_thumbnails_list); self.addDockWidget(Qt.LeftDockWidgetArea, self.page_thumbnails_dock)
-        self.bookmarks_dock = QDockWidget("Signets", self); self.bookmarks_tree = QListWidget(); self.bookmarks_dock.setWidget(self.bookmarks_tree); self.addDockWidget(Qt.LeftDockWidgetArea, self.bookmarks_dock)
+
+        self.bookmarks_dock = QDockWidget("Signets", self)
+        self.bookmarks_tree = QTreeWidget() # Changed from QListWidget
+        self.bookmarks_tree.setHeaderLabels(["Titre"]) # Set header label
+        self.bookmarks_tree.itemClicked.connect(self._on_bookmark_clicked) # Connect signal
+        self.bookmarks_dock.setWidget(self.bookmarks_tree)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.bookmarks_dock)
+
+
         self.tabifyDockWidget(self.page_thumbnails_dock, self.bookmarks_dock)
         self.properties_dock = QDockWidget("Propriétés", self); self.properties_widget_container = QWidget(); self.property_widget_layout = QVBoxLayout(self.properties_widget_container)
         self.property_widget_layout.setAlignment(Qt.AlignTop); self.properties_label_info = QLabel("Aucun élément."); self.property_widget_layout.addWidget(self.properties_label_info)
@@ -301,7 +309,11 @@ class MainWindow(QMainWindow):
 
     def _reset_ui_on_error(self): # ... (Ajouter la désactivation de merge_pdfs_action si elle dépendait d'un doc ouvert)
         self.pdf_scene.clear(); self.pdf_view_item = QGraphicsPixmapItem(); self.pdf_scene.addItem(self.pdf_view_item); self.pdf_view_item.setPixmap(QPixmap())
-        self.setWindowTitle("Éditeur PDF PyQt"); self.page_thumbnails_list.clear(); self.update_navigation_controls()
+        self.setWindowTitle("Éditeur PDF PyQt");
+        self.page_thumbnails_list.clear()
+        self.bookmarks_tree.clear() # Clear bookmarks
+        self.update_navigation_controls()
+
         actions_to_disable = [
             self.save_action, self.save_as_action, self.zoom_in_action, self.zoom_out_action, self.zoom_original_action,
             self.delete_page_action, self.insert_blank_page_action, self.import_pages_action, self.rotate_cw_action,
@@ -324,7 +336,10 @@ class MainWindow(QMainWindow):
         if self.current_pdf_document:
             try: self.current_pdf_document.close()
             except Exception as e: logging.warning(f"Erreur fermeture: {e}")
-            self.current_pdf_document = None; self._reset_ui_on_error()
+            self.current_pdf_document = None
+            # _reset_ui_on_error() also clears thumbnails and bookmarks
+            self._reset_ui_on_error() # Call reset which also clears bookmarks
+
         file_path, _ = QFileDialog.getOpenFileName(self, "Ouvrir PDF", "", "Fichiers PDF (*.pdf)")
         if file_path:
             try:
@@ -345,8 +360,71 @@ class MainWindow(QMainWindow):
                 # self.merge_pdfs_action.setEnabled(True) # Toujours active
                 self.statusBar().showMessage(f"Ouvert : {file_path}"); logging.info(f"PDF ouvert : {file_path}")
                 self.setWindowTitle(f"Éditeur PDF PyQt - Page {self.current_page_number + 1}/{self.current_pdf_document.page_count} [{file_path}]")
+                self._load_bookmarks() # Load bookmarks after opening file
             except Exception as e:
                 QMessageBox.critical(self, "Erreur", f"Ouverture impossible '{file_path}'.\nErreur : {e}"); self.current_pdf_document = None; self._reset_ui_on_error()
+
+    def _load_bookmarks(self):
+        self.bookmarks_tree.clear()
+        if not self.current_pdf_document:
+            return
+
+        toc = self.current_pdf_document.get_toc(simple=False)
+        if not toc:
+            # Add a placeholder item if no bookmarks
+            # item = QTreeWidgetItem(self.bookmarks_tree, ["Aucun signet dans ce document."])
+            # item.setDisabled(True)
+            return
+
+        # Helper function to recursively add items
+        def add_items_recursively(parent_item, toc_list, current_level_toc_entries):
+            last_item_at_this_level = None
+
+            for i, entry in enumerate(current_level_toc_entries):
+                level, title, page_num, dest_dict = entry # PyMuPDF 1.19+ uses dict for 4th element
+
+                item = QTreeWidgetItem([title])
+                # Store 0-indexed page and destination details
+                item.setData(0, Qt.UserRole, {'page': page_num - 1, 'dest_details': dest_dict})
+
+                parent_item.addChild(item)
+                last_item_at_this_level = item
+
+                # Find children for this item
+                children_toc_entries = []
+                # Look ahead in the main toc_list for entries that are direct children of the current item
+                start_search_idx = toc_list.index(entry) + 1 # Start searching after current entry
+                for k in range(start_search_idx, len(toc_list)):
+                    next_entry = toc_list[k]
+                    next_level = next_entry[0]
+                    if next_level == level + 1:
+                        children_toc_entries.append(next_entry)
+                    elif next_level <= level: # Reached sibling or ancestor, stop collecting children
+                        break
+
+                if children_toc_entries:
+                    add_items_recursively(item, toc_list, children_toc_entries)
+
+        # Filter top-level items (level 1) to start the recursion
+        top_level_items = [entry for entry in toc if entry[0] == 1]
+        add_items_recursively(self.bookmarks_tree, toc, top_level_items)
+        self.bookmarks_tree.expandAll() # Optionally expand all items
+
+    def _on_bookmark_clicked(self, item: QTreeWidgetItem, column: int):
+        data = item.data(0, Qt.UserRole)
+        if data and isinstance(data, dict) and 'page' in data:
+            page_num_0_indexed = data['page']
+            # dest_details = data.get('dest_details', {}) # For future use with zoom/specific location
+
+            if 0 <= page_num_0_indexed < (self.current_pdf_document.page_count if self.current_pdf_document else 0):
+                logging.info(f"Bookmark clicked: Navigating to page {page_num_0_indexed + 1}")
+                self.go_to_page(page_num_0_indexed)
+            else:
+                logging.warning(f"Bookmark click: Invalid page number {page_num_0_indexed} from item data: {data}")
+        else:
+            logging.warning(f"Bookmark click: No valid page data found for item: {item.text(0)}")
+
+
 
     # ... (Autres méthodes jusqu'à extract_images_from_document)
     def update_page_view(self):
@@ -1073,7 +1151,6 @@ class MainWindow(QMainWindow):
                 logging.error(f"Erreur lors de la division par plage: {e}", exc_info=True)
                 QMessageBox.critical(self, "Erreur de Division", f"Une erreur est survenue: {e}")
                 if 'new_pdf' in locals() and new_pdf.is_open: new_pdf.close()
-
 
 
 if __name__ == '__main__':
