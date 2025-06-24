@@ -3,13 +3,13 @@ import sys
 import sqlite3
 import logging
 
-_APP_SETUP_IMPORTED = False
-try:
-    import app_setup
-    _APP_SETUP_IMPORTED = True
-except ModuleNotFoundError:
-    _current_dir_db_conn = os.path.dirname(os.path.abspath(__file__))
-    _project_root_db_conn = os.path.dirname(_current_dir_db_conn)
+# Add the project root to sys.path to allow importing app_setup
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+import app_setup # Import app_setup directly
+
 
     original_sys_path = list(sys.path) # Keep a copy for reference if needed
 
