@@ -18,7 +18,8 @@ from db.connection import get_db_connection # Corrected import
 from db.cruds.generic_crud import GenericCRUD
 
 # Import CRUD instances for refactored modules
-from db.cruds.users_crud import users_crud_instance
+# from db.cruds.users_crud import users_crud_instance # Replaced with direct module import
+from db.cruds import users_crud # Import the module itself
 from db.cruds.clients_crud import clients_crud_instance
 from db.cruds.products_crud import products_crud_instance
 
@@ -123,10 +124,10 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                 # IMPORTANT: This password MUST be changed immediately by the administrator.
                 # For a real deployment, this password should be very strong or generated
                 # and displayed once, or set via a secure first-time setup process.
-                temp_admin_password = "admin_password123!" # Example temporary password
+                temp_admin_password = "admin" # Changed to user's request
 
                 new_admin_id = crud_add_user(
-                    username=DEFAULT_ADMIN_USERNAME,
+                    username=DEFAULT_ADMIN_USERNAME, # This is "admin" from config.py
                     password=temp_admin_password,
                     role_id=admin_role_id,
                     full_name="Default Administrator",
@@ -165,31 +166,53 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
 
         # 4. TeamMembers
         if admin_user_id:
-            admin_user_for_tm_dict = users_crud_instance.get_user_by_id(admin_user_id, conn=conn)
+            admin_user_for_tm_dict = users_crud.get_user_by_id(admin_user_id, conn=conn)
             if admin_user_for_tm_dict:
                 cursor.execute("SELECT COUNT(*) FROM TeamMembers WHERE user_id = ?", (admin_user_id,))
                 if cursor.fetchone()[0] == 0:
+                    # Use 'role_name' as fetched from get_user_by_id, and map to 'role_or_title' column in TeamMembers
                     cursor.execute("INSERT OR IGNORE INTO TeamMembers (user_id, full_name, email, role_or_title) VALUES (?, ?, ?, ?)",
-                                   (admin_user_id, admin_user_for_tm_dict['full_name'], admin_user_for_tm_dict['email'], admin_user_for_tm_dict['role']))
+                                   (admin_user_id, admin_user_for_tm_dict['full_name'], admin_user_for_tm_dict['email'], admin_user_for_tm_dict.get('role_name')))
                     logger.info("Seeded admin team member.")
             else:
-                logger.warning(f"Could not retrieve admin user details for ID {admin_user_id}.")
+                logger.warning(f"Could not retrieve admin user details for ID {admin_user_id} to seed into TeamMembers.")
         else:
             logger.warning("Admin user ID not available for TeamMember seeding.")
 
         # Default Operational User
         DEFAULT_OPERATIONAL_USERNAME = "default_operational_user"
-        DEFAULT_OPERATIONAL_USER_ROLE = "User"
+        DEFAULT_OPERATIONAL_USER_ROLE = "User" # This should be a role_id or fetched dynamically
         logger.info(f"Checking for default operational user '{DEFAULT_OPERATIONAL_USERNAME}'...")
-        existing_operational_user = users_crud_instance.get_user_by_username(DEFAULT_OPERATIONAL_USERNAME, conn=conn)
+        existing_operational_user = users_crud.get_user_by_username(DEFAULT_OPERATIONAL_USERNAME, conn=conn)
         if existing_operational_user is None:
             logger.info(f"Creating default operational user '{DEFAULT_OPERATIONAL_USERNAME}'...")
-            op_user_data = {'username': DEFAULT_OPERATIONAL_USERNAME, 'password': uuid.uuid4().hex, 
-                            'email': f"{DEFAULT_OPERATIONAL_USERNAME}@example.local", 'role': DEFAULT_OPERATIONAL_USER_ROLE,
-                            'full_name': "Default Operational User", 'is_active': True}
-            op_user_result = users_crud_instance.add_user(op_user_data, conn=conn)
-            if op_user_result['success']: logger.info(f"Created default operational user ID: {op_user_result['id']}.")
-            else: logger.error(f"Failed to create default operational user: {op_user_result.get('error')}")
+            # Fetch OPERATOR role_id
+            operator_role_id = role_ids.get(OPERATOR) # Get OPERATOR role_id from seeded roles
+            if operator_role_id:
+                op_user_data = {
+                    'username': DEFAULT_OPERATIONAL_USERNAME,
+                    'password': uuid.uuid4().hex, # Generate a random password
+                    'role_id': operator_role_id,
+                    'full_name': "Default Operational User",
+                    'email': f"{DEFAULT_OPERATIONAL_USERNAME}@example.local",
+                    'is_active': True # This is not directly passed to users_crud.add_user; it's defaulted there
+                }
+                # users_crud.add_user expects: username, password, role_id, full_name=None, email=None, conn=None
+                # It returns user_id (str) or None
+                op_user_id = users_crud.add_user(
+                    username=op_user_data['username'],
+                    password=op_user_data['password'],
+                    role_id=op_user_data['role_id'],
+                    full_name=op_user_data['full_name'],
+                    email=op_user_data['email'],
+                    conn=conn
+                )
+                if op_user_id:
+                    logger.info(f"Created default operational user ID: {op_user_id}.")
+                else:
+                    logger.error(f"Failed to create default operational user: {DEFAULT_OPERATIONAL_USERNAME}")
+            else:
+                logger.error(f"Could not find role_id for '{OPERATOR}'. Cannot create default operational user.")
         else:
             logger.info(f"Default operational user '{DEFAULT_OPERATIONAL_USERNAME}' already exists.")
 
