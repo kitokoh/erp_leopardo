@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QLabel, QTableWidget,
                              QHBoxLayout, QMessageBox)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import QAbstractItemView
 
 # Assuming users_crud and roles_crud are accessible for fetching data
 # and auth.permissions for permission checking if actions were added here.
@@ -289,4 +290,4 @@ class UserManagementPage(QWidget):
                 QMessageBox.critical(self, self.tr("Erreur"),
                                      self.tr("Impossible de réinitialiser le mot de passe pour '{0}'.").format(username_to_display))
         # --- End Placeholder ---
-```
+# ```
