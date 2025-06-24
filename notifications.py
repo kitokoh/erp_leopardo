@@ -279,6 +279,15 @@ class NotificationManager(QObject):
                                       Set to 0 or negative for no auto-close by timer.
             icon_path (str, optional): Path to a custom icon. Defaults to None (uses type-based default).
         """
+        # Defer the actual creation and showing of the widget until the event loop is active
+        QTimer.singleShot(0, lambda: self._create_and_show_widget(title, message, type, duration, icon_path))
+
+    def _create_and_show_widget(self, title, message, type, duration, icon_path):
+        """Helper method to actually create and show the notification widget."""
+        if not QApplication.instance(): # Should not happen if QTimer.singleShot(0,..) works as expected
+            logging.error("NotificationManager: QApplication not available when trying to create widget.")
+            return
+
         notification_widget = NotificationWidget(title, message, type, duration,
                                                  parent_window=self.parent_window,
                                                  icon_path=icon_path)

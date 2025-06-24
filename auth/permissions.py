@@ -33,6 +33,10 @@ P_LINK_PRODUCTS_TO_CLIENT = "link_products_to_client" # Add/remove/set qty/price
 # Document Management (Client Specific)
 P_MANAGE_CLIENT_DOCUMENTS = "manage_client_documents" # Create, view, edit, delete client docs, compile, email
 
+# Client Assignments & Billing
+P_MANAGE_CLIENT_ASSIGNMENTS = "manage_client_assignments" # Manage assignments of personnel, transporters, etc. to a client/project
+P_MANAGE_CLIENT_BILLING = "manage_client_billing" # Manage billing aspects, generate invoices for a client
+
 # Modules & Specific Features
 P_ACCESS_PROJECT_MODULE = "access_project_module"
 P_MANAGE_ALL_PROJECTS = "manage_all_projects" # Create, edit, task management for all projects
@@ -69,6 +73,7 @@ PERMISSION_MAP = {
         P_VIEW_GLOBAL_PRODUCTS, P_MANAGE_GLOBAL_PRODUCTS,
         P_LINK_PRODUCTS_TO_CLIENT,
         P_MANAGE_CLIENT_DOCUMENTS,
+        P_MANAGE_CLIENT_ASSIGNMENTS, P_MANAGE_CLIENT_BILLING, # Added
         P_ACCESS_PROJECT_MODULE, P_MANAGE_ALL_PROJECTS,
         P_ACCESS_STATISTICS_MODULE,
         P_ACCESS_PARTNER_MODULE, P_MANAGE_PARTNERS,
@@ -84,6 +89,7 @@ PERMISSION_MAP = {
         P_VIEW_GLOBAL_PRODUCTS, P_MANAGE_GLOBAL_PRODUCTS, # Might restrict delete from P_MANAGE_GLOBAL_PRODUCTS for TL
         P_LINK_PRODUCTS_TO_CLIENT,
         P_MANAGE_CLIENT_DOCUMENTS, # Might restrict delete for TL
+        P_MANAGE_CLIENT_ASSIGNMENTS, P_MANAGE_CLIENT_BILLING, # Added
         P_ACCESS_PROJECT_MODULE, P_MANAGE_ALL_PROJECTS, # Or P_MANAGE_ASSIGNED_PROJECTS
         P_ACCESS_STATISTICS_MODULE,
         P_ACCESS_PARTNER_MODULE, P_MANAGE_PARTNERS,
