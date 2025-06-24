@@ -14,6 +14,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QAction, QMenu, QMenuBar
                              QPushButton as QDialogButton, QHBoxLayout as QDialogHBoxLayout,
                              QAbstractItemView, QFormLayout, QTreeWidget, QTreeWidgetItem)
 from PyQt5.QtCore import Qt, QSize, QRectF, QPointF, QLineF, QTimer
+
 from PyQt5.QtGui import QIcon, QPixmap, QImage, QColor, QPen, QPainterPath, QMouseEvent
 
 logging.basicConfig(level=logging.DEBUG,
@@ -82,6 +83,7 @@ class PageRangeDialog(QDialog):
     def get_range_string(self):
         return self.range_input_line_edit.text()
 
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -102,6 +104,7 @@ class MainWindow(QMainWindow):
         self.freetext_fontname = "helv"
         self.freetext_fontsize = 11
         self.freetext_color = (0,0,0)
+
         self.selection_start_point = None
         self.selection_rect_item = None
         self.current_ink_stroke = []
@@ -111,6 +114,7 @@ class MainWindow(QMainWindow):
         self.selected_widget = None
         self.property_widget_layout = None
         self.current_prop_widgets = []
+
         self._create_actions()
         self._create_menu_bar()
         self._create_tool_bars()
@@ -282,6 +286,7 @@ class MainWindow(QMainWindow):
         self.bookmarks_dock.setWidget(self.bookmarks_tree)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.bookmarks_dock)
 
+
         self.tabifyDockWidget(self.page_thumbnails_dock, self.bookmarks_dock)
         self.properties_dock = QDockWidget("Propriétés", self); self.properties_widget_container = QWidget(); self.property_widget_layout = QVBoxLayout(self.properties_widget_container)
         self.property_widget_layout.setAlignment(Qt.AlignTop); self.properties_label_info = QLabel("Aucun élément."); self.property_widget_layout.addWidget(self.properties_label_info)
@@ -308,6 +313,7 @@ class MainWindow(QMainWindow):
         self.page_thumbnails_list.clear()
         self.bookmarks_tree.clear() # Clear bookmarks
         self.update_navigation_controls()
+
         actions_to_disable = [
             self.save_action, self.save_as_action, self.zoom_in_action, self.zoom_out_action, self.zoom_original_action,
             self.delete_page_action, self.insert_blank_page_action, self.import_pages_action, self.rotate_cw_action,
@@ -333,6 +339,7 @@ class MainWindow(QMainWindow):
             self.current_pdf_document = None
             # _reset_ui_on_error() also clears thumbnails and bookmarks
             self._reset_ui_on_error() # Call reset which also clears bookmarks
+
         file_path, _ = QFileDialog.getOpenFileName(self, "Ouvrir PDF", "", "Fichiers PDF (*.pdf)")
         if file_path:
             try:
@@ -473,6 +480,7 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(0, apply_specific_destination)
 
 
+
     # ... (Autres méthodes jusqu'à extract_images_from_document)
     def update_page_view(self):
         if not self.current_pdf_document or self.current_page_number < 0 or self.current_page_number >= self.current_pdf_document.page_count:
@@ -490,6 +498,7 @@ class MainWindow(QMainWindow):
         self.pdf_scene.setSceneRect(QRectF(pixmap.rect()))
         doc_name = self.current_pdf_document.name if hasattr(self.current_pdf_document, 'name') and self.current_pdf_document.name else "Nouveau Document"
         self.setWindowTitle(f"Éditeur PDF PyQt - Page {self.current_page_number + 1}/{self.current_pdf_document.page_count} [{doc_name}]")
+
         self.update_navigation_controls()
 
     def update_thumbnails(self):

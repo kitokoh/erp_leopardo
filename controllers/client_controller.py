@@ -82,19 +82,25 @@ class ClientController:
         adding them to the database if they don't exist.
         Returns the created client data (with IDs) or None on failure.
         """
+        from db.cruds.status_settings_crud import get_status_setting_by_name # Import here
+        from db.cruds.templates_crud import get_all_templates # Import for fallback template ID
+        from db.cruds.users_crud import users_crud_instance # Import for fallback user ID
+
+
         try:
             country_name = client_data.get('country_name', '').strip()
             city_name = client_data.get('city_name', '').strip()
 
             if not country_name:
-                print("Error: Country name is required to create a client.")
-                return None # Or raise ValueError
+                logging.error("Country name is required to create a client.")
+                return {'success': False, 'error': "Country name is required."}
+
 
             # Get or add country
             country_obj = self.add_country(country_name) # add_country handles get_or_add
             if not country_obj or 'country_id' not in country_obj:
-                print(f"Error: Could not get or add country '{country_name}'.")
-                return None
+                logging.error(f"Could not get or add country '{country_name}'.")
+                return {'success': False, 'error': f"Could not get or add country '{country_name}'."}
 
             final_country_id = country_obj['country_id']
 
@@ -102,15 +108,36 @@ class ClientController:
             if city_name:
                 city_obj = self.add_city(city_name, final_country_id)
                 if not city_obj or 'city_id' not in city_obj:
-                    print(f"Warning: Could not get or add city '{city_name}'. Proceeding without city.")
-                    # Depending on requirements, this could be an error or a warning.
-                    # For now, allow client creation without a city if city processing fails.
+                    logging.warning(f"Could not get or add city '{city_name}'. Proceeding without city.")
                 else:
                     final_city_id = city_obj['city_id']
 
-            # Prepare data for db_manager.add_client (or equivalent)
-            # The actual fields for add_client need to be checked against db_manager.py
-            # Assuming db_manager.add_client takes a dictionary similar to this:
+            # Determine default status_id
+            default_status_name = "Actif" # Or "Nouveau" or any other standard active status
+            status_obj = get_status_setting_by_name(default_status_name, "Client")
+            final_status_id = None
+            if status_obj and 'status_id' in status_obj:
+                final_status_id = status_obj['status_id']
+            else:
+                logging.warning(f"Default client status '{default_status_name}' not found. Client will be created without a status or with DB default if any.")
+                # If status_id is strictly required by DB (NOT NULL FK), this path would lead to an error.
+                # For now, allow None if not found, assuming DB might allow NULL or have its own default.
+                # A more robust solution might be to ensure 'Actif' status exists during seeding or configuration.
+
+            # Determine default_template_id
+            final_default_template_id = client_data.get('default_template_id')
+            if final_default_template_id is None:
+                try:
+                    all_templates = get_all_templates(apply_visibility_filter=False) # Get all, even non-visible, as a last resort
+                    if all_templates:
+                        final_default_template_id = all_templates[0].get('template_id')
+                        logging.info(f"Using first available template ID {final_default_template_id} as fallback for default_template_id.")
+                    else:
+                        logging.warning("No templates found in DB. default_template_id will be None. This might cause FK error if column is NOT NULL.")
+                except Exception as e_tpl:
+                    logging.error(f"Error fetching fallback template ID: {e_tpl}. default_template_id will be None.")
+
+
             db_client_data = {
                 'client_name': client_data.get('client_name'),
                 'company_name': client_data.get('company_name'),
@@ -118,17 +145,46 @@ class ClientController:
                 'country_id': final_country_id,
                 'city_id': final_city_id, # Can be None
                 'project_identifier': client_data.get('project_identifier'),
-                'client_status_id': client_data.get('client_status_id', 1), # Default status if applicable
-                'languages': client_data.get('selected_languages') # Assuming this is how languages are stored
-                # 'default_template_id': client_data.get('default_template_id') # Removed
+                'status_id': client_data.get('status_id', final_status_id), # Use fetched default, allow override from client_data
+                'languages': client_data.get('selected_languages'),
+                'default_template_id': final_default_template_id # Use fetched or provided template_id
 
-                # Add any other fields required by the database schema for a client
+                # 'price' and 'notes' etc., are handled by clients_crud if present in client_data
             }
 
-            # Validate required client fields before calling db_manager
+            # Add other fields from client_data that are directly storable
+            for key in ['price', 'notes', 'category']: # created_by_user_id handled separately
+                if key in client_data:
+                    db_client_data[key] = client_data[key]
+
+            # Ensure created_by_user_id
+            final_created_by_user_id = client_data.get('created_by_user_id')
+            if not final_created_by_user_id:
+                logging.warning("created_by_user_id not found in client_data. Attempting to fetch first user as fallback.")
+                try:
+                    all_users = users_crud_instance.get_all_users(limit=1)
+                    if all_users:
+                        final_created_by_user_id = all_users[0].get('user_id')
+                        logging.info(f"Using first user ID {final_created_by_user_id} as fallback for created_by_user_id.")
+                    else:
+                        logging.error("No users found in DB. Cannot set created_by_user_id for new client.")
+                        return {'success': False, 'error': "No users available to assign as client creator."}
+                except Exception as e_user:
+                    logging.error(f"Error fetching fallback user ID: {e_user}. Cannot set created_by_user_id.")
+                    return {'success': False, 'error': f"Error fetching fallback user: {e_user}"}
+
+            if not final_created_by_user_id: # Still no user ID
+                 logging.error("Critical: created_by_user_id could not be determined.")
+                 return {'success': False, 'error': "Client creator ID could not be determined."}
+
+            db_client_data['created_by_user_id'] = final_created_by_user_id
+
+
+
+            # Validate required client fields before calling clients_crud
             if not db_client_data.get('client_name'):
-                print("Error: Client name is required.")
-                return None
+                logging.error("Client name is required.") # Changed from print to logging
+                return {'success': False, 'error': "Client name is required."}
 
             # Assuming db_manager.add_client returns the newly created client object or its ID
             # Let's assume it returns a dict of the created client for consistency

@@ -3,9 +3,9 @@ import uuid
 import hashlib
 import os # For os.urandom
 from datetime import datetime
-# Import _manage_conn and get_db_connection from generic_crud.py
+# Import _manage_conn from generic_crud.py
 # Assuming generic_crud.py is in the same directory (db/cruds/):
-from .generic_crud import _manage_conn, get_db_connection
+from .generic_crud import _manage_conn # get_db_connection is not used directly
 
 # --- Users CRUD ---
 @_manage_conn
@@ -94,7 +94,7 @@ def get_all_users(conn: sqlite3.Connection = None, skip: int = 0, limit: int = 1
     # return [dict(row) for row in rows]
     return []
 import re # For email validation
-from .generic_crud import GenericCRUD, _manage_conn, get_db_connection # Updated import
+from .generic_crud import GenericCRUD, _manage_conn # get_db_connection is not used directly
 import logging
 
 class UsersCRUD(GenericCRUD):

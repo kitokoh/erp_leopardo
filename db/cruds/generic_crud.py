@@ -1,4 +1,5 @@
 import sqlite3
+from typing import Union, List, Dict, Any
 import uuid # Required by some CRUD functions, even if not directly in generic
 import hashlib # Required by some CRUD functions, even if not directly in generic
 from datetime import datetime # Required by some CRUD functions, even if not directly in generic
@@ -7,19 +8,20 @@ import os # Keep os if used by other parts of the file, but not for path manipul
 import logging
 
 # Configuration and Utilities
-try:
-    # This is the primary and now should be the ONLY way it gets get_db_connection
-    from ..connection import get_db_connection
-except ImportError as e:
-    # If this import fails, it's a problem with db.connection or the package structure.
-    # generic_crud.py should not try to work around it with its own config loading.
-    logging.critical(f"CRITICAL: Failed to import get_db_connection from ..connection in generic_crud.py. Error: {e}")
-    # Re-raise the error as the CRUD operations cannot function without a db connection.
-    raise ImportError(f"Essential import get_db_connection from ..connection failed in generic_crud.py") from e
+# try:
+#     # This is the primary and now should be the ONLY way it gets get_db_connection
+#     from ..connection import get_db_connection ### MOVED INTO _manage_conn.wrapper
+# except ImportError as e:
+#     # If this import fails, it's a problem with db.connection or the package structure.
+#     # generic_crud.py should not try to work around it with its own config loading.
+#     logging.critical(f"CRITICAL: Failed to import get_db_connection from ..connection in generic_crud.py. Error: {e}")
+#     # Re-raise the error as the CRUD operations cannot function without a db connection.
+#     raise ImportError(f"Essential import get_db_connection from ..connection failed in generic_crud.py") from e
 
 # Helper to manage connection lifecycle for CRUD functions
 def _manage_conn(func):
     def wrapper(*args, **kwargs):
+        from ..connection import get_db_connection # DEFERRED IMPORT
         conn_passed = kwargs.get('conn')
         conn_is_external = conn_passed is not None
         conn_to_use = conn_passed if conn_is_external else get_db_connection()
@@ -76,14 +78,14 @@ class GenericCRUD:
     # or if needing to ensure dict conversion at a specific point.
     # However, with conn.row_factory = sqlite3.Row, direct dict(row) works.
     # Let's define it here for explicitness and potential complex object handling later.
-    def _object_to_dict(self, db_row: sqlite3.Row) -> dict | None:
+    def _object_to_dict(self, db_row: sqlite3.Row) -> Union[Dict, None]:
         """Converts a sqlite3.Row object to a dictionary."""
         if db_row is None:
             return None
         return dict(db_row)
 
     @_manage_conn
-    def get_by_id(self, table_name: str, id_column: str, item_id: any, conn: sqlite3.Connection) -> dict | None:
+    def get_by_id(self, table_name: str, id_column: str, item_id: Any, conn: sqlite3.Connection) -> Union[Dict, None]:
         """
         Fetches a single record from a specified table by its ID.
 
@@ -102,7 +104,7 @@ class GenericCRUD:
         return self._object_to_dict(row)
 
     @_manage_conn
-    def delete_by_id(self, table_name: str, id_column: str, item_id: any, conn: sqlite3.Connection) -> bool:
+    def delete_by_id(self, table_name: str, id_column: str, item_id: Any, conn: sqlite3.Connection) -> bool:
         """
         Deletes a record from a specified table by its ID.
         This performs a hard delete.
@@ -121,7 +123,7 @@ class GenericCRUD:
         return cursor.rowcount > 0
 
     @_manage_conn
-    def exists_by_id(self, table_name: str, id_column: str, item_id: any, conn: sqlite3.Connection) -> bool:
+    def exists_by_id(self, table_name: str, id_column: str, item_id: Any, conn: sqlite3.Connection) -> bool:
         """
         Checks if a record exists in a specified table by its ID.
 
@@ -139,7 +141,7 @@ class GenericCRUD:
         return cursor.fetchone() is not None
 
     @_manage_conn
-    def get_all(self, table_name: str, conn: sqlite3.Connection, order_by: str = None) -> list[dict]:
+    def get_all(self, table_name: str, conn: sqlite3.Connection, order_by: str = None) -> List[Dict]:
         """
         Fetches all records from a specified table, with optional ordering.
 
@@ -167,9 +169,92 @@ class GenericCRUD:
     #     # For example, handling multiple conditions, joins, etc.
     #     pass
 
+    @_manage_conn
+    def create(self, data: Dict, conn: sqlite3.Connection, table_name: str = None) -> Union[Any, None]:
+        """
+        Inserts a new record into the specified table.
+
+        Args:
+            data (dict): A dictionary where keys are column names and values are the values to insert.
+            conn (sqlite3.Connection): The database connection object.
+            table_name (str, optional): The name of the table. If None, uses self.table_name.
+
+        Returns:
+            any | None: The ID of the newly inserted row if successful, otherwise None.
+                        Returns None if table_name is not set and not provided.
+        """
+        _table_name = table_name if table_name else self.table_name
+        if not _table_name:
+            logging.error("Table name not specified for create operation.")
+            return None
+
+        columns = ', '.join(data.keys())
+        placeholders = ', '.join(['?'] * len(data))
+        query = f"INSERT INTO {_table_name} ({columns}) VALUES ({placeholders})"
+
+        try:
+            cursor = conn.execute(query, list(data.values()))
+            return cursor.lastrowid
+        except sqlite3.Error as e:
+            logging.error(f"Error creating record in {_table_name}: {e} with data {data}")
+            # The @_manage_conn decorator will handle rollback if conn is not external.
+            raise # Re-raise to be caught by _manage_conn or caller
+
+    @_manage_conn
+    def get_by_attributes(self, attributes: Dict, conn: sqlite3.Connection, table_name: str = None, logical_operator: str = "AND", order_by: str = None) -> List[Dict]:
+        """
+        Fetches records from the specified table that match given attributes.
+
+        Args:
+            attributes (dict): A dictionary of column names and their desired values.
+            conn (sqlite3.Connection): The database connection object.
+            table_name (str, optional): The name of the table. If None, uses self.table_name.
+            logical_operator (str): The logical operator to join conditions ("AND" or "OR").
+                                    Defaults to "AND".
+            order_by (str, optional): A string to use for the ORDER BY clause.
+
+        Returns:
+            list[dict]: A list of dictionaries representing the matching records.
+                        Returns an empty list if no records match or table is not found.
+                        Returns empty list if table_name is not set and not provided.
+        """
+        _table_name = table_name if table_name else self.table_name
+        if not _table_name:
+            logging.error("Table name not specified for get_by_attributes operation.")
+            return []
+
+        if not attributes:
+            # If no attributes, effectively a get_all, but let's be explicit.
+            # Or one might argue it should return an error or all items.
+            # For now, let's return all items if attributes is empty, like a get_all.
+            # This matches the behavior if the WHERE clause was empty.
+            return self.get_all(table_name=_table_name, conn=conn, order_by=order_by)
+
+        conditions = []
+        values = []
+        for key, value in attributes.items():
+            if value is None:
+                conditions.append(f"{key} IS NULL")
+            else:
+                conditions.append(f"{key} = ?")
+                values.append(value)
+
+        if not conditions: # Should not happen if attributes is not empty, but as a safe guard.
+             return self.get_all(table_name=_table_name, conn=conn, order_by=order_by)
+
+        where_clause = f" {logical_operator.upper()} ".join(conditions)
+        query = f"SELECT * FROM {_table_name} WHERE {where_clause}"
+
+        if order_by:
+            query += f" ORDER BY {order_by}"
+
+        cursor = conn.execute(query, values)
+        rows = cursor.fetchall()
+        return [self._object_to_dict(row) for row in rows]
+
 # Utility function, can be outside the class if preferred, or static.
 # Making it a top-level function for easier import/use by other modules if needed.
-def object_to_dict(db_row: sqlite3.Row) -> dict | None:
+def object_to_dict(db_row: sqlite3.Row) -> Union[Dict, None]:
     """Converts a sqlite3.Row object to a dictionary."""
     if db_row is None:
         return None

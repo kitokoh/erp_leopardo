@@ -14,7 +14,7 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtCore import QUrl, QStandardPaths, Qt, QCoreApplication, pyqtSlot, QObject, pyqtSignal, QFileInfo, QTimer
 import db as db_manager
 from db.utils import get_document_context_data
-from db.cruds.companies_crud import get_default_company
+# from db.cruds.companies_crud import get_default_company # Moved into __init__
 from html_to_pdf_util import render_html_template, convert_html_to_pdf
 
 class JsBridge(QObject):
@@ -50,6 +50,7 @@ class HtmlEditor(QDialog):
         self.channel = None
         self.tinymce_init_timer = None
 
+        from db.cruds.companies_crud import get_default_company # Deferred import
         default_company_obj = get_default_company()
         self.default_company_id = default_company_obj['company_id'] if default_company_obj else None
         if not self.default_company_id:

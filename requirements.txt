@@ -11,14 +11,29 @@ tzdata==2025.2
 WeasyPrint>=50.0
 openpyxl>=3.0
 python-docx>=0.8
+lxml>=4.5.0 # Added explicit dependency for python-docx
 fastapi>=0.100.0
 uvicorn[standard]>=0.20.0
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
 pytest>=7.0.0
 httpx>=0.23.0
-SpeechRecognition
-pywhatkit
+# SpeechRecognition
+# pywhatkit
 watchdog
-PyAudio
+# PyAudio
+holidays>=0.23 # For calendar public holidays, version might need adjustment
 h11>=0.12.0 # Required by Uvicorn for HTTP tooling
+pytest>=7.0.0 # Added for running tests
+SQLAlchemy>=1.4.0 # Added for ORM
+email-validator>=2.0.0 # Added for Pydantic EmailStr validation
+aiofiles==24.1.0
+pyqtgraph==0.13.7
+matplotlib==3.10.3
+folium==0.20.0
+SpeechRecognition==3.14.3
+pyqtgraph==0.13.7
+matplotlib==3.10.3
+folium==0.20.0
+SpeechRecognition==3.14.3
+opencv-python-headless==4.11.0.86
