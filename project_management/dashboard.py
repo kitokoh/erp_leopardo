@@ -234,14 +234,78 @@ class MainDashboard(QWidget): # Changed from QMainWindow to QWidget
 
 
     def setup_topbar(self):
-        logging.info("ProjectManagementDashboard: setup_topbar MINIMAL - NO WIDGETS CREATED")
-        self.topbar = None # Set to None instead of QFrame
-        self.user_name = None # Set to None
-        self.user_role = None # Set to None
+        logging.info("ProjectManagementDashboard: setup_topbar - Restoring full implementation")
+        self.topbar = QFrame()
+        self.topbar.setObjectName("mainDashboardTopbar") # Apply object name for QSS
+        self.topbar.setFixedHeight(60) # Example height
+        # self.topbar.setStyleSheet("background-color: #f0f0f0; border-bottom: 1px solid #cccccc;") # Basic styling
+
+        topbar_layout = QHBoxLayout(self.topbar)
+        topbar_layout.setContentsMargins(10, 0, 10, 0) # Left, Top, Right, Bottom
+        topbar_layout.setSpacing(10)
+
+        # Logo (optional)
+        # logo_label = QLabel()
+        # logo_pixmap = QPixmap(":/icons/logo.svg").scaled(40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        # logo_label.setPixmap(logo_pixmap)
+        # topbar_layout.addWidget(logo_label)
+
+        # Navigation Buttons (example)
         self.nav_buttons = []
-        # All QWidget creations and layout additions are skipped.
-        logging.info("ProjectManagementDashboard: setup_topbar MINIMAL - FINISHED")
-        pass
+        nav_items = [
+            (self.tr("Dashboard"), "layout.svg", lambda: self.main_content.setCurrentIndex(0)), # Index 0 for dashboard_page
+            (self.tr("Équipe"), "users.svg", lambda: self.main_content.setCurrentIndex(1)),    # Index 1 for team_page
+            (self.tr("Projets"), "briefcase.svg", lambda: self.main_content.setCurrentIndex(2)), # Index 2 for projects_page
+            (self.tr("Tâches"), "check-square.svg", lambda: self.main_content.setCurrentIndex(3)), # Index 3 for tasks_page
+            (self.tr("Rapports"), "bar-chart-2.svg", lambda: self.main_content.setCurrentIndex(4)), # Index 4 for reports_page
+            (self.tr("Production"), "tool.svg", lambda: self.main_content.setCurrentIndex(6)), # Index 6 for production_management_page
+            (self.tr("Couvertures"), "file-text.svg", lambda: self.main_content.setCurrentIndex(5)) # Index 5 for cover_page_management_page
+            # Settings page is usually last or accessed differently
+        ]
+
+        for text, icon_name, callback in nav_items:
+            btn = QPushButton(text)
+            # Assuming icons are in a resource file (e.g., icons.qrc) with a prefix like ":/icons/"
+            # If not, provide full paths or adjust icon loading.
+            icon = QIcon(f":/icons/{icon_name}")
+            if icon.isNull():
+                logging.warning(f"Icon ':/icons/{icon_name}' not found for topbar button '{text}'.")
+            btn.setIcon(icon)
+            btn.setObjectName("topbarNavButton") # For QSS styling
+            btn.setFixedHeight(40) # Example height
+            btn.clicked.connect(callback)
+            topbar_layout.addWidget(btn)
+            self.nav_buttons.append(btn)
+
+        topbar_layout.addStretch(1) # Pushes user info and logout to the right
+
+        # User Info
+        user_info_widget = QWidget()
+        user_info_layout = QVBoxLayout(user_info_widget)
+        user_info_layout.setContentsMargins(0,0,0,0)
+        user_info_layout.setSpacing(0)
+
+        self.user_name = QLabel(self.tr("Nom Utilisateur")) # Placeholder, will be set
+        self.user_name.setObjectName("topbarUserName")
+        self.user_name.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        self.user_role = QLabel(self.tr("Rôle")) # Placeholder, will be set
+        self.user_role.setObjectName("topbarUserRole")
+        self.user_role.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        user_info_layout.addWidget(self.user_name)
+        user_info_layout.addWidget(self.user_role)
+        topbar_layout.addWidget(user_info_widget)
+
+        # Logout Button
+        self.logout_btn = QPushButton(self.tr("Déconnexion"))
+        self.logout_btn.setIcon(QIcon(":/icons/log-out.svg"))
+        self.logout_btn.setObjectName("topbarLogoutButton")
+        self.logout_btn.setToolTip(self.tr("Se déconnecter de la session actuelle"))
+        self.logout_btn.clicked.connect(self.logout) # Connect to the logout method
+        topbar_layout.addWidget(self.logout_btn)
+
+        logging.info("ProjectManagementDashboard: setup_topbar - Full implementation restored.")
 
 
     def logout(self):

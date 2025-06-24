@@ -186,18 +186,6 @@ class DocumentManager(QMainWindow):
         # Conditional Widget Initialization based on module states
         if self.module_states.get('project_management', True):
             logging.info("DocumentManager: Creating ProjectManagementDashboard...")
-            # --- BEGIN DEBUG PRINT ---
-            try:
-                from project_management.dashboard import MainDashboard as PMD_Class_Debug
-                import inspect
-                logging.info(f"DEBUG_MW: ProjectManagementDashboard class from import: {PMD_Class_Debug}")
-                if hasattr(PMD_Class_Debug, '__init__'):
-                    logging.info(f"DEBUG_MW: ProjectManagementDashboard.__init__ signature: {inspect.signature(PMD_Class_Debug.__init__)}")
-                else:
-                    logging.info("DEBUG_MW: ProjectManagementDashboard imported class has no __init__ attribute!")
-            except Exception as e_debug_inspect:
-                logging.error(f"DEBUG_MW: Error inspecting ProjectManagementDashboard during import: {e_debug_inspect}", exc_info=True)
-            # --- END DEBUG PRINT ---
 
             self.project_management_widget_instance = ProjectManagementDashboard(parent=self, current_user_info=self.current_user_info)
             logging.info("DocumentManager: ProjectManagementDashboard instance created. Scheduling addWidget to main_area_stack.")
