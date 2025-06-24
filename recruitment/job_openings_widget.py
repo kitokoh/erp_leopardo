@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
 from PyQt5.QtCore import Qt, QVariant # Added QVariant for custom data roles
 import requests # For making API calls
 import json # For handling JSON data, especially in error messages
+import logging
 
 # Assuming API base URL is something like this. This should be configurable.
 API_BASE_URL = "http://localhost:8000/recruitment" # Adjusted to match FastAPI router prefix
