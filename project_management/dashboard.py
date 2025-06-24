@@ -10,11 +10,11 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                             QAbstractItemView) # Added QAbstractItemView
 from PyQt5.QtCore import Qt, QDate, QTimer, QSize, QRect # Added QSize, QRect
 from PyQt5.QtGui import QFont, QColor, QIcon, QPixmap
-import pyqtgraph as pg
+# import pyqtgraph as pg # Commented out for testing
 from datetime import datetime, timedelta
 import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+# import matplotlib.pyplot as plt # Commented out if only used for pyqtgraph bridge
+# from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas # Commented out
 import hashlib
 import os
 import math
@@ -191,122 +191,57 @@ class MainDashboard(QWidget): # Changed from QMainWindow to QWidget
         self.topbar.setObjectName("mainDashboardTopbar")
         self._main_layout.addWidget(self.topbar)
 
+        logging.info("ProjectManagementDashboard: Creating QStackedWidget for main_content.")
         self.main_content = QStackedWidget()
         self.main_content.setObjectName("mainDashboardContentArea")
+        logging.info("ProjectManagementDashboard: QStackedWidget for main_content created.")
 
+        logging.info("ProjectManagementDashboard: Calling setup_dashboard_page...")
         self.setup_dashboard_page()
+        logging.info("ProjectManagementDashboard: setup_dashboard_page DONE.")
+
+        logging.info("ProjectManagementDashboard: Calling setup_team_page...")
         self.setup_team_page()
+        logging.info("ProjectManagementDashboard: setup_team_page DONE.")
+
+        logging.info("ProjectManagementDashboard: Calling setup_projects_page...")
         self.setup_projects_page()
+        logging.info("ProjectManagementDashboard: setup_projects_page DONE.")
+
+        logging.info("ProjectManagementDashboard: Calling setup_tasks_page...")
         self.setup_tasks_page()
+        logging.info("ProjectManagementDashboard: setup_tasks_page DONE.")
+
+        logging.info("ProjectManagementDashboard: Calling setup_reports_page...")
         self.setup_reports_page()
+        logging.info("ProjectManagementDashboard: setup_reports_page DONE.")
+
+        logging.info("ProjectManagementDashboard: Calling setup_settings_page...")
         self.setup_settings_page()
+        logging.info("ProjectManagementDashboard: setup_settings_page DONE.")
+
+        logging.info("ProjectManagementDashboard: Calling setup_cover_page_management_page...")
         self.setup_cover_page_management_page()
+        logging.info("ProjectManagementDashboard: setup_cover_page_management_page DONE.")
+
+        logging.info("ProjectManagementDashboard: Calling setup_production_management_page...")
         self.setup_production_management_page()
+        logging.info("ProjectManagementDashboard: setup_production_management_page DONE.")
 
         self._main_layout.addWidget(self.main_content)
+        logging.info("ProjectManagementDashboard: init_ui completed.")
 
 
     def setup_topbar(self):
-        self.topbar = QFrame()
-        self.topbar.setFixedHeight(70)
-
-        topbar_layout = QHBoxLayout(self.topbar)
-        topbar_layout.setContentsMargins(15, 10, 15, 10)
-        topbar_layout.setSpacing(20)
-
-        logo_container = QHBoxLayout()
-        logo_container.setSpacing(10)
-        logo_icon = QLabel()
-        logo_icon.setPixmap(QIcon(":/icons/logo.svg").pixmap(45, 45)) # Assuming icons are in resource file
-        logo_text = QLabel("léopardo")
-        logo_text.setObjectName("dashboardLogoText")
-        logo_container.addWidget(logo_icon)
-        logo_container.addWidget(logo_text)
-        topbar_layout.addLayout(logo_container)
-
-        topbar_layout.addStretch(1)
+        logging.info("ProjectManagementDashboard: setup_topbar MINIMAL - NO WIDGETS CREATED")
+        self.topbar = None # Set to None instead of QFrame
+        self.user_name = None # Set to None
+        self.user_role = None # Set to None
         self.nav_buttons = []
+        # All QWidget creations and layout additions are skipped.
+        logging.info("ProjectManagementDashboard: setup_topbar MINIMAL - FINISHED")
+        pass
 
-        dashboard_btn = QPushButton("Dashboard")
-        dashboard_btn.setIcon(QIcon(":/icons/dashboard.svg"))
-        dashboard_btn.clicked.connect(lambda: self.change_page(0))
-        self.nav_buttons.append(dashboard_btn)
-        topbar_layout.addWidget(dashboard_btn)
-
-        management_menu = QMenu()
-        management_menu.addAction(QIcon(":/icons/team.svg"), "Team", lambda: self.change_page(1))
-        management_menu.addAction(QIcon(":/icons/settings.svg"), "Settings", lambda: self.change_page(5))
-        management_menu.addAction(QIcon(":/icons/bell.svg"), "Notifications", self.gestion_notification)
-        management_menu.addAction(QIcon(":/icons/help-circle.svg"), "Client Support", self.gestion_sav)
-        management_menu.addAction(QIcon(":/icons/users.svg"), "Prospect", self.gestion_prospects)
-        management_menu.addAction(QIcon(":/icons/file-text.svg"), "Documents", self.gestion_documents)
-        management_menu.addAction(QIcon(":/icons/book.svg"), "Contacts", self.gestion_contacts)
-        management_btn = QPushButton("Management")
-        management_btn.setIcon(QIcon(":/icons/briefcase.svg"))
-        management_btn.setMenu(management_menu)
-        management_btn.setObjectName("menu_button")
-        self.nav_buttons.append(management_btn)
-        topbar_layout.addWidget(management_btn)
-
-        product_management_btn = QPushButton("Gestion Produits")
-        product_management_btn.setIcon(QIcon(":/icons/briefcase.svg"))
-        product_management_btn.setObjectName("menu_button")
-        product_menu = QMenu(product_management_btn)
-        manage_global_products_action = product_menu.addAction(QIcon(":/icons/plus-square.svg"), "Gérer Produits Globaux")
-        manage_global_products_action.triggered.connect(self.open_manage_global_products_dialog)
-        manage_equivalencies_action = product_menu.addAction(QIcon(":/icons/refresh-cw.svg"), "Gérer Équivalences Produits")
-        manage_equivalencies_action.triggered.connect(self.open_product_equivalency_dialog)
-        product_management_btn.setMenu(product_menu)
-        self.nav_buttons.append(product_management_btn)
-        topbar_layout.addWidget(product_management_btn)
-
-        projects_menu = QMenu()
-        projects_menu.addAction(QIcon(":/icons/folder.svg"), "Projects", lambda: self.change_page(2))
-        projects_menu.addAction(QIcon(":/icons/check-square.svg"), "Tasks", lambda: self.change_page(3))
-        projects_menu.addAction(QIcon(":/icons/bar-chart-2.svg"), "Reports", lambda: self.change_page(4))
-        projects_menu.addAction(QIcon(":/icons/layout.svg"), "Cover Pages", lambda: self.change_page(6))
-        projects_menu.addAction(QIcon(":/icons/settings.svg"), "Production Orders", lambda: self.change_page(7))
-        projects_btn = QPushButton("Activities")
-        projects_btn.setIcon(QIcon(":/icons/activity.svg"))
-        projects_btn.setMenu(projects_menu)
-        projects_btn.setObjectName("menu_button")
-        self.nav_buttons.append(projects_btn)
-        topbar_layout.addWidget(projects_btn)
-
-        add_on_btn = QPushButton("Add-on")
-        add_on_btn.setIcon(QIcon(":/icons/plus-circle.svg"))
-        add_on_btn.clicked.connect(self.add_on_page)
-        self.nav_buttons.append(add_on_btn)
-        topbar_layout.addWidget(add_on_btn)
-        topbar_layout.addStretch(1)
-
-        user_container = QHBoxLayout()
-        user_container.setSpacing(10)
-        user_avatar = QLabel()
-        user_avatar.setPixmap(QIcon(":/icons/user.svg").pixmap(35, 35))
-        user_avatar.setObjectName("userAvatarLabel")
-        user_info = QVBoxLayout()
-        user_info.setSpacing(0)
-        self.user_name = QLabel("Guest")
-        self.user_name.setObjectName("UserFullNameLabel")
-        self.user_role = QLabel("Not logged in")
-        self.user_role.setObjectName("UserRoleLabel")
-        user_info.addWidget(self.user_name)
-        user_info.addWidget(self.user_role)
-        user_container.addWidget(user_avatar)
-        user_container.addLayout(user_info)
-        logout_btn = QPushButton()
-        logout_btn.setIcon(QIcon(":/icons/log-out.svg"))
-        logout_btn.setIconSize(QSize(20, 20))
-        logout_btn.setToolTip("Logout")
-        logout_btn.setFixedSize(35, 35)
-        logout_btn.setObjectName("logoutButtonTopbar")
-        logout_btn.clicked.connect(self.logout)
-        user_container.addWidget(logout_btn)
-        user_widget = QWidget()
-        user_widget.setLayout(user_container)
-        topbar_layout.addWidget(user_widget)
-        self.nav_buttons[0].setObjectName("selected")
 
     def logout(self):
         print("Logout button clicked. Attempting to signal parent...")
@@ -354,18 +289,28 @@ class MainDashboard(QWidget): # Changed from QMainWindow to QWidget
         graph_widget = QWidget()
         graph_layout = QHBoxLayout(graph_widget)
         graph_layout.setSpacing(15)
-        self.performance_graph = pg.PlotWidget()
-        self.performance_graph.setBackground('w')
-        self.performance_graph.setTitle("Team Performance", color='#333333', size='12pt')
-        self.performance_graph.showGrid(x=True, y=True)
-        self.performance_graph.setMinimumHeight(300)
-        self.project_progress_graph = pg.PlotWidget()
-        self.project_progress_graph.setBackground('w')
-        self.project_progress_graph.setTitle("Project Progress", color='#333333', size='12pt')
-        self.project_progress_graph.showGrid(x=True, y=True)
-        self.project_progress_graph.setMinimumHeight(300)
+
+        logging.info("ProjectManagementDashboard: Attempting to create pyqtgraph PlotWidgets (commented out for testing).")
+        # self.performance_graph = pg.PlotWidget()
+        # self.performance_graph.setBackground('w')
+        # self.performance_graph.setTitle("Team Performance", color='#333333', size='12pt')
+        # self.performance_graph.showGrid(x=True, y=True)
+        # self.performance_graph.setMinimumHeight(300)
+        # self.project_progress_graph = pg.PlotWidget()
+        # self.project_progress_graph.setBackground('w')
+        # self.project_progress_graph.setTitle("Project Progress", color='#333333', size='12pt')
+        # self.project_progress_graph.showGrid(x=True, y=True)
+        # self.project_progress_graph.setMinimumHeight(300)
+        # graph_layout.addWidget(self.performance_graph, 1)
+        # graph_layout.addWidget(self.project_progress_graph, 1)
+
+        # Create placeholder labels if the graphs are expected by other parts of the code for layout
+        self.performance_graph = QLabel("Performance Graph Placeholder (pyqtgraph commented out)")
+        self.project_progress_graph = QLabel("Project Progress Graph Placeholder (pyqtgraph commented out)")
         graph_layout.addWidget(self.performance_graph, 1)
         graph_layout.addWidget(self.project_progress_graph, 1)
+        logging.info("ProjectManagementDashboard: pyqtgraph PlotWidgets creation SKIPPED (commented out). Placeholders used.")
+
         activities_widget = QGroupBox("Recent Activities")
         activities_layout = QVBoxLayout(activities_widget)
         activities_layout.setContentsMargins(10, 10, 10, 10)
