@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import QMessageBox
 
 from docx import Document
 import db as db_manager # For generate_pdf_for_document
-# from html_editor import HtmlEditor # For generate_pdf_for_document - DEFERRED
+
 from html_to_pdf_util import convert_html_to_pdf # For generate_pdf_for_document
 
 # MAIN_APP_ROOT_DIR import removed as app_root_dir is now passed to generate_pdf_for_document
@@ -149,6 +149,8 @@ def generate_pdf_for_document(source_file_path: str, client_info: dict, app_root
     Uses app_root_dir for resolving paths to resources like default logos if needed.
     Includes logic to check for product language match for proforma invoices.
     """
+    from html_editor import HtmlEditor # Moved here to break circular import
+
     if not os.path.exists(source_file_path):
         logging.error(f"Source HTML file not found for PDF generation: {source_file_path}")
         QMessageBox.critical(parent_widget, "File Error", f"Source HTML file not found for PDF generation: {source_file_path}")
