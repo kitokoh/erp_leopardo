@@ -391,7 +391,7 @@ def _seed_user_motivational_messages(cursor: sqlite3.Cursor, conn: sqlite3.Conne
     logger = logger_passed
     logger.info("Attempting to seed example user motivational messages...")
 
-    user_messages_crud = GenericCRUD(conn, 'user_motivational_messages', 'id')
+    user_messages_crud = GenericCRUD(table_name='user_motivational_messages', primary_key='id')
 
     example_user_messages = [
         {"message": "Keep pushing your limits!", "language_code": "en"},
@@ -416,9 +416,10 @@ def _seed_user_motivational_messages(cursor: sqlite3.Cursor, conn: sqlite3.Conne
 
             data_to_insert = {
                 "message": msg_data["message"],
-                "language_code": msg_data.get("language_code") # Handles if language_code is not present
+                "language_code": msg_data.get("language_code"), # Handles if language_code is not present
+                "is_active": True
             }
-            user_messages_crud.create(data_to_insert)
+            user_messages_crud.create(data_to_insert, conn=conn)
             added_count += 1
             logger.debug(f"Added user motivational message: {msg_data['message'][:30]}...")
         except sqlite3.IntegrityError as e:
@@ -508,9 +509,10 @@ def _seed_motivational_messages(cursor: sqlite3.Cursor, conn: sqlite3.Connection
             data_to_insert = {
                 "language_code": msg_data["language_code"],
                 "message": msg_data["message"],
-                "day_of_year": msg_data["day_of_year"] # Can be None
+                "day_of_year": msg_data["day_of_year"], # Can be None
+                "is_active": True
             }
-            messages_crud.create(data_to_insert)
+            messages_crud.create(data_to_insert, conn=conn)
             added_count += 1
             logger.debug(f"Added motivational message: {msg_data['message'][:30]}... for lang {msg_data['language_code']}")
         except sqlite3.IntegrityError as e: # Handles UNIQUE constraint violations

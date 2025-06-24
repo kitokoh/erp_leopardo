@@ -51,7 +51,7 @@ class SplashWindow(QWidget):
 
             # 1. Fetch User-Customized Messages (prioritize these)
             # These are considered general purpose for now, not tied to day_of_year
-            user_messages_crud = GenericCRUD(conn, 'user_motivational_messages', 'id')
+            user_messages_crud = GenericCRUD(table_name='user_motivational_messages', primary_key='id')
             # Fetch user messages for current language OR language_code IS NULL (language-neutral)
             user_lang_specific = user_messages_crud.get_by_attributes(
                 {"language_code": self.language_code, "is_active": True}
@@ -69,7 +69,7 @@ class SplashWindow(QWidget):
                 return random.choice(candidate_messages)
 
             # 2. If no user messages, proceed with system messages
-            system_messages_crud = GenericCRUD(conn, 'motivational_messages', 'id')
+            system_messages_crud = GenericCRUD(table_name='motivational_messages', primary_key='id')
             current_day_of_year = datetime.date.today().timetuple().tm_yday
 
             # Try to fetch a system message for the current language and specific day_of_year
