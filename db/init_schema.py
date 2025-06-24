@@ -605,11 +605,13 @@ def initialize_database():
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         is_deleted INTEGER DEFAULT 0, -- Added for soft delete
         deleted_at TEXT, -- Added for soft delete
+        created_by_user_id TEXT, -- Added for tracking who created the product
+        FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL, -- Added FK
         UNIQUE (product_name, language_code)
     )
     """)
 
-    # Ensure is_deleted and deleted_at columns exist for soft delete in Products table
+    # Ensure is_deleted, deleted_at, and created_by_user_id columns exist for soft delete in Products table
     cursor.execute("PRAGMA table_info(Products)")
     products_columns_info = cursor.fetchall()
     products_column_names = [info['name'] for info in products_columns_info]
@@ -627,6 +629,16 @@ def initialize_database():
             print("Added 'deleted_at' column to Products table.")
         except sqlite3.Error as e_alter_deleted_at_prod:
             print(f"Error adding 'deleted_at' column to Products table: {e_alter_deleted_at_prod}")
+
+    if 'created_by_user_id' not in products_column_names:
+        try:
+            cursor.execute("ALTER TABLE Products ADD COLUMN created_by_user_id TEXT")
+            # Cannot add FOREIGN KEY constraint with ALTER TABLE in older SQLite versions easily.
+            # The FK in CREATE TABLE is for new DBs. For existing, this adds the column.
+            # App logic or a more complex migration would be needed for full FK on existing tables.
+            print("Added 'created_by_user_id' column to Products table.")
+        except sqlite3.Error as e_alter_created_by_prod:
+            print(f"Error adding 'created_by_user_id' column to Products table: {e_alter_created_by_prod}")
 
     # Create ProductDimensions table (from ca.py)
     cursor.execute("""
@@ -2192,26 +2204,26 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
             print("DEBUG_INIT_DB: Rollback due to accounting seeding error.")
 
 
-        # User Seeding (Admin user)
-        print("DEBUG_INIT_DB: Checking/Seeding Users...")
-        cursor.execute("SELECT COUNT(*) FROM Users")
-        if cursor.fetchone()['COUNT(*)'] == 0: # Use dict access due to row_factory
-            admin_uid = str(uuid.uuid4())
-            # Generate salt and hash for default admin - direct SQL insertion for bootstrap
-            admin_salt = os.urandom(16).hex()
-            admin_password_bytes = config.DEFAULT_ADMIN_PASSWORD.encode('utf-8')
-            admin_salt_bytes = bytes.fromhex(admin_salt)
-            admin_pass_hash = hashlib.sha256(admin_salt_bytes + admin_password_bytes).hexdigest()
+        # User Seeding (Admin user) - This initial seeding attempt is now handled by db_seed.py
+        # print("DEBUG_INIT_DB: Checking/Seeding Users...")
+        # cursor.execute("SELECT COUNT(*) FROM Users")
+        # if cursor.fetchone()['COUNT(*)'] == 0: # Use dict access due to row_factory
+        #     admin_uid = str(uuid.uuid4())
+        #     # Generate salt and hash for default admin - direct SQL insertion for bootstrap
+        #     admin_salt = os.urandom(16).hex()
+        #     admin_password_bytes = config.DEFAULT_ADMIN_PASSWORD.encode('utf-8')
+        #     admin_salt_bytes = bytes.fromhex(admin_salt)
+        #     admin_pass_hash = hashlib.sha256(admin_salt_bytes + admin_password_bytes).hexdigest()
 
-            cursor.execute("""
-                INSERT OR IGNORE INTO Users
-                    (user_id, username, password_hash, salt, full_name, email, role, is_deleted, deleted_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (admin_uid, config.DEFAULT_ADMIN_USERNAME, admin_pass_hash, admin_salt,
-                  'Default Admin', f'{config.DEFAULT_ADMIN_USERNAME}@example.com', SUPER_ADMIN, 0, None))
-            print(f"Admin user '{config.DEFAULT_ADMIN_USERNAME}' seeded with salt and hash.")
-            print("DEBUG_INIT_DB: Admin user potentially seeded.")
-        print("DEBUG_INIT_DB: User seeding check complete.")
+        #     cursor.execute("""
+        #         INSERT OR IGNORE INTO Users
+        #             (user_id, username, password_hash, salt, full_name, email, role, is_deleted, deleted_at)
+        #         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        #     """, (admin_uid, config.DEFAULT_ADMIN_USERNAME, admin_pass_hash, admin_salt,
+        #           'Default Admin', f'{config.DEFAULT_ADMIN_USERNAME}@example.com', SUPER_ADMIN, 0, None))
+        #     print(f"Admin user '{config.DEFAULT_ADMIN_USERNAME}' seeded with salt and hash.")
+        #     print("DEBUG_INIT_DB: Admin user potentially seeded.")
+        # print("DEBUG_INIT_DB: User seeding check complete.") # End of commented block
 
         # Application Settings Seeding
         print("DEBUG_INIT_DB: Seeding Application Settings...")
