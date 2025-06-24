@@ -63,7 +63,7 @@ from .cruds.kpis_crud import get_kpis_for_project
 from .cruds.activity_logs_crud import add_activity_log, get_activity_logs
 from .cruds.users_crud import (
     get_user_by_id,
-    get_all_users,
+    list_users, # Changed from get_all_users
     update_user,
     verify_user_password,
 )
@@ -264,7 +264,7 @@ __all__ = [
     "add_activity_log",
     "get_activity_logs",
     "get_user_by_id",
-    "get_all_users",
+    "list_users", # Changed from get_all_users
     "update_user",
     "verify_user_password",
     "get_all_team_members",
