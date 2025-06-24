@@ -63,9 +63,9 @@ from .cruds.kpis_crud import get_kpis_for_project
 from .cruds.activity_logs_crud import add_activity_log, get_activity_logs
 from .cruds.users_crud import (
     get_user_by_id,
-    get_all_users,
-    update_user,
-    verify_user_password,
+    list_users, # Changed from get_all_users
+    update_user_password, # Changed from update_user
+    verify_password, # Changed from verify_user_password
 )
 from .cruds.team_members_crud import (
     get_all_team_members,
@@ -264,9 +264,9 @@ __all__ = [
     "add_activity_log",
     "get_activity_logs",
     "get_user_by_id",
-    "get_all_users",
-    "update_user",
-    "verify_user_password",
+    "list_users", # Changed from get_all_users
+    "update_user_password", # Changed from update_user
+    "verify_password", # Changed from verify_user_password
     "get_all_team_members",
     "get_team_member_by_id",
     "add_team_member",
