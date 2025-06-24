@@ -1,6 +1,6 @@
 import sqlite3
 from datetime import datetime
-from ..utils import get_db_connection
+from ..connection import get_db_connection # Corrected import path
 
 # --- CRUD functions for Client_Transporters ---
 def assign_transporter_to_client(client_id: str, transporter_id: str, transport_details: str = None, cost_estimate: float = None) -> int | None:

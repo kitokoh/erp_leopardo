@@ -1,6 +1,6 @@
 import sqlite3
 from datetime import datetime
-from ..utils import get_db_connection
+from ..connection import get_db_connection # Corrected import path
 
 # --- CRUD functions for Client_AssignedPersonnel ---
 def assign_personnel_to_client(client_id: str, personnel_id: int, role_in_project: str) -> int | None:
