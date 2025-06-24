@@ -64,9 +64,9 @@ from .cruds.activity_logs_crud import add_activity_log, get_activity_logs
 from .cruds.users_crud import (
     get_user_by_id,
     list_users, # Changed from get_all_users
+    update_user_password, # Changed from update_user
     add_user as add_user_crud, # Alias to avoid conflict if main has add_user
 
-    update_user,
     verify_user_password,
     update_user_password,
     update_user_role,
@@ -272,10 +272,10 @@ __all__ = [
     "get_activity_logs",
     "get_user_by_id",
     "list_users", # Changed from get_all_users
+    "update_user_password", # Changed from update_user
     "add_user_crud", # Exporting aliased add_user
     "get_user_by_username", # Exporting get_user_by_username
 
-    "update_user",
     "update_user_password", # Exporting new user functions
     "update_user_role",
     "set_user_active_status",
