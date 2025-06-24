@@ -225,6 +225,22 @@ def main():
 
     # Initialize database after logging and API server start attempt
     db.initialize_database()
+
+    # --- Coordinated Data Seeding ---
+    # This block handles the seeding of initial data after the schema is created,
+    # using the dedicated seeding module.
+    # MOVED EARLIER: run_seed() needs to happen AFTER initialize_database() and BEFORE UI elements try to read seeded settings.
+    try:
+        logging.info("Attempting to run data seeding if necessary...")
+        run_seed() # Call the main seeding function from db_seed.py
+        # run_seed() handles its own connection, commit, rollback, and logging.
+        logging.info("Data seeding process via run_seed() completed.")
+    except Exception as e_seed_run:
+        # Catch any unexpected error from run_seed() itself, though it should handle its own.
+        logging.error(f"An unexpected error occurred when calling run_seed(): {e_seed_run}", exc_info=True)
+        # Depending on severity, might want to sys.exit(1) here if seeding is critical for app function
+    # --- End Coordinated Data Seeding ---
+
     # Log the configured session timeout value
     logging.info(f"Session timeout is set to: {SESSION_TIMEOUT_SECONDS // 60} minutes ({SESSION_TIMEOUT_SECONDS} seconds).")
 
@@ -244,17 +260,20 @@ def main():
     # Display Splash Screen using the new SplashWindow
     from ui.splash_screen import SplashWindow # Import the new class
 
-    # Determine current language for splash screen
-    # This duplicates some logic from later in main() for translations, consider refactoring
-    current_app_lang = QLocale.system().name().split('_')[0]
-    language_code_from_db_for_splash = db.get_setting('user_selected_language') # Use db.get_setting
-    if language_code_from_db_for_splash and isinstance(language_code_from_db_for_splash, str) and language_code_from_db_for_splash.strip():
-        current_app_lang = language_code_from_db_for_splash.strip()
-    else:
-        # Use system lang if available in config, else default from config, else 'en'
-        sys_lang = QLocale.system().name().split('_')[0]
-        current_app_lang = CONFIG.get("language", sys_lang if sys_lang in ["en", "fr", "ar"] else "en")
-
+    # Determine current language for splash screen - NOW SAFE TO CALL db.get_setting
+    current_app_lang = QLocale.system().name().split('_')[0] # Default
+    try:
+        language_code_from_db_for_splash = db.get_setting('user_selected_language')
+        if language_code_from_db_for_splash and isinstance(language_code_from_db_for_splash, str) and language_code_from_db_for_splash.strip():
+            current_app_lang = language_code_from_db_for_splash.strip()
+            logging.info(f"Splash screen language '{current_app_lang}' loaded from database setting.")
+        else:
+            sys_lang = QLocale.system().name().split('_')[0]
+            current_app_lang = CONFIG.get("language", sys_lang if sys_lang in ["en", "fr", "ar"] else "en")
+            logging.info(f"Splash screen language '{current_app_lang}' from config/system (DB setting not found or invalid).")
+    except Exception as e_splash_lang:
+        logging.error(f"Error getting language for splash screen, defaulting. Error: {e_splash_lang}")
+        # current_app_lang remains system default or 'en'
 
     # APP_ROOT_DIR is available here from app_setup import
     splash = SplashWindow(app_root_dir=APP_ROOT_DIR, language_code=current_app_lang)
