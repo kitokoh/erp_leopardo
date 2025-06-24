@@ -131,6 +131,7 @@ from db.cruds.client_documents_crud import add_client_document # For assign dial
 import os # For path checks in download monitor init
 
 from calendar_module.calendar_widget import CalendarWidget # Import CalendarWidget
+from user_management.page import UserManagementPage # Import UserManagementPage
 
 # Definition of configurable modules
 CONFIGURABLE_MODULES = [
@@ -204,7 +205,7 @@ class DocumentManager(QMainWindow):
             self.partner_management_widget_instance = None
 
         if self.module_states.get('product_management', True):
-            self.product_management_page_instance = ProductManagementPage(parent=self)
+            self.product_management_page_instance = ProductManagementPage(current_user_info=self.current_user_info, parent=self) # Pass current_user_info
             self.main_area_stack.addWidget(self.product_management_page_instance)
         else:
             self.product_management_page_instance = None
@@ -257,10 +258,14 @@ class DocumentManager(QMainWindow):
 
 
         self.home_page_widget_instance = HomePageWidget(parent=self) # Create Home Page instance
-        self.main_area_stack.addWidget(self.home_page_widget_instance) # Add Home Page to stack
+        self.main_area_stack.addWidget(self.home_page_widget_instance)
+
+        # User Management Page (always create, visibility of action controlled by RBAC)
+        self.user_management_page_instance = UserManagementPage(current_user_info=self.current_user_info, parent=self)
+        self.main_area_stack.addWidget(self.user_management_page_instance)
 
         self.main_area_stack.setCurrentWidget(self.home_page_widget_instance) # Set Home Page as default view
-        self.create_actions_main(); self.create_menus_main()
+        self.create_actions_main(); self.create_menus_main() # Menus and actions are created before _apply_permissions
         
         self.voice_input_service = VoiceInputService() # Instantiate VoiceInputService
 
@@ -714,7 +719,8 @@ class DocumentManager(QMainWindow):
         # Action for managing users - Placeholder, actual UI for this is not yet built
         # but the action can be controlled by RBAC.
         self.manage_users_action = QAction(QIcon(":/icons/users.svg"), self.tr("Gérer les Utilisateurs"), self)
-        self.manage_users_action.triggered.connect(self._placeholder_manage_users) # Connect to a placeholder
+        self.manage_users_action.triggered.connect(self.show_user_management_page) # Connect to show page method
+
 
 
         # Populate searchable_actions_map
@@ -1516,3 +1522,15 @@ class DocumentManager(QMainWindow):
             # This case would apply if the module was made configurable and then disabled
             logging.warning("Calendar Module widget instance is None. Cannot show view.")
             QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Calendrier est désactivé ou non initialisé."))
+
+    def show_user_management_page(self):
+        """Switches the main stacked widget to display the User Management page."""
+        if self.user_management_page_instance:
+            # Refresh data when page is shown, in case of external changes or role changes
+            if hasattr(self.user_management_page_instance, 'load_users_to_table'):
+                self.user_management_page_instance.load_users_to_table()
+            self.main_area_stack.setCurrentWidget(self.user_management_page_instance)
+        else:
+            logging.error("UserManagementPage instance is None. Cannot show user management view.")
+            QMessageBox.critical(self, self.tr("Erreur Critique"),
+                                 self.tr("La page de gestion des utilisateurs n'a pas pu être chargée."))

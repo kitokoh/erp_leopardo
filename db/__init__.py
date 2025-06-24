@@ -65,7 +65,14 @@ from .cruds.users_crud import (
     get_user_by_id,
     list_users, # Changed from get_all_users
     update_user_password, # Changed from update_user
+    add_user as add_user_crud, # Alias to avoid conflict if main has add_user
+
     verify_user_password,
+    update_user_password,
+    update_user_role,
+    set_user_active_status,
+    record_login_time,
+    get_user_by_username
 )
 from .cruds.team_members_crud import (
     get_all_team_members,
@@ -266,6 +273,13 @@ __all__ = [
     "get_user_by_id",
     "list_users", # Changed from get_all_users
     "update_user_password", # Changed from update_user
+    "add_user_crud", # Exporting aliased add_user
+    "get_user_by_username", # Exporting get_user_by_username
+
+    "update_user_password", # Exporting new user functions
+    "update_user_role",
+    "set_user_active_status",
+    "record_login_time",
     "verify_user_password",
     "get_all_team_members",
     "get_team_member_by_id",
