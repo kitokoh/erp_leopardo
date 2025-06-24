@@ -31,8 +31,8 @@ def add_contact(data: dict, conn: sqlite3.Connection = None) -> int | None:
               address_formattedValue, address_streetAddress, address_city,
               address_region, address_postalCode, address_country,
               organization_name, organization_title, birthday_date,
-              created_at, updated_at)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"""
+              created_at, updated_at, created_by_user_id)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""" # Added created_by_user_id
     params=(name, data.get('email'), data.get('phone'), data.get('position'),
             data.get('company_name'), data.get('notes'), data.get('givenName'),
             data.get('familyName'), data.get('displayName'), data.get('phone_type'),
@@ -41,7 +41,7 @@ def add_contact(data: dict, conn: sqlite3.Connection = None) -> int | None:
             data.get('address_region'), data.get('address_postalCode'),
             data.get('address_country'), data.get('organization_name'),
             data.get('organization_title'), data.get('birthday_date'),
-            now, now)
+            now, now, data.get('created_by_user_id')) # Added created_by_user_id
     try:
         cursor.execute(sql,params)
         return cursor.lastrowid
@@ -103,9 +103,16 @@ def update_contact(id: int, data: dict, conn: sqlite3.Connection = None) -> bool
     valid_cols=['name','email','phone','position','company_name','notes','givenName',
                   'familyName','displayName','phone_type','email_type','address_formattedValue',
                   'address_streetAddress','address_city','address_region','address_postalCode',
-                  'address_country','organization_name','organization_title','birthday_date','updated_at']
+                  'address_country','organization_name','organization_title','birthday_date','updated_at',
+                  'updated_by_user_id'] # Added updated_by_user_id
     to_set={k:v for k,v in data.items() if k in valid_cols}
     if not to_set: return False
+    # Ensure updated_by_user_id is part of the update if provided, even if other fields are not changing
+    if 'updated_by_user_id' in data and 'updated_by_user_id' not in to_set:
+        to_set['updated_by_user_id'] = data['updated_by_user_id']
+    if 'updated_at' not in to_set : # always update updated_at
+        to_set['updated_at'] = now
+
 
     set_c=[f"{k}=?" for k in to_set.keys()]; params_list=list(to_set.values()); params_list.append(id)
     sql=f"UPDATE Contacts SET {', '.join(set_c)} WHERE contact_id = ?"
@@ -165,8 +172,8 @@ def remove_contact_from_list(data: dict, conn: sqlite3.Connection = None) -> obj
 
 # --- ClientContacts CRUD ---
 @_manage_conn
-def link_contact_to_client(client_id: str, contact_id: int, is_primary: bool = False, can_receive_documents: bool = True, conn: sqlite3.Connection = None) -> int | None:
-    logging.info(f"Attempting to link/update contact {contact_id} for client {client_id}. Is_primary: {is_primary}, Can_receive_docs: {can_receive_documents}")
+def link_contact_to_client(client_id: str, contact_id: int, is_primary: bool = False, can_receive_documents: bool = True, added_by_user_id: str = None, conn: sqlite3.Connection = None) -> int | None:
+    logging.info(f"Attempting to link/update contact {contact_id} for client {client_id}. Is_primary: {is_primary}, Can_receive_docs: {can_receive_documents}, Added_by: {added_by_user_id}")
     cursor = conn.cursor()
 
     # Check if the link already exists
@@ -174,29 +181,34 @@ def link_contact_to_client(client_id: str, contact_id: int, is_primary: bool = F
 
     if existing_link:
         logging.info(f"Link already exists for client {client_id} and contact {contact_id}. ClientContactID: {existing_link['client_contact_id']}.")
-        # Link exists, check if an update is needed for is_primary or can_receive_documents
         details_to_update = {}
-        if existing_link.get('is_primary_for_client') != is_primary:
-            details_to_update['is_primary_for_client'] = is_primary
-        if existing_link.get('can_receive_documents') != can_receive_documents:
-            details_to_update['can_receive_documents'] = can_receive_documents
+        # Convert incoming booleans to 0/1 for comparison with DB which stores integers
+        is_primary_db_val = 1 if is_primary else 0
+        can_receive_documents_db_val = 1 if can_receive_documents else 0
+
+        if existing_link.get('is_primary_for_client') != is_primary_db_val:
+            details_to_update['is_primary_for_client'] = is_primary_db_val
+        if existing_link.get('can_receive_documents') != can_receive_documents_db_val:
+            details_to_update['can_receive_documents'] = can_receive_documents_db_val
         
         if details_to_update:
             logging.info(f"Updating existing link {existing_link['client_contact_id']} with details: {details_to_update}")
+            # Note: update_client_contact_link does not handle added_by_user_id as links are not re-added by different users, only modified.
             if update_client_contact_link(existing_link['client_contact_id'], details_to_update, conn=conn):
                 logging.info(f"Successfully updated link {existing_link['client_contact_id']}.")
             else:
                 logging.error(f"Failed to update existing link {existing_link['client_contact_id']}.")
-                # Depending on desired behavior, could return None or the existing ID anyway
-        return existing_link['client_contact_id'] # Return existing link ID
+        return existing_link['client_contact_id']
     else:
         # Link does not exist, proceed with insertion
         logging.info(f"No existing link found for client {client_id} and contact {contact_id}. Creating new link.")
-        sql = "INSERT INTO ClientContacts (client_id, contact_id, is_primary_for_client, can_receive_documents) VALUES (?,?,?,?)"
+        sql = "INSERT INTO ClientContacts (client_id, contact_id, is_primary_for_client, can_receive_documents, added_by_user_id) VALUES (?,?,?,?,?)"
         try:
-            cursor.execute(sql, (client_id, contact_id, is_primary, can_receive_documents))
+            is_primary_int = 1 if is_primary else 0
+            can_receive_documents_int = 1 if can_receive_documents else 0
+            cursor.execute(sql, (client_id, contact_id, is_primary_int, can_receive_documents_int, added_by_user_id))
             new_link_id = cursor.lastrowid
-            logging.info(f"Successfully created new link for client {client_id}, contact {contact_id}. New ClientContactID: {new_link_id}")
+            logging.info(f"Successfully created new link for client {client_id}, contact {contact_id} by user {added_by_user_id}. New ClientContactID: {new_link_id}")
             return new_link_id
         except sqlite3.Error as e:
             logging.error(f"Error inserting new link for contact {contact_id} to client {client_id}. Error: {e}", exc_info=True)

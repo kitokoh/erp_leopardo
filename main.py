@@ -56,12 +56,15 @@ from db.db_seed import run_seed
 from db import get_all_companies, add_company # Specific imports for company check
 # from db.cruds.application_settings_crud import get_setting # Removed direct import
 # from db.init_schema import initialize_database # This will be db.initialize_database after this change
-from auth.login_window import LoginWindow # Added for authentication
+# from auth.login_window import LoginWindow # Replaced by LoginDialog
+from dialogs.login_dialog import LoginDialog # New LoginDialog
+from auth import authentication as auth_service # Import the auth service
+
 from PyQt5.QtWidgets import QDialog # Required for QDialog.Accepted check (already present, but good to note)
 # from initial_setup_dialog import InitialSetupDialog # Redundant import, already imported above
 # import db as db_manager # For db initialization - already imported above, now using 'import db'
 from notifications import NotificationManager # Added for notifications
-from db.cruds.users_crud import users_crud_instance # Added for default operational user
+# from db.cruds.users_crud import users_crud_instance # users_crud is used directly by auth_service
 from PyQt5.QtWidgets import QMessageBox # Added for error dialog
 from PyQt5.QtWidgets import QSplashScreen
 
@@ -506,110 +509,51 @@ def main():
     proceed_to_main_app = False # Initialize before bypass and remember me
 
     # --- Development/Testing: Bypass Login ---
-    if BYPASS_LOGIN_FOR_TESTING:
-        logging.warning("Login screen is being bypassed due to BYPASS_LOGIN_FOR_TESTING flag.")
-        try:
-            # Ensure db operations can be performed to get admin user
-            from db.cruds.users_crud import users_crud_instance
-            # from auth.roles import SUPER_ADMIN # Make sure SUPER_ADMIN is imported if not already (it is)
-
-            admin_user = users_crud_instance.get_user_by_username("admin") # Assuming "admin" is the default admin username
-            if admin_user:
-                CURRENT_USER_ID = admin_user['user_id']
-                CURRENT_USER_ROLE = SUPER_ADMIN # Assign super_admin role
-                CURRENT_SESSION_TOKEN = "BYPASS_TOKEN_ADMIN_SUPER"
-                SESSION_START_TIME = datetime.datetime.now()
-                proceed_to_main_app = True # This sets it to True if bypass is successful
-                logging.info(f"Bypassed login. Logged in as default admin: {admin_user['username']} (ID: {CURRENT_USER_ID}), Role: {CURRENT_USER_ROLE}")
-            else:
-                logging.error("BYPASS_LOGIN_FOR_TESTING: Could not find default admin user 'admin'. Login cannot be bypassed.")
-                # proceed_to_main_app will remain False, forcing normal login
-        except Exception as e_bypass:
-            logging.error(f"BYPASS_LOGIN_FOR_TESTING: Error during login bypass: {e_bypass}", exc_info=True)
-            # proceed_to_main_app will remain False, normal login flow will occur.
-    # --- End Development/Testing: Bypass Login ---
+    # BYPASS_LOGIN_FOR_TESTING flag is removed; login is now mandatory.
+    # If bypass is needed for development, it should be handled by temporarily
+    # modifying the login logic or providing default credentials.
 
     # 10. Authentication Flow
-    settings = QSettings()
+    # QSettings for "Remember Me" is not implemented in this phase.
+    # Login will be required each time.
 
-    # Now check "Remember Me" ONLY if bypass did not occur
-    if not proceed_to_main_app:
-        remember_me_active = settings.value("auth/remember_me_active", False, type=bool)
-        if remember_me_active:
-            logging.info("Found active 'Remember Me' flag.")
-            stored_token = settings.value("auth/session_token", None)
-            stored_user_id = settings.value("auth/user_id", None)
-            stored_username = settings.value("auth/username", "Unknown") # Default for logging
-            stored_user_role = settings.value("auth/user_role", None)
+    logged_in_user_info = None # To store user details after successful login
 
-            if stored_token and stored_user_id and stored_user_role:
-                logging.info(f"Attempting to restore session for user: {stored_username} (ID: {stored_user_id}) with stored token.")
-
-                # global CURRENT_SESSION_TOKEN, CURRENT_USER_ID, CURRENT_USER_ROLE, SESSION_START_TIME # Already global
-                CURRENT_SESSION_TOKEN = stored_token
-                CURRENT_USER_ID = stored_user_id
-                CURRENT_USER_ROLE = stored_user_role
-                SESSION_START_TIME = datetime.datetime.now() # Reset session timer
-
-                logging.info(f"Session restored for user: {stored_username}, Role: {CURRENT_USER_ROLE}. Token: {CURRENT_SESSION_TOKEN}")
-                logging.info(f"Session (restored) started at: {SESSION_START_TIME}")
-                proceed_to_main_app = True
-            else:
-                logging.warning("Found 'Remember Me' flag but token or user details are missing. Clearing invalid 'Remember Me' data.")
-                settings.setValue("auth/remember_me_active", False)
-                settings.remove("auth/session_token")
-                settings.remove("auth/user_id")
-                settings.remove("auth/username")
-                settings.remove("auth/user_role")
-        else:
-            logging.info("'Remember Me' is not active.")
-
-    if not proceed_to_main_app:
-        logging.info("Proceeding to show LoginWindow.")
-        login_dialog = LoginWindow()
-        login_result = login_dialog.exec_()
-
-        if login_result == QDialog.Accepted:
-            session_token = login_dialog.get_session_token()
-            logged_in_user = login_dialog.get_current_user()
-
-            # global CURRENT_SESSION_TOKEN, CURRENT_USER_ROLE, CURRENT_USER_ID, SESSION_START_TIME # Already global
-            CURRENT_SESSION_TOKEN = session_token # These are assigned again here for clarity
-            if logged_in_user:
-                CURRENT_USER_ROLE = logged_in_user.get('role')
-                CURRENT_USER_ID = logged_in_user.get('user_id')
-                SESSION_START_TIME = datetime.datetime.now()
-                logging.info(f"Login successful. User: {logged_in_user.get('username')}, Role: {CURRENT_USER_ROLE}, Token: {CURRENT_SESSION_TOKEN}, Session started: {SESSION_START_TIME}")
-            else: # Should not happen if dialog.accept() is called correctly
-                logging.error("Login reported successful by dialog, but no user data retrieved. Exiting.")
-                sys.exit(1)
-            proceed_to_main_app = True # Mark to proceed
-        else:
-            logging.warning("Login dialog was not accepted (failed, cancelled, or closed). Attempting to use default operational user.")
-            DEFAULT_OPERATIONAL_USERNAME = "default_operational_user"
-            try:
-                # Assuming users_crud_instance does not require explicit connection management here
-                # or it handles it internally for read-only operations like get_user_by_username.
-                # If main.py initializes a global DB connection that CRUD instances can use, that's also fine.
-                default_user = users_crud_instance.get_user_by_username(DEFAULT_OPERATIONAL_USERNAME)
-                if default_user:
-                    CURRENT_USER_ID = default_user.get('user_id')
-                    CURRENT_USER_ROLE = default_user.get('role')
-                    SESSION_START_TIME = datetime.datetime.now()
-                    CURRENT_SESSION_TOKEN = "default_user_session_token" # Placeholder token
-                    logging.info(f"Proceeding with default operational user: {DEFAULT_OPERATIONAL_USERNAME} (ID: {CURRENT_USER_ID}, Role: {CURRENT_USER_ROLE})")
+    while True: # Loop until successful login or explicit exit
+        login_dialog = LoginDialog()
+        if login_dialog.exec_() == QDialog.Accepted:
+            user_data_from_dialog = login_dialog.get_user_data()
+            if user_data_from_dialog:
+                # auth_service.set_current_user(user_data_from_dialog) # Set in global auth state
+                # The above line is redundant if DocumentManager will hold the user state
+                # and if auth_service primarily serves to validate.
+                # For now, login_dialog directly calls auth_service.login which sets _current_user_data.
+                # We need to get this data to pass to DocumentManager.
+                logged_in_user_info = auth_service.get_current_user() # Get data set by login_dialog via auth_service
+                if logged_in_user_info:
+                    logging.info(f"Login successful. User: {logged_in_user_info.get('username')}, Role: {logged_in_user_info.get('role_name')}")
                     proceed_to_main_app = True
+                    break # Exit login loop
                 else:
-                    logging.critical(f"Default operational user '{DEFAULT_OPERATIONAL_USERNAME}' not found in the database.")
-                    QMessageBox.critical(None, "Critical Error", f"Default operational user profile ('{DEFAULT_OPERATIONAL_USERNAME}') not found. Application cannot start. Please contact support or run database seeding.")
-                    sys.exit(1)
-            except Exception as e_default_user:
-                logging.critical(f"An error occurred while trying to fetch the default operational user '{DEFAULT_OPERATIONAL_USERNAME}': {e_default_user}", exc_info=True)
-                QMessageBox.critical(None, "Critical Database Error", f"An error occurred while accessing user data. Application cannot start. Check logs for details.")
-                sys.exit(1)
+                    # This case should ideally not be hit if login_dialog.accept() means auth_service.login() was successful
+                    # and set _current_user_data.
+                    logging.error("Login dialog accepted, but no user data found in auth_service. Critical error.")
+                    QMessageBox.critical(None, "Erreur Critique de Connexion", "Impossible de récupérer les informations utilisateur après la connexion.")
+                    splash.hide() # Ensure splash is hidden
+                    sys.exit(1) # Critical failure
+            else:
+                # This case should also not be hit if dialog.accept() means login was successful.
+                logging.error("Login dialog accepted, but get_user_data() returned None.")
+                QMessageBox.critical(None, "Erreur de Connexion", "Échec de la récupération des données utilisateur.")
+                # Loop will continue via the while True
+        else: # LoginDialog was cancelled or closed
+            logging.warning("Login dialog was cancelled or closed by the user. Exiting application.")
+            splash.hide() # Ensure splash is hidden
+            sys.exit(0) # User chose to exit
 
-    if proceed_to_main_app:
-        main_window = DocumentManager(APP_ROOT_DIR, CURRENT_USER_ID)
+    if proceed_to_main_app and logged_in_user_info:
+        # Pass the full user_info dictionary to DocumentManager
+        main_window = DocumentManager(APP_ROOT_DIR, logged_in_user_info)
 
         # Setup Notification Manager
         # Ensure 'app' is the QApplication instance, available in this scope

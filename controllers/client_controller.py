@@ -162,7 +162,8 @@ class ClientController:
             if not final_created_by_user_id:
                 logging.warning("created_by_user_id not found in client_data. Attempting to fetch first user as fallback.")
                 try:
-                    all_users = users_crud_instance.get_all_users(limit=1)
+                    # Use list_users instead of get_all_users
+                    all_users = users_crud_instance.list_users(limit=1)
                     if all_users:
                         final_created_by_user_id = all_users[0].get('user_id')
                         logging.info(f"Using first user ID {final_created_by_user_id} as fallback for created_by_user_id.")

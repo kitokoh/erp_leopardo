@@ -71,14 +71,15 @@ class ProductsCRUD(GenericCRUD):
         sql = """INSERT INTO Products
                  (product_name, product_code, description, category, language_code, base_unit_price,
                   unit_of_measure, weight, dimensions, is_active, created_at, updated_at,
-                  is_deleted, deleted_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                  is_deleted, deleted_at, created_by_user_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""" # Added created_by_user_id
         params = (product_data.get('product_name'), product_data.get('product_code'),
                   product_data.get('description'), product_data.get('category'),
                   product_data.get('language_code', 'fr'), product_data.get('base_unit_price'),
                   product_data.get('unit_of_measure'), product_data.get('weight'),
                   product_data.get('dimensions'), product_data.get('is_active', True),
-                  now, now, product_data.get('is_deleted', 0), product_data.get('deleted_at', None))
+                  now, now, product_data.get('is_deleted', 0), product_data.get('deleted_at', None),
+                  product_data.get('created_by_user_id')) # Added created_by_user_id
         try:
             cursor.execute(sql, params)
             new_id = cursor.lastrowid
@@ -268,7 +269,8 @@ class ProductsCRUD(GenericCRUD):
 
         valid_cols = ['product_name', 'product_code', 'description', 'category', 'language_code',
                       'base_unit_price', 'unit_of_measure', 'weight', 'dimensions',
-                      'is_active', 'updated_at', 'is_deleted', 'deleted_at']
+                      'is_active', 'updated_at', 'is_deleted', 'deleted_at',
+                      'updated_by_user_id'] # Added updated_by_user_id
 
         to_set = {}
         for k,v in data.items():
@@ -278,8 +280,37 @@ class ProductsCRUD(GenericCRUD):
                     return {'success': False, 'error': "Invalid data type for base_unit_price."}
                 to_set[k] = v
 
-        if not to_set:
-            return {'success': False, 'error': "No valid fields to update."}
+        # Ensure updated_by_user_id is part of the update if provided in data, even if no other valid_cols changed
+        # (though updated_at always changes)
+        if 'updated_by_user_id' in data and 'updated_by_user_id' not in to_set:
+            if data['updated_by_user_id'] is not None : # Only add if it has a value
+                 to_set['updated_by_user_id'] = data['updated_by_user_id']
+
+        if 'updated_at' not in to_set: # Should always be true due to data['updated_at'] = now
+            to_set['updated_at'] = now
+
+
+        if not to_set or all(k in ['updated_at', 'updated_by_user_id'] and to_set[k] is None for k in to_set):
+             # If only updated_at (always set) and updated_by_user_id (which might be None and thus skipped)
+             # are present, and updated_by_user_id is None, then effectively no real data fields to update.
+             # However, we generally want to update 'updated_at' at least.
+             # Let's refine: if to_set only contains 'updated_at' and potentially a None 'updated_by_user_id',
+             # and no other actual data fields were provided in the input `data` dict, then it's "no valid fields".
+             # A simpler check: if len(to_set) <= (1 if 'updated_by_user_id' not in to_set or to_set.get('updated_by_user_id') is None else 2):
+             # This logic is getting complex. The original "if not to_set:" was for when data only contained invalid keys.
+             # If `data` comes in with valid keys but their values are unchanged, `to_set` will still be populated.
+             # The critical part is `data` must have something other than just audit fields to be a meaningful update.
+             # For now, the existing "if not to_set:" before audit field addition is fine.
+             # After audit fields, if to_set *only* contains updated_at and updated_by_user_id=None, it's not a data update.
+             # However, an UPDATE query with just `updated_at` is valid.
+             # The original `if not to_set:` should be checked against the original `data`'s valid fields.
+             # Let's assume if `data` has any valid_cols (excluding audit), `to_set` will have them.
+             # The current check `if not to_set:` (after iterating `data`) means no valid updatable fields were found in `data`.
+             pass # Allow updates that only change updated_at and/or updated_by_user_id
+
+        if not to_set: # This check is now after potentially adding updated_by_user_id
+             return {'success': False, 'error': "No valid fields to update."}
+
 
         set_c = [f"{key}=?" for key in to_set.keys()]
         params = list(to_set.values())
