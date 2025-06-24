@@ -37,3 +37,4 @@ matplotlib==3.10.3
 folium==0.20.0
 SpeechRecognition==3.14.3
 opencv-python-headless==4.11.0.86
+werkzeug>=2.0.0 # For password hashing

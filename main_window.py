@@ -149,10 +149,15 @@ CONFIGURABLE_MODULES = [
 ]
 
 class DocumentManager(QMainWindow):
-    def __init__(self, app_root_dir, current_user_id):
+    def __init__(self, app_root_dir, current_user_info: dict): # Changed current_user_id to current_user_info
         super().__init__()
         self.app_root_dir = app_root_dir
-        self.current_user_id = current_user_id
+        self.current_user_info = current_user_info # Store the full user info dictionary
+        # self.current_user_id = current_user_id # Kept for compatibility, but new code should use current_user_info
+        self.current_user_id = self.current_user_info.get('user_id') # Extract user_id for existing usage
+
+        logging.info(f"DocumentManager initialized for user: {self.current_user_info.get('username')}, Role: {self.current_user_info.get('role_name')}")
+
         self.setWindowTitle(self.tr("Gestionnaire de Documents Client")); self.setGeometry(100, 100, 1200, 800)
         self.setWindowIcon(QIcon(":/icons/logo.svg"))
         
@@ -706,6 +711,11 @@ class DocumentManager(QMainWindow):
         self.calendar_module_action = QAction(QIcon(":/icons/book.svg"), self.tr("Calendrier"), self) # Placeholder icon
         self.calendar_module_action.triggered.connect(self.show_calendar_module_view)
 
+        # Action for managing users - Placeholder, actual UI for this is not yet built
+        # but the action can be controlled by RBAC.
+        self.manage_users_action = QAction(QIcon(":/icons/users.svg"), self.tr("Gérer les Utilisateurs"), self)
+        self.manage_users_action.triggered.connect(self._placeholder_manage_users) # Connect to a placeholder
+
 
         # Populate searchable_actions_map
         self.searchable_actions_map[self.tr("Accueil")] = self.home_action # Added Home action
@@ -725,12 +735,34 @@ class DocumentManager(QMainWindow):
         self.searchable_actions_map[self.tr("Gestion Caméras")] = self.camera_management_action
         self.searchable_actions_map[self.tr("Gestion des Connaissances")] = self.experience_management_action
         self.searchable_actions_map[self.tr("Calendrier")] = self.calendar_module_action
+        self.searchable_actions_map[self.tr("Gérer les Utilisateurs")] = self.manage_users_action
+
+    def _placeholder_manage_users(self):
+        # This is a placeholder. Actual user management UI would be complex.
+        # For now, it can just show a message or be a no-op if no UI is built yet.
+        QMessageBox.information(self, self.tr("Gestion Utilisateurs"),
+                                self.tr("La fonctionnalité de gestion des utilisateurs n'est pas encore implémentée dans l'interface graphique.\n"
+                                        "Elle est accessible via les fonctions CRUD et le service d'authentification pour le moment."))
 
 
-    def create_menus_main(self): 
-        menu_bar = self.menuBar(); file_menu = menu_bar.addMenu(self.tr("Fichier")); file_menu.addAction(self.settings_action); file_menu.addAction(self.status_action); # self.template_action removed, file_menu.addAction(self.product_equivalency_action);
-        file_menu.addSeparator(); file_menu.addAction(self.exit_action)
+    def create_menus_main(self):
+        menu_bar = self.menuBar()
 
+        # File Menu
+        file_menu = menu_bar.addMenu(self.tr("Fichier"))
+        file_menu.addAction(self.settings_action) # Will be controlled by _apply_permissions
+        # self.status_action was disabled with a tooltip, consider if it should be permission-based too
+        # For now, keeping its original behavior. If it becomes a real feature, add P_MANAGE_STATUSES.
+        file_menu.addAction(self.status_action)
+        file_menu.addSeparator()
+        file_menu.addAction(self.exit_action) # Exit is always available
+
+        # Admin Menu (new menu for admin-specific tasks)
+        self.admin_menu = menu_bar.addMenu(self.tr("Administration"))
+        self.admin_menu.addAction(self.manage_users_action)
+        # Add other admin-specific actions here if any (e.g., manage roles, system logs)
+
+        # Modules Menu
         modules_menu = menu_bar.addMenu(self.tr("Modules"))
         modules_menu.addAction(self.home_action) # Added Home action to Modules menu
         modules_menu.addAction(self.documents_view_action) # Documents view is core, always added
@@ -782,7 +814,178 @@ class DocumentManager(QMainWindow):
         self.search_completer.activated[str].connect(self.handle_search_activation)
         self.search_bar_line_edit.returnPressed.connect(self.handle_search_return_pressed)
 
-        self.menuBar().setCornerWidget(self.search_bar_line_edit, Qt.TopRightCorner)
+        # User display and logout button
+        self.user_display_widget = QWidget()
+        user_display_layout = QHBoxLayout(self.user_display_widget)
+        user_display_layout.setContentsMargins(5, 0, 5, 0) # Adjust margins as needed
+        user_display_layout.setSpacing(10)
+
+        self.user_info_label = QLabel(self.tr("Non connecté"))
+        self.user_info_label.setObjectName("userInfoLabel") # For styling
+        user_display_layout.addWidget(self.user_info_label)
+
+        self.logout_button = QPushButton(self.tr("Déconnexion"))
+        self.logout_button.setIcon(QIcon(":/icons/log-out.svg")) # Ensure icon exists
+        self.logout_button.setFlat(True) # Make it look less like a bulky button in the menubar
+        self.logout_button.setToolTip(self.tr("Se déconnecter et revenir à l'écran de connexion"))
+        self.logout_button.clicked.connect(self._handle_logout)
+        user_display_layout.addWidget(self.logout_button)
+
+        # Main Search Bar (as before)
+        self.search_bar_line_edit = QLineEdit(self)
+        self.search_bar_line_edit.setObjectName("menuBarSearch")
+        self.search_bar_line_edit.setPlaceholderText(self.tr("Rechercher une fonctionnalité..."))
+        # ... (completer setup as before) ...
+
+        # Container for both search and user display
+        top_right_container = QWidget()
+        top_right_layout = QHBoxLayout(top_right_container)
+        top_right_layout.setContentsMargins(0,0,0,0)
+        top_right_layout.setSpacing(15) # Spacing between search and user info
+        top_right_layout.addWidget(self.search_bar_line_edit)
+        top_right_layout.addWidget(self.user_display_widget)
+
+        self.menuBar().setCornerWidget(top_right_container, Qt.TopRightCorner)
+        self._update_user_display() # Initial update of user display
+        self._apply_permissions() # Apply permissions on initial load
+
+    def _apply_permissions(self):
+        """Applies role-based permissions to UI elements."""
+        from auth.permissions import has_permission, P_MANAGE_SYSTEM_SETTINGS, P_CREATE_CLIENT, \
+                                     P_MANAGE_USERS, P_ACCESS_PROJECT_MODULE, P_ACCESS_STATISTICS_MODULE, \
+                                     P_ACCESS_PARTNER_MODULE, P_ACCESS_INVENTORY_MODULE, \
+                                     P_ACCESS_RECRUITMENT_MODULE, P_ACCESS_EXPERIENCE_MODULE, \
+                                     P_ACCESS_CALENDAR_MODULE, P_ACCESS_BOTPRESS_MODULE, \
+                                     P_ACCESS_CARRIER_MAP_MODULE, P_ACCESS_CAMERA_MODULE, \
+                                     P_MANAGE_GLOBAL_PRODUCTS # For Product Management Page action
+
+        role_name = self.current_user_info.get('role_name') if self.current_user_info else None
+        if not role_name: # Should not happen if login is enforced, but good for safety
+            # Disable almost everything if no role (e.g. error state)
+            is_admin_or_similar = False # Fallback to least privilege
+            can_create_client = False
+        else:
+            is_admin_or_similar = has_permission(role_name, P_MANAGE_SYSTEM_SETTINGS) # Good proxy for admin-like access
+            can_create_client = has_permission(role_name, P_CREATE_CLIENT)
+
+        # Menu Actions
+        self.settings_action.setEnabled(is_admin_or_similar)
+        # self.status_action is currently hard-disabled with a tooltip. If it becomes a feature:
+        # self.status_action.setEnabled(has_permission(role_name, P_MANAGE_STATUSES))
+
+        # Admin Menu visibility
+        self.admin_menu.menuAction().setVisible(has_permission(role_name, P_MANAGE_USERS)) # Hide/show whole menu
+        self.manage_users_action.setEnabled(has_permission(role_name, P_MANAGE_USERS)) # Also control action itself
+
+        # Module Menu Actions (Visibility based on module access permission)
+        # Assuming specific P_ACCESS_MODULE_XYZ permissions or more granular ones.
+        # Example: self.project_management_action.setVisible(has_permission(role_name, P_ACCESS_PROJECT_MODULE))
+        # This part needs to align with how module visibility itself is handled (db config vs. role perm)
+        # For now, let's assume module visibility from DB config (self.module_states) is primary,
+        # and then role permissions might further restrict actions *within* an enabled module.
+        # If a module action should purely be role-based, then:
+
+        # Example for a few module actions based on defined permissions:
+        if self.project_management_action: # Check if action exists (it's conditional on module_states)
+            self.project_management_action.setVisible(has_permission(role_name, P_ACCESS_PROJECT_MODULE))
+        if self.product_list_action: # Product Management Page
+             self.product_list_action.setVisible(has_permission(role_name, P_MANAGE_GLOBAL_PRODUCTS) or \
+                                                 has_permission(role_name, P_VIEW_GLOBAL_PRODUCTS)) # View or Manage
+        if self.partner_management_action:
+            self.partner_management_action.setVisible(has_permission(role_name, P_ACCESS_PARTNER_MODULE))
+        if self.statistics_action:
+            self.statistics_action.setVisible(has_permission(role_name, P_ACCESS_STATISTICS_MODULE))
+        if self.inventory_browser_action:
+            self.inventory_browser_action.setVisible(has_permission(role_name, P_ACCESS_INVENTORY_MODULE))
+        if self.recruitment_action: # Assuming this is the attribute name for recruitment QAction
+            self.recruitment_action.setVisible(has_permission(role_name, P_ACCESS_RECRUITMENT_MODULE))
+        if self.experience_management_action:
+            self.experience_management_action.setVisible(has_permission(role_name, P_ACCESS_EXPERIENCE_MODULE))
+        if self.calendar_module_action:
+            self.calendar_module_action.setVisible(has_permission(role_name, P_ACCESS_CALENDAR_MODULE))
+        if self.botpress_integration_action:
+             self.botpress_integration_action.setVisible(has_permission(role_name, P_ACCESS_BOTPRESS_MODULE))
+        if self.open_carrier_map_action:
+             self.open_carrier_map_action.setVisible(has_permission(role_name, P_ACCESS_CARRIER_MAP_MODULE))
+        if self.camera_management_action:
+             self.camera_management_action.setVisible(has_permission(role_name, P_ACCESS_CAMERA_MODULE))
+
+
+        # Main Buttons on Document View
+        self.add_new_client_button.setEnabled(can_create_client)
+        self.add_client_by_voice_button.setEnabled(can_create_client) # Assuming same permission
+
+        # Further UI elements (e.g., context menu items in client list, buttons in ClientWidget)
+        # will need similar checks when those widgets are initialized or data is loaded.
+        logging.info(f"Permissions applied for role: {role_name}")
+
+
+    def _update_user_display(self):
+        if self.current_user_info:
+            username = self.current_user_info.get('username', 'N/A')
+            role_name = self.current_user_info.get('role_name', 'N/A')
+            self.user_info_label.setText(self.tr("Utilisateur: {0} ({1})").format(username, role_name))
+            self.logout_button.setVisible(True)
+        else:
+            self.user_info_label.setText(self.tr("Non connecté"))
+            self.logout_button.setVisible(False) # Hide logout if no one is logged in (e.g. at startup before login)
+
+    def _handle_logout(self):
+        from auth import authentication as auth_service # Local import
+        from dialogs.login_dialog import LoginDialog # Local import
+
+        reply = QMessageBox.question(self, self.tr("Confirmation de Déconnexion"),
+                                     self.tr("Êtes-vous sûr de vouloir vous déconnecter ?"),
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+
+        if reply == QMessageBox.No:
+            return
+
+        auth_service.logout()
+        self.current_user_info = None # Clear user info in main window
+        self._update_user_display()
+
+        # Optionally, close all tabs or reset parts of the UI
+        # For example, close all client tabs:
+        while self.client_tabs_widget.count() > 0:
+            self.client_tabs_widget.removeTab(0)
+
+        # Disable/hide UI elements that require login (to be implemented with RBAC)
+        # For now, just clear the client list as an example of UI reset
+        self.client_list_widget.clear()
+        self.clients_data_map.clear()
+
+        # Show login dialog again
+        # This part is tricky as main.py initially handles the login loop.
+        # A more robust way might be for DocumentManager to signal to main.py
+        # that a logout occurred and main.py should re-trigger the login sequence.
+        # For a simpler desktop app, restarting or re-showing login here can work.
+
+        # Attempt to re-show login dialog.
+        # This might need to be handled by exiting and restarting, or by a method in main.py
+        # that can re-initialize the login loop.
+        # For now, let's assume we re-show it directly, though this might have issues with app lifecycle.
+
+        # A simple approach: hide main window, show login, if login ok, re-show main window.
+        self.hide()
+        login_dialog = LoginDialog(self) # Pass parent
+        if login_dialog.exec_() == QDialog.Accepted:
+            new_user_info = auth_service.get_current_user()
+            if new_user_info:
+                self.current_user_info = new_user_info
+                self.current_user_id = self.current_user_info.get('user_id') # Update user_id
+                self._update_user_display()
+                self._apply_permissions() # Re-apply permissions for the new user
+                self.load_clients_from_db_slot() # Reload data relevant to the new user
+                # Potentially re-initialize other parts of the UI based on the new user/role
+                self.show()
+            else: # Should not happen if login_dialog.accept() implies success
+                QMessageBox.critical(self, "Erreur de Reconnexion", "Impossible de récupérer les informations du nouvel utilisateur.")
+                QApplication.instance().quit() # Exit if re-login fails critically
+        else: # Login cancelled after logout
+            QMessageBox.information(self, "Déconnexion", "Vous avez été déconnecté. L'application va se fermer.")
+            QApplication.instance().quit() # Exit if user cancels login after logout
+
 
     @pyqtSlot(str)
     def handle_search_activation(self, text):
