@@ -4332,6 +4332,28 @@ class ClientWidget(QWidget):
             if products_list_data or processed_count > 0:
                 self.load_products()
 
+                # After products are added and table reloaded, update client's total price
+                client_uuid = self.client_info.get("client_id")
+                if client_uuid:
+                    try:
+                        linked_prods = db_manager.get_products_for_client_or_project(client_uuid, project_id=None)
+                        if linked_prods is None: linked_prods = []
+                        new_total_client_price = sum(
+                            p.get('total_price_calculated', 0.0) for p in linked_prods if p.get('total_price_calculated') is not None
+                        )
+
+                        if db_manager.update_client(client_uuid, {'price': new_total_client_price}):
+                            self.client_info['price'] = new_total_client_price
+                            logging.info(f"Client {client_uuid} total price updated to {new_total_client_price} after adding product(s).")
+                            # Refresh the main details display if not in edit mode
+                            if not self.is_editing_client and hasattr(self, 'populate_details_layout'):
+                                self.populate_details_layout()
+                        else:
+                            logging.error(f"Failed to update client {client_uuid} total price in DB after adding product(s).")
+                    except Exception as e:
+                        logging.error(f"Error updating client total price after adding product(s) for client {client_uuid}: {e}", exc_info=True)
+
+
     def edit_product(self):
         selected_row = self.products_table.currentRow();
         if selected_row < 0: QMessageBox.information(self, self.tr("Sélection Requise"), self.tr("Veuillez sélectionner un produit à modifier.")); return

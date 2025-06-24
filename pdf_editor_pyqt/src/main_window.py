@@ -13,6 +13,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QAction, QMenu, QMenuBar
                              QDialog, QVBoxLayout as QDialogVBoxLayout, QTextEdit as QDialogTextEdit,
                              QPushButton as QDialogButton, QHBoxLayout as QDialogHBoxLayout,
                              QAbstractItemView, QFormLayout)
+
 from PyQt5.QtCore import Qt, QSize, QRectF, QPointF, QLineF
 from PyQt5.QtGui import QIcon, QPixmap, QImage, QColor, QPen, QPainterPath, QMouseEvent
 
@@ -82,6 +83,7 @@ class PageRangeDialog(QDialog):
     def get_range_string(self):
         return self.range_input_line_edit.text()
 
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -102,6 +104,7 @@ class MainWindow(QMainWindow):
         self.freetext_fontname = "helv"
         self.freetext_fontsize = 11
         self.freetext_color = (0,0,0)
+
         self.selection_start_point = None
         self.selection_rect_item = None
         self.current_ink_stroke = []
@@ -111,6 +114,7 @@ class MainWindow(QMainWindow):
         self.selected_widget = None
         self.property_widget_layout = None
         self.current_prop_widgets = []
+
         self._create_actions()
         self._create_menu_bar()
         self._create_tool_bars()
@@ -361,6 +365,7 @@ class MainWindow(QMainWindow):
         self.pdf_scene.setSceneRect(QRectF(pixmap.rect()))
         doc_name = self.current_pdf_document.name if hasattr(self.current_pdf_document, 'name') and self.current_pdf_document.name else "Nouveau Document"
         self.setWindowTitle(f"Éditeur PDF PyQt - Page {self.current_page_number + 1}/{self.current_pdf_document.page_count} [{doc_name}]")
+
         self.update_navigation_controls()
 
     def update_thumbnails(self):
@@ -1068,6 +1073,7 @@ class MainWindow(QMainWindow):
                 logging.error(f"Erreur lors de la division par plage: {e}", exc_info=True)
                 QMessageBox.critical(self, "Erreur de Division", f"Une erreur est survenue: {e}")
                 if 'new_pdf' in locals() and new_pdf.is_open: new_pdf.close()
+
 
 
 if __name__ == '__main__':
