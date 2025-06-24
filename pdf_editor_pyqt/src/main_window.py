@@ -12,7 +12,8 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QAction, QMenu, QMenuBar
                              QRadioButton, QVBoxLayout, QButtonGroup, QComboBox,
                              QDialog, QVBoxLayout as QDialogVBoxLayout, QTextEdit as QDialogTextEdit,
                              QPushButton as QDialogButton, QHBoxLayout as QDialogHBoxLayout,
-                             QAbstractItemView)
+                             QAbstractItemView, QFormLayout)
+
 from PyQt5.QtCore import Qt, QSize, QRectF, QPointF, QLineF
 from PyQt5.QtGui import QIcon, QPixmap, QImage, QColor, QPen, QPainterPath, QMouseEvent
 
@@ -48,6 +49,39 @@ class TextDisplayDialog(QDialog):
                 with open(file_path, 'w', encoding='utf-8') as f: f.write(self.text_edit.toPlainText())
                 QMessageBox.information(self, "Enregistré", f"Texte enregistré: {file_path}")
             except Exception as e: QMessageBox.critical(self, "Erreur", f"Erreur: {e}")
+
+class PageRangeDialog(QDialog):
+    def __init__(self, total_pages, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Définir les Plages de Pages")
+        self.setMinimumWidth(350)
+
+        layout = QVBoxLayout(self)
+
+        self.instruction_label = QLabel("Entrez les plages de pages (ex: 1-3, 5, 7-fin):")
+        layout.addWidget(self.instruction_label)
+
+        self.range_input_line_edit = QLineEdit(self)
+        self.range_input_line_edit.setObjectName("range_input_line_edit")
+        layout.addWidget(self.range_input_line_edit)
+
+        self.total_pages_label = QLabel(f"Le document a {total_pages} page(s).")
+        self.total_pages_label.setObjectName("total_pages_label")
+        layout.addWidget(self.total_pages_label)
+
+        # Boutons OK et Annuler
+        button_box = QHBoxLayout()
+        self.ok_button = QPushButton("OK", self)
+        self.ok_button.clicked.connect(self.accept)
+        self.cancel_button = QPushButton("Annuler", self)
+        self.cancel_button.clicked.connect(self.reject)
+        button_box.addStretch()
+        button_box.addWidget(self.ok_button)
+        button_box.addWidget(self.cancel_button)
+        layout.addLayout(button_box)
+
+    def get_range_string(self):
+        return self.range_input_line_edit.text()
 
 
 class MainWindow(QMainWindow):
@@ -915,12 +949,131 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Erreur de Division", f"Une erreur majeure est survenue: {e}")
             if 'new_doc' in locals() and new_doc.is_open: new_doc.close()
 
+    def _parse_page_ranges(self, range_string: str, doc_total_pages: int) -> list | str:
+        output_file_page_lists = []
+        if not range_string.strip():
+            return "Erreur: La chaîne de plages est vide."
+
+        parts = range_string.split(',')
+
+        for part_string in parts:
+            part_string = part_string.strip()
+            if not part_string:
+                continue  # Skip empty parts that might result from "1,,2" or trailing commas
+
+            current_part_pages_set = set()
+
+            if '-' in part_string:
+                if part_string.count('-') > 1:
+                    return f"Erreur: Format de plage invalide dans '{part_string}'. Trop de tirets."
+
+                start_str, end_str = part_string.split('-', 1)
+                start_str = start_str.strip()
+                end_str = end_str.strip()
+
+                if not start_str or not end_str:
+                     return f"Erreur: Numéro de début ou de fin manquant dans la plage '{part_string}'."
+
+                try:
+                    start_num = int(start_str)
+                except ValueError:
+                    return f"Erreur: Numéro de début non valide dans la plage '{part_string}'."
+
+                try:
+                    if end_str.lower() == 'fin': # French 'end'
+                        end_num = doc_total_pages
+                    elif end_str.lower() == 'end': # English 'end'
+                        end_num = doc_total_pages
+                    else:
+                        end_num = int(end_str)
+                except ValueError:
+                    return f"Erreur: Numéro de fin non valide dans la plage '{part_string}'."
+
+                if not (1 <= start_num <= doc_total_pages):
+                    return f"Erreur: Numéro de page de début {start_num} hors limites (1-{doc_total_pages}) dans '{part_string}'."
+                if not (1 <= end_num <= doc_total_pages):
+                    return f"Erreur: Numéro de page de fin {end_num} hors limites (1-{doc_total_pages}) dans '{part_string}'."
+                if start_num > end_num:
+                    return f"Erreur: Le numéro de page de début {start_num} est supérieur au numéro de fin {end_num} dans '{part_string}'."
+
+                for p in range(start_num, end_num + 1):
+                    current_part_pages_set.add(p - 1)
+            else: # Single page number
+                try:
+                    pageNum = int(part_string)
+                except ValueError:
+                    return f"Erreur: Numéro de page non valide '{part_string}'."
+
+                if not (1 <= pageNum <= doc_total_pages):
+                    return f"Erreur: Numéro de page {pageNum} hors limites (1-{doc_total_pages}) dans '{part_string}'."
+                current_part_pages_set.add(pageNum - 1)
+
+            if current_part_pages_set:
+                output_file_page_lists.append(sorted(list(current_part_pages_set)))
+
+        if not output_file_page_lists:
+            return "Erreur: Aucune page ou plage valide n'a été spécifiée pour créer des fichiers de sortie."
+
+        return output_file_page_lists
 
     def split_pdf_by_range(self):
         if not self.current_pdf_document:
-            QMessageBox.warning(self, "Aucun Document", "Veuillez ouvrir un document PDF à diviser.")
+            QMessageBox.warning(self, "Aucun Document", "Veuillez ouvrir un document PDF d'abord.")
             return
-        QMessageBox.information(self, "Fonctionnalité à Venir", "La division par plage de pages sera implémentée prochainement.")
+
+        dialog = PageRangeDialog(self.current_pdf_document.page_count, self)
+        dialog_result = dialog.exec_()
+
+        if dialog_result == QDialog.Accepted:
+            range_str = dialog.get_range_string().strip()
+            if not range_str:
+                QMessageBox.warning(self, "Entrée Requise", "Veuillez entrer les plages de pages.")
+                return
+
+            page_lists_for_files = self._parse_page_ranges(range_str, self.current_pdf_document.page_count)
+
+            if isinstance(page_lists_for_files, str): # Error message returned
+                QMessageBox.critical(self, "Erreur de Plage", page_lists_for_files)
+                return
+
+            if not page_lists_for_files: # Should be caught by parser, but as a safeguard
+                QMessageBox.information(self, "Aucune Page Sélectionnée", "Aucune page valide n'a été sélectionnée avec les plages fournies.")
+                return
+
+            output_dir = QFileDialog.getExistingDirectory(self, "Sélectionner le Dossier de Sortie")
+            if not output_dir:
+                return # User cancelled directory selection
+
+            base_name = os.path.splitext(os.path.basename(self.current_pdf_document.name or "document"))[0]
+            files_created_count = 0
+
+            try:
+                for i, pages_for_one_file in enumerate(page_lists_for_files):
+                    if not pages_for_one_file: # Should not happen if parser is correct
+                        logging.warning(f"Bloc de pages vide rencontré pour la partie {i+1}, ignoré.")
+                        continue
+
+                    new_pdf = fitz.open()
+                    for page_index in pages_for_one_file: # pages are 0-indexed
+                        new_pdf.insert_pdf(self.current_pdf_document, from_page=page_index, to_page=page_index)
+
+                    output_path = os.path.join(output_dir, f"{base_name}_partie_{i+1}.pdf")
+                    new_pdf.save(output_path, garbage=3, deflate=True)
+                    new_pdf.close()
+                    files_created_count += 1
+
+                if files_created_count > 0:
+                    QMessageBox.information(self, "Division Réussie",
+                                            f"{files_created_count} fichier(s) créé(s) avec succès dans {output_dir}.")
+                else:
+                    # This case should ideally be caught by parser returning an error for "No valid pages..."
+                    QMessageBox.information(self, "Division Terminée",
+                                            "Aucun fichier n'a été créé. Veuillez vérifier vos plages de pages.")
+            except Exception as e:
+                logging.error(f"Erreur lors de la division par plage: {e}", exc_info=True)
+                QMessageBox.critical(self, "Erreur de Division", f"Une erreur est survenue: {e}")
+                if 'new_pdf' in locals() and new_pdf.is_open: new_pdf.close()
+
 
 
 if __name__ == '__main__':
