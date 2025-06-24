@@ -11,12 +11,13 @@ from controllers.contact_controller import ContactController # Added
 import icons_rc # Import for Qt resource file
 
 class ContactDialog(QDialog):
-    def __init__(self, client_id=None, contact_data=None, parent=None, is_first_contact=False): # Added is_first_contact
+    def __init__(self, client_id=None, contact_data=None, parent=None, is_first_contact=False, current_user_id=None): # Added current_user_id
         super().__init__(parent)
         self.client_id = client_id
         self.contact_data = contact_data or {}
-        self.is_first_contact = is_first_contact # Store is_first_contact
-        self.contact_controller = ContactController() # Added
+        self.is_first_contact = is_first_contact
+        self.current_user_id = current_user_id # Store current_user_id
+        self.contact_controller = ContactController(current_user_id=self.current_user_id) # Pass to controller
         self.setWindowTitle(self.tr("Modifier Contact") if self.contact_data and self.contact_data.get('contact_id') else self.tr("Ajouter Contact"))
         self.setMinimumSize(450,300)
         self.setup_ui()
