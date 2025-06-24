@@ -13,8 +13,8 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QAction, QMenu, QMenuBar
                              QDialog, QVBoxLayout as QDialogVBoxLayout, QTextEdit as QDialogTextEdit,
                              QPushButton as QDialogButton, QHBoxLayout as QDialogHBoxLayout,
                              QAbstractItemView, QFormLayout, QTreeWidget, QTreeWidgetItem)
+from PyQt5.QtCore import Qt, QSize, QRectF, QPointF, QLineF, QTimer
 
-from PyQt5.QtCore import Qt, QSize, QRectF, QPointF, QLineF
 from PyQt5.QtGui import QIcon, QPixmap, QImage, QColor, QPen, QPainterPath, QMouseEvent
 
 logging.basicConfig(level=logging.DEBUG,
@@ -412,17 +412,72 @@ class MainWindow(QMainWindow):
 
     def _on_bookmark_clicked(self, item: QTreeWidgetItem, column: int):
         data = item.data(0, Qt.UserRole)
-        if data and isinstance(data, dict) and 'page' in data:
-            page_num_0_indexed = data['page']
-            # dest_details = data.get('dest_details', {}) # For future use with zoom/specific location
-
-            if 0 <= page_num_0_indexed < (self.current_pdf_document.page_count if self.current_pdf_document else 0):
-                logging.info(f"Bookmark clicked: Navigating to page {page_num_0_indexed + 1}")
-                self.go_to_page(page_num_0_indexed)
-            else:
-                logging.warning(f"Bookmark click: Invalid page number {page_num_0_indexed} from item data: {data}")
-        else:
+        if not (data and isinstance(data, dict) and 'page' in data):
             logging.warning(f"Bookmark click: No valid page data found for item: {item.text(0)}")
+            return
+
+        page_num_0_indexed = data['page']
+        dest_details = data.get('dest_details', {})
+
+        if not (0 <= page_num_0_indexed < (self.current_pdf_document.page_count if self.current_pdf_document else 0)):
+            logging.warning(f"Bookmark click: Invalid page number {page_num_0_indexed} from item data: {data}")
+            return
+
+        logging.info(f"Bookmark clicked: Navigating to page {page_num_0_indexed + 1}. Details: {dest_details}")
+
+        # Navigate to page first. This will call update_page_view.
+        self.go_to_page(page_num_0_indexed)
+
+        # Apply specific zoom and scroll after the page view has been updated.
+        # Use QTimer.singleShot to ensure this runs after the current event processing (including page rendering) is done.
+        def apply_specific_destination():
+            logging.debug(f"Applying specific destination for page {page_num_0_indexed +1}: {dest_details}")
+            # Handle Zoom
+            new_zoom = dest_details.get('zoom', 0)
+            if new_zoom > 0 and abs(self.current_zoom_factor - new_zoom) > 0.01 : # Check if zoom is different
+                logging.debug(f"Setting zoom to: {new_zoom}")
+                self.set_zoom_factor(new_zoom) # This will call update_page_view again
+
+            # Handle Scroll Position ('to' point is top-left in PDF coordinates)
+            to_point_data = dest_details.get('to')
+            if to_point_data and isinstance(to_point_data, fitz.Point):
+                # Ensure zoom factor used for coordinate conversion is the one potentially set by 'zoom' key
+                # If set_zoom_factor was called, self.current_zoom_factor is already updated.
+                # If set_zoom_factor was not called, self.current_zoom_factor is from the go_to_page call.
+
+                # If zoom was changed by set_zoom_factor, update_page_view has run.
+                # If zoom was NOT changed, update_page_view has run once from go_to_page.
+                # So, current_zoom_factor should be correct for the current view.
+
+                scene_x = to_point_data.x * self.current_zoom_factor
+                scene_y = to_point_data.y * self.current_zoom_factor
+                logging.debug(f"Scrolling to PDF point {to_point_data}, scene point ({scene_x}, {scene_y})")
+
+                # self.pdf_view is in a QScrollArea. Its parent is QScrollArea's viewport(), then QScrollArea.
+                scroll_area = self.centralWidget() # This is the QScrollArea
+                if scroll_area and isinstance(scroll_area, QScrollArea):
+                    scroll_area.horizontalScrollBar().setValue(int(scene_x))
+                    scroll_area.verticalScrollBar().setValue(int(scene_y))
+                else:
+                    logging.warning("Could not find QScrollArea to adjust scrollbars for bookmark destination.")
+            elif dest_details.get('left') is not None and dest_details.get('top') is not None : # XYZ with left, top
+                # Simplified handling for XYZ with top-left specified, assuming fit page/width.
+                # More complex XYZ (fit rectangle, etc.) would need more logic.
+                # For now, if 'to' is not present, we rely on the zoom and default page display.
+                # If 'top' is present, scroll to that vertical position.
+                pdf_y = dest_details.get('top', 0) # PyMuPDF 'top' is often the y-coordinate for XYZ
+                # 'left' could also be used if available.
+                # This is a simplification. Full XYZ destination handling is more involved.
+                if pdf_y > 0 : # Typically if 'top' is 0, it might mean fit page or similar.
+                               # Non-zero 'top' suggests a specific vertical scroll.
+                    scene_y = pdf_y * self.current_zoom_factor
+                    scroll_area = self.centralWidget()
+                    if scroll_area and isinstance(scroll_area, QScrollArea):
+                         logging.debug(f"Scrolling to Y-pos based on 'top': PDF Y={pdf_y}, Scene Y={scene_y}")
+                         scroll_area.verticalScrollBar().setValue(int(scene_y))
+
+
+        QTimer.singleShot(0, apply_specific_destination)
 
 
 

@@ -722,6 +722,7 @@ class DocumentManager(QMainWindow):
         self.manage_users_action.triggered.connect(self.show_user_management_page) # Connect to show page method
 
 
+
         # Populate searchable_actions_map
         self.searchable_actions_map[self.tr("Accueil")] = self.home_action # Added Home action
         self.searchable_actions_map[self.tr("Paramètres")] = self.settings_action

@@ -65,6 +65,7 @@ from .cruds.users_crud import (
     get_user_by_id,
     list_users, # Changed from get_all_users
     add_user as add_user_crud, # Alias to avoid conflict if main has add_user
+
     update_user,
     verify_user_password,
     update_user_password,
@@ -273,6 +274,7 @@ __all__ = [
     "list_users", # Changed from get_all_users
     "add_user_crud", # Exporting aliased add_user
     "get_user_by_username", # Exporting get_user_by_username
+
     "update_user",
     "update_user_password", # Exporting new user functions
     "update_user_role",

@@ -379,17 +379,20 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                     doc_manager.clients_data_map[actual_new_client_id]['price'] = calculated_total_sum_after_cancel
                 # CreateDocumentDialog is SKIPPED as per Test Case 3
 
-        else: # ui_map_data was not populated (should not happen if controller succeeded)
-             QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Données Client"), doc_manager.tr("Les données du client (ui_map_data) ne sont pas disponibles pour la séquence de dialogue."))
-# --- After contact_dialog.exec_() block ---
-            else: # ContactDialog was cancelled
-                logging.info("ContactDialog cancelled by user.")
-                # Ensure client's price is initialized/updated even if workflow is exited early
-                # (e.g., to 0 if no products were ever associated with this new client)
-                clients_crud_instance.update_client(actual_new_client_id, {'price': 0.0})
-                if actual_new_client_id in doc_manager.clients_data_map:
-                    doc_manager.clients_data_map[actual_new_client_id]['price'] = 0.0
-                if ui_map_data: ui_map_data['price'] = 0.0
+
+
+
+#         else: # ui_map_data was not populated (should not happen if controller succeeded)
+#              QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Données Client"), doc_manager.tr("Les données du client (ui_map_data) ne sont pas disponibles pour la séquence de dialogue."))
+# # --- After contact_dialog.exec_() block ---
+        else: # ContactDialog was cancelled
+            logging.info("ContactDialog cancelled by user.")
+            # Ensure client's price is initialized/updated even if workflow is exited early
+            # (e.g., to 0 if no products were ever associated with this new client)
+            clients_crud_instance.update_client(actual_new_client_id, {'price': 0.0})
+            if actual_new_client_id in doc_manager.clients_data_map:
+                doc_manager.clients_data_map[actual_new_client_id]['price'] = 0.0
+            if ui_map_data: ui_map_data['price'] = 0.0
 
 
 # --- Final notifications and UI updates (outside the main if ui_map_data block, but relies on its outcomes) ---
