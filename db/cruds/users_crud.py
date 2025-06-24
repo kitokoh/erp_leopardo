@@ -145,8 +145,46 @@ def list_users(conn: sqlite3.Connection = None) -> list[dict]:
         return []
 
 def verify_password(hashed_password: str, provided_password: str) -> bool:
-    """Verifies a provided password against a stored hash."""
+    """
+    Verifies a provided password against a stored hash.
+    Internal helper, typically not called directly from outside for login.
+    """
     return check_password_hash(hashed_password, provided_password)
+
+@_manage_conn
+def verify_user_password(username: str, password: str, conn: sqlite3.Connection = None) -> dict | None:
+    """
+    Verifies user credentials for login.
+    Fetches user by username, checks if active, and verifies password.
+    Returns user dictionary if valid and active, otherwise None.
+    """
+    if not username or not password:
+        logger.warning("Username and password are required for verification.")
+        return None
+
+    user = get_user_by_username(username, conn=conn) # get_user_by_username is already decorated
+
+    if user:
+        if not user.get('is_active'):
+            logger.warning(f"Login attempt for inactive user: {username}")
+            return None
+
+        # Ensure 'hashed_password' key exists, though it should if user record is proper
+        if 'hashed_password' not in user:
+            logger.error(f"User record for {username} is missing 'hashed_password'. Cannot verify.")
+            return None
+
+        if verify_password(user['hashed_password'], password):
+            logger.info(f"Password verification successful for user: {username}")
+            # Update last login time
+            record_login_time(user['user_id'], conn=conn) # record_login_time is also decorated
+            return user  # Return the full user dictionary
+        else:
+            logger.warning(f"Password verification failed for user: {username}")
+            return None
+    else:
+        logger.warning(f"Login attempt for non-existent user: {username}")
+        return None
 
 # For consistency, if there's an existing users_crud_instance, re-declare it or ensure it's updated.
 # If the previous users_crud.py was very different, this overwrite is fine.
