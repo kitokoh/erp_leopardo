@@ -379,6 +379,7 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                     doc_manager.clients_data_map[actual_new_client_id]['price'] = calculated_total_sum_after_cancel
                 # CreateDocumentDialog is SKIPPED as per Test Case 3
 
+
 #         else: # ui_map_data was not populated (should not happen if controller succeeded)
 #              QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Données Client"), doc_manager.tr("Les données du client (ui_map_data) ne sont pas disponibles pour la séquence de dialogue."))
 # # --- After contact_dialog.exec_() block ---
