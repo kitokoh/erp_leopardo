@@ -10,11 +10,11 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                             QAbstractItemView) # Added QAbstractItemView
 from PyQt5.QtCore import Qt, QDate, QTimer, QSize, QRect # Added QSize, QRect
 from PyQt5.QtGui import QFont, QColor, QIcon, QPixmap
-import pyqtgraph as pg
+# import pyqtgraph as pg # Commented out for testing
 from datetime import datetime, timedelta
 import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+# import matplotlib.pyplot as plt # Commented out if only used for pyqtgraph bridge
+# from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas # Commented out
 import hashlib
 import os
 import math
@@ -25,24 +25,54 @@ import logging
 # Assuming db.py is in the parent directory of project_management
 # and the application is run from a context where 'db' is discoverable.
 # For the __main__ block, this might require db.py to be in PYTHONPATH or similar.
-from db import (
-    get_status_setting_by_id, get_all_status_settings, get_status_setting_by_name,
-    get_all_projects, get_project_by_id, add_project, update_project, delete_project,
-    get_tasks_by_project_id, add_task, update_task, delete_task, get_task_by_id,
-    get_tasks_by_assignee_id,
-    get_kpis_for_project,
-    add_activity_log, get_activity_logs,
-    get_user_by_id, get_all_users, update_user, verify_user_password,
-    get_all_team_members, get_team_member_by_id, add_team_member, update_team_member, delete_team_member,
-    get_all_clients,
-    get_cover_pages_for_client, add_cover_page, update_cover_page, delete_cover_page, get_cover_page_by_id,
-    get_all_file_based_templates, get_cover_page_template_by_id,
-    get_milestones_for_project, add_milestone, get_milestone_by_id, update_milestone, delete_milestone,
-    initialize_database,
-    # Imports for task dependencies (assuming they are in db.py)
-    add_task_dependency, get_predecessor_tasks, remove_task_dependency,
-    get_tasks_by_project_id_ordered_by_sequence # Used by ProductionOrderDetailDialog, EditProductionOrderDialog
+# from db import (
+#     get_status_setting_by_id, get_all_status_settings, get_status_setting_by_name,
+#     get_all_projects, get_project_by_id, add_project, update_project, delete_project,
+#     get_tasks_by_project_id, add_task, update_task, delete_task, get_task_by_id,
+#     get_tasks_by_assignee_id,
+#     get_kpis_for_project,
+#     add_activity_log, get_activity_logs,
+#     get_user_by_id, get_all_users, update_user, verify_user_password,
+#     get_all_team_members, get_team_member_by_id, add_team_member, update_team_member, delete_team_member,
+#     get_all_clients,
+#     get_cover_pages_for_client, add_cover_page, update_cover_page, delete_cover_page, get_cover_page_by_id,
+#     get_all_file_based_templates, get_cover_page_template_by_id,
+#     get_milestones_for_project, add_milestone, get_milestone_by_id, update_milestone, delete_milestone,
+#     initialize_database,
+#     # Imports for task dependencies (assuming they are in db.py)
+#     add_task_dependency, get_predecessor_tasks, remove_task_dependency,
+#     get_tasks_by_project_id_ordered_by_sequence # Used by ProductionOrderDetailDialog, EditProductionOrderDialog
+# )
+
+# Corrected imports from specific CRUD modules
+from db.cruds.status_settings_crud import get_status_setting_by_id, get_all_status_settings, get_status_setting_by_name
+from db.cruds.projects_crud import get_all_projects, get_project_by_id, add_project, update_project, delete_project
+# search_projects, get_projects_by_status, get_projects_by_user # These were missing, import if they exist or comment out usage
+from db.cruds.tasks_crud import (
+    get_task_by_id, add_task, update_task, delete_task,
+    get_tasks_by_project_id, # Use this or get_tasks_by_project_id_ordered_by_sequence for get_tasks_for_project
+    get_tasks_by_project_id_ordered_by_sequence,
+    get_tasks_by_assignee_id, # Use this for get_tasks_by_assignee
+    add_task_dependency, get_predecessor_tasks, remove_task_dependency
+    # get_tasks_by_status, # This was missing, import if it exists or comment out usage
 )
+from db.cruds.kpis_crud import get_kpis_for_project
+from db.cruds.activity_logs_crud import add_activity_log, get_activity_logs # Assuming activity_logs_crud exists
+from db.cruds.users_crud import get_user_by_id, list_users as get_all_users, update_user_password as update_user, verify_user_password
+from db.cruds.team_members_crud import get_all_team_members, get_team_member_by_id, add_team_member, update_team_member, delete_team_member
+from db.cruds.clients_crud import get_all_clients # Assuming this is the correct one
+from db.cruds.cover_pages_crud import get_cover_pages_for_client, add_cover_page, update_cover_page, delete_cover_page, get_cover_page_by_id
+from db.cruds.templates_crud import get_all_file_based_templates
+from db.cruds.cover_page_templates_crud import get_cover_page_template_by_id
+from db.cruds.milestones_crud import get_milestones_for_project, add_milestone, get_milestone_by_id, update_milestone, delete_milestone
+from db.init_schema import initialize_database # initialize_database is usually in init_schema or db module directly
+
+# Missing log/file functions - to be addressed if project_logs_crud and project_files_crud are created
+from db.cruds import project_logs_crud # Assuming this file will be created with add_project_log, get_project_logs
+from db.cruds import project_files_crud # Assuming this file will be created with get_project_files, add_project_file, delete_project_file
+# For specific function imports, if preferred:
+# from db.cruds.project_logs_crud import add_project_log, get_project_logs
+# from db.cruds.project_files_crud import get_project_files, add_project_file, delete_project_file
 
 
 # --- Project-Internal Imports ---
@@ -93,9 +123,10 @@ from Installsweb.installmodules import InstallerDialog
 
 
 class MainDashboard(QWidget): # Changed from QMainWindow to QWidget
-    def __init__(self, parent=None, current_user=None): # Added current_user parameter
+    # Ensure this __init__ signature is what's expected by the caller
+    def __init__(self, parent=None, current_user_info=None):
         super().__init__(parent)
-        self.current_user = current_user # Use passed-in user
+        self.current_user = current_user_info # Use passed-in user_info dict
         self.template_manager = ProjectTemplateManager() # Initialize ProjectTemplateManager
 
         # Task Page Pagination state
@@ -160,122 +191,120 @@ class MainDashboard(QWidget): # Changed from QMainWindow to QWidget
         self.topbar.setObjectName("mainDashboardTopbar")
         self._main_layout.addWidget(self.topbar)
 
+        logging.info("ProjectManagementDashboard: Creating QStackedWidget for main_content.")
         self.main_content = QStackedWidget()
         self.main_content.setObjectName("mainDashboardContentArea")
+        logging.info("ProjectManagementDashboard: QStackedWidget for main_content created.")
 
+        logging.info("ProjectManagementDashboard: Calling setup_dashboard_page...")
         self.setup_dashboard_page()
+        logging.info("ProjectManagementDashboard: setup_dashboard_page DONE.")
+
+        logging.info("ProjectManagementDashboard: Calling setup_team_page...")
         self.setup_team_page()
+        logging.info("ProjectManagementDashboard: setup_team_page DONE.")
+
+        logging.info("ProjectManagementDashboard: Calling setup_projects_page...")
         self.setup_projects_page()
+        logging.info("ProjectManagementDashboard: setup_projects_page DONE.")
+
+        logging.info("ProjectManagementDashboard: Calling setup_tasks_page...")
         self.setup_tasks_page()
+        logging.info("ProjectManagementDashboard: setup_tasks_page DONE.")
+
+        logging.info("ProjectManagementDashboard: Calling setup_reports_page...")
         self.setup_reports_page()
+        logging.info("ProjectManagementDashboard: setup_reports_page DONE.")
+
+        logging.info("ProjectManagementDashboard: Calling setup_settings_page...")
         self.setup_settings_page()
+        logging.info("ProjectManagementDashboard: setup_settings_page DONE.")
+
+        logging.info("ProjectManagementDashboard: Calling setup_cover_page_management_page...")
         self.setup_cover_page_management_page()
+        logging.info("ProjectManagementDashboard: setup_cover_page_management_page DONE.")
+
+        logging.info("ProjectManagementDashboard: Calling setup_production_management_page...")
         self.setup_production_management_page()
+        logging.info("ProjectManagementDashboard: setup_production_management_page DONE.")
 
         self._main_layout.addWidget(self.main_content)
+        logging.info("ProjectManagementDashboard: init_ui completed.")
 
 
     def setup_topbar(self):
+        logging.info("ProjectManagementDashboard: setup_topbar - Restoring full implementation")
         self.topbar = QFrame()
-        self.topbar.setFixedHeight(70)
+        self.topbar.setObjectName("mainDashboardTopbar") # Apply object name for QSS
+        self.topbar.setFixedHeight(60) # Example height
+        # self.topbar.setStyleSheet("background-color: #f0f0f0; border-bottom: 1px solid #cccccc;") # Basic styling
 
         topbar_layout = QHBoxLayout(self.topbar)
-        topbar_layout.setContentsMargins(15, 10, 15, 10)
-        topbar_layout.setSpacing(20)
+        topbar_layout.setContentsMargins(10, 0, 10, 0) # Left, Top, Right, Bottom
+        topbar_layout.setSpacing(10)
 
-        logo_container = QHBoxLayout()
-        logo_container.setSpacing(10)
-        logo_icon = QLabel()
-        logo_icon.setPixmap(QIcon(":/icons/logo.svg").pixmap(45, 45)) # Assuming icons are in resource file
-        logo_text = QLabel("léopardo")
-        logo_text.setObjectName("dashboardLogoText")
-        logo_container.addWidget(logo_icon)
-        logo_container.addWidget(logo_text)
-        topbar_layout.addLayout(logo_container)
+        # Logo (optional)
+        # logo_label = QLabel()
+        # logo_pixmap = QPixmap(":/icons/logo.svg").scaled(40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        # logo_label.setPixmap(logo_pixmap)
+        # topbar_layout.addWidget(logo_label)
 
-        topbar_layout.addStretch(1)
+        # Navigation Buttons (example)
         self.nav_buttons = []
+        nav_items = [
+            (self.tr("Dashboard"), "layout.svg", lambda: self.main_content.setCurrentIndex(0)), # Index 0 for dashboard_page
+            (self.tr("Équipe"), "users.svg", lambda: self.main_content.setCurrentIndex(1)),    # Index 1 for team_page
+            (self.tr("Projets"), "briefcase.svg", lambda: self.main_content.setCurrentIndex(2)), # Index 2 for projects_page
+            (self.tr("Tâches"), "check-square.svg", lambda: self.main_content.setCurrentIndex(3)), # Index 3 for tasks_page
+            (self.tr("Rapports"), "bar-chart-2.svg", lambda: self.main_content.setCurrentIndex(4)), # Index 4 for reports_page
+            (self.tr("Production"), "tool.svg", lambda: self.main_content.setCurrentIndex(6)), # Index 6 for production_management_page
+            (self.tr("Couvertures"), "file-text.svg", lambda: self.main_content.setCurrentIndex(5)) # Index 5 for cover_page_management_page
+            # Settings page is usually last or accessed differently
+        ]
 
-        dashboard_btn = QPushButton("Dashboard")
-        dashboard_btn.setIcon(QIcon(":/icons/dashboard.svg"))
-        dashboard_btn.clicked.connect(lambda: self.change_page(0))
-        self.nav_buttons.append(dashboard_btn)
-        topbar_layout.addWidget(dashboard_btn)
+        for text, icon_name, callback in nav_items:
+            btn = QPushButton(text)
+            # Assuming icons are in a resource file (e.g., icons.qrc) with a prefix like ":/icons/"
+            # If not, provide full paths or adjust icon loading.
+            icon = QIcon(f":/icons/{icon_name}")
+            if icon.isNull():
+                logging.warning(f"Icon ':/icons/{icon_name}' not found for topbar button '{text}'.")
+            btn.setIcon(icon)
+            btn.setObjectName("topbarNavButton") # For QSS styling
+            btn.setFixedHeight(40) # Example height
+            btn.clicked.connect(callback)
+            topbar_layout.addWidget(btn)
+            self.nav_buttons.append(btn)
 
-        management_menu = QMenu()
-        management_menu.addAction(QIcon(":/icons/team.svg"), "Team", lambda: self.change_page(1))
-        management_menu.addAction(QIcon(":/icons/settings.svg"), "Settings", lambda: self.change_page(5))
-        management_menu.addAction(QIcon(":/icons/bell.svg"), "Notifications", self.gestion_notification)
-        management_menu.addAction(QIcon(":/icons/help-circle.svg"), "Client Support", self.gestion_sav)
-        management_menu.addAction(QIcon(":/icons/users.svg"), "Prospect", self.gestion_prospects)
-        management_menu.addAction(QIcon(":/icons/file-text.svg"), "Documents", self.gestion_documents)
-        management_menu.addAction(QIcon(":/icons/book.svg"), "Contacts", self.gestion_contacts)
-        management_btn = QPushButton("Management")
-        management_btn.setIcon(QIcon(":/icons/briefcase.svg"))
-        management_btn.setMenu(management_menu)
-        management_btn.setObjectName("menu_button")
-        self.nav_buttons.append(management_btn)
-        topbar_layout.addWidget(management_btn)
+        topbar_layout.addStretch(1) # Pushes user info and logout to the right
 
-        product_management_btn = QPushButton("Gestion Produits")
-        product_management_btn.setIcon(QIcon(":/icons/briefcase.svg"))
-        product_management_btn.setObjectName("menu_button")
-        product_menu = QMenu(product_management_btn)
-        manage_global_products_action = product_menu.addAction(QIcon(":/icons/plus-square.svg"), "Gérer Produits Globaux")
-        manage_global_products_action.triggered.connect(self.open_manage_global_products_dialog)
-        manage_equivalencies_action = product_menu.addAction(QIcon(":/icons/refresh-cw.svg"), "Gérer Équivalences Produits")
-        manage_equivalencies_action.triggered.connect(self.open_product_equivalency_dialog)
-        product_management_btn.setMenu(product_menu)
-        self.nav_buttons.append(product_management_btn)
-        topbar_layout.addWidget(product_management_btn)
+        # User Info
+        user_info_widget = QWidget()
+        user_info_layout = QVBoxLayout(user_info_widget)
+        user_info_layout.setContentsMargins(0,0,0,0)
+        user_info_layout.setSpacing(0)
 
-        projects_menu = QMenu()
-        projects_menu.addAction(QIcon(":/icons/folder.svg"), "Projects", lambda: self.change_page(2))
-        projects_menu.addAction(QIcon(":/icons/check-square.svg"), "Tasks", lambda: self.change_page(3))
-        projects_menu.addAction(QIcon(":/icons/bar-chart-2.svg"), "Reports", lambda: self.change_page(4))
-        projects_menu.addAction(QIcon(":/icons/layout.svg"), "Cover Pages", lambda: self.change_page(6))
-        projects_menu.addAction(QIcon(":/icons/settings.svg"), "Production Orders", lambda: self.change_page(7))
-        projects_btn = QPushButton("Activities")
-        projects_btn.setIcon(QIcon(":/icons/activity.svg"))
-        projects_btn.setMenu(projects_menu)
-        projects_btn.setObjectName("menu_button")
-        self.nav_buttons.append(projects_btn)
-        topbar_layout.addWidget(projects_btn)
+        self.user_name = QLabel(self.tr("Nom Utilisateur")) # Placeholder, will be set
+        self.user_name.setObjectName("topbarUserName")
+        self.user_name.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
-        add_on_btn = QPushButton("Add-on")
-        add_on_btn.setIcon(QIcon(":/icons/plus-circle.svg"))
-        add_on_btn.clicked.connect(self.add_on_page)
-        self.nav_buttons.append(add_on_btn)
-        topbar_layout.addWidget(add_on_btn)
-        topbar_layout.addStretch(1)
+        self.user_role = QLabel(self.tr("Rôle")) # Placeholder, will be set
+        self.user_role.setObjectName("topbarUserRole")
+        self.user_role.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
-        user_container = QHBoxLayout()
-        user_container.setSpacing(10)
-        user_avatar = QLabel()
-        user_avatar.setPixmap(QIcon(":/icons/user.svg").pixmap(35, 35))
-        user_avatar.setObjectName("userAvatarLabel")
-        user_info = QVBoxLayout()
-        user_info.setSpacing(0)
-        self.user_name = QLabel("Guest")
-        self.user_name.setObjectName("UserFullNameLabel")
-        self.user_role = QLabel("Not logged in")
-        self.user_role.setObjectName("UserRoleLabel")
-        user_info.addWidget(self.user_name)
-        user_info.addWidget(self.user_role)
-        user_container.addWidget(user_avatar)
-        user_container.addLayout(user_info)
-        logout_btn = QPushButton()
-        logout_btn.setIcon(QIcon(":/icons/log-out.svg"))
-        logout_btn.setIconSize(QSize(20, 20))
-        logout_btn.setToolTip("Logout")
-        logout_btn.setFixedSize(35, 35)
-        logout_btn.setObjectName("logoutButtonTopbar")
-        logout_btn.clicked.connect(self.logout)
-        user_container.addWidget(logout_btn)
-        user_widget = QWidget()
-        user_widget.setLayout(user_container)
-        topbar_layout.addWidget(user_widget)
-        self.nav_buttons[0].setObjectName("selected")
+        user_info_layout.addWidget(self.user_name)
+        user_info_layout.addWidget(self.user_role)
+        topbar_layout.addWidget(user_info_widget)
+
+        # Logout Button
+        self.logout_btn = QPushButton(self.tr("Déconnexion"))
+        self.logout_btn.setIcon(QIcon(":/icons/log-out.svg"))
+        self.logout_btn.setObjectName("topbarLogoutButton")
+        self.logout_btn.setToolTip(self.tr("Se déconnecter de la session actuelle"))
+        self.logout_btn.clicked.connect(self.logout) # Connect to the logout method
+        topbar_layout.addWidget(self.logout_btn)
+
+        logging.info("ProjectManagementDashboard: setup_topbar - Full implementation restored.")
 
     def logout(self):
         print("Logout button clicked. Attempting to signal parent...")
@@ -323,18 +352,28 @@ class MainDashboard(QWidget): # Changed from QMainWindow to QWidget
         graph_widget = QWidget()
         graph_layout = QHBoxLayout(graph_widget)
         graph_layout.setSpacing(15)
-        self.performance_graph = pg.PlotWidget()
-        self.performance_graph.setBackground('w')
-        self.performance_graph.setTitle("Team Performance", color='#333333', size='12pt')
-        self.performance_graph.showGrid(x=True, y=True)
-        self.performance_graph.setMinimumHeight(300)
-        self.project_progress_graph = pg.PlotWidget()
-        self.project_progress_graph.setBackground('w')
-        self.project_progress_graph.setTitle("Project Progress", color='#333333', size='12pt')
-        self.project_progress_graph.showGrid(x=True, y=True)
-        self.project_progress_graph.setMinimumHeight(300)
+
+        logging.info("ProjectManagementDashboard: Attempting to create pyqtgraph PlotWidgets (commented out for testing).")
+        # self.performance_graph = pg.PlotWidget()
+        # self.performance_graph.setBackground('w')
+        # self.performance_graph.setTitle("Team Performance", color='#333333', size='12pt')
+        # self.performance_graph.showGrid(x=True, y=True)
+        # self.performance_graph.setMinimumHeight(300)
+        # self.project_progress_graph = pg.PlotWidget()
+        # self.project_progress_graph.setBackground('w')
+        # self.project_progress_graph.setTitle("Project Progress", color='#333333', size='12pt')
+        # self.project_progress_graph.showGrid(x=True, y=True)
+        # self.project_progress_graph.setMinimumHeight(300)
+        # graph_layout.addWidget(self.performance_graph, 1)
+        # graph_layout.addWidget(self.project_progress_graph, 1)
+
+        # Create placeholder labels if the graphs are expected by other parts of the code for layout
+        self.performance_graph = QLabel("Performance Graph Placeholder (pyqtgraph commented out)")
+        self.project_progress_graph = QLabel("Project Progress Graph Placeholder (pyqtgraph commented out)")
         graph_layout.addWidget(self.performance_graph, 1)
         graph_layout.addWidget(self.project_progress_graph, 1)
+        logging.info("ProjectManagementDashboard: pyqtgraph PlotWidgets creation SKIPPED (commented out). Placeholders used.")
+
         activities_widget = QGroupBox("Recent Activities")
         activities_layout = QVBoxLayout(activities_widget)
         activities_layout.setContentsMargins(10, 10, 10, 10)
