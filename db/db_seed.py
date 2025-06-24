@@ -74,18 +74,75 @@ def _seed_default_partner_categories(cursor: sqlite3.Cursor, conn: sqlite3.Conne
 
 def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
     logger = logger_passed
+
+    # Import here to avoid circular dependencies if roles_crud uses get_db_connection
+    from db.cruds.roles_crud import add_role as crud_add_role, get_role_by_name as crud_get_role_by_name
+    from db.cruds.users_crud import add_user as crud_add_user, get_user_by_username as crud_get_user_by_username
+    from auth.permissions import ADMINISTRATOR, TEAM_LEAD, OPERATOR # Role names
+
     try:
-        # 1. Users
-        logger.info(f"Attempting to retrieve admin user ID for '{DEFAULT_ADMIN_USERNAME}' for seeding purposes.")
-        admin_user_dict = users_crud_instance.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn)
-        admin_user_id = admin_user_dict['user_id'] if admin_user_dict else None
+        # Seed Roles
+        logger.info("Seeding default roles...")
+        roles_to_seed = {
+            ADMINISTRATOR: "Full application access and user management.",
+            TEAM_LEAD: "Manages projects and teams, advanced client/product operations.",
+            OPERATOR: "Standard user for daily operations, data entry, document generation."
+        }
+        role_ids = {}
+        for role_name, desc in roles_to_seed.items():
+            existing_role = crud_get_role_by_name(role_name, conn=conn)
+            if existing_role:
+                role_ids[role_name] = existing_role['role_id']
+                logger.info(f"Role '{role_name}' already exists with ID {role_ids[role_name]}.")
+            else:
+                new_role_id = crud_add_role(role_name, desc, conn=conn)
+                if new_role_id:
+                    role_ids[role_name] = new_role_id
+                    logger.info(f"Role '{role_name}' added with ID {new_role_id}.")
+                else:
+                    logger.error(f"Failed to add role '{role_name}'.")
 
-        if admin_user_id:
-            logger.info(f"Found admin user '{DEFAULT_ADMIN_USERNAME}' with ID: {admin_user_id}.")
-        else:
-            logger.warning(f"Admin user '{DEFAULT_ADMIN_USERNAME}' not found.")
+        # Ensure Administrator role ID was obtained
+        admin_role_id = role_ids.get(ADMINISTRATOR)
+        if not admin_role_id:
+            logger.critical(f"Administrator role ('{ADMINISTRATOR}') could not be seeded or found. Cannot create default admin user.")
+            # Depending on policy, might raise an error or try to proceed if other roles are vital.
+            # For now, log critical and proceed, other parts of seeding might still be useful.
 
-        # 2. Companies
+        # 1. Users - Seed initial Admin User
+        admin_user_id = None # Initialize
+        if admin_role_id: # Only proceed if Admin role exists
+            logger.info(f"Checking for default admin user '{DEFAULT_ADMIN_USERNAME}'...")
+            admin_user_dict = crud_get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn)
+            if admin_user_dict:
+                admin_user_id = admin_user_dict['user_id']
+                logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' already exists with ID {admin_user_id}.")
+            else:
+                logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' not found. Creating...")
+                # Use a secure, but known temporary password for initial setup.
+                # IMPORTANT: This password MUST be changed immediately by the administrator.
+                # For a real deployment, this password should be very strong or generated
+                # and displayed once, or set via a secure first-time setup process.
+                temp_admin_password = "admin_password123!" # Example temporary password
+
+                new_admin_id = crud_add_user(
+                    username=DEFAULT_ADMIN_USERNAME,
+                    password=temp_admin_password,
+                    role_id=admin_role_id,
+                    full_name="Default Administrator",
+                    email="admin@example.local", # Placeholder email
+                    conn=conn
+                )
+                if new_admin_id:
+                    admin_user_id = new_admin_id
+                    logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' created with ID {admin_user_id}. PLEASE CHANGE THE DEFAULT PASSWORD IMMEDIATELY.")
+                else:
+                    logger.error(f"Failed to create default admin user '{DEFAULT_ADMIN_USERNAME}'.")
+        else: # admin_role_id was not found/created
+            logger.warning(f"Cannot seed default admin user because Administrator role ID is missing.")
+
+
+        # 2. Companies (uses admin_user_id if available for created_by or similar in future)
         default_company_id = None
         cursor.execute("SELECT COUNT(*) FROM Companies")
         if cursor.fetchone()[0] == 0:

@@ -380,6 +380,7 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                 # CreateDocumentDialog is SKIPPED as per Test Case 3
 
 
+
 #         else: # ui_map_data was not populated (should not happen if controller succeeded)
 #              QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Données Client"), doc_manager.tr("Les données du client (ui_map_data) ne sont pas disponibles pour la séquence de dialogue."))
 # # --- After contact_dialog.exec_() block ---
