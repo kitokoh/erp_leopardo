@@ -68,9 +68,9 @@ class LoginDialog(QDialog):
 
         # Buttons
         self.button_box = QDialogButtonBox()
-        login_button = self.button_box.addButton(self.tr("Connexion"), QDialogButtonBox.AcceptRole)
-        login_button.setIcon(QIcon(":/icons/log-in.svg")) # Assuming log-in.svg exists
-        login_button.setObjectName("primaryButton") # For styling
+        self.login_button = self.button_box.addButton(self.tr("Connexion"), QDialogButtonBox.AcceptRole) # Store as instance member
+        self.login_button.setIcon(QIcon(":/icons/log-in.svg")) # Assuming log-in.svg exists
+        self.login_button.setObjectName("primaryButton") # For styling
 
         cancel_button = self.button_box.addButton(QDialogButtonBox.Cancel)
         cancel_button.setText(self.tr("Annuler"))
@@ -92,8 +92,8 @@ class LoginDialog(QDialog):
             QMessageBox.warning(self, self.tr("Champs Requis"), self.tr("Veuillez entrer votre nom d'utilisateur et votre mot de passe."))
             return
 
-        login_button = self.button_box.button(QDialogButtonBox.AcceptRole)
-        login_button.setEnabled(False) # Disable button during processing
+        # Use the stored self.login_button instance
+        self.login_button.setEnabled(False) # Disable button during processing
         QApplication.processEvents() # Ensure UI updates
 
         try:
@@ -118,8 +118,8 @@ class LoginDialog(QDialog):
             QMessageBox.critical(self, self.tr("Erreur Inattendue"), self.tr("Une erreur inattendue est survenue: {0}").format(str(e)))
             self.password_input.clear()
         finally:
-            if login_button: # Ensure login_button reference exists
-                login_button.setEnabled(True) # Re-enable button
+            # Use the stored self.login_button instance
+            self.login_button.setEnabled(True) # Re-enable button
 
 
     def get_user_data(self) -> dict | None:
