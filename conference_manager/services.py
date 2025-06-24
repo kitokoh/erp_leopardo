@@ -192,7 +192,13 @@ def creer_conference(titre: str,
                      date_heure_programmation: Optional[datetime] = None,
                      notes: str = "",
                      client_id: Optional[str] = None,
-                     participants_externes: str = "") -> Conference:
+                     participants_externes: str = "",
+                     lieu: Optional[str] = None,
+                     description_calendrier: Optional[str] = None,
+                     rappel_active: bool = True,
+                     minutes_rappel_avant: Optional[int] = 30
+                     ) -> Conference:
+
     """Crée une nouvelle conférence et la stocke en base de données SQLite."""
     if not titre or not titre.strip():
         raise ValueError("Le titre de la conférence ne peut pas être vide.")
@@ -200,15 +206,20 @@ def creer_conference(titre: str,
     if client_id and not obtenir_client(client_id): # Vérifie si le client existe en BD
         raise ValueError(f"Client avec ID '{client_id}' non trouvé.")
 
-    # Crée une instance de Conference pour générer l'ID et la date de création
+    # Crée une instance de Conference pour générer l'ID, la date de création et gérer la logique des rappels
     nouvelle_conference_obj = Conference(
+        titre=titre.strip(), # Assurer que le titre est nettoyé aussi
 
-        titre=titre,
         date_heure_programmation=date_heure_programmation,
         notes_rapport=notes,
         client_id=client_id,
         participants_externes=participants_externes,
-        statut=Conference.CONFERENCE_STATUT_PLANNED # Statut initial par défaut
+        statut=Conference.CONFERENCE_STATUT_PLANNED, # Statut initial par défaut
+        lieu=lieu,
+        description_calendrier=description_calendrier,
+        rappel_active=rappel_active,
+        minutes_rappel_avant=minutes_rappel_avant
+
     )
 
     # La vérification obtenir_client utilise déjà _get_service_db_connection
@@ -218,8 +229,10 @@ def creer_conference(titre: str,
         raise ConnectionError("Impossible d'établir une connexion à la base de données.")
 
     sql = """INSERT INTO conferences (id, titre, date_heure_creation, date_heure_programmation,
-                                    notes_rapport, client_id, participants_externes, statut)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
+                                    notes_rapport, client_id, participants_externes, statut,
+                                    lieu, description_calendrier, rappel_active, minutes_rappel_avant)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+
     try:
         cursor = conn.cursor()
         cursor.execute(sql, (
@@ -230,7 +243,12 @@ def creer_conference(titre: str,
             nouvelle_conference_obj.notes_rapport,
             nouvelle_conference_obj.client_id,
             nouvelle_conference_obj.participants_externes,
-            nouvelle_conference_obj.statut
+            nouvelle_conference_obj.statut,
+            nouvelle_conference_obj.lieu,
+            nouvelle_conference_obj.description_calendrier,
+            1 if nouvelle_conference_obj.rappel_active else 0, # Convertir bool en int pour SQLite
+            nouvelle_conference_obj.minutes_rappel_avant
+
         ))
         conn.commit()
     except sqlite3.IntegrityError as e:
@@ -261,7 +279,12 @@ def _row_to_conference_obj(row: sqlite3.Row) -> Optional[Conference]:
         notes_rapport=row["notes_rapport"],
         client_id=row["client_id"],
         participants_externes=row["participants_externes"],
-        statut=row["statut"]
+        statut=row["statut"],
+        lieu=row["lieu"],
+        description_calendrier=row["description_calendrier"],
+        rappel_active=bool(row["rappel_active"]), # Convertir int (0/1) de SQLite en bool
+        minutes_rappel_avant=row["minutes_rappel_avant"]
+
     )
 
 def obtenir_details_conference(conference_id: str) -> Optional[Conference]:
@@ -290,22 +313,32 @@ def mettre_a_jour_conference(conference_id: str,
                              titre: Optional[str] = None,
                              date_heure_programmation: Optional[datetime] = None,
                              notes_rapport: Optional[str] = None,
-                             client_id: Optional[str] = None, # Utiliser une valeur spéciale pour "désaffecter"
+                             client_id: Optional[str] = None,
                              participants_externes: Optional[str] = None,
-                             statut: Optional[str] = None
+                             statut: Optional[str] = None,
+                             lieu: Optional[str] = None,
+                             description_calendrier: Optional[str] = None,
+                             rappel_active: Optional[bool] = None,
+                             minutes_rappel_avant: Optional[int] = None # Utiliser une valeur spéciale pour supprimer ? ex: -1
                             ) -> Optional[Conference]:
     """Met à jour les champs spécifiés d'une conférence existante."""
 
-    # Vérifier qu'au moins un champ est fourni pour la mise à jour (ou permettre la mise à jour vide ?)
-    if all(arg is None for arg in [titre, date_heure_programmation, notes_rapport, client_id, participants_externes, statut]):
-        # On pourrait retourner la conférence existante sans rien faire ou lever une erreur.
-        # Pour l'instant, levons une erreur si rien n'est à mettre à jour.
-        # Ou, si on veut permettre de passer client_id = None explicitement pour désaffecter :
-        # if all(arg is None for arg in [titre, date_heure_programmation, notes_rapport, participants_externes, statut]) and client_id_provided is False:
-        raise ValueError("Aucun champ fourni pour la mise à jour de la conférence.")
+    # Vérifier qu'au moins un champ est fourni pour la mise à jour.
+    # On utilise une sentinelle pour différencier un argument non fourni (None) d'une volonté de mettre à None.
+    _sentinel = object()
+    provided_args = {
+        'titre': titre, 'date_heure_programmation': date_heure_programmation,
+        'notes_rapport': notes_rapport, 'client_id': client_id,
+        'participants_externes': participants_externes, 'statut': statut,
+        'lieu': lieu, 'description_calendrier': description_calendrier,
+        'rappel_active': rappel_active, 'minutes_rappel_avant': minutes_rappel_avant
+    }
+    # Si tous les arguments passés sont None (non fournis explicitement pour mise à jour)
+    if all(value is None for value in provided_args.values()):
+         raise ValueError("Aucun champ fourni pour la mise à jour de la conférence.")
 
     # Récupérer la conférence existante pour vérifier son existence
-    # et potentiellement pour la retourner mise à jour (si on ne relit pas depuis la BD après).
+
     # Cependant, il est plus sûr de relire après la MàJ ou de construire l'objet avec les nouvelles valeurs.
 
     fields_to_update = []
@@ -347,12 +380,43 @@ def mettre_a_jour_conference(conference_id: str,
         fields_to_update.append("statut = ?")
         params.append(statut)
 
+    if lieu is not None:
+        fields_to_update.append("lieu = ?")
+        params.append(lieu if lieu.strip() else None) # Stocker NULL si vide après strip
+
+    if description_calendrier is not None:
+        fields_to_update.append("description_calendrier = ?")
+        params.append(description_calendrier) # Peut être une chaîne vide
+
+    if rappel_active is not None:
+        fields_to_update.append("rappel_active = ?")
+        params.append(1 if rappel_active else 0)
+        # Si rappel_active devient False, s'assurer que minutes_rappel_avant est NULL
+        if not rappel_active and "minutes_rappel_avant = ?" not in [f.split(" = ")[0] for f in fields_to_update]:
+             # Si minutes_rappel_avant n'est pas déjà en train d'être mis à jour, le mettre à NULL
+            fields_to_update.append("minutes_rappel_avant = ?")
+            params.append(None)
+
+
+    if minutes_rappel_avant is not None:
+        # Si rappel_active est explicitement mis à False dans le même appel, minutes_rappel_avant sera ignoré ou mis à NULL
+        # La logique ci-dessus pour rappel_active=False gère la mise à NULL de minutes_rappel_avant.
+        # Si rappel_active n'est pas fourni ou est True, on met à jour minutes_rappel_avant.
+        if rappel_active is None or rappel_active is True:
+            if "minutes_rappel_avant = ?" not in [f.split(" = ")[0] for f in fields_to_update]: # Eviter double ajout
+                 fields_to_update.append("minutes_rappel_avant = ?")
+                 params.append(minutes_rappel_avant if minutes_rappel_avant >=0 else None) # Permettre de le mettre à NULL avec -1
+            else: # Si déjà dans la liste (par le bloc rappel_active=False), modifier la valeur
+                try:
+                    idx = [f.split(" = ")[0] for f in fields_to_update].index("minutes_rappel_avant")
+                    if params[idx] is None : # Si rappel_active=False l'a mis à None, on respecte cela, sauf si minutes_rappel_avant est explicitement fourni et >=0
+                         if minutes_rappel_avant >=0 : params[idx] = minutes_rappel_avant
+                    # Sinon, la valeur de minutes_rappel_avant est déjà celle désirée
+                except ValueError: # Ne devrait pas arriver
+                    pass
+
+
     if not fields_to_update:
-        # Si on arrive ici, c'est qu'aucun champ n'a été réellement préparé pour la MàJ.
-        # Cela peut arriver si par ex. client_id est None mais pas "".
-        # On peut retourner la conf existante ou lever une erreur si on considère cela anormal.
-        # Pour l'instant, on considère que si la liste est vide, rien ne sera mis à jour.
-        # On pourrait relire la conférence et la retourner.
         return obtenir_details_conference(conference_id)
 
 
@@ -694,6 +758,139 @@ def obtenir_conferences_a_venir() -> List[Conference]:
     return conferences_futures_list
 
 
+# --- Logique de Rappel ---
+
+def obtenir_conferences_necessitant_rappel(fenetre_proche_futur_minutes: int = 5) -> List[Conference]:
+    """
+    Identifie les conférences futures pour lesquelles un rappel devrait être envoyé.
+
+    Un rappel est nécessaire si :
+    - Le rappel est actif pour la conférence.
+    - L'heure de la conférence n'est pas encore passée.
+    - Le statut de la conférence n'est ni "Terminée" ni "Annulée".
+    - L'heure de rappel calculée (heure_conf - minutes_rappel_avant) est :
+        - Soit déjà passée.
+        - Soit dans les `fenetre_proche_futur_minutes` prochaines minutes.
+
+    Retourne une liste de conférences triées par heure de rappel (la plus proche en premier).
+    """
+    maintenant = datetime.now()
+    limite_futur_proche = maintenant + timedelta(minutes=fenetre_proche_futur_minutes)
+
+    conferences_pour_rappel = []
+    conn = _get_service_db_connection()
+    if not conn:
+        print("Avertissement: Impossible d'établir une connexion BD pour obtenir_conferences_necessitant_rappel.")
+        return []
+
+    # Sélectionner les conférences candidates
+    sql = """
+        SELECT * FROM conferences
+        WHERE rappel_active = 1
+          AND date_heure_programmation IS NOT NULL
+          AND date_heure_programmation > ?       -- La conférence elle-même doit être dans le futur
+          AND statut NOT IN (?, ?)
+          AND minutes_rappel_avant IS NOT NULL AND minutes_rappel_avant >= 0
+    """
+    # Le filtrage fin sur l'heure de rappel se fera en Python après récupération,
+    # car les calculs de date directement en SQL peuvent varier en complexité/portabilité.
+    # Alternativement, on pourrait essayer de tout faire en SQL avec les fonctions de date SQLite.
+
+    params = (
+        maintenant,
+        Conference.CONFERENCE_STATUT_COMPLETED,
+        Conference.CONFERENCE_STATUT_CANCELLED
+    )
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute(sql, params)
+        rows = cursor.fetchall()
+
+        for row in rows:
+            conf = _row_to_conference_obj(row)
+            if not conf or not conf.date_heure_programmation or conf.minutes_rappel_avant is None:
+                continue
+
+            heure_rappel = conf.date_heure_programmation - timedelta(minutes=conf.minutes_rappel_avant)
+
+            # Condition pour le rappel:
+            # 1. L'heure de rappel est passée ou dans la fenêtre future proche.
+            # 2. Mais la conférence elle-même n'a pas encore commencé (ceci est déjà en partie géré par la requête SQL
+            #    `date_heure_programmation > ?` (maintenant), mais on peut le re-vérifier pour être sûr).
+            if heure_rappel <= limite_futur_proche and conf.date_heure_programmation > maintenant :
+                # Ajouter l'heure de rappel calculée à l'objet pour le tri, si nécessaire, ou trier sur l'objet
+                # Pour l'instant, on ajoute juste la conférence.
+                conferences_pour_rappel.append(conf)
+
+    except sqlite3.Error as e:
+        print(f"Erreur SQLite lors de la récupération des conférences pour rappel: {e}")
+    finally:
+        if conn and conn is not database._memory_conn:
+            conn.close()
+
+    # Trier les conférences par leur heure de rappel effective (la plus ancienne/proche en premier)
+    conferences_pour_rappel.sort(key=lambda c: (c.date_heure_programmation - timedelta(minutes=c.minutes_rappel_avant if c.minutes_rappel_avant is not None else 0)))
+
+    return conferences_pour_rappel
+
+
+# --- Export iCalendar ---
+from icalendar import Calendar, Event as IcsEvent, Alarm # Importer Alarm
+from datetime import timedelta # Déjà importé globalement, mais bon à noter ici
+
+def generer_contenu_ics_pour_conference(conference_id: str, default_duration_minutes: int = 60) -> Optional[str]:
+    """
+    Génère une chaîne de caractères au format iCalendar (.ics) pour une conférence donnée.
+    Retourne None si la conférence n'est pas trouvée ou n'a pas de date de programmation.
+    """
+    conference = obtenir_details_conference(conference_id)
+
+    if not conference or not conference.date_heure_programmation:
+        return None
+
+    cal = Calendar()
+    # Propriétés standard du calendrier
+    cal.add('prodid', '-//MonLogicielDeConference//votredomaine.com//')
+    cal.add('version', '2.0')
+
+    event = IcsEvent()
+    event.add('uid', f"{conference.id}@votredomaine.com") # Assurer un UID unique
+    event.add('summary', conference.titre)
+    event.add('dtstart', conference.date_heure_programmation)
+
+    # Calculer dtend basé sur une durée par défaut
+    dt_end = conference.date_heure_programmation + timedelta(minutes=default_duration_minutes)
+    event.add('dtend', dt_end)
+
+    # dtstamp est généralement l'heure de création/modification de l'événement .ics lui-même
+    event.add('dtstamp', conference.date_heure_creation if conference.date_heure_creation else datetime.now())
+
+    if conference.lieu:
+        event.add('location', conference.lieu)
+
+    description_ics = conference.description_calendrier if conference.description_calendrier else conference.notes_rapport
+    if description_ics: # S'assurer qu'il y a une description à ajouter
+        event.add('description', description_ics)
+
+    # Ajouter un rappel si configuré dans la conférence
+    if conference.rappel_active and conference.minutes_rappel_avant is not None and conference.minutes_rappel_avant >= 0:
+        alarm = Alarm()
+        alarm.add('action', 'DISPLAY')
+        # Le trigger doit être une propriété de type DURATION, négative pour "avant"
+        alarm.add('trigger', timedelta(minutes=-conference.minutes_rappel_avant))
+        alarm.add('description', f"Rappel: {conference.titre}")
+        event.add_component(alarm)
+
+    cal.add_component(event)
+
+    try:
+        return cal.to_ical().decode('utf-8').replace('\r\n', '\n') # Normaliser les fins de ligne pour tests/comparaisons
+    except Exception as e:
+        print(f"Erreur lors de la génération du contenu iCalendar pour la conférence {conference.id}: {e}")
+        return None
+
+
 
 # --- Gestion des Rapports ---
 
@@ -737,13 +934,26 @@ def generer_texte_rapport_conference(conference_id: str) -> str:
     else:
         rapport_lignes.append("Client Associé: Aucun")
 
+    if conference.lieu:
+        rapport_lignes.append(f"Lieu: {conference.lieu}")
+    else:
+        rapport_lignes.append("Lieu: Non spécifié")
+
     if conference.participants_externes:
         rapport_lignes.append(f"Participants Externes: {conference.participants_externes}")
     else:
         rapport_lignes.append("Participants Externes: Aucun")
 
+    rapport_lignes.append(f"Rappel Actif: {'Oui' if conference.rappel_active else 'Non'}")
+    if conference.rappel_active and conference.minutes_rappel_avant is not None:
+        rapport_lignes.append(f"Rappel Avant (minutes): {conference.minutes_rappel_avant}")
+
     rapport_lignes.append(f"-------------------------")
-    rapport_lignes.append(f"Notes / Rapport:")
+    rapport_lignes.append(f"Description Calendrier:")
+    rapport_lignes.append(conference.description_calendrier if conference.description_calendrier else "Aucune description pour calendrier.")
+    rapport_lignes.append(f"-------------------------")
+    rapport_lignes.append(f"Notes / Rapport Détaillé:")
+
     rapport_lignes.append(conference.notes_rapport if conference.notes_rapport else "Aucune note enregistrée.")
     rapport_lignes.append(f"-------------------------")
 

@@ -36,7 +36,12 @@ class Conference:
                  notes_rapport: str = "",
                  client_id: Optional[str] = None,
                  participants_externes: str = "",
-                 statut: str = CONFERENCE_STATUT_PLANNED):
+                 statut: str = CONFERENCE_STATUT_PLANNED,
+                 lieu: Optional[str] = None,
+                 description_calendrier: Optional[str] = None,
+                 rappel_active: bool = True,
+                 minutes_rappel_avant: Optional[int] = 30):
+
 
         self.id: str = conference_id if conference_id else str(uuid.uuid4())
         self.titre: str = titre
@@ -50,8 +55,13 @@ class Conference:
             raise ValueError(f"Statut invalide: {statut}. Doit être un de {self.VALID_STATUSES}")
         self.statut: str = statut
 
+        self.lieu: Optional[str] = lieu
+        self.description_calendrier: Optional[str] = description_calendrier
+        self.rappel_active: bool = rappel_active
+        self.minutes_rappel_avant: Optional[int] = minutes_rappel_avant if rappel_active else None # Pas de minutes si rappel inactif
+
     def __repr__(self) -> str:
-        return f"<Conference(id={self.id}, titre='{self.titre}', statut='{self.statut}')>"
+        return f"<Conference(id={self.id}, titre='{self.titre}', statut='{self.statut}', rappel_active={self.rappel_active})>"
 
 # Example usage (optional, for testing or demonstration)
 if __name__ == '__main__':
