@@ -416,7 +416,8 @@ def _seed_user_motivational_messages(cursor: sqlite3.Cursor, conn: sqlite3.Conne
 
             data_to_insert = {
                 "message": msg_data["message"],
-                "language_code": msg_data.get("language_code") # Handles if language_code is not present
+                "language_code": msg_data.get("language_code"), # Handles if language_code is not present
+                "is_active": True
             }
             user_messages_crud.create(data_to_insert, conn=conn)
             added_count += 1
@@ -508,7 +509,8 @@ def _seed_motivational_messages(cursor: sqlite3.Cursor, conn: sqlite3.Connection
             data_to_insert = {
                 "language_code": msg_data["language_code"],
                 "message": msg_data["message"],
-                "day_of_year": msg_data["day_of_year"] # Can be None
+                "day_of_year": msg_data["day_of_year"], # Can be None
+                "is_active": True
             }
             messages_crud.create(data_to_insert, conn=conn)
             added_count += 1
