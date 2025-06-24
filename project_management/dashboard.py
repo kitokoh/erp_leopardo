@@ -68,6 +68,10 @@ from db.cruds.milestones_crud import get_milestones_for_project, add_milestone, 
 from db.init_schema import initialize_database # initialize_database is usually in init_schema or db module directly
 
 # Missing log/file functions - to be addressed if project_logs_crud and project_files_crud are created
+from db.cruds import project_logs_crud # Assuming this file will be created with add_project_log, get_project_logs
+from db.cruds import project_files_crud # Assuming this file will be created with get_project_files, add_project_file, delete_project_file
+# For specific function imports, if preferred:
+
 # from db.cruds.project_logs_crud import add_project_log, get_project_logs
 # from db.cruds.project_files_crud import get_project_files, add_project_file, delete_project_file
 

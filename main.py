@@ -216,6 +216,7 @@ def main():
 
     # Start the API server - Commented out as per user request for local PyQt app
     # start_api_server()
+    # logging.info("API server auto-start is disabled for local PyQt execution.") # Log message removed
 
 
     # Register the function to stop the API server on application exit

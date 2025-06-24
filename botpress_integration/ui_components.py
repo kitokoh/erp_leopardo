@@ -412,13 +412,19 @@ class BotpressIntegrationUI(QWidget):
                 self.logger.info(f"Bot reply '{bot_reply_text}' (API ID: {bot_message_api_id}) saved to DB for conv_id {self.current_db_conversation_id}")
 
         except BotpressAPIError as e:
-            self.logger.error(f"Botpress API error: {e}", exc_info=True)
-            QMessageBox.critical(self, "API Error", f"Botpress API error: {e}")
-            self.add_message_to_display("system", f"API Error: {e}", datetime.now())
-        except Exception as e:
-            self.logger.error(f"Error sending/receiving: {e}", exc_info=True)
-            QMessageBox.critical(self, "Processing Error", f"Error during send/receive: {e}")
-            self.add_message_to_display("system", f"Processing Error: {e}", datetime.now())
+            self.logger.warning(f"Botpress API interaction failed: {e}", exc_info=True) # Changed from error to warning for connection issues
+            # Check if it's a connection-like error if BotpressAPIError is broad
+            if "Connection error" in str(e) or "Timeout" in str(e) or "Failed to establish a new connection" in str(e):
+                QMessageBox.warning(self, self.tr("Botpress Offline"),
+                                    self.tr("Could not connect to Botpress server. Please check your connection or API settings. The service might be temporarily unavailable."))
+                self.add_message_to_display("system", self.tr("Botpress server appears to be offline or unreachable."), datetime.now())
+            else: # Other API errors (e.g., auth, bad request from bot logic)
+                QMessageBox.critical(self, self.tr("Botpress API Error"), f"{e}")
+                self.add_message_to_display("system", f"API Error: {e}", datetime.now())
+        except Exception as e: # Catch-all for other unexpected errors
+            self.logger.error(f"Unexpected error during message send/receive: {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Processing Error"), f"{e}")
+            self.add_message_to_display("system", f"Unexpected Error: {e}", datetime.now())
         finally:
             self.message_input.clear()
             # Auto-scroll handled by add_message_to_display
