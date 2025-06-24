@@ -71,14 +71,15 @@ class ProductsCRUD(GenericCRUD):
         sql = """INSERT INTO Products
                  (product_name, product_code, description, category, language_code, base_unit_price,
                   unit_of_measure, weight, dimensions, is_active, created_at, updated_at,
-                  is_deleted, deleted_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                  is_deleted, deleted_at, created_by_user_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""" # Added created_by_user_id
         params = (product_data.get('product_name'), product_data.get('product_code'),
                   product_data.get('description'), product_data.get('category'),
                   product_data.get('language_code', 'fr'), product_data.get('base_unit_price'),
                   product_data.get('unit_of_measure'), product_data.get('weight'),
                   product_data.get('dimensions'), product_data.get('is_active', True),
-                  now, now, product_data.get('is_deleted', 0), product_data.get('deleted_at', None))
+                  now, now, product_data.get('is_deleted', 0), product_data.get('deleted_at', None),
+                  product_data.get('created_by_user_id')) # Added created_by_user_id
         try:
             cursor.execute(sql, params)
             new_id = cursor.lastrowid
