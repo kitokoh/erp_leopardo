@@ -42,6 +42,7 @@ class Conference:
                  rappel_active: bool = True,
                  minutes_rappel_avant: Optional[int] = 30):
 
+
         self.id: str = conference_id if conference_id else str(uuid.uuid4())
         self.titre: str = titre
         self.date_heure_creation: datetime = date_heure_creation if date_heure_creation else datetime.now()

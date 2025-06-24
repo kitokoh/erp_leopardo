@@ -187,6 +187,7 @@ def supprimer_client(client_id: str) -> bool:
 
 # --- Gestion des Conférences (sera adapté ensuite) ---
 
+
 def creer_conference(titre: str,
                      date_heure_programmation: Optional[datetime] = None,
                      notes: str = "",
@@ -197,6 +198,7 @@ def creer_conference(titre: str,
                      rappel_active: bool = True,
                      minutes_rappel_avant: Optional[int] = 30
                      ) -> Conference:
+
     """Crée une nouvelle conférence et la stocke en base de données SQLite."""
     if not titre or not titre.strip():
         raise ValueError("Le titre de la conférence ne peut pas être vide.")
@@ -207,6 +209,7 @@ def creer_conference(titre: str,
     # Crée une instance de Conference pour générer l'ID, la date de création et gérer la logique des rappels
     nouvelle_conference_obj = Conference(
         titre=titre.strip(), # Assurer que le titre est nettoyé aussi
+
         date_heure_programmation=date_heure_programmation,
         notes_rapport=notes,
         client_id=client_id,
@@ -216,6 +219,7 @@ def creer_conference(titre: str,
         description_calendrier=description_calendrier,
         rappel_active=rappel_active,
         minutes_rappel_avant=minutes_rappel_avant
+
     )
 
     # La vérification obtenir_client utilise déjà _get_service_db_connection
@@ -228,6 +232,7 @@ def creer_conference(titre: str,
                                     notes_rapport, client_id, participants_externes, statut,
                                     lieu, description_calendrier, rappel_active, minutes_rappel_avant)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+
     try:
         cursor = conn.cursor()
         cursor.execute(sql, (
@@ -243,6 +248,7 @@ def creer_conference(titre: str,
             nouvelle_conference_obj.description_calendrier,
             1 if nouvelle_conference_obj.rappel_active else 0, # Convertir bool en int pour SQLite
             nouvelle_conference_obj.minutes_rappel_avant
+
         ))
         conn.commit()
     except sqlite3.IntegrityError as e:
@@ -278,6 +284,7 @@ def _row_to_conference_obj(row: sqlite3.Row) -> Optional[Conference]:
         description_calendrier=row["description_calendrier"],
         rappel_active=bool(row["rappel_active"]), # Convertir int (0/1) de SQLite en bool
         minutes_rappel_avant=row["minutes_rappel_avant"]
+
     )
 
 def obtenir_details_conference(conference_id: str) -> Optional[Conference]:
@@ -331,6 +338,7 @@ def mettre_a_jour_conference(conference_id: str,
          raise ValueError("Aucun champ fourni pour la mise à jour de la conférence.")
 
     # Récupérer la conférence existante pour vérifier son existence
+
     # Cependant, il est plus sûr de relire après la MàJ ou de construire l'objet avec les nouvelles valeurs.
 
     fields_to_update = []
@@ -410,6 +418,7 @@ def mettre_a_jour_conference(conference_id: str,
 
     if not fields_to_update:
         return obtenir_details_conference(conference_id)
+
 
     params.append(conference_id) # Pour la clause WHERE
 
@@ -882,6 +891,7 @@ def generer_contenu_ics_pour_conference(conference_id: str, default_duration_min
         return None
 
 
+
 # --- Gestion des Rapports ---
 
 def generer_texte_rapport_conference(conference_id: str) -> str:
@@ -889,6 +899,7 @@ def generer_texte_rapport_conference(conference_id: str) -> str:
     Génère un rapport textuel simple pour une conférence donnée.
     """
     conference = obtenir_details_conference(conference_id) # Utilise déjà SQLite
+
     if not conference:
         raise ValueError(f"Conférence avec ID '{conference_id}' non trouvée.")
 
@@ -907,6 +918,7 @@ def generer_texte_rapport_conference(conference_id: str) -> str:
         rapport_lignes.append("Date de Création: Non disponible")
 
 
+
     if conference.date_heure_programmation:
         rapport_lignes.append(f"Date Programmée: {conference.date_heure_programmation.strftime('%Y-%m-%d %H:%M:%S')}")
     else:
@@ -916,6 +928,7 @@ def generer_texte_rapport_conference(conference_id: str) -> str:
 
     if conference.client_id:
         client = obtenir_client(conference.client_id) # Utilise déjà SQLite
+
         client_nom = client.nom if client else "Client inconnu (ID non trouvé)"
         rapport_lignes.append(f"Client Associé: {client_nom} (ID: {conference.client_id})")
     else:
@@ -940,6 +953,7 @@ def generer_texte_rapport_conference(conference_id: str) -> str:
     rapport_lignes.append(conference.description_calendrier if conference.description_calendrier else "Aucune description pour calendrier.")
     rapport_lignes.append(f"-------------------------")
     rapport_lignes.append(f"Notes / Rapport Détaillé:")
+
     rapport_lignes.append(conference.notes_rapport if conference.notes_rapport else "Aucune note enregistrée.")
     rapport_lignes.append(f"-------------------------")
 

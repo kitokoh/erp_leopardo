@@ -81,6 +81,7 @@ def create_tables(conn: sqlite3.Connection, drop_first: bool = False):
         description_calendrier TEXT,
         rappel_active BOOLEAN NOT NULL DEFAULT 1,
         minutes_rappel_avant INTEGER,
+
         FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE SET NULL
     );
     """

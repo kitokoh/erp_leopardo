@@ -75,6 +75,7 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
     def test_creer_client(self):
         nom_client = "Nouveau Client Gamma"
         coordonnees_client = {"adresse": "3 rue Gamma"}
+
         client = services.creer_client(nom=nom_client, coordonnees=coordonnees_client)
         self.assertIsNotNone(client.id)
         self.assertEqual(client.nom, nom_client)
@@ -183,6 +184,7 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
             description_calendrier="Présentation Alpha pour Calendrier",
             rappel_active=True,
             minutes_rappel_avant=15
+
         )
         self.assertIsNotNone(conf_obj.id)
         self.assertEqual(conf_obj.titre, titre_conf)
@@ -199,6 +201,7 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
         self.assertEqual(conf_obj.description_calendrier, "Présentation Alpha pour Calendrier")
         self.assertTrue(conf_obj.rappel_active)
         self.assertEqual(conf_obj.minutes_rappel_avant, 15)
+
 
 
         retrieved_conf = services.obtenir_details_conference(conf_obj.id)
@@ -221,6 +224,7 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
         retrieved_conf = services.obtenir_details_conference(conf.id)
         self.assertFalse(retrieved_conf.rappel_active)
         self.assertIsNone(retrieved_conf.minutes_rappel_avant)
+
 
 
     def test_creer_conference_titre_vide(self):
@@ -354,6 +358,7 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
         self.assertIsNone(updated_conf_no_minutes.minutes_rappel_avant) # Mais sans durée spécifique
 
 
+
     def test_lister_conferences(self):
         conf1 = services.creer_conference(titre="Conf Alpha", client_id=self.client1.id)
         conf2_obj = services.creer_conference(titre="Conf Beta", client_id=self.client2.id)
@@ -386,6 +391,7 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
         self.assertIn(conf3.id, [c.id for c in planned_confs])
 
 
+
         client1_planned_confs = services.lister_conferences(client_id=self.client1.id, statut=Conference.CONFERENCE_STATUT_PLANNED)
         self.assertEqual(len(client1_planned_confs), 2)
 
@@ -410,6 +416,7 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
     def test_supprimer_conference_inexistante(self):
         resultat = services.supprimer_conference("id_conf_vraiment_bidon_suppr")
         self.assertFalse(resultat)
+
 
     # --- Tests pour la Logique de Planification ---
     def test_obtenir_conferences_a_venir(self):
@@ -477,6 +484,7 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
         conf = services.obtenir_details_conference(conf_obj.id)
         self.assertIsNotNone(conf)
 
+
         rapport = services.generer_texte_rapport_conference(conf.id)
 
         self.assertIn(conf.id, rapport)
@@ -500,6 +508,7 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
             titre="Conf Rapport Minimal",
             rappel_active=False # Tester avec rappel inactif
         )
+
         services.mettre_a_jour_conference(conf_obj.id, statut=Conference.CONFERENCE_STATUT_IN_PROGRESS)
 
         conf = services.obtenir_details_conference(conf_obj.id)
@@ -517,6 +526,7 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
         self.assertIn(Conference.CONFERENCE_STATUT_IN_PROGRESS, rapport)
         self.assertIn("Rappel Actif: Non", rapport)
         self.assertNotIn("Rappel Avant (minutes):", rapport) # Ne doit pas apparaître si rappel inactif
+
         if conf.date_heure_creation:
             self.assertIn(conf.date_heure_creation.strftime('%Y-%m-%d %H:%M:%S'), rapport)
 
@@ -672,6 +682,7 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
         ics_content = services.generer_contenu_ics_pour_conference(conf.id)
         self.assertIsNotNone(ics_content)
         self.assertNotIn("BEGIN:VALARM", ics_content, "Ne devrait pas y avoir d'alarme si rappel_active est False")
+
 
 
 if __name__ == '__main__':
