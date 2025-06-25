@@ -735,37 +735,43 @@ def initialize_database():
         serial_number TEXT,
         purchase_confirmed_at TIMESTAMP,
         added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        added_by_user_id TEXT, -- Added column
         FOREIGN KEY (client_id) REFERENCES Clients (client_id) ON DELETE CASCADE,
         FOREIGN KEY (project_id) REFERENCES Projects (project_id) ON DELETE CASCADE,
         FOREIGN KEY (product_id) REFERENCES Products (product_id) ON DELETE CASCADE,
+        FOREIGN KEY (added_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL, -- Added FK
         UNIQUE (client_id, project_id, product_id)
     )
     """)
 
-    # Ensure serial_number column exists in ClientProjectProducts table
-    cursor.execute("PRAGMA table_info(ClientProjectProducts)")
-    cpp_columns_info_check = cursor.fetchall() # Use a different variable name to avoid conflict
-    cpp_column_names_check = [info['name'] for info in cpp_columns_info_check]
-
-    if 'serial_number' not in cpp_column_names_check:
-        try:
-            cursor.execute("ALTER TABLE ClientProjectProducts ADD COLUMN serial_number TEXT")
-            print("Added 'serial_number' column to ClientProjectProducts table.")
-        except sqlite3.Error as e_alter_cpp_sn:
-            print(f"Error adding 'serial_number' column to ClientProjectProducts table: {e_alter_cpp_sn}")
-    # The existing check for purchase_confirmed_at can remain as is.
-
-    # Ensure purchase_confirmed_at column exists in ClientProjectProducts table
+    # Ensure serial_number and added_by_user_id columns exist in ClientProjectProducts table
     cursor.execute("PRAGMA table_info(ClientProjectProducts)")
     cpp_columns_info = cursor.fetchall()
     cpp_column_names = [info['name'] for info in cpp_columns_info]
 
-    if 'purchase_confirmed_at' not in cpp_column_names:
+    if 'serial_number' not in cpp_column_names:
+        try:
+            cursor.execute("ALTER TABLE ClientProjectProducts ADD COLUMN serial_number TEXT")
+            print("DEBUG_INIT_DB: Added 'serial_number' column to ClientProjectProducts table.")
+        except sqlite3.Error as e_alter_cpp_sn:
+            print(f"DEBUG_INIT_DB: Error adding 'serial_number' column to ClientProjectProducts table: {e_alter_cpp_sn}")
+
+    if 'purchase_confirmed_at' not in cpp_column_names: # This check was already here, keeping it.
         try:
             cursor.execute("ALTER TABLE ClientProjectProducts ADD COLUMN purchase_confirmed_at TIMESTAMP")
-            print("Added 'purchase_confirmed_at' column to ClientProjectProducts table.")
-        except sqlite3.Error as e_alter_cpp:
-            print(f"Error adding 'purchase_confirmed_at' column to ClientProjectProducts table: {e_alter_cpp}")
+            print("DEBUG_INIT_DB: Added 'purchase_confirmed_at' column to ClientProjectProducts table.")
+        except sqlite3.Error as e_alter_cpp_pca: # Changed variable name for clarity
+            print(f"DEBUG_INIT_DB: Error adding 'purchase_confirmed_at' column to ClientProjectProducts table: {e_alter_cpp_pca}")
+
+    if 'added_by_user_id' not in cpp_column_names:
+        try:
+            # Note: Adding FK constraint via ALTER TABLE is not fully supported in older SQLite.
+            # The FK in CREATE TABLE is for new DBs. For existing, this adds the column.
+            # App logic or a more complex migration would be needed for full FK on existing tables if strict FK needed.
+            cursor.execute("ALTER TABLE ClientProjectProducts ADD COLUMN added_by_user_id TEXT REFERENCES Users(user_id) ON DELETE SET NULL")
+            print("DEBUG_INIT_DB: Added 'added_by_user_id' column to ClientProjectProducts table.")
+        except sqlite3.Error as e_alter_cpp_creator:
+            print(f"DEBUG_INIT_DB: Error adding 'added_by_user_id' column to ClientProjectProducts table: {e_alter_cpp_creator}")
 
     # Create ScheduledEmails table (from ca.py)
     cursor.execute("""
