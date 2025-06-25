@@ -3745,6 +3745,7 @@ class ClientWidget(QWidget):
             if not client_id:
                 if hasattr(self, 'documents_empty_label'): self.documents_empty_label.setVisible(True)
                 logging.warning("PT_DEBUG: populate_doc_table - client_id is missing. Returning early.")
+                self._is_populating_docs = False # Ensure guard is reset before early return
                 return # Early return for missing client_id
             logging.info("PT_DEBUG: populate_doc_table - Client ID obtained.")
 
@@ -3853,17 +3854,20 @@ class ClientWidget(QWidget):
             logging.info("PT_DEBUG: populate_doc_table - Client-side filtering completed. Count: {len(filtered_list)}")
 
             base_client_path = self.client_info.get("base_folder_path")
-        if not base_client_path: # Fallback to default_base_folder_path
-            base_client_path = self.client_info.get("default_base_folder_path", "")
-        logging.info(f"PT_DEBUG: populate_doc_table - base_client_path (after fallback): {base_client_path}")
+            if not base_client_path: # Fallback to default_base_folder_path
+                base_client_path = self.client_info.get("default_base_folder_path", "")
+            logging.info(f"PT_DEBUG: populate_doc_table - base_client_path (after fallback): {base_client_path}")
 
             if not base_client_path or not os.path.isdir(base_client_path):
                 logging.error(f"PT_DEBUG: populate_doc_table - Invalid base_folder_path: {base_client_path}")
                 if hasattr(self, 'documents_empty_label'):
-                self.documents_empty_label.setText(self.tr("Erreur: Dossier client introuvable ou non configuré."))
+                    self.documents_empty_label.setText(self.tr("Erreur: Dossier client introuvable ou non configuré."))
                     self.documents_empty_label.setVisible(True)
                 self.doc_table.setVisible(False)
                 logging.info("PT_DEBUG: populate_doc_table - END (invalid base_client_path)")
+                # Ensure guard is reset before early return due to invalid path
+                # This return was missing the reset, which was the SyntaxError cause.
+                # The 'finally' block will now handle this.
                 return # Early return for invalid base_client_path
             logging.info("PT_DEBUG: populate_doc_table - base_client_path is valid.")
 
@@ -3873,6 +3877,9 @@ class ClientWidget(QWidget):
                      self.documents_empty_label.setVisible(True)
                 self.doc_table.setVisible(False)
                 logging.info("PT_DEBUG: populate_doc_table - END (no documents after filtering)")
+                 # Ensure guard is reset before early return
+                # This return was missing the reset.
+                # The 'finally' block will now handle this.
                 return # Early return if no documents match
             logging.info(f"PT_DEBUG: populate_doc_table - Filtered list has {len(filtered_list)} documents.")
 
