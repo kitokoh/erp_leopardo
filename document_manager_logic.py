@@ -23,10 +23,17 @@ from db.cruds.clients_crud import clients_crud_instance # Import the instance
 from db.cruds.projects_crud import add_project, get_project_by_id, delete_project # Fine
 from db.cruds.tasks_crud import add_task # Fine
 from db.cruds.contacts_crud import get_contact_by_email, add_contact, update_contact, link_contact_to_client, get_contacts_for_client, update_client_contact_link # Fine
-# products_crud_instance will be imported locally in the function that needs it.
-from db.cruds.products_crud import get_product_by_name, add_product
+from db.cruds.products_crud import get_product_by_name, add_product, products_crud_instance
 
 from db.cruds.client_project_products_crud import add_product_to_client_or_project, get_products_for_client_or_project
+
+import logging # For logging errors or info
+# Confirm import of products_crud_instance at module load time
+if 'products_crud_instance' in globals():
+    logging.info(f"DM_LOGIC: products_crud_instance successfully imported at module level: {products_crud_instance}")
+else:
+    logging.error("DM_LOGIC: products_crud_instance is NOT DEFINED at module level after import line!")
+
 
 # Import dialogs that are used within the moved logic
 # Assuming these dialogs are in a 'dialogs.py' or similar accessible location.
@@ -271,17 +278,16 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
             if product_dialog.exec_() == QDialog.Accepted:
                 products_list_data = product_dialog.get_data()
 
-                # Attempt to import products_crud_instance locally for robustness
-                products_crud_instance = None # Ensure it's defined in this scope
-                try:
-                    from db.cruds.products_crud import products_crud_instance as pci
-                    products_crud_instance = pci
-                    logging.info("Successfully imported products_crud_instance locally in handle_create_client_execution's product loop.")
-                except ImportError as e_import:
-                    logging.error(f"Failed to import products_crud_instance locally: {e_import}", exc_info=True)
-                    QMessageBox.critical(doc_manager, "Erreur Critique d'Importation", "Impossible d'importer le module de gestion des produits. L'ajout de produit ne pourra pas continuer.")
-                    # Decide if we should return or just skip product processing for this client.
-                    # For now, product processing will fail if instance is None.
+                # Check if products_crud_instance is defined before using it in the loop
+                if 'products_crud_instance' not in globals() or globals()['products_crud_instance'] is None:
+                    logging.error("DM_LOGIC: products_crud_instance is NOT available in handle_create_client_execution before product loop. This should have been caught at module load.")
+                    QMessageBox.critical(doc_manager, "Erreur Critique Module Produit", "Le module de gestion des produits n'est pas correctement initialisé.")
+                    # Optionally, return or raise an exception to prevent further processing
+                    # For now, we'll let it proceed and potentially hit NameErrors if it's truly not defined,
+                    # but the module-level log should have caught this.
+                else:
+                    logging.info(f"DM_LOGIC: products_crud_instance IS available in handle_create_client_execution: {globals()['products_crud_instance']}")
+
 
                 for product_item_data in products_list_data:
                     logging.info(f"Processing product item from dialog: {product_item_data}")
@@ -289,10 +295,11 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                     current_base_unit_price = None # Used to determine if override is needed
 
                     try:
-                        if products_crud_instance is None:
-                            logging.error("products_crud_instance is None, cannot process product. Skipping this product.")
-                            QMessageBox.warning(doc_manager, "Erreur Module Produit", f"Le module produit n'est pas chargé. Impossible de traiter {product_item_data.get('name', 'produit inconnu')}.")
-                            continue # Skip to next product_item_data
+                        # products_crud_instance is now checked before the loop.
+                        # If it was None, an error message was shown.
+                        # If execution reaches here and it's still None (e.g. due to some very complex issue),
+                        # the NameError will occur as before, but the logs should give clues.
+
 
                         # Step 1: Determine the global_product_id
                         dialog_provided_global_product_id = product_item_data.get('product_id') # From selected existing product
