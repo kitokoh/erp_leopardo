@@ -2,149 +2,201 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>SPECIFICATIONS TECHNIQUES - {{PRODUCT_NAME_TECH_SPEC}}</title>
+    <title>Spécifications Techniques - {{PRODUCT_NAME_TECH_SPEC}}</title>
     <style>
+        /* === General Page Styling === */
         body {
-            font-family: "Segoe UI", Arial, sans-serif;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
             margin: 0;
             padding: 0;
             background-color: #f4f7fc;
-            color: #333;
-            font-size: 10pt;
+            color: #2D3748; /* Dark blue-gray text */
+            font-size: 11pt;
+            line-height: 1.6;
         }
         .page {
             width: 210mm;
             min-height: 297mm;
-            padding: 20mm;
+            padding: 18mm;
             margin: 10mm auto;
-            background-color: #fff;
-            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+            background-color: #ffffff;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.05);
             page-break-after: always;
             box-sizing: border-box;
         }
         .page:last-child {
             page-break-after: avoid;
         }
+        @page {
+            counter-increment: page;
+        }
+
+        /* === Header === */
         .header-container-tech {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            border-bottom: 2px solid #3498db; /* Technical Blue */
+            border-bottom: 2px solid #3A539B; /* Primary blue */
             padding-bottom: 15px;
             margin-bottom: 25px;
         }
         .logo-tech {
-            max-width: 160px;
-            max-height: 70px;
+            max-width: 150px;
+            max-height: 65px;
             object-fit: contain;
         }
         .document-title-tech {
             text-align: right;
         }
         .document-title-tech h1 {
-            font-size: 20pt;
-            color: #3498db;
-            margin: 0 0 5px 0;
+            font-size: 1.9em; /* Adjusted */
+            color: #3A539B;
+            margin: 0 0 8px 0;
             font-weight: 600;
         }
         .document-title-tech p {
-            font-size: 9pt;
-            color: #555;
-            margin: 2px 0;
+            font-size: 0.9em;
+            color: #4A5568; /* Slightly lighter blue-gray */
+            margin: 3px 0;
         }
+
+        /* Condensed Header Styles */
+        .header-container-tech.condensed-header {
+            border-bottom: none;
+            margin-bottom: 15px;
+            padding-bottom: 5px;
+            align-items: center;
+        }
+        .logo-tech.condensed-logo {
+            max-height: 40px;
+        }
+        .document-title-tech.condensed-title p { /* More specific selector */
+            font-size: 1.1em;
+            color: #3A539B;
+            font-weight: 500;
+            margin: 0;
+        }
+
+
+        /* === Sections === */
         .section-tech {
             margin-bottom: 20px;
         }
-        .section-tech h2 {
-            font-size: 14pt;
-            color: #2980b9; /* Darker Technical Blue */
-            border-bottom: 1px solid #aed6f1;
-            padding-bottom: 6px;
-            margin-top: 0; /* For first section on a page */
-            margin-bottom: 15px;
-            font-weight: 500;
+        .section-tech h2 { /* Target h2 within section-tech */
+            font-size: 1.5em;
+            color: #3A539B;
+            border-bottom: 1px solid #A0AEC0; /* Lighter gray for section border */
+            padding-bottom: 8px;
+            margin-top: 0; /* Usually good to reset top margin for section titles */
+            margin-bottom: 18px;
+            font-weight: 600;
         }
-        .section-tech h3 {
-            font-size: 12pt;
-            color: #2c3e50;
-            margin-top: 15px;
-            margin-bottom: 8px;
-            font-weight: 500;
-        }
-        .section-tech p, .section-tech ul, .section-tech table {
-            font-size: 9.5pt;
-            line-height: 1.6;
+        .section-tech h3 { /* Target h3 within section-tech */
+            font-size: 1.2em;
+            color: #2D3748;
+            margin-top: 20px;
             margin-bottom: 10px;
+            font-weight: 600;
         }
-        .section-tech ul {
-            padding-left: 20px;
+        .section-tech p,
+        .section-tech ul,
+        .section-tech table { /* Target p, ul, table within section-tech */
+            font-size: 0.95em;
+            line-height: 1.65;
+            margin-bottom: 12px;
+        }
+        .section-tech ul { /* Target ul within section-tech */
+            padding-left: 25px;
             list-style-type: disc;
         }
-        .section-tech li {
-            margin-bottom: 5px;
+        .section-tech li { /* Target li within section-tech */
+            margin-bottom: 6px;
         }
+
+        /* === Image Container === */
         .tech-image-container {
             text-align: center;
-            margin-bottom: 20px;
-            border: 1px solid #e0e0e0;
+            margin: 20px auto; /* Center block element */
             padding: 15px;
-            background-color: #f9f9f9;
+            background-color: #f8fafc;
+            border: 1px solid #E2E8F0;
+            border-radius: 4px;
         }
-        .tech-image-container img {
-            max-width: 100%;
-            max-height: 400px; /* Adjust as needed */
+        .tech-image-container img { /* Target img within tech-image-container */
+            max-width: 90%; /* Allow some padding */
+            max-height: 380px;
             object-fit: contain;
-            border: 1px solid #ccc;
+            border: 1px solid #CBD5E0;
+            border-radius: 3px;
         }
-        .dimensions-table {
+        .tech-image-container p em { /* Target p em within tech-image-container */
+            font-size: 0.85em;
+            color: #718096;
+            display: block;
+            margin-top: 10px;
+        }
+
+        /* === Dimensions Table (and other similar tables) === */
+        .dimensions-table { /* Applied to tables with this class */
             width: 100%;
             border-collapse: collapse;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
         }
-        .dimensions-table th, .dimensions-table td {
-            border: 1px solid #bdc3c7; /* Gray borders */
-            padding: 8px 10px;
+        .dimensions-table th,
+        .dimensions-table td { /* Target th, td within dimensions-table */
+            border: 1px solid #CBD5E0; /* Consistent gray border */
+            padding: 10px 12px;
             text-align: left;
+            vertical-align: top;
         }
-        .dimensions-table th {
-            background-color: #ecf0f1; /* Light Gray Blue */
-            font-weight: 500;
+        .dimensions-table th { /* Target th within dimensions-table */
+            background-color: #4A5568; /* Dark header */
+            color: #ffffff;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            font-size: 0.9em;
         }
+
+        /* === Footer === */
         .footer-tech {
-            border-top: 1px solid #3498db;
-            padding-top: 10px;
-            margin-top: 30px;
+            border-top: 1px solid #3A539B;
+            padding-top: 12px;
+            margin-top: 25px;
             text-align: center;
-            font-size: 8.5pt;
-            color: #777;
+            font-size: 0.85em;
+            color: #718096;
         }
         .page-number::before {
             content: "Page " counter(page);
         }
-        @page {
-            counter-increment: page;
-        }
     </style>
 </head>
 <body>
-    <!-- Page 1: Image and Dimensions -->
+    <!-- Page 1: General Info, Image, Dimensions -->
     <div class="page">
         <div class="header-container-tech">
             <img src="{{SELLER_LOGO_PATH}}" alt="Logo Entreprise" class="logo-tech">
             <div class="document-title-tech">
-                <h1>SPECIFICATIONS TECHNIQUES</h1>
-                <p>Produit: {{PRODUCT_NAME_TECH_SPEC}}</p>
-                <p>Référence Projet: {{PROJECT_ID_TECH_SPEC}}</p>
-                <p>Date: {{DATE_TECH_SPEC}} | Version: {{VERSION_TECH_SPEC}}</p>
+                <h1>SPÉCIFICATIONS TECHNIQUES</h1>
+                <p>Produit : {{PRODUCT_NAME_TECH_SPEC}}</p>
+                <p>Projet N° : {{PROJECT_ID_TECH_SPEC}}</p>
+                <p>Date : {{DATE_TECH_SPEC}} | Version : {{VERSION_TECH_SPEC}}</p>
             </div>
         </div>
 
         <div class="section-tech">
-            <h2>Aperçu Technique et Dimensions</h2>
-            <div class="tech-image-container">
-                <img src="{{TECHNICAL_IMAGE_PATH_OR_EMBED}}" alt="Image Technique du Produit">
-                <p><em>{{TECHNICAL_IMAGE_CAPTION}}</em></p>
-            </div>
-            <h3>Dimensions Principales</h3>
+            <h2>1. Description Générale du Produit</h2>
+            <p>{{PRODUCT_GENERAL_DESCRIPTION_TECH_SPEC}}</p>
+        </div>
+
+        <div class="tech-image-container">
+            <img src="{{TECHNICAL_IMAGE_PATH_OR_EMBED}}" alt="Image Technique du Produit">
+            <p><em>{{TECHNICAL_IMAGE_CAPTION}}</em></p>
+        </div>
+
+        <div class="section-tech">
+            <h2>2. Dimensions et Poids</h2>
             <table class="dimensions-table">
                 <thead>
                     <tr>
@@ -158,61 +210,80 @@
                     {{DIMENSIONS_TABLE_ROWS_TECH_SPEC}}
                 </tbody>
             </table>
+             <p style="font-size:0.85em; text-align:right; margin-top:5px;"><em>Toutes les dimensions sont sujettes à des variations mineures dues aux processus de fabrication.</em></p>
         </div>
+
         <div class="footer-tech">
-            <span class="page-number"></span> | {{SELLER_COMPANY_NAME}} - Confidentiel
+            <p>{{SELLER_COMPANY_NAME}} - Confidentiel</p>
+            <p class="page-number"></p>
         </div>
     </div>
 
     <!-- Page 2: Material Conditions and Performance -->
     <div class="page">
-        <div class="header-container-tech" style="border-bottom:none; margin-bottom:5px;">
-             <img src="{{SELLER_LOGO_PATH}}" alt="Logo Entreprise" class="logo-tech" style="max-height:40px;">
-             <div class="document-title-tech" style="padding-top:10px;">
-                <p style="font-size:11pt; color:#3498db; font-weight:500;">SPECIFICATIONS TECHNIQUES - {{PRODUCT_NAME_TECH_SPEC}} (Suite)</p>
+        <div class="header-container-tech condensed-header">
+             <img src="{{SELLER_LOGO_PATH}}" alt="Logo Entreprise" class="logo-tech condensed-logo">
+             <div class="document-title-tech condensed-title">
+                <p>SPÉCIFICATIONS TECHNIQUES - {{PRODUCT_NAME_TECH_SPEC}} (Suite)</p>
             </div>
         </div>
+
         <div class="section-tech">
-            <h2>Conditions sur les Matériaux</h2>
+            <h2>3. Matériaux et Composition</h2>
+            <h3>3.1 Vue d'ensemble</h3>
             <p>{{MATERIALS_GENERAL_OVERVIEW_TECH_SPEC}}</p>
-            {{MATERIALS_CONDITIONS_DETAILED_LIST_TECH_SPEC}}
+            <h3>3.2 Liste détaillée des matériaux</h3>
+            <ul>
+                {{MATERIALS_CONDITIONS_DETAILED_LIST_TECH_SPEC}}
+            </ul>
         </div>
+
         <div class="section-tech">
-            <h2>Performances et Caractéristiques Opérationnelles</h2>
-            {{PERFORMANCE_SPECS_TECH_SPEC}}
+            <h2>4. Performances Techniques</h2>
+            <ul>
+                {{PERFORMANCE_SPECS_TECH_SPEC}}
+            </ul>
         </div>
         <div class="footer-tech">
-             <span class="page-number"></span> | {{SELLER_COMPANY_NAME}} - Confidentiel
+            <p>{{SELLER_COMPANY_NAME}} - Confidentiel</p>
+            <p class="page-number"></p>
         </div>
     </div>
 
-    <!-- Page 3: Compliance, Environment, Maintenance, Notes -->
+    <!-- Page 3: Standards, Environment, Maintenance, Notes -->
     <div class="page">
-        <div class="header-container-tech" style="border-bottom:none; margin-bottom:5px;">
-             <img src="{{SELLER_LOGO_PATH}}" alt="Logo Entreprise" class="logo-tech" style="max-height:40px;">
-             <div class="document-title-tech" style="padding-top:10px;">
-                <p style="font-size:11pt; color:#3498db; font-weight:500;">SPECIFICATIONS TECHNIQUES - {{PRODUCT_NAME_TECH_SPEC}} (Suite)</p>
+        <div class="header-container-tech condensed-header">
+             <img src="{{SELLER_LOGO_PATH}}" alt="Logo Entreprise" class="logo-tech condensed-logo">
+             <div class="document-title-tech condensed-title">
+                <p>SPÉCIFICATIONS TECHNIQUES - {{PRODUCT_NAME_TECH_SPEC}} (Suite)</p>
             </div>
         </div>
+
         <div class="section-tech">
-            <h2>Conformité et Standards</h2>
-            {{COMPLIANCE_STANDARDS_TECH_SPEC}}
+            <h2>5. Normes et Conformité</h2>
+            <p>{{COMPLIANCE_STANDARDS_TECH_SPEC}}</p>
         </div>
+
         <div class="section-tech">
-            <h2>Environnement d'Utilisation</h2>
-            {{OPERATING_ENVIRONMENT_TECH_SPEC}}
+            <h2>6. Conditions d'Utilisation et Environnementales</h2>
+            <p>{{OPERATING_ENVIRONMENT_TECH_SPEC}}</p>
         </div>
+
         <div class="section-tech">
-            <h2>Maintenance et Entretien</h2>
-            {{MAINTENANCE_INFO_TECH_SPEC}}
+            <h2>7. Maintenance et Entretien</h2>
+            <p>{{MAINTENANCE_INFO_TECH_SPEC}}</p>
         </div>
+
         <div class="section-tech">
-            <h2>Notes Complémentaires</h2>
+            <h2>8. Notes Additionnelles</h2>
             <p>{{NOTES_TECH_SPEC}}</p>
         </div>
+
         <div class="footer-tech">
-             <span class="page-number"></span> | {{SELLER_COMPANY_NAME}} - Confidentiel
+            <p>{{SELLER_COMPANY_NAME}} - Confidentiel</p>
+            <p class="page-number"></p>
         </div>
     </div>
+
 </body>
 </html>

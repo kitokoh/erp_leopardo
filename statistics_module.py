@@ -89,7 +89,6 @@ class StatisticsDashboard(QWidget):
         # self.left_widget_for_map.setLayout(self._stored_left_map_layout) # Redundant, QVBoxLayout constructor does this
 
         self.map_view = None # Initialize as None
-
         main_splitter.addWidget(self.left_widget_for_map)
 
         # Right widget for Stats
@@ -126,7 +125,6 @@ class StatisticsDashboard(QWidget):
             # Parent QWebEngineView to self.left_widget_for_map, which is its container
             self.map_view = QWebEngineView(self.left_widget_for_map)
             target_layout.addWidget(self.map_view) # Add to the stored (and hopefully correct) layout
-
             logging.info("StatisticsDashboard: QWebEngineView (self.map_view) created and added to layout.")
 
             self.map_interaction_handler = MapInteractionHandler(self)
