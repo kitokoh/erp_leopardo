@@ -88,6 +88,7 @@ class StatisticsDashboard(QWidget):
         initial_left_map_layout.setContentsMargins(0,0,0,0)
         self.left_widget_for_map.setLayout(initial_left_map_layout) # Explicitly set layout
 
+
         self.map_view = None # Initialize as None
         main_splitter.addWidget(self.left_widget_for_map)
 
@@ -129,6 +130,7 @@ class StatisticsDashboard(QWidget):
             # Parent QWebEngineView to self.left_widget_for_map, which is its container
             self.map_view = QWebEngineView(self.left_widget_for_map)
             target_layout.addWidget(self.map_view) # Add to the (potentially new) layout
+
             logging.info("StatisticsDashboard: QWebEngineView (self.map_view) created and added to layout.")
 
             self.map_interaction_handler = MapInteractionHandler(self)
