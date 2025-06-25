@@ -3172,7 +3172,13 @@ class ClientWidget(QWidget):
             try:
                 # Determine the target directory using the selected language
                 # AND POTENTIAL order_identifier (conceptual for now, as add_document doesn't create DB entry)
-                client_base_path = self.client_info["base_folder_path"]
+                client_base_path = self.client_info.get("base_folder_path")
+                if not client_base_path:
+                    client_base_path = self.client_info.get("default_base_folder_path", "")
+                
+                if not client_base_path or not os.path.isdir(client_base_path):
+                    QMessageBox.warning(self, self.tr("Erreur Dossier Client"), self.tr("Le chemin du dossier de base du client n'est pas configuré ou est invalide."))
+                    return
 
                 # --- Conceptual: How order_identifier would be handled if add_document created DB entries ---
                 # For now, this part is more about the file system structure if an order_id were available.
