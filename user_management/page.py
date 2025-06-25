@@ -63,11 +63,11 @@ class UserManagementPage(QWidget):
         self.edit_user_button.clicked.connect(self._handle_edit_user)
         action_layout.addWidget(self.edit_user_button)
 
-        self.toggle_active_button = QPushButton(QIcon(":/icons/power.svg"), self.tr("Activer/Désactiver")) # Placeholder icon
+        self.toggle_active_button = QPushButton(QIcon(":/icons/log-out.svg"), self.tr("Activer/Désactiver")) # Changed to existing log-out.svg
         self.toggle_active_button.clicked.connect(self._handle_toggle_active)
         action_layout.addWidget(self.toggle_active_button)
 
-        self.reset_password_button = QPushButton(QIcon(":/icons/lock.svg"), self.tr("Réinitialiser MDP")) # Placeholder icon
+        self.reset_password_button = QPushButton(QIcon(":/icons/settings.svg"), self.tr("Réinitialiser MDP")) # Changed to existing settings.svg
         self.reset_password_button.clicked.connect(self._handle_reset_password)
         action_layout.addWidget(self.reset_password_button)
 
