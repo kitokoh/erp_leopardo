@@ -845,11 +845,13 @@ class DocumentManager(QMainWindow):
         self.logout_button.clicked.connect(self._handle_logout)
         user_display_layout.addWidget(self.logout_button)
 
-        # Main Search Bar (as before)
-        self.search_bar_line_edit = QLineEdit(self)
-        self.search_bar_line_edit.setObjectName("menuBarSearch")
-        self.search_bar_line_edit.setPlaceholderText(self.tr("Rechercher une fonctionnalité..."))
-        # ... (completer setup as before) ...
+        # The following block redefining self.search_bar_line_edit is redundant
+        # and was likely causing the issue. It's removed.
+        # # Main Search Bar (as before)
+        # self.search_bar_line_edit = QLineEdit(self)
+        # self.search_bar_line_edit.setObjectName("menuBarSearch")
+        # self.search_bar_line_edit.setPlaceholderText(self.tr("Rechercher une fonctionnalité..."))
+        # # ... (completer setup as before) ...
 
         # Container for both search and user display
         top_right_container = QWidget()
@@ -956,6 +958,7 @@ class DocumentManager(QMainWindow):
             return
 
         auth_service.logout()
+        auth_service.clear_remember_me_preference() # Clear remember me on manual logout
         self.current_user_info = None # Clear user info in main window
         self._update_user_display()
 
