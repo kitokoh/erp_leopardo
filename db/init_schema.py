@@ -744,34 +744,49 @@ def initialize_database():
     )
     """)
 
-    # Ensure serial_number and added_by_user_id columns exist in ClientProjectProducts table
+    # Ensure serial_number, purchase_confirmed_at, and added_by_user_id columns exist in ClientProjectProducts table
+    logging.debug("DEBUG_INIT_DB: Checking schema for ClientProjectProducts...")
     cursor.execute("PRAGMA table_info(ClientProjectProducts)")
-    cpp_columns_info = cursor.fetchall()
-    cpp_column_names = [info['name'] for info in cpp_columns_info]
+    cpp_columns_info_before = cursor.fetchall()
+    cpp_column_names_before = [info['name'] for info in cpp_columns_info_before]
+    logging.debug(f"DEBUG_INIT_DB: ClientProjectProducts schema BEFORE alter attempts: {cpp_column_names_before}")
 
-    if 'serial_number' not in cpp_column_names:
+    if 'serial_number' not in cpp_column_names_before:
+
         try:
+            logging.info("DEBUG_INIT_DB: Attempting to add 'serial_number' to ClientProjectProducts...")
             cursor.execute("ALTER TABLE ClientProjectProducts ADD COLUMN serial_number TEXT")
-            print("DEBUG_INIT_DB: Added 'serial_number' column to ClientProjectProducts table.")
+            logging.info("DEBUG_INIT_DB: Successfully added 'serial_number' column to ClientProjectProducts table.")
         except sqlite3.Error as e_alter_cpp_sn:
-            print(f"DEBUG_INIT_DB: Error adding 'serial_number' column to ClientProjectProducts table: {e_alter_cpp_sn}")
+            logging.error(f"DEBUG_INIT_DB: Error adding 'serial_number' column to ClientProjectProducts table: {e_alter_cpp_sn}")
 
-    if 'purchase_confirmed_at' not in cpp_column_names: # This check was already here, keeping it.
+    if 'purchase_confirmed_at' not in cpp_column_names_before: # This check was already here, keeping it.
+
         try:
+            logging.info("DEBUG_INIT_DB: Attempting to add 'purchase_confirmed_at' to ClientProjectProducts...")
             cursor.execute("ALTER TABLE ClientProjectProducts ADD COLUMN purchase_confirmed_at TIMESTAMP")
-            print("DEBUG_INIT_DB: Added 'purchase_confirmed_at' column to ClientProjectProducts table.")
+            logging.info("DEBUG_INIT_DB: Successfully added 'purchase_confirmed_at' column to ClientProjectProducts table.")
         except sqlite3.Error as e_alter_cpp_pca: # Changed variable name for clarity
-            print(f"DEBUG_INIT_DB: Error adding 'purchase_confirmed_at' column to ClientProjectProducts table: {e_alter_cpp_pca}")
+            logging.error(f"DEBUG_INIT_DB: Error adding 'purchase_confirmed_at' column to ClientProjectProducts table: {e_alter_cpp_pca}")
 
-    if 'added_by_user_id' not in cpp_column_names:
+    if 'added_by_user_id' not in cpp_column_names_before:
         try:
+            logging.info("DEBUG_INIT_DB: Attempting to add 'added_by_user_id' to ClientProjectProducts...")
             # Note: Adding FK constraint via ALTER TABLE is not fully supported in older SQLite.
             # The FK in CREATE TABLE is for new DBs. For existing, this adds the column.
-            # App logic or a more complex migration would be needed for full FK on existing tables if strict FK needed.
             cursor.execute("ALTER TABLE ClientProjectProducts ADD COLUMN added_by_user_id TEXT REFERENCES Users(user_id) ON DELETE SET NULL")
-            print("DEBUG_INIT_DB: Added 'added_by_user_id' column to ClientProjectProducts table.")
+            logging.info("DEBUG_INIT_DB: Successfully added 'added_by_user_id' column to ClientProjectProducts table.")
         except sqlite3.Error as e_alter_cpp_creator:
-            print(f"DEBUG_INIT_DB: Error adding 'added_by_user_id' column to ClientProjectProducts table: {e_alter_cpp_creator}")
+            logging.error(f"DEBUG_INIT_DB: Error adding 'added_by_user_id' column to ClientProjectProducts table: {e_alter_cpp_creator}")
+    else:
+        logging.debug("DEBUG_INIT_DB: 'added_by_user_id' column already exists in ClientProjectProducts.")
+
+    logging.debug("DEBUG_INIT_DB: Re-checking schema for ClientProjectProducts AFTER alter attempts...")
+    cursor.execute("PRAGMA table_info(ClientProjectProducts)")
+    cpp_columns_info_after = cursor.fetchall()
+    cpp_column_names_after = [info['name'] for info in cpp_columns_info_after]
+    logging.info(f"DEBUG_INIT_DB: ClientProjectProducts schema AFTER alter attempts: {cpp_column_names_after}")
+
 
     # Create ScheduledEmails table (from ca.py)
     cursor.execute("""

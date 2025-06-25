@@ -42,7 +42,11 @@ def add_product_to_client_or_project(link_data: dict, conn: sqlite3.Connection =
             total_price, link_data.get('serial_number'),
             link_data.get('purchase_confirmed_at'), datetime.utcnow().isoformat()+"Z",
             link_data.get('added_by_user_id')) # Added added_by_user_id
-    logger.debug(f"Executing SQL: {sql} with params: {params}")
+
+    # Enhanced logging for diagnostics
+    logger.info(f"Executing SQL for add_product_to_client_or_project: {sql}")
+    logger.info(f"With parameters: {params}")
+
     try:
         cursor.execute(sql,params)
         last_id = cursor.lastrowid

@@ -125,7 +125,6 @@ class StatisticsDashboard(QWidget):
             logging.critical("StatisticsDashboard: self._left_map_actual_layout is None. This indicates a severe issue in __init__ or object state.")
             return # Cannot proceed
 
-
         if self.map_view is None:
             # Parent QWebEngineView to self.left_widget_for_map, which is its container
             self.map_view = QWebEngineView(self.left_widget_for_map)
