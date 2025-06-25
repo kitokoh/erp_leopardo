@@ -24,6 +24,7 @@ from db.cruds.projects_crud import add_project, get_project_by_id, delete_projec
 from db.cruds.tasks_crud import add_task # Fine
 from db.cruds.contacts_crud import get_contact_by_email, add_contact, update_contact, link_contact_to_client, get_contacts_for_client, update_client_contact_link # Fine
 from db.cruds.products_crud import get_product_by_name, add_product, products_crud_instance
+
 from db.cruds.client_project_products_crud import add_product_to_client_or_project, get_products_for_client_or_project
 
 import logging # For logging errors or info
@@ -287,6 +288,7 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                 else:
                     logging.info(f"DM_LOGIC: products_crud_instance IS available in handle_create_client_execution: {globals()['products_crud_instance']}")
 
+
                 for product_item_data in products_list_data:
                     logging.info(f"Processing product item from dialog: {product_item_data}")
                     global_product_id_to_link = None
@@ -297,6 +299,7 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                         # If it was None, an error message was shown.
                         # If execution reaches here and it's still None (e.g. due to some very complex issue),
                         # the NameError will occur as before, but the logs should give clues.
+
 
                         # Step 1: Determine the global_product_id
                         dialog_provided_global_product_id = product_item_data.get('product_id') # From selected existing product
@@ -333,10 +336,10 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                                 if add_result and add_result.get('success'):
                                     global_product_id_to_link = add_result.get('id')
                                     current_base_unit_price = new_global_product_data['base_unit_price']
-                                    logging.info(f"Helper: New global product created. ID: {global_product_id_to_link}")
+                                    logging.info(f"DM_LOGIC: New global product '{new_global_product_data['product_name']}' created with ID: {global_product_id_to_link}") # Enhanced log
                                 else:
                                     error_detail = add_result.get('error', 'Unknown error') if add_result else 'Unknown error'
-                                    logging.error(f"Helper: Failed to add new global product '{product_item_data.get('name')}' (Code: {product_code_from_dialog}). Error: {error_detail}")
+                                    logging.error(f"DM_LOGIC: Failed to add new global product '{product_item_data.get('name')}' (Code: {product_code_from_dialog}). Error: {error_detail}")
                                     QMessageBox.critical(doc_manager, doc_manager.tr("Erreur Création Produit Global"),
                                                          doc_manager.tr("Impossible de créer le produit global '{0}' (Code: {1}). Erreur: {2}").format(product_item_data['name'], product_code_from_dialog, error_detail))
                                     return False # Indicate failure for this item
