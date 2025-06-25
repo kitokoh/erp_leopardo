@@ -3737,11 +3737,15 @@ class ClientWidget(QWidget):
             logging.info("PT_DEBUG: populate_doc_table - START")
 
             if hasattr(self, 'documents_empty_label'): self.documents_empty_label.setVisible(True)
+
         self.doc_table.setVisible(False)
         logging.info("PT_DEBUG: populate_doc_table - Initial visibility set.")
 
         client_id = self.client_info.get("client_id")
         logging.info(f"PT_DEBUG: populate_doc_table - client_id: {client_id}")
+
+        logging.info(f"ClientWidget.populate_doc_table: client_id is {client_id}.") # Changed to INFO
+
         if not client_id:
             if hasattr(self, 'documents_empty_label'): self.documents_empty_label.setVisible(True)
             logging.warning("PT_DEBUG: populate_doc_table - client_id is missing. Returning early.")
@@ -3758,6 +3762,7 @@ class ClientWidget(QWidget):
             logging.error(f"PT_DEBUG: populate_doc_table - Error fetching order_events: {e_oe}", exc_info=True)
             # Continue with empty order_events
 
+
         is_distributor_type = self.client_info.get('category') == 'Distributeur'
         has_multiple_orders = order_events and len(order_events) > 1
         show_order_filter_dropdown = is_distributor_type or has_multiple_orders
@@ -3767,6 +3772,7 @@ class ClientWidget(QWidget):
         if show_order_filter_dropdown:
             logging.info("PT_DEBUG: populate_doc_table - Populating doc_order_filter_combo.")
             current_order_filter_selection = self.doc_order_filter_combo.currentData()
+
             self.doc_order_filter_combo.blockSignals(True)
             self.doc_order_filter_combo.clear()
             self.doc_order_filter_combo.addItem(self.tr("Toutes les Commandes"), "ALL")
@@ -3774,6 +3780,7 @@ class ClientWidget(QWidget):
             if order_events:
                 for i, event_ts in enumerate(order_events):
                     logging.info(f"PT_DEBUG: populate_doc_table - Processing order_event {i+1}/{len(order_events)}: {event_ts}")
+
                     if event_ts:
                         try:
                             dt_obj = datetime.fromisoformat(event_ts.replace('Z', '+00:00'))
@@ -3784,6 +3791,7 @@ class ClientWidget(QWidget):
                             logging.warning(f"PT_DEBUG: populate_doc_table - Added raw item for event_ts '{event_ts}' due to ValueError.")
             if current_order_filter_selection:
                 index = self.doc_order_filter_combo.findData(current_order_filter_selection)
+
                 if index >= 0: self.doc_order_filter_combo.setCurrentIndex(index)
                 else: self.doc_order_filter_combo.setCurrentIndex(0)
             else:
@@ -3799,6 +3807,10 @@ class ClientWidget(QWidget):
 
         db_filters = {}
         selected_order_filter_data = self.doc_order_filter_combo.currentData()
+
+
+        logging.info(f"ClientWidget.populate_doc_table: selected_order_filter_data: {selected_order_filter_data}") # Changed to INFO
+
         if selected_order_filter_data == "NONE":
             db_filters['order_identifier'] = None
         elif selected_order_filter_data != "ALL":
@@ -3826,6 +3838,9 @@ class ClientWidget(QWidget):
             doc_passes_lang_filter = True
             doc_passes_type_filter = True
 
+
+
+
             if selected_lang_filter != "ALL":
                 doc_lang = doc_data.get('language_code')
                 if not doc_lang and doc_data.get('file_path_relative'): # Infer from path
@@ -3834,6 +3849,9 @@ class ClientWidget(QWidget):
                         doc_lang = path_parts[0]
                 if doc_lang != selected_lang_filter:
                     doc_passes_lang_filter = False
+
+
+
 
             if selected_type_filter != "ALL":
                 doc_type_generated = doc_data.get('document_type_generated', '').upper()
@@ -3854,6 +3872,7 @@ class ClientWidget(QWidget):
 
         base_client_path = self.client_info.get("base_folder_path")
         logging.info(f"PT_DEBUG: populate_doc_table - base_client_path: {base_client_path}")
+
         if not base_client_path or not os.path.isdir(base_client_path):
             logging.error(f"PT_DEBUG: populate_doc_table - Invalid base_folder_path: {base_client_path}")
             if hasattr(self, 'documents_empty_label'):
@@ -3882,6 +3901,7 @@ class ClientWidget(QWidget):
         for row_idx, doc_data in enumerate(filtered_list):
             logging.info(f"PT_DEBUG: populate_doc_table - Populating row {row_idx + 1}/{len(filtered_list)}, doc_id: {doc_data.get('document_id')}")
             
+
             document_id = doc_data.get('document_id')
             doc_name = doc_data.get('document_name', 'N/A')
             file_path_relative_from_db = doc_data.get('file_path_relative', '')
@@ -3976,6 +3996,7 @@ class ClientWidget(QWidget):
         logging.info("PT_DEBUG: populate_doc_table - END (SUCCESS)")
         finally:
             self._is_populating_docs = False
+
 
     def handle_edit_source_template(self, document_data):
         source_template_id = document_data.get('source_template_id')
