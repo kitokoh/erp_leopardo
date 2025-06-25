@@ -200,6 +200,7 @@ class DocumentManager(QMainWindow):
             logging.info("DocumentManager: Attempting to create StatisticsDashboard...") # Kept for diagnostics
             self.statistics_dashboard_instance = StatisticsDashboard(parent=self)
             logging.info("DocumentManager: StatisticsDashboard instance created.") # Kept for diagnostics
+
             self.statistics_dashboard_instance.request_add_client_for_country.connect(self.handle_add_client_from_stats_map)
             self.statistics_dashboard_instance.request_view_client_details.connect(self.handle_view_client_from_stats_map)
             self.main_area_stack.addWidget(self.statistics_dashboard_instance)
