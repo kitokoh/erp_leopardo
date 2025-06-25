@@ -550,6 +550,7 @@ def main():
         # For this simplified version, we fetch user details directly.
         # This assumes the user still exists and is active.
         user_details = users_crud.get_user_by_username(remembered_username) # Corrected usage
+        #  user_details = db.users_crud.get_user_by_username(remembered_username) # Use the imported users_crud
         if user_details and user_details.get('is_active'):
             auth_service.set_current_user(user_details) # Set the user as current
             logged_in_user_info = user_details
