@@ -54,6 +54,7 @@ from PyQt5.QtWidgets import QDialog # Required for QDialog.Accepted check
 import db # Added import for db module
 from db.db_seed import run_seed
 from db import get_all_companies, add_company # Specific imports for company check
+from db.cruds import users_crud # Corrected import for users_crud
 # from db.cruds.application_settings_crud import get_setting # Removed direct import
 # from db.init_schema import initialize_database # This will be db.initialize_database after this change
 # from auth.login_window import LoginWindow # Replaced by LoginDialog
@@ -541,37 +542,54 @@ def main():
 
     logged_in_user_info = None # To store user details after successful login
 
-    while True: # Loop until successful login or explicit exit
-        login_dialog = LoginDialog()
-        if login_dialog.exec_() == QDialog.Accepted:
-            user_data_from_dialog = login_dialog.get_user_data()
-            if user_data_from_dialog:
-                # auth_service.set_current_user(user_data_from_dialog) # Set in global auth state
-                # The above line is redundant if DocumentManager will hold the user state
-                # and if auth_service primarily serves to validate.
-                # For now, login_dialog directly calls auth_service.login which sets _current_user_data.
-                # We need to get this data to pass to DocumentManager.
-                logged_in_user_info = auth_service.get_current_user() # Get data set by login_dialog via auth_service
-                if logged_in_user_info:
-                    logging.info(f"Login successful. User: {logged_in_user_info.get('username')}, Role: {logged_in_user_info.get('role_name')}")
-                    proceed_to_main_app = True
-                    break # Exit login loop
+    # --- Remember Me - Attempt Auto Login ---
+    remembered_username = auth_service.get_remembered_user()
+    if remembered_username:
+        logging.info(f"Attempting auto-login for remembered user: {remembered_username}")
+        # In a real token system, we'd validate the token here.
+        # For this simplified version, we fetch user details directly.
+        # This assumes the user still exists and is active.
+        user_details = users_crud.get_user_by_username(remembered_username) # Corrected usage
+        if user_details and user_details.get('is_active'):
+            auth_service.set_current_user(user_details) # Set the user as current
+            logged_in_user_info = user_details
+            proceed_to_main_app = True
+            logging.info(f"Auto-login successful for user: {remembered_username}")
+            SESSION_START_TIME = datetime.datetime.now() # Start session timer
+        else:
+            logging.warning(f"Auto-login failed for remembered user: {remembered_username}. User not found or inactive. Clearing preference.")
+            auth_service.clear_remember_me_preference()
+            proceed_to_main_app = False # Fallback to manual login
+    else:
+        proceed_to_main_app = False # No remembered user, proceed to manual login
+
+    if not proceed_to_main_app: # If auto-login didn't happen or failed
+        while True: # Loop until successful login or explicit exit
+            login_dialog = LoginDialog()
+            if login_dialog.exec_() == QDialog.Accepted:
+                user_data_from_dialog = login_dialog.get_user_data() # This is already the full user_info from auth_service.login
+                if user_data_from_dialog:
+                    logged_in_user_info = user_data_from_dialog # Already set by auth_service.login and retrieved
+                    if logged_in_user_info: # Should always be true if user_data_from_dialog is not None
+                        logging.info(f"Manual login successful. User: {logged_in_user_info.get('username')}, Role: {logged_in_user_info.get('role_name')}")
+                        # Save remember me preference based on checkbox in LoginDialog
+                        # This is now handled inside auth_service.login based on the 'remember_me' param
+                        # auth_service.save_remember_me_preference(logged_in_user_info['username'], login_dialog.is_remember_me_checked())
+                        SESSION_START_TIME = datetime.datetime.now() # Start session timer
+                        proceed_to_main_app = True
+                        break # Exit login loop
+                    else:
+                        logging.error("Login dialog accepted, but no user data found in auth_service after manual login. Critical error.")
+                        QMessageBox.critical(None, "Erreur Critique de Connexion", "Impossible de récupérer les informations utilisateur après la connexion.")
+                        splash.hide()
+                        sys.exit(1)
                 else:
-                    # This case should ideally not be hit if login_dialog.accept() means auth_service.login() was successful
-                    # and set _current_user_data.
-                    logging.error("Login dialog accepted, but no user data found in auth_service. Critical error.")
-                    QMessageBox.critical(None, "Erreur Critique de Connexion", "Impossible de récupérer les informations utilisateur après la connexion.")
-                    splash.hide() # Ensure splash is hidden
-                    sys.exit(1) # Critical failure
-            else:
-                # This case should also not be hit if dialog.accept() means login was successful.
-                logging.error("Login dialog accepted, but get_user_data() returned None.")
-                QMessageBox.critical(None, "Erreur de Connexion", "Échec de la récupération des données utilisateur.")
-                # Loop will continue via the while True
-        else: # LoginDialog was cancelled or closed
-            logging.warning("Login dialog was cancelled or closed by the user. Exiting application.")
-            splash.hide() # Ensure splash is hidden
-            sys.exit(0) # User chose to exit
+                    logging.error("Login dialog accepted, but get_user_data() returned None from manual login.")
+                    QMessageBox.critical(None, "Erreur de Connexion", "Échec de la récupération des données utilisateur.")
+            else: # LoginDialog was cancelled or closed
+                logging.warning("Login dialog was cancelled or closed by the user. Exiting application.")
+                splash.hide()
+                sys.exit(0)
 
     if proceed_to_main_app and logged_in_user_info:
         # Pass the full user_info dictionary to DocumentManager
