@@ -3732,93 +3732,110 @@ class ClientWidget(QWidget):
 
         if hasattr(self, 'documents_empty_label'): self.documents_empty_label.setVisible(True)
         self.doc_table.setVisible(False)
-        logging.info("PT_DEBUG: populate_doc_table - Initial visibility set.")
+        logging.info("ClientWidget.populate_doc_table: Initial visibility set.") # Changed to INFO for better visibility
 
+        logging.info("ClientWidget.populate_doc_table: Getting client_id.") # Changed to INFO
         client_id = self.client_info.get("client_id")
-        logging.info(f"PT_DEBUG: populate_doc_table - client_id: {client_id}")
+        logging.info(f"ClientWidget.populate_doc_table: client_id is {client_id}.") # Changed to INFO
+
         if not client_id:
             if hasattr(self, 'documents_empty_label'): self.documents_empty_label.setVisible(True)
             logging.warning("PT_DEBUG: populate_doc_table - client_id is missing. Returning early.")
             return
-        logging.info("PT_DEBUG: populate_doc_table - Client ID obtained.")
+        logging.info("ClientWidget.populate_doc_table: Client ID obtained.") # Changed to INFO
 
-        logging.info("PT_DEBUG: populate_doc_table - Starting order filter population.")
-        order_events = []
+        logging.info("ClientWidget.populate_doc_table: Starting order filter population.") # Changed to INFO
+        order_events = [] # Initialize
         try:
-            logging.info("PT_DEBUG: populate_doc_table - Attempting to fetch order_events.")
             order_events = db_manager.get_distinct_purchase_confirmed_at_for_client(client_id)
-            logging.info(f"PT_DEBUG: populate_doc_table - Fetched order_events: {order_events}")
+            logging.info(f"ClientWidget.populate_doc_table: Fetched order_events: {order_events}") # Changed to INFO
         except Exception as e_oe:
-            logging.error(f"PT_DEBUG: populate_doc_table - Error fetching order_events: {e_oe}", exc_info=True)
-            # Continue with empty order_events
+            logging.error(f"ClientWidget.populate_doc_table: Error fetching order_events: {e_oe}", exc_info=True)
+            # Decide if we should return or continue with empty order_events
+
 
         is_distributor_type = self.client_info.get('category') == 'Distributeur'
         has_multiple_orders = order_events and len(order_events) > 1
         show_order_filter_dropdown = is_distributor_type or has_multiple_orders
-        logging.info(f"PT_DEBUG: populate_doc_table - show_order_filter_dropdown: {show_order_filter_dropdown}")
+        logging.info(f"ClientWidget.populate_doc_table: show_order_filter_dropdown: {show_order_filter_dropdown}") # Changed to INFO
 
         current_order_filter_selection = None
         if show_order_filter_dropdown:
-            logging.info("PT_DEBUG: populate_doc_table - Populating doc_order_filter_combo.")
+            logging.info("ClientWidget.populate_doc_table: Populating doc_order_filter_combo.") # Changed to INFO
             current_order_filter_selection = self.doc_order_filter_combo.currentData()
+            logging.info(f"ClientWidget.populate_doc_table: current_order_filter_selection before clear: {current_order_filter_selection}") # Changed to INFO
+
             self.doc_order_filter_combo.blockSignals(True)
             self.doc_order_filter_combo.clear()
             self.doc_order_filter_combo.addItem(self.tr("Toutes les Commandes"), "ALL")
             self.doc_order_filter_combo.addItem(self.tr("Documents Généraux (sans commande)"), "NONE")
             if order_events:
+                logging.info("ClientWidget.populate_doc_table: Looping through order_events.") # Changed to INFO
                 for i, event_ts in enumerate(order_events):
-                    logging.info(f"PT_DEBUG: populate_doc_table - Processing order_event {i+1}/{len(order_events)}: {event_ts}")
+                    logging.info(f"ClientWidget.populate_doc_table: Processing order_event {i+1}/{len(order_events)}: {event_ts}") # Changed to INFO
+
                     if event_ts:
                         try:
                             dt_obj = datetime.fromisoformat(event_ts.replace('Z', '+00:00'))
                             display_text = self.tr("Commande du {0}").format(dt_obj.strftime('%Y-%m-%d %H:%M'))
                             self.doc_order_filter_combo.addItem(display_text, event_ts)
+                            logging.info(f"ClientWidget.populate_doc_table: Added item '{display_text}' with data '{event_ts}' to combo.") # Changed to INFO
                         except ValueError:
                             self.doc_order_filter_combo.addItem(self.tr("Commande du {0} (brut)").format(event_ts), event_ts)
-                            logging.warning(f"PT_DEBUG: populate_doc_table - Added raw item for event_ts '{event_ts}' due to ValueError.")
+                            logging.warning(f"ClientWidget.populate_doc_table: Added raw item for event_ts '{event_ts}' due to ValueError.")
+                logging.info("ClientWidget.populate_doc_table: Finished looping through order_events.") # Changed to INFO
             if current_order_filter_selection:
                 index = self.doc_order_filter_combo.findData(current_order_filter_selection)
+                logging.info(f"ClientWidget.populate_doc_table: Found index {index} for current_order_filter_selection '{current_order_filter_selection}'.") # Changed to INFO
+
                 if index >= 0: self.doc_order_filter_combo.setCurrentIndex(index)
                 else: self.doc_order_filter_combo.setCurrentIndex(0)
             else:
                  self.doc_order_filter_combo.setCurrentIndex(0)
+                 logging.info("ClientWidget.populate_doc_table: current_order_filter_selection was None, set to index 0.") # Changed to INFO
             self.doc_order_filter_combo.blockSignals(False)
-            logging.info("PT_DEBUG: populate_doc_table - Finished populating doc_order_filter_combo.")
+            logging.info("ClientWidget.populate_doc_table: Finished populating doc_order_filter_combo.") # Changed to INFO
         else:
-            logging.info("PT_DEBUG: populate_doc_table - Order filter not applicable.")
+            logging.info("ClientWidget.populate_doc_table: Order filter not applicable, clearing and disabling combo.") # Changed to INFO
             self.doc_order_filter_combo.clear()
             self.doc_order_filter_combo.addItem(self.tr("N/A"), "ALL")
             self.doc_order_filter_combo.setEnabled(False)
-        logging.info("PT_DEBUG: populate_doc_table - Order filter setup completed.")
+        logging.info("ClientWidget.populate_doc_table: Order filter population completed.") # Changed to INFO
 
-        db_filters = {}
+        logging.info("ClientWidget.populate_doc_table: Preparing DB filters.") # Changed to INFO
+        db_filters = {} 
         selected_order_filter_data = self.doc_order_filter_combo.currentData()
+        logging.info(f"ClientWidget.populate_doc_table: selected_order_filter_data: {selected_order_filter_data}") # Changed to INFO
+
         if selected_order_filter_data == "NONE":
             db_filters['order_identifier'] = None
         elif selected_order_filter_data != "ALL":
             db_filters['order_identifier'] = selected_order_filter_data
-        logging.info(f"PT_DEBUG: populate_doc_table - DB filters prepared: {db_filters}")
+        logging.info(f"ClientWidget.populate_doc_table: db_filters prepared: {db_filters}") # Changed to INFO
 
-        client_documents_from_db = []
+        logging.info("ClientWidget.populate_doc_table: Fetching documents from DB...") # Changed to INFO
+        client_documents_from_db = [] # Initialize
         try:
-            logging.info("PT_DEBUG: populate_doc_table - Fetching documents from DB...")
             client_documents_from_db = db_manager.get_documents_for_client(client_id, filters=db_filters)
             client_documents_from_db = client_documents_from_db if client_documents_from_db else []
-            logging.info(f"PT_DEBUG: populate_doc_table - Fetched {len(client_documents_from_db)} documents from DB.")
+            logging.info(f"ClientWidget.populate_doc_table: Fetched {len(client_documents_from_db)} documents from DB initially.") # Changed to INFO
         except Exception as e_docs_fetch:
-            logging.error(f"PT_DEBUG: populate_doc_table - Error fetching documents: {e_docs_fetch}", exc_info=True)
-            # Continue with empty list
+            logging.error(f"ClientWidget.populate_doc_table: Error fetching documents: {e_docs_fetch}", exc_info=True)
+            # Decide if we should return or continue with empty list
 
+        logging.info("ClientWidget.populate_doc_table: Getting language and type filter values.") # Changed to INFO
         selected_lang_filter = self.doc_language_filter_combo.currentData()
         selected_type_filter = self.doc_type_filter_combo.currentData()
-        logging.info(f"PT_DEBUG: populate_doc_table - Lang filter: {selected_lang_filter}, Type filter: {selected_type_filter}")
+        logging.info(f"ClientWidget.populate_doc_table: selected_lang_filter: {selected_lang_filter}, selected_type_filter: {selected_type_filter}") # Changed to INFO
 
         filtered_list = []
-        logging.info("PT_DEBUG: populate_doc_table - Starting client-side filtering.")
+        logging.info("ClientWidget.populate_doc_table: Starting client-side filtering of documents.") # Changed to INFO
         for i, doc_data in enumerate(client_documents_from_db):
-            logging.debug(f"PT_DEBUG: populate_doc_table - Filtering doc {i+1}, ID: {doc_data.get('document_id')}")
+            logging.info(f"ClientWidget.populate_doc_table: Filtering document {i+1}/{len(client_documents_from_db)}, ID: {doc_data.get('document_id')}") # Changed to INFO
             doc_passes_lang_filter = True
             doc_passes_type_filter = True
+
+            logging.debug("ClientWidget.populate_doc_table: Applying language filter.") # Kept as debug for verbosity
 
             if selected_lang_filter != "ALL":
                 doc_lang = doc_data.get('language_code')
@@ -3828,6 +3845,8 @@ class ClientWidget(QWidget):
                         doc_lang = path_parts[0]
                 if doc_lang != selected_lang_filter:
                     doc_passes_lang_filter = False
+
+            logging.debug("ClientWidget.populate_doc_table: Applying type filter.") # Kept as debug
 
             if selected_type_filter != "ALL":
                 doc_type_generated = doc_data.get('document_type_generated', '').upper()
@@ -3844,10 +3863,13 @@ class ClientWidget(QWidget):
 
             if doc_passes_lang_filter and doc_passes_type_filter:
                 filtered_list.append(doc_data)
-        logging.info("PT_DEBUG: populate_doc_table - Client-side filtering completed. Count: {len(filtered_list)}")
+                logging.debug(f"ClientWidget.populate_doc_table: Document ID {doc_data.get('document_id')} passed filters, added to list.")
+        logging.info("ClientWidget.populate_doc_table: Client-side filtering completed.") # Changed to INFO
 
+        logging.info("ClientWidget.populate_doc_table: Getting base_client_path.") # Changed to INFO
         base_client_path = self.client_info.get("base_folder_path")
-        logging.info(f"PT_DEBUG: populate_doc_table - base_client_path: {base_client_path}")
+        logging.info(f"ClientWidget.populate_doc_table: base_client_path: {base_client_path}") # Changed to INFO
+
         if not base_client_path or not os.path.isdir(base_client_path):
             logging.error(f"PT_DEBUG: populate_doc_table - Invalid base_folder_path: {base_client_path}")
             if hasattr(self, 'documents_empty_label'):
@@ -3856,7 +3878,9 @@ class ClientWidget(QWidget):
             self.doc_table.setVisible(False)
             logging.info("PT_DEBUG: populate_doc_table - END (invalid base_client_path)")
             return
-        logging.info("PT_DEBUG: populate_doc_table - base_client_path is valid.")
+        logging.info("ClientWidget.populate_doc_table: base_client_path is valid.") # Changed to INFO
+
+        logging.info("ClientWidget.populate_doc_table: Checking if filtered_list is empty.") # Changed to INFO
 
         if not filtered_list:
             if hasattr(self, 'documents_empty_label'):
@@ -3865,17 +3889,20 @@ class ClientWidget(QWidget):
             self.doc_table.setVisible(False)
             logging.info("PT_DEBUG: populate_doc_table - END (no documents after filtering)")
             return
-        logging.info(f"PT_DEBUG: populate_doc_table - Filtered list has {len(filtered_list)} documents.")
+        logging.info(f"ClientWidget.populate_doc_table: Filtered list contains {len(filtered_list)} documents.") # Changed to INFO
 
+        logging.info("ClientWidget.populate_doc_table: Setting visibility for table and empty label (documents found).") # Changed to INFO
         if hasattr(self, 'documents_empty_label'): self.documents_empty_label.setVisible(False)
         self.doc_table.setVisible(True)
         self.doc_table.setRowCount(len(filtered_list))
-        logging.info("PT_DEBUG: populate_doc_table - Table visible, row count set.")
+        logging.info("ClientWidget.populate_doc_table: Visibility set, row count set for doc_table.") # Changed to INFO
 
-        logging.info("PT_DEBUG: populate_doc_table - Starting loop to populate rows.")
+        logging.info("ClientWidget.populate_doc_table: Starting loop to populate doc_table rows.") # Changed to INFO
         for row_idx, doc_data in enumerate(filtered_list):
-            logging.info(f"PT_DEBUG: populate_doc_table - Populating row {row_idx + 1}/{len(filtered_list)}, doc_id: {doc_data.get('document_id')}")
+            logging.info(f"ClientWidget.populate_doc_table: Populating row {row_idx + 1}/{len(filtered_list)}.") # Changed to INFO
             
+            logging.debug("ClientWidget.populate_doc_table: Getting document details.") # Kept debug for inner loop verbosity
+
             document_id = doc_data.get('document_id')
             doc_name = doc_data.get('document_name', 'N/A')
             file_path_relative_from_db = doc_data.get('file_path_relative', '')
