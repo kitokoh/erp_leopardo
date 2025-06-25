@@ -188,17 +188,20 @@ class DocumentManager(QMainWindow):
             logging.info("DocumentManager: Creating ProjectManagementDashboard...")
 
             self.project_management_widget_instance = ProjectManagementDashboard(parent=self, current_user_info=self.current_user_info)
-            logging.info("DocumentManager: ProjectManagementDashboard instance created. Scheduling addWidget to main_area_stack.")
-            # Defer adding the widget to the QStackedWidget
-            QTimer.singleShot(0, lambda widget=self.project_management_widget_instance: self.main_area_stack.addWidget(widget))
-
-            logging.info("DocumentManager: ProjectManagementDashboard addWidget call has been deferred.")
+            logging.info("DocumentManager: ProjectManagementDashboard instance created.")
+            # Add the widget directly instead of deferring
+            self.main_area_stack.addWidget(self.project_management_widget_instance)
+            logging.info("DocumentManager: ProjectManagementDashboard directly added to main_area_stack.")
         else:
             self.project_management_widget_instance = None
             logging.info("DocumentManager: Project Management module disabled, widget not created.")
 
         if self.module_states.get('statistics', True):
+            logging.info("DocumentManager: Attempting to create StatisticsDashboard...") # New log message
+            logging.info("!!! Exiting BEFORE StatisticsDashboard creation for diagnostics !!!") # Diagnostic exit
+            sys.exit(0) # Force exit here
             self.statistics_dashboard_instance = StatisticsDashboard(parent=self)
+            logging.info("DocumentManager: StatisticsDashboard instance created.") # New log message
             self.statistics_dashboard_instance.request_add_client_for_country.connect(self.handle_add_client_from_stats_map)
             self.statistics_dashboard_instance.request_view_client_details.connect(self.handle_view_client_from_stats_map)
             self.main_area_stack.addWidget(self.statistics_dashboard_instance)
