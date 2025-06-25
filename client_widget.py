@@ -93,6 +93,7 @@ class ClientWidget(QWidget):
         super().__init__(parent)
         self.current_user_info = current_user_info # Store full user info
         self.current_user_id = self.current_user_info.get('user_id') # Extract for existing code
+        self._is_populating_docs = False # Initialize re-entrancy guard
 
         logging.info(f"ClientWidget.__init__: INSTANTIATION STARTED for client_id={client_info.get('client_id')}, user: {self.current_user_info.get('username')}")
         logging.info(f"ClientWidget.__init__: Received client_info: {client_info}")
@@ -3725,17 +3726,24 @@ class ClientWidget(QWidget):
                 logging.warning("Notification manager not available. Cannot show notification: Erreur Notes - Erreur de sauvegarde des notes: {0}.".format(str(e)))
 
     def populate_doc_table(self):
-        logging.debug("ClientWidget.populate_doc_table: Method started.")
-        logging.debug("ClientWidget.populate_doc_table: Setting row count to 0.")
-        self.doc_table.setRowCount(0) # Clear table first
-        logging.info("PT_DEBUG: populate_doc_table - START")
+        if hasattr(self, '_is_populating_docs') and self._is_populating_docs:
+            logging.warning("PT_DEBUG: populate_doc_table - Re-entrant call detected, returning.")
+            return
+        self._is_populating_docs = True
+        try:
+            logging.debug("ClientWidget.populate_doc_table: Method started.")
+            logging.debug("ClientWidget.populate_doc_table: Setting row count to 0.")
+            self.doc_table.setRowCount(0) # Clear table first
+            logging.info("PT_DEBUG: populate_doc_table - START")
 
-        if hasattr(self, 'documents_empty_label'): self.documents_empty_label.setVisible(True)
+            if hasattr(self, 'documents_empty_label'): self.documents_empty_label.setVisible(True)
+
         self.doc_table.setVisible(False)
         logging.info("PT_DEBUG: populate_doc_table - Initial visibility set.")
 
         client_id = self.client_info.get("client_id")
         logging.info(f"PT_DEBUG: populate_doc_table - client_id: {client_id}")
+
         logging.info(f"ClientWidget.populate_doc_table: client_id is {client_id}.") # Changed to INFO
 
         if not client_id:
@@ -3765,8 +3773,6 @@ class ClientWidget(QWidget):
             logging.info("PT_DEBUG: populate_doc_table - Populating doc_order_filter_combo.")
             current_order_filter_selection = self.doc_order_filter_combo.currentData()
 
-            logging.info(f"ClientWidget.populate_doc_table: current_order_filter_selection before clear: {current_order_filter_selection}") # Changed to INFO
-
             self.doc_order_filter_combo.blockSignals(True)
             self.doc_order_filter_combo.clear()
             self.doc_order_filter_combo.addItem(self.tr("Toutes les Commandes"), "ALL")
@@ -3774,8 +3780,6 @@ class ClientWidget(QWidget):
             if order_events:
                 for i, event_ts in enumerate(order_events):
                     logging.info(f"PT_DEBUG: populate_doc_table - Processing order_event {i+1}/{len(order_events)}: {event_ts}")
-                    logging.info(f"ClientWidget.populate_doc_table: Processing order_event {i+1}/{len(order_events)}: {event_ts}") # Changed to INFO
-
 
                     if event_ts:
                         try:
@@ -3787,8 +3791,6 @@ class ClientWidget(QWidget):
                             logging.warning(f"PT_DEBUG: populate_doc_table - Added raw item for event_ts '{event_ts}' due to ValueError.")
             if current_order_filter_selection:
                 index = self.doc_order_filter_combo.findData(current_order_filter_selection)
-
-                logging.info(f"ClientWidget.populate_doc_table: Found index {index} for current_order_filter_selection '{current_order_filter_selection}'.") # Changed to INFO
 
                 if index >= 0: self.doc_order_filter_combo.setCurrentIndex(index)
                 else: self.doc_order_filter_combo.setCurrentIndex(0)
@@ -3805,6 +3807,7 @@ class ClientWidget(QWidget):
 
         db_filters = {}
         selected_order_filter_data = self.doc_order_filter_combo.currentData()
+
 
         logging.info(f"ClientWidget.populate_doc_table: selected_order_filter_data: {selected_order_filter_data}") # Changed to INFO
 
@@ -3836,7 +3839,7 @@ class ClientWidget(QWidget):
             doc_passes_type_filter = True
 
 
-            logging.debug("ClientWidget.populate_doc_table: Applying language filter.") # Kept as debug for verbosity
+
 
             if selected_lang_filter != "ALL":
                 doc_lang = doc_data.get('language_code')
@@ -3848,7 +3851,7 @@ class ClientWidget(QWidget):
                     doc_passes_lang_filter = False
 
 
-            logging.debug("ClientWidget.populate_doc_table: Applying type filter.") # Kept as debug
+
 
             if selected_type_filter != "ALL":
                 doc_type_generated = doc_data.get('document_type_generated', '').upper()
@@ -3869,7 +3872,6 @@ class ClientWidget(QWidget):
 
         base_client_path = self.client_info.get("base_folder_path")
         logging.info(f"PT_DEBUG: populate_doc_table - base_client_path: {base_client_path}")
-        logging.info(f"ClientWidget.populate_doc_table: base_client_path: {base_client_path}") # Changed to INFO
 
         if not base_client_path or not os.path.isdir(base_client_path):
             logging.error(f"PT_DEBUG: populate_doc_table - Invalid base_folder_path: {base_client_path}")
@@ -3880,9 +3882,6 @@ class ClientWidget(QWidget):
             logging.info("PT_DEBUG: populate_doc_table - END (invalid base_client_path)")
             return
         logging.info("PT_DEBUG: populate_doc_table - base_client_path is valid.")
-
-
-        logging.info("ClientWidget.populate_doc_table: Checking if filtered_list is empty.") # Changed to INFO
 
         if not filtered_list:
             if hasattr(self, 'documents_empty_label'):
@@ -3902,8 +3901,6 @@ class ClientWidget(QWidget):
         for row_idx, doc_data in enumerate(filtered_list):
             logging.info(f"PT_DEBUG: populate_doc_table - Populating row {row_idx + 1}/{len(filtered_list)}, doc_id: {doc_data.get('document_id')}")
             
-
-            logging.debug("ClientWidget.populate_doc_table: Getting document details.") # Kept debug for inner loop verbosity
 
             document_id = doc_data.get('document_id')
             doc_name = doc_data.get('document_name', 'N/A')
@@ -3997,6 +3994,9 @@ class ClientWidget(QWidget):
             logging.info(f"PT_DEBUG: populate_doc_table - Finished populating row {row_idx + 1}/{len(filtered_list)}.")
         logging.info("PT_DEBUG: populate_doc_table - Finished loop for populating rows.")
         logging.info("PT_DEBUG: populate_doc_table - END (SUCCESS)")
+        finally:
+            self._is_populating_docs = False
+
 
     def handle_edit_source_template(self, document_data):
         source_template_id = document_data.get('source_template_id')
