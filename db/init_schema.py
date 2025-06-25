@@ -545,10 +545,26 @@ def initialize_database():
         organization_name TEXT,
         organization_title TEXT,
         birthday_date TEXT,
+        created_by_user_id TEXT, -- Added column
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL -- Added FK
     )
     """)
+
+    # Ensure created_by_user_id column exists in Contacts table for existing databases
+    cursor.execute("PRAGMA table_info(Contacts)")
+    contacts_columns_info = cursor.fetchall()
+    contacts_column_names = [info['name'] for info in contacts_columns_info]
+
+    if 'created_by_user_id' not in contacts_column_names:
+        try:
+            cursor.execute("ALTER TABLE Contacts ADD COLUMN created_by_user_id TEXT REFERENCES Users(user_id) ON DELETE SET NULL")
+            print("DEBUG_INIT_DB: Added 'created_by_user_id' column to Contacts table.")
+        except sqlite3.Error as e_alter_contacts_creator:
+            print(f"DEBUG_INIT_DB: Error adding 'created_by_user_id' column to Contacts table: {e_alter_contacts_creator}")
+            # Note: Older SQLite versions might not support adding FK via ALTER TABLE.
+            # The FK in CREATE TABLE is for new DBs. For existing, this adds the column. App logic must handle.
 
     # Create ClientContacts table (base from ca.py)
     cursor.execute("""

@@ -84,14 +84,12 @@ class StatisticsDashboard(QWidget):
 
         # Left widget for Map
         self.left_widget_for_map = QWidget()
-        left_map_layout = QVBoxLayout(self.left_widget_for_map)
-        left_map_layout.setContentsMargins(0,0,0,0)
+        self._stored_left_map_layout = QVBoxLayout(self.left_widget_for_map) # Create and store layout
+        self._stored_left_map_layout.setContentsMargins(0,0,0,0)
+        # self.left_widget_for_map.setLayout(self._stored_left_map_layout) # Redundant, QVBoxLayout constructor does this
 
-        # Defer map_view creation
         self.map_view = None # Initialize as None
-        # map_view will be created and added to left_map_layout in _initialize_map_and_load_data
 
-        self.left_widget_for_map.setLayout(left_map_layout)
         main_splitter.addWidget(self.left_widget_for_map)
 
         # Right widget for Stats
@@ -118,14 +116,17 @@ class StatisticsDashboard(QWidget):
         """Deferred initialization of map components and initial data load."""
         logging.info("StatisticsDashboard: _initialize_map_and_load_data called by QTimer.")
 
-        left_map_layout = self.left_widget_for_map.layout()
-        if not left_map_layout:
-            logging.error("StatisticsDashboard: left_map_layout not found for map initialization.")
+        # Use the stored layout directly
+        target_layout = self._stored_left_map_layout
+        if not target_layout:
+            logging.error("StatisticsDashboard: self._stored_left_map_layout is None. This should not happen.")
             return
 
         if self.map_view is None:
+            # Parent QWebEngineView to self.left_widget_for_map, which is its container
             self.map_view = QWebEngineView(self.left_widget_for_map)
-            left_map_layout.addWidget(self.map_view)
+            target_layout.addWidget(self.map_view) # Add to the stored (and hopefully correct) layout
+
             logging.info("StatisticsDashboard: QWebEngineView (self.map_view) created and added to layout.")
 
             self.map_interaction_handler = MapInteractionHandler(self)
