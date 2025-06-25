@@ -54,6 +54,7 @@ from PyQt5.QtWidgets import QDialog # Required for QDialog.Accepted check
 import db # Added import for db module
 from db.db_seed import run_seed
 from db import get_all_companies, add_company # Specific imports for company check
+from db.cruds import users_crud # Corrected import for users_crud
 # from db.cruds.application_settings_crud import get_setting # Removed direct import
 # from db.init_schema import initialize_database # This will be db.initialize_database after this change
 # from auth.login_window import LoginWindow # Replaced by LoginDialog
@@ -548,7 +549,8 @@ def main():
         # In a real token system, we'd validate the token here.
         # For this simplified version, we fetch user details directly.
         # This assumes the user still exists and is active.
-        user_details = db.users_crud.get_user_by_username(remembered_username) # Use the imported users_crud
+        user_details = users_crud.get_user_by_username(remembered_username) # Corrected usage
+        #  user_details = db.users_crud.get_user_by_username(remembered_username) # Use the imported users_crud
         if user_details and user_details.get('is_active'):
             auth_service.set_current_user(user_details) # Set the user as current
             logged_in_user_info = user_details
