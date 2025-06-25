@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtWidgets import QCheckBox
 
 # Assuming auth.authentication module is accessible
 # Adjust import path if necessary based on project structure
