@@ -153,6 +153,22 @@ class MainDashboard(QWidget): # Changed from QMainWindow to QWidget
         self.notification_manager = NotificationManager(self)
         self.notification_manager.setup_timer()
 
+    def load_initial_data(self):
+        """Loads initial data for the various sections of the dashboard."""
+        logging.info("MainDashboard: Loading initial data...")
+        if hasattr(self, 'update_dashboard'):
+            self.update_dashboard() # For the main dashboard page (KPIs, graphs, etc.)
+        if hasattr(self, 'load_team_members'):
+            self.load_team_members()
+        if hasattr(self, 'load_projects'):
+            self.load_projects()
+        if hasattr(self, 'load_tasks'):
+            self.load_tasks() # Loads the first page of tasks
+        if hasattr(self, 'load_production_orders'):
+            self.load_production_orders()
+        # Note: Cover page data is loaded during setup_cover_page_management_page via init_ui.
+        logging.info("MainDashboard: Initial data loading process initiated.")
+
     def open_manage_global_products_dialog(self):
         try:
             app_root_dir = self.resource_path("")
