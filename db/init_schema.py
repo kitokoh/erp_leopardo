@@ -790,6 +790,7 @@ def initialize_database():
     cpp_column_names_after_alter = [info['name'] for info in cpp_columns_info_after_alter]
     logging.info(f"DEBUG_INIT_DB: ClientProjectProducts schema AFTER all alter attempts: {cpp_column_names_after_alter}")
 
+
     # Create ScheduledEmails table (from ca.py)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS ScheduledEmails (
