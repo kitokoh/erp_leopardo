@@ -752,6 +752,7 @@ def initialize_database():
     logging.debug(f"DEBUG_INIT_DB: ClientProjectProducts schema BEFORE alter attempts: {cpp_column_names_before}")
 
     if 'serial_number' not in cpp_column_names_before:
+
         try:
             logging.info("DEBUG_INIT_DB: Attempting to add 'serial_number' to ClientProjectProducts...")
             cursor.execute("ALTER TABLE ClientProjectProducts ADD COLUMN serial_number TEXT")
@@ -760,6 +761,7 @@ def initialize_database():
             logging.error(f"DEBUG_INIT_DB: Error adding 'serial_number' column to ClientProjectProducts table: {e_alter_cpp_sn}")
 
     if 'purchase_confirmed_at' not in cpp_column_names_before: # This check was already here, keeping it.
+
         try:
             logging.info("DEBUG_INIT_DB: Attempting to add 'purchase_confirmed_at' to ClientProjectProducts...")
             cursor.execute("ALTER TABLE ClientProjectProducts ADD COLUMN purchase_confirmed_at TIMESTAMP")
@@ -784,6 +786,7 @@ def initialize_database():
     cpp_columns_info_after = cursor.fetchall()
     cpp_column_names_after = [info['name'] for info in cpp_columns_info_after]
     logging.info(f"DEBUG_INIT_DB: ClientProjectProducts schema AFTER alter attempts: {cpp_column_names_after}")
+
 
     # Create ScheduledEmails table (from ca.py)
     cursor.execute("""

@@ -25,6 +25,7 @@ from db.cruds.tasks_crud import add_task # Fine
 from db.cruds.contacts_crud import get_contact_by_email, add_contact, update_contact, link_contact_to_client, get_contacts_for_client, update_client_contact_link # Fine
 # products_crud_instance will be imported locally in the function that needs it.
 from db.cruds.products_crud import get_product_by_name, add_product
+
 from db.cruds.client_project_products_crud import add_product_to_client_or_project, get_products_for_client_or_project
 
 # Import dialogs that are used within the moved logic
