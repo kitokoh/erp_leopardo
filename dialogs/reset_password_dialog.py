@@ -15,7 +15,7 @@ class ResetPasswordDialog(QDialog):
         self._new_password = ""
 
         self.setWindowTitle(self.tr("Réinitialiser le mot de passe pour ") + username)
-        self.setWindowIcon(QIcon(":/icons/lock.svg")) # Placeholder
+        self.setWindowIcon(QIcon(":/icons/settings.svg")) # Changed to existing settings.svg
         self.setMinimumWidth(350)
         self._setup_ui()
 
