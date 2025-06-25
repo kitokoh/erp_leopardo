@@ -3853,11 +3853,14 @@ class ClientWidget(QWidget):
             logging.info("PT_DEBUG: populate_doc_table - Client-side filtering completed. Count: {len(filtered_list)}")
 
             base_client_path = self.client_info.get("base_folder_path")
-            logging.info(f"PT_DEBUG: populate_doc_table - base_client_path: {base_client_path}")
+        if not base_client_path: # Fallback to default_base_folder_path
+            base_client_path = self.client_info.get("default_base_folder_path", "")
+        logging.info(f"PT_DEBUG: populate_doc_table - base_client_path (after fallback): {base_client_path}")
+
             if not base_client_path or not os.path.isdir(base_client_path):
                 logging.error(f"PT_DEBUG: populate_doc_table - Invalid base_folder_path: {base_client_path}")
                 if hasattr(self, 'documents_empty_label'):
-                    self.documents_empty_label.setText(self.tr("Erreur: Dossier client introuvable."))
+                self.documents_empty_label.setText(self.tr("Erreur: Dossier client introuvable ou non configuré."))
                     self.documents_empty_label.setVisible(True)
                 self.doc_table.setVisible(False)
                 logging.info("PT_DEBUG: populate_doc_table - END (invalid base_client_path)")
