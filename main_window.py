@@ -200,7 +200,6 @@ class DocumentManager(QMainWindow):
             logging.info("DocumentManager: Attempting to create StatisticsDashboard...") # Kept for diagnostics
             self.statistics_dashboard_instance = StatisticsDashboard(parent=self)
             logging.info("DocumentManager: StatisticsDashboard instance created.") # Kept for diagnostics
-
             self.statistics_dashboard_instance.request_add_client_for_country.connect(self.handle_add_client_from_stats_map)
             self.statistics_dashboard_instance.request_view_client_details.connect(self.handle_view_client_from_stats_map)
             self.main_area_stack.addWidget(self.statistics_dashboard_instance)
@@ -1292,10 +1291,10 @@ class DocumentManager(QMainWindow):
                 config=self.config,
                 app_root_dir=self.app_root_dir,
                 notification_manager=notification_manager,
-                current_user_id=self.current_user_id, # Pass current_user_id
+                current_user_info=self.current_user_info, # Changed to pass current_user_info
                 parent=self
             )
-            logging.info(f"main_window.open_client_tab_by_id: Successfully created ClientWidget for client_id: {client_id_to_open} with user_id: {self.current_user_id}")
+            logging.info(f"main_window.open_client_tab_by_id: Successfully created ClientWidget for client_id: {client_id_to_open} with user_info.") # Log updated
         except Exception as e:
             logging.error(f"main_window.open_client_tab_by_id: Error instantiating ClientWidget for client_id: {client_id_to_open} - {e}", exc_info=True)
             QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("Impossible de créer l'onglet client. Erreur: {0}").format(str(e)))
