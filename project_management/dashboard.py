@@ -274,7 +274,7 @@ class MainDashboard(QWidget): # Changed from QMainWindow to QWidget
             (self.tr("Projets"), "briefcase.svg", lambda: self.main_content.setCurrentIndex(2)), # Index 2 for projects_page
             (self.tr("Tâches"), "check-square.svg", lambda: self.main_content.setCurrentIndex(3)), # Index 3 for tasks_page
             (self.tr("Rapports"), "bar-chart-2.svg", lambda: self.main_content.setCurrentIndex(4)), # Index 4 for reports_page
-            (self.tr("Production"), "tool.svg", lambda: self.main_content.setCurrentIndex(6)), # Index 6 for production_management_page
+            (self.tr("Production"), "settings.svg", lambda: self.main_content.setCurrentIndex(6)), # Index 6 for production_management_page, changed icon
             (self.tr("Couvertures"), "file-text.svg", lambda: self.main_content.setCurrentIndex(5)) # Index 5 for cover_page_management_page
             # Settings page is usually last or accessed differently
         ]

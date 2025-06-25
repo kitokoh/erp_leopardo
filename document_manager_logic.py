@@ -336,10 +336,10 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                                 if add_result and add_result.get('success'):
                                     global_product_id_to_link = add_result.get('id')
                                     current_base_unit_price = new_global_product_data['base_unit_price']
-                                    logging.info(f"Helper: New global product created. ID: {global_product_id_to_link}")
+                                    logging.info(f"DM_LOGIC: New global product '{new_global_product_data['product_name']}' created with ID: {global_product_id_to_link}") # Enhanced log
                                 else:
                                     error_detail = add_result.get('error', 'Unknown error') if add_result else 'Unknown error'
-                                    logging.error(f"Helper: Failed to add new global product '{product_item_data.get('name')}' (Code: {product_code_from_dialog}). Error: {error_detail}")
+                                    logging.error(f"DM_LOGIC: Failed to add new global product '{product_item_data.get('name')}' (Code: {product_code_from_dialog}). Error: {error_detail}")
                                     QMessageBox.critical(doc_manager, doc_manager.tr("Erreur Création Produit Global"),
                                                          doc_manager.tr("Impossible de créer le produit global '{0}' (Code: {1}). Erreur: {2}").format(product_item_data['name'], product_code_from_dialog, error_detail))
                                     return False # Indicate failure for this item
