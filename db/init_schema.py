@@ -545,24 +545,81 @@ def initialize_database():
         organization_name TEXT,
         organization_title TEXT,
         birthday_date TEXT,
+        created_by_user_id TEXT, -- Added column
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL -- Added FK
     )
     """)
+
+    # Ensure created_by_user_id column exists in Contacts table for existing databases
+    cursor.execute("PRAGMA table_info(Contacts)")
+    contacts_columns_info = cursor.fetchall()
+    contacts_column_names = [info['name'] for info in contacts_columns_info]
+
+    if 'created_by_user_id' not in contacts_column_names:
+        try:
+            cursor.execute("ALTER TABLE Contacts ADD COLUMN created_by_user_id TEXT REFERENCES Users(user_id) ON DELETE SET NULL")
+            print("DEBUG_INIT_DB: Added 'created_by_user_id' column to Contacts table.")
+        except sqlite3.Error as e_alter_contacts_creator:
+            print(f"DEBUG_INIT_DB: Error adding 'created_by_user_id' column to Contacts table: {e_alter_contacts_creator}")
+            # Note: Older SQLite versions might not support adding FK via ALTER TABLE.
+            # The FK in CREATE TABLE is for new DBs. For existing, this adds the column. App logic must handle.
 
     # Create ClientContacts table (base from ca.py)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS ClientContacts (
         client_contact_id INTEGER PRIMARY KEY AUTOINCREMENT,
         client_id TEXT NOT NULL,
-        contact_id TEXT NOT NULL, -- Changed from INTEGER in some versions, keep TEXT if Contacts.contact_id is TEXT
+        contact_id INTEGER NOT NULL, -- Standardized to INTEGER to match Contacts.contact_id
         is_primary_for_client BOOLEAN DEFAULT FALSE,
         can_receive_documents BOOLEAN DEFAULT TRUE,
+        added_by_user_id TEXT, -- Added column
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Added column
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Added column
         FOREIGN KEY (client_id) REFERENCES Clients (client_id) ON DELETE CASCADE,
-        FOREIGN KEY (contact_id) REFERENCES Contacts (contact_id) ON DELETE CASCADE, -- Assuming contact_id is INTEGER in Contacts
+        FOREIGN KEY (contact_id) REFERENCES Contacts (contact_id) ON DELETE CASCADE,
+        FOREIGN KEY (added_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL, -- Added FK
         UNIQUE (client_id, contact_id)
     )
     """)
+
+    # Ensure added_by_user_id, created_at, updated_at columns exist in ClientContacts table for existing databases
+    cursor.execute("PRAGMA table_info(ClientContacts)")
+    cc_columns_info = cursor.fetchall()
+    cc_column_names = [info['name'] for info in cc_columns_info]
+
+    if 'contact_id' in cc_column_names: # Check if table exists and has contact_id
+        # Check current type of contact_id
+        contact_id_col_info = next((col for col in cc_columns_info if col['name'] == 'contact_id'), None)
+        if contact_id_col_info and contact_id_col_info['type'].upper() == 'TEXT':
+            logging.warning("ClientContacts.contact_id is TEXT, ideally should be INTEGER. Manual migration might be needed if data exists and FK is to be enforced strictly.")
+            # For now, we won't attempt to change type of existing column due to complexity with data.
+            # The CREATE TABLE statement above defines it as INTEGER for new DBs.
+
+    if 'added_by_user_id' not in cc_column_names:
+        try:
+            cursor.execute("ALTER TABLE ClientContacts ADD COLUMN added_by_user_id TEXT REFERENCES Users(user_id) ON DELETE SET NULL")
+            print("DEBUG_INIT_DB: Added 'added_by_user_id' column to ClientContacts table.")
+        except sqlite3.Error as e_alter_cc_adder:
+            print(f"DEBUG_INIT_DB: Error adding 'added_by_user_id' column to ClientContacts table: {e_alter_cc_adder}")
+
+    if 'created_at' not in cc_column_names:
+        try:
+            # Adding with DEFAULT CURRENT_TIMESTAMP might only work on newer SQLite versions with ALTER.
+            # Simpler to add NULLable and let app logic handle if needed, or backfill.
+            cursor.execute("ALTER TABLE ClientContacts ADD COLUMN created_at TIMESTAMP")
+            print("DEBUG_INIT_DB: Added 'created_at' column to ClientContacts table (will be NULL for existing rows).")
+        except sqlite3.Error as e_alter_cc_created:
+            print(f"DEBUG_INIT_DB: Error adding 'created_at' column to ClientContacts table: {e_alter_cc_created}")
+
+    if 'updated_at' not in cc_column_names:
+        try:
+            cursor.execute("ALTER TABLE ClientContacts ADD COLUMN updated_at TIMESTAMP")
+            print("DEBUG_INIT_DB: Added 'updated_at' column to ClientContacts table (will be NULL for existing rows).")
+        except sqlite3.Error as e_alter_cc_updated:
+            print(f"DEBUG_INIT_DB: Error adding 'updated_at' column to ClientContacts table: {e_alter_cc_updated}")
+
     # Note: Contacts.contact_id is INTEGER AUTOINCREMENT, so ClientContacts.contact_id should be INTEGER.
     # The schema from ca.py for Contacts has INTEGER. The ClientContacts table in ca.py has contact_id TEXT. This is a mismatch.
     # Standardizing to INTEGER for contact_id in ClientContacts.
@@ -678,37 +735,55 @@ def initialize_database():
         serial_number TEXT,
         purchase_confirmed_at TIMESTAMP,
         added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        added_by_user_id TEXT, -- Added column
         FOREIGN KEY (client_id) REFERENCES Clients (client_id) ON DELETE CASCADE,
         FOREIGN KEY (project_id) REFERENCES Projects (project_id) ON DELETE CASCADE,
         FOREIGN KEY (product_id) REFERENCES Products (product_id) ON DELETE CASCADE,
+        FOREIGN KEY (added_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL, -- Added FK
         UNIQUE (client_id, project_id, product_id)
     )
     """)
 
-    # Ensure serial_number column exists in ClientProjectProducts table
+    # Ensure serial_number, purchase_confirmed_at, and added_by_user_id columns exist in ClientProjectProducts table
+    logging.debug("DEBUG_INIT_DB: Checking schema for ClientProjectProducts...")
     cursor.execute("PRAGMA table_info(ClientProjectProducts)")
-    cpp_columns_info_check = cursor.fetchall() # Use a different variable name to avoid conflict
-    cpp_column_names_check = [info['name'] for info in cpp_columns_info_check]
+    cpp_columns_info_before = cursor.fetchall()
+    cpp_column_names_before = [info['name'] for info in cpp_columns_info_before]
+    logging.debug(f"DEBUG_INIT_DB: ClientProjectProducts schema BEFORE alter attempts: {cpp_column_names_before}")
 
-    if 'serial_number' not in cpp_column_names_check:
+    if 'serial_number' not in cpp_column_names_before:
         try:
+            logging.info("DEBUG_INIT_DB: Attempting to add 'serial_number' to ClientProjectProducts...")
             cursor.execute("ALTER TABLE ClientProjectProducts ADD COLUMN serial_number TEXT")
-            print("Added 'serial_number' column to ClientProjectProducts table.")
+            logging.info("DEBUG_INIT_DB: Successfully added 'serial_number' column to ClientProjectProducts table.")
         except sqlite3.Error as e_alter_cpp_sn:
-            print(f"Error adding 'serial_number' column to ClientProjectProducts table: {e_alter_cpp_sn}")
-    # The existing check for purchase_confirmed_at can remain as is.
+            logging.error(f"DEBUG_INIT_DB: Error adding 'serial_number' column to ClientProjectProducts table: {e_alter_cpp_sn}")
 
-    # Ensure purchase_confirmed_at column exists in ClientProjectProducts table
-    cursor.execute("PRAGMA table_info(ClientProjectProducts)")
-    cpp_columns_info = cursor.fetchall()
-    cpp_column_names = [info['name'] for info in cpp_columns_info]
-
-    if 'purchase_confirmed_at' not in cpp_column_names:
+    if 'purchase_confirmed_at' not in cpp_column_names_before: # This check was already here, keeping it.
         try:
+            logging.info("DEBUG_INIT_DB: Attempting to add 'purchase_confirmed_at' to ClientProjectProducts...")
             cursor.execute("ALTER TABLE ClientProjectProducts ADD COLUMN purchase_confirmed_at TIMESTAMP")
-            print("Added 'purchase_confirmed_at' column to ClientProjectProducts table.")
-        except sqlite3.Error as e_alter_cpp:
-            print(f"Error adding 'purchase_confirmed_at' column to ClientProjectProducts table: {e_alter_cpp}")
+            logging.info("DEBUG_INIT_DB: Successfully added 'purchase_confirmed_at' column to ClientProjectProducts table.")
+        except sqlite3.Error as e_alter_cpp_pca: # Changed variable name for clarity
+            logging.error(f"DEBUG_INIT_DB: Error adding 'purchase_confirmed_at' column to ClientProjectProducts table: {e_alter_cpp_pca}")
+
+    if 'added_by_user_id' not in cpp_column_names_before:
+        try:
+            logging.info("DEBUG_INIT_DB: Attempting to add 'added_by_user_id' to ClientProjectProducts...")
+            # Note: Adding FK constraint via ALTER TABLE is not fully supported in older SQLite.
+            # The FK in CREATE TABLE is for new DBs. For existing, this adds the column.
+            cursor.execute("ALTER TABLE ClientProjectProducts ADD COLUMN added_by_user_id TEXT REFERENCES Users(user_id) ON DELETE SET NULL")
+            logging.info("DEBUG_INIT_DB: Successfully added 'added_by_user_id' column to ClientProjectProducts table.")
+        except sqlite3.Error as e_alter_cpp_creator:
+            logging.error(f"DEBUG_INIT_DB: Error adding 'added_by_user_id' column to ClientProjectProducts table: {e_alter_cpp_creator}")
+    else:
+        logging.debug("DEBUG_INIT_DB: 'added_by_user_id' column already exists in ClientProjectProducts.")
+
+    logging.debug("DEBUG_INIT_DB: Re-checking schema for ClientProjectProducts AFTER alter attempts...")
+    cursor.execute("PRAGMA table_info(ClientProjectProducts)")
+    cpp_columns_info_after = cursor.fetchall()
+    cpp_column_names_after = [info['name'] for info in cpp_columns_info_after]
+    logging.info(f"DEBUG_INIT_DB: ClientProjectProducts schema AFTER alter attempts: {cpp_column_names_after}")
 
     # Create ScheduledEmails table (from ca.py)
     cursor.execute("""
