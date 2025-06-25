@@ -84,9 +84,10 @@ class StatisticsDashboard(QWidget):
 
         # Left widget for Map
         self.left_widget_for_map = QWidget()
-        self._stored_left_map_layout = QVBoxLayout(self.left_widget_for_map) # Create and store layout
-        self._stored_left_map_layout.setContentsMargins(0,0,0,0)
-        # self.left_widget_for_map.setLayout(self._stored_left_map_layout) # Redundant, QVBoxLayout constructor does this
+        initial_left_map_layout = QVBoxLayout()
+        initial_left_map_layout.setContentsMargins(0,0,0,0)
+        self.left_widget_for_map.setLayout(initial_left_map_layout) # Explicitly set layout
+
 
         self.map_view = None # Initialize as None
         main_splitter.addWidget(self.left_widget_for_map)
@@ -115,16 +116,21 @@ class StatisticsDashboard(QWidget):
         """Deferred initialization of map components and initial data load."""
         logging.info("StatisticsDashboard: _initialize_map_and_load_data called by QTimer.")
 
-        # Use the stored layout directly
-        target_layout = self._stored_left_map_layout
+        target_layout = self.left_widget_for_map.layout()
+
         if not target_layout:
-            logging.error("StatisticsDashboard: self._stored_left_map_layout is None. This should not happen.")
-            return
+            logging.error("StatisticsDashboard: self.left_widget_for_map.layout() returned None. This is unexpected. Attempting to create a new layout.")
+            # Fallback: If layout is somehow None, create and set a new one.
+            target_layout = QVBoxLayout()
+            target_layout.setContentsMargins(0,0,0,0)
+            self.left_widget_for_map.setLayout(target_layout)
+            logging.warning("StatisticsDashboard: Created and set a new QVBoxLayout for left_widget_for_map as a fallback.")
 
         if self.map_view is None:
             # Parent QWebEngineView to self.left_widget_for_map, which is its container
             self.map_view = QWebEngineView(self.left_widget_for_map)
-            target_layout.addWidget(self.map_view) # Add to the stored (and hopefully correct) layout
+            target_layout.addWidget(self.map_view) # Add to the (potentially new) layout
+
             logging.info("StatisticsDashboard: QWebEngineView (self.map_view) created and added to layout.")
 
             self.map_interaction_handler = MapInteractionHandler(self)
