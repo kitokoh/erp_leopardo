@@ -97,7 +97,7 @@ class EditUserDialog(QDialog):
         if not self.add_mode or (self.add_mode and self.user_id_to_edit): # Latter case for self-edit
             self.full_name_input.setText(self.user_data_to_edit.get('full_name', ''))
             self.email_input.setText(self.user_data_to_edit.get('email', ''))
-
+        
         # Populate roles combo
         try:
             all_roles = roles_crud.list_roles()
@@ -118,19 +118,20 @@ class EditUserDialog(QDialog):
                 #     index = self.role_combo.findData(operator_role_id['role_id'])
                 #     if index >= 0: self.role_combo.setCurrentIndex(index)
                 pass # No default role set for now, user must select
+        except Exception as e: # This is the except for the role population try block
+            logger.error(f"Failed to populate roles in EditUserDialog: {e}", exc_info=True)
+            QMessageBox.warning(self, self.tr("Erreur Chargement Rôles"),
+                                self.tr("Impossible de charger la liste des rôles."))
 
         # Refinement for "Edit My Account" mode: Disable role_combo for self-edit unless admin
+        # This logic should be AFTER the try-except for role population.
         if not self.add_mode and self.user_id_to_edit == self.current_admin_user_info.get('user_id'):
             # User is editing their own account
             current_user_role_name = self.current_admin_user_info.get('role_name')
             if not has_permission(current_user_role_name, P_MANAGE_USERS):
                 self.role_combo.setEnabled(False)
                 self.role_combo.setToolTip(self.tr("Vous ne pouvez pas modifier votre propre rôle."))
-
-        except Exception as e:
-            logger.error(f"Failed to populate roles in EditUserDialog: {e}", exc_info=True)
-            QMessageBox.warning(self, self.tr("Erreur Chargement Rôles"),
-                                self.tr("Impossible de charger la liste des rôles."))
+        # No specific "except" needed for the self-edit refinement logic itself, as it's UI manipulation.
 
     def _save_changes(self):
         admin_role_name = self.current_admin_user_info.get('role_name')
@@ -195,11 +196,11 @@ class EditUserDialog(QDialog):
             if new_email != self.user_data_to_edit.get('email', ''):
                 update_data_user['email'] = new_email
                 changed_details = True
-
+            
             # Self-edit: Prevent role change unless admin.
             # This logic is part of step 2 of the plan, but good to place it here.
             is_self_edit = self.user_id_to_edit == self.current_admin_user_info.get('user_id')
-
+            
             # The role_combo is already disabled if is_self_edit and no P_MANAGE_USERS.
             # However, if an admin IS self-editing and CAN change their role, this check is still valid.
             # If the combo was disabled, new_role_id should ideally be the same as original,
@@ -213,7 +214,7 @@ class EditUserDialog(QDialog):
                 if new_role_id != self.user_data_to_edit.get('role_id'):
                      QMessageBox.warning(self, self.tr("Modification Interdite"), self.tr("Vous ne pouvez pas modifier votre propre rôle."))
                      return
-
+            
             # If admin is editing another user, or admin is editing self (and has P_MANAGE_USERS), role change is allowed by P_MANAGE_USERS check at the start of function.
 
             user_update_success = True
