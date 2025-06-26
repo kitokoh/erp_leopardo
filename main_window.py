@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
+from PyQt5.QtCore import QDate
 
 # --- BEGIN WORKAROUND for ModuleNotFoundError ---
 # Ensure the project root is in sys.path when main_window.py is loaded.
@@ -104,6 +105,11 @@ from product_management.page import ProductManagementPage # Added
 
 from dialogs.status_management_dialog import StatusManagementDialog # Added for status management
 from dialogs.manage_saved_filters_dialog import ManageSavedFiltersDialog # Import for managing saved filters
+<<<<<<< feature/redesign-gestion-document-ui
+=======
+from PyQt5.QtWidgets import QDateEdit
+
+>>>>>>> main
 
 
 from client_widget import ClientWidget
@@ -126,7 +132,7 @@ from PyQt5.QtGui import QColor, QPalette # For ClientListItemWidget text color
 
 from recruitment.recruitment_dashboard import RecruitmentDashboard # Import RecruitmentDashboard
 
-from home_page_widget import HomePageWidget # Added for new Home Page
+from ui.home.home_page_widget import HomePageWidget # Updated import path
 from experience_module_widget import ExperienceModuleWidget # Added
 from download_monitor_service import DownloadMonitorService
 from dialogs.assign_document_dialog import AssignDocumentToClientDialog
@@ -136,6 +142,8 @@ from db.cruds import user_saved_filters_crud # Import for saved filters
 
 from calendar_module.calendar_widget import CalendarWidget # Import CalendarWidget
 from user_management.page import UserManagementPage # Import UserManagementPage
+from user_management.user_menu_button import UserMenuButton # Import UserMenuButton
+from dialogs.edit_user_dialog import EditUserDialog # For handling edit/add user requests
 
 # Definition of configurable modules
 CONFIGURABLE_MODULES = [
@@ -364,6 +372,24 @@ class DocumentManager(QMainWindow):
         self.check_timer = QTimer(self); self.check_timer.timeout.connect(self.check_old_clients_routine_slot); self.check_timer.start(3600000)
         self.init_or_update_download_monitor() # Initialize or update based on config
         self.populate_saved_filters_combo() # Populate saved filters on init
+<<<<<<< feature/redesign-gestion-document-ui
+=======
+
+        # Set bottom widget for HomePageWidget if statistics module is enabled
+        if self.home_page_widget_instance and hasattr(self.home_page_widget_instance, 'set_bottom_widget'):
+            stats_widget_instance = self.get_statistics_widget_instance()
+            if stats_widget_instance:
+                self.home_page_widget_instance.set_bottom_widget(stats_widget_instance)
+            else: # Optionally hide or set a default placeholder if stats are disabled/unavailable
+                self.home_page_widget_instance.set_bottom_widget(None)
+
+
+    def get_statistics_widget_instance(self):
+        """Returns the instance of the statistics dashboard if available."""
+        if self.module_states.get('statistics', True) and hasattr(self, 'statistics_dashboard_instance'):
+            return self.statistics_dashboard_instance
+        return None
+>>>>>>> main
 
     def _load_module_states(self):
         """Loads the enabled/disabled state of configurable modules from the database."""
@@ -636,12 +662,20 @@ class DocumentManager(QMainWindow):
 
         filter_search_main_layout.addLayout(top_filter_line_layout) # This is the single visible line of filters
 
+<<<<<<< feature/redesign-gestion-document-ui
+=======
+
+>>>>>>> main
         # --- Collapsible Filter Widget ---
         self.collapsible_filter_widget = QWidget()
         collapsible_layout = QVBoxLayout(self.collapsible_filter_widget)
         # Remove top margin if it creates unwanted space when hidden, or ensure widget is fully hidden
         collapsible_layout.setContentsMargins(0, 2, 0, 0) # Minimal top margin when visible
 
+<<<<<<< feature/redesign-gestion-document-ui
+=======
+
+>>>>>>> main
         # Archive Filter (moved into collapsible area)
         archive_filter_layout_group = QWidget()
         archive_filter_v_layout = QVBoxLayout(archive_filter_layout_group)
@@ -683,6 +717,10 @@ class DocumentManager(QMainWindow):
         self.date_filter_end = QDateEdit()
         self.date_filter_end.setCalendarPopup(True)
         self.date_filter_end.setClearButtonEnabled(True)
+<<<<<<< feature/redesign-gestion-document-ui
+=======
+
+>>>>>>> main
         self.date_filter_end.setDate(QDate()) # Null date initially
         self.date_filter_end.setDisplayFormat("yyyy-MM-dd")
         self.date_filter_end.dateChanged.connect(self.filter_client_list_display_slot)
@@ -736,6 +774,10 @@ class DocumentManager(QMainWindow):
         # Remove the previous layout for reset_button_layout as it's now on the top line
         # filter_search_main_layout.addLayout(reset_button_layout) # This line is removed
 
+<<<<<<< feature/redesign-gestion-document-ui
+=======
+
+>>>>>>> main
         # The main stretch for filter_search_main_layout should be removed if we want the client list
         # to be directly under the collapsible_filter_widget (or top_filter_line_layout when collapsed).
         # filter_search_main_layout.addStretch(1) # REMOVE THIS to prevent pushing client list down
@@ -756,12 +798,22 @@ class DocumentManager(QMainWindow):
         client_actions_layout = QHBoxLayout()
         self.add_new_client_button = QPushButton(self.tr("Ajouter Nouveau Client")); self.add_new_client_button.setIcon(QIcon(":/icons/user-add.svg")); self.add_new_client_button.setObjectName("primaryButton"); self.add_new_client_button.clicked.connect(self.open_add_new_client_dialog)
         client_actions_layout.addWidget(self.add_new_client_button)
+<<<<<<< feature/redesign-gestion-document-ui
 
         self.add_client_by_voice_button = QPushButton(self.tr("Ajouter par Voix")); self.add_client_by_voice_button.setIcon(QIcon(":/icons/mic.svg")); self.add_client_by_voice_button.setObjectName("primaryButton")
         self.add_client_by_voice_button.clicked.connect(self.handle_add_client_by_voice_clicked)
         self.add_client_by_voice_button.setEnabled(False) # Disable as requested
         self.add_client_by_voice_button.setToolTip(self.tr("Fonctionnalité en cours de développement"))
         client_actions_layout.addWidget(self.add_client_by_voice_button)
+=======
+
+        self.add_client_by_voice_button = QPushButton(self.tr("Ajouter par Voix")); self.add_client_by_voice_button.setIcon(QIcon(":/icons/mic.svg")); self.add_client_by_voice_button.setObjectName("primaryButton")
+        self.add_client_by_voice_button.clicked.connect(self.handle_add_client_by_voice_clicked)
+        self.add_client_by_voice_button.setEnabled(False) # Disable as requested
+        self.add_client_by_voice_button.setToolTip(self.tr("Fonctionnalité en cours de développement"))
+        client_actions_layout.addWidget(self.add_client_by_voice_button)
+
+>>>>>>> main
 
         left_pane_layout.addLayout(client_actions_layout)
 
@@ -811,6 +863,10 @@ class DocumentManager(QMainWindow):
             self.more_filters_button.setIcon(QIcon(":/icons/chevron-down.svg")) # Change icon to down
             # self.more_filters_button.setText(self.tr("Plus de Filtres")) # Text removed
 
+<<<<<<< feature/redesign-gestion-document-ui
+=======
+
+>>>>>>> main
     def reset_all_filters_slot(self):
         """Resets all filter inputs to their default states and refreshes the client list."""
         logging.info("Resetting all filters.")
@@ -829,6 +885,10 @@ class DocumentManager(QMainWindow):
         if hasattr(self, 'date_filter_end'):
             self.date_filter_end.setDate(QDate())
 
+<<<<<<< feature/redesign-gestion-document-ui
+=======
+
+>>>>>>> main
         # Collapse the "More Filters" section if it's open
         if self.collapsible_filter_widget.isVisible():
             self.more_filters_button.setChecked(False) # This will trigger toggle_more_filters_visibility
@@ -1058,16 +1118,25 @@ class DocumentManager(QMainWindow):
         user_display_layout.setContentsMargins(5, 0, 5, 0) # Adjust margins as needed
         user_display_layout.setSpacing(10)
 
-        self.user_info_label = QLabel(self.tr("Non connecté"))
-        self.user_info_label.setObjectName("userInfoLabel") # For styling
-        user_display_layout.addWidget(self.user_info_label)
+        # self.user_info_label = QLabel(self.tr("Non connecté")) # Replaced by UserMenuButton
+        # self.user_info_label.setObjectName("userInfoLabel") # For styling
+        # user_display_layout.addWidget(self.user_info_label)
 
-        self.logout_button = QPushButton(self.tr("Déconnexion"))
-        self.logout_button.setIcon(QIcon(":/icons/log-out.svg")) # Ensure icon exists
-        self.logout_button.setFlat(True) # Make it look less like a bulky button in the menubar
-        self.logout_button.setToolTip(self.tr("Se déconnecter et revenir à l'écran de connexion"))
-        self.logout_button.clicked.connect(self._handle_logout)
-        user_display_layout.addWidget(self.logout_button)
+        # self.logout_button = QPushButton(self.tr("Déconnexion")) # Replaced by UserMenuButton
+        # self.logout_button.setIcon(QIcon(":/icons/log-out.svg"))
+        # self.logout_button.setFlat(True)
+        # self.logout_button.setToolTip(self.tr("Se déconnecter et revenir à l'écran de connexion"))
+        # self.logout_button.clicked.connect(self._handle_logout)
+        # user_display_layout.addWidget(self.logout_button)
+
+        self.user_menu_button_instance = UserMenuButton(current_user_info=self.current_user_info, parent=self)
+        self.user_menu_button_instance.setObjectName("userMenuButton") # Added object name
+        self.user_menu_button_instance.request_logout.connect(self._handle_logout)
+        self.user_menu_button_instance.request_show_user_management_page.connect(self.show_user_management_page)
+        self.user_menu_button_instance.request_open_edit_my_account_dialog.connect(self._handle_request_open_edit_my_account)
+        self.user_menu_button_instance.request_open_add_user_dialog.connect(self._handle_request_open_add_user)
+        user_display_layout.addWidget(self.user_menu_button_instance)
+
 
         # The following block redefining self.search_bar_line_edit is redundant
         # and was likely causing the issue. It's removed.
@@ -1161,16 +1230,22 @@ class DocumentManager(QMainWindow):
 
 
     def _update_user_display(self):
-        if self.current_user_info:
-            username = self.current_user_info.get('username', 'N/A')
-            role_name = self.current_user_info.get('role_name', 'N/A')
-            self.user_info_label.setText(self.tr("Utilisateur: {0} ({1})").format(username, role_name))
-            self.logout_button.setVisible(True)
+        if hasattr(self, 'user_menu_button_instance') and self.user_menu_button_instance:
+            self.user_menu_button_instance.update_user_info(self.current_user_info)
         else:
-            self.user_info_label.setText(self.tr("Non connecté"))
-            self.logout_button.setVisible(False) # Hide logout if no one is logged in (e.g. at startup before login)
+            # Fallback or initial setup if button not yet created - though it should be.
+            # This path is less likely if create_menus_main is called after current_user_info is set.
+            if self.current_user_info:
+                # self.user_info_label.setText(self.tr("Utilisateur: {0} ({1})").format(username, role_name)) # Old label
+                # self.logout_button.setVisible(True) # Old button
+                pass
+            else:
+                # self.user_info_label.setText(self.tr("Non connecté")) # Old label
+                # self.logout_button.setVisible(False) # Old button
+                pass
 
     def _handle_logout(self):
+        # This method is now also connected to UserMenuButton.request_logout signal
         from auth import authentication as auth_service # Local import
         from dialogs.login_dialog import LoginDialog # Local import
 
@@ -1215,8 +1290,8 @@ class DocumentManager(QMainWindow):
             if new_user_info:
                 self.current_user_info = new_user_info
                 self.current_user_id = self.current_user_info.get('user_id') # Update user_id
-                self._update_user_display()
-                self._apply_permissions() # Re-apply permissions for the new user
+                self._update_user_display() # This will now call user_menu_button_instance.update_user_info()
+                self._apply_permissions() # Re-apply permissions for the new user (menus etc.)
                 self.load_clients_from_db_slot() # Reload data relevant to the new user
                 # Potentially re-initialize other parts of the UI based on the new user/role
                 self.show()
@@ -1226,6 +1301,50 @@ class DocumentManager(QMainWindow):
         else: # Login cancelled after logout
             QMessageBox.information(self, "Déconnexion", "Vous avez été déconnecté. L'application va se fermer.")
             QApplication.instance().quit() # Exit if user cancels login after logout
+
+    def _handle_request_open_edit_my_account(self):
+        if not self.current_user_info:
+            QMessageBox.warning(self, self.tr("Erreur"), self.tr("Aucun utilisateur n'est connecté."))
+            return
+
+        user_id_to_edit = self.current_user_info.get('user_id')
+        if not user_id_to_edit:
+            QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("ID utilisateur manquant pour l'utilisateur actuel."))
+            return
+
+        # Pass current_user_info as current_admin_user_info because the user is initiating the action on themselves.
+        # EditUserDialog's internal logic will handle permissions for self-edit (e.g. role change).
+        dialog = EditUserDialog(user_id=user_id_to_edit,
+                                current_admin_user_info=self.current_user_info,
+                                parent=self)
+        if dialog.exec_() == QDialog.Accepted:
+            # User data might have changed, re-fetch and update
+            # This is important if e.g. full_name changed, to update display in UserMenuButton
+            from auth import authentication as auth_service # Local import
+            updated_user_info = auth_service.get_current_user() # Should reflect any changes if auth_service was updated by EditUserDialog
+            if updated_user_info:
+                 self.current_user_info = updated_user_info # Update main window's copy
+                 self._update_user_display() # Refresh the UserMenuButton display
+            # No need to reload client list or anything like that for self-account edit
+            self.notify(self.tr("Compte Modifié"), self.tr("Vos informations de compte ont été mises à jour."), type='SUCCESS')
+
+
+    def _handle_request_open_add_user(self):
+        if not self.current_user_info:
+            QMessageBox.warning(self, self.tr("Erreur"), self.tr("Opération non permise sans être connecté."))
+            return
+
+        # current_user_info is passed as current_admin_user_info to EditUserDialog
+        # The dialog itself (or the CRUD operation) will use P_MANAGE_USERS from this admin_user_info
+        dialog = EditUserDialog(user_id=None, # Indicates "add" mode
+                                current_admin_user_info=self.current_user_info,
+                                parent=self)
+        if dialog.exec_() == QDialog.Accepted:
+            # If a user was added, and the current view is UserManagementPage, refresh its table
+            if self.main_area_stack.currentWidget() == self.user_management_page_instance:
+                if hasattr(self.user_management_page_instance, 'load_users_to_table'):
+                    self.user_management_page_instance.load_users_to_table()
+            self.notify(self.tr("Utilisateur Ajouté"), self.tr("Le nouvel utilisateur a été créé avec succès."), type='SUCCESS')
 
 
     @pyqtSlot(str)
@@ -1428,6 +1547,10 @@ class DocumentManager(QMainWindow):
         self.client_list_widget.addItem(item)
         self.client_list_widget.setItemWidget(item, custom_widget)
 
+<<<<<<< feature/redesign-gestion-document-ui
+=======
+
+>>>>>>> main
 
     def load_countries_into_filter_combo(self):
         current_selection_data = self.country_filter_combo.currentData()
