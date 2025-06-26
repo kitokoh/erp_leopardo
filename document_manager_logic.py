@@ -23,8 +23,17 @@ from db.cruds.clients_crud import clients_crud_instance # Import the instance
 from db.cruds.projects_crud import add_project, get_project_by_id, delete_project # Fine
 from db.cruds.tasks_crud import add_task # Fine
 from db.cruds.contacts_crud import get_contact_by_email, add_contact, update_contact, link_contact_to_client, get_contacts_for_client, update_client_contact_link # Fine
-from db.cruds.products_crud import get_product_by_name, add_product
+from db.cruds.products_crud import get_product_by_name, add_product, products_crud_instance
+
 from db.cruds.client_project_products_crud import add_product_to_client_or_project, get_products_for_client_or_project
+
+import logging # For logging errors or info
+# Confirm import of products_crud_instance at module load time
+if 'products_crud_instance' in globals():
+    logging.info(f"DM_LOGIC: products_crud_instance successfully imported at module level: {products_crud_instance}")
+else:
+    logging.error("DM_LOGIC: products_crud_instance is NOT DEFINED at module level after import line!")
+
 
 # Import dialogs that are used within the moved logic
 # Assuming these dialogs are in a 'dialogs.py' or similar accessible location.
@@ -268,12 +277,30 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
             product_dialog = ProductDialog(client_id=actual_new_client_id, app_root_dir=doc_manager.app_root_dir, parent=doc_manager)
             if product_dialog.exec_() == QDialog.Accepted:
                 products_list_data = product_dialog.get_data()
+
+                # Check if products_crud_instance is defined before using it in the loop
+                if 'products_crud_instance' not in globals() or globals()['products_crud_instance'] is None:
+                    logging.error("DM_LOGIC: products_crud_instance is NOT available in handle_create_client_execution before product loop. This should have been caught at module load.")
+                    QMessageBox.critical(doc_manager, "Erreur Critique Module Produit", "Le module de gestion des produits n'est pas correctement initialisé.")
+                    # Optionally, return or raise an exception to prevent further processing
+                    # For now, we'll let it proceed and potentially hit NameErrors if it's truly not defined,
+                    # but the module-level log should have caught this.
+                else:
+                    logging.info(f"DM_LOGIC: products_crud_instance IS available in handle_create_client_execution: {globals()['products_crud_instance']}")
+
+
                 for product_item_data in products_list_data:
                     logging.info(f"Processing product item from dialog: {product_item_data}")
                     global_product_id_to_link = None
                     current_base_unit_price = None # Used to determine if override is needed
 
                     try:
+                        # products_crud_instance is now checked before the loop.
+                        # If it was None, an error message was shown.
+                        # If execution reaches here and it's still None (e.g. due to some very complex issue),
+                        # the NameError will occur as before, but the logs should give clues.
+
+
                         # Step 1: Determine the global_product_id
                         dialog_provided_global_product_id = product_item_data.get('product_id') # From selected existing product
                         product_code_from_dialog = product_item_data.get('product_code', "").strip()
@@ -309,10 +336,10 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                                 if add_result and add_result.get('success'):
                                     global_product_id_to_link = add_result.get('id')
                                     current_base_unit_price = new_global_product_data['base_unit_price']
-                                    logging.info(f"Helper: New global product created. ID: {global_product_id_to_link}")
+                                    logging.info(f"DM_LOGIC: New global product '{new_global_product_data['product_name']}' created with ID: {global_product_id_to_link}") # Enhanced log
                                 else:
                                     error_detail = add_result.get('error', 'Unknown error') if add_result else 'Unknown error'
-                                    logging.error(f"Helper: Failed to add new global product '{product_item_data.get('name')}' (Code: {product_code_from_dialog}). Error: {error_detail}")
+                                    logging.error(f"DM_LOGIC: Failed to add new global product '{product_item_data.get('name')}' (Code: {product_code_from_dialog}). Error: {error_detail}")
                                     QMessageBox.critical(doc_manager, doc_manager.tr("Erreur Création Produit Global"),
                                                          doc_manager.tr("Impossible de créer le produit global '{0}' (Code: {1}). Erreur: {2}").format(product_item_data['name'], product_code_from_dialog, error_detail))
                                     return False # Indicate failure for this item

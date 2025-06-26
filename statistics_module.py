@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
     QGroupBox, QFormLayout, QTableWidget, QHeaderView, QTabWidget, QProgressBar,
     QTableWidgetItem, QStackedWidget
 )
-from PyQt5.QtCore import Qt, QObject, pyqtSignal, pyqtSlot
+from PyQt5.QtCore import Qt, QObject, pyqtSignal, pyqtSlot, QTimer # Added QTimer
 from PyQt5.QtWebChannel import QWebChannel
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWebEngineWidgets import QWebEngineView
@@ -84,18 +84,19 @@ class StatisticsDashboard(QWidget):
 
         # Left widget for Map
         self.left_widget_for_map = QWidget()
-        left_map_layout = QVBoxLayout(self.left_widget_for_map)
-        left_map_layout.setContentsMargins(0,0,0,0)
-        self.map_view = QWebEngineView(self)
-        left_map_layout.addWidget(self.map_view)
-        self.left_widget_for_map.setLayout(left_map_layout)
+        # Create layout, set it as the layout for self.left_widget_for_map, AND store it
+        self._left_map_actual_layout = QVBoxLayout(self.left_widget_for_map)
+        self._left_map_actual_layout.setContentsMargins(0,0,0,0)
+        # self.left_widget_for_map.setLayout(self._left_map_actual_layout) # Redundant if QVBoxLayout constructor has parent
+
+
+        self.map_view = None # Initialize as None
         main_splitter.addWidget(self.left_widget_for_map)
 
         # Right widget for Stats
         self.right_widget_for_stats = QWidget()
         right_stats_layout = QVBoxLayout(self.right_widget_for_stats)
         right_stats_layout.setContentsMargins(5,5,5,5)
-        # self._setup_stats_display_ui(right_stats_layout) # This will be called later
         self.right_widget_for_stats.setLayout(right_stats_layout)
         main_splitter.addWidget(self.right_widget_for_stats)
 
@@ -103,21 +104,44 @@ class StatisticsDashboard(QWidget):
         main_layout.addWidget(main_splitter)
         self.setLayout(main_layout)
 
-        # Setup for interactive map
-        self.map_interaction_handler = MapInteractionHandler(self)
-        self.map_interaction_handler.country_clicked_signal.connect(self._on_map_country_clicked)
-        # Connect client_clicked_on_map_signal to the new panel display method
-        self.map_interaction_handler.client_clicked_on_map_signal.connect(self._display_client_details_in_panel)
+        self.map_interaction_handler = None # Initialize as None
 
-        web_channel = QWebChannel(self.map_view.page())
-        self.map_view.page().setWebChannel(web_channel)
-        web_channel.registerObject("pyMapConnector", self.map_interaction_handler)
+        self._setup_stats_display_ui(right_stats_layout)
 
-        # Placeholder for ported stats UI setup and initial data load
-        self._setup_stats_display_ui(right_stats_layout) # Now call it
+        # Defer map component initialization and initial data load that depends on map
+        QTimer.singleShot(0, self._initialize_map_and_load_data)
+
+        logging.info("StatisticsDashboard initialized. Map components will be loaded via QTimer.")
+
+    def _initialize_map_and_load_data(self):
+        """Deferred initialization of map components and initial data load."""
+        logging.info("StatisticsDashboard: _initialize_map_and_load_data called by QTimer.")
+
+        # Use the explicitly stored layout
+        target_layout = self._left_map_actual_layout
+
+        if not target_layout:
+            # This should absolutely not happen if __init__ worked.
+            logging.critical("StatisticsDashboard: self._left_map_actual_layout is None. This indicates a severe issue in __init__ or object state.")
+            return # Cannot proceed
+
+        if self.map_view is None:
+            # Parent QWebEngineView to self.left_widget_for_map, which is its container
+            self.map_view = QWebEngineView(self.left_widget_for_map)
+            target_layout.addWidget(self.map_view) # Add to the stored (and hopefully correct) layout
+            logging.info("StatisticsDashboard: QWebEngineView (self.map_view) created and added to _left_map_actual_layout.")
+
+
+            self.map_interaction_handler = MapInteractionHandler(self)
+            self.map_interaction_handler.country_clicked_signal.connect(self._on_map_country_clicked)
+            self.map_interaction_handler.client_clicked_on_map_signal.connect(self._display_client_details_in_panel)
+
+            web_channel = QWebChannel(self.map_view.page())
+            self.map_view.page().setWebChannel(web_channel)
+            web_channel.registerObject("pyMapConnector", self.map_interaction_handler)
+            logging.info("StatisticsDashboard: MapInteractionHandler and QWebChannel set up.")
+
         self.refresh_all_dashboard_content()
-
-        logging.info("StatisticsDashboard initialized with new interactive structure.")
 
     @pyqtSlot(str)
     def _on_map_country_clicked(self, country_name):
@@ -137,9 +161,12 @@ class StatisticsDashboard(QWidget):
 
     def refresh_all_dashboard_content(self):
         logging.info("Refreshing all dashboard content...")
-        self.refresh_statistics_data()
-        self.update_map()
-        logging.info("All dashboard content refresh complete.")
+        self.refresh_statistics_data() # This updates non-map stats
+        if self.map_view: # Only update map if it has been initialized
+            self.update_map()
+        else:
+            logging.info("StatisticsDashboard: Map view not yet initialized, skipping map update in refresh_all_dashboard_content.")
+        logging.info("All dashboard content refresh process initiated.")
 
     # Placeholder for _setup_stats_display_ui - to be filled in Phase 2
     def _setup_stats_display_ui(self, layout_to_populate):

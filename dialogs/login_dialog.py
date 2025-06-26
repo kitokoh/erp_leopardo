@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtWidgets import QCheckBox
 
 # Assuming auth.authentication module is accessible
 # Adjust import path if necessary based on project structure
@@ -62,8 +63,17 @@ class LoginDialog(QDialog):
         # Allow login on Enter press from password field
         self.password_input.returnPressed.connect(self._attempt_login)
 
+        # Remember Me Checkbox
+        self.remember_me_checkbox = QCheckBox(self.tr("Se souvenir de moi"))
+        self.remember_me_checkbox.setChecked(False) # Default to unchecked for security
+        # Add checkbox to a new QHBoxLayout for better alignment if needed, or directly to form_layout/main_layout
+        remember_me_layout = QHBoxLayout()
+        remember_me_layout.addStretch() # Push to the right
+        remember_me_layout.addWidget(self.remember_me_checkbox)
+        # form_layout.addRow(remember_me_layout) # Alternative placement
 
-        main_layout.addLayout(form_layout)
+        main_layout.addLayout(form_layout) # Add form layout first
+        main_layout.addLayout(remember_me_layout) # Then add remember_me layout
         main_layout.addStretch(1)
 
         # Buttons
@@ -82,7 +92,19 @@ class LoginDialog(QDialog):
         main_layout.addWidget(self.button_box)
 
         self.username_input.setFocus() # Set focus to username field initially
+        self._load_remembered_user()
 
+
+    def _load_remembered_user(self):
+        """Checks for a remembered user and pre-fills the form."""
+        remembered_username = authentication.get_remembered_user()
+        if remembered_username:
+            self.username_input.setText(remembered_username)
+            self.remember_me_checkbox.setChecked(True)
+            self.password_input.setFocus() # Move focus to password if username is filled
+            logger.info(f"Pre-filled login form for remembered user: {remembered_username}")
+        else:
+            self.username_input.setFocus() # Default focus if no user remembered
 
     def _attempt_login(self):
         username = self.username_input.text().strip()
@@ -97,10 +119,11 @@ class LoginDialog(QDialog):
         QApplication.processEvents() # Ensure UI updates
 
         try:
-            success, error_message, user_info = authentication.login(username, password)
+            remember_me_checked = self.is_remember_me_checked()
+            success, error_message, user_info = authentication.login(username, password, remember_me=remember_me_checked)
 
             if success and user_info:
-                logger.info(f"Login successful for user: {username}")
+                logger.info(f"Login successful for user: {username}. Remember Me: {remember_me_checked}")
                 self.user_data = user_info
                 self.login_successful.emit(user_info) # Emit signal with user data
                 self.accept() # Close the dialog with QDialog.Accepted status
@@ -128,6 +151,10 @@ class LoginDialog(QDialog):
         Call this after the dialog has been accepted.
         """
         return self.user_data
+
+    def is_remember_me_checked(self) -> bool:
+        """Returns the state of the 'Remember Me' checkbox."""
+        return self.remember_me_checkbox.isChecked()
 
 # Example Usage (for testing the dialog itself, not part of the main app flow here)
 if __name__ == '__main__':
