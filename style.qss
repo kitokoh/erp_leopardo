@@ -1064,6 +1064,7 @@ QMenu::indicator:non-exclusive:unchecked {
 
 /* == END OF MENU STYLING ENHANCEMENTS == */
 
+
 /* HomePageWidget Specific Styles */
 QWidget#HomePageWidget {
     background-color: #F5F7FA; /* Secondary Background, plus doux que blanc pur */
@@ -1124,10 +1125,9 @@ QWidget#homePageButtonGridContainer QPushButton:pressed {
 
 /* Style pour les icônes à l'intérieur des boutons de la page d'accueil si nécessaire */
 /* Actuellement, la taille est définie en Python. On pourrait ajouter des filtres ou des effets ici si Qt le supporte. */
-<<<<<<< feat/homepage-redesign-v1
 /* QWidget#homePageButtonGridContainer QPushButton::icon { ... } */
-=======
 /* QWidget#homePageButtonGridContainer QPushButton::icon { ... } */
+
 /* Specific button for "More Filters" */
 QPushButton#moreFiltersButton {
     background-color: #FFFFFF; /* White background */
@@ -1186,4 +1186,29 @@ QPushButton[class="tableActionButton"]:pressed {
     color: #0056B3;
 }
 
->>>>>>> main
+/* User Menu Button in Menu Bar */
+QPushButton#userMenuButton {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 16px; /* Half of the button's fixed size (32px / 2) */
+    padding: 0px;
+    min-width: 32px; /* Consistent with UserMenuButton fixed size */
+    max-width: 32px;
+    min-height: 32px;
+    max-height: 32px;
+    /* icon-size: 20px; */ /* Icon size is best controlled from UserMenuButton.py if precise sizing needed */
+}
+
+QPushButton#userMenuButton:hover {
+    background-color: #E0E0E0; /* Light grey hover */
+}
+
+QPushButton#userMenuButton:pressed {
+    background-color: #CFD8DC; /* Slightly darker grey when pressed */
+}
+
+QPushButton#userMenuButton::menu-indicator {
+    image: none; /* Hide default menu indicator arrow */
+}
+
+
