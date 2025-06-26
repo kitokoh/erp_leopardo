@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSlot, QSize
 from PyQt5.QtGui import QFont, QIcon, QMovie
 import os # Added for path construction
+from PyQt5.QtWidgets import QHBoxLayout
 
 class HomePageWidget(QWidget):
     def __init__(self, parent=None):
