@@ -1,0 +1,270 @@
+/* calculator/styles/calculator_style.qss */
+
+/* Base style for all calculator widgets if they set objectName */
+QWidget#CalculatorModuleBaseWidget { /* MainCalculatorWidget can set this */
+    background-color: #DCDCDC; /* Light grey background for the whole module area */
+    border-radius: 8px;
+}
+
+/* --- Display Styles --- */
+QLineEdit#CalculatorDisplay {
+    background-color: #E8F0FE; /* Light, slightly bluish LCD-like background */
+    color: #1C2833; /* Dark text */
+    border: 2px solid #AEB6BF;
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 26pt; /* Larger font for display */
+    font-family: "Open Sans", "Segoe UI", Arial, sans-serif; /* Consistent font */
+    font-weight: bold;
+}
+
+QLabel#CalculatorExpressionDisplay {
+    color: #566573; /* Dark grey for expression */
+    font-size: 11pt;
+    padding: 0 8px 2px 8px; /* Padding right and bottom */
+    background-color: transparent;
+}
+
+/* --- General Button Styles for Calculators --- */
+/* Applied to QWidget that is a direct child of MainCalculatorWidget, or specific calculator widgets */
+QWidget#CommercialCalculatorWidget QPushButton,
+QWidget#ScientificCalculatorWidget QPushButton {
+    border: 1px solid #B0BEC5; /* Slightly darker border than default theme */
+    border-radius: 5px;
+    padding: 10px 5px; /* Generous padding for touch feel */
+    font-size: 13pt;   /* Readable font size */
+    font-weight: 500; /* Medium weight */
+    color: #212121; /* Dark text for buttons */
+    background-color: #F5F5F5; /* Light grey for most buttons */
+    min-height: 35px; /* Ensure buttons are not too small */
+    min-width: 45px;
+}
+
+QWidget#CommercialCalculatorWidget QPushButton:hover,
+QWidget#ScientificCalculatorWidget QPushButton:hover {
+    background-color: #E0E0E0; /* Slightly darker on hover */
+    border-color: #9E9E9E;
+}
+
+QWidget#CommercialCalculatorWidget QPushButton:pressed,
+QWidget#ScientificCalculatorWidget QPushButton:pressed {
+    background-color: #D6D6D6; /* Even darker when pressed */
+    border-style: inset; /* Gives a pressed feel */
+}
+
+/* --- Number Buttons (0-9, .) --- */
+QPushButton[objectName="calcNumButton"],
+QPushButton[objectName="calcDotButton"] {
+    background-color: #FFFFFF; /* White for number buttons */
+    color: #1C2833;
+    font-weight: bold; /* Make numbers stand out */
+}
+QPushButton[objectName="calcNumButton"]:hover,
+QPushButton[objectName="calcDotButton"]:hover {
+    background-color: #F0F0F0;
+}
+QPushButton[objectName="calcNumButton"]:pressed,
+QPushButton[objectName="calcDotButton"]:pressed {
+    background-color: #E0E0E0;
+}
+
+
+/* --- Operator Buttons (+, -, *, /) --- */
+QPushButton[objectName="calcOperatorButton"] {
+    background-color: #CFD8DC; /* Bluish grey for operators */
+    color: #263238;
+    font-size: 15pt; /* Slightly larger for operator symbols if needed */
+}
+QPushButton[objectName="calcOperatorButton"]:hover {
+    background-color: #B0BEC5;
+}
+QPushButton[objectName="calcOperatorButton"]:pressed {
+    background-color: #90A4AE;
+}
+
+/* --- Equals Button (=) --- */
+QPushButton[objectName="calcEqualsButton"] {
+    background-color: #007BFF; /* Accent Blue from main theme */
+    color: #FFFFFF;
+    font-size: 16pt;
+    font-weight: bold;
+}
+QPushButton[objectName="calcEqualsButton"]:hover {
+    background-color: #0069D9;
+}
+QPushButton[objectName="calcEqualsButton"]:pressed {
+    background-color: #0056B3;
+}
+
+/* --- Clear Button (C, AC, CE) --- */
+QPushButton[objectName="calcClearButton"] {
+    background-color: #FF7043; /* Orange-Red for clear */
+    color: #FFFFFF;
+    font-weight: bold;
+}
+QPushButton[objectName="calcClearButton"]:hover {
+    background-color: #FF5722;
+}
+QPushButton[objectName="calcClearButton"]:pressed {
+    background-color: #F4511E;
+}
+
+/* --- Memory Buttons (M+, M-, MR, MC) --- */
+QPushButton[objectName="calcMemoryButton"] {
+    background-color: #78909C; /* Slate grey for memory functions */
+    color: #FFFFFF;
+}
+QPushButton[objectName="calcMemoryButton"]:hover {
+    background-color: #607D8B;
+}
+QPushButton[objectName="calcMemoryButton"]:pressed {
+    background-color: #546E7A;
+}
+
+/* --- Scientific Function Buttons (sin, cos, log, sqrt, etc.) --- */
+QPushButton[objectName="calcSciFunctionButton"] {
+    background-color: #616161; /* Darker grey for scientific functions */
+    color: #FFFFFF;
+    font-size: 11pt; /* Slightly smaller font if text is long */
+    padding: 8px 3px;
+}
+QPushButton[objectName="calcSciFunctionButton"]:hover {
+    background-color: #424242;
+}
+QPushButton[objectName="calcSciFunctionButton"]:pressed {
+    background-color: #303030;
+}
+
+/* Specific for Inv button if active */
+QPushButton#sciInvButtonActive {
+    background-color: #3F51B5; /* Indigo when active (from SciCalc) */
+    border: 2px solid #C5CAE9; /* Lighter border to show it's active */
+}
+
+
+/* Style for Cylinder Calculator QGroupBox and children */
+QWidget#CylinderCalculatorWidget QGroupBox {
+    background-color: #ECEFF1; /* Slightly different background for groups */
+    border: 1px solid #B0BEC5;
+    border-radius: 6px;
+    margin-top: 1ex;
+    padding: 12px;
+}
+QWidget#CylinderCalculatorWidget QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top center; /* Center title */
+    padding: 0 10px;
+    color: #37474F;
+    font-weight: bold;
+    background-color: #ECEFF1; /* Match groupbox bg */
+}
+QWidget#CylinderCalculatorWidget QLabel { /* Labels within Cylinder Calc */
+    font-weight: 500; /* Medium weight for input labels */
+    color: #455A64;
+    padding: 4px;
+    background-color: transparent;
+}
+QWidget#CylinderCalculatorWidget QLineEdit { /* Inputs within Cylinder Calc */
+    background-color: #FFFFFF;
+    border: 1px solid #90A4AE;
+    border-radius: 4px;
+    padding: 6px;
+    font-size: 11pt;
+}
+QWidget#CylinderCalculatorWidget QPushButton#calculateCylinderButton { /* Specific ID for calculate button */
+    background-color: #0288D1; /* Specific Blue */
+    color: white;
+    font-size: 13pt;
+    font-weight: bold;
+    padding: 10px 15px;
+}
+QWidget#CylinderCalculatorWidget QPushButton#calculateCylinderButton:hover {
+    background-color: #0277BD;
+}
+QWidget#CylinderCalculatorWidget QLabel[objectName="cylinderResultLabel"] { /* For result labels if they get an objectName */
+    font-weight: normal;
+    padding: 5px;
+    background-color: #E1F5FE; /* Light blue for results */
+    border-radius: 4px;
+    border: 1px solid #B3E5FC;
+    font-size: 11pt;
+    color: #01579B;
+}
+QWidget#CylinderCalculatorWidget QLabel#bucklingWarningLabel { /* Already has specific style in QSS */
+    color: #D32F2F; /* Stronger Red */
+    font-weight: bold;
+    font-size: 10pt;
+    background-color: #FFCDD2; /* Light red background */
+    padding: 5px;
+    border-radius: 4px;
+    border: 1px solid #EF9A9A;
+}
+
+/* Style for Unit Converter */
+QWidget#UnitConverterCalculatorWidget {
+    background-color: #E8EAF6; /* Lavender-ish background */
+    padding: 15px;
+}
+QWidget#UnitConverterCalculatorWidget QComboBox {
+    font-size: 12pt;
+    padding: 6px;
+    border: 1px solid #9FA8DA;
+    border-radius: 4px;
+    background-color: white;
+    min-height: 30px;
+}
+QWidget#UnitConverterCalculatorWidget QLineEdit {
+    font-size: 13pt;
+    padding: 6px;
+    border: 1px solid #9FA8DA;
+    border-radius: 4px;
+}
+QWidget#UnitConverterCalculatorWidget QLabel#unitConverterEqualsLabel {
+    font-size: 22pt;
+    font-weight: bold;
+    color: #3F51B5; /* Indigo */
+    padding: 0 10px;
+}
+
+/* History Display Dialog */
+QDialog#HistoryDisplayDialog QTextEdit {
+    background-color: #FAFAFA;
+    border: 1px solid #CFD8DC;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 10pt; /* Slightly smaller for history log */
+    color: #37474F;
+}
+QDialog#HistoryDisplayDialog QPushButton {
+    background-color: #607D8B;
+    color: white;
+    padding: 8px 12px;
+    font-size: 10pt;
+}
+QDialog#HistoryDisplayDialog QPushButton:hover {
+    background-color: #546E7A;
+}
+
+/* Main Calculator Widget (the container) */
+QWidget#MainCalculatorWidget {
+    background-color: #F5F7FA; /* From main theme secondary background */
+    /* No border here, it's a module within a larger app */
+}
+
+QWidget#MainCalculatorWidget QComboBox#calculatorSelectorCombo { /* For the main selector */
+    font-size: 12pt;
+    padding: 8px;
+    border: 1px solid #B0BEC5;
+    border-radius: 4px;
+    background-color: white;
+    min-height: 30px;
+}
+QWidget#MainCalculatorWidget QPushButton#historyButton { /* For the main history button */
+    font-size: 11pt;
+    padding: 8px 12px;
+    background-color: #E8EAF6; /* Light lavender */
+    color: #3F51B5; /* Indigo text */
+    border: 1px solid #C5CAE9;
+}
+QWidget#MainCalculatorWidget QPushButton#historyButton:hover {
+    background-color: #C5CAE9;
+}
