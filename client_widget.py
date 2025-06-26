@@ -3175,11 +3175,7 @@ class ClientWidget(QWidget):
                 client_base_path = self.client_info.get("base_folder_path")
                 if not client_base_path:
                     client_base_path = self.client_info.get("default_base_folder_path", "")
-<<<<<<< feature/multi-fixes-and-remember-me
-
-=======
                 
->>>>>>> main
                 if not client_base_path or not os.path.isdir(client_base_path):
                     QMessageBox.warning(self, self.tr("Erreur Dossier Client"), self.tr("Le chemin du dossier de base du client n'est pas configuré ou est invalide."))
                     return
@@ -3858,11 +3854,7 @@ class ClientWidget(QWidget):
                     elif selected_type_filter == "XLSX" and not is_xlsx: doc_passes_type_filter = False
                     elif selected_type_filter == "DOCX" and not is_docx: doc_passes_type_filter = False
                     elif selected_type_filter == "OTHER" and (is_html or is_pdf or is_xlsx or is_docx): doc_passes_type_filter = False
-<<<<<<< feature/multi-fixes-and-remember-me
-
-=======
                 
->>>>>>> main
                 if doc_passes_lang_filter and doc_passes_type_filter:
                     filtered_list.append(doc_data)
             logging.info("PT_DEBUG: populate_doc_table - Client-side filtering completed. Count: {len(filtered_list)}")
@@ -3905,20 +3897,12 @@ class ClientWidget(QWidget):
             logging.info("PT_DEBUG: populate_doc_table - Starting loop to populate rows.")
             for row_idx, doc_data in enumerate(filtered_list):
                 logging.info(f"PT_DEBUG: populate_doc_table - Populating row {row_idx + 1}/{len(filtered_list)}, doc_id: {doc_data.get('document_id')}")
-<<<<<<< feature/multi-fixes-and-remember-me
-
-=======
                 
->>>>>>> main
                 document_id = doc_data.get('document_id')
                 doc_name = doc_data.get('document_name', 'N/A')
                 file_path_relative_from_db = doc_data.get('file_path_relative', '')
                 order_identifier_for_doc = doc_data.get('order_identifier')
-<<<<<<< feature/multi-fixes-and-remember-me
-
-=======
                 
->>>>>>> main
                 language_code = doc_data.get('language_code', "N/A")
                 if language_code == "N/A" and file_path_relative_from_db: # Infer
                     path_parts = file_path_relative_from_db.split(os.sep)
@@ -3935,11 +3919,7 @@ class ClientWidget(QWidget):
                         logging.warning(f"PT_DEBUG: populate_doc_table - File not found: {full_file_path} for doc_id {document_id}")
                 else:
                     logging.warning(f"PT_DEBUG: populate_doc_table - Missing relative path for doc_id {document_id}")
-<<<<<<< feature/multi-fixes-and-remember-me
-
-=======
                 
->>>>>>> main
                 name_item = QTableWidgetItem(doc_name)
                 name_item.setData(Qt.UserRole, full_file_path if full_file_path else None)
 
@@ -3951,11 +3931,7 @@ class ClientWidget(QWidget):
                         dt_obj = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
                         mod_time_formatted = dt_obj.strftime('%Y-%m-%d %H:%M')
                     except ValueError: mod_time_formatted = created_at_str
-<<<<<<< feature/multi-fixes-and-remember-me
-
-=======
                 
->>>>>>> main
                 logging.debug(f"PT_DEBUG: populate_doc_table - Row {row_idx}: Setting basic items.")
                 self.doc_table.setItem(row_idx, 0, name_item)
                 self.doc_table.setItem(row_idx, 1, QTableWidgetItem(file_type_str))
@@ -3964,11 +3940,7 @@ class ClientWidget(QWidget):
 
                 logging.debug(f"PT_DEBUG: populate_doc_table - Row {row_idx}: Creating action widget.")
                 action_widget = QWidget(); action_layout = QHBoxLayout(action_widget); action_layout.setContentsMargins(2,2,2,2); action_layout.setSpacing(5)
-<<<<<<< feature/multi-fixes-and-remember-me
-
-=======
                 
->>>>>>> main
                 pdf_btn = QPushButton(""); pdf_btn.setIcon(QIcon(":/icons/file-text.svg")); pdf_btn.setToolTip(self.tr("Générer/Ouvrir PDF")); pdf_btn.setFixedSize(30,30)
                 pdf_btn.clicked.connect(lambda _, p=full_file_path: self._handle_open_pdf_action(p))
                 action_layout.addWidget(pdf_btn)
@@ -3983,11 +3955,7 @@ class ClientWidget(QWidget):
                     template_info_for_edit_btn = db_manager.get_template_by_id(source_template_id)
                     if template_info_for_edit_btn and template_info_for_edit_btn.get('template_type', '').startswith('html'):
                         can_edit_source_template = True
-<<<<<<< feature/multi-fixes-and-remember-me
-
-=======
                 
->>>>>>> main
                 role_name = self.current_user_info.get('role_name') if self.current_user_info else None
                 can_manage_docs = has_permission(role_name, P_MANAGE_CLIENT_DOCUMENTS)
 
@@ -4015,11 +3983,7 @@ class ClientWidget(QWidget):
                     action_layout.addWidget(delete_btn)
                 else: # No permission to delete
                     spacer_widget = QWidget(); spacer_widget.setFixedSize(30,30); action_layout.addWidget(spacer_widget)
-<<<<<<< feature/multi-fixes-and-remember-me
-
-=======
                 
->>>>>>> main
                 action_layout.addStretch(); action_widget.setLayout(action_layout)
                 logging.debug(f"PT_DEBUG: populate_doc_table - Row {row_idx}: Setting cell widget.")
                 self.doc_table.setCellWidget(row_idx, 4, action_widget)

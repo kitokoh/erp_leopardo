@@ -22,6 +22,7 @@ from html_editor import HtmlEditor
 from utils import populate_docx_template
 # clients_crud_instance is not used by CreateDocumentDialog
 import icons_rc # Import for Qt resource file
+from PyQt5.QtWidgets import QFormLayout
 
 class CreateDocumentDialog(QDialog):
     # Maps internal type keys to user-friendly names and template_type filters
