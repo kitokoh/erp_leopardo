@@ -107,7 +107,7 @@ class HomePageWidget(QWidget):
         # right_content_area.setStyleSheet("background-color: #00FF00;") # For debugging layout
         right_content_layout = QVBoxLayout(right_content_area) # Basic layout for now
         right_content_layout.setContentsMargins(20,20,20,20)
-
+        
         gif_label = QLabel()
         # Construct path to GIF. This assumes 'resources' is at the same level as the script's dir or project root.
         # A more robust solution might involve getting APP_ROOT_DIR if this widget needs to be more portable.
@@ -130,7 +130,7 @@ class HomePageWidget(QWidget):
             gif_placeholder_label.setAlignment(Qt.AlignCenter)
             gif_placeholder_label.setStyleSheet("color: red; font-style: italic;")
             right_content_layout.addWidget(gif_placeholder_label)
-
+            
         right_content_area.setLayout(right_content_layout)
 
 
