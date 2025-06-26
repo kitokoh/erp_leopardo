@@ -612,9 +612,21 @@ class ClientWidget(QWidget):
             self.documents_empty_label.setFont(font_docs_empty)
             docs_layout.addWidget(self.documents_empty_label)
             self.doc_table = QTableWidget()
-            self.doc_table.setColumnCount(5)
-            self.doc_table.setHorizontalHeaderLabels([self.tr("Nom"), self.tr("Type"), self.tr("Langue"), self.tr("Date"), self.tr("Actions")])
+            # Increased column count for new "Quick Actions" column
+            self.doc_table.setColumnCount(6)
+            self.doc_table.setHorizontalHeaderLabels([
+                self.tr("Nom"), self.tr("Type"), self.tr("Langue"),
+                self.tr("Date"), self.tr("Fichier Original"), self.tr("Actions Rapides") # Added "Fichier Original" and "Actions Rapides"
+            ])
             self.doc_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            # Adjust column widths - make Actions Rapides and Fichier Original fit content
+            self.doc_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch) # Nom
+            self.doc_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents) # Type
+            self.doc_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents) # Langue
+            self.doc_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents) # Date
+            self.doc_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents) # Fichier Original
+            self.doc_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents) # Actions Rapides
+
             self.doc_table.setSelectionBehavior(QAbstractItemView.SelectRows)
             self.doc_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
             docs_layout.addWidget(self.doc_table)
@@ -3985,13 +3997,73 @@ class ClientWidget(QWidget):
                     spacer_widget = QWidget(); spacer_widget.setFixedSize(30,30); action_layout.addWidget(spacer_widget)
 
                 action_layout.addStretch(); action_widget.setLayout(action_layout)
-                logging.debug(f"PT_DEBUG: populate_doc_table - Row {row_idx}: Setting cell widget.")
+                logging.debug(f"PT_DEBUG: populate_doc_table - Row {row_idx}: Setting legacy actions cell widget (column 4).")
+                # This is the old "Actions" column, now "Fichier Original"
                 self.doc_table.setCellWidget(row_idx, 4, action_widget)
+
+                # --- New Quick Actions Column (Column 5) ---
+                quick_actions_widget = QWidget()
+                quick_actions_layout = QHBoxLayout(quick_actions_widget)
+                quick_actions_layout.setContentsMargins(2, 2, 2, 2)
+                quick_actions_layout.setSpacing(5)
+
+                btn_preview_quick = QPushButton("")
+                btn_preview_quick.setProperty("class", "tableActionButton") # Added class property
+                btn_preview_quick.setIcon(QIcon(":/icons/eye.svg"))
+                btn_preview_quick.setToolTip(self.tr("Aperçu rapide du document (meilleur effort)"))
+                btn_preview_quick.setFixedSize(28, 28) # Smaller buttons
+                # Store document data needed for the action
+                btn_preview_quick.setProperty("document_id", document_id)
+                btn_preview_quick.setProperty("file_path", full_file_path)
+                btn_preview_quick.setProperty("file_name", doc_name)
+                btn_preview_quick.clicked.connect(self.on_preview_doc_button_clicked)
+                quick_actions_layout.addWidget(btn_preview_quick)
+
+                btn_download_quick = QPushButton("")
+                btn_download_quick.setProperty("class", "tableActionButton") # Added class property
+                btn_download_quick.setIcon(QIcon(":/icons/download.svg"))
+                btn_download_quick.setToolTip(self.tr("Télécharger ce document"))
+                btn_download_quick.setFixedSize(28, 28)
+                btn_download_quick.setProperty("document_id", document_id)
+                btn_download_quick.setProperty("file_path", full_file_path)
+                btn_download_quick.setProperty("file_name", doc_name) # Original name for download
+                btn_download_quick.clicked.connect(self.on_download_doc_button_clicked)
+                quick_actions_layout.addWidget(btn_download_quick)
+
+                quick_actions_layout.addStretch()
+                quick_actions_widget.setLayout(quick_actions_layout)
+                self.doc_table.setCellWidget(row_idx, 5, quick_actions_widget) # New column index
+                # --- End New Quick Actions Column ---
+
                 logging.info(f"PT_DEBUG: populate_doc_table - Finished populating row {row_idx + 1}/{len(filtered_list)}.")
             logging.info("PT_DEBUG: populate_doc_table - Finished loop for populating rows.")
             logging.info("PT_DEBUG: populate_doc_table - END (SUCCESS)")
         finally:
             self._is_populating_docs = False
+
+    def on_preview_doc_button_clicked(self):
+        button = self.sender()
+        if button:
+            file_path = button.property("file_path")
+            # document_id = button.property("document_id") # Not used by preview_document_file
+            if file_path and os.path.exists(file_path):
+                self.preview_document_file(file_path) # Call existing method
+            elif file_path:
+                QMessageBox.warning(self, self.tr("Aperçu Impossible"), self.tr("Le fichier '{0}' est introuvable.").format(os.path.basename(file_path)))
+            else:
+                QMessageBox.warning(self, self.tr("Aperçu Impossible"), self.tr("Chemin du fichier non disponible pour l'aperçu."))
+
+    def on_download_doc_button_clicked(self):
+        button = self.sender()
+        if button:
+            file_path = button.property("file_path")
+            original_file_name = button.property("file_name")
+            if file_path and os.path.exists(file_path):
+                self.download_document_file(file_path, original_file_name) # Call existing method
+            elif file_path:
+                QMessageBox.warning(self, self.tr("Téléchargement Impossible"), self.tr("Le fichier source '{0}' est introuvable.").format(os.path.basename(file_path)))
+            else:
+                QMessageBox.warning(self, self.tr("Téléchargement Impossible"), self.tr("Chemin du fichier source non disponible."))
 
     def handle_edit_source_template(self, document_data):
         source_template_id = document_data.get('source_template_id')
