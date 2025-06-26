@@ -67,6 +67,7 @@ L'application s'articule autour des modules fonctionnels principaux suivants (ch
     *   Description : [Module Gestion des Partenaires](./module_gestion_partenaires.md)
 *   **Sécurité (fonctionnalités spécifiques UI)**:
     *   Description : [Module Sécurité (Fonctionnalités Spécifiques UI)](./module_securite_specifique_ui.md)
+
 *   **API Backend (si applicable comme distincte)**:
     *   Description : [Module API Backend Desktop](./module_api_backend_desktop.md)
 *   **Base de Données**:

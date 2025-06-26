@@ -5,6 +5,10 @@ ENV/
 .venv/
 pythonenv/
 pyenv/
+env/
+__pycache__/
+*.log
+*.pyc
 
 ### Fichiers Python compilés et cache ###
 __pycache__/
