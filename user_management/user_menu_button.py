@@ -3,6 +3,7 @@ import logging
 from PyQt5.QtWidgets import QPushButton, QMenu, QAction, QLabel, QWidgetAction, QApplication, QMessageBox
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, pyqtSignal, QPoint # Import QPoint
+from PyQt5.QtCore import Qt, pyqtSignal
 
 from auth.permissions import has_permission, P_MANAGE_USERS
 # Import EditUserDialog relatively if UserMenuButton is in the same directory level as dialogs,
@@ -88,6 +89,7 @@ class UserMenuButton(QPushButton):
         # The menu is parented to self (the button), so it should position correctly by default
         # For more control: self.user_menu.popup(self.mapToGlobal(self.rect().bottomLeft()))
         self.user_menu.exec_(self.mapToGlobal(self.rect().bottomLeft() + QPoint(0, 5))) # Use imported QPoint
+
 
 
     def _handle_edit_my_account(self):

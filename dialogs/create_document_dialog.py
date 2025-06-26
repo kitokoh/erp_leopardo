@@ -360,10 +360,20 @@ class CreateDocumentDialog(QDialog):
             document_context = {}
 
         # Determine Output Filename and Path
-        client_base_folder = self.client_info.get("base_folder_path") or self.client_info.get("default_base_folder_path")
+        client_base_folder_explicit = self.client_info.get("base_folder_path")
+        client_base_folder_default = self.client_info.get("default_base_folder_path")
+        logging.info(f"CreateDocumentDialog: client_info content: {self.client_info}")
+        logging.info(f"CreateDocumentDialog: Trying 'base_folder_path': {client_base_folder_explicit}")
+        logging.info(f"CreateDocumentDialog: Trying 'default_base_folder_path': {client_base_folder_default}")
+
+        client_base_folder = client_base_folder_explicit or client_base_folder_default
+
         if not client_base_folder or not os.path.isdir(client_base_folder):
+            logging.error(f"CreateDocumentDialog: Final client_base_folder '{client_base_folder}' is invalid or not a directory.")
             QMessageBox.critical(self, self.tr("Erreur Dossier Client"), self.tr("Dossier client non configuré ou invalide."))
             return None
+        else:
+            logging.info(f"CreateDocumentDialog: Using client_base_folder: {client_base_folder}")
 
         # Use a subfolder based on template's display name for organization
         doc_type_name_for_folder = template_display_name_for_output.replace(" ", "_").replace("/", "_")
