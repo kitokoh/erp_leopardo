@@ -105,6 +105,7 @@ from product_management.page import ProductManagementPage # Added
 
 from dialogs.status_management_dialog import StatusManagementDialog # Added for status management
 from dialogs.manage_saved_filters_dialog import ManageSavedFiltersDialog # Import for managing saved filters
+
 from PyQt5.QtWidgets import QDateEdit
 
 
@@ -369,6 +370,7 @@ class DocumentManager(QMainWindow):
         self.check_timer = QTimer(self); self.check_timer.timeout.connect(self.check_old_clients_routine_slot); self.check_timer.start(3600000)
         self.init_or_update_download_monitor() # Initialize or update based on config
         self.populate_saved_filters_combo() # Populate saved filters on init
+
 
         # Set bottom widget for HomePageWidget if statistics module is enabled
         if self.home_page_widget_instance and hasattr(self.home_page_widget_instance, 'set_bottom_widget'):
