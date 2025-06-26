@@ -404,42 +404,12 @@ class StatisticsDashboard(QWidget):
             else:
                 logging.info("No client count data to display on map for choropleth/GeoJson coloring.")
 
-
-            if data_for_map["country_name"] and data_for_map["client_count"]:
-                df = pd.DataFrame(data_for_map)
-
-                # Define color categories and thresholds
-                category_colors = ['#f0f0f0', '#c6dbef', '#6baed6', '#08519c'] # Grey, Light Blue, Medium Blue, Dark Blue
-                # Index: Start of each category. [0, 1, 2, 4] means:
-                #   color[0] for values in [0, 1) (i.e., 0 clients)
-                #   color[1] for values in [1, 2) (i.e., 1 client)
-                #   color[2] for values in [2, 4) (i.e., 2, 3 clients)
-                #   color[3] for values >= 4 (i.e., 4+ clients)
-                color_index = [0, 1, 2, 4]
-
-                max_observed_clients = df["client_count"].max() if not df.empty else 0
-
-                client_colormap = StepColormap(
-                    colors=category_colors,
-                    index=color_index,
-                    vmin=0,
-                    vmax=max(4, max_observed_clients), # Ensure colormap covers at least up to 4, or max observed
-                    caption=self.tr("Client Count by Country (Categories)")
-                )
-
-                folium.Choropleth(
-                    geo_data=geojson_path, name="choropleth", data=df,
-                    columns=["country_name", "client_count"], key_on="feature.properties.name",
-                    # fill_color is handled by client_colormap.add_to(m)
-                    fill_opacity=0.7, # Slightly more opaque for better color visibility
-                    line_opacity=0.3,
-                    highlight=True,
-                    # legend_name removed to use the StepColormap's legend
-                ).add_to(m)
-
-                # Add the colormap itself to the map to generate the legend and apply color
-                client_colormap.add_to(m)
-
+            # The folium.GeoJson layer with style_function (defined earlier) already handles
+            # the country coloring and adds the client_colormap to the map.
+            # The separate folium.Choropleth call that was here previously was redundant
+            # for coloring purposes if the GeoJson layer is active with its style_function.
+            # If data_for_map was used for something else, that logic would need to be preserved,
+            # but it was primarily for the redundant Choropleth.
 
             # Fetch active client data for interactive markers/popups
             # This is a simplified version; in DocumentManager it's get_active_clients_per_country
