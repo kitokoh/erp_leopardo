@@ -12,6 +12,7 @@ from PyQt5.QtCore import Qt
 
 import db as db_manager # This class uses db_manager directly
 import icons_rc # Import for Qt resource file
+from PyQt5.QtWidgets import QWidget
 
 class ClientProductDimensionDialog(QDialog):
     def __init__(self, client_id, product_id, app_root_dir, parent=None):

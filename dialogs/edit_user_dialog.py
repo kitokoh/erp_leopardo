@@ -119,6 +119,7 @@ class EditUserDialog(QDialog):
                 #     if index >= 0: self.role_combo.setCurrentIndex(index)
                 pass # No default role set for now, user must select
         except Exception as e: # This is the except for the role population try block
+
             logger.error(f"Failed to populate roles in EditUserDialog: {e}", exc_info=True)
             QMessageBox.warning(self, self.tr("Erreur Chargement Rôles"),
                                 self.tr("Impossible de charger la liste des rôles."))
