@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
+from PyQt5.QtCore import QDate
 
 # --- BEGIN WORKAROUND for ModuleNotFoundError ---
 # Ensure the project root is in sys.path when main_window.py is loaded.
@@ -104,6 +105,8 @@ from product_management.page import ProductManagementPage # Added
 
 from dialogs.status_management_dialog import StatusManagementDialog # Added for status management
 from dialogs.manage_saved_filters_dialog import ManageSavedFiltersDialog # Import for managing saved filters
+from PyQt5.QtWidgets import QDateEdit
+
 
 
 from client_widget import ClientWidget
@@ -126,7 +129,7 @@ from PyQt5.QtGui import QColor, QPalette # For ClientListItemWidget text color
 
 from recruitment.recruitment_dashboard import RecruitmentDashboard # Import RecruitmentDashboard
 
-from home_page_widget import HomePageWidget # Added for new Home Page
+from ui.home.home_page_widget import HomePageWidget # Updated import path
 from experience_module_widget import ExperienceModuleWidget # Added
 from download_monitor_service import DownloadMonitorService
 from dialogs.assign_document_dialog import AssignDocumentToClientDialog
@@ -636,11 +639,13 @@ class DocumentManager(QMainWindow):
 
         filter_search_main_layout.addLayout(top_filter_line_layout) # This is the single visible line of filters
 
+
         # --- Collapsible Filter Widget ---
         self.collapsible_filter_widget = QWidget()
         collapsible_layout = QVBoxLayout(self.collapsible_filter_widget)
         # Remove top margin if it creates unwanted space when hidden, or ensure widget is fully hidden
         collapsible_layout.setContentsMargins(0, 2, 0, 0) # Minimal top margin when visible
+
 
         # Archive Filter (moved into collapsible area)
         archive_filter_layout_group = QWidget()
@@ -683,6 +688,7 @@ class DocumentManager(QMainWindow):
         self.date_filter_end = QDateEdit()
         self.date_filter_end.setCalendarPopup(True)
         self.date_filter_end.setClearButtonEnabled(True)
+
         self.date_filter_end.setDate(QDate()) # Null date initially
         self.date_filter_end.setDisplayFormat("yyyy-MM-dd")
         self.date_filter_end.dateChanged.connect(self.filter_client_list_display_slot)
@@ -736,6 +742,7 @@ class DocumentManager(QMainWindow):
         # Remove the previous layout for reset_button_layout as it's now on the top line
         # filter_search_main_layout.addLayout(reset_button_layout) # This line is removed
 
+
         # The main stretch for filter_search_main_layout should be removed if we want the client list
         # to be directly under the collapsible_filter_widget (or top_filter_line_layout when collapsed).
         # filter_search_main_layout.addStretch(1) # REMOVE THIS to prevent pushing client list down
@@ -762,6 +769,7 @@ class DocumentManager(QMainWindow):
         self.add_client_by_voice_button.setEnabled(False) # Disable as requested
         self.add_client_by_voice_button.setToolTip(self.tr("Fonctionnalité en cours de développement"))
         client_actions_layout.addWidget(self.add_client_by_voice_button)
+
 
         left_pane_layout.addLayout(client_actions_layout)
 
@@ -811,6 +819,7 @@ class DocumentManager(QMainWindow):
             self.more_filters_button.setIcon(QIcon(":/icons/chevron-down.svg")) # Change icon to down
             # self.more_filters_button.setText(self.tr("Plus de Filtres")) # Text removed
 
+
     def reset_all_filters_slot(self):
         """Resets all filter inputs to their default states and refreshes the client list."""
         logging.info("Resetting all filters.")
@@ -828,6 +837,7 @@ class DocumentManager(QMainWindow):
             self.date_filter_start.setDate(QDate())
         if hasattr(self, 'date_filter_end'):
             self.date_filter_end.setDate(QDate())
+
 
         # Collapse the "More Filters" section if it's open
         if self.collapsible_filter_widget.isVisible():
@@ -1427,6 +1437,7 @@ class DocumentManager(QMainWindow):
 
         self.client_list_widget.addItem(item)
         self.client_list_widget.setItemWidget(item, custom_widget)
+
 
 
     def load_countries_into_filter_combo(self):
