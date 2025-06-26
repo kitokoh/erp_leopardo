@@ -510,43 +510,57 @@ class DocumentManager(QMainWindow):
         top_filter_line_layout = QHBoxLayout()
 
         # Status Filter
-        status_filter_layout_group = QWidget() # Use a QWidget as a container for label and combo
-        status_filter_v_layout = QVBoxLayout(status_filter_layout_group)
-        status_filter_v_layout.setContentsMargins(0,0,0,0)
-        status_label = QLabel(self.tr("Statut:"))
+        # status_filter_layout_group = QWidget() # Use a QWidget as a container for label and combo
+        # status_filter_v_layout = QVBoxLayout(status_filter_layout_group)
+        # status_filter_v_layout.setContentsMargins(0,0,0,0)
+        # status_label = QLabel(self.tr("Statut:")) # Label for status
         self.status_filter_combo = QComboBox(); self.status_filter_combo.addItem(self.tr("Tous les statuts"), None)
         self.load_statuses_into_filter_combo(); self.status_filter_combo.currentIndexChanged.connect(self.filter_client_list_display_slot)
-        status_filter_v_layout.addWidget(status_label)
-        status_filter_v_layout.addWidget(self.status_filter_combo)
-        top_filter_line_layout.addWidget(status_filter_layout_group)
+        self.status_filter_combo.setToolTip(self.tr("Filtrer par statut"))
+        # status_filter_v_layout.addWidget(status_label)
+        # status_filter_v_layout.addWidget(self.status_filter_combo)
+        top_filter_line_layout.addWidget(self.status_filter_combo) # Add combo directly
 
-        # Search Input (simplified, always visible for now)
-        search_input_layout_group = QWidget() # Container for label and input
-        search_input_v_layout = QVBoxLayout(search_input_layout_group)
-        search_input_v_layout.setContentsMargins(0,0,0,0)
-        self.search_label = QLabel(self.tr("Recherche:"))
+        # Search Input
+        # search_input_layout_group = QWidget() # Container for label and input
+        # search_input_v_layout = QVBoxLayout(search_input_layout_group)
+        # search_input_v_layout.setContentsMargins(0,0,0,0)
+        # self.search_label = QLabel(self.tr("Recherche:")) # Label for search
+        # self.search_label.setVisible(False) # Hide label for compactness
         self.search_input_field = QLineEdit(); self.search_input_field.setPlaceholderText(self.tr("Rechercher client..."))
         self.search_input_field.textChanged.connect(self.filter_client_list_display_slot)
-        search_input_v_layout.addWidget(self.search_label)
-        search_input_v_layout.addWidget(self.search_input_field)
-        top_filter_line_layout.addWidget(search_input_layout_group)
+        # search_input_v_layout.addWidget(self.search_label)
+        # search_input_v_layout.addWidget(self.search_input_field)
+        top_filter_line_layout.addWidget(self.search_input_field) # Add input directly
 
-        top_filter_line_layout.addStretch(1) # Pushes search and status to left
+        top_filter_line_layout.addStretch(1) # Pushes search and status to left, allows buttons to be at the end
 
-        # "More Filters" Button
-        self.more_filters_button = QPushButton(self.tr("Plus de Filtres"))
-        self.more_filters_button.setObjectName("moreFiltersButton") # Added object name
-        self.more_filters_button.setIcon(QIcon(":/icons/chevron-down.svg")) # Placeholder icon
-        self.more_filters_button.setCheckable(True) # Make it behave like a toggle
+        # "More Filters" Button (Icon Only)
+        self.more_filters_button = QPushButton("") # No text
+        self.more_filters_button.setObjectName("moreFiltersButton")
+        self.more_filters_button.setIcon(QIcon(":/icons/chevron-down.svg"))
+        self.more_filters_button.setCheckable(True)
         self.more_filters_button.toggled.connect(self.toggle_more_filters_visibility)
-        top_filter_line_layout.addWidget(self.more_filters_button, 0, Qt.AlignBottom) # Align to bottom for better look with taller inputs
+        self.more_filters_button.setToolTip(self.tr("Afficher/Masquer plus de filtres"))
+        top_filter_line_layout.addWidget(self.more_filters_button)
 
-        filter_search_main_layout.addLayout(top_filter_line_layout)
+        # "Réinitialiser Filtres" Button (Icon Only, moved to top line)
+        self.reset_filters_button = QPushButton("") # No text
+        self.reset_filters_button.setObjectName("resetFiltersButton")
+        self.reset_filters_button.setIcon(QIcon(":/icons/refresh-cw.svg"))
+        self.reset_filters_button.clicked.connect(self.reset_all_filters_slot)
+        self.reset_filters_button.setToolTip(self.tr("Réinitialiser tous les filtres"))
+        top_filter_line_layout.addWidget(self.reset_filters_button)
+
+        filter_search_main_layout.addLayout(top_filter_line_layout) # This is the single visible line of filters
+
 
         # --- Collapsible Filter Widget ---
         self.collapsible_filter_widget = QWidget()
         collapsible_layout = QVBoxLayout(self.collapsible_filter_widget)
-        collapsible_layout.setContentsMargins(0, 5, 0, 0) # Add some top margin when visible
+        # Remove top margin if it creates unwanted space when hidden, or ensure widget is fully hidden
+        collapsible_layout.setContentsMargins(0, 2, 0, 0) # Minimal top margin when visible
+
 
         # Archive Filter (moved into collapsible area)
         archive_filter_layout_group = QWidget()
@@ -575,6 +589,7 @@ class DocumentManager(QMainWindow):
         country_filter_v_layout.addWidget(self.country_filter_combo)
         collapsible_layout.addWidget(country_filter_layout_group)
 
+
         self.collapsible_filter_widget.setVisible(False) # Initially hidden
         filter_search_main_layout.addWidget(self.collapsible_filter_widget)
 
@@ -592,7 +607,9 @@ class DocumentManager(QMainWindow):
         filter_search_main_layout.addLayout(reset_button_layout)
 
 
-        filter_search_main_layout.addStretch(1) # Pushes all filter groups upwards if there's vertical space
+        # The main stretch for filter_search_main_layout should be removed if we want the client list
+        # to be directly under the collapsible_filter_widget (or top_filter_line_layout when collapsed).
+        # filter_search_main_layout.addStretch(1) # REMOVE THIS to prevent pushing client list down
         left_pane_layout.addWidget(filter_search_group)
 
         self.client_list_widget = QListWidget(); self.client_list_widget.setAlternatingRowColors(True)
@@ -661,10 +678,10 @@ class DocumentManager(QMainWindow):
         self.collapsible_filter_widget.setVisible(checked)
         if checked:
             self.more_filters_button.setIcon(QIcon(":/icons/chevron-up.svg")) # Change icon to up
-            self.more_filters_button.setText(self.tr("Moins de Filtres"))
+            # self.more_filters_button.setText(self.tr("Moins de Filtres")) # Text removed
         else:
             self.more_filters_button.setIcon(QIcon(":/icons/chevron-down.svg")) # Change icon to down
-            self.more_filters_button.setText(self.tr("Plus de Filtres"))
+            # self.more_filters_button.setText(self.tr("Plus de Filtres")) # Text removed
 
 
     def reset_all_filters_slot(self):
@@ -688,8 +705,6 @@ class DocumentManager(QMainWindow):
         self.filter_client_list_display_slot()
 
         self.notify(self.tr("Filtres Réinitialisés"), self.tr("Tous les filtres ont été réinitialisés."), type='INFO')
-
-
 
     def save_splitter_state(self, pos, index):
         """Saves the current state of the main_splitter."""
