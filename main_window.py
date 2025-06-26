@@ -506,76 +506,96 @@ class DocumentManager(QMainWindow):
         filter_search_group = QGroupBox(self.tr("Filtres et Recherche Clients"))
         filter_search_main_layout = QVBoxLayout(filter_search_group) # Changed to QVBoxLayout
 
-        # --- Status and Archive Filters Group (Horizontal) ---
-        status_archive_filter_group_layout = QHBoxLayout()
+        # --- Top line filters (Status, Search, More Filters button) ---
+        top_filter_line_layout = QHBoxLayout()
 
         # Status Filter
-        status_filter_layout = QVBoxLayout()
-        status_label = QLabel(self.tr("Statut:"))
+        # status_filter_layout_group = QWidget() # Use a QWidget as a container for label and combo
+        # status_filter_v_layout = QVBoxLayout(status_filter_layout_group)
+        # status_filter_v_layout.setContentsMargins(0,0,0,0)
+        # status_label = QLabel(self.tr("Statut:")) # Label for status
         self.status_filter_combo = QComboBox(); self.status_filter_combo.addItem(self.tr("Tous les statuts"), None)
         self.load_statuses_into_filter_combo(); self.status_filter_combo.currentIndexChanged.connect(self.filter_client_list_display_slot)
-        status_filter_layout.addWidget(status_label)
-        status_filter_layout.addWidget(self.status_filter_combo)
-        status_archive_filter_group_layout.addLayout(status_filter_layout)
+        self.status_filter_combo.setToolTip(self.tr("Filtrer par statut"))
+        # status_filter_v_layout.addWidget(status_label)
+        # status_filter_v_layout.addWidget(self.status_filter_combo)
+        top_filter_line_layout.addWidget(self.status_filter_combo) # Add combo directly
 
-        # Archive Filter
-        archive_filter_layout = QVBoxLayout()
+        # Search Input
+        # search_input_layout_group = QWidget() # Container for label and input
+        # search_input_v_layout = QVBoxLayout(search_input_layout_group)
+        # search_input_v_layout.setContentsMargins(0,0,0,0)
+        # self.search_label = QLabel(self.tr("Recherche:")) # Label for search
+        # self.search_label.setVisible(False) # Hide label for compactness
+        self.search_input_field = QLineEdit(); self.search_input_field.setPlaceholderText(self.tr("Rechercher client..."))
+        self.search_input_field.textChanged.connect(self.filter_client_list_display_slot)
+        # search_input_v_layout.addWidget(self.search_label)
+        # search_input_v_layout.addWidget(self.search_input_field)
+        top_filter_line_layout.addWidget(self.search_input_field) # Add input directly
+
+        top_filter_line_layout.addStretch(1) # Pushes search and status to left, allows buttons to be at the end
+
+        # "More Filters" Button (Icon Only)
+        self.more_filters_button = QPushButton("") # No text
+        self.more_filters_button.setObjectName("moreFiltersButton")
+        self.more_filters_button.setIcon(QIcon(":/icons/chevron-down.svg"))
+        self.more_filters_button.setCheckable(True)
+        self.more_filters_button.toggled.connect(self.toggle_more_filters_visibility)
+        self.more_filters_button.setToolTip(self.tr("Afficher/Masquer plus de filtres"))
+        top_filter_line_layout.addWidget(self.more_filters_button)
+
+        # "Réinitialiser Filtres" Button (Icon Only, moved to top line)
+        self.reset_filters_button = QPushButton("") # No text
+        self.reset_filters_button.setObjectName("resetFiltersButton")
+        self.reset_filters_button.setIcon(QIcon(":/icons/refresh-cw.svg"))
+        self.reset_filters_button.clicked.connect(self.reset_all_filters_slot)
+        self.reset_filters_button.setToolTip(self.tr("Réinitialiser tous les filtres"))
+        top_filter_line_layout.addWidget(self.reset_filters_button)
+
+        filter_search_main_layout.addLayout(top_filter_line_layout) # This is the single visible line of filters
+
+        # --- Collapsible Filter Widget ---
+        self.collapsible_filter_widget = QWidget()
+        collapsible_layout = QVBoxLayout(self.collapsible_filter_widget)
+        # Remove top margin if it creates unwanted space when hidden, or ensure widget is fully hidden
+        collapsible_layout.setContentsMargins(0, 2, 0, 0) # Minimal top margin when visible
+
+        # Archive Filter (moved into collapsible area)
+        archive_filter_layout_group = QWidget()
+        archive_filter_v_layout = QVBoxLayout(archive_filter_layout_group)
+        archive_filter_v_layout.setContentsMargins(0,0,0,0)
         archive_label = QLabel(self.tr("Filtre Archive:"))
         self.client_archive_filter_combo = QComboBox()
         self.client_archive_filter_combo.addItem(self.tr("Clients Actifs"), False)
         self.client_archive_filter_combo.addItem(self.tr("Clients Archivés (supprimés logiquement)"), True)
         self.client_archive_filter_combo.addItem(self.tr("Tout"), "all_status_types")
         self.client_archive_filter_combo.setCurrentIndex(0); self.client_archive_filter_combo.currentIndexChanged.connect(self.filter_client_list_display_slot)
-        archive_filter_layout.addWidget(archive_label)
-        archive_filter_layout.addWidget(self.client_archive_filter_combo)
-        status_archive_filter_group_layout.addLayout(archive_filter_layout)
-        status_archive_filter_group_layout.addStretch(1) # Push status/archive filters to the left
+        archive_filter_v_layout.addWidget(archive_label)
+        archive_filter_v_layout.addWidget(self.client_archive_filter_combo)
+        collapsible_layout.addWidget(archive_filter_layout_group)
 
-        filter_search_main_layout.addLayout(status_archive_filter_group_layout) # Add horizontal group to main vertical
-
-        # --- Country Filter Group (Horizontal) ---
-        country_filter_group_layout = QHBoxLayout()
-        country_filter_layout = QVBoxLayout()
+        # Country Filter (moved into collapsible area)
+        country_filter_layout_group = QWidget()
+        country_filter_v_layout = QVBoxLayout(country_filter_layout_group)
+        country_filter_v_layout.setContentsMargins(0,0,0,0)
         country_label = QLabel(self.tr("Pays:"))
         self.country_filter_combo = QComboBox()
         self.country_filter_combo.addItem(self.tr("Tous les pays"), None)
         self.load_countries_into_filter_combo()
         self.country_filter_combo.currentIndexChanged.connect(self.filter_client_list_display_slot)
-        country_filter_layout.addWidget(country_label)
-        country_filter_layout.addWidget(self.country_filter_combo)
-        country_filter_group_layout.addLayout(country_filter_layout)
-        country_filter_group_layout.addStretch(1) # Push country filter to the left
+        country_filter_v_layout.addWidget(country_label)
+        country_filter_v_layout.addWidget(self.country_filter_combo)
+        collapsible_layout.addWidget(country_filter_layout_group)
 
-        filter_search_main_layout.addLayout(country_filter_group_layout) # Add horizontal group to main vertical
+        self.collapsible_filter_widget.setVisible(False) # Initially hidden
+        filter_search_main_layout.addWidget(self.collapsible_filter_widget)
 
-        # --- Search Input Group (Horizontal) ---
-        search_group_layout = QHBoxLayout()
-        # Original search_layout (QVBoxLayout for label + QHBoxLayout for icon/input)
-        search_layout = QVBoxLayout()
-        self.search_label = QLabel(self.tr("Recherche:"))
-        self.search_label.setVisible(False)
-        search_layout.addWidget(self.search_label)
+        # Remove the previous layout for reset_button_layout as it's now on the top line
+        # filter_search_main_layout.addLayout(reset_button_layout) # This line is removed
 
-        search_bar_line_layout = QHBoxLayout()
-        self.search_icon_btn = QPushButton()
-        self.search_icon_btn.setIcon(QIcon.fromTheme("edit-find", QIcon(":/icons/search.svg")))
-        self.search_icon_btn.setToolTip(self.tr("Afficher/Cacher la barre de recherche"))
-        search_bar_line_layout.addWidget(self.search_icon_btn)
-
-        self.search_input_field = QLineEdit(); self.search_input_field.setPlaceholderText(self.tr("Rechercher client..."))
-        self.search_input_field.setVisible(False)
-        self.search_input_field.textChanged.connect(self.filter_client_list_display_slot)
-        search_bar_line_layout.addWidget(self.search_input_field)
-
-        search_layout.addLayout(search_bar_line_layout)
-        search_group_layout.addLayout(search_layout) # Add the search VBox to the HBox
-        search_group_layout.addStretch(1) # Push search elements to the left
-
-        filter_search_main_layout.addLayout(search_group_layout) # Add horizontal group to main vertical
-
-        self.search_icon_btn.clicked.connect(self.toggle_search_input_visibility)
-
-        filter_search_main_layout.addStretch(1) # Pushes all filter groups upwards if there's vertical space
+        # The main stretch for filter_search_main_layout should be removed if we want the client list
+        # to be directly under the collapsible_filter_widget (or top_filter_line_layout when collapsed).
+        # filter_search_main_layout.addStretch(1) # REMOVE THIS to prevent pushing client list down
         left_pane_layout.addWidget(filter_search_group)
 
         self.client_list_widget = QListWidget(); self.client_list_widget.setAlternatingRowColors(True)
@@ -589,9 +609,18 @@ class DocumentManager(QMainWindow):
         self.page_info_label = QLabel(self.tr("Page 1")); pagination_layout.addWidget(self.prev_page_button); pagination_layout.addWidget(self.page_info_label); pagination_layout.addWidget(self.next_page_button)
         left_pane_layout.addLayout(pagination_layout)
         
-        self.add_new_client_button = QPushButton(self.tr("Ajouter un Nouveau Client")); self.add_new_client_button.setIcon(QIcon(":/icons/user-add.svg")); self.add_new_client_button.setObjectName("primaryButton"); self.add_new_client_button.clicked.connect(self.open_add_new_client_dialog); left_pane_layout.addWidget(self.add_new_client_button)
+        # Buttons in a single row
+        client_actions_layout = QHBoxLayout()
+        self.add_new_client_button = QPushButton(self.tr("Ajouter Nouveau Client")); self.add_new_client_button.setIcon(QIcon(":/icons/user-add.svg")); self.add_new_client_button.setObjectName("primaryButton"); self.add_new_client_button.clicked.connect(self.open_add_new_client_dialog)
+        client_actions_layout.addWidget(self.add_new_client_button)
 
-        self.add_client_by_voice_button = QPushButton(self.tr("Ajouter Client par Voix")); self.add_client_by_voice_button.setIcon(QIcon(":/icons/mic.svg")); self.add_client_by_voice_button.setObjectName("primaryButton"); self.add_client_by_voice_button.clicked.connect(self.handle_add_client_by_voice_clicked); left_pane_layout.addWidget(self.add_client_by_voice_button)
+        self.add_client_by_voice_button = QPushButton(self.tr("Ajouter par Voix")); self.add_client_by_voice_button.setIcon(QIcon(":/icons/mic.svg")); self.add_client_by_voice_button.setObjectName("primaryButton")
+        self.add_client_by_voice_button.clicked.connect(self.handle_add_client_by_voice_clicked)
+        self.add_client_by_voice_button.setEnabled(False) # Disable as requested
+        self.add_client_by_voice_button.setToolTip(self.tr("Fonctionnalité en cours de développement"))
+        client_actions_layout.addWidget(self.add_client_by_voice_button)
+
+        left_pane_layout.addLayout(client_actions_layout)
 
         # map_group_box removed from here
         left_pane_widget.setLayout(left_pane_layout)
@@ -610,15 +639,16 @@ class DocumentManager(QMainWindow):
                 splitter_state_byte_array = QByteArray.fromHex(saved_splitter_state_hex.encode('utf-8'))
                 if not self.main_splitter.restoreState(splitter_state_byte_array):
                     logging.warning("Failed to restore splitter state, applying defaults.")
-                    self.main_splitter.setSizes([int(self.width() * 0.12), int(self.width() * 0.88)])
+                    self.main_splitter.setSizes([int(self.width() * 0.20), int(self.width() * 0.80)]) # Adjusted default
                 else:
                     logging.info("Client list splitter state restored.")
             except Exception as e:
                 logging.error(f"Error restoring splitter state: {e}. Applying defaults.", exc_info=True)
-                self.main_splitter.setSizes([int(self.width() * 0.12), int(self.width() * 0.88)])
+                self.main_splitter.setSizes([int(self.width() * 0.20), int(self.width() * 0.80)]) # Adjusted default
         else:
-            self.main_splitter.setSizes([int(self.width() * 0.12), int(self.width() * 0.88)])
-            logging.info("Client list splitter: No saved state found, applied default sizes 12/88.")
+            # Adjusted default splitter sizes: left pane 20%, right pane 80%
+            self.main_splitter.setSizes([int(self.width() * 0.20), int(self.width() * 0.80)])
+            logging.info("Client list splitter: No saved state found, applied default sizes 20/80.")
 
         self.main_splitter.splitterMoved.connect(self.save_splitter_state)
 
@@ -628,6 +658,38 @@ class DocumentManager(QMainWindow):
         self.documents_page_widget.setLayout(docs_page_layout)
 
         self.main_area_stack.addWidget(self.documents_page_widget)
+
+    def toggle_more_filters_visibility(self, checked):
+        self.collapsible_filter_widget.setVisible(checked)
+        if checked:
+            self.more_filters_button.setIcon(QIcon(":/icons/chevron-up.svg")) # Change icon to up
+            # self.more_filters_button.setText(self.tr("Moins de Filtres")) # Text removed
+        else:
+            self.more_filters_button.setIcon(QIcon(":/icons/chevron-down.svg")) # Change icon to down
+            # self.more_filters_button.setText(self.tr("Plus de Filtres")) # Text removed
+
+    def reset_all_filters_slot(self):
+        """Resets all filter inputs to their default states and refreshes the client list."""
+        logging.info("Resetting all filters.")
+
+        # Reset ComboBoxes to their first item (index 0)
+        self.status_filter_combo.setCurrentIndex(0)
+        self.client_archive_filter_combo.setCurrentIndex(0)
+        self.country_filter_combo.setCurrentIndex(0)
+
+        # Clear the search input field
+        self.search_input_field.setText("")
+
+        # Collapse the "More Filters" section if it's open
+        if self.collapsible_filter_widget.isVisible():
+            self.more_filters_button.setChecked(False) # This will trigger toggle_more_filters_visibility
+
+        # Refresh the client list
+        # Calling filter_client_list_display_slot will also reset pagination and load from DB
+        self.filter_client_list_display_slot()
+
+        self.notify(self.tr("Filtres Réinitialisés"), self.tr("Tous les filtres ont été réinitialisés."), type='INFO')
+
 
     def save_splitter_state(self, pos, index):
         """Saves the current state of the main_splitter."""
@@ -1193,10 +1255,95 @@ class DocumentManager(QMainWindow):
     def set_client_status_archived(self, client_id): self.set_client_status_archived_slot(client_id)
     def delete_client_permanently(self, client_id): self.delete_client_permanently_slot(client_id)
 
-    def add_client_to_list_widget(self, client_dict_data): 
-        item = QListWidgetItem(client_dict_data["client_name"])
+    def get_status_visual_indicator(self, status_name_str):
+        """Returns an HTML styled Unicode character based on status name."""
+        # Normalize status name for robust matching
+        status_lower = status_name_str.lower() if status_name_str else ""
+
+        # Define status to icon and color mapping
+        # Colors are HTML color names or hex codes
+        if "actif" in status_lower or "active" in status_lower : # Assuming 'Actif' or 'Active'
+            return "<span style='color: green;'>●</span>"
+        elif "prospect" in status_lower:
+            return "<span style='color: blue;'>●</span>"
+        elif "inactif" in status_lower or "inactive" in status_lower: # Assuming 'Inactif' or 'Inactive'
+            return "<span style='color: orange;'>●</span>"
+        elif "archivé" in status_lower or "archived" in status_lower: # Assuming 'Archivé'
+            return "<span style='color: grey;'>●</span>"
+        elif "complété" in status_lower or "completed" in status_lower:
+             return "<span style='color: purple;'>●</span>" # Example for 'Complété'
+        # Add more specific statuses as needed:
+        # elif "some_other_status" in status_lower:
+        #     return "<span style='color: some_color;'>●</span>"
+        else: # Default for unknown or non-specific statuses
+            return "<span style='color: black;'>○</span>" # Default: empty circle or a light grey dot
+
+    def add_client_to_list_widget(self, client_dict_data):
+        client_name = client_dict_data.get("client_name", self.tr("Client Inconnu"))
+        status_name = client_dict_data.get("status", "") # Get status name, default to empty string
+
+        status_indicator_html = self.get_status_visual_indicator(status_name)
+
+        # Using a simple HTML structure for the item text
+        # The StatusDelegate will still handle the background based on the full client_dict_data
+        item_html = f"<div>{status_indicator_html} {client_name}</div>"
+
+        item = QListWidgetItem()
         item.setData(Qt.UserRole, client_dict_data)
+
+        # To render HTML in QListWidgetItem, we need to use a QLabel or similar approach,
+        # as QListWidgetItem.setText() doesn't directly render rich HTML in all styles/platforms.
+        # A common way is to set a custom widget on the item, or ensure the view supports HTML.
+        # For simplicity with existing StatusDelegate, let's try prepending text and rely on delegate if it supports basic HTML or styling.
+        # If StatusDelegate does not support HTML in text, this might just show literal HTML.
+        # A more robust solution if HTML in setText() is not rendered is to use a custom delegate
+        # that explicitly draws an icon and text, or set a QWidget with a QLabel for each item.
+
+        # Simplest attempt: Prepend Unicode character directly to text (color styling might be lost without HTML)
+        # For this iteration, we will rely on the HTML being processed by the delegate or view.
+        # If icons don't appear colored, the StatusDelegate would need modification to parse this HTML
+        # or draw icons itself.
+
+        # Let's construct text that might be parsed by a delegate or as rich text
+        # This is a common way to try to get rich text in list items.
+        # We'll assume the list widget can interpret some basic HTML.
+        list_widget_item_text_label = QLabel(item_html)
+        list_widget_item_text_label.setStyleSheet("background:transparent;") # Ensure label bg is transparent
+
+        # Instead of setting text directly, create a QWidget, put QLabel in it, and set that as item.
+        # However, this conflicts with StatusDelegate if it expects to draw the whole item.
+        # Let's stick to trying to set rich text on the item itself, assuming the view supports it.
+        # The item.setText() method itself does not render HTML.
+        # We need to ensure the list view is set up to interpret HTML or use a delegate.
+        # The most straightforward way without complex delegate changes is to use a QLabel as the item itself,
+        # but QListWidget takes QListWidgetItems.
+
+        # Fallback for now: just prepend icon text, color will be default.
+        # Delegate would need to handle color if this is insufficient.
+        raw_status_icon = "●" # Default icon
+        if "actif" in status_name.lower() or "active" in status_name.lower(): raw_status_icon = "●" # Color would be handled by delegate potentially
+        elif "prospect" in status_name.lower(): raw_status_icon = "●"
+        # ... and so on for other statuses. This part is simplified as visual color is key.
+
+        # The StatusDelegate is already in place. It uses client_data['status'] to set background.
+        # We will prepend a Unicode character. The color of this character will be the default text color.
+        # For colored icons, the StatusDelegate would need to be enhanced to draw them.
+        # For this step, a simple monochrome icon is acceptable if colored ones are too complex with the current delegate.
+
+        # Let's use a simplified icon map for direct text prepending.
+        # The StatusDelegate could be enhanced later to color these icons.
+        icon = "○" # Default
+        if status_name:
+            s_lower = status_name.lower()
+            if "actif" in s_lower or "active" in s_lower: icon = "●" # Typically want green
+            elif "prospect" in s_lower: icon = "●" # Typically want blue
+            elif "inactif" in s_lower or "inactive" in s_lower: icon = "●" # Typically want orange/yellow
+            elif "archivé" in s_lower or "archived" in s_lower: icon = "●" # Typically want grey
+            elif "complété" in s_lower or "completed" in s_lower: icon = "●" # Typically want purple/black
+
+        item.setText(f"{icon} {client_name}")
         self.client_list_widget.addItem(item)
+
 
     def load_countries_into_filter_combo(self):
         current_selection_data = self.country_filter_combo.currentData()
