@@ -103,6 +103,7 @@ except Exception:
 from product_management.page import ProductManagementPage # Added
 
 from dialogs.status_management_dialog import StatusManagementDialog # Added for status management
+from dialogs.manage_saved_filters_dialog import ManageSavedFiltersDialog # Import for managing saved filters
 
 
 from client_widget import ClientWidget
@@ -1986,8 +1987,21 @@ class DocumentManager(QMainWindow):
             self.notify(self.tr("Erreur Sauvegarde"), self.tr("Une erreur est survenue: {0}").format(str(e)), type='ERROR')
 
     def open_manage_filters_dialog_slot(self):
-        """Placeholder for opening the dialog to manage saved filters."""
-        logging.info("Manage saved filters button clicked (placeholder).")
-        QMessageBox.information(self,
-                                self.tr("Gestion des Filtres"),
-                                self.tr("La fonctionnalité de gestion des filtres sauvegardés sera implémentée dans une prochaine phase."))
+        """Opens the dialog to manage saved filters."""
+        if not self.current_user_id:
+            self.notify(self.tr("Erreur Utilisateur"), self.tr("Aucun utilisateur connecté. Impossible de gérer les filtres."), type='ERROR')
+            return
+
+        logging.info(f"Opening ManageSavedFiltersDialog for user {self.current_user_id}.")
+        dialog = ManageSavedFiltersDialog(current_user_id=self.current_user_id, parent=self)
+
+        # exec_() is blocking. We check result or flag after it closes.
+        dialog.exec_()
+
+        if dialog.changes_made: # Check the custom flag
+            logging.info("Changes were made in ManageSavedFiltersDialog. Refreshing load_filter_combo.")
+            self.populate_saved_filters_combo()
+            # Also reset the combo to the placeholder, as the list of available filters might have changed
+            self.load_filter_combo.setCurrentIndex(0)
+        else:
+            logging.info("No changes reported from ManageSavedFiltersDialog.")
