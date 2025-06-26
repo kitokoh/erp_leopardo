@@ -139,6 +139,8 @@ from db.cruds import user_saved_filters_crud # Import for saved filters
 
 from calendar_module.calendar_widget import CalendarWidget # Import CalendarWidget
 from user_management.page import UserManagementPage # Import UserManagementPage
+from user_management.user_menu_button import UserMenuButton # Import UserMenuButton
+from dialogs.edit_user_dialog import EditUserDialog # For handling edit/add user requests
 
 # Definition of configurable modules
 CONFIGURABLE_MODULES = [
@@ -1083,16 +1085,25 @@ class DocumentManager(QMainWindow):
         user_display_layout.setContentsMargins(5, 0, 5, 0) # Adjust margins as needed
         user_display_layout.setSpacing(10)
 
-        self.user_info_label = QLabel(self.tr("Non connecté"))
-        self.user_info_label.setObjectName("userInfoLabel") # For styling
-        user_display_layout.addWidget(self.user_info_label)
+        # self.user_info_label = QLabel(self.tr("Non connecté")) # Replaced by UserMenuButton
+        # self.user_info_label.setObjectName("userInfoLabel") # For styling
+        # user_display_layout.addWidget(self.user_info_label)
 
-        self.logout_button = QPushButton(self.tr("Déconnexion"))
-        self.logout_button.setIcon(QIcon(":/icons/log-out.svg")) # Ensure icon exists
-        self.logout_button.setFlat(True) # Make it look less like a bulky button in the menubar
-        self.logout_button.setToolTip(self.tr("Se déconnecter et revenir à l'écran de connexion"))
-        self.logout_button.clicked.connect(self._handle_logout)
-        user_display_layout.addWidget(self.logout_button)
+        # self.logout_button = QPushButton(self.tr("Déconnexion")) # Replaced by UserMenuButton
+        # self.logout_button.setIcon(QIcon(":/icons/log-out.svg"))
+        # self.logout_button.setFlat(True)
+        # self.logout_button.setToolTip(self.tr("Se déconnecter et revenir à l'écran de connexion"))
+        # self.logout_button.clicked.connect(self._handle_logout)
+        # user_display_layout.addWidget(self.logout_button)
+
+        self.user_menu_button_instance = UserMenuButton(current_user_info=self.current_user_info, parent=self)
+        self.user_menu_button_instance.setObjectName("userMenuButton") # Added object name
+        self.user_menu_button_instance.request_logout.connect(self._handle_logout)
+        self.user_menu_button_instance.request_show_user_management_page.connect(self.show_user_management_page)
+        self.user_menu_button_instance.request_open_edit_my_account_dialog.connect(self._handle_request_open_edit_my_account)
+        self.user_menu_button_instance.request_open_add_user_dialog.connect(self._handle_request_open_add_user)
+        user_display_layout.addWidget(self.user_menu_button_instance)
+
 
         # The following block redefining self.search_bar_line_edit is redundant
         # and was likely causing the issue. It's removed.
@@ -1186,16 +1197,22 @@ class DocumentManager(QMainWindow):
 
 
     def _update_user_display(self):
-        if self.current_user_info:
-            username = self.current_user_info.get('username', 'N/A')
-            role_name = self.current_user_info.get('role_name', 'N/A')
-            self.user_info_label.setText(self.tr("Utilisateur: {0} ({1})").format(username, role_name))
-            self.logout_button.setVisible(True)
+        if hasattr(self, 'user_menu_button_instance') and self.user_menu_button_instance:
+            self.user_menu_button_instance.update_user_info(self.current_user_info)
         else:
-            self.user_info_label.setText(self.tr("Non connecté"))
-            self.logout_button.setVisible(False) # Hide logout if no one is logged in (e.g. at startup before login)
+            # Fallback or initial setup if button not yet created - though it should be.
+            # This path is less likely if create_menus_main is called after current_user_info is set.
+            if self.current_user_info:
+                # self.user_info_label.setText(self.tr("Utilisateur: {0} ({1})").format(username, role_name)) # Old label
+                # self.logout_button.setVisible(True) # Old button
+                pass
+            else:
+                # self.user_info_label.setText(self.tr("Non connecté")) # Old label
+                # self.logout_button.setVisible(False) # Old button
+                pass
 
     def _handle_logout(self):
+        # This method is now also connected to UserMenuButton.request_logout signal
         from auth import authentication as auth_service # Local import
         from dialogs.login_dialog import LoginDialog # Local import
 
@@ -1240,8 +1257,8 @@ class DocumentManager(QMainWindow):
             if new_user_info:
                 self.current_user_info = new_user_info
                 self.current_user_id = self.current_user_info.get('user_id') # Update user_id
-                self._update_user_display()
-                self._apply_permissions() # Re-apply permissions for the new user
+                self._update_user_display() # This will now call user_menu_button_instance.update_user_info()
+                self._apply_permissions() # Re-apply permissions for the new user (menus etc.)
                 self.load_clients_from_db_slot() # Reload data relevant to the new user
                 # Potentially re-initialize other parts of the UI based on the new user/role
                 self.show()
@@ -1251,6 +1268,50 @@ class DocumentManager(QMainWindow):
         else: # Login cancelled after logout
             QMessageBox.information(self, "Déconnexion", "Vous avez été déconnecté. L'application va se fermer.")
             QApplication.instance().quit() # Exit if user cancels login after logout
+
+    def _handle_request_open_edit_my_account(self):
+        if not self.current_user_info:
+            QMessageBox.warning(self, self.tr("Erreur"), self.tr("Aucun utilisateur n'est connecté."))
+            return
+
+        user_id_to_edit = self.current_user_info.get('user_id')
+        if not user_id_to_edit:
+            QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("ID utilisateur manquant pour l'utilisateur actuel."))
+            return
+
+        # Pass current_user_info as current_admin_user_info because the user is initiating the action on themselves.
+        # EditUserDialog's internal logic will handle permissions for self-edit (e.g. role change).
+        dialog = EditUserDialog(user_id=user_id_to_edit,
+                                current_admin_user_info=self.current_user_info,
+                                parent=self)
+        if dialog.exec_() == QDialog.Accepted:
+            # User data might have changed, re-fetch and update
+            # This is important if e.g. full_name changed, to update display in UserMenuButton
+            from auth import authentication as auth_service # Local import
+            updated_user_info = auth_service.get_current_user() # Should reflect any changes if auth_service was updated by EditUserDialog
+            if updated_user_info:
+                 self.current_user_info = updated_user_info # Update main window's copy
+                 self._update_user_display() # Refresh the UserMenuButton display
+            # No need to reload client list or anything like that for self-account edit
+            self.notify(self.tr("Compte Modifié"), self.tr("Vos informations de compte ont été mises à jour."), type='SUCCESS')
+
+
+    def _handle_request_open_add_user(self):
+        if not self.current_user_info:
+            QMessageBox.warning(self, self.tr("Erreur"), self.tr("Opération non permise sans être connecté."))
+            return
+
+        # current_user_info is passed as current_admin_user_info to EditUserDialog
+        # The dialog itself (or the CRUD operation) will use P_MANAGE_USERS from this admin_user_info
+        dialog = EditUserDialog(user_id=None, # Indicates "add" mode
+                                current_admin_user_info=self.current_user_info,
+                                parent=self)
+        if dialog.exec_() == QDialog.Accepted:
+            # If a user was added, and the current view is UserManagementPage, refresh its table
+            if self.main_area_stack.currentWidget() == self.user_management_page_instance:
+                if hasattr(self.user_management_page_instance, 'load_users_to_table'):
+                    self.user_management_page_instance.load_users_to_table()
+            self.notify(self.tr("Utilisateur Ajouté"), self.tr("Le nouvel utilisateur a été créé avec succès."), type='SUCCESS')
 
 
     @pyqtSlot(str)
