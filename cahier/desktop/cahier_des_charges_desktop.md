@@ -48,25 +48,26 @@ L'application s'articule autour des modules fonctionnels principaux suivants (ch
 *   **Recrutement**:
     *   Description : [Module Recrutement](./module_recrutement.md)
 *   **Gestion des Actifs/Inventaire**:
-    *   Description : `cahier/desktop/module_gestion_actifs.md` (à créer)
+    *   Description : [Module Gestion des Actifs et de l'Inventaire](./module_gestion_actifs.md)
 *   **Rapports et Statistiques**:
-    *   Description : `cahier/desktop/module_rapports_statistiques.md` (à créer)
+    *   Description : [Module Rapports et Statistiques](./module_rapports_statistiques.md)
 *   **Calendrier/Agenda**:
-    *   Description : `cahier/desktop/module_calendrier.md` (à créer)
+    *   Description : [Module Calendrier/Agenda](./module_calendrier.md)
 *   **Paramètres et Configuration**:
     *   Description : [Module Paramètres et Configuration](./module_parametres_configuration.md)
-*   **Gestion des E-mails**:
-    *   Description : `cahier/desktop/module_gestion_emails.md` (à créer, partie de Utilitaires/Services)
+*   **Gestion des E-mails (Interface Utilisateur)**:
+    *   Description : [Module Gestion des E-mails (Interface Utilisateur)](./module_gestion_emails_ui.md)
 *   **Intégrations Externes (E-commerce, Botpress, WhatsApp)**:
-    *   Description : `cahier/desktop/module_integrations_externes.md` (à créer)
-*   **Gestion des Médias**:
-    *   Description : `cahier/desktop/module_gestion_medias.md` (à créer)
+    *   Description : [Module Intégrations Externes](./module_integrations_externes.md)
+*   **Gestion des Médias (Centralisée)**:
+    *   Description : [Module Gestion des Médias (Centralisée)](./module_gestion_medias.md)
 *   **Support Après-Vente (SAV)**:
-    *   Description : `cahier/desktop/module_sav.md` (à créer)
+    *   Description : [Module Support Après-Vente (SAV)](./module_sav.md)
 *   **Gestion des Partenaires**:
-    *   Description : `cahier/desktop/module_gestion_partenaires.md` (à créer)
-*   **Sécurité (fonctionnalités spécifiques)**:
-    *   Description : `cahier/desktop/module_securite_specifique.md` (à créer)
+    *   Description : [Module Gestion des Partenaires](./module_gestion_partenaires.md)
+*   **Sécurité (fonctionnalités spécifiques UI)**:
+    *   Description : [Module Sécurité (Fonctionnalités Spécifiques UI)](./module_securite_specifique_ui.md)
+
 *   **API Backend (si applicable comme distincte)**:
     *   Description : [Module API Backend Desktop](./module_api_backend_desktop.md)
 *   **Base de Données**:
