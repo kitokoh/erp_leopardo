@@ -1065,6 +1065,7 @@ QMenu::indicator:non-exclusive:unchecked {
 /* == END OF MENU STYLING ENHANCEMENTS == */
 
 
+
 /* HomePageWidget Specific Styles */
 QWidget#HomePageWidget {
     background-color: #F5F7FA; /* Secondary Background, plus doux que blanc pur */
@@ -1128,6 +1129,7 @@ QWidget#homePageButtonGridContainer QPushButton:pressed {
 /* QWidget#homePageButtonGridContainer QPushButton::icon { ... } */
 /* QWidget#homePageButtonGridContainer QPushButton::icon { ... } */
 
+>>>>>>> main
 /* Specific button for "More Filters" */
 QPushButton#moreFiltersButton {
     background-color: #FFFFFF; /* White background */
@@ -1184,6 +1186,7 @@ QPushButton[class="tableActionButton"]:hover {
 QPushButton[class="tableActionButton"]:pressed {
     background-color: #CCE5FF; /* Darker blue when pressed */
     color: #0056B3;
+
 }
 
 /* User Menu Button in Menu Bar */
