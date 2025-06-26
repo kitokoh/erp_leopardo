@@ -1063,3 +1063,24 @@ QMenu::indicator:non-exclusive:unchecked {
 }
 
 /* == END OF MENU STYLING ENHANCEMENTS == */
+
+/* Specific button for "More Filters" */
+QPushButton#moreFiltersButton {
+    background-color: #FFFFFF; /* White background */
+    color: #546E7A; /* Secondary text color */
+    border: 1px solid #DDE2E6; /* Standard border */
+    padding: 6px 10px; /* Adjust padding as needed */
+    font-weight: normal; /* Not bold */
+}
+
+QPushButton#moreFiltersButton:hover {
+    background-color: #F5F7FA; /* Light grey hover */
+    border-color: #B0BEC5;
+    color: #263238; /* Darker text on hover */
+}
+
+QPushButton#moreFiltersButton:checked { /* When active/expanded */
+    background-color: #E3F2FD; /* Light blue to indicate active state */
+    border-color: #007BFF;
+    color: #007BFF;
+}
