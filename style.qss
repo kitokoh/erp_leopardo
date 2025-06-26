@@ -1085,3 +1085,40 @@ QPushButton#moreFiltersButton:checked { /* When active/expanded */
     color: #007BFF;
 }
 
+/* Reset Filters Button */
+QPushButton#resetFiltersButton {
+    background-color: #FFFFFF;
+    color: #DC3545; /* Danger color for text to indicate reset */
+    border: 1px solid #DDE2E6;
+    padding: 6px 10px;
+    font-weight: normal;
+    margin-top: 5px; /* Add some space above it */
+}
+
+QPushButton#resetFiltersButton:hover {
+    background-color: #F5F7FA;
+    border-color: #DC3545; /* Danger color border on hover */
+    color: #C82333; /* Darker danger color text */
+}
+
+/* Table Action Buttons (using property selector for ClientWidget documents table) */
+QPushButton[class="tableActionButton"] {
+    background-color: transparent;
+    border: none;
+    padding: 1px; /* Minimal padding for icon buttons */
+    color: #546E7A; /* Default secondary text color for icons */
+    /* Fixed size is set in code (28x28), ensure icon fits well */
+    /* min-width, min-height might not be needed if fixedSize is used */
+    border-radius: 3px; /* Slight rounding for consistency */
+}
+
+QPushButton[class="tableActionButton"]:hover {
+    color: #007BFF; /* Accent color on hover */
+    background-color: #E3F2FD; /* Light blue background on hover */
+}
+
+QPushButton[class="tableActionButton"]:pressed {
+    background-color: #CCE5FF; /* Darker blue when pressed */
+    color: #0056B3;
+}
+
