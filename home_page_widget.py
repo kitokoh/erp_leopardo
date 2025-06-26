@@ -7,6 +7,7 @@ from PyQt5.QtCore import Qt, pyqtSlot, QSize
 from PyQt5.QtGui import QFont, QIcon, QMovie
 import os
 
+
 class HomePageWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -21,6 +22,7 @@ class HomePageWidget(QWidget):
         # Welcome Message
         welcome_label = QLabel(self.tr("Bienvenue à votre Gestionnaire d'Application"))
         welcome_label.setObjectName("homePageWelcomeLabel")
+
         welcome_font = QFont()
         welcome_font.setPointSize(28)
         welcome_font.setBold(True)
@@ -56,6 +58,7 @@ class HomePageWidget(QWidget):
 
         # Scroll Area for module buttons
         scroll_area = QScrollArea()
+
         scroll_area.setWidgetResizable(True)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         # Pour que le QScrollArea ne prenne pas toute la hauteur restante de manière agressive :
@@ -67,6 +70,7 @@ class HomePageWidget(QWidget):
         content_widget = QWidget()
         content_widget.setObjectName("homePageButtonGridContainer")
         content_widget.setStyleSheet("background-color: transparent;")
+
 
         grid_layout = QGridLayout()
         grid_layout.setContentsMargins(10, 10, 10, 10)
@@ -96,6 +100,7 @@ class HomePageWidget(QWidget):
                 button.setIcon(QIcon(module["icon"]))
                 button.setIconSize(QSize(32,32)) # Taille d'icône standard
 
+
             button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             button.clicked.connect(module["slot"])
             grid_layout.addWidget(button, row, col)
@@ -113,8 +118,7 @@ class HomePageWidget(QWidget):
         scroll_area.setWidget(content_widget)
         main_v_layout.addWidget(scroll_area) # Ajout du scroll area au layout principal
 
-        # Ajouter un espace extensible en bas pour pousser tout vers le haut si peu d'éléments
-        # main_v_layout.addStretch(1) # A décommenter si on veut que tout soit poussé en haut
+
 
         self.setLayout(main_v_layout)
 

@@ -121,6 +121,8 @@ from partners.partner_main_widget import PartnerMainWidget # Partner Management
 from inventory_browser_widget import InventoryBrowserWidget # Inventory Management
 from camera_management.camera_management_widget import CameraManagementWidget # Camera Management
 
+from PyQt5.QtGui import QColor, QPalette # For ClientListItemWidget text color
+
 from recruitment.recruitment_dashboard import RecruitmentDashboard # Import RecruitmentDashboard
 
 from home_page_widget import HomePageWidget # Added for new Home Page
@@ -148,6 +150,83 @@ CONFIGURABLE_MODULES = [
     {'key': 'module_calendar_enabled', 'name': 'calendar', 'action_attr': 'calendar_module_action', 'widget_attr': 'calendar_module_widget_instance'},
     {'key': 'module_camera_management_enabled', 'name': 'camera_management', 'action_attr': 'camera_management_action', 'widget_attr': 'camera_management_widget_instance'}
 ]
+
+class ClientListItemWidget(QWidget):
+    def __init__(self, client_data, parent=None):
+        super().__init__(parent)
+        self.client_data = client_data
+        # Get the main DocumentManager instance to call its methods (like tr)
+        # This assumes ClientListItemWidget is instantiated with DocumentManager as an ancestor or direct parent.
+        # A more robust way might be to pass DocumentManager instance if deeply nested.
+        self.doc_manager = parent # Assuming parent is DocumentManager or provides tr
+        while self.doc_manager and not isinstance(self.doc_manager, DocumentManager):
+            self.doc_manager = self.doc_manager.parent()
+
+        if not self.doc_manager:
+            # Fallback if DocumentManager not found in parent hierarchy
+            # This might happen if parent is QListWidget, then its parent etc.
+            # For simplicity, we assume it can be found or tr will work via QCoreApplication.translate
+            # A cleaner way is to pass doc_manager instance explicitly if this becomes an issue.
+            # logging.warning("ClientListItemWidget: DocumentManager instance not found via parent hierarchy.")
+            pass
+
+        self.init_ui()
+
+    def _tr(self, text):
+        if self.doc_manager and hasattr(self.doc_manager, 'tr'):
+            return self.doc_manager.tr(text)
+        return QApplication.translate("ClientListItemWidget", text) # Fallback
+
+    def init_ui(self):
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(5, 3, 5, 3)
+        main_layout.setSpacing(1) # Reduced spacing
+
+        # Line 1: Status Icon + Client Name
+        line1_layout = QHBoxLayout()
+        line1_layout.setSpacing(4)
+
+        status_icon_label = QLabel()
+        status_name = self.client_data.get("status", "")
+        icon_html = self._get_status_icon_html(status_name)
+        status_icon_label.setText(icon_html)
+        status_icon_label.setFixedWidth(12) # Adjusted for typical font size of icon
+        line1_layout.addWidget(status_icon_label)
+
+        client_name_label = QLabel(f"<b>{self.client_data.get('client_name', 'N/A')}</b>")
+        client_name_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        line1_layout.addWidget(client_name_label)
+        line1_layout.addStretch()
+        main_layout.addLayout(line1_layout)
+
+        # Line 2: Additional Info (e.g., Project Identifier)
+        project_identifier = self.client_data.get('project_identifier', '')
+        if project_identifier:
+            additional_info_label = QLabel(f"<small>{self._tr('Projet:')} {project_identifier}</small>")
+            additional_info_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+
+            palette = additional_info_label.palette()
+            palette.setColor(QPalette.WindowText, QColor(Qt.darkGray))
+            additional_info_label.setPalette(palette)
+
+            additional_info_layout = QHBoxLayout()
+            additional_info_layout.addSpacing(15)
+            additional_info_layout.addWidget(additional_info_label)
+            additional_info_layout.addStretch()
+            main_layout.addLayout(additional_info_layout)
+
+        self.setStyleSheet("background:transparent;")
+
+    def _get_status_icon_html(self, status_name_str):
+        status_lower = status_name_str.lower() if status_name_str else ""
+        # Colors chosen for visibility against typical delegate backgrounds
+        if "actif" in status_lower or "active" in status_lower: return "<span style='font-size:10pt; color: #28A745;'>●</span>" # Green
+        elif "prospect" in status_lower: return "<span style='font-size:10pt; color: #007BFF;'>●</span>" # Blue
+        elif "inactif" in status_lower or "inactive" in status_lower: return "<span style='font-size:10pt; color: #FFC107;'>●</span>" # Yellow/Orange
+        elif "archivé" in status_lower or "archived" in status_lower: return "<span style='font-size:10pt; color: #6c757d;'>●</span>" # Grey
+        elif "complété" in status_lower or "completed" in status_lower: return "<span style='font-size:10pt; color: #663399;'>●</span>" # Purple
+        else: return "<span style='font-size:10pt; color: #343A40;'>○</span>" # Dark Grey/Black circle for others
+
 
 class DocumentManager(QMainWindow):
     def __init__(self, app_root_dir, current_user_info: dict): # Changed current_user_id to current_user_info
@@ -506,76 +585,126 @@ class DocumentManager(QMainWindow):
         filter_search_group = QGroupBox(self.tr("Filtres et Recherche Clients"))
         filter_search_main_layout = QVBoxLayout(filter_search_group) # Changed to QVBoxLayout
 
-        # --- Status and Archive Filters Group (Horizontal) ---
-        status_archive_filter_group_layout = QHBoxLayout()
+        # --- Top line filters (Status, Search, More Filters button) ---
+        top_filter_line_layout = QHBoxLayout()
 
         # Status Filter
-        status_filter_layout = QVBoxLayout()
-        status_label = QLabel(self.tr("Statut:"))
+        # status_filter_layout_group = QWidget() # Use a QWidget as a container for label and combo
+        # status_filter_v_layout = QVBoxLayout(status_filter_layout_group)
+        # status_filter_v_layout.setContentsMargins(0,0,0,0)
+        # status_label = QLabel(self.tr("Statut:")) # Label for status
         self.status_filter_combo = QComboBox(); self.status_filter_combo.addItem(self.tr("Tous les statuts"), None)
         self.load_statuses_into_filter_combo(); self.status_filter_combo.currentIndexChanged.connect(self.filter_client_list_display_slot)
-        status_filter_layout.addWidget(status_label)
-        status_filter_layout.addWidget(self.status_filter_combo)
-        status_archive_filter_group_layout.addLayout(status_filter_layout)
+        self.status_filter_combo.setToolTip(self.tr("Filtrer par statut"))
+        # status_filter_v_layout.addWidget(status_label)
+        # status_filter_v_layout.addWidget(self.status_filter_combo)
+        top_filter_line_layout.addWidget(self.status_filter_combo) # Add combo directly
 
-        # Archive Filter
-        archive_filter_layout = QVBoxLayout()
+        # Search Input
+        # search_input_layout_group = QWidget() # Container for label and input
+        # search_input_v_layout = QVBoxLayout(search_input_layout_group)
+        # search_input_v_layout.setContentsMargins(0,0,0,0)
+        # self.search_label = QLabel(self.tr("Recherche:")) # Label for search
+        # self.search_label.setVisible(False) # Hide label for compactness
+        self.search_input_field = QLineEdit(); self.search_input_field.setPlaceholderText(self.tr("Rechercher client..."))
+        self.search_input_field.textChanged.connect(self.filter_client_list_display_slot)
+        # search_input_v_layout.addWidget(self.search_label)
+        # search_input_v_layout.addWidget(self.search_input_field)
+        top_filter_line_layout.addWidget(self.search_input_field) # Add input directly
+
+        top_filter_line_layout.addStretch(1) # Pushes search and status to left, allows buttons to be at the end
+
+        # "More Filters" Button (Icon Only)
+        self.more_filters_button = QPushButton("") # No text
+        self.more_filters_button.setObjectName("moreFiltersButton")
+        self.more_filters_button.setIcon(QIcon(":/icons/chevron-down.svg"))
+        self.more_filters_button.setCheckable(True)
+        self.more_filters_button.toggled.connect(self.toggle_more_filters_visibility)
+        self.more_filters_button.setToolTip(self.tr("Afficher/Masquer plus de filtres"))
+        top_filter_line_layout.addWidget(self.more_filters_button)
+
+        # "Réinitialiser Filtres" Button (Icon Only, moved to top line)
+        self.reset_filters_button = QPushButton("") # No text
+        self.reset_filters_button.setObjectName("resetFiltersButton")
+        self.reset_filters_button.setIcon(QIcon(":/icons/refresh-cw.svg"))
+        self.reset_filters_button.clicked.connect(self.reset_all_filters_slot)
+        self.reset_filters_button.setToolTip(self.tr("Réinitialiser tous les filtres"))
+        top_filter_line_layout.addWidget(self.reset_filters_button)
+
+        filter_search_main_layout.addLayout(top_filter_line_layout) # This is the single visible line of filters
+
+
+        # --- Collapsible Filter Widget ---
+        self.collapsible_filter_widget = QWidget()
+        collapsible_layout = QVBoxLayout(self.collapsible_filter_widget)
+        # Remove top margin if it creates unwanted space when hidden, or ensure widget is fully hidden
+        collapsible_layout.setContentsMargins(0, 2, 0, 0) # Minimal top margin when visible
+
+
+        # Archive Filter (moved into collapsible area)
+        archive_filter_layout_group = QWidget()
+        archive_filter_v_layout = QVBoxLayout(archive_filter_layout_group)
+        archive_filter_v_layout.setContentsMargins(0,0,0,0)
         archive_label = QLabel(self.tr("Filtre Archive:"))
         self.client_archive_filter_combo = QComboBox()
         self.client_archive_filter_combo.addItem(self.tr("Clients Actifs"), False)
         self.client_archive_filter_combo.addItem(self.tr("Clients Archivés (supprimés logiquement)"), True)
         self.client_archive_filter_combo.addItem(self.tr("Tout"), "all_status_types")
         self.client_archive_filter_combo.setCurrentIndex(0); self.client_archive_filter_combo.currentIndexChanged.connect(self.filter_client_list_display_slot)
-        archive_filter_layout.addWidget(archive_label)
-        archive_filter_layout.addWidget(self.client_archive_filter_combo)
-        status_archive_filter_group_layout.addLayout(archive_filter_layout)
-        status_archive_filter_group_layout.addStretch(1) # Push status/archive filters to the left
+        archive_filter_v_layout.addWidget(archive_label)
+        archive_filter_v_layout.addWidget(self.client_archive_filter_combo)
+        collapsible_layout.addWidget(archive_filter_layout_group)
 
-        filter_search_main_layout.addLayout(status_archive_filter_group_layout) # Add horizontal group to main vertical
-
-        # --- Country Filter Group (Horizontal) ---
-        country_filter_group_layout = QHBoxLayout()
-        country_filter_layout = QVBoxLayout()
+        # Country Filter (moved into collapsible area)
+        country_filter_layout_group = QWidget()
+        country_filter_v_layout = QVBoxLayout(country_filter_layout_group)
+        country_filter_v_layout.setContentsMargins(0,0,0,0)
         country_label = QLabel(self.tr("Pays:"))
         self.country_filter_combo = QComboBox()
         self.country_filter_combo.addItem(self.tr("Tous les pays"), None)
         self.load_countries_into_filter_combo()
         self.country_filter_combo.currentIndexChanged.connect(self.filter_client_list_display_slot)
-        country_filter_layout.addWidget(country_label)
-        country_filter_layout.addWidget(self.country_filter_combo)
-        country_filter_group_layout.addLayout(country_filter_layout)
-        country_filter_group_layout.addStretch(1) # Push country filter to the left
+        country_filter_v_layout.addWidget(country_label)
+        country_filter_v_layout.addWidget(self.country_filter_combo)
+        collapsible_layout.addWidget(country_filter_layout_group)
 
-        filter_search_main_layout.addLayout(country_filter_group_layout) # Add horizontal group to main vertical
+        # --- Date Filter Group (Horizontal, within collapsible area) ---
+        date_filter_group_layout = QHBoxLayout()
+        date_filter_label_start = QLabel(self.tr("Créé de:"))
+        self.date_filter_start = QDateEdit()
+        self.date_filter_start.setCalendarPopup(True)
+        self.date_filter_start.setClearButtonEnabled(True)
+        self.date_filter_start.setDate(QDate()) # Null date initially
+        self.date_filter_start.setDisplayFormat("yyyy-MM-dd")
+        self.date_filter_start.dateChanged.connect(self.filter_client_list_display_slot)
 
-        # --- Search Input Group (Horizontal) ---
-        search_group_layout = QHBoxLayout()
-        # Original search_layout (QVBoxLayout for label + QHBoxLayout for icon/input)
-        search_layout = QVBoxLayout()
-        self.search_label = QLabel(self.tr("Recherche:"))
-        self.search_label.setVisible(False)
-        search_layout.addWidget(self.search_label)
+        date_filter_label_end = QLabel(self.tr("à:"))
+        self.date_filter_end = QDateEdit()
+        self.date_filter_end.setCalendarPopup(True)
+        self.date_filter_end.setClearButtonEnabled(True)
+        self.date_filter_end.setDate(QDate()) # Null date initially
+        self.date_filter_end.setDisplayFormat("yyyy-MM-dd")
+        self.date_filter_end.dateChanged.connect(self.filter_client_list_display_slot)
 
-        search_bar_line_layout = QHBoxLayout()
-        self.search_icon_btn = QPushButton()
-        self.search_icon_btn.setIcon(QIcon.fromTheme("edit-find", QIcon(":/icons/search.svg")))
-        self.search_icon_btn.setToolTip(self.tr("Afficher/Cacher la barre de recherche"))
-        search_bar_line_layout.addWidget(self.search_icon_btn)
+        date_filter_group_layout.addWidget(date_filter_label_start)
+        date_filter_group_layout.addWidget(self.date_filter_start)
+        date_filter_group_layout.addWidget(date_filter_label_end)
+        date_filter_group_layout.addWidget(self.date_filter_end)
+        date_filter_group_layout.addStretch(1)
+        collapsible_layout.addLayout(date_filter_group_layout)
+        # --- End Date Filter Group ---
 
-        self.search_input_field = QLineEdit(); self.search_input_field.setPlaceholderText(self.tr("Rechercher client..."))
-        self.search_input_field.setVisible(False)
-        self.search_input_field.textChanged.connect(self.filter_client_list_display_slot)
-        search_bar_line_layout.addWidget(self.search_input_field)
 
-        search_layout.addLayout(search_bar_line_layout)
-        search_group_layout.addLayout(search_layout) # Add the search VBox to the HBox
-        search_group_layout.addStretch(1) # Push search elements to the left
+        self.collapsible_filter_widget.setVisible(False) # Initially hidden
+        filter_search_main_layout.addWidget(self.collapsible_filter_widget)
 
-        filter_search_main_layout.addLayout(search_group_layout) # Add horizontal group to main vertical
+        # Remove the previous layout for reset_button_layout as it's now on the top line
+        # filter_search_main_layout.addLayout(reset_button_layout) # This line is removed
 
-        self.search_icon_btn.clicked.connect(self.toggle_search_input_visibility)
 
-        filter_search_main_layout.addStretch(1) # Pushes all filter groups upwards if there's vertical space
+        # The main stretch for filter_search_main_layout should be removed if we want the client list
+        # to be directly under the collapsible_filter_widget (or top_filter_line_layout when collapsed).
+        # filter_search_main_layout.addStretch(1) # REMOVE THIS to prevent pushing client list down
         left_pane_layout.addWidget(filter_search_group)
 
         self.client_list_widget = QListWidget(); self.client_list_widget.setAlternatingRowColors(True)
@@ -589,9 +718,26 @@ class DocumentManager(QMainWindow):
         self.page_info_label = QLabel(self.tr("Page 1")); pagination_layout.addWidget(self.prev_page_button); pagination_layout.addWidget(self.page_info_label); pagination_layout.addWidget(self.next_page_button)
         left_pane_layout.addLayout(pagination_layout)
         
-        self.add_new_client_button = QPushButton(self.tr("Ajouter un Nouveau Client")); self.add_new_client_button.setIcon(QIcon(":/icons/user-add.svg")); self.add_new_client_button.setObjectName("primaryButton"); self.add_new_client_button.clicked.connect(self.open_add_new_client_dialog); left_pane_layout.addWidget(self.add_new_client_button)
+        # Buttons in a single row
+        client_actions_layout = QHBoxLayout()
+        self.add_new_client_button = QPushButton(self.tr("Ajouter Nouveau Client")); self.add_new_client_button.setIcon(QIcon(":/icons/user-add.svg")); self.add_new_client_button.setObjectName("primaryButton"); self.add_new_client_button.clicked.connect(self.open_add_new_client_dialog)
+        client_actions_layout.addWidget(self.add_new_client_button)
 
-        self.add_client_by_voice_button = QPushButton(self.tr("Ajouter Client par Voix")); self.add_client_by_voice_button.setIcon(QIcon(":/icons/mic.svg")); self.add_client_by_voice_button.setObjectName("primaryButton"); self.add_client_by_voice_button.clicked.connect(self.handle_add_client_by_voice_clicked); left_pane_layout.addWidget(self.add_client_by_voice_button)
+        self.add_client_by_voice_button = QPushButton(self.tr("Ajouter par Voix")); self.add_client_by_voice_button.setIcon(QIcon(":/icons/mic.svg")); self.add_client_by_voice_button.setObjectName("primaryButton")
+        self.add_client_by_voice_button.clicked.connect(self.handle_add_client_by_voice_clicked)
+        self.add_client_by_voice_button.setEnabled(False) # Disable as requested
+        self.add_client_by_voice_button.setToolTip(self.tr("Fonctionnalité en cours de développement"))
+        client_actions_layout.addWidget(self.add_client_by_voice_button)
+
+
+        self.add_client_by_voice_button = QPushButton(self.tr("Ajouter par Voix")); self.add_client_by_voice_button.setIcon(QIcon(":/icons/mic.svg")); self.add_client_by_voice_button.setObjectName("primaryButton")
+        self.add_client_by_voice_button.clicked.connect(self.handle_add_client_by_voice_clicked)
+        self.add_client_by_voice_button.setEnabled(False) # Disable as requested
+        self.add_client_by_voice_button.setToolTip(self.tr("Fonctionnalité en cours de développement"))
+        client_actions_layout.addWidget(self.add_client_by_voice_button)
+
+
+        left_pane_layout.addLayout(client_actions_layout)
 
         # map_group_box removed from here
         left_pane_widget.setLayout(left_pane_layout)
@@ -610,15 +756,16 @@ class DocumentManager(QMainWindow):
                 splitter_state_byte_array = QByteArray.fromHex(saved_splitter_state_hex.encode('utf-8'))
                 if not self.main_splitter.restoreState(splitter_state_byte_array):
                     logging.warning("Failed to restore splitter state, applying defaults.")
-                    self.main_splitter.setSizes([int(self.width() * 0.12), int(self.width() * 0.88)])
+                    self.main_splitter.setSizes([int(self.width() * 0.20), int(self.width() * 0.80)]) # Adjusted default
                 else:
                     logging.info("Client list splitter state restored.")
             except Exception as e:
                 logging.error(f"Error restoring splitter state: {e}. Applying defaults.", exc_info=True)
-                self.main_splitter.setSizes([int(self.width() * 0.12), int(self.width() * 0.88)])
+                self.main_splitter.setSizes([int(self.width() * 0.20), int(self.width() * 0.80)]) # Adjusted default
         else:
-            self.main_splitter.setSizes([int(self.width() * 0.12), int(self.width() * 0.88)])
-            logging.info("Client list splitter: No saved state found, applied default sizes 12/88.")
+            # Adjusted default splitter sizes: left pane 20%, right pane 80%
+            self.main_splitter.setSizes([int(self.width() * 0.20), int(self.width() * 0.80)])
+            logging.info("Client list splitter: No saved state found, applied default sizes 20/80.")
 
         self.main_splitter.splitterMoved.connect(self.save_splitter_state)
 
@@ -628,6 +775,46 @@ class DocumentManager(QMainWindow):
         self.documents_page_widget.setLayout(docs_page_layout)
 
         self.main_area_stack.addWidget(self.documents_page_widget)
+
+    def toggle_more_filters_visibility(self, checked):
+        self.collapsible_filter_widget.setVisible(checked)
+        if checked:
+            self.more_filters_button.setIcon(QIcon(":/icons/chevron-up.svg")) # Change icon to up
+            # self.more_filters_button.setText(self.tr("Moins de Filtres")) # Text removed
+        else:
+            self.more_filters_button.setIcon(QIcon(":/icons/chevron-down.svg")) # Change icon to down
+            # self.more_filters_button.setText(self.tr("Plus de Filtres")) # Text removed
+
+
+    def reset_all_filters_slot(self):
+        """Resets all filter inputs to their default states and refreshes the client list."""
+        logging.info("Resetting all filters.")
+
+        # Reset ComboBoxes to their first item (index 0)
+        self.status_filter_combo.setCurrentIndex(0)
+        self.client_archive_filter_combo.setCurrentIndex(0)
+        self.country_filter_combo.setCurrentIndex(0)
+
+        # Clear the search input field
+        self.search_input_field.setText("")
+
+        # Clear date filters
+        if hasattr(self, 'date_filter_start'): # Check if attributes exist (they should)
+            self.date_filter_start.setDate(QDate())
+        if hasattr(self, 'date_filter_end'):
+            self.date_filter_end.setDate(QDate())
+
+
+        # Collapse the "More Filters" section if it's open
+        if self.collapsible_filter_widget.isVisible():
+            self.more_filters_button.setChecked(False) # This will trigger toggle_more_filters_visibility
+
+        # Refresh the client list
+        # Calling filter_client_list_display_slot will also reset pagination and load from DB
+        self.filter_client_list_display_slot()
+
+        self.notify(self.tr("Filtres Réinitialisés"), self.tr("Tous les filtres ont été réinitialisés."), type='INFO')
+
 
     def save_splitter_state(self, pos, index):
         """Saves the current state of the main_splitter."""
@@ -1129,7 +1316,14 @@ class DocumentManager(QMainWindow):
         elif isinstance(archive_filter_data, bool): include_deleted_filter = archive_filter_data
         filters_for_crud = {};
         if status_id_filter is not None: filters_for_crud['status_id'] = status_id_filter
-        if country_id_filter is not None: filters_for_crud['country_id'] = country_id_filter # Add to filters
+        if country_id_filter is not None: filters_for_crud['country_id'] = country_id_filter
+
+        # Add date filters if they are set
+        if hasattr(self, 'date_filter_start') and self.date_filter_start.date().isValid() and not self.date_filter_start.date().isNull():
+            filters_for_crud['created_at_start'] = self.date_filter_start.date().toString("yyyy-MM-dd")
+
+        if hasattr(self, 'date_filter_end') and self.date_filter_end.date().isValid() and not self.date_filter_end.date().isNull():
+            filters_for_crud['created_at_end'] = self.date_filter_end.date().toString("yyyy-MM-dd")
 
         # Update total_filtered_clients count
         # Conceptual: if clients_crud_instance.get_all_clients_count existed:
@@ -1193,10 +1387,26 @@ class DocumentManager(QMainWindow):
     def set_client_status_archived(self, client_id): self.set_client_status_archived_slot(client_id)
     def delete_client_permanently(self, client_id): self.delete_client_permanently_slot(client_id)
 
-    def add_client_to_list_widget(self, client_dict_data): 
-        item = QListWidgetItem(client_dict_data["client_name"])
+    # Old get_status_visual_indicator removed as its logic is now in ClientListItemWidget
+
+    def add_client_to_list_widget(self, client_dict_data):
+        item = QListWidgetItem(self.client_list_widget)
+        # Pass self (DocumentManager instance) as parent to ClientListItemWidget
+        # so it can access tr() or other methods if needed.
+        # Or pass self.client_list_widget as parent for widget hierarchy.
+        custom_widget = ClientListItemWidget(client_dict_data, self.client_list_widget)
+        item.setSizeHint(custom_widget.sizeHint())
+
+        # Store the raw client_dict_data in the QListWidgetItem's UserRole
+        # This is crucial for context menus, click handling etc. to get the full data.
         item.setData(Qt.UserRole, client_dict_data)
+
+
+
         self.client_list_widget.addItem(item)
+        self.client_list_widget.setItemWidget(item, custom_widget)
+
+
 
     def load_countries_into_filter_combo(self):
         current_selection_data = self.country_filter_combo.currentData()
