@@ -368,6 +368,21 @@ class DocumentManager(QMainWindow):
         self.init_or_update_download_monitor() # Initialize or update based on config
         self.populate_saved_filters_combo() # Populate saved filters on init
 
+        # Set bottom widget for HomePageWidget if statistics module is enabled
+        if self.home_page_widget_instance and hasattr(self.home_page_widget_instance, 'set_bottom_widget'):
+            stats_widget_instance = self.get_statistics_widget_instance()
+            if stats_widget_instance:
+                self.home_page_widget_instance.set_bottom_widget(stats_widget_instance)
+            else: # Optionally hide or set a default placeholder if stats are disabled/unavailable
+                self.home_page_widget_instance.set_bottom_widget(None)
+
+
+    def get_statistics_widget_instance(self):
+        """Returns the instance of the statistics dashboard if available."""
+        if self.module_states.get('statistics', True) and hasattr(self, 'statistics_dashboard_instance'):
+            return self.statistics_dashboard_instance
+        return None
+
     def _load_module_states(self):
         """Loads the enabled/disabled state of configurable modules from the database."""
         if not db_manager:
