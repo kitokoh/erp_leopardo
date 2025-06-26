@@ -1121,3 +1121,4 @@ QPushButton[class="tableActionButton"]:pressed {
     background-color: #CCE5FF; /* Darker blue when pressed */
     color: #0056B3;
 }
+
