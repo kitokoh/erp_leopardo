@@ -102,6 +102,7 @@ except Exception:
     pass
 # --- END TARGETED sys.path FIX ---
 from product_management.page import ProductManagementPage # Added
+from PyQt5.QtWidgets import QSizePolicy
 
 from dialogs.status_management_dialog import StatusManagementDialog # Added for status management
 from dialogs.manage_saved_filters_dialog import ManageSavedFiltersDialog # Import for managing saved filters
@@ -698,7 +699,7 @@ class DocumentManager(QMainWindow):
         date_filter_label_start = QLabel(self.tr("Créé de:"))
         self.date_filter_start = QDateEdit()
         self.date_filter_start.setCalendarPopup(True)
-        self.date_filter_start.setClearButtonEnabled(True)
+        # self.date_filter_start.setClearButtonEnabled(True)
         self.date_filter_start.setDate(QDate()) # Null date initially
         self.date_filter_start.setDisplayFormat("yyyy-MM-dd")
         self.date_filter_start.dateChanged.connect(self.filter_client_list_display_slot)
@@ -706,7 +707,7 @@ class DocumentManager(QMainWindow):
         date_filter_label_end = QLabel(self.tr("à:"))
         self.date_filter_end = QDateEdit()
         self.date_filter_end.setCalendarPopup(True)
-        self.date_filter_end.setClearButtonEnabled(True)
+        # self.date_filter_end.setClearButtonEnabled(True)
 
         self.date_filter_end.setDate(QDate()) # Null date initially
         self.date_filter_end.setDisplayFormat("yyyy-MM-dd")
