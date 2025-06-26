@@ -3,8 +3,9 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QGridLayout, QPushButton, QLabel, QSizePolicy,
     QScrollArea
 )
-from PyQt5.QtCore import Qt, pyqtSlot
-from PyQt5.QtGui import QFont
+from PyQt5.QtCore import Qt, pyqtSlot, QSize
+from PyQt5.QtGui import QFont, QIcon, QMovie
+import os # Added for path construction
 
 class HomePageWidget(QWidget):
     def __init__(self, parent=None):
@@ -13,27 +14,37 @@ class HomePageWidget(QWidget):
         self._init_ui()
 
     def _init_ui(self):
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(20)
+        # Main horizontal layout
+        main_h_layout = QHBoxLayout(self)
+        main_h_layout.setContentsMargins(0, 0, 0, 0) # No margins for the main HBox, handle padding inside children
+        main_h_layout.setSpacing(0) # No spacing for the main HBox
+
+        # --- Left Content Area (Welcome Message and Buttons) ---
+        left_content_area = QWidget()
+        left_content_layout = QVBoxLayout(left_content_area)
+        left_content_layout.setContentsMargins(20, 20, 20, 20)
+        left_content_layout.setSpacing(20)
+        # left_content_area.setStyleSheet("background-color: #FF0000;") # For debugging layout
 
         # Welcome Message
         welcome_label = QLabel(self.tr("Bienvenue à votre Gestionnaire d'Application"))
+        welcome_label.setObjectName("homePageWelcomeLabel") # Added objectName
         welcome_font = QFont()
         welcome_font.setPointSize(28) # Increased size
         welcome_font.setBold(True)
         welcome_label.setFont(welcome_font)
         welcome_label.setAlignment(Qt.AlignCenter)
-        welcome_label.setStyleSheet("color: #333; margin-bottom: 20px;")
-        main_layout.addWidget(welcome_label)
+        welcome_label.setStyleSheet("color: #333; margin-bottom: 20px; background-color: transparent;")
+        left_content_layout.addWidget(welcome_label)
 
         # Scroll Area for module buttons
-        scroll_area = QScrollArea(self)
+        scroll_area = QScrollArea(left_content_area) # Parent is now left_content_area
         scroll_area.setWidgetResizable(True)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll_area.setStyleSheet("QScrollArea { border: none; background-color: transparent; }")
 
         content_widget = QWidget()
+        content_widget.setObjectName("homePageButtonGridContainer") # Added objectName
         content_widget.setStyleSheet("background-color: transparent;") # Ensure content widget is transparent
         scroll_area.setWidget(content_widget)
 
@@ -55,26 +66,6 @@ class HomePageWidget(QWidget):
             {"name": self.tr("Paramètres"), "object_name": "btnSettings", "icon": ":/icons/modern/settings.svg", "slot": self.go_to_settings}
         ]
 
-        button_style_sheet = """
-            QPushButton {
-                background-color: #ffffff;
-                border: 1px solid #cccccc;
-                border-radius: 8px;
-                padding: 20px;
-                font-size: 14px;
-                font-weight: bold;
-                color: #333333;
-                text-align: center;
-            }
-            QPushButton:hover {
-                background-color: #f0f0f0;
-                border-color: #aaaaaa;
-            }
-            QPushButton:pressed {
-                background-color: #e0e0e0;
-            }
-        """
-
         row, col = 0, 0
         # Determine number of columns (e.g., 3 for wider screens, 2 for narrower)
         # This is a static example; dynamic resizing would be more complex.
@@ -84,15 +75,15 @@ class HomePageWidget(QWidget):
             button = QPushButton(module["name"])
             button.setObjectName(module["object_name"])
             # Icons would be set here if `icons_rc.py` was updated
-            # from PyQt5.QtGui import QIcon
-            # if QIcon.hasThemeIcon(module["icon"]): # Check if icon exists
-            #     button.setIcon(QIcon(module["icon"]))
-            #     button.setIconSize(Qt.QSize(32,32)) # Example size
+            # from PyQt5.QtGui import QIcon # Already imported at the top
+            if module["icon"] and QIcon.hasThemeIcon(module["icon"]): # Check if icon exists and is not empty
+                button.setIcon(QIcon(module["icon"]))
+                button.setIconSize(QSize(32,32)) # Example size - QSize was also imported
 
             button.setMinimumHeight(100) # Make buttons taller for card-like appearance
             button.setMinimumWidth(180)  # Set a minimum width for buttons
             button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding) # Allow buttons to expand
-            button.setStyleSheet(button_style_sheet)
+            # button.setStyleSheet(button_style_sheet) # Style moved to style.qss
             button.clicked.connect(module["slot"])
 
             grid_layout.addWidget(button, row, col)
@@ -107,7 +98,46 @@ class HomePageWidget(QWidget):
         grid_layout.setRowStretch(row + 1, 1)
         grid_layout.setColumnStretch(num_columns, 1)
 
-        main_layout.addWidget(scroll_area)
+        left_content_layout.addWidget(scroll_area)
+        left_content_area.setLayout(left_content_layout)
+
+        # --- Right Content Area (for GIF) ---
+        right_content_area = QWidget()
+        # right_content_area.setStyleSheet("background-color: #00FF00;") # For debugging layout
+        right_content_layout = QVBoxLayout(right_content_area) # Basic layout for now
+        right_content_layout.setContentsMargins(20,20,20,20)
+
+        gif_label = QLabel()
+        # Construct path to GIF. This assumes 'resources' is at the same level as the script's dir or project root.
+        # A more robust solution might involve getting APP_ROOT_DIR if this widget needs to be more portable.
+        gif_path = os.path.join(os.path.dirname(__file__), "..", "resources", "gifs", "leoo3.gif")
+        if not os.path.exists(gif_path): # Fallback if running from a different structure (e.g. project root)
+            gif_path = os.path.join("resources", "gifs", "leoo3.gif")
+
+        if os.path.exists(gif_path):
+            movie = QMovie(gif_path)
+            gif_label.setMovie(movie)
+            movie.start()
+            gif_label.setAlignment(Qt.AlignCenter)
+            # Optional: Set a fixed or maximum size for the GIF label to control its display
+            # gif_label.setFixedSize(400, 300) # Example: or use setMaximumSize
+            gif_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            right_content_layout.addWidget(gif_label)
+        else:
+            # Fallback if GIF not found
+            gif_placeholder_label = QLabel(self.tr("GIF non trouvé:\n{0}").format(gif_path))
+            gif_placeholder_label.setAlignment(Qt.AlignCenter)
+            gif_placeholder_label.setStyleSheet("color: red; font-style: italic;")
+            right_content_layout.addWidget(gif_placeholder_label)
+
+        right_content_area.setLayout(right_content_layout)
+
+
+        # Add left and right areas to the main horizontal layout
+        main_h_layout.addWidget(left_content_area, 2) # Give more stretch factor to button area initially
+        main_h_layout.addWidget(right_content_area, 1) # Stretch factor for GIF area
+
+        self.setLayout(main_h_layout) # Set the main layout for HomePageWidget
 
     # Placeholder slots for navigation - these will call parent methods
     @pyqtSlot()
