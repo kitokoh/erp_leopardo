@@ -57,7 +57,12 @@ class JobOpeningsWidget(QWidget):
         self.setLayout(self.main_layout)
 
         self.update_action_buttons_state()
-        self.load_job_openings()
+        # self.load_job_openings() # Removed automatic loading
+
+        # Add a refresh button
+        self.refresh_button = QPushButton("Refresh List")
+        self.refresh_button.clicked.connect(self.load_job_openings)
+        self.actions_layout.addWidget(self.refresh_button, 0, Qt.AlignRight) # Add to the right
 
     def load_job_openings(self):
         self.job_openings_table.setRowCount(0)
