@@ -554,11 +554,13 @@ class DocumentManager(QMainWindow):
 
         filter_search_main_layout.addLayout(top_filter_line_layout) # This is the single visible line of filters
 
+
         # --- Collapsible Filter Widget ---
         self.collapsible_filter_widget = QWidget()
         collapsible_layout = QVBoxLayout(self.collapsible_filter_widget)
         # Remove top margin if it creates unwanted space when hidden, or ensure widget is fully hidden
         collapsible_layout.setContentsMargins(0, 2, 0, 0) # Minimal top margin when visible
+
 
         # Archive Filter (moved into collapsible area)
         archive_filter_layout_group = QWidget()
@@ -587,11 +589,23 @@ class DocumentManager(QMainWindow):
         country_filter_v_layout.addWidget(self.country_filter_combo)
         collapsible_layout.addWidget(country_filter_layout_group)
 
+
         self.collapsible_filter_widget.setVisible(False) # Initially hidden
         filter_search_main_layout.addWidget(self.collapsible_filter_widget)
 
-        # Remove the previous layout for reset_button_layout as it's now on the top line
-        # filter_search_main_layout.addLayout(reset_button_layout) # This line is removed
+
+        # "Réinitialiser Filtres" Button
+        self.reset_filters_button = QPushButton(self.tr("Réinitialiser Filtres"))
+        self.reset_filters_button.setObjectName("resetFiltersButton") # Added object name
+        self.reset_filters_button.setIcon(QIcon(":/icons/refresh-cw.svg")) # Placeholder icon, ensure it exists
+        self.reset_filters_button.clicked.connect(self.reset_all_filters_slot)
+        # Add some top margin to separate it from the collapsible section
+        reset_button_layout = QHBoxLayout()
+        reset_button_layout.addStretch(1) # Push button to the right or center as desired
+        reset_button_layout.addWidget(self.reset_filters_button)
+        reset_button_layout.addStretch(1)
+        filter_search_main_layout.addLayout(reset_button_layout)
+
 
         # The main stretch for filter_search_main_layout should be removed if we want the client list
         # to be directly under the collapsible_filter_widget (or top_filter_line_layout when collapsed).
@@ -619,6 +633,7 @@ class DocumentManager(QMainWindow):
         self.add_client_by_voice_button.setEnabled(False) # Disable as requested
         self.add_client_by_voice_button.setToolTip(self.tr("Fonctionnalité en cours de développement"))
         client_actions_layout.addWidget(self.add_client_by_voice_button)
+
 
         left_pane_layout.addLayout(client_actions_layout)
 
@@ -668,6 +683,7 @@ class DocumentManager(QMainWindow):
             self.more_filters_button.setIcon(QIcon(":/icons/chevron-down.svg")) # Change icon to down
             # self.more_filters_button.setText(self.tr("Plus de Filtres")) # Text removed
 
+
     def reset_all_filters_slot(self):
         """Resets all filter inputs to their default states and refreshes the client list."""
         logging.info("Resetting all filters.")
@@ -689,7 +705,6 @@ class DocumentManager(QMainWindow):
         self.filter_client_list_display_slot()
 
         self.notify(self.tr("Filtres Réinitialisés"), self.tr("Tous les filtres ont été réinitialisés."), type='INFO')
-
 
     def save_splitter_state(self, pos, index):
         """Saves the current state of the main_splitter."""
