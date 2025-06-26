@@ -1216,3 +1216,28 @@ QPushButton#userMenuButton::menu-indicator {
     image: none; /* Hide default menu indicator arrow */
 }
 
+/* User Menu Button in Menu Bar */
+QPushButton#userMenuButton {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 16px; /* Half of the button's fixed size (32px / 2) */
+    padding: 0px;
+    min-width: 32px; /* Consistent with UserMenuButton fixed size */
+    max-width: 32px;
+    min-height: 32px;
+    max-height: 32px;
+    /* icon-size: 20px; */ /* Icon size is best controlled from UserMenuButton.py if precise sizing needed */
+}
+
+QPushButton#userMenuButton:hover {
+    background-color: #E0E0E0; /* Light grey hover */
+}
+
+QPushButton#userMenuButton:pressed {
+    background-color: #CFD8DC; /* Slightly darker grey when pressed */
+}
+
+QPushButton#userMenuButton::menu-indicator {
+    image: none; /* Hide default menu indicator arrow */
+}
+
