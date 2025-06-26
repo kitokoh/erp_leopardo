@@ -121,6 +121,8 @@ from partners.partner_main_widget import PartnerMainWidget # Partner Management
 from inventory_browser_widget import InventoryBrowserWidget # Inventory Management
 from camera_management.camera_management_widget import CameraManagementWidget # Camera Management
 
+from PyQt5.QtGui import QColor, QPalette # For ClientListItemWidget text color
+
 from recruitment.recruitment_dashboard import RecruitmentDashboard # Import RecruitmentDashboard
 
 from home_page_widget import HomePageWidget # Added for new Home Page
@@ -148,6 +150,83 @@ CONFIGURABLE_MODULES = [
     {'key': 'module_calendar_enabled', 'name': 'calendar', 'action_attr': 'calendar_module_action', 'widget_attr': 'calendar_module_widget_instance'},
     {'key': 'module_camera_management_enabled', 'name': 'camera_management', 'action_attr': 'camera_management_action', 'widget_attr': 'camera_management_widget_instance'}
 ]
+
+class ClientListItemWidget(QWidget):
+    def __init__(self, client_data, parent=None):
+        super().__init__(parent)
+        self.client_data = client_data
+        # Get the main DocumentManager instance to call its methods (like tr)
+        # This assumes ClientListItemWidget is instantiated with DocumentManager as an ancestor or direct parent.
+        # A more robust way might be to pass DocumentManager instance if deeply nested.
+        self.doc_manager = parent # Assuming parent is DocumentManager or provides tr
+        while self.doc_manager and not isinstance(self.doc_manager, DocumentManager):
+            self.doc_manager = self.doc_manager.parent()
+
+        if not self.doc_manager:
+            # Fallback if DocumentManager not found in parent hierarchy
+            # This might happen if parent is QListWidget, then its parent etc.
+            # For simplicity, we assume it can be found or tr will work via QCoreApplication.translate
+            # A cleaner way is to pass doc_manager instance explicitly if this becomes an issue.
+            # logging.warning("ClientListItemWidget: DocumentManager instance not found via parent hierarchy.")
+            pass
+
+        self.init_ui()
+
+    def _tr(self, text):
+        if self.doc_manager and hasattr(self.doc_manager, 'tr'):
+            return self.doc_manager.tr(text)
+        return QApplication.translate("ClientListItemWidget", text) # Fallback
+
+    def init_ui(self):
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(5, 3, 5, 3)
+        main_layout.setSpacing(1) # Reduced spacing
+
+        # Line 1: Status Icon + Client Name
+        line1_layout = QHBoxLayout()
+        line1_layout.setSpacing(4)
+
+        status_icon_label = QLabel()
+        status_name = self.client_data.get("status", "")
+        icon_html = self._get_status_icon_html(status_name)
+        status_icon_label.setText(icon_html)
+        status_icon_label.setFixedWidth(12) # Adjusted for typical font size of icon
+        line1_layout.addWidget(status_icon_label)
+
+        client_name_label = QLabel(f"<b>{self.client_data.get('client_name', 'N/A')}</b>")
+        client_name_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        line1_layout.addWidget(client_name_label)
+        line1_layout.addStretch()
+        main_layout.addLayout(line1_layout)
+
+        # Line 2: Additional Info (e.g., Project Identifier)
+        project_identifier = self.client_data.get('project_identifier', '')
+        if project_identifier:
+            additional_info_label = QLabel(f"<small>{self._tr('Projet:')} {project_identifier}</small>")
+            additional_info_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+
+            palette = additional_info_label.palette()
+            palette.setColor(QPalette.WindowText, QColor(Qt.darkGray))
+            additional_info_label.setPalette(palette)
+
+            additional_info_layout = QHBoxLayout()
+            additional_info_layout.addSpacing(15)
+            additional_info_layout.addWidget(additional_info_label)
+            additional_info_layout.addStretch()
+            main_layout.addLayout(additional_info_layout)
+
+        self.setStyleSheet("background:transparent;")
+
+    def _get_status_icon_html(self, status_name_str):
+        status_lower = status_name_str.lower() if status_name_str else ""
+        # Colors chosen for visibility against typical delegate backgrounds
+        if "actif" in status_lower or "active" in status_lower: return "<span style='font-size:10pt; color: #28A745;'>●</span>" # Green
+        elif "prospect" in status_lower: return "<span style='font-size:10pt; color: #007BFF;'>●</span>" # Blue
+        elif "inactif" in status_lower or "inactive" in status_lower: return "<span style='font-size:10pt; color: #FFC107;'>●</span>" # Yellow/Orange
+        elif "archivé" in status_lower or "archived" in status_lower: return "<span style='font-size:10pt; color: #6c757d;'>●</span>" # Grey
+        elif "complété" in status_lower or "completed" in status_lower: return "<span style='font-size:10pt; color: #663399;'>●</span>" # Purple
+        else: return "<span style='font-size:10pt; color: #343A40;'>○</span>" # Dark Grey/Black circle for others
+
 
 class DocumentManager(QMainWindow):
     def __init__(self, app_root_dir, current_user_info: dict): # Changed current_user_id to current_user_info
@@ -556,7 +635,10 @@ class DocumentManager(QMainWindow):
 
 <<<<<<< feature/redesign-gestion-document-ui
 =======
+<<<<<<< feature/redesign-gestion-document-ui
+=======
 
+>>>>>>> main
 >>>>>>> main
         # --- Collapsible Filter Widget ---
         self.collapsible_filter_widget = QWidget()
@@ -566,7 +648,10 @@ class DocumentManager(QMainWindow):
 
 <<<<<<< feature/redesign-gestion-document-ui
 =======
+<<<<<<< feature/redesign-gestion-document-ui
+=======
 
+>>>>>>> main
 >>>>>>> main
         # Archive Filter (moved into collapsible area)
         archive_filter_layout_group = QWidget()
@@ -596,11 +681,42 @@ class DocumentManager(QMainWindow):
         collapsible_layout.addWidget(country_filter_layout_group)
 
 <<<<<<< feature/redesign-gestion-document-ui
+        # --- Date Filter Group (Horizontal, within collapsible area) ---
+        date_filter_group_layout = QHBoxLayout()
+        date_filter_label_start = QLabel(self.tr("Créé de:"))
+        self.date_filter_start = QDateEdit()
+        self.date_filter_start.setCalendarPopup(True)
+        self.date_filter_start.setClearButtonEnabled(True)
+        self.date_filter_start.setDate(QDate()) # Null date initially
+        self.date_filter_start.setDisplayFormat("yyyy-MM-dd")
+        self.date_filter_start.dateChanged.connect(self.filter_client_list_display_slot)
+
+        date_filter_label_end = QLabel(self.tr("à:"))
+        self.date_filter_end = QDateEdit()
+        self.date_filter_end.setCalendarPopup(True)
+        self.date_filter_end.setClearButtonEnabled(True)
+        self.date_filter_end.setDate(QDate()) # Null date initially
+        self.date_filter_end.setDisplayFormat("yyyy-MM-dd")
+        self.date_filter_end.dateChanged.connect(self.filter_client_list_display_slot)
+
+        date_filter_group_layout.addWidget(date_filter_label_start)
+        date_filter_group_layout.addWidget(self.date_filter_start)
+        date_filter_group_layout.addWidget(date_filter_label_end)
+        date_filter_group_layout.addWidget(self.date_filter_end)
+        date_filter_group_layout.addStretch(1)
+        collapsible_layout.addLayout(date_filter_group_layout)
+        # --- End Date Filter Group ---
+
+=======
+<<<<<<< feature/redesign-gestion-document-ui
+>>>>>>> main
         self.collapsible_filter_widget.setVisible(False) # Initially hidden
         filter_search_main_layout.addWidget(self.collapsible_filter_widget)
 
         # Remove the previous layout for reset_button_layout as it's now on the top line
         # filter_search_main_layout.addLayout(reset_button_layout) # This line is removed
+<<<<<<< feature/redesign-gestion-document-ui
+=======
 =======
 
         self.collapsible_filter_widget.setVisible(False) # Initially hidden
@@ -619,6 +735,7 @@ class DocumentManager(QMainWindow):
         reset_button_layout.addStretch(1)
         filter_search_main_layout.addLayout(reset_button_layout)
 
+>>>>>>> main
 >>>>>>> main
 
         # The main stretch for filter_search_main_layout should be removed if we want the client list
@@ -649,6 +766,14 @@ class DocumentManager(QMainWindow):
         self.add_client_by_voice_button.setToolTip(self.tr("Fonctionnalité en cours de développement"))
         client_actions_layout.addWidget(self.add_client_by_voice_button)
 =======
+<<<<<<< feature/redesign-gestion-document-ui
+
+        self.add_client_by_voice_button = QPushButton(self.tr("Ajouter par Voix")); self.add_client_by_voice_button.setIcon(QIcon(":/icons/mic.svg")); self.add_client_by_voice_button.setObjectName("primaryButton")
+        self.add_client_by_voice_button.clicked.connect(self.handle_add_client_by_voice_clicked)
+        self.add_client_by_voice_button.setEnabled(False) # Disable as requested
+        self.add_client_by_voice_button.setToolTip(self.tr("Fonctionnalité en cours de développement"))
+        client_actions_layout.addWidget(self.add_client_by_voice_button)
+=======
 
         self.add_client_by_voice_button = QPushButton(self.tr("Ajouter par Voix")); self.add_client_by_voice_button.setIcon(QIcon(":/icons/mic.svg")); self.add_client_by_voice_button.setObjectName("primaryButton")
         self.add_client_by_voice_button.clicked.connect(self.handle_add_client_by_voice_clicked)
@@ -656,6 +781,7 @@ class DocumentManager(QMainWindow):
         self.add_client_by_voice_button.setToolTip(self.tr("Fonctionnalité en cours de développement"))
         client_actions_layout.addWidget(self.add_client_by_voice_button)
 
+>>>>>>> main
 >>>>>>> main
 
         left_pane_layout.addLayout(client_actions_layout)
@@ -708,7 +834,10 @@ class DocumentManager(QMainWindow):
 
 <<<<<<< feature/redesign-gestion-document-ui
 =======
+<<<<<<< feature/redesign-gestion-document-ui
+=======
 
+>>>>>>> main
 >>>>>>> main
     def reset_all_filters_slot(self):
         """Resets all filter inputs to their default states and refreshes the client list."""
@@ -722,6 +851,15 @@ class DocumentManager(QMainWindow):
         # Clear the search input field
         self.search_input_field.setText("")
 
+<<<<<<< feature/redesign-gestion-document-ui
+        # Clear date filters
+        if hasattr(self, 'date_filter_start'): # Check if attributes exist (they should)
+            self.date_filter_start.setDate(QDate())
+        if hasattr(self, 'date_filter_end'):
+            self.date_filter_end.setDate(QDate())
+
+=======
+>>>>>>> main
         # Collapse the "More Filters" section if it's open
         if self.collapsible_filter_widget.isVisible():
             self.more_filters_button.setChecked(False) # This will trigger toggle_more_filters_visibility
@@ -735,6 +873,10 @@ class DocumentManager(QMainWindow):
 <<<<<<< feature/redesign-gestion-document-ui
 
 =======
+<<<<<<< feature/redesign-gestion-document-ui
+
+=======
+>>>>>>> main
 >>>>>>> main
     def save_splitter_state(self, pos, index):
         """Saves the current state of the main_splitter."""
@@ -1236,7 +1378,14 @@ class DocumentManager(QMainWindow):
         elif isinstance(archive_filter_data, bool): include_deleted_filter = archive_filter_data
         filters_for_crud = {};
         if status_id_filter is not None: filters_for_crud['status_id'] = status_id_filter
-        if country_id_filter is not None: filters_for_crud['country_id'] = country_id_filter # Add to filters
+        if country_id_filter is not None: filters_for_crud['country_id'] = country_id_filter
+
+        # Add date filters if they are set
+        if hasattr(self, 'date_filter_start') and self.date_filter_start.date().isValid() and not self.date_filter_start.date().isNull():
+            filters_for_crud['created_at_start'] = self.date_filter_start.date().toString("yyyy-MM-dd")
+
+        if hasattr(self, 'date_filter_end') and self.date_filter_end.date().isValid() and not self.date_filter_end.date().isNull():
+            filters_for_crud['created_at_end'] = self.date_filter_end.date().toString("yyyy-MM-dd")
 
         # Update total_filtered_clients count
         # Conceptual: if clients_crud_instance.get_all_clients_count existed:
@@ -1300,6 +1449,22 @@ class DocumentManager(QMainWindow):
     def set_client_status_archived(self, client_id): self.set_client_status_archived_slot(client_id)
     def delete_client_permanently(self, client_id): self.delete_client_permanently_slot(client_id)
 
+<<<<<<< feature/redesign-gestion-document-ui
+    # Old get_status_visual_indicator removed as its logic is now in ClientListItemWidget
+
+    def add_client_to_list_widget(self, client_dict_data):
+        item = QListWidgetItem(self.client_list_widget)
+        # Pass self (DocumentManager instance) as parent to ClientListItemWidget
+        # so it can access tr() or other methods if needed.
+        # Or pass self.client_list_widget as parent for widget hierarchy.
+        custom_widget = ClientListItemWidget(client_dict_data, self.client_list_widget)
+        item.setSizeHint(custom_widget.sizeHint())
+
+        # Store the raw client_dict_data in the QListWidgetItem's UserRole
+        # This is crucial for context menus, click handling etc. to get the full data.
+        item.setData(Qt.UserRole, client_dict_data)
+
+=======
     def get_status_visual_indicator(self, status_name_str):
         """Returns an HTML styled Unicode character based on status name."""
         # Normalize status name for robust matching
@@ -1387,7 +1552,10 @@ class DocumentManager(QMainWindow):
             elif "complété" in s_lower or "completed" in s_lower: icon = "●" # Typically want purple/black
 
         item.setText(f"{icon} {client_name}")
+>>>>>>> main
         self.client_list_widget.addItem(item)
+        self.client_list_widget.setItemWidget(item, custom_widget)
+
 
 
     def load_countries_into_filter_combo(self):
