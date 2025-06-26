@@ -31,10 +31,10 @@ class HomePageWidget(QWidget):
 
         # GIF Area
         gif_label = QLabel()
-
+        
         available_gifs = ["1.gif", "2.gif", "3.gif"]
         chosen_gif_name = random.choice(available_gifs)
-
+        
         # Path construction for when this script is in ui/home/
         gif_path = os.path.join(os.path.dirname(__file__), "..", "..", "resources", "gifshome", chosen_gif_name)
 
@@ -49,8 +49,8 @@ class HomePageWidget(QWidget):
         if os.path.exists(gif_path):
             self.movie = QMovie(gif_path)
             gif_label.setMovie(self.movie)
-
-            target_height = 200
+            
+            target_height = 200 
             # Ensure pixmap is valid before trying to get its dimensions
             if not self.movie.currentPixmap().isNull():
                 scaled_width = int(target_height * self.movie.currentPixmap().width() / self.movie.currentPixmap().height())
@@ -70,7 +70,7 @@ class HomePageWidget(QWidget):
             main_v_layout.addWidget(gif_placeholder_label)
 
         # Scroll Area for module buttons
-        scroll_area = QScrollArea()
+        scroll_area = QScrollArea() 
         scroll_area.setWidgetResizable(True)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -79,9 +79,9 @@ class HomePageWidget(QWidget):
         content_widget = QWidget()
         content_widget.setObjectName("homePageButtonGridContainer")
         content_widget.setStyleSheet("background-color: transparent;")
-
-        grid_layout = QGridLayout()
-        grid_layout.setContentsMargins(10, 10, 10, 10)
+        
+        grid_layout = QGridLayout() 
+        grid_layout.setContentsMargins(10, 10, 10, 10) 
         grid_layout.setSpacing(20)
 
         self.modules = [
@@ -106,8 +106,8 @@ class HomePageWidget(QWidget):
             button.setObjectName(module["object_name"])
             if module["icon"] and QIcon.hasThemeIcon(module["icon"]):
                 button.setIcon(QIcon(module["icon"]))
-                button.setIconSize(QSize(32,32))
-
+                button.setIconSize(QSize(32,32)) 
+            
             button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             button.clicked.connect(module["slot"])
             grid_layout.addWidget(button, row, col)
@@ -116,11 +116,11 @@ class HomePageWidget(QWidget):
             if col >= num_columns:
                 col = 0
                 row += 1
-
+        
         content_widget.setLayout(grid_layout)
         scroll_area.setWidget(content_widget)
-        main_v_layout.addWidget(scroll_area)
-
+        main_v_layout.addWidget(scroll_area) 
+        
         self.setLayout(main_v_layout)
 
     # Slots de navigation... (inchangés)
@@ -194,10 +194,10 @@ if __name__ == '__main__':
             # Ceci ne fonctionnera que si le script est exécuté depuis la racine du projet
             # et que ui/home est dans le PYTHONPATH.
             # Pour un test robuste, il faudrait ajuster sys.path ici.
-            # from ui.home.home_page_widget import HomePageWidget
+            # from ui.home.home_page_widget import HomePageWidget 
             self.home_page = HomePageWidget(self) # Supposant que l'import global fonctionne
             layout.addWidget(self.home_page)
-            self.resize(800, 900)
+            self.resize(800, 900) 
 
         def show_documents_view(self): print("Navigating to Documents View")
         def show_project_management_view(self): print("Navigating to Project Management")
