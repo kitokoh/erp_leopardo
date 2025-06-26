@@ -502,18 +502,21 @@ class DocumentManager(QMainWindow):
         left_pane_layout = QVBoxLayout(left_pane_widget)
         left_pane_layout.setContentsMargins(0,0,0,0)
 
-        # Filter Search Group - Re-layout to QHBoxLayout
+        # Filter Search Group - Now uses QVBoxLayout for vertical stacking of filter groups
         filter_search_group = QGroupBox(self.tr("Filtres et Recherche Clients"))
-        filter_search_main_layout = QHBoxLayout(filter_search_group) # Changed to QHBoxLayout
+        filter_search_main_layout = QVBoxLayout(filter_search_group) # Changed to QVBoxLayout
+
+        # --- Status and Archive Filters Group (Horizontal) ---
+        status_archive_filter_group_layout = QHBoxLayout()
 
         # Status Filter
-        status_filter_layout = QVBoxLayout() # Using QVBoxLayout for label on top
+        status_filter_layout = QVBoxLayout()
         status_label = QLabel(self.tr("Statut:"))
         self.status_filter_combo = QComboBox(); self.status_filter_combo.addItem(self.tr("Tous les statuts"), None)
         self.load_statuses_into_filter_combo(); self.status_filter_combo.currentIndexChanged.connect(self.filter_client_list_display_slot)
         status_filter_layout.addWidget(status_label)
         status_filter_layout.addWidget(self.status_filter_combo)
-        filter_search_main_layout.addLayout(status_filter_layout)
+        status_archive_filter_group_layout.addLayout(status_filter_layout)
 
         # Archive Filter
         archive_filter_layout = QVBoxLayout()
@@ -525,47 +528,57 @@ class DocumentManager(QMainWindow):
         self.client_archive_filter_combo.setCurrentIndex(0); self.client_archive_filter_combo.currentIndexChanged.connect(self.filter_client_list_display_slot)
         archive_filter_layout.addWidget(archive_label)
         archive_filter_layout.addWidget(self.client_archive_filter_combo)
-        filter_search_main_layout.addLayout(archive_filter_layout)
+        status_archive_filter_group_layout.addLayout(archive_filter_layout)
+        status_archive_filter_group_layout.addStretch(1) # Push status/archive filters to the left
 
-        # Country Filter
+        filter_search_main_layout.addLayout(status_archive_filter_group_layout) # Add horizontal group to main vertical
+
+        # --- Country Filter Group (Horizontal) ---
+        country_filter_group_layout = QHBoxLayout()
         country_filter_layout = QVBoxLayout()
         country_label = QLabel(self.tr("Pays:"))
         self.country_filter_combo = QComboBox()
         self.country_filter_combo.addItem(self.tr("Tous les pays"), None)
-        self.load_countries_into_filter_combo() # Call to load countries
+        self.load_countries_into_filter_combo()
         self.country_filter_combo.currentIndexChanged.connect(self.filter_client_list_display_slot)
         country_filter_layout.addWidget(country_label)
         country_filter_layout.addWidget(self.country_filter_combo)
-        filter_search_main_layout.addLayout(country_filter_layout)
+        country_filter_group_layout.addLayout(country_filter_layout)
+        country_filter_group_layout.addStretch(1) # Push country filter to the left
 
-        # Search Input
+        filter_search_main_layout.addLayout(country_filter_group_layout) # Add horizontal group to main vertical
+
+        # --- Search Input Group (Horizontal) ---
+        search_group_layout = QHBoxLayout()
+        # Original search_layout (QVBoxLayout for label + QHBoxLayout for icon/input)
         search_layout = QVBoxLayout()
-        self.search_label = QLabel(self.tr("Recherche:")) # Store label as instance member to toggle visibility
-        self.search_label.setVisible(False) # Initially hidden
+        self.search_label = QLabel(self.tr("Recherche:"))
+        self.search_label.setVisible(False)
         search_layout.addWidget(self.search_label)
 
         search_bar_line_layout = QHBoxLayout()
         self.search_icon_btn = QPushButton()
-        self.search_icon_btn.setIcon(QIcon.fromTheme("edit-find", QIcon(":/icons/search.svg"))) # Set icon
-        # Removed setCheckable and setFixedWidth
+        self.search_icon_btn.setIcon(QIcon.fromTheme("edit-find", QIcon(":/icons/search.svg")))
+        self.search_icon_btn.setToolTip(self.tr("Afficher/Cacher la barre de recherche"))
         search_bar_line_layout.addWidget(self.search_icon_btn)
 
         self.search_input_field = QLineEdit(); self.search_input_field.setPlaceholderText(self.tr("Rechercher client..."))
-        self.search_input_field.setVisible(False) # Initially hidden
+        self.search_input_field.setVisible(False)
         self.search_input_field.textChanged.connect(self.filter_client_list_display_slot)
         search_bar_line_layout.addWidget(self.search_input_field)
 
         search_layout.addLayout(search_bar_line_layout)
-        filter_search_main_layout.addLayout(search_layout)
+        search_group_layout.addLayout(search_layout) # Add the search VBox to the HBox
+        search_group_layout.addStretch(1) # Push search elements to the left
 
-        self.search_icon_btn.clicked.connect(self.toggle_search_input_visibility) # Connect to clicked
-        # Removed setVisible(True) for search_input_field and setChecked(True) for the button
+        filter_search_main_layout.addLayout(search_group_layout) # Add horizontal group to main vertical
 
+        self.search_icon_btn.clicked.connect(self.toggle_search_input_visibility)
 
-        filter_search_main_layout.addStretch(1) # Add stretch to push filters to the left
+        filter_search_main_layout.addStretch(1) # Pushes all filter groups upwards if there's vertical space
         left_pane_layout.addWidget(filter_search_group)
-        
-        self.client_list_widget = QListWidget(); self.client_list_widget.setAlternatingRowColors(True) 
+
+        self.client_list_widget = QListWidget(); self.client_list_widget.setAlternatingRowColors(True)
         self.client_list_widget.setItemDelegate(StatusDelegate(self.client_list_widget))
         self.client_list_widget.itemClicked.connect(self.handle_client_list_click); self.client_list_widget.setContextMenuPolicy(Qt.CustomContextMenu)
         self.client_list_widget.customContextMenuRequested.connect(self.show_client_context_menu); left_pane_layout.addWidget(self.client_list_widget)
