@@ -117,19 +117,36 @@ class StatisticsDashboard(QWidget):
         """Deferred initialization of map components and initial data load."""
         logging.info("StatisticsDashboard: _initialize_map_and_load_data called by QTimer.")
 
-        # Use the explicitly stored layout
-        target_layout = self._left_map_actual_layout
+        # Ensure the container widget for the map exists
+        if self.left_widget_for_map is None:
+            logging.critical("StatisticsDashboard: self.left_widget_for_map is None at the start of _initialize_map_and_load_data. Cannot initialize map.")
+            # This indicates a severe problem with the widget's construction or state.
+            return
 
-        if not target_layout:
-            # This should absolutely not happen if __init__ worked.
-            logging.critical("StatisticsDashboard: self._left_map_actual_layout is None. This indicates a severe issue in __init__ or object state.")
-            return # Cannot proceed
+        # Get the layout from the widget. If it's missing, __init__ might not have completed as expected.
+        target_layout = self.left_widget_for_map.layout()
+        if target_layout is None:
+            logging.warning("StatisticsDashboard: Layout for left_widget_for_map was None in _initialize_map_and_load_data. Attempting to recreate QVBoxLayout.")
+            # This is a recovery attempt. The layout should have been set in __init__.
+            target_layout = QVBoxLayout(self.left_widget_for_map) # This also sets it on the widget
+            target_layout.setContentsMargins(0,0,0,0)
+            # Store it back for consistency, though direct use of target_layout is preferred within this method.
+            self._left_map_actual_layout = target_layout
+        else:
+            # If the layout exists, ensure our reference is up-to-date.
+            self._left_map_actual_layout = target_layout
+
+
+        if not self._left_map_actual_layout: # Double check after potential recreation
+            logging.critical("StatisticsDashboard: self._left_map_actual_layout is STILL None after attempting to get/recreate. Cannot proceed.")
+            return
 
         if self.map_view is None:
             # Parent QWebEngineView to self.left_widget_for_map, which is its container
             self.map_view = QWebEngineView(self.left_widget_for_map)
-            target_layout.addWidget(self.map_view) # Add to the stored (and hopefully correct) layout
-            logging.info("StatisticsDashboard: QWebEngineView (self.map_view) created and added to _left_map_actual_layout.")
+            # Add the map_view to the now confirmed target_layout (which is self._left_map_actual_layout)
+            self._left_map_actual_layout.addWidget(self.map_view)
+            logging.info("StatisticsDashboard: QWebEngineView (self.map_view) created and added to layout of left_widget_for_map.")
 
 
             self.map_interaction_handler = MapInteractionHandler(self)
