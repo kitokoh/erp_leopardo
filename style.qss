@@ -1124,6 +1124,9 @@ QWidget#homePageButtonGridContainer QPushButton:pressed {
 
 /* Style pour les icônes à l'intérieur des boutons de la page d'accueil si nécessaire */
 /* Actuellement, la taille est définie en Python. On pourrait ajouter des filtres ou des effets ici si Qt le supporte. */
+<<<<<<< feat/homepage-redesign-v1
+/* QWidget#homePageButtonGridContainer QPushButton::icon { ... } */
+=======
 /* QWidget#homePageButtonGridContainer QPushButton::icon { ... } */
 /* Specific button for "More Filters" */
 QPushButton#moreFiltersButton {
@@ -1183,3 +1186,4 @@ QPushButton[class="tableActionButton"]:pressed {
     color: #0056B3;
 }
 
+>>>>>>> main
