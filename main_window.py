@@ -578,6 +578,9 @@ class DocumentManager(QMainWindow):
         self.collapsible_filter_widget.setVisible(False) # Initially hidden
         filter_search_main_layout.addWidget(self.collapsible_filter_widget)
 <<<<<<< feature/redesign-gestion-document-ui
+=======
+<<<<<<< feature/redesign-gestion-document-ui
+>>>>>>> main
 
         # "Réinitialiser Filtres" Button
         self.reset_filters_button = QPushButton(self.tr("Réinitialiser Filtres"))
@@ -590,7 +593,10 @@ class DocumentManager(QMainWindow):
         reset_button_layout.addWidget(self.reset_filters_button)
         reset_button_layout.addStretch(1)
         filter_search_main_layout.addLayout(reset_button_layout)
+<<<<<<< feature/redesign-gestion-document-ui
 =======
+=======
+>>>>>>> main
 >>>>>>> main
 
         filter_search_main_layout.addStretch(1) # Pushes all filter groups upwards if there's vertical space
@@ -620,6 +626,7 @@ class DocumentManager(QMainWindow):
         client_actions_layout.addWidget(self.add_client_by_voice_button)
 
 =======
+<<<<<<< feature/redesign-gestion-document-ui
 
         self.add_client_by_voice_button = QPushButton(self.tr("Ajouter par Voix")); self.add_client_by_voice_button.setIcon(QIcon(":/icons/mic.svg")); self.add_client_by_voice_button.setObjectName("primaryButton")
         self.add_client_by_voice_button.clicked.connect(self.handle_add_client_by_voice_clicked)
@@ -627,6 +634,15 @@ class DocumentManager(QMainWindow):
         self.add_client_by_voice_button.setToolTip(self.tr("Fonctionnalité en cours de développement"))
         client_actions_layout.addWidget(self.add_client_by_voice_button)
 
+=======
+
+        self.add_client_by_voice_button = QPushButton(self.tr("Ajouter par Voix")); self.add_client_by_voice_button.setIcon(QIcon(":/icons/mic.svg")); self.add_client_by_voice_button.setObjectName("primaryButton")
+        self.add_client_by_voice_button.clicked.connect(self.handle_add_client_by_voice_clicked)
+        self.add_client_by_voice_button.setEnabled(False) # Disable as requested
+        self.add_client_by_voice_button.setToolTip(self.tr("Fonctionnalité en cours de développement"))
+        client_actions_layout.addWidget(self.add_client_by_voice_button)
+
+>>>>>>> main
 >>>>>>> main
         left_pane_layout.addLayout(client_actions_layout)
 
@@ -677,6 +693,9 @@ class DocumentManager(QMainWindow):
             self.more_filters_button.setText(self.tr("Plus de Filtres"))
 
 <<<<<<< feature/redesign-gestion-document-ui
+=======
+<<<<<<< feature/redesign-gestion-document-ui
+>>>>>>> main
     def reset_all_filters_slot(self):
         """Resets all filter inputs to their default states and refreshes the client list."""
         logging.info("Resetting all filters.")
@@ -700,7 +719,10 @@ class DocumentManager(QMainWindow):
         self.notify(self.tr("Filtres Réinitialisés"), self.tr("Tous les filtres ont été réinitialisés."), type='INFO')
 
 
+<<<<<<< feature/redesign-gestion-document-ui
 =======
+=======
+>>>>>>> main
 >>>>>>> main
     def save_splitter_state(self, pos, index):
         """Saves the current state of the main_splitter."""
