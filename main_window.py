@@ -121,6 +121,8 @@ from partners.partner_main_widget import PartnerMainWidget # Partner Management
 from inventory_browser_widget import InventoryBrowserWidget # Inventory Management
 from camera_management.camera_management_widget import CameraManagementWidget # Camera Management
 
+from PyQt5.QtGui import QColor, QPalette # For ClientListItemWidget text color
+
 from recruitment.recruitment_dashboard import RecruitmentDashboard # Import RecruitmentDashboard
 
 from home_page_widget import HomePageWidget # Added for new Home Page
@@ -148,6 +150,83 @@ CONFIGURABLE_MODULES = [
     {'key': 'module_calendar_enabled', 'name': 'calendar', 'action_attr': 'calendar_module_action', 'widget_attr': 'calendar_module_widget_instance'},
     {'key': 'module_camera_management_enabled', 'name': 'camera_management', 'action_attr': 'camera_management_action', 'widget_attr': 'camera_management_widget_instance'}
 ]
+
+class ClientListItemWidget(QWidget):
+    def __init__(self, client_data, parent=None):
+        super().__init__(parent)
+        self.client_data = client_data
+        # Get the main DocumentManager instance to call its methods (like tr)
+        # This assumes ClientListItemWidget is instantiated with DocumentManager as an ancestor or direct parent.
+        # A more robust way might be to pass DocumentManager instance if deeply nested.
+        self.doc_manager = parent # Assuming parent is DocumentManager or provides tr
+        while self.doc_manager and not isinstance(self.doc_manager, DocumentManager):
+            self.doc_manager = self.doc_manager.parent()
+
+        if not self.doc_manager:
+            # Fallback if DocumentManager not found in parent hierarchy
+            # This might happen if parent is QListWidget, then its parent etc.
+            # For simplicity, we assume it can be found or tr will work via QCoreApplication.translate
+            # A cleaner way is to pass doc_manager instance explicitly if this becomes an issue.
+            # logging.warning("ClientListItemWidget: DocumentManager instance not found via parent hierarchy.")
+            pass
+
+        self.init_ui()
+
+    def _tr(self, text):
+        if self.doc_manager and hasattr(self.doc_manager, 'tr'):
+            return self.doc_manager.tr(text)
+        return QApplication.translate("ClientListItemWidget", text) # Fallback
+
+    def init_ui(self):
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(5, 3, 5, 3)
+        main_layout.setSpacing(1) # Reduced spacing
+
+        # Line 1: Status Icon + Client Name
+        line1_layout = QHBoxLayout()
+        line1_layout.setSpacing(4)
+
+        status_icon_label = QLabel()
+        status_name = self.client_data.get("status", "")
+        icon_html = self._get_status_icon_html(status_name)
+        status_icon_label.setText(icon_html)
+        status_icon_label.setFixedWidth(12) # Adjusted for typical font size of icon
+        line1_layout.addWidget(status_icon_label)
+
+        client_name_label = QLabel(f"<b>{self.client_data.get('client_name', 'N/A')}</b>")
+        client_name_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        line1_layout.addWidget(client_name_label)
+        line1_layout.addStretch()
+        main_layout.addLayout(line1_layout)
+
+        # Line 2: Additional Info (e.g., Project Identifier)
+        project_identifier = self.client_data.get('project_identifier', '')
+        if project_identifier:
+            additional_info_label = QLabel(f"<small>{self._tr('Projet:')} {project_identifier}</small>")
+            additional_info_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+
+            palette = additional_info_label.palette()
+            palette.setColor(QPalette.WindowText, QColor(Qt.darkGray))
+            additional_info_label.setPalette(palette)
+
+            additional_info_layout = QHBoxLayout()
+            additional_info_layout.addSpacing(15)
+            additional_info_layout.addWidget(additional_info_label)
+            additional_info_layout.addStretch()
+            main_layout.addLayout(additional_info_layout)
+
+        self.setStyleSheet("background:transparent;")
+
+    def _get_status_icon_html(self, status_name_str):
+        status_lower = status_name_str.lower() if status_name_str else ""
+        # Colors chosen for visibility against typical delegate backgrounds
+        if "actif" in status_lower or "active" in status_lower: return "<span style='font-size:10pt; color: #28A745;'>●</span>" # Green
+        elif "prospect" in status_lower: return "<span style='font-size:10pt; color: #007BFF;'>●</span>" # Blue
+        elif "inactif" in status_lower or "inactive" in status_lower: return "<span style='font-size:10pt; color: #FFC107;'>●</span>" # Yellow/Orange
+        elif "archivé" in status_lower or "archived" in status_lower: return "<span style='font-size:10pt; color: #6c757d;'>●</span>" # Grey
+        elif "complété" in status_lower or "completed" in status_lower: return "<span style='font-size:10pt; color: #663399;'>●</span>" # Purple
+        else: return "<span style='font-size:10pt; color: #343A40;'>○</span>" # Dark Grey/Black circle for others
+
 
 class DocumentManager(QMainWindow):
     def __init__(self, app_root_dir, current_user_info: dict): # Changed current_user_id to current_user_info
@@ -554,11 +633,13 @@ class DocumentManager(QMainWindow):
 
         filter_search_main_layout.addLayout(top_filter_line_layout) # This is the single visible line of filters
 
+
         # --- Collapsible Filter Widget ---
         self.collapsible_filter_widget = QWidget()
         collapsible_layout = QVBoxLayout(self.collapsible_filter_widget)
         # Remove top margin if it creates unwanted space when hidden, or ensure widget is fully hidden
         collapsible_layout.setContentsMargins(0, 2, 0, 0) # Minimal top margin when visible
+
 
         # Archive Filter (moved into collapsible area)
         archive_filter_layout_group = QWidget()
@@ -587,22 +668,38 @@ class DocumentManager(QMainWindow):
         country_filter_v_layout.addWidget(self.country_filter_combo)
         collapsible_layout.addWidget(country_filter_layout_group)
 
+        # --- Date Filter Group (Horizontal, within collapsible area) ---
+        date_filter_group_layout = QHBoxLayout()
+        date_filter_label_start = QLabel(self.tr("Créé de:"))
+        self.date_filter_start = QDateEdit()
+        self.date_filter_start.setCalendarPopup(True)
+        self.date_filter_start.setClearButtonEnabled(True)
+        self.date_filter_start.setDate(QDate()) # Null date initially
+        self.date_filter_start.setDisplayFormat("yyyy-MM-dd")
+        self.date_filter_start.dateChanged.connect(self.filter_client_list_display_slot)
+
+        date_filter_label_end = QLabel(self.tr("à:"))
+        self.date_filter_end = QDateEdit()
+        self.date_filter_end.setCalendarPopup(True)
+        self.date_filter_end.setClearButtonEnabled(True)
+        self.date_filter_end.setDate(QDate()) # Null date initially
+        self.date_filter_end.setDisplayFormat("yyyy-MM-dd")
+        self.date_filter_end.dateChanged.connect(self.filter_client_list_display_slot)
+
+        date_filter_group_layout.addWidget(date_filter_label_start)
+        date_filter_group_layout.addWidget(self.date_filter_start)
+        date_filter_group_layout.addWidget(date_filter_label_end)
+        date_filter_group_layout.addWidget(self.date_filter_end)
+        date_filter_group_layout.addStretch(1)
+        collapsible_layout.addLayout(date_filter_group_layout)
+        # --- End Date Filter Group ---
+
 
         self.collapsible_filter_widget.setVisible(False) # Initially hidden
         filter_search_main_layout.addWidget(self.collapsible_filter_widget)
 
-
-        # "Réinitialiser Filtres" Button
-        self.reset_filters_button = QPushButton(self.tr("Réinitialiser Filtres"))
-        self.reset_filters_button.setObjectName("resetFiltersButton") # Added object name
-        self.reset_filters_button.setIcon(QIcon(":/icons/refresh-cw.svg")) # Placeholder icon, ensure it exists
-        self.reset_filters_button.clicked.connect(self.reset_all_filters_slot)
-        # Add some top margin to separate it from the collapsible section
-        reset_button_layout = QHBoxLayout()
-        reset_button_layout.addStretch(1) # Push button to the right or center as desired
-        reset_button_layout.addWidget(self.reset_filters_button)
-        reset_button_layout.addStretch(1)
-        filter_search_main_layout.addLayout(reset_button_layout)
+        # Remove the previous layout for reset_button_layout as it's now on the top line
+        # filter_search_main_layout.addLayout(reset_button_layout) # This line is removed
 
 
         # The main stretch for filter_search_main_layout should be removed if we want the client list
@@ -625,6 +722,13 @@ class DocumentManager(QMainWindow):
         client_actions_layout = QHBoxLayout()
         self.add_new_client_button = QPushButton(self.tr("Ajouter Nouveau Client")); self.add_new_client_button.setIcon(QIcon(":/icons/user-add.svg")); self.add_new_client_button.setObjectName("primaryButton"); self.add_new_client_button.clicked.connect(self.open_add_new_client_dialog)
         client_actions_layout.addWidget(self.add_new_client_button)
+
+        self.add_client_by_voice_button = QPushButton(self.tr("Ajouter par Voix")); self.add_client_by_voice_button.setIcon(QIcon(":/icons/mic.svg")); self.add_client_by_voice_button.setObjectName("primaryButton")
+        self.add_client_by_voice_button.clicked.connect(self.handle_add_client_by_voice_clicked)
+        self.add_client_by_voice_button.setEnabled(False) # Disable as requested
+        self.add_client_by_voice_button.setToolTip(self.tr("Fonctionnalité en cours de développement"))
+        client_actions_layout.addWidget(self.add_client_by_voice_button)
+
 
         self.add_client_by_voice_button = QPushButton(self.tr("Ajouter par Voix")); self.add_client_by_voice_button.setIcon(QIcon(":/icons/mic.svg")); self.add_client_by_voice_button.setObjectName("primaryButton")
         self.add_client_by_voice_button.clicked.connect(self.handle_add_client_by_voice_clicked)
@@ -681,6 +785,7 @@ class DocumentManager(QMainWindow):
             self.more_filters_button.setIcon(QIcon(":/icons/chevron-down.svg")) # Change icon to down
             # self.more_filters_button.setText(self.tr("Plus de Filtres")) # Text removed
 
+
     def reset_all_filters_slot(self):
         """Resets all filter inputs to their default states and refreshes the client list."""
         logging.info("Resetting all filters.")
@@ -693,6 +798,13 @@ class DocumentManager(QMainWindow):
         # Clear the search input field
         self.search_input_field.setText("")
 
+        # Clear date filters
+        if hasattr(self, 'date_filter_start'): # Check if attributes exist (they should)
+            self.date_filter_start.setDate(QDate())
+        if hasattr(self, 'date_filter_end'):
+            self.date_filter_end.setDate(QDate())
+
+
         # Collapse the "More Filters" section if it's open
         if self.collapsible_filter_widget.isVisible():
             self.more_filters_button.setChecked(False) # This will trigger toggle_more_filters_visibility
@@ -702,6 +814,7 @@ class DocumentManager(QMainWindow):
         self.filter_client_list_display_slot()
 
         self.notify(self.tr("Filtres Réinitialisés"), self.tr("Tous les filtres ont été réinitialisés."), type='INFO')
+
 
     def save_splitter_state(self, pos, index):
         """Saves the current state of the main_splitter."""
@@ -1203,7 +1316,14 @@ class DocumentManager(QMainWindow):
         elif isinstance(archive_filter_data, bool): include_deleted_filter = archive_filter_data
         filters_for_crud = {};
         if status_id_filter is not None: filters_for_crud['status_id'] = status_id_filter
-        if country_id_filter is not None: filters_for_crud['country_id'] = country_id_filter # Add to filters
+        if country_id_filter is not None: filters_for_crud['country_id'] = country_id_filter
+
+        # Add date filters if they are set
+        if hasattr(self, 'date_filter_start') and self.date_filter_start.date().isValid() and not self.date_filter_start.date().isNull():
+            filters_for_crud['created_at_start'] = self.date_filter_start.date().toString("yyyy-MM-dd")
+
+        if hasattr(self, 'date_filter_end') and self.date_filter_end.date().isValid() and not self.date_filter_end.date().isNull():
+            filters_for_crud['created_at_end'] = self.date_filter_end.date().toString("yyyy-MM-dd")
 
         # Update total_filtered_clients count
         # Conceptual: if clients_crud_instance.get_all_clients_count existed:
@@ -1267,94 +1387,25 @@ class DocumentManager(QMainWindow):
     def set_client_status_archived(self, client_id): self.set_client_status_archived_slot(client_id)
     def delete_client_permanently(self, client_id): self.delete_client_permanently_slot(client_id)
 
-    def get_status_visual_indicator(self, status_name_str):
-        """Returns an HTML styled Unicode character based on status name."""
-        # Normalize status name for robust matching
-        status_lower = status_name_str.lower() if status_name_str else ""
-
-        # Define status to icon and color mapping
-        # Colors are HTML color names or hex codes
-        if "actif" in status_lower or "active" in status_lower : # Assuming 'Actif' or 'Active'
-            return "<span style='color: green;'>●</span>"
-        elif "prospect" in status_lower:
-            return "<span style='color: blue;'>●</span>"
-        elif "inactif" in status_lower or "inactive" in status_lower: # Assuming 'Inactif' or 'Inactive'
-            return "<span style='color: orange;'>●</span>"
-        elif "archivé" in status_lower or "archived" in status_lower: # Assuming 'Archivé'
-            return "<span style='color: grey;'>●</span>"
-        elif "complété" in status_lower or "completed" in status_lower:
-             return "<span style='color: purple;'>●</span>" # Example for 'Complété'
-        # Add more specific statuses as needed:
-        # elif "some_other_status" in status_lower:
-        #     return "<span style='color: some_color;'>●</span>"
-        else: # Default for unknown or non-specific statuses
-            return "<span style='color: black;'>○</span>" # Default: empty circle or a light grey dot
+    # Old get_status_visual_indicator removed as its logic is now in ClientListItemWidget
 
     def add_client_to_list_widget(self, client_dict_data):
-        client_name = client_dict_data.get("client_name", self.tr("Client Inconnu"))
-        status_name = client_dict_data.get("status", "") # Get status name, default to empty string
+        item = QListWidgetItem(self.client_list_widget)
+        # Pass self (DocumentManager instance) as parent to ClientListItemWidget
+        # so it can access tr() or other methods if needed.
+        # Or pass self.client_list_widget as parent for widget hierarchy.
+        custom_widget = ClientListItemWidget(client_dict_data, self.client_list_widget)
+        item.setSizeHint(custom_widget.sizeHint())
 
-        status_indicator_html = self.get_status_visual_indicator(status_name)
-
-        # Using a simple HTML structure for the item text
-        # The StatusDelegate will still handle the background based on the full client_dict_data
-        item_html = f"<div>{status_indicator_html} {client_name}</div>"
-
-        item = QListWidgetItem()
+        # Store the raw client_dict_data in the QListWidgetItem's UserRole
+        # This is crucial for context menus, click handling etc. to get the full data.
         item.setData(Qt.UserRole, client_dict_data)
 
-        # To render HTML in QListWidgetItem, we need to use a QLabel or similar approach,
-        # as QListWidgetItem.setText() doesn't directly render rich HTML in all styles/platforms.
-        # A common way is to set a custom widget on the item, or ensure the view supports HTML.
-        # For simplicity with existing StatusDelegate, let's try prepending text and rely on delegate if it supports basic HTML or styling.
-        # If StatusDelegate does not support HTML in text, this might just show literal HTML.
-        # A more robust solution if HTML in setText() is not rendered is to use a custom delegate
-        # that explicitly draws an icon and text, or set a QWidget with a QLabel for each item.
 
-        # Simplest attempt: Prepend Unicode character directly to text (color styling might be lost without HTML)
-        # For this iteration, we will rely on the HTML being processed by the delegate or view.
-        # If icons don't appear colored, the StatusDelegate would need modification to parse this HTML
-        # or draw icons itself.
 
-        # Let's construct text that might be parsed by a delegate or as rich text
-        # This is a common way to try to get rich text in list items.
-        # We'll assume the list widget can interpret some basic HTML.
-        list_widget_item_text_label = QLabel(item_html)
-        list_widget_item_text_label.setStyleSheet("background:transparent;") # Ensure label bg is transparent
-
-        # Instead of setting text directly, create a QWidget, put QLabel in it, and set that as item.
-        # However, this conflicts with StatusDelegate if it expects to draw the whole item.
-        # Let's stick to trying to set rich text on the item itself, assuming the view supports it.
-        # The item.setText() method itself does not render HTML.
-        # We need to ensure the list view is set up to interpret HTML or use a delegate.
-        # The most straightforward way without complex delegate changes is to use a QLabel as the item itself,
-        # but QListWidget takes QListWidgetItems.
-
-        # Fallback for now: just prepend icon text, color will be default.
-        # Delegate would need to handle color if this is insufficient.
-        raw_status_icon = "●" # Default icon
-        if "actif" in status_name.lower() or "active" in status_name.lower(): raw_status_icon = "●" # Color would be handled by delegate potentially
-        elif "prospect" in status_name.lower(): raw_status_icon = "●"
-        # ... and so on for other statuses. This part is simplified as visual color is key.
-
-        # The StatusDelegate is already in place. It uses client_data['status'] to set background.
-        # We will prepend a Unicode character. The color of this character will be the default text color.
-        # For colored icons, the StatusDelegate would need to be enhanced to draw them.
-        # For this step, a simple monochrome icon is acceptable if colored ones are too complex with the current delegate.
-
-        # Let's use a simplified icon map for direct text prepending.
-        # The StatusDelegate could be enhanced later to color these icons.
-        icon = "○" # Default
-        if status_name:
-            s_lower = status_name.lower()
-            if "actif" in s_lower or "active" in s_lower: icon = "●" # Typically want green
-            elif "prospect" in s_lower: icon = "●" # Typically want blue
-            elif "inactif" in s_lower or "inactive" in s_lower: icon = "●" # Typically want orange/yellow
-            elif "archivé" in s_lower or "archived" in s_lower: icon = "●" # Typically want grey
-            elif "complété" in s_lower or "completed" in s_lower: icon = "●" # Typically want purple/black
-
-        item.setText(f"{icon} {client_name}")
         self.client_list_widget.addItem(item)
+        self.client_list_widget.setItemWidget(item, custom_widget)
+
 
 
     def load_countries_into_filter_combo(self):
