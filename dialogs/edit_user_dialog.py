@@ -118,19 +118,21 @@ class EditUserDialog(QDialog):
                 #     index = self.role_combo.findData(operator_role_id['role_id'])
                 #     if index >= 0: self.role_combo.setCurrentIndex(index)
                 pass # No default role set for now, user must select
+        except Exception as e: # This is the except for the role population try block
+
+            logger.error(f"Failed to populate roles in EditUserDialog: {e}", exc_info=True)
+            QMessageBox.warning(self, self.tr("Erreur Chargement Rôles"),
+                                self.tr("Impossible de charger la liste des rôles."))
 
         # Refinement for "Edit My Account" mode: Disable role_combo for self-edit unless admin
+        # This logic should be AFTER the try-except for role population.
         if not self.add_mode and self.user_id_to_edit == self.current_admin_user_info.get('user_id'):
             # User is editing their own account
             current_user_role_name = self.current_admin_user_info.get('role_name')
             if not has_permission(current_user_role_name, P_MANAGE_USERS):
                 self.role_combo.setEnabled(False)
                 self.role_combo.setToolTip(self.tr("Vous ne pouvez pas modifier votre propre rôle."))
-
-        except Exception as e:
-            logger.error(f"Failed to populate roles in EditUserDialog: {e}", exc_info=True)
-            QMessageBox.warning(self, self.tr("Erreur Chargement Rôles"),
-                                self.tr("Impossible de charger la liste des rôles."))
+        # No specific "except" needed for the self-edit refinement logic itself, as it's UI manipulation.
 
     def _save_changes(self):
         admin_role_name = self.current_admin_user_info.get('role_name')

@@ -1130,8 +1130,7 @@ QWidget#homePageButtonGridContainer QPushButton:pressed {
 /* QWidget#homePageButtonGridContainer QPushButton::icon { ... } */
 /* QWidget#homePageButtonGridContainer QPushButton::icon { ... } */
 
->>>>>>> main
->>>>>>> main
+
 /* Specific button for "More Filters" */
 QPushButton#moreFiltersButton {
     background-color: #FFFFFF; /* White background */
@@ -1216,5 +1215,4 @@ QPushButton#userMenuButton:pressed {
 QPushButton#userMenuButton::menu-indicator {
     image: none; /* Hide default menu indicator arrow */
 }
-
 
