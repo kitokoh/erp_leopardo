@@ -3178,7 +3178,11 @@ class ClientWidget(QWidget):
 <<<<<<< feature/multi-fixes-and-remember-me
 
 =======
+<<<<<<< feature/multi-fixes-and-remember-me
+
+=======
                 
+>>>>>>> main
 >>>>>>> main
                 if not client_base_path or not os.path.isdir(client_base_path):
                     QMessageBox.warning(self, self.tr("Erreur Dossier Client"), self.tr("Le chemin du dossier de base du client n'est pas configuré ou est invalide."))
@@ -3861,7 +3865,11 @@ class ClientWidget(QWidget):
 <<<<<<< feature/multi-fixes-and-remember-me
 
 =======
+<<<<<<< feature/multi-fixes-and-remember-me
+
+=======
                 
+>>>>>>> main
 >>>>>>> main
                 if doc_passes_lang_filter and doc_passes_type_filter:
                     filtered_list.append(doc_data)
@@ -3908,7 +3916,11 @@ class ClientWidget(QWidget):
 <<<<<<< feature/multi-fixes-and-remember-me
 
 =======
+<<<<<<< feature/multi-fixes-and-remember-me
+
+=======
                 
+>>>>>>> main
 >>>>>>> main
                 document_id = doc_data.get('document_id')
                 doc_name = doc_data.get('document_name', 'N/A')
@@ -3917,7 +3929,11 @@ class ClientWidget(QWidget):
 <<<<<<< feature/multi-fixes-and-remember-me
 
 =======
+<<<<<<< feature/multi-fixes-and-remember-me
+
+=======
                 
+>>>>>>> main
 >>>>>>> main
                 language_code = doc_data.get('language_code', "N/A")
                 if language_code == "N/A" and file_path_relative_from_db: # Infer
@@ -3938,7 +3954,11 @@ class ClientWidget(QWidget):
 <<<<<<< feature/multi-fixes-and-remember-me
 
 =======
+<<<<<<< feature/multi-fixes-and-remember-me
+
+=======
                 
+>>>>>>> main
 >>>>>>> main
                 name_item = QTableWidgetItem(doc_name)
                 name_item.setData(Qt.UserRole, full_file_path if full_file_path else None)
@@ -3954,7 +3974,11 @@ class ClientWidget(QWidget):
 <<<<<<< feature/multi-fixes-and-remember-me
 
 =======
+<<<<<<< feature/multi-fixes-and-remember-me
+
+=======
                 
+>>>>>>> main
 >>>>>>> main
                 logging.debug(f"PT_DEBUG: populate_doc_table - Row {row_idx}: Setting basic items.")
                 self.doc_table.setItem(row_idx, 0, name_item)
@@ -3967,7 +3991,11 @@ class ClientWidget(QWidget):
 <<<<<<< feature/multi-fixes-and-remember-me
 
 =======
+<<<<<<< feature/multi-fixes-and-remember-me
+
+=======
                 
+>>>>>>> main
 >>>>>>> main
                 pdf_btn = QPushButton(""); pdf_btn.setIcon(QIcon(":/icons/file-text.svg")); pdf_btn.setToolTip(self.tr("Générer/Ouvrir PDF")); pdf_btn.setFixedSize(30,30)
                 pdf_btn.clicked.connect(lambda _, p=full_file_path: self._handle_open_pdf_action(p))
@@ -3986,7 +4014,11 @@ class ClientWidget(QWidget):
 <<<<<<< feature/multi-fixes-and-remember-me
 
 =======
+<<<<<<< feature/multi-fixes-and-remember-me
+
+=======
                 
+>>>>>>> main
 >>>>>>> main
                 role_name = self.current_user_info.get('role_name') if self.current_user_info else None
                 can_manage_docs = has_permission(role_name, P_MANAGE_CLIENT_DOCUMENTS)
@@ -4018,7 +4050,11 @@ class ClientWidget(QWidget):
 <<<<<<< feature/multi-fixes-and-remember-me
 
 =======
+<<<<<<< feature/multi-fixes-and-remember-me
+
+=======
                 
+>>>>>>> main
 >>>>>>> main
                 action_layout.addStretch(); action_widget.setLayout(action_layout)
                 logging.debug(f"PT_DEBUG: populate_doc_table - Row {row_idx}: Setting cell widget.")
