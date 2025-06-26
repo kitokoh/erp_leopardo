@@ -123,7 +123,7 @@ from camera_management.camera_management_widget import CameraManagementWidget # 
 
 from recruitment.recruitment_dashboard import RecruitmentDashboard # Import RecruitmentDashboard
 
-from home_page_widget import HomePageWidget # Added for new Home Page
+from ui.home.home_page_widget import HomePageWidget # Updated import path
 from experience_module_widget import ExperienceModuleWidget # Added
 from download_monitor_service import DownloadMonitorService
 from dialogs.assign_document_dialog import AssignDocumentToClientDialog
