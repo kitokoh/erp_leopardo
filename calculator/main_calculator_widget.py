@@ -9,6 +9,9 @@ from .commercial_calculator import CommercialCalculatorWidget
 from .scientific_calculator import ScientificCalculatorWidget
 from .cylinder_calculator import CylinderCalculatorWidget
 from .unit_converter_calculator import UnitConverterCalculatorWidget
+from .tonnage_calculator import TonnageCalculatorWidget
+from .bending_calculator import BendingCalculatorWidget # New import
+
 from .history_manager import HistoryManager
 from .history_display_widget import HistoryDisplayWidget
 
@@ -46,6 +49,9 @@ class MainCalculatorWidget(QWidget):
         self.calculator_selector.addItem("Calculatrice Commerciale", "commercial")
         self.calculator_selector.addItem("Calculatrice Scientifique", "scientific")
         self.calculator_selector.addItem("Calculatrice Cylindres Hydrauliques", "cylinder")
+        self.calculator_selector.addItem("Calculatrice de Tonnage (Pliage)", "tonnage_bending")
+        self.calculator_selector.addItem("Calculatrice de Cintrage (Tôle)", "bending_sheet_metal") # New calculator
+
         self.calculator_selector.addItem("Convertisseur d'Unités", "unit_converter")
         # self.calculator_selector.setStyleSheet("font-size: 14px; padding: 5px; margin-right: 10px;") # Will be handled by QSS
         self.calculator_selector.currentIndexChanged.connect(self.on_calculator_selected)
@@ -71,6 +77,13 @@ class MainCalculatorWidget(QWidget):
         self.cylinder_calc_widget = CylinderCalculatorWidget(parent=self, history_manager=self.history_manager)
         self.cylinder_calc_widget.setObjectName("CylinderCalculatorWidget")
 
+        self.tonnage_calc_widget = TonnageCalculatorWidget(parent=self, history_manager=self.history_manager)
+        self.tonnage_calc_widget.setObjectName("TonnageCalculatorWidget")
+
+        self.bending_calc_widget = BendingCalculatorWidget(parent=self, history_manager=self.history_manager) # New instance
+        self.bending_calc_widget.setObjectName("BendingCalculatorWidget")
+
+
         self.unit_converter_widget = UnitConverterCalculatorWidget(parent=self)
         self.unit_converter_widget.setObjectName("UnitConverterCalculatorWidget")
 
@@ -78,6 +91,9 @@ class MainCalculatorWidget(QWidget):
             "commercial": self.commercial_calc_widget,
             "scientific": self.scientific_calc_widget,
             "cylinder": self.cylinder_calc_widget,
+            "tonnage_bending": self.tonnage_calc_widget,
+            "bending_sheet_metal": self.bending_calc_widget, # Added to dictionary
+
             "unit_converter": self.unit_converter_widget,
         }
         for widget_key in self.calculators:
