@@ -142,7 +142,7 @@ from db.cruds import user_saved_filters_crud # Import for saved filters
 from calendar_module.calendar_widget import CalendarWidget # Import CalendarWidget
 from user_management.page import UserManagementPage # Import UserManagementPage
 from calculator.main_calculator_widget import MainCalculatorWidget # Import Calculator Widget
-from db.connection import SessionLocal as AppSessionLocal_MW # Import SessionLocal for calculator
+# from db.connection import SessionLocal as AppSessionLocal_MW # Import SessionLocal for calculator
 from user_management.user_menu_button import UserMenuButton # Import UserMenuButton
 from dialogs.edit_user_dialog import EditUserDialog # For handling edit/add user requests
 
@@ -370,7 +370,7 @@ class DocumentManager(QMainWindow):
             self.calculator_module_widget_instance = MainCalculatorWidget(
                 parent=self,
                 app_auth_manager=self, # DocumentManager can act as a source for user info
-                db_session_factory=AppSessionLocal_MW
+                db_session_factory=None
             )
             self.main_area_stack.addWidget(self.calculator_module_widget_instance)
             logging.info("DocumentManager: Calculator module widget instance created and added to stack.")

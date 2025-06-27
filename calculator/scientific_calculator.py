@@ -90,7 +90,11 @@ class ScientificCalculatorWidget(QWidget):
 
             btn_text, row, col, *span_data = btn_def
             button = QPushButton(btn_text)
-            button.setSizePolicy(QPushButton.Expanding, QPushButton.Expanding)
+            from PyQt5.QtWidgets import QSizePolicy
+
+            button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+            # button.setSizePolicy(QPushButton.Expanding, QPushButton.Expanding)
             # button.setMinimumSize(QSize(50, 45)) # Style from QSS
             # button.setStyleSheet(self.get_button_style(btn_text)) # Style from QSS
 
