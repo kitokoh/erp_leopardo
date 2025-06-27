@@ -378,8 +378,11 @@ class CreateDocumentDialog(QDialog):
             # This error log is important, so we keep it or a version of it.
             logging.error(f"CreateDocumentDialog: Client base folder '{client_base_folder_absolute}' (from relative: '{client_base_folder_relative}') is invalid or not a directory.")
             QMessageBox.critical(self, self.tr("Erreur Dossier Client"),
-                                 self.tr("Dossier client '{0}' non configuré, invalide, ou inaccessible.").format(client_base_folder_absolute or client_base_folder_relative or self.tr('Non spécifié')))
+            self.tr("Dossier client '{0}' non configuré, invalide, ou inaccessible.").format(client_base_folder_absolute or client_base_folder_relative or self.tr('Non spécifié')))
             return None
+        
+        # Ensure client_base_folder used later is the absolute one
+        client_base_folder = client_base_folder_absolute
 
         # Ensure client_base_folder used later is the absolute one
         client_base_folder = client_base_folder_absolute
