@@ -6,7 +6,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship, declarative_base
 from sqlalchemy.sql import func
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, model_validator
 from typing import Optional, List, Dict, Any
 from datetime import date, datetime
 
@@ -323,13 +323,20 @@ class JournalItemBase(BaseModel):
 
     # Validator to ensure that not both debit and credit are zero, or both non-zero
     # This might be better handled in service layer logic depending on complexity
-    # @model_validator(mode='after')
-    # def check_debit_credit_logic(self) -> 'JournalItemBase':
-    #     if self.debit_amount == 0 and self.credit_amount == 0:
-    #         raise ValueError('Both debit and credit amounts cannot be zero.')
-    #     if self.debit_amount != 0 and self.credit_amount != 0:
-    #         raise ValueError('Debit and credit amounts cannot both be non-zero.')
-    #     return self
+    @model_validator(mode='after')
+    def check_debit_credit_logic(self) -> 'JournalItemBase':
+        if self.debit_amount == 0 and self.credit_amount == 0:
+            # Allow items to be zero if they are part of a larger entry that balances.
+            # This specific validation might be too restrictive at item level if entry must balance.
+            # However, an item itself being all zero is often an error.
+            # For now, let's keep it to prevent all-zero items.
+            pass # Re-evaluating this: an item can be zero if it's a placeholder or will be adjusted.
+                 # The balancing should happen at JournalEntry level.
+                 # Let's remove the strict non-zero check here.
+
+        if self.debit_amount != 0 and self.credit_amount != 0:
+            raise ValueError('Debit and credit amounts cannot both be non-zero for a single journal item.')
+        return self
 
 class JournalItemCreate(JournalItemBase):
     pass
@@ -355,15 +362,15 @@ class JournalEntryCreate(JournalEntryBase):
     items: List[JournalItemCreate]
 
     # Validator to ensure debits equal credits for the entry
-    # @model_validator(mode='after')
-    # def check_debits_equal_credits(self) -> 'JournalEntryCreate':
-    #     total_debits = sum(item.debit_amount for item in self.items)
-    #     total_credits = sum(item.credit_amount for item in self.items)
-    #     if total_debits != total_credits:
-    #         raise ValueError('Total debits must equal total credits for the journal entry.')
-    #     if not self.items:
-    #         raise ValueError('Journal entry must have at least one item.')
-    #     return self
+    @model_validator(mode='after')
+    def check_debits_equal_credits(self) -> 'JournalEntryCreate':
+        total_debits = sum(item.debit_amount for item in self.items)
+        total_credits = sum(item.credit_amount for item in self.items)
+        if total_debits != total_credits:
+            raise ValueError('Total debits must equal total credits for the journal entry.')
+        if not self.items:
+            raise ValueError('Journal entry must have at least one item.')
+        return self
 
 class JournalEntryUpdate(BaseModel):
     entry_date: Optional[date] = None
