@@ -3421,6 +3421,17 @@ class ClientWidget(QWidget):
 
     def _handle_generate_and_open_pdf_action(self, document_data: dict):
         QApplication.setOverrideCursor(Qt.WaitCursor)
+        # Show "In Progress" notification
+        if self.notification_manager:
+            self.notification_manager.show(
+                title=self.tr("Génération PDF"),
+                message=self.tr("Génération du PDF en cours... Veuillez patienter."),
+                type='INFO',
+                duration=3000 # Keep it reasonably short, actual feedback will follow
+            )
+        QApplication.processEvents() # Ensure the notification is displayed
+
+
         generated_pdf_path_final = None
         try:
             if not self.client_info or 'client_id' not in self.client_info:
@@ -3478,6 +3489,7 @@ class ClientWidget(QWidget):
                 logging.warning(f"Document data for {document_data.get('document_id')} missing language_code, defaulting to 'fr'.")
 
             app_root_dir_from_config = self.config.get('app_root_dir', self.app_root_dir)
+
 
             additional_context_for_pdf = {
                 'document_type': document_data.get('document_type_generated'), # Original type of the template

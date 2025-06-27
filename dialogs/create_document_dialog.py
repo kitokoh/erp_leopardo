@@ -24,6 +24,16 @@ from utils import populate_docx_template
 import icons_rc # Import for Qt resource file
 from PyQt5.QtWidgets import QFormLayout
 
+# List of template types to be excluded from the "Generate via model" dialog (typically email templates)
+# This list should be maintained to match the template_type values used for email templates in the database.
+EMAIL_TEMPLATE_TYPES_TO_EXCLUDE = [
+    "EMAIL_WELCOME", "EMAIL_RESET_PASSWORD", "EMAIL_NEWSLETTER_SUBSCRIPTION",
+    "EMAIL_FOLLOW_UP", "EMAIL_HOLIDAY_CHRISTMAS", "EMAIL_HOLIDAY_NEWYEAR",
+    "EMAIL_SAV_TICKET_OPENED", "EMAIL_SAV_TICKET_RESOLVED",
+    "GENERIC_EMAIL_MESSAGE", "NEWSLETTER_BASE"
+    # Add any other specific email template types used in your system
+]
+
 class CreateDocumentDialog(QDialog):
     # Maps internal type keys to user-friendly names and template_type filters
     DOCUMENT_TYPE_MAPPING = {
