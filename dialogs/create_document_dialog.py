@@ -24,6 +24,16 @@ from utils import populate_docx_template
 import icons_rc # Import for Qt resource file
 from PyQt5.QtWidgets import QFormLayout
 
+# List of template types to be excluded from the "Generate via model" dialog (typically email templates)
+# This list should be maintained to match the template_type values used for email templates in the database.
+EMAIL_TEMPLATE_TYPES_TO_EXCLUDE = [
+    "EMAIL_WELCOME", "EMAIL_RESET_PASSWORD", "EMAIL_NEWSLETTER_SUBSCRIPTION",
+    "EMAIL_FOLLOW_UP", "EMAIL_HOLIDAY_CHRISTMAS", "EMAIL_HOLIDAY_NEWYEAR",
+    "EMAIL_SAV_TICKET_OPENED", "EMAIL_SAV_TICKET_RESOLVED",
+    "GENERIC_EMAIL_MESSAGE", "NEWSLETTER_BASE"
+    # Add any other specific email template types used in your system
+]
+
 class CreateDocumentDialog(QDialog):
     # Maps internal type keys to user-friendly names and template_type filters
     DOCUMENT_TYPE_MAPPING = {
@@ -61,20 +71,31 @@ class CreateDocumentDialog(QDialog):
 
     def _init_ui(self):
         main_layout = QVBoxLayout(self)
-        form_layout = QFormLayout()
+
+        # Filters layout
+        filters_group_box = QGroupBox(self.tr("Filtres"))
+        filters_layout = QHBoxLayout(filters_group_box) # Use QHBoxLayout for horizontal alignment
 
         self.doc_type_combo = QComboBox()
         self.language_combo = QComboBox()
+
+        doc_type_label = QLabel(self.tr("Type:"))
+        filters_layout.addWidget(doc_type_label)
+        filters_layout.addWidget(self.doc_type_combo)
+        filters_layout.addSpacing(15) # Add some space between filter groups
+
+        language_label = QLabel(self.tr("Langue:"))
+        filters_layout.addWidget(language_label)
+        filters_layout.addWidget(self.language_combo)
+        filters_layout.addStretch(1) # Push filters to the left
+
+        main_layout.addWidget(filters_group_box)
+
+        # Template List
         self.template_list_widget = QListWidget()
-        self.template_list_widget.setSelectionMode(QListWidget.ExtendedSelection) # Allow multiple selections
-
-        form_layout.addRow(self.tr("Type de Document (Filtre):"), self.doc_type_combo)
-        form_layout.addRow(self.tr("Langue du Document (Filtre):"), self.language_combo)
-
-        main_layout.addLayout(form_layout)
-
+        self.template_list_widget.setSelectionMode(QListWidget.ExtendedSelection)
         main_layout.addWidget(QLabel(self.tr("Modèles Disponibles (sélectionnez un ou plusieurs):")))
-        main_layout.addWidget(self.template_list_widget)
+        main_layout.addWidget(self.template_list_widget, 1) # Give list widget stretch factor
 
         self._load_document_types_and_languages() # Populates combos
 

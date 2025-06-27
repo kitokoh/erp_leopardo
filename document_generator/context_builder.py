@@ -22,14 +22,13 @@ from db.cruds import (
 )
 from db.utils import get_db_connection
 # Assuming these config variables are correctly defined in your project.
-# from db_config import APP_ROOT_DIR_CONTEXT, LOGO_SUBDIR_CONTEXT
-# from config import MEDIA_FILES_BASE_PATH
+# from db_config import APP_ROOT_DIR_CONTEXT, LOGO_SUBDIR_CONTEXT # Removed
+# from config import MEDIA_FILES_BASE_PATH # Removed
 
-# Dummy config values for now, replace with actual imports
-APP_ROOT_DIR_CONTEXT = "/app" # Example, replace with actual context
-LOGO_SUBDIR_CONTEXT = "logos" # Example, replace with actual context
-MEDIA_FILES_BASE_PATH = "/app/media" # Example, replace with actual context
+# APP_ROOT_DIR_CONTEXT, LOGO_SUBDIR_CONTEXT, MEDIA_FILES_BASE_PATH will now be passed or derived from app_root_dir or config object
 
+# Import config for MEDIA_FILES_BASE_PATH, assuming app_root_dir is for logos primarily
+from app_setup import CONFIG as AppGlobalConfig
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -82,7 +81,8 @@ def get_document_context(
     project_id: int = None,
     document_type: str = None, # e.g., 'proforma_invoice', 'technical_sheet'
     additional_data: dict = None,
-    db_conn=None
+    db_conn=None,
+    app_root_dir: str = None # Added app_root_dir parameter
 ) -> dict:
     """
     Fetches and structures data for document generation.
@@ -143,14 +143,18 @@ def get_document_context(
             context["seller"]["vat_id"] = seller_company.get("vat_id")
 
             logo_relative_path = seller_company.get("logo_path")
-            if logo_relative_path:
+            if logo_relative_path and app_root_dir: # Check if app_root_dir is provided
                 # Correctly join paths for the logo
-                logo_abs_path = os.path.join(APP_ROOT_DIR_CONTEXT, logo_relative_path.lstrip('/'))
+                # Assuming logo_relative_path is relative to app_root_dir (e.g., "assets/logos/company_logo.png")
+                logo_abs_path = os.path.join(app_root_dir, logo_relative_path.lstrip(os.sep))
                 if os.path.exists(logo_abs_path):
-                    context["seller"]["logo_path"] = f"file://{logo_abs_path}"
+                    context["seller"]["logo_path"] = f"file://{logo_abs_path.replace(os.sep, '/')}" # Ensure forward slashes for URL
                 else:
                     context["seller"]["logo_path"] = None
-                    logger.warning(f"Seller logo not found at: {logo_abs_path}")
+                    logger.warning(f"Seller logo not found at calculated path: {logo_abs_path} (app_root_dir: {app_root_dir}, relative: {logo_relative_path})")
+            elif logo_relative_path and not app_root_dir:
+                context["seller"]["logo_path"] = None
+                logger.warning(f"app_root_dir not provided to get_document_context, cannot resolve seller logo path: {logo_relative_path}")
             else:
                 context["seller"]["logo_path"] = None
 
@@ -270,17 +274,29 @@ def get_document_context(
             if media_links_raw:
                 for media_link in media_links_raw:
                     file_path = media_link.get("file_path")
-                    if file_path:
-                        # Ensure MEDIA_FILES_BASE_PATH is defined and correct
-                        abs_media_path = os.path.join(MEDIA_FILES_BASE_PATH, file_path.lstrip('/'))
-                        if os.path.exists(abs_media_path):
-                             media_links_processed.append({
-                                 "url": f"file://{abs_media_path}",
-                                 "type": media_link.get("type", "image"), # e.g., image, datasheet
-                                 "description": media_link.get("description")
-                             })
+                    if file_path and app_root_dir: # MEDIA_FILES_BASE_PATH was a dummy, use app_root_dir or config
+                        # Use a configured base path for media, or derive from app_root_dir if necessary.
+                        # Let's assume AppGlobalConfig.get('media_files_path', os.path.join(app_root_dir, 'media'))
+                        # For simplicity, if app_root_dir is given, we'll use it. Otherwise, try config.
+
+                        media_root = AppGlobalConfig.get('media_files_path')
+                        if not media_root and app_root_dir: # Fallback if media_files_path not in config
+                            media_root = os.path.join(app_root_dir, 'media')
+
+                        if media_root:
+                            abs_media_path = os.path.join(media_root, file_path.lstrip(os.sep))
+                            if os.path.exists(abs_media_path):
+                                 media_links_processed.append({
+                                     "url": f"file://{abs_media_path.replace(os.sep, '/')}",
+                                     "type": media_link.get("type", "image"),
+                                     "description": media_link.get("description")
+                                 })
+                            else:
+                                logger.warning(f"Media file not found: {abs_media_path} for product {product_id} (media_root: {media_root})")
                         else:
-                            logger.warning(f"Media file not found: {abs_media_path} for product {product_id}")
+                             logger.warning(f"Media root path could not be determined. Cannot resolve media path for product {product_id}: {file_path}")
+                    # Removed: elif file_path and not app_root_dir, as media_root logic covers this.
+
 
             quantity = Decimal(str(prod_data.get("quantity", 1)))
             unit_price = Decimal(str(current_product_details.get("unit_price", "0.00")))
@@ -408,7 +424,8 @@ if __name__ == '__main__':
                 "vat_rate": "0.10",
                 # "lite_selected_products": [101, 102],
                 # "products_quantities": {101: 2, 102: 5}
-            }
+            },
+            app_root_dir=os.getcwd() # Example for testing, provide a sensible path
             # db_conn=mock_get_db_connection() # Pass mock connection
         )
         logger.info(f"Generated context (test run, likely with errors if DB not mocked):")
@@ -427,5 +444,3 @@ if __name__ == '__main__':
     # or provide mock implementations for them.
     # Example:
     # PYTHONPATH=. python document_generator/context_builder.py (if run from project root)
-
-bbb  
