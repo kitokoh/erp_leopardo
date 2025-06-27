@@ -1785,6 +1785,47 @@ class ClientWidget(QWidget):
         self.notes_group_box.toggled.connect(self._handle_notes_section_toggled)
         self.tabs_group_box.toggled.connect(self._handle_tabs_section_toggled)
 
+    def delete_client_document_entry(self, document_id, file_path):
+        """
+        Deletes a client document entry from the database and the corresponding file from disk.
+        """
+        if not document_id:
+            QMessageBox.warning(self, self.tr("Erreur"), self.tr("ID du document manquant."))
+            return
+
+        reply = QMessageBox.question(self, self.tr("Confirmer Suppression"),
+                                     self.tr("Êtes-vous sûr de vouloir supprimer définitivement ce document ({0})?\nLe fichier '{1}' sera également supprimé du disque.").format(document_id, os.path.basename(file_path or "N/A")),
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+
+        if reply == QMessageBox.Yes:
+            try:
+                # Attempt to delete from DB
+                # Assuming db_manager.delete_client_document is now implemented correctly
+                db_deleted = db_manager.delete_client_document(document_id)
+
+                if db_deleted:
+                    logging.info(f"Document ID {document_id} deleted from database.")
+                    # Attempt to delete file from disk
+                    if file_path and os.path.exists(file_path):
+                        try:
+                            os.remove(file_path)
+                            logging.info(f"File {file_path} deleted from disk.")
+                            QMessageBox.information(self, self.tr("Succès"), self.tr("Document et fichier supprimés avec succès."))
+                        except OSError as e_file:
+                            logging.error(f"Error deleting file {file_path}: {e_file}", exc_info=True)
+                            QMessageBox.warning(self, self.tr("Erreur Fichier"), self.tr("Document supprimé de la base de données, mais échec de la suppression du fichier:\n{0}").format(str(e_file)))
+                    else:
+                        logging.warning(f"File path not provided or file does not exist for document ID {document_id}: {file_path}. DB entry deleted.")
+                        QMessageBox.information(self, self.tr("Succès (Partiel)"), self.tr("Entrée de document supprimée de la base de données. Fichier non trouvé ou chemin non spécifié."))
+                else:
+                    QMessageBox.warning(self, self.tr("Erreur DB"), self.tr("Impossible de supprimer l'entrée du document de la base de données (ID: {0}).").format(document_id))
+
+            except Exception as e:
+                logging.error(f"Error in delete_client_document_entry for doc ID {document_id}: {e}", exc_info=True)
+                QMessageBox.critical(self, self.tr("Erreur Suppression"), self.tr("Une erreur inattendue est survenue:\n{0}").format(str(e)))
+            finally:
+                self.populate_doc_table() # Refresh the document list
+
     def _handle_edit_pdf_action(self, file_path, document_id):
         if file_path and os.path.exists(file_path):
             QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
@@ -2300,6 +2341,47 @@ class ClientWidget(QWidget):
         self.client_info_group_box.toggled.connect(self._handle_client_info_section_toggled)
         self.notes_group_box.toggled.connect(self._handle_notes_section_toggled)
         self.tabs_group_box.toggled.connect(self._handle_tabs_section_toggled)
+
+    def delete_client_document_entry(self, document_id, file_path):
+        """
+        Deletes a client document entry from the database and the corresponding file from disk.
+        """
+        if not document_id:
+            QMessageBox.warning(self, self.tr("Erreur"), self.tr("ID du document manquant."))
+            return
+
+        # Ensure file_path is a string for os.path.basename
+        file_display_name = os.path.basename(file_path) if file_path else self.tr("Inconnu")
+
+        reply = QMessageBox.question(self, self.tr("Confirmer Suppression"),
+                                     self.tr("Êtes-vous sûr de vouloir supprimer définitivement ce document (ID: {0})?\nLe fichier '{1}' sera également supprimé du disque.").format(document_id, file_display_name),
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+
+        if reply == QMessageBox.Yes:
+            try:
+                db_deleted = db_manager.delete_client_document(document_id)
+
+                if db_deleted:
+                    logging.info(f"Document ID {document_id} deleted from database.")
+                    if file_path and os.path.exists(file_path):
+                        try:
+                            os.remove(file_path)
+                            logging.info(f"File {file_path} deleted from disk.")
+                            self.notify(self.tr("Succès"), self.tr("Document et fichier supprimés avec succès."), type='SUCCESS')
+                        except OSError as e_file:
+                            logging.error(f"Error deleting file {file_path}: {e_file}", exc_info=True)
+                            self.notify(self.tr("Erreur Fichier"), self.tr("Document supprimé de la base de données, mais échec de la suppression du fichier:\n{0}").format(str(e_file)), type='ERROR')
+                    else:
+                        logging.warning(f"File path not provided or file does not exist for document ID {document_id}: {file_path}. DB entry deleted.")
+                        self.notify(self.tr("Succès (Partiel)"), self.tr("Entrée de document supprimée de la base de données. Fichier non trouvé ou chemin non spécifié."), type='WARNING')
+                else:
+                    self.notify(self.tr("Erreur DB"), self.tr("Impossible de supprimer l'entrée du document de la base de données (ID: {0}). Vérifiez les logs.").format(document_id), type='ERROR')
+
+            except Exception as e:
+                logging.error(f"Error in delete_client_document_entry for doc ID {document_id}: {e}", exc_info=True)
+                self.notify(self.tr("Erreur Suppression"), self.tr("Une erreur inattendue est survenue:\n{0}").format(str(e)), type='CRITICAL')
+            finally:
+                self.populate_doc_table()
 
     def _handle_edit_pdf_action(self, file_path, document_id):
         if file_path and os.path.exists(file_path):
@@ -3842,7 +3924,7 @@ class ClientWidget(QWidget):
             filtered_list = []
             logging.info("PT_DEBUG: populate_doc_table - Starting client-side filtering.")
             for i, doc_data in enumerate(client_documents_from_db):
-                logging.debug(f"PT_DEBUG: populate_doc_table - Filtering doc {i+1}, ID: {doc_data.get('document_id')}")
+                # logging.debug(f"PT_DEBUG: populate_doc_table - Filtering doc {i+1}, ID: {doc_data.get('document_id')}") # Reduced verbosity
                 doc_passes_lang_filter = True
                 doc_passes_type_filter = True
 

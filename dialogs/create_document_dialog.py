@@ -368,7 +368,7 @@ class CreateDocumentDialog(QDialog):
                 logging.error(f"CreateDocumentDialog: self.app_root_dir '{self.app_root_dir}' is invalid. Cannot form absolute path for client documents.")
                 QMessageBox.critical(self, self.tr("Erreur Configuration"), self.tr("Le dossier racine de l'application n'est pas correctement configuré."))
                 return None
-            
+
             client_base_folder_absolute = os.path.join(self.app_root_dir, client_base_folder_relative)
             client_base_folder_absolute = os.path.normpath(client_base_folder_absolute)
         else:
@@ -377,10 +377,13 @@ class CreateDocumentDialog(QDialog):
         if not client_base_folder_absolute or not os.path.isdir(client_base_folder_absolute):
             # This error log is important, so we keep it or a version of it.
             logging.error(f"CreateDocumentDialog: Client base folder '{client_base_folder_absolute}' (from relative: '{client_base_folder_relative}') is invalid or not a directory.")
-            QMessageBox.critical(self, self.tr("Erreur Dossier Client"), 
-                                 self.tr("Dossier client '{0}' non configuré, invalide, ou inaccessible.").format(client_base_folder_absolute or client_base_folder_relative or self.tr('Non spécifié')))
+            QMessageBox.critical(self, self.tr("Erreur Dossier Client"),
+            self.tr("Dossier client '{0}' non configuré, invalide, ou inaccessible.").format(client_base_folder_absolute or client_base_folder_relative or self.tr('Non spécifié')))
             return None
         
+        # Ensure client_base_folder used later is the absolute one
+        client_base_folder = client_base_folder_absolute
+
         # Ensure client_base_folder used later is the absolute one
         client_base_folder = client_base_folder_absolute
 
