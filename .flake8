@@ -1,0 +1,19 @@
+[flake8]
+max-line-length = 88
+extend-ignore =
+    E203,
+    W503,
+    F401,
+    F841,
+    E722,
+    E501
+exclude =
+    .git,
+    __pycache__,
+    dist,
+    build,
+    .venv,
+    .tox,
+    .eggs,
+    icons_rc.py
+max-complexity = 12
