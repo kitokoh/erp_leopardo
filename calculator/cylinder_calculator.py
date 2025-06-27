@@ -3,6 +3,7 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QGridLayout, QLabel,
                              QLineEdit, QPushButton, QMessageBox, QFormLayout,
                              QGroupBox,QSizePolicy, QComboBox)
+
 from PyQt5.QtCore import Qt
 import math
 from .history_manager import HistoryManager
@@ -13,11 +14,13 @@ N_MM2_TO_BAR = 1 / BAR_TO_N_MM2
 LPM_TO_MM3_S = 1000000 / 60
 N_TO_KGF = 1 / 9.80665
 
+
 class CylinderCalculatorWidget(QWidget):
     """
     A QWidget for calculating hydraulic cylinder performance characteristics,
     including forces, speeds, volumes, rod buckling analysis, and inverse calculations
     (pressure for a given force, diameter for a given force/pressure).
+
     Styling is intended to be applied via QSS through objectNames.
     """
     def __init__(self, parent=None, history_manager=None):
@@ -29,6 +32,7 @@ class CylinderCalculatorWidget(QWidget):
         """
         super().__init__(parent)
         self.setObjectName("CylinderCalculatorWidget")
+
 
         self.history_manager = history_manager if history_manager else HistoryManager()
         self.parent_main_calc_widget = parent
@@ -47,6 +51,7 @@ class CylinderCalculatorWidget(QWidget):
         self.pressure_input = QLineEdit(self); self.pressure_input.setPlaceholderText("bar"); self.pressure_input.setToolTip("Pression hydraulique appliquée (P)")
         self.rod_diameter_input = QLineEdit(self); self.rod_diameter_input.setPlaceholderText("mm (0 si simple effet)"); self.rod_diameter_input.setToolTip("Diamètre de la tige (d). 0 si simple effet.")
         self.flow_rate_input = QLineEdit(self); self.flow_rate_input.setPlaceholderText("L/min (optionnel)"); self.flow_rate_input.setToolTip("Débit d'huile (Q), pour calcul de vitesse.")
+
 
         form_layout.addRow(QLabel("Diamètre Piston (D):"), self.diameter_input)
         form_layout.addRow(QLabel("Course (S):"), self.stroke_input)
@@ -83,6 +88,7 @@ class CylinderCalculatorWidget(QWidget):
         self.results_layout.addWidget(QLabel("Temps Traction (tₜ):"),3,2); self.results_layout.addWidget(self.result_labels["time_pull"],3,3)
         self.results_layout.addWidget(QLabel("Ratio (φ = Aₚ/Aₐ):"),4,2); self.results_layout.addWidget(self.result_labels["ratio"],4,3)
         self.results_layout.setColumnStretch(1,1); self.results_layout.setColumnStretch(3,1)
+
         self.layout.addWidget(output_group)
 
         # --- Buckling Calculation Group ---
@@ -95,6 +101,7 @@ class CylinderCalculatorWidget(QWidget):
         self.coeff_extremite_input.setItemData(0, 1.0); self.coeff_extremite_input.setItemData(1, 0.5); self.coeff_extremite_input.setItemData(2, 0.7); self.coeff_extremite_input.setItemData(3, 2.0)
         self.module_young_input = QLineEdit(self); self.module_young_input.setPlaceholderText("GPa (ex: 210)"); self.module_young_input.setText("210"); self.module_young_input.setToolTip("Module d'Young (E).")
         self.safety_factor_buckling_input = QLineEdit(self); self.safety_factor_buckling_input.setPlaceholderText("ex: 3.0"); self.safety_factor_buckling_input.setText("3.0"); self.safety_factor_buckling_input.setToolTip("Facteur de sécurité.")
+
         buckling_form_layout.addRow(QLabel("Longueur Libre Tige (L):"), self.longueur_libre_tige_input)
         buckling_form_layout.addRow(QLabel("Coeff. Fixation (K):"), self.coeff_extremite_input)
         buckling_form_layout.addRow(QLabel("Module d'Young (E):"), self.module_young_input)
@@ -212,6 +219,7 @@ class CylinderCalculatorWidget(QWidget):
         if dia_rod_mm >= dia_piston_mm and dia_piston_mm > 0 :
             QMessageBox.warning(self, "Entrée Invalide", "Le diamètre de la tige doit être inférieur au diamètre du piston."); return
 
+
         area_piston_mm2 = math.pi * (dia_piston_mm / 2)**2
         self.result_labels["piston_area"].setText(f"{area_piston_mm2:.2f} mm² ({area_piston_mm2/100:.2f} cm²)")
         area_rod_mm2 = math.pi * (dia_rod_mm / 2)**2 if dia_rod_mm > 0 else 0
@@ -228,6 +236,7 @@ class CylinderCalculatorWidget(QWidget):
         self.result_labels["volume_push"].setText(f"{vol_push_mm3 / 1000:.2f} cm³ ({vol_push_mm3 / 1000000:.3f} L)")
         vol_pull_mm3 = area_annular_mm2 * stroke_mm if dia_rod_mm > 0 else 0
         self.result_labels["volume_pull"].setText(f"{vol_pull_mm3 / 1000:.2f} cm³ ({vol_pull_mm3 / 1000000:.3f} L)" if dia_rod_mm > 0 else "N/A")
+
         self.result_labels["ratio"].setText(f"{(area_piston_mm2 / area_annular_mm2):.2f}" if dia_rod_mm > 0 and area_annular_mm2 > 0 else "N/A")
 
         if flow_lpm > 0:
@@ -267,14 +276,17 @@ class CylinderCalculatorWidget(QWidget):
             if dia_rod_mm_buckling is not None and dia_rod_mm_buckling <=0: self.result_labels["force_critique_flambage"].setText("Ø tige > 0 requis")
             return
         k_factor = self.coeff_extremite_input.currentData()
+
         E_N_mm2 = module_young_gpa * 1000
         I_mm4 = (math.pi * (dia_rod_mm_buckling**4)) / 64
         effective_length_mm = k_factor * longueur_libre_mm
         if effective_length_mm == 0: self.result_labels["force_critique_flambage"].setText("L_eff > 0 requis"); return
+
         F_crit_N = ((math.pi**2) * E_N_mm2 * I_mm4) / (effective_length_mm**2)
         self.result_labels["force_critique_flambage"].setText(f"{F_crit_N:.2f} N ({F_crit_N/1000:.2f} kN)")
         F_adm_N = F_crit_N / safety_factor
         self.result_labels["charge_adm_flambage"].setText(f"{F_adm_N:.2f} N ({F_adm_N/1000:.2f} kN)")
+
         if self.last_calculated_push_force_N > 0:
             if F_adm_N < self.last_calculated_push_force_N:
                 self.buckling_warning_label.setText(f"ATTENTION: Risque de flambage! (F_poussée {self.last_calculated_push_force_N:.0f}N > F_adm {F_adm_N:.0f}N)")
@@ -368,4 +380,5 @@ if __name__ == '__main__':
     main_container_layout.addWidget(calc); calc_widget_container.setLayout(main_container_layout)
     scroll_area.setWidget(calc_widget_container)
     scroll_area.setWindowTitle("Calculatrice de Vérins Hydrauliques - Test Avancé"); scroll_area.setMinimumSize(700, 850); scroll_area.show()
+
     sys.exit(app.exec_())

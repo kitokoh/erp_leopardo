@@ -3,7 +3,8 @@ import sqlite3
 import uuid
 from datetime import datetime
 import logging
-from werkzeug.security import generate_password_hash, check_password_hash # For password hashing
+# from werkzeug.security import generate_password_hash, check_password_hash # Replaced by passlib
+from utils import hash_password, verify_password # Using passlib functions from utils
 from .generic_crud import _manage_conn
 
 logger = logging.getLogger(__name__)
@@ -15,7 +16,8 @@ def add_user(username: str, password: str, role_id: int, full_name: str = None, 
         logger.error("Username, password, and role_id are required to add a user.")
         return None
 
-    hashed_pw = generate_password_hash(password)
+    # hashed_pw = generate_password_hash(password) # Replaced by utils.hash_password
+    hashed_pw = hash_password(password)
     user_id = str(uuid.uuid4()) # Generate UUID for user_id
     now = datetime.utcnow().isoformat() + "Z"
 
@@ -88,7 +90,8 @@ def update_user_password(user_id: str, new_password: str, conn: sqlite3.Connecti
     if not new_password:
         logger.error("New password cannot be empty.")
         return False
-    hashed_pw = generate_password_hash(new_password)
+    # hashed_pw = generate_password_hash(new_password) # Replaced by utils.hash_password
+    hashed_pw = hash_password(new_password)
     now = datetime.utcnow().isoformat() + "Z"
     sql = "UPDATE Users SET hashed_password = ?, updated_at = ? WHERE user_id = ?"
     try:
@@ -148,8 +151,10 @@ def verify_password(hashed_password: str, provided_password: str) -> bool:
     """
     Verifies a provided password against a stored hash.
     Internal helper, typically not called directly from outside for login.
+    Uses the verify_password function imported from utils.py (which uses passlib).
     """
-    return check_password_hash(hashed_password, provided_password)
+    # return check_password_hash(hashed_password, provided_password) # Replaced by utils.verify_password
+    return verify_password(provided_password, hashed_password) # Note the argument order for utils.verify_password
 
 @_manage_conn
 def verify_user_password(username: str, password: str, conn: sqlite3.Connection = None) -> dict | None:

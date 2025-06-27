@@ -73,19 +73,22 @@ def add_client_document(data: dict, conn: sqlite3.Connection = None) -> str | No
 def delete_client_document(document_id: str, conn: sqlite3.Connection = None) -> bool:
     """
     Deletes a client document by its document_id.
-    STUB FUNCTION - Full implementation pending.
     """
-    # Changed document_id type hint to str to match new_document_id type
-    logging.warning(f"Called stub function delete_client_document for document_id: {document_id}. Full implementation is missing.")
-    # Example:
-    # cursor = conn.cursor()
-    # try:
-    #     cursor.execute("DELETE FROM ClientDocuments WHERE document_id = ?", (document_id,))
-    #     return cursor.rowcount > 0 # Returns True if a row was deleted
-    # except sqlite3.Error as e:
-    #     logging.error(f"Stub delete_client_document error for {document_id}: {e}")
-    #     return False
-    return False
+    cursor = conn.cursor()
+    try:
+        logging.info(f"Attempting to delete client document with ID: {document_id}")
+        cursor.execute("DELETE FROM ClientDocuments WHERE document_id = ?", (document_id,))
+        # conn.commit() # Handled by _manage_conn
+        if cursor.rowcount > 0:
+            logging.info(f"Successfully deleted client document with ID: {document_id}")
+            return True
+        else:
+            logging.warning(f"No client document found with ID: {document_id} to delete.")
+            return False # No row was deleted, likely document_id not found
+    except sqlite3.Error as e:
+        logging.error(f"SQLite error deleting client document {document_id}: {e}", exc_info=True)
+        # conn.rollback() # Handled by _manage_conn
+        return False
 
 @_manage_conn
 def get_document_by_id(document_id: str, conn: sqlite3.Connection = None) -> dict | None:
