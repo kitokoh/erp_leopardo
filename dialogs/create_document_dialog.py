@@ -24,6 +24,16 @@ from utils import populate_docx_template
 import icons_rc # Import for Qt resource file
 from PyQt5.QtWidgets import QFormLayout
 
+# List of template types to be excluded from the "Generate via model" dialog (typically email templates)
+# This list should be maintained to match the template_type values used for email templates in the database.
+EMAIL_TEMPLATE_TYPES_TO_EXCLUDE = [
+    "EMAIL_WELCOME", "EMAIL_RESET_PASSWORD", "EMAIL_NEWSLETTER_SUBSCRIPTION",
+    "EMAIL_FOLLOW_UP", "EMAIL_HOLIDAY_CHRISTMAS", "EMAIL_HOLIDAY_NEWYEAR",
+    "EMAIL_SAV_TICKET_OPENED", "EMAIL_SAV_TICKET_RESOLVED",
+    "GENERIC_EMAIL_MESSAGE", "NEWSLETTER_BASE"
+    # Add any other specific email template types used in your system
+]
+
 class CreateDocumentDialog(QDialog):
     # Maps internal type keys to user-friendly names and template_type filters
     DOCUMENT_TYPE_MAPPING = {
@@ -61,20 +71,31 @@ class CreateDocumentDialog(QDialog):
 
     def _init_ui(self):
         main_layout = QVBoxLayout(self)
-        form_layout = QFormLayout()
+
+        # Filters layout
+        filters_group_box = QGroupBox(self.tr("Filtres"))
+        filters_layout = QHBoxLayout(filters_group_box) # Use QHBoxLayout for horizontal alignment
 
         self.doc_type_combo = QComboBox()
         self.language_combo = QComboBox()
+
+        doc_type_label = QLabel(self.tr("Type:"))
+        filters_layout.addWidget(doc_type_label)
+        filters_layout.addWidget(self.doc_type_combo)
+        filters_layout.addSpacing(15) # Add some space between filter groups
+
+        language_label = QLabel(self.tr("Langue:"))
+        filters_layout.addWidget(language_label)
+        filters_layout.addWidget(self.language_combo)
+        filters_layout.addStretch(1) # Push filters to the left
+
+        main_layout.addWidget(filters_group_box)
+
+        # Template List
         self.template_list_widget = QListWidget()
-        self.template_list_widget.setSelectionMode(QListWidget.ExtendedSelection) # Allow multiple selections
-
-        form_layout.addRow(self.tr("Type de Document (Filtre):"), self.doc_type_combo)
-        form_layout.addRow(self.tr("Langue du Document (Filtre):"), self.language_combo)
-
-        main_layout.addLayout(form_layout)
-
+        self.template_list_widget.setSelectionMode(QListWidget.ExtendedSelection)
         main_layout.addWidget(QLabel(self.tr("Modèles Disponibles (sélectionnez un ou plusieurs):")))
-        main_layout.addWidget(self.template_list_widget)
+        main_layout.addWidget(self.template_list_widget, 1) # Give list widget stretch factor
 
         self._load_document_types_and_languages() # Populates combos
 
@@ -360,10 +381,32 @@ class CreateDocumentDialog(QDialog):
             document_context = {}
 
         # Determine Output Filename and Path
-        client_base_folder = self.client_info.get("base_folder_path") or self.client_info.get("default_base_folder_path")
-        if not client_base_folder or not os.path.isdir(client_base_folder):
-            QMessageBox.critical(self, self.tr("Erreur Dossier Client"), self.tr("Dossier client non configuré ou invalide."))
+        client_base_folder_relative = self.client_info.get("base_folder_path") or self.client_info.get("default_base_folder_path")
+        client_base_folder_absolute = None
+
+        if client_base_folder_relative:
+            if not self.app_root_dir or not os.path.isdir(self.app_root_dir):
+                logging.error(f"CreateDocumentDialog: self.app_root_dir '{self.app_root_dir}' is invalid. Cannot form absolute path for client documents.")
+                QMessageBox.critical(self, self.tr("Erreur Configuration"), self.tr("Le dossier racine de l'application n'est pas correctement configuré."))
+                return None
+
+            client_base_folder_absolute = os.path.join(self.app_root_dir, client_base_folder_relative)
+            client_base_folder_absolute = os.path.normpath(client_base_folder_absolute)
+        else:
+            logging.warning("CreateDocumentDialog: No base_folder_path or default_base_folder_path found in client_info.")
+
+        if not client_base_folder_absolute or not os.path.isdir(client_base_folder_absolute):
+            # This error log is important, so we keep it or a version of it.
+            logging.error(f"CreateDocumentDialog: Client base folder '{client_base_folder_absolute}' (from relative: '{client_base_folder_relative}') is invalid or not a directory.")
+            QMessageBox.critical(self, self.tr("Erreur Dossier Client"),
+            self.tr("Dossier client '{0}' non configuré, invalide, ou inaccessible.").format(client_base_folder_absolute or client_base_folder_relative or self.tr('Non spécifié')))
             return None
+        
+        # Ensure client_base_folder used later is the absolute one
+        client_base_folder = client_base_folder_absolute
+
+        # Ensure client_base_folder used later is the absolute one
+        client_base_folder = client_base_folder_absolute
 
         # Use a subfolder based on template's display name for organization
         doc_type_name_for_folder = template_display_name_for_output.replace(" ", "_").replace("/", "_")

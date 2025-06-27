@@ -18,29 +18,26 @@ QLabel#homePageWelcomeLabel {
 /* HomePageWidget Button Styles (Cartes de Module) */
 /* Ciblé via le conteneur pour spécificité */
 QWidget#homePageButtonGridContainer QPushButton {
-    background-color: #FFFFFF; /* Fond blanc pour l'aspect carte */
-    border: 1px solid #DDE2E6; /* Bordure légère et moderne */
+    background-color: #FFFFFF;
+    border: 1px solid #DDE2E6; /* Conserver une bordure fine pour la définition de la carte */
     border-radius: 10px;       /* Coins arrondis */
-    padding: 10px;             /* Padding réduit pour des boutons plus petits */
-    font-size: 12px;           /* Taille de police légèrement réduite */
+    padding: 10px;             /* Padding réduit */
+    font-size: 12px;           /* Police réduite */
+
     font-weight: bold;
     color: #333333;
     text-align: center;
     min-height: 80px;          /* Hauteur réduite */
-    /* min-width est géré par la grille et le nombre de colonnes */
-    /* Effet d'ombre simulé */
-    border-bottom-width: 2px;
-    border-right-width: 2px;
-    border-bottom-color: #C0C6CC;
-    border-right-color: #C0C6CC;
+    /* min-width n'est pas fixé, la grille s'en chargera avec 4 colonnes */
+    /* Les ombres sont maintenant gérées par QGraphicsDropShadowEffect en Python */
+
 }
 
 QWidget#homePageButtonGridContainer QPushButton:hover {
     background-color: #E3F2FD;
     border-color: #007BFF;
     color: #0056B3;
-    border-bottom-color: #0056B3;
-    border-right-color: #0056B3;
+
 }
 
 QWidget#homePageButtonGridContainer QPushButton:pressed {

@@ -44,7 +44,8 @@ def format_currency(amount: float | None, symbol: str = "€", precision: int = 
 
 def _get_batch_products_and_equivalents(product_ids: list[int], target_language_code: str, conn_passed=None) -> dict:
     # from .. import db # Avoid importing full db package
-    from ..cruds.products_crud import get_product_by_id_details as products_get_product_by_id_details
+    from .cruds.products_crud import get_product_by_id as products_get_product_by_id_details # Actual function name
+
     # Note: If other db.crud functions are needed, they must be imported specifically.
     if not product_ids: return {}
 
