@@ -366,14 +366,23 @@ class StatisticsDashboard(QWidget):
 
             if not os.path.exists(geojson_path):
                 logging.error(f"GeoJSON file not found at: {geojson_path}")
-                m = folium.Map(location=[20,0], zoom_start=2)
-                folium.Marker([0,0], popup="Error: GeoJSON file for map not found.").add_to(m)
-                if self.map_view:
-                    self.map_view.setHtml(m.get_root().render())
+            error_message = self.tr("Les données géographiques de la carte (GeoJSON) sont introuvables. La carte ne peut pas être affichée. Veuillez vérifier l'installation de l'application ou contacter le support.")
+            self._set_map_error_html(error_message)
+
                 return
 
             m = folium.Map(location=[20, 0], zoom_start=2, tiles="CartoDB positron")
             clients_by_country_counts = get_client_counts_by_country()
+
+        try:
+            clients_by_country_counts = get_client_counts_by_country()
+        except Exception as db_exc:
+            logging.error(f"Database error while fetching client counts for map: {db_exc}", exc_info=True)
+            error_message = self.tr("Erreur de récupération des données statistiques pour la carte : {error_details}. L'affichage de la carte est indisponible.").format(error_details=str(db_exc))
+            self._set_map_error_html(error_message)
+            return
+
+
 
             if clients_by_country_counts:
                 counts_dict = {item['country_name']: item['client_count'] for item in clients_by_country_counts}
@@ -472,13 +481,53 @@ class StatisticsDashboard(QWidget):
                 logging.error("StatisticsDashboard: self.map_view is None. Cannot set HTML for the map.")
 
         except Exception as e:
-            logging.error(f"Error updating interactive map: {e}", exc_info=True)
-            if self.map_view:
-                error_map = folium.Map(location=[0,0], zoom_start=1) # Keep error map simple
-                folium.Marker([0,0], popup=f"Error generating map: {str(e)[:1000]}").add_to(error_map) # Limit error message length
-                self.map_view.setHtml(error_map.get_root().render())
-            else:
-                logging.error("StatisticsDashboard: self.map_view is None during error handling in update_map.")
+            logging.error(f"General error updating interactive map: {e}", exc_info=True) # Changed log message slightly for clarity
+            error_message = self.tr("Une erreur inattendue est survenue lors de la génération de la carte : {error_details}. L'affichage de la carte est indisponible. Veuillez réessayer ou contacter le support si le problème persiste.").format(error_details=str(e))
+            self._set_map_error_html(error_message)
+
+    def _set_map_error_html(self, message: str):
+        """Helper function to set an error message HTML in the map_view."""
+        if self.map_view:
+            # Basic styling for the error message
+            # The button's onclick attempts to call a new method on pyMapConnector.
+            # This 'requestMapRefresh' signal/slot needs to be added to MapInteractionHandler and StatisticsDashboard.
+            # For this step, the JS call might not work fully yet, but the HTML structure is set.
+            error_html = f"""
+            <html>
+            <head>
+                <style>
+                    body {{ font-family: Arial, sans-serif; margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f8f9fa; }}
+                    .error-container {{ text-align: center; padding: 30px; border: 1px solid #dc3545; background-color: #f8d7da; color: #721c24; border-radius: 8px; max-width: 80%; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }}
+                    .error-icon {{ font-size: 32px; margin-bottom: 15px; color: #dc3545; }}
+                    h3 {{ margin-top: 0; color: #721c24; font-size: 1.5em; }}
+                    p {{ font-size: 1em; margin-bottom: 20px; }}
+                    button {{
+                        padding: 10px 20px;
+                        font-size: 1em;
+                        color: white;
+                        background-color: #007bff;
+                        border: none;
+                        border-radius: 5px;
+                        cursor: pointer;
+                        transition: background-color 0.3s ease;
+                    }}
+                    button:hover {{ background-color: #0056b3; }}
+                </style>
+            </head>
+            <body>
+                <div class="error-container">
+                    <div class="error-icon">⚠️</div>
+                    <h3>{self.tr("Erreur d'Affichage de la Carte")}</h3>
+                    <p>{message}</p>
+                    <button onclick="if(window.pyMapConnector && typeof window.pyMapConnector.requestMapRefresh === 'function') {{ window.pyMapConnector.requestMapRefresh(); }} else {{ alert('{self.tr("Le mécanisme de rafraîchissement n\\'est pas encore pleinement disponible.")}'); }}">{self.tr("Réessayer")}</button>
+                </div>
+            </body>
+            </html>
+            """
+            self.map_view.setHtml(error_html)
+            logging.info(f"Displayed error HTML in map_view: {message}")
+        else:
+            logging.error("StatisticsDashboard: self.map_view is None. Cannot display error message in map_view.")
 
 
     # --- Methods to be ported from CollapsibleStatisticsWidget ---
