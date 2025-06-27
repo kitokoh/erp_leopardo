@@ -69,30 +69,46 @@
                 </tr>
             </thead>
             <tbody>
-                {{doc.products_table_rows}} <!-- Populated by db.py -->
-                <!-- Example Row (to be replaced by HtmlEditor):
+                <!-- Structure des lignes de produits générée par get_proforma_invoice_context_data -->
+                <!-- Chaque ligne ressemble à :
                 <tr>
-                    <td>1</td>
-                    <td>Product A</td>
-                    <td>2</td>
-                    <td>€100.00</td>
-                    <td>€200.00</td>
+                    <td>#</td> (index)
+                    <td>{{product.product_code}}</td>
+                    <td><strong>{{product.name}}</strong><br><small>{{product.description}}</small></td>
+                    <td class='number'>{{product.quantity}}</td>
+                    <td class='number'>{{product.unit_price_formatted}}</td>
+                    <td class='number'>{{product.total_price_formatted}}</td>
                 </tr>
                 -->
+                {{{doc.products_table_rows}}}
             </tbody>
         </table>
 
-        <div class="total-section">
-            <p>Subtotal: {{SUBTOTAL_AMOUNT}}</p>
-            <p>Discount ({{DISCOUNT_RATE}}%): {{DISCOUNT_AMOUNT}}</p>
-            <p>VAT ({{VAT_RATE}}%): {{VAT_AMOUNT}}</p>
-            <h3><strong>Total Amount Due: {{GRAND_TOTAL_AMOUNT}}</strong></h3>
+        <div class="invoice-meta" style="margin-top: 20px;">
+            <p><strong>Référence Commande Client:</strong> {{ order.client_order_number }}</p>
+            <p><strong>Date Commande Client:</strong> {{ order.client_order_date }}</p>
         </div>
 
-        <div class="footer">
-            <p>Bank Details: {{BANK_NAME}}, Account: {{BANK_ACCOUNT_NUMBER}}, Swift/BIC: {{BANK_SWIFT_BIC}}</p>
-            <p>This is a proforma invoice and is not a demand for payment.</p>
-            <p>Thank you for your business!</p>
+        <div class="total-section">
+            <p>Sous-total: {{placeholders.SUBTOTAL_AMOUNT}}</p>
+            <p>Remise ({{placeholders.DISCOUNT_RATE}}%): {{placeholders.DISCOUNT_AMOUNT}}</p>
+            <p>TVA ({{placeholders.VAT_RATE}}%): {{placeholders.VAT_AMOUNT}}</p>
+            <h3><strong>Montant Total: {{placeholders.GRAND_TOTAL_AMOUNT}}</strong></h3>
+            <!-- <p>({{placeholders.GRAND_TOTAL_AMOUNT_WORDS}})</p> -->
+        </div>
+
+        <div class="footer" style="margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px;">
+            <p><strong>Nos coordonnées bancaires :</strong></p>
+            <p>Banque: {{ seller.bank_name }}</p>
+            <p>Titulaire du compte: {{ seller.bank_account_holder_name }}</p>
+            <p>IBAN: {{ seller.bank_iban }}</p>
+            <p>SWIFT/BIC: {{ seller.bank_swift_bic }}</p>
+            <p>Adresse de la banque: {{ seller.bank_address }}</p>
+            <hr>
+            <p>{{ doc.proforma_notes }}</p>
+            <p style="margin-top: 10px;"><em>Ceci est une facture proforma et ne constitue pas une demande de paiement.</em></p>
+            <p><em>Merci de votre confiance !</em></p>
+            <p style="font-size: 0.8em; color: #999; margin-top: 20px;">{{ seller.company_name }} - {{ seller.address }} - Numéro de TVA: {{ seller.vat_id }} - Numéro d'enregistrement: {{ seller.registration_number }}</p>
         </div>
     </div>
 </body>
