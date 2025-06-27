@@ -5,6 +5,7 @@ QWidget#MainCalculatorWidget {
     background-color: #4A4A4A; /* Dark grey, like a calculator body */
     border-radius: 10px; /* Rounded corners for the entire module */
     padding: 5px;
+
 }
 
 /* --- Display Styles --- */
@@ -16,6 +17,7 @@ QLineEdit#CalculatorDisplay {
     padding: 10px;
     font-size: 28pt;
     font-family: "Consolas", "Courier New", "Lucida Console", monospace; /* LCD-like font */
+
     font-weight: bold;
 }
 
@@ -42,12 +44,14 @@ QWidget#ScientificCalculatorWidget QPushButton {
     min-height: 40px;
     min-width: 50px;
     outline: none; /* Remove focus outline if not desired */
+
 }
 
 QWidget#CommercialCalculatorWidget QPushButton:hover,
 QWidget#ScientificCalculatorWidget QPushButton:hover {
     background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FFFFFF, stop:1 #E8E8E8); /* Slightly lighter on hover */
     border-color: #616161;
+
 }
 
 QWidget#CommercialCalculatorWidget QPushButton:pressed,
@@ -55,6 +59,7 @@ QWidget#ScientificCalculatorWidget QPushButton:pressed {
     background-color: #D6D6D6;
     border-style: inset; /* Inset for pressed feel */
     padding: 13px 5px 11px 7px; /* Adjust padding for inset effect */
+
 }
 
 /* --- Number Buttons (0-9, .) --- */
@@ -70,6 +75,7 @@ QPushButton[objectName="calcOperatorButton"] {
     background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #E0E0E0, stop:1 #CACACA); /* Slightly darker grey */
     color: #1c1c1c;
     font-size: 15pt;
+
 }
 
 /* --- Equals Button (=) --- */
@@ -113,6 +119,7 @@ QPushButton[objectName="calcFunctionButton"]:hover {
 QPushButton[objectName="calcMemoryButton"]:pressed,
 QPushButton[objectName="calcFunctionButton"]:pressed {
     background-color: #78909C;
+
 }
 
 /* --- Scientific Function Buttons (sin, cos, log, sqrt, etc.) --- */
@@ -180,6 +187,7 @@ QWidget#CylinderCalculatorWidget QLineEdit {
 }
 QWidget#CylinderCalculatorWidget QPushButton#calculateCylinderButton {
     background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #29B6F6, stop:1 #0288D1); /* Light Blue gradient */
+
     color: white;
     font-size: 13pt;
     font-weight: bold;
@@ -300,4 +308,5 @@ QWidget#MainCalculatorWidget QPushButton#historyButton:hover {
 }
 QWidget#MainCalculatorWidget QPushButton#historyButton:pressed {
     background-color: #616161;
+
 }
