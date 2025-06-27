@@ -552,7 +552,7 @@ class ClientWidget(QWidget):
                     parent=self,
                     template_data=template_data  # Pass the fetched template data
                 )
-                logging.info(f"ClientWidget.handle_generate_template_button_clicked: About to open CreateDocumentDialog. Client Info: {self.client_info}, Config available: {bool(self.config)}")
+                # logging.info(f"ClientWidget.handle_generate_template_button_clicked: About to open CreateDocumentDialog. Client Info: {self.client_info}, Config available: {bool(self.config)}") # DEBUG LOG REMOVED
                 if dialog.exec_() == QDialog.Accepted:
                     self.populate_doc_table()  # Refresh documents tab
             else:
@@ -4163,7 +4163,7 @@ class ClientWidget(QWidget):
 
 
     def open_create_docs_dialog(self):
-        logging.info(f"ClientWidget.open_create_docs_dialog: About to open CreateDocumentDialog. Client Info: {self.client_info}, Config available: {bool(self.config)}")
+        # logging.info(f"ClientWidget.open_create_docs_dialog: About to open CreateDocumentDialog. Client Info: {self.client_info}, Config available: {bool(self.config)}") # DEBUG LOG REMOVED
         dialog = self.CreateDocumentDialog(self.client_info, self.config, self.current_user_id, self) # Pass current_user_id
         if dialog.exec_() == QDialog.Accepted: self.populate_doc_table()
 
