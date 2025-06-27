@@ -17,7 +17,7 @@ from PyQt5.QtWidgets import (
     QSizePolicy # Added QSizePolicy
 )
 from PyQt5.QtGui import QIcon, QDesktopServices, QFont, QColor, QPixmap, QTextCursor
-from PyQt5.QtCore import Qt, QUrl, QCoreApplication, QEvent
+from PyQt5.QtCore import Qt, QUrl, QCoreApplication, QEvent, QStandardPaths
 from PyQt5.QtWidgets import QFormLayout
 from PyQt5.QtWidgets import QListWidgetItem
 from PyQt5.QtGui import QPixmap

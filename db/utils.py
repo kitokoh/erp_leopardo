@@ -62,7 +62,7 @@ def _get_batch_products_and_equivalents(product_ids: list[int], target_language_
         cursor = conn.cursor()
 
         for pid_original in product_ids:
-            product_detail = products_get_product_by_id_details(id=pid_original, conn=conn) # Use specific import
+            product_detail = products_get_product_by_id_details(product_id=pid_original, conn=conn) # Use specific import
             if product_detail:
                 results[pid_original]['original'] = product_detail
 
