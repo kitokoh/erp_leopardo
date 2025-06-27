@@ -3431,6 +3431,7 @@ class ClientWidget(QWidget):
             )
         QApplication.processEvents() # Ensure the notification is displayed
 
+
         generated_pdf_path_final = None
         try:
             if not self.client_info or 'client_id' not in self.client_info:
@@ -3488,6 +3489,7 @@ class ClientWidget(QWidget):
                 logging.warning(f"Document data for {document_data.get('document_id')} missing language_code, defaulting to 'fr'.")
 
             app_root_dir_from_config = self.config.get('app_root_dir', self.app_root_dir)
+
 
             additional_context_for_pdf = {
                 'document_type': document_data.get('document_type_generated'), # Original type of the template

@@ -62,7 +62,11 @@ class CommercialCalculatorWidget(QWidget):
         for i, btn_def in enumerate(buttons):
             btn_text, row, col, *span = btn_def
             button = QPushButton(btn_text)
-            button.setSizePolicy(QPushButton.Expanding, QPushButton.Expanding)
+            from PyQt5.QtWidgets import QSizePolicy
+
+            button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+            # button.setSizePolicy(QPushButton.Expanding, QPushButton.Expanding)
             # button.setMinimumSize(QSize(60, 50)) # Min size will be handled by QSS or default
             # button.setStyleSheet(self.get_button_style(btn_text)) # Styles will come from QSS
 
