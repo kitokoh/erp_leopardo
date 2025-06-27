@@ -136,6 +136,8 @@ import os # For path checks in download monitor init
 
 from calendar_module.calendar_widget import CalendarWidget # Import CalendarWidget
 from user_management.page import UserManagementPage # Import UserManagementPage
+from calculator.main_calculator_widget import MainCalculatorWidget # Import Calculator Widget
+from db.connection import SessionLocal as AppSessionLocal_MW # Import SessionLocal for calculator
 
 # Definition of configurable modules
 CONFIGURABLE_MODULES = [
@@ -150,7 +152,8 @@ CONFIGURABLE_MODULES = [
     # Add Calendar module here - for now, not making it 'configurable' via DB setting, always enabled.
     # If it needs to be configurable, add a 'key' and handle its state in _load_module_states and settings.
     {'key': 'module_calendar_enabled', 'name': 'calendar', 'action_attr': 'calendar_module_action', 'widget_attr': 'calendar_module_widget_instance'},
-    {'key': 'module_camera_management_enabled', 'name': 'camera_management', 'action_attr': 'camera_management_action', 'widget_attr': 'camera_management_widget_instance'}
+    {'key': 'module_camera_management_enabled', 'name': 'camera_management', 'action_attr': 'camera_management_action', 'widget_attr': 'camera_management_widget_instance'},
+    {'key': 'module_calculator_enabled', 'name': 'calculator', 'action_attr': 'calculator_module_action', 'widget_attr': 'calculator_module_widget_instance'} # Added Calculator module
 ]
 
 class ClientListItemWidget(QWidget):
@@ -352,6 +355,22 @@ class DocumentManager(QMainWindow):
         # User Management Page (always create, visibility of action controlled by RBAC)
         self.user_management_page_instance = UserManagementPage(current_user_info=self.current_user_info, parent=self)
         self.main_area_stack.addWidget(self.user_management_page_instance)
+
+        # Calculator Module
+        if self.module_states.get('calculator', True): # Default to True if not in DB settings yet
+            # Pass self as app_auth_manager (it holds current_user_info and can have methods)
+            # Pass AppSessionLocal_MW as db_session_factory
+            self.calculator_module_widget_instance = MainCalculatorWidget(
+                parent=self,
+                app_auth_manager=self, # DocumentManager can act as a source for user info
+                db_session_factory=AppSessionLocal_MW
+            )
+            self.main_area_stack.addWidget(self.calculator_module_widget_instance)
+            logging.info("DocumentManager: Calculator module widget instance created and added to stack.")
+        else:
+            self.calculator_module_widget_instance = None
+            logging.info("DocumentManager: Calculator module disabled, widget not created.")
+
 
         self.main_area_stack.setCurrentWidget(self.home_page_widget_instance) # Set Home Page as default view
         self.create_actions_main(); self.create_menus_main() # Menus and actions are created before _apply_permissions
@@ -940,10 +959,14 @@ class DocumentManager(QMainWindow):
         self.manage_users_action = QAction(QIcon(":/icons/users.svg"), self.tr("Gérer les Utilisateurs"), self)
         self.manage_users_action.triggered.connect(self.show_user_management_page) # Connect to show page method
 
+        # Action for Calculator Module
+        self.calculator_module_action = QAction(QIcon(":/icons/bar-chart.svg"), self.tr("Calculatrices"), self) # Placeholder icon
+        self.calculator_module_action.triggered.connect(self.show_calculator_module_view)
 
 
         # Populate searchable_actions_map
-        self.searchable_actions_map[self.tr("Accueil")] = self.home_action # Added Home action
+        self.searchable_actions_map[self.tr("Accueil")] = self.home_action
+        self.searchable_actions_map[self.tr("Calculatrices")] = self.calculator_module_action # Added Calculator action
         self.searchable_actions_map[self.tr("Paramètres")] = self.settings_action
         # self.searchable_actions_map[self.tr("Gérer les Modèles")] removed
         self.searchable_actions_map[self.tr("Gérer les Statuts")] = self.status_action
@@ -1084,7 +1107,7 @@ class DocumentManager(QMainWindow):
                                      P_ACCESS_RECRUITMENT_MODULE, P_ACCESS_EXPERIENCE_MODULE, \
                                      P_ACCESS_CALENDAR_MODULE, P_ACCESS_BOTPRESS_MODULE, \
                                      P_ACCESS_CARRIER_MAP_MODULE, P_ACCESS_CAMERA_MODULE, \
-                                     P_MANAGE_GLOBAL_PRODUCTS # For Product Management Page action
+                                     P_MANAGE_GLOBAL_PRODUCTS, P_ACCESS_CALCULATOR_MODULE # Added P_ACCESS_CALCULATOR_MODULE
 
         role_name = self.current_user_info.get('role_name') if self.current_user_info else None
         if not role_name: # Should not happen if login is enforced, but good for safety
@@ -1136,6 +1159,16 @@ class DocumentManager(QMainWindow):
              self.open_carrier_map_action.setVisible(has_permission(role_name, P_ACCESS_CARRIER_MAP_MODULE))
         if self.camera_management_action:
              self.camera_management_action.setVisible(has_permission(role_name, P_ACCESS_CAMERA_MODULE))
+
+        if hasattr(self, 'calculator_module_action') and self.calculator_module_action:
+            # To make it visible by default if module is enabled, and then add specific permission later:
+            # self.calculator_module_action.setVisible(self.module_states.get('calculator', False))
+            # To use a specific permission (P_ACCESS_CALCULATOR_MODULE must be defined in auth/permissions.py):
+            if 'P_ACCESS_CALCULATOR_MODULE' in locals() or 'P_ACCESS_CALCULATOR_MODULE' in globals(): # Check if defined
+                 self.calculator_module_action.setVisible(has_permission(role_name, P_ACCESS_CALCULATOR_MODULE))
+            else: # Fallback if P_ACCESS_CALCULATOR_MODULE is not defined: make visible if module is on
+                logging.warning("P_ACCESS_CALCULATOR_MODULE permission constant not found. Calculator module visibility based on module_states only.")
+                self.calculator_module_action.setVisible(self.module_states.get('calculator', False))
 
 
         # Main Buttons on Document View
@@ -1779,3 +1812,21 @@ class DocumentManager(QMainWindow):
             logging.error("UserManagementPage instance is None. Cannot show user management view.")
             QMessageBox.critical(self, self.tr("Erreur Critique"),
                                  self.tr("La page de gestion des utilisateurs n'a pas pu être chargée."))
+
+    def show_calculator_module_view(self):
+        """Switches the main stacked widget to display the Calculator module."""
+        if self.calculator_module_widget_instance:
+            # Pass/update auth_manager and db_session_factory if they can change or need to be set late
+            # For now, assuming they are set at __init__
+            if hasattr(self.calculator_module_widget_instance, 'app_auth_manager') and \
+               self.calculator_module_widget_instance.app_auth_manager is None:
+                self.calculator_module_widget_instance.app_auth_manager = self # Pass self as auth manager
+
+            # Potentially refresh history or user specific things if needed when view is shown
+            # if hasattr(self.calculator_module_widget_instance, 'refresh_on_display'):
+            #     self.calculator_module_widget_instance.refresh_on_display()
+
+            self.main_area_stack.setCurrentWidget(self.calculator_module_widget_instance)
+        else:
+            logging.warning("Calculator module widget instance is None. Cannot show view.")
+            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Calculatrices est désactivé ou non initialisé."))

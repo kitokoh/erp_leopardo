@@ -1,0 +1,303 @@
+/* calculator/styles/calculator_style.qss */
+
+/* Base style for the calculator module container */
+QWidget#MainCalculatorWidget {
+    background-color: #4A4A4A; /* Dark grey, like a calculator body */
+    border-radius: 10px; /* Rounded corners for the entire module */
+    padding: 5px;
+}
+
+/* --- Display Styles --- */
+QLineEdit#CalculatorDisplay {
+    background-color: #C8E6C9; /* Classic LCD green background */
+    color: #212121; /* Dark text, almost black */
+    border: 2px solid #757575; /* Darker grey border for inset look */
+    border-radius: 6px;
+    padding: 10px;
+    font-size: 28pt;
+    font-family: "Consolas", "Courier New", "Lucida Console", monospace; /* LCD-like font */
+    font-weight: bold;
+}
+
+QLabel#CalculatorExpressionDisplay {
+    color: #BDBDBD; /* Lighter grey for secondary display on dark background */
+    font-size: 11pt;
+    padding: 2px 8px 0px 8px; /* Top, Right, Bottom, Left */
+    background-color: transparent;
+    font-family: "Consolas", "Courier New", monospace;
+}
+
+/* --- General Button Styles for Calculators (Commercial & Scientific) --- */
+QWidget#CommercialCalculatorWidget QPushButton,
+QWidget#ScientificCalculatorWidget QPushButton {
+    border-width: 1px;
+    border-style: outset; /* Default outset for 3D feel */
+    border-color: #757575; /* Mid-grey border */
+    border-radius: 6px;   /* Rounded buttons */
+    padding: 12px 6px;
+    font-size: 13pt;
+    font-weight: bold;
+    color: #212121;
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FAFAFA, stop:1 #E0E0E0); /* Light grey gradient */
+    min-height: 40px;
+    min-width: 50px;
+    outline: none; /* Remove focus outline if not desired */
+}
+
+QWidget#CommercialCalculatorWidget QPushButton:hover,
+QWidget#ScientificCalculatorWidget QPushButton:hover {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FFFFFF, stop:1 #E8E8E8); /* Slightly lighter on hover */
+    border-color: #616161;
+}
+
+QWidget#CommercialCalculatorWidget QPushButton:pressed,
+QWidget#ScientificCalculatorWidget QPushButton:pressed {
+    background-color: #D6D6D6;
+    border-style: inset; /* Inset for pressed feel */
+    padding: 13px 5px 11px 7px; /* Adjust padding for inset effect */
+}
+
+/* --- Number Buttons (0-9, .) --- */
+QPushButton[objectName="calcNumButton"],
+QPushButton[objectName="calcDotButton"] {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FFFFFF, stop:1 #F0F0F0); /* Whiter gradient */
+    color: #1c1c1c;
+    font-size: 14pt;
+}
+
+/* --- Operator Buttons (+, -, *, /) --- */
+QPushButton[objectName="calcOperatorButton"] {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #E0E0E0, stop:1 #CACACA); /* Slightly darker grey */
+    color: #1c1c1c;
+    font-size: 15pt;
+}
+
+/* --- Equals Button (=) --- */
+QPushButton[objectName="calcEqualsButton"] {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FF9800, stop:1 #F57C00); /* Vibrant Orange */
+    color: #FFFFFF;
+    font-size: 16pt;
+    border-color: #E65100; /* Darker orange border */
+}
+QPushButton[objectName="calcEqualsButton"]:hover {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FFA726, stop:1 #FB8C00);
+}
+QPushButton[objectName="calcEqualsButton"]:pressed {
+    background-color: #F57C00;
+}
+
+/* --- Clear Button (C, AC, CE, Backspace) --- */
+QPushButton[objectName="calcClearButton"] {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #EF5350, stop:1 #D32F2F); /* Red gradient */
+    color: #FFFFFF;
+    border-color: #C62828; /* Darker red border */
+}
+QPushButton[objectName="calcClearButton"]:hover {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #E57373, stop:1 #E53935);
+}
+QPushButton[objectName="calcClearButton"]:pressed {
+    background-color: #D32F2F;
+}
+
+/* --- Memory Buttons (M+, M-, MR, MC) & Other Function Buttons --- */
+QPushButton[objectName="calcMemoryButton"],
+QPushButton[objectName="calcFunctionButton"] {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #B0BEC5, stop:1 #90A4AE); /* Blue-grey */
+    color: #FFFFFF;
+    border-color: #607D8B;
+}
+QPushButton[objectName="calcMemoryButton"]:hover,
+QPushButton[objectName="calcFunctionButton"]:hover {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #B0BEC5, stop:1 #78909C);
+}
+QPushButton[objectName="calcMemoryButton"]:pressed,
+QPushButton[objectName="calcFunctionButton"]:pressed {
+    background-color: #78909C;
+}
+
+/* --- Scientific Function Buttons (sin, cos, log, sqrt, etc.) --- */
+QPushButton[objectName="calcSciFunctionButton"] {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #757575, stop:1 #616161); /* Darker grey */
+    color: #FFFFFF;
+    font-size: 11pt;
+    padding: 10px 3px; /* Adjust padding for potentially longer text */
+    border-color: #424242;
+}
+QPushButton[objectName="calcSciFunctionButton"]:hover {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #616161, stop:1 #424242);
+}
+QPushButton[objectName="calcSciFunctionButton"]:pressed {
+    background-color: #424242;
+}
+
+/* Specific for Inv button if active */
+QPushButton#sciInvButton[objectName="calcSciFunctionButton"] { /* Target sciInvButton when it's also a calcSciFunctionButton */
+    /* Normal state is covered by calcSciFunctionButton */
+}
+QPushButton#sciInvButton:checked { /* Use :checked pseudo-state if button is checkable */
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #5C6BC0, stop:1 #3F51B5); /* Indigo when active */
+    border-color: #303F9F;
+    color: #FFFFFF;
+}
+/* If not checkable, this might need dynamic property in Python + QSS like QPushButton[invActive="true"] */
+
+
+/* --- Styles for other calculator types --- */
+
+/* Cylinder Calculator */
+QWidget#CylinderCalculatorWidget {
+    background-color: #CFD8DC; /* Lighter, slightly bluish grey body */
+    padding: 10px;
+    border-radius: 6px;
+}
+QWidget#CylinderCalculatorWidget QGroupBox {
+    background-color: #ECEFF1;
+    border: 1px solid #B0BEC5;
+    border-radius: 6px;
+    margin-top: 1em; /* QGroupBox default is 1.5ex, adjust as needed */
+    padding: 10px;
+}
+QWidget#CylinderCalculatorWidget QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top center;
+    padding: 0 8px;
+    color: #37474F;
+    font-weight: bold;
+    background-color: transparent; /* Title bg transparent relative to groupbox */
+}
+QWidget#CylinderCalculatorWidget QLabel {
+    font-weight: normal;
+    color: #37474F;
+    padding: 4px 2px;
+    background-color: transparent;
+}
+QWidget#CylinderCalculatorWidget QLineEdit {
+    background-color: #FFFFFF;
+    border: 1px solid #90A4AE;
+    border-radius: 4px;
+    padding: 7px; /* Slightly more padding */
+    font-size: 11pt;
+}
+QWidget#CylinderCalculatorWidget QPushButton#calculateCylinderButton {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #29B6F6, stop:1 #0288D1); /* Light Blue gradient */
+    color: white;
+    font-size: 13pt;
+    font-weight: bold;
+    padding: 10px 15px;
+    border: 1px solid #01579B;
+    border-radius: 5px;
+}
+QWidget#CylinderCalculatorWidget QPushButton#calculateCylinderButton:hover {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #4FC3F7, stop:1 #0277BD);
+}
+QWidget#CylinderCalculatorWidget QPushButton#calculateCylinderButton:pressed {
+    background-color: #0277BD;
+}
+QWidget#CylinderCalculatorWidget QLabel[objectName="cylinderResultLabel"] {
+    font-weight: 500; /* Slightly bolder for results */
+    padding: 6px;
+    background-color: #FFFFFF;
+    border-radius: 4px;
+    border: 1px solid #B0BEC5;
+    font-size: 11pt;
+    color: #0D47A1; /* Darker blue for result text */
+}
+QWidget#CylinderCalculatorWidget QLabel#bucklingWarningLabel {
+    color: #FFFFFF;
+    font-weight: bold;
+    font-size: 10pt;
+    background-color: #D32F2F; /* Red background for warning */
+    padding: 6px;
+    border-radius: 4px;
+    border: 1px solid #C62828;
+    text-align: center; /* May not work on QLabel, set alignment in code */
+}
+
+/* Unit Converter */
+QWidget#UnitConverterCalculatorWidget {
+    background-color: #E0E0E0; /* Grey background, similar to a physical device */
+    padding: 15px;
+    border-radius: 6px;
+}
+QWidget#UnitConverterCalculatorWidget QLabel { /* General labels in unit converter */
+    font-size: 11pt;
+    color: #333333;
+    margin-bottom: 3px;
+    background-color: transparent;
+}
+QWidget#UnitConverterCalculatorWidget QComboBox {
+    font-size: 11pt;
+    padding: 7px;
+    border: 1px solid #9E9E9E;
+    border-radius: 4px;
+    background-color: white;
+    min-height: 32px; /* Consistent height */
+}
+QWidget#UnitConverterCalculatorWidget QLineEdit {
+    font-size: 12pt;
+    padding: 7px;
+    border: 1px solid #9E9E9E;
+    border-radius: 4px;
+}
+QWidget#UnitConverterCalculatorWidget QLineEdit#toValueDisplayUnitConverter { /* Read-only result field */
+    background-color: #F5F5F5; /* Slightly off-white for read-only display */
+    font-weight: bold;
+}
+QWidget#UnitConverterCalculatorWidget QLabel#unitConverterEqualsLabel {
+    font-size: 24pt;
+    font-weight: bold;
+    color: #424242; /* Dark grey for equals */
+    padding: 0 12px;
+}
+
+/* History Display Dialog */
+QDialog#HistoryDisplayDialog {
+    background-color: #ECEFF1; /* Light grey for dialog background */
+}
+QDialog#HistoryDisplayDialog QTextEdit#historyTextEdit {
+    background-color: #FFFFFF;
+    border: 1px solid #CFD8DC;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 10pt;
+    color: #37474F;
+    padding: 5px;
+}
+QDialog#HistoryDisplayDialog QPushButton { /* General buttons in history dialog */
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #90A4AE, stop:1 #607D8B); /* Blue-grey */
+    color: white;
+    padding: 8px 15px;
+    font-size: 10pt;
+    border: 1px solid #546E7A;
+    border-radius: 4px;
+}
+QDialog#HistoryDisplayDialog QPushButton:hover {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #78909C, stop:1 #546E7A);
+}
+QDialog#HistoryDisplayDialog QPushButton:pressed {
+    background-color: #546E7A;
+}
+
+/* Main Calculator Widget UI elements (selector, history button) */
+QWidget#MainCalculatorWidget QComboBox#calculatorSelectorCombo {
+    font-size: 11pt;
+    padding: 7px;
+    border: 1px solid #757575; /* Darker border to stand out on dark bg */
+    border-radius: 5px;
+    background-color: #E0E0E0; /* Light grey */
+    color: #212121;
+    min-height: 30px;
+}
+QWidget#MainCalculatorWidget QPushButton#historyButton {
+    font-size: 11pt;
+    padding: 7px 12px;
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #9E9E9E, stop:1 #757575); /* Mid Grey */
+    color: #FFFFFF;
+    border: 1px solid #616161;
+    border-radius: 5px;
+}
+QWidget#MainCalculatorWidget QPushButton#historyButton:hover {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #757575, stop:1 #616161);
+}
+QWidget#MainCalculatorWidget QPushButton#historyButton:pressed {
+    background-color: #616161;
+}
