@@ -152,9 +152,29 @@ def verify_password(hashed_password: str, provided_password: str) -> bool:
     Verifies a provided password against a stored hash.
     Internal helper, typically not called directly from outside for login.
     Uses the verify_password function imported from utils.py (which uses passlib).
+    Now returns a tuple: (bool_verified, new_hash_if_updated_or_None)
     """
-    # return check_password_hash(hashed_password, provided_password) # Replaced by utils.verify_password
-    return verify_password(provided_password, hashed_password) # Note the argument order for utils.verify_password
+    # The function signature in utils.verify_password is (plain_password, hashed_password)
+    # So, the call should be utils.verify_password(provided_password, hashed_password)
+    return verify_password(provided_password, hashed_password) # Corrected argument order from previous step if it was wrong
+
+@_manage_conn
+def _update_user_password_hash_only(user_id: str, new_hashed_password: str, conn: sqlite3.Connection = None) -> bool:
+    """Updates only the hashed_password and updated_at for a user. Internal use for hash upgrades."""
+    now = datetime.utcnow().isoformat() + "Z"
+    sql = "UPDATE Users SET hashed_password = ?, updated_at = ? WHERE user_id = ?"
+    try:
+        cursor = conn.cursor()
+        cursor.execute(sql, (new_hashed_password, now, user_id))
+        # conn.commit() # Handled by _manage_conn decorator
+        if cursor.rowcount > 0:
+            logger.info(f"Password hash upgraded and updated in DB for user ID '{user_id}'.")
+            return True
+        return False # Should not happen if user_id is valid
+    except sqlite3.Error as e:
+        logger.error(f"Database error updating password hash for user ID '{user_id}': {e}", exc_info=True)
+        return False
+
 
 @_manage_conn
 def verify_user_password(username: str, password: str, conn: sqlite3.Connection = None) -> dict | None:
@@ -179,10 +199,23 @@ def verify_user_password(username: str, password: str, conn: sqlite3.Connection 
             logger.error(f"User record for {username} is missing 'hashed_password'. Cannot verify.")
             return None
 
-        if verify_password(user['hashed_password'], password):
+        # verify_password (the internal one) now calls utils.verify_password which returns a tuple
+        verified, new_hash = verify_password(user['hashed_password'], password)
+
+        if verified:
             logger.info(f"Password verification successful for user: {username}")
             # Update last login time
-            record_login_time(user['user_id'], conn=conn) # record_login_time is also decorated
+            record_login_time(user['user_id'], conn=conn)
+
+            # If the hash was upgraded (old scheme), update it in the DB
+            if new_hash:
+                logger.info(f"Password hash for user '{username}' needs upgrade. New hash: {new_hash[:20]}...") # Log only part of hash
+                if _update_user_password_hash_only(user['user_id'], new_hash, conn=conn):
+                    logger.info(f"Successfully upgraded password hash for user '{username}'.")
+                else:
+                    logger.error(f"Failed to upgrade password hash for user '{username}' in database.")
+                    # Depending on policy, this could be a critical error, but login can still proceed.
+
             return user  # Return the full user dictionary
         else:
             logger.warning(f"Password verification failed for user: {username}")

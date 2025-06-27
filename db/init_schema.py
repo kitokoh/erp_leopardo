@@ -2099,6 +2099,22 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     print("DEBUG_INIT_DB: Indexes for Company Expense and Facture tables created or already exist.")
     # --- End Company Expense Module Tables and Indexes ---
 
+    # --- UserSavedFilters Table (Added for filter saving functionality) ---
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS user_saved_filters (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        filter_name TEXT NOT NULL,
+        filter_parameters_json TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE,
+        UNIQUE (user_id, filter_name)
+    )
+    """)
+    print("DEBUG_INIT_DB: Table user_saved_filters created or exists.")
+    # --- End UserSavedFilters Table ---
+
     # Commit schema changes made via raw SQLite connection before proceeding to SQLAlchemy part
     try:
         logging.info("DEBUG_INIT_DB: Committing main schema/index changes before accounting module DDL.")

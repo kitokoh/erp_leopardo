@@ -368,9 +368,11 @@ class StatisticsDashboard(QWidget):
                 logging.error(f"GeoJSON file not found at: {geojson_path}")
             error_message = self.tr("Les données géographiques de la carte (GeoJSON) sont introuvables. La carte ne peut pas être affichée. Veuillez vérifier l'installation de l'application ou contacter le support.")
             self._set_map_error_html(error_message)
+
                 return
 
             m = folium.Map(location=[20, 0], zoom_start=2, tiles="CartoDB positron")
+            clients_by_country_counts = get_client_counts_by_country()
 
         try:
             clients_by_country_counts = get_client_counts_by_country()
@@ -379,6 +381,7 @@ class StatisticsDashboard(QWidget):
             error_message = self.tr("Erreur de récupération des données statistiques pour la carte : {error_details}. L'affichage de la carte est indisponible.").format(error_details=str(db_exc))
             self._set_map_error_html(error_message)
             return
+
 
 
             if clients_by_country_counts:
@@ -525,6 +528,7 @@ class StatisticsDashboard(QWidget):
             logging.info(f"Displayed error HTML in map_view: {message}")
         else:
             logging.error("StatisticsDashboard: self.map_view is None. Cannot display error message in map_view.")
+
 
     # --- Methods to be ported from CollapsibleStatisticsWidget ---
     def update_global_stats(self):

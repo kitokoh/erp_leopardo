@@ -96,6 +96,323 @@ Les modèles de données sont définis dans le dossier `db/models/`. Chaque fich
 *   **Foreign Keys**: Les relations sont établies à l'aide de clés étrangères (par exemple, `invoice.client_id` référence `clients.id`).
 *   **Cascading**: Des règles de suppression ou de mise à jour en cascade peuvent être définies au niveau de l'ORM ou de la base de données pour maintenir l'intégrité référentielle.
 
+### 4.1. Diagramme ER Simplifié : Clients et Entités Liées
+
+```mermaid
+erDiagram
+    CLIENTS {
+        string id PK
+        string nom
+        string societe
+        string email
+        string telephone
+        string adresse_facturation
+        string siret
+        string code_tva
+        string notes
+    }
+    CONTACTS {
+        string id PK
+        string client_id FK
+        string nom
+        string prenom
+        string email
+        string telephone
+        string fonction
+    }
+    CLIENT_DOCUMENTS {
+        string id PK
+        string client_id FK
+        string document_nom
+        string document_chemin
+        date date_creation
+    }
+    CLIENT_ASSIGNED_PERSONNEL {
+        string client_id FK
+        string user_id FK
+        string role_assignation
+    }
+    USERS {
+        string id PK
+        string username
+        string nom_complet
+    }
+    LOCATIONS {
+        string id PK
+        string client_id FK "peut avoir plusieurs"
+        string adresse
+        string ville
+        string code_postal
+        string pays
+        bool is_default_shipping
+        bool is_default_billing
+    }
+
+    CLIENTS ||--o{ CONTACTS : "possède"
+    CLIENTS ||--o{ CLIENT_DOCUMENTS : "a"
+    CLIENTS ||--o{ LOCATIONS : "a_des_adresses"
+    CLIENTS }o--o{ CLIENT_ASSIGNED_PERSONNEL : "est_assigné_à"
+    USERS ||--o{ CLIENT_ASSIGNED_PERSONNEL : "est_assigné_sur"
+
+```
+*(Note: Ce diagramme est une simplification. Les noms exacts des champs et toutes les relations peuvent varier. `LOCATIONS` est inclus ici comme exemple d'adresses multiples pour un client.)*
+
+### 4.2. Diagramme ER Simplifié : Produits et Stock
+
+```mermaid
+erDiagram
+    PRODUCTS {
+        string id PK
+        string nom
+        string reference
+        string description
+        float prix_vente
+        string unite_mesure
+        string categorie_id FK
+    }
+    PRODUCT_CATEGORIES {
+        string id PK
+        string nom_categorie
+    }
+    PRODUCT_MEDIA_LINKS {
+        string product_id FK
+        string media_item_id FK
+        string type_lien "ex: image_principale, fiche_technique"
+    }
+    MEDIA_ITEMS {
+        string id PK
+        string nom_fichier
+        string chemin_fichier
+        string type_mime
+    }
+    INTERNAL_STOCK_ITEMS {
+        string id PK
+        string product_id FK
+        int quantite_actuelle
+        string item_location_id FK
+        date date_derniere_modif
+    }
+    ITEM_LOCATIONS {
+        string id PK
+        string nom_emplacement "ex: Entrepôt A, Étagère B2"
+        string description
+    }
+
+    PRODUCTS ||--|{ PRODUCT_CATEGORIES : "appartient_à"
+    PRODUCTS ||--o{ PRODUCT_MEDIA_LINKS : "a_des_medias"
+    MEDIA_ITEMS ||--o{ PRODUCT_MEDIA_LINKS : "est_lié_via"
+    PRODUCTS ||--o{ INTERNAL_STOCK_ITEMS : "a_du_stock"
+    ITEM_LOCATIONS ||--o{ INTERNAL_STOCK_ITEMS : "localise_stock"
+```
+*(Note: Ce diagramme est une simplification. La gestion des prix d'achat, fournisseurs par défaut, ou variantes de produits ne sont pas explicitement montrés ici mais pourraient exister.)*
+
+### 4.3. Diagramme ER Simplifié : Documents Commerciaux (Factures/Proformas)
+
+```mermaid
+erDiagram
+    INVOICES {
+        string id PK
+        string numero_facture
+        string client_id FK
+        date date_emission
+        date date_echeance
+        float montant_ht
+        float montant_tva
+        float montant_ttc
+        string statut "Brouillon, Envoyée, Payée, Annulée"
+        string notes
+        string proforma_id FK "origine si convertie"
+    }
+    PROFORMA_INVOICES {
+        string id PK
+        string numero_proforma
+        string client_id FK
+        date date_emission
+        date date_validite
+        float montant_ht
+        float montant_tva
+        float montant_ttc
+        string statut "Brouillon, Envoyée, Acceptée, Refusée, Convertie"
+    }
+    DOCUMENT_LINES {
+        string id PK
+        string document_id FK "id de INVOICES ou PROFORMA_INVOICES"
+        string document_type "INVOICE ou PROFORMA"
+        string product_id FK
+        string description_ligne
+        int quantite
+        float prix_unitaire_ht
+        float taux_tva
+        float montant_ligne_ht
+    }
+    CLIENTS {
+        string id PK
+        string nom_societe
+    }
+    PRODUCTS {
+        string id PK
+        string nom_produit
+    }
+    PAYMENTS {
+        string id PK
+        string invoice_id FK
+        date date_paiement
+        float montant_paye
+        string mode_paiement
+        string reference_paiement
+    }
+
+    CLIENTS ||--o{ INVOICES : "reçoit"
+    CLIENTS ||--o{ PROFORMA_INVOICES : "reçoit"
+    INVOICES ||--o{ DOCUMENT_LINES : "contient"
+    PROFORMA_INVOICES ||--o{ DOCUMENT_LINES : "contient"
+    PRODUCTS ||--o{ DOCUMENT_LINES : "est_détaillé_dans"
+    PROFORMA_INVOICES }o--|| INVOICES : "peut_être_convertie_en"
+    INVOICES ||--o{ PAYMENTS : "reçoit_des"
+```
+*(Note: Simplification. Les aspects comme les adresses de facturation/livraison spécifiques au document, les taxes multiples, ou les conditions de paiement détaillées ne sont pas tous montrés.)*
+
+### 4.4. Diagramme ER Simplifié : Gestion de Projet
+
+```mermaid
+erDiagram
+    PROJECTS {
+        string id PK
+        string nom_projet
+        string description
+        string client_id FK
+        string chef_projet_id FK "user_id"
+        date date_debut
+        date date_fin_prevue
+        string statut
+    }
+    TASKS {
+        string id PK
+        string project_id FK
+        string nom_tache
+        string description
+        string responsable_id FK "user_id"
+        date date_echeance
+        string statut_tache
+        int priorite
+    }
+    MILESTONES {
+        string id PK
+        string project_id FK
+        string nom_jalon
+        date date_cible
+        string statut_jalon
+    }
+    PROJECT_FILES {
+        string id PK
+        string project_id FK
+        string media_item_id FK
+        string nom_fichier_projet
+        date date_upload
+    }
+    PROJECT_LOGS {
+        string id PK
+        string project_id FK
+        timestamp date_log
+        string user_id FK
+        string action_effectuee
+    }
+    CLIENTS {
+        string id PK
+        string nom_client
+    }
+    USERS {
+        string id PK
+        string nom_utilisateur
+    }
+    MEDIA_ITEMS {
+        string id PK
+        string nom_media
+    }
+
+    CLIENTS ||--o{ PROJECTS : "a_pour"
+    USERS ||--o{ PROJECTS : "gère_comme_chef_de_projet"
+    PROJECTS ||--o{ TASKS : "contient"
+    USERS ||--o{ TASKS : "est_responsable_de"
+    PROJECTS ||--o{ MILESTONES : "a"
+    PROJECTS ||--o{ PROJECT_FILES : "a_des_fichiers"
+    MEDIA_ITEMS ||--o{ PROJECT_FILES : "est_lié_via"
+    PROJECTS ||--o{ PROJECT_LOGS : "a_un_journal_de"
+    USERS ||--o{ PROJECT_LOGS : "effectue_action_sur"
+```
+*(Note: Ce diagramme est une simplification. Les dépendances entre tâches, l'assignation de multiples membres d'équipe à un projet/tâche, ou le suivi budgétaire ne sont pas montrés.)*
+
+### 4.5. Diagramme ER Simplifié : Recrutement
+
+```mermaid
+erDiagram
+    JOB_OPENINGS {
+        string id PK
+        string titre_poste
+        string description
+        string departement
+        date date_publication
+        string statut_offre "Ouvert, Clos"
+    }
+    RECRUITMENT_STEPS {
+        string id PK
+        string job_opening_id FK
+        string nom_etape
+        int ordre_etape
+    }
+    CANDIDATES {
+        string id PK
+        string nom
+        string prenom
+        string email
+        string telephone
+        string cv_chemin_fichier
+    }
+    CANDIDATE_APPLICATIONS {
+        string candidate_id FK
+        string job_opening_id FK
+        date date_application
+        string source_candidature
+    }
+    RECRUITMENT_CANDIDATE_PROGRESS {
+        string id PK
+        string candidate_application_id FK "Composite FK to CANDIDATE_APPLICATIONS"
+        string step_id FK
+        string statut_etape "En attente, En cours, Validé, Rejeté"
+        date date_changement_statut
+        string notes_evaluateur
+    }
+    INTERVIEWS {
+        string id PK
+        string candidate_application_id FK "Composite FK to CANDIDATE_APPLICATIONS"
+        date date_entretien
+        string type_entretien "Téléphonique, RH, Technique"
+        string statut_entretien "Planifié, Réalisé, Annulé"
+        string feedback_evaluateur
+    }
+    USERS {
+        string id PK
+        string nom_utilisateur
+    }
+    INTERVIEW_ATTENDEES {
+        string interview_id FK
+        string user_id FK "interviewer"
+    }
+
+
+    JOB_OPENINGS ||--o{ RECRUITMENT_STEPS : "définit_les_étapes_de"
+    JOB_OPENINGS ||--o{ CANDIDATE_APPLICATIONS : "reçoit_des"
+    CANDIDATES ||--o{ CANDIDATE_APPLICATIONS : "postule_via"
+    CANDIDATE_APPLICATIONS ||--o{ RECRUITMENT_CANDIDATE_PROGRESS : "progresse_à_travers"
+    RECRUITMENT_STEPS ||--o{ RECRUITMENT_CANDIDATE_PROGRESS : "est_une_étape_de"
+    CANDIDATE_APPLICATIONS ||--o{ INTERVIEWS : "a_des"
+    INTERVIEWS ||--o{ INTERVIEW_ATTENDEES : "a_comme_participants"
+    USERS ||--o{ INTERVIEW_ATTENDEES : "participe_à"
+
+```
+*(Note: Ce diagramme est une simplification. La liaison des documents CV/LM directement à `CANDIDATES` est une simplification ; une table `CANDIDATE_DOCUMENTS` serait plus flexible. `CANDIDATE_APPLICATIONS` est introduite pour gérer le fait qu'un candidat peut postuler à plusieurs offres.)*
+
+
 ## 5. Couche d'Accès aux Données (CRUDs)
 
 *   Le dossier `db/cruds/` contient des modules Python chacun étant dédié aux opérations CRUD (Create, Read, Update, Delete) pour une ou plusieurs tables/modèles.

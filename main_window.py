@@ -141,6 +141,7 @@ from db.cruds import user_saved_filters_crud # Import for saved filters
 
 from calendar_module.calendar_widget import CalendarWidget # Import CalendarWidget
 from user_management.page import UserManagementPage # Import UserManagementPage
+
 from calculator.main_calculator_widget import MainCalculatorWidget # Import Calculator Widget
 # from db.connection import SessionLocal as AppSessionLocal_MW # Import SessionLocal for calculator
 from user_management.user_menu_button import UserMenuButton # Import UserMenuButton
@@ -986,7 +987,9 @@ class DocumentManager(QMainWindow):
 
         self.settings_action = QAction(QIcon(":/icons/modern/settings.svg"), self.tr("Paramètres"), self); self.settings_action.triggered.connect(self.show_settings_page) # Changed to show_settings_page
         # self.template_action removed
-        self.status_action = QAction(QIcon(":/icons/check-square.svg"), self.tr("Gérer les Statuts"), self); self.status_action.triggered.connect(self.open_status_management_dialog_slot); self.status_action.setEnabled(False); self.status_action.setToolTip(self.tr("Fonctionnalité de gestion des statuts prévue pour une future version."))
+        self.status_action = QAction(QIcon(":/icons/check-square.svg"), self.tr("Gérer les Statuts"), self); self.status_action.triggered.connect(self.open_status_management_dialog_slot)
+        # self.status_action.setEnabled(False); # No longer hard-disabled
+        # self.status_action.setToolTip(self.tr("Fonctionnalité de gestion des statuts prévue pour une future version.")) # Tooltip removed
         self.exit_action = QAction(QIcon(":/icons/log-out.svg"), self.tr("Quitter"), self); self.exit_action.setShortcut("Ctrl+Q"); self.exit_action.triggered.connect(self.close)
         self.project_management_action = QAction(QIcon(":/icons/dashboard.svg"), self.tr("Gestion de Projet"), self); self.project_management_action.triggered.connect(self.show_project_management_view)
         self.documents_view_action = QAction(QIcon(":/icons/modern/folder-docs.svg"), self.tr("Gestion Documents"), self); self.documents_view_action.triggered.connect(self.show_documents_view)
@@ -1174,7 +1177,7 @@ class DocumentManager(QMainWindow):
                                      P_ACCESS_RECRUITMENT_MODULE, P_ACCESS_EXPERIENCE_MODULE, \
                                      P_ACCESS_CALENDAR_MODULE, P_ACCESS_BOTPRESS_MODULE, \
                                      P_ACCESS_CARRIER_MAP_MODULE, P_ACCESS_CAMERA_MODULE, \
-                                     P_MANAGE_GLOBAL_PRODUCTS, P_ACCESS_CALCULATOR_MODULE # Added P_ACCESS_CALCULATOR_MODULE
+                                     P_MANAGE_GLOBAL_PRODUCTS, P_ACCESS_CALCULATOR_MODULE, P_MANAGE_STATUSES # Added P_MANAGE_STATUSES
 
         role_name = self.current_user_info.get('role_name') if self.current_user_info else None
         if not role_name: # Should not happen if login is enforced, but good for safety
@@ -1187,8 +1190,8 @@ class DocumentManager(QMainWindow):
 
         # Menu Actions
         self.settings_action.setEnabled(is_admin_or_similar)
-        # self.status_action is currently hard-disabled with a tooltip. If it becomes a feature:
-        # self.status_action.setEnabled(has_permission(role_name, P_MANAGE_STATUSES))
+        if hasattr(self, 'status_action'): # Check if status_action exists
+            self.status_action.setEnabled(has_permission(role_name, P_MANAGE_STATUSES))
 
         # Admin Menu visibility
         self.admin_menu.menuAction().setVisible(has_permission(role_name, P_MANAGE_USERS)) # Hide/show whole menu

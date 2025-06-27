@@ -3,6 +3,7 @@ import logging
 from PyQt5.QtWidgets import QPushButton, QMenu, QAction, QLabel, QWidgetAction, QApplication, QMessageBox
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, pyqtSignal, QPoint # Import QPoint
+
 from PyQt5.QtCore import Qt, pyqtSignal
 
 from auth.permissions import has_permission, P_MANAGE_USERS

@@ -1232,6 +1232,7 @@ QPushButton#userMenuButton:hover {
     background-color: #E0E0E0; /* Light grey hover */
 }
 
+
 QPushButton#userMenuButton:pressed {
     background-color: #CFD8DC; /* Slightly darker grey when pressed */
 }
