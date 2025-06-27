@@ -242,3 +242,36 @@ def generate_pdf_for_document(source_file_path: str, client_info: dict, app_root
 # For load_config, it now explicitly takes app_root_dir.
 # populate_docx_template does not seem to need APP_ROOT_DIR directly.
 # save_config and get_config_file_path/get_config_dir are self-contained.
+
+# --- Password Hashing Utilities ---
+from passlib.context import CryptContext
+
+# Setup CryptContext - this should ideally be done once per application
+# Using bcrypt as it's specified in requirements.txt (passlib[bcrypt])
+# Deprecated algorithms can be added if migrating from older hashes.
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto"
+)
+
+def hash_password(password: str) -> str:
+    """Hashes a password using the configured context."""
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> tuple[bool, str | None]:
+    """
+    Verifies a plain password against a hashed one and checks if the hash should be updated.
+
+    Returns:
+        tuple[bool, str | None]: (is_verified, new_hash_if_needed_or_None)
+    """
+    try:
+        # verify_and_update returns (verified, new_hash_or_None)
+        # new_hash_or_None is None if the hash is already in the default format.
+        # It's a new hash string if the old hash was valid but used a deprecated scheme.
+        verified, new_hash = pwd_context.verify_and_update(plain_password, hashed_password)
+        return verified, new_hash
+    except Exception as e:
+        # Log unexpected errors during verification, e.g., malformed hash, unknown scheme
+        logging.error(f"Error verifying password or during hash update check: {e}", exc_info=True)
+        return False, None # Return False and no new hash on error
