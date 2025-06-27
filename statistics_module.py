@@ -159,6 +159,8 @@ class StatisticsDashboard(QWidget):
             logging.info("StatisticsDashboard: MapInteractionHandler and QWebChannel set up.")
 
         self.refresh_all_dashboard_content()
+        # Removed diagnostic logging from the end of this method
+
 
     @pyqtSlot(str)
     def _on_map_country_clicked(self, country_name):
@@ -360,169 +362,83 @@ class StatisticsDashboard(QWidget):
     def update_map(self):
         logging.info("Updating interactive map...")
         try:
-            # Fetch data for choropleth
-            clients_by_country_counts = get_client_counts_by_country()
-
-            data_for_map = {"country_name": [], "client_count": []}
-            if clients_by_country_counts:
-                for entry in clients_by_country_counts:
-                    data_for_map["country_name"].append(entry["country_name"])
-                    data_for_map["client_count"].append(entry["client_count"])
-
             geojson_path = os.path.join(APP_ROOT_DIR, "assets", "world_countries.geojson")
 
             if not os.path.exists(geojson_path):
                 logging.error(f"GeoJSON file not found at: {geojson_path}")
                 m = folium.Map(location=[20,0], zoom_start=2)
                 folium.Marker([0,0], popup="Error: GeoJSON file for map not found.").add_to(m)
-                self.map_view.setHtml(m.get_root().render())
+                if self.map_view:
+                    self.map_view.setHtml(m.get_root().render())
                 return
 
             m = folium.Map(location=[20, 0], zoom_start=2, tiles="CartoDB positron")
+            clients_by_country_counts = get_client_counts_by_country()
 
-            if clients_by_country_counts: # Check if there's any data
+            if clients_by_country_counts:
                 counts_dict = {item['country_name']: item['client_count'] for item in clients_by_country_counts}
                 max_observed_clients = max(item['client_count'] for item in clients_by_country_counts) if clients_by_country_counts else 0
-
-                category_colors = ['#f7f7f7', '#c6dbef', '#6baed6', '#08519c'] # Light Grey, Light Blue, Medium Blue, Dark Blue
-                color_index = [0, 1, 2, 4] # Min value for each color category (0, 1, 2-3, 4+)
-
-                client_colormap = StepColormap(
-                    colors=category_colors,
-                    index=color_index,
-                    vmin=0,
-                    vmax=max(4, max_observed_clients),
-                    caption=self.tr("Nombre de Clients par Pays (Catégories)")
-                )
-
+                category_colors = ['#f7f7f7', '#c6dbef', '#6baed6', '#08519c']
+                color_index = [0, 1, 2, 4]
+                client_colormap = StepColormap(colors=category_colors, index=color_index, vmin=0, vmax=max(4, max_observed_clients), caption=self.tr("Nombre de Clients par Pays (Catégories)"))
                 def style_function(feature):
-                    count = counts_dict.get(feature['properties']['name'], 0) # Default to 0 if country not in data
-                    return {
-                        'fillColor': client_colormap(count),
-                        'color': '#555555', # Border color for countries
-                        'weight': 0.5,
-                        'fillOpacity': 0.7
-                    }
-
-                if os.path.exists(geojson_path):
-                    folium.GeoJson(
-                        geojson_path,
-                        name=self.tr("Distribution des Clients par Pays"),
-                        style_function=style_function,
-                        tooltip=folium.features.GeoJsonTooltip(
-                            fields=['name'], # Show country name on hover
-                            aliases=[self.tr('Pays:')], # Use self.tr for alias
-                            localize=True
-                        )
-                    ).add_to(m)
-                    client_colormap.add_to(m) # Add legend to map
-                else:
-                    logging.warning(f"GeoJSON file not found at {geojson_path}, choropleth layer skipped.")
+                    count = counts_dict.get(feature['properties']['name'], 0)
+                    return {'fillColor': client_colormap(count), 'color': '#555555', 'weight': 0.5, 'fillOpacity': 0.7}
+                folium.GeoJson(geojson_path, name=self.tr("Distribution des Clients par Pays"), style_function=style_function, tooltip=folium.features.GeoJsonTooltip(fields=['name'], aliases=[self.tr('Pays:')], localize=True)).add_to(m)
+                client_colormap.add_to(m)
             else:
-                logging.info("No client count data to display on map for choropleth/GeoJson coloring.")
+                folium.GeoJson(geojson_path, name=self.tr("Pays (Base)"), tooltip=folium.features.GeoJsonTooltip(fields=['name'], aliases=[self.tr('Pays:')])).add_to(m)
+                logging.info("StatisticsDashboard: No client count data. Added basic GeoJSON layer for choropleth.")
 
-            # The folium.GeoJson layer with style_function (defined earlier) already handles
-            # the country coloring and adds the client_colormap to the map.
-            # The separate folium.Choropleth call that was here previously was redundant
-            # for coloring purposes if the GeoJson layer is active with its style_function.
-            # If data_for_map was used for something else, that logic would need to be preserved,
-            # but it was primarily for the redundant Choropleth.
-
-            # Fetch active client data for interactive markers/popups
-            # This is a simplified version; in DocumentManager it's get_active_clients_per_country
-            # For StatisticsDashboard, we might just use the same get_client_counts_by_country data
-            # or fetch more detailed client data if we want to plot individual clients (can be slow).
-            # For now, the popups will focus on country interaction.
-
-            # Interactive popups for countries
             popup_layer = folium.GeoJson(
                 geojson_path,
                 name=self.tr("Informations Pays"),
                 style_function=lambda x: {'fillColor':'transparent', 'color':'transparent', 'weight':0},
-                tooltip=None # Disable default tooltip for this layer if choropleth provides enough
+                tooltip=None
             )
 
-            js_script_content = ""
             for feature in popup_layer.data.get('features', []):
                 country_name = feature.get('properties', {}).get('name', 'N/A')
                 if country_name == 'N/A': continue
-
                 country_client_count = next((item['client_count'] for item in clients_by_country_counts if item['country_name'] == country_name), 0)
-
                 popup_html = f"<b>{country_name}</b><br>"
                 popup_html += f"{self.tr('Clients (Total)')}: {country_client_count}<br><hr>"
-
-                # Fetch and list clients by city for this country
                 country_obj = get_country_by_name(country_name)
                 city_client_map = {}
                 if country_obj:
                     country_id = country_obj.get('country_id')
-                    clients_in_country = clients_crud_instance.get_all_clients_with_details(
-                        filters={'country_id': country_id},
-                        include_deleted=False # Only show active clients in this list
-                    )
+                    clients_in_country = clients_crud_instance.get_all_clients_with_details(filters={'country_id': country_id}, include_deleted=False)
                     if clients_in_country:
                         for client in clients_in_country:
                             city_name = client.get('city', self.tr('Ville Inconnue'))
                             client_detail_name = client.get('client_name', self.tr('Client Inconnu'))
                             client_id = client.get('client_id')
-
-                            city_name = client.get('city', self.tr('Ville Inconnue'))
-                            client_detail_name = client.get('client_name', self.tr('Client Inconnu'))
-                            client_id = client.get('client_id')
-
-                            if city_name not in city_client_map:
-                                city_client_map[city_name] = []
-
-                            if len(city_client_map[city_name]) < 3: # Limit to 3 clients per city for popup
-                                city_client_map[city_name].append({
-                                    'id': client_id,
-                                    'name': client_detail_name
-                                })
-
+                            if city_name not in city_client_map: city_client_map[city_name] = []
+                            if len(city_client_map[city_name]) < 3: city_client_map[city_name].append({'id': client_id, 'name': client_detail_name})
                 if city_client_map:
                     for city_name_iter, clients_in_city_list in city_client_map.items():
                         popup_html += f"<b>{self.tr('Ville')}: {city_name_iter}</b> ({len(clients_in_city_list)} {self.tr('client(s) affiché(s)')})<br>"
                         popup_html += "<ul>"
                         for client_data_item in clients_in_city_list:
-                            # Use json.dumps directly on the raw data for JS arguments
                             js_client_id_arg = json.dumps(client_data_item['id'])
                             js_client_name_arg = json.dumps(client_data_item['name'])
-
                             onclick_js = f"pyMapConnector.clientClickedOnMap({js_client_id_arg}, {js_client_name_arg}); return false;"
                             popup_html += f"<li><a href='#' onclick='{onclick_js}'>{client_data_item['name']}</a></li>"
                         popup_html += "</ul>"
                 else:
                     popup_html += f"{self.tr('Aucun client détaillé à afficher pour les villes.')}<br>"
 
-                # "Ajouter Client Ici" button
                 js_country_name_arg = json.dumps(country_name)
                 button_text = self.tr('Ajouter Client Ici')
-
                 onclick_country_js = f"pyMapConnector.countryClicked({js_country_name_arg}); return false;"
                 popup_html += f"<br><button onclick='{onclick_country_js}'>{button_text}</button>"
-
                 feature['properties']['popup_content'] = popup_html
 
             popup_layer.add_child(folium.features.GeoJsonPopup(fields=['popup_content'], localize=True))
             popup_layer.add_to(m)
-
-            if data_for_map["country_name"]: # Only add LayerControl if there's data
-                # Check if popup_layer is defined before adding LayerControl.
-                # Only add LayerControl if there's more than just the base map and choropleth.
-                # The popup_layer adds interactivity, so it's a good condition.
-                if 'popup_layer' in locals() and popup_layer is not None:
-                    folium.LayerControl().add_to(m)
-
-            # The JavaScript for pyMapConnector to exist.
-            # Note: folium's get_root().render() wraps the map in an IFrame.
-            # Direct JS injection like this might be tricky if the context is wrong.
-            # QWebChannel works by injecting objects into the page's main window.
-            # The onclick handlers in popups should correctly call `window.pyMapConnector.method()`.
-
+            folium.LayerControl().add_to(m)
             map_html_content = m.get_root().render()
 
-            # Define the QWebChannel setup JavaScript
             webchannel_setup_js = """
             <script type="text/javascript" src="qrc:///qtwebchannel/qwebchannel.js"></script>
             <script type="text/javascript">
@@ -542,25 +458,28 @@ class StatisticsDashboard(QWidget):
                 });
             </script>
             """
-
-            # Inject the QWebChannel setup script into the map HTML
             if "</body>" in map_html_content:
                 map_html_content = map_html_content.replace("</body>", webchannel_setup_js + "</body>", 1)
-            elif "</html>" in map_html_content: # Fallback if no body tag
+            elif "</html>" in map_html_content:
                 map_html_content = map_html_content.replace("</html>", webchannel_setup_js + "</html>", 1)
-            else: # Fallback if no body or html tag
+            else:
                 map_html_content += webchannel_setup_js
 
-            # Removed the debug_map.html saving functionality
-            # The console.log messages in webchannel_setup_js will remain for advanced debugging.
+            if self.map_view:
+                self.map_view.setHtml(map_html_content)
+                logging.info("Interactive map updated successfully with QWebChannel JS.")
+            else:
+                logging.error("StatisticsDashboard: self.map_view is None. Cannot set HTML for the map.")
 
-            self.map_view.setHtml(map_html_content)
-            logging.info("Interactive map updated successfully with QWebChannel JS.")
         except Exception as e:
             logging.error(f"Error updating interactive map: {e}", exc_info=True)
-            error_map = folium.Map(location=[0,0], zoom_start=1)
-            folium.Marker([0,0], popup=f"Error generating map: {e}").add_to(error_map)
-            self.map_view.setHtml(error_map.get_root().render())
+            if self.map_view:
+                error_map = folium.Map(location=[0,0], zoom_start=1) # Keep error map simple
+                folium.Marker([0,0], popup=f"Error generating map: {str(e)[:1000]}").add_to(error_map) # Limit error message length
+                self.map_view.setHtml(error_map.get_root().render())
+            else:
+                logging.error("StatisticsDashboard: self.map_view is None during error handling in update_map.")
+
 
     # --- Methods to be ported from CollapsibleStatisticsWidget ---
     def update_global_stats(self):

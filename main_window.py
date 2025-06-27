@@ -48,7 +48,7 @@ from PyQt5.QtWidgets import (
 
 )
 from PyQt5.QtGui import QIcon, QDesktopServices, QFont
-from PyQt5.QtCore import Qt, QUrl, QTimer, pyqtSlot, QByteArray # Added QByteArray
+from PyQt5.QtCore import Qt, QUrl, QTimer, pyqtSlot, QByteArray, QDate # Added QDate
 # QWebEngineView might still be used by ClientWidget or other parts, so keep for now unless confirmed unused.
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 # from PyQt5.QtWebChannel import QWebChannel # QWebChannel removed as DocumentManager no longer uses its own map.
@@ -102,9 +102,13 @@ except Exception:
     pass
 # --- END TARGETED sys.path FIX ---
 from product_management.page import ProductManagementPage # Added
+from PyQt5.QtWidgets import QSizePolicy
 
 from dialogs.status_management_dialog import StatusManagementDialog # Added for status management
+from dialogs.manage_saved_filters_dialog import ManageSavedFiltersDialog # Import for managing saved filters
+
 from PyQt5.QtWidgets import QDateEdit
+
 
 
 from client_widget import ClientWidget
@@ -133,9 +137,13 @@ from download_monitor_service import DownloadMonitorService
 from dialogs.assign_document_dialog import AssignDocumentToClientDialog
 from db.cruds.client_documents_crud import add_client_document # For assign dialog
 import os # For path checks in download monitor init
+from db.cruds import user_saved_filters_crud # Import for saved filters
 
 from calendar_module.calendar_widget import CalendarWidget # Import CalendarWidget
 from user_management.page import UserManagementPage # Import UserManagementPage
+
+from calculator.main_calculator_widget import MainCalculatorWidget # Import Calculator Widget
+# from db.connection import SessionLocal as AppSessionLocal_MW # Import SessionLocal for calculator
 from user_management.user_menu_button import UserMenuButton # Import UserMenuButton
 from dialogs.edit_user_dialog import EditUserDialog # For handling edit/add user requests
 
@@ -152,7 +160,8 @@ CONFIGURABLE_MODULES = [
     # Add Calendar module here - for now, not making it 'configurable' via DB setting, always enabled.
     # If it needs to be configurable, add a 'key' and handle its state in _load_module_states and settings.
     {'key': 'module_calendar_enabled', 'name': 'calendar', 'action_attr': 'calendar_module_action', 'widget_attr': 'calendar_module_widget_instance'},
-    {'key': 'module_camera_management_enabled', 'name': 'camera_management', 'action_attr': 'camera_management_action', 'widget_attr': 'camera_management_widget_instance'}
+    {'key': 'module_camera_management_enabled', 'name': 'camera_management', 'action_attr': 'camera_management_action', 'widget_attr': 'camera_management_widget_instance'},
+    {'key': 'module_calculator_enabled', 'name': 'calculator', 'action_attr': 'calculator_module_action', 'widget_attr': 'calculator_module_widget_instance'} # Added Calculator module
 ]
 
 class ClientListItemWidget(QWidget):
@@ -355,6 +364,22 @@ class DocumentManager(QMainWindow):
         self.user_management_page_instance = UserManagementPage(current_user_info=self.current_user_info, parent=self)
         self.main_area_stack.addWidget(self.user_management_page_instance)
 
+        # Calculator Module
+        if self.module_states.get('calculator', True): # Default to True if not in DB settings yet
+            # Pass self as app_auth_manager (it holds current_user_info and can have methods)
+            # Pass AppSessionLocal_MW as db_session_factory
+            self.calculator_module_widget_instance = MainCalculatorWidget(
+                parent=self,
+                app_auth_manager=self, # DocumentManager can act as a source for user info
+                db_session_factory=None
+            )
+            self.main_area_stack.addWidget(self.calculator_module_widget_instance)
+            logging.info("DocumentManager: Calculator module widget instance created and added to stack.")
+        else:
+            self.calculator_module_widget_instance = None
+            logging.info("DocumentManager: Calculator module disabled, widget not created.")
+
+
         self.main_area_stack.setCurrentWidget(self.home_page_widget_instance) # Set Home Page as default view
         self.create_actions_main(); self.create_menus_main() # Menus and actions are created before _apply_permissions
         
@@ -365,6 +390,38 @@ class DocumentManager(QMainWindow):
         # self.update_integrated_map() # Method removed
         self.check_timer = QTimer(self); self.check_timer.timeout.connect(self.check_old_clients_routine_slot); self.check_timer.start(3600000)
         self.init_or_update_download_monitor() # Initialize or update based on config
+        self.populate_saved_filters_combo() # Populate saved filters on init
+
+
+        # Set bottom widget for HomePageWidget if statistics module is enabled
+        if self.home_page_widget_instance and hasattr(self.home_page_widget_instance, 'set_bottom_widget'):
+            stats_widget_instance = self.get_statistics_widget_instance()
+            if stats_widget_instance:
+                self.home_page_widget_instance.set_bottom_widget(stats_widget_instance)
+            else: # Optionally hide or set a default placeholder if stats are disabled/unavailable
+                self.home_page_widget_instance.set_bottom_widget(None)
+
+
+    def get_statistics_widget_instance(self):
+        """Returns the instance of the statistics dashboard if available."""
+        if self.module_states.get('statistics', True) and hasattr(self, 'statistics_dashboard_instance'):
+            return self.statistics_dashboard_instance
+        return None
+
+        # Set bottom widget for HomePageWidget if statistics module is enabled
+        if self.home_page_widget_instance and hasattr(self.home_page_widget_instance, 'set_bottom_widget'):
+            stats_widget_instance = self.get_statistics_widget_instance()
+            if stats_widget_instance:
+                self.home_page_widget_instance.set_bottom_widget(stats_widget_instance)
+            else: # Optionally hide or set a default placeholder if stats are disabled/unavailable
+                self.home_page_widget_instance.set_bottom_widget(None)
+
+
+    def get_statistics_widget_instance(self):
+        """Returns the instance of the statistics dashboard if available."""
+        if self.module_states.get('statistics', True) and hasattr(self, 'statistics_dashboard_instance'):
+            return self.statistics_dashboard_instance
+        return None
 
     def _load_module_states(self):
         """Loads the enabled/disabled state of configurable modules from the database."""
@@ -674,27 +731,19 @@ class DocumentManager(QMainWindow):
 
         # --- Date Filter Group (Horizontal, within collapsible area) ---
         date_filter_group_layout = QHBoxLayout()
-
         date_filter_label_start = QLabel(self.tr("Créé de:"))
         self.date_filter_start = QDateEdit()
         self.date_filter_start.setCalendarPopup(True)
-        self.date_filter_start.setDate(QDate.currentDate())  # Par défaut, date actuelle
+        # self.date_filter_start.setClearButtonEnabled(True)
+        self.date_filter_start.setDate(QDate()) # Null date initially
         self.date_filter_start.setDisplayFormat("yyyy-MM-dd")
         self.date_filter_start.dateChanged.connect(self.filter_client_list_display_slot)
-
-        # (Optionnel) Bouton pour effacer la date
-        clear_date_button = QPushButton("Effacer")
-        clear_date_button.clicked.connect(lambda: self.date_filter_start.setDate(QDate.currentDate()))
-
-        # Ajout au layout
-        date_filter_group_layout.addWidget(date_filter_label_start)
-        date_filter_group_layout.addWidget(self.date_filter_start)
-        date_filter_group_layout.addWidget(clear_date_button)
 
         date_filter_label_end = QLabel(self.tr("à:"))
         self.date_filter_end = QDateEdit()
         self.date_filter_end.setCalendarPopup(True)
         # self.date_filter_end.setClearButtonEnabled(True)
+
         self.date_filter_end.setDate(QDate()) # Null date initially
         self.date_filter_end.setDisplayFormat("yyyy-MM-dd")
         self.date_filter_end.dateChanged.connect(self.filter_client_list_display_slot)
@@ -707,9 +756,43 @@ class DocumentManager(QMainWindow):
         collapsible_layout.addLayout(date_filter_group_layout)
         # --- End Date Filter Group ---
 
-
         self.collapsible_filter_widget.setVisible(False) # Initially hidden
         filter_search_main_layout.addWidget(self.collapsible_filter_widget)
+
+        # --- Saved Filters UI ---
+        saved_filters_group = QGroupBox(self.tr("Filtres Sauvegardés")) # Optional: GroupBox for clarity
+        saved_filters_main_layout = QVBoxLayout(saved_filters_group)
+
+        load_filters_layout = QHBoxLayout()
+        load_filters_layout.addWidget(QLabel(self.tr("Charger:")))
+        self.load_filter_combo = QComboBox()
+        self.load_filter_combo.addItem(self.tr("--- Sélectionner un filtre ---"), None)
+        self.load_filter_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        load_filters_layout.addWidget(self.load_filter_combo)
+        self.manage_filters_button = QPushButton(self.tr("Gérer..."))
+        self.manage_filters_button.setIcon(QIcon(":/icons/settings.svg"))
+        self.manage_filters_button.setToolTip(self.tr("Gérer les filtres sauvegardés"))
+        self.manage_filters_button.clicked.connect(self.open_manage_filters_dialog_slot) # Connect placeholder
+        load_filters_layout.addWidget(self.manage_filters_button)
+        saved_filters_main_layout.addLayout(load_filters_layout)
+
+        # Connect signal for loading a saved filter
+        self.load_filter_combo.activated[int].connect(self.apply_saved_filter_slot)
+
+
+        save_filter_layout = QHBoxLayout()
+        self.saved_filter_name_input = QLineEdit()
+        self.saved_filter_name_input.setPlaceholderText(self.tr("Nom du nouveau filtre sauvegardé"))
+        save_filter_layout.addWidget(self.saved_filter_name_input)
+        self.save_filter_button = QPushButton(self.tr("Sauvegarder Actuel"))
+        self.save_filter_button.setIcon(QIcon(":/icons/save.svg"))
+        self.save_filter_button.setToolTip(self.tr("Sauvegarder la configuration actuelle des filtres"))
+        self.save_filter_button.clicked.connect(self.save_current_filter_slot) # Connect save button
+        save_filter_layout.addWidget(self.save_filter_button)
+        saved_filters_main_layout.addLayout(save_filter_layout)
+
+        filter_search_main_layout.addWidget(saved_filters_group) # Add the group to the main filter layout
+        # --- End Saved Filters UI ---
 
         # Remove the previous layout for reset_button_layout as it's now on the top line
         # filter_search_main_layout.addLayout(reset_button_layout) # This line is removed
@@ -735,13 +818,6 @@ class DocumentManager(QMainWindow):
         client_actions_layout = QHBoxLayout()
         self.add_new_client_button = QPushButton(self.tr("Ajouter Nouveau Client")); self.add_new_client_button.setIcon(QIcon(":/icons/user-add.svg")); self.add_new_client_button.setObjectName("primaryButton"); self.add_new_client_button.clicked.connect(self.open_add_new_client_dialog)
         client_actions_layout.addWidget(self.add_new_client_button)
-
-        self.add_client_by_voice_button = QPushButton(self.tr("Ajouter par Voix")); self.add_client_by_voice_button.setIcon(QIcon(":/icons/mic.svg")); self.add_client_by_voice_button.setObjectName("primaryButton")
-        self.add_client_by_voice_button.clicked.connect(self.handle_add_client_by_voice_clicked)
-        self.add_client_by_voice_button.setEnabled(False) # Disable as requested
-        self.add_client_by_voice_button.setToolTip(self.tr("Fonctionnalité en cours de développement"))
-        client_actions_layout.addWidget(self.add_client_by_voice_button)
-
 
         self.add_client_by_voice_button = QPushButton(self.tr("Ajouter par Voix")); self.add_client_by_voice_button.setIcon(QIcon(":/icons/mic.svg")); self.add_client_by_voice_button.setObjectName("primaryButton")
         self.add_client_by_voice_button.clicked.connect(self.handle_add_client_by_voice_clicked)
@@ -942,10 +1018,14 @@ class DocumentManager(QMainWindow):
         self.manage_users_action = QAction(QIcon(":/icons/users.svg"), self.tr("Gérer les Utilisateurs"), self)
         self.manage_users_action.triggered.connect(self.show_user_management_page) # Connect to show page method
 
+        # Action for Calculator Module
+        self.calculator_module_action = QAction(QIcon(":/icons/bar-chart.svg"), self.tr("Calculatrices"), self) # Placeholder icon
+        self.calculator_module_action.triggered.connect(self.show_calculator_module_view)
 
 
         # Populate searchable_actions_map
-        self.searchable_actions_map[self.tr("Accueil")] = self.home_action # Added Home action
+        self.searchable_actions_map[self.tr("Accueil")] = self.home_action
+        self.searchable_actions_map[self.tr("Calculatrices")] = self.calculator_module_action # Added Calculator action
         self.searchable_actions_map[self.tr("Paramètres")] = self.settings_action
         # self.searchable_actions_map[self.tr("Gérer les Modèles")] removed
         self.searchable_actions_map[self.tr("Gérer les Statuts")] = self.status_action
@@ -1095,7 +1175,7 @@ class DocumentManager(QMainWindow):
                                      P_ACCESS_RECRUITMENT_MODULE, P_ACCESS_EXPERIENCE_MODULE, \
                                      P_ACCESS_CALENDAR_MODULE, P_ACCESS_BOTPRESS_MODULE, \
                                      P_ACCESS_CARRIER_MAP_MODULE, P_ACCESS_CAMERA_MODULE, \
-                                     P_MANAGE_GLOBAL_PRODUCTS # For Product Management Page action
+                                     P_MANAGE_GLOBAL_PRODUCTS, P_ACCESS_CALCULATOR_MODULE # Added P_ACCESS_CALCULATOR_MODULE
 
         role_name = self.current_user_info.get('role_name') if self.current_user_info else None
         if not role_name: # Should not happen if login is enforced, but good for safety
@@ -1147,6 +1227,16 @@ class DocumentManager(QMainWindow):
              self.open_carrier_map_action.setVisible(has_permission(role_name, P_ACCESS_CARRIER_MAP_MODULE))
         if self.camera_management_action:
              self.camera_management_action.setVisible(has_permission(role_name, P_ACCESS_CAMERA_MODULE))
+
+        if hasattr(self, 'calculator_module_action') and self.calculator_module_action:
+            # To make it visible by default if module is enabled, and then add specific permission later:
+            # self.calculator_module_action.setVisible(self.module_states.get('calculator', False))
+            # To use a specific permission (P_ACCESS_CALCULATOR_MODULE must be defined in auth/permissions.py):
+            if 'P_ACCESS_CALCULATOR_MODULE' in locals() or 'P_ACCESS_CALCULATOR_MODULE' in globals(): # Check if defined
+                 self.calculator_module_action.setVisible(has_permission(role_name, P_ACCESS_CALCULATOR_MODULE))
+            else: # Fallback if P_ACCESS_CALCULATOR_MODULE is not defined: make visible if module is on
+                logging.warning("P_ACCESS_CALCULATOR_MODULE permission constant not found. Calculator module visibility based on module_states only.")
+                self.calculator_module_action.setVisible(self.module_states.get('calculator', False))
 
 
         # Main Buttons on Document View
@@ -1472,8 +1562,6 @@ class DocumentManager(QMainWindow):
         # Store the raw client_dict_data in the QListWidgetItem's UserRole
         # This is crucial for context menus, click handling etc. to get the full data.
         item.setData(Qt.UserRole, client_dict_data)
-
-
 
         self.client_list_widget.addItem(item)
         self.client_list_widget.setItemWidget(item, custom_widget)
@@ -1840,3 +1928,236 @@ class DocumentManager(QMainWindow):
             logging.error("UserManagementPage instance is None. Cannot show user management view.")
             QMessageBox.critical(self, self.tr("Erreur Critique"),
                                  self.tr("La page de gestion des utilisateurs n'a pas pu être chargée."))
+
+    def show_calculator_module_view(self):
+        """Switches the main stacked widget to display the Calculator module."""
+        if self.calculator_module_widget_instance:
+            # Pass/update auth_manager and db_session_factory if they can change or need to be set late
+            # For now, assuming they are set at __init__
+            if hasattr(self.calculator_module_widget_instance, 'app_auth_manager') and \
+               self.calculator_module_widget_instance.app_auth_manager is None:
+                self.calculator_module_widget_instance.app_auth_manager = self # Pass self as auth manager
+
+            # Potentially refresh history or user specific things if needed when view is shown
+            # if hasattr(self.calculator_module_widget_instance, 'refresh_on_display'):
+            #     self.calculator_module_widget_instance.refresh_on_display()
+
+            self.main_area_stack.setCurrentWidget(self.calculator_module_widget_instance)
+        else:
+            logging.warning("Calculator module widget instance is None. Cannot show view.")
+            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Calculatrices est désactivé ou non initialisé."))
+    # --- Saved Filters Methods ---
+    def populate_saved_filters_combo(self):
+        """Populates the combo box with filters saved by the current user."""
+        self.load_filter_combo.blockSignals(True)
+        self.load_filter_combo.clear()
+        self.load_filter_combo.addItem(self.tr("--- Sélectionner un filtre ---"), None) # Placeholder
+
+        if not self.current_user_id:
+            logging.warning("populate_saved_filters_combo: No current_user_id, cannot load filters.")
+            self.load_filter_combo.blockSignals(False)
+            return
+
+        try:
+            saved_filters = user_saved_filters_crud.get_saved_filters_for_user(self.current_user_id)
+            if saved_filters:
+                for filt in saved_filters:
+                    self.load_filter_combo.addItem(filt['filter_name'], filt['id'])
+            logging.info(f"Populated saved filters combo with {len(saved_filters)} items for user {self.current_user_id}.")
+        except Exception as e:
+            logging.error(f"Error populating saved filters combo: {e}", exc_info=True)
+            self.notify(self.tr("Erreur Filtres Sauvegardés"), self.tr("Impossible de charger les filtres sauvegardés."), type='ERROR')
+        finally:
+            self.load_filter_combo.blockSignals(False)
+
+    def apply_saved_filter_slot(self, index: int):
+        """Applies the selected saved filter to the UI controls and refreshes the client list."""
+        if index == 0: # Placeholder selected
+            return
+
+        saved_filter_id = self.load_filter_combo.itemData(index)
+        if saved_filter_id is None:
+            return
+
+        logging.info(f"Applying saved filter with ID: {saved_filter_id}")
+
+        try:
+            filter_data = user_saved_filters_crud.get_saved_filter_by_id(saved_filter_id, self.current_user_id)
+            if not filter_data or 'filter_parameters' not in filter_data:
+                self.notify(self.tr("Erreur Chargement Filtre"), self.tr("Filtre non trouvé ou corrompu."), type='ERROR')
+                self.populate_saved_filters_combo() # Refresh combo in case filter was deleted elsewhere
+                return
+
+            params = filter_data['filter_parameters']
+
+            # Block signals on individual filter controls to prevent multiple refreshes
+            self.status_filter_combo.blockSignals(True)
+            self.client_archive_filter_combo.blockSignals(True)
+            self.country_filter_combo.blockSignals(True)
+            self.search_input_field.blockSignals(True)
+            if hasattr(self, 'date_filter_start'): self.date_filter_start.blockSignals(True)
+            if hasattr(self, 'date_filter_end'): self.date_filter_end.blockSignals(True)
+            if hasattr(self, 'more_filters_button'): self.more_filters_button.blockSignals(True)
+
+
+            # Apply status filter
+            status_idx = self.status_filter_combo.findData(params.get('status_id'))
+            self.status_filter_combo.setCurrentIndex(status_idx if status_idx != -1 else 0)
+
+            # Apply archive filter
+            archive_idx = self.client_archive_filter_combo.findData(params.get('archive_filter'))
+            self.client_archive_filter_combo.setCurrentIndex(archive_idx if archive_idx != -1 else 0)
+
+            # Apply country filter
+            country_idx = self.country_filter_combo.findData(params.get('country_id'))
+            self.country_filter_combo.setCurrentIndex(country_idx if country_idx != -1 else 0)
+
+            # Apply search term
+            self.search_input_field.setText(params.get('search_term', ''))
+
+            # Apply date filters
+            show_collapsible = False
+            if hasattr(self, 'date_filter_start'):
+                date_start_str = params.get('created_at_start')
+                if date_start_str:
+                    self.date_filter_start.setDate(QDate.fromString(date_start_str, "yyyy-MM-dd"))
+                    if self.date_filter_start.date().isValid(): show_collapsible = True
+                else:
+                    self.date_filter_start.setDate(QDate())
+
+            if hasattr(self, 'date_filter_end'):
+                date_end_str = params.get('created_at_end')
+                if date_end_str:
+                    self.date_filter_end.setDate(QDate.fromString(date_end_str, "yyyy-MM-dd"))
+                    if self.date_filter_end.date().isValid(): show_collapsible = True
+                else:
+                    self.date_filter_end.setDate(QDate())
+
+            # Determine if collapsible section should be shown
+            if params.get('country_id') is not None or params.get('archive_filter') is not None: # Check other collapsible filters
+                show_collapsible = True
+
+            if hasattr(self, 'more_filters_button') and hasattr(self, 'collapsible_filter_widget'):
+                if self.collapsible_filter_widget.isVisible() != show_collapsible:
+                    self.more_filters_button.setChecked(show_collapsible) # This will trigger toggle_more_filters_visibility
+
+            # Unblock signals
+            self.status_filter_combo.blockSignals(False)
+            self.client_archive_filter_combo.blockSignals(False)
+            self.country_filter_combo.blockSignals(False)
+            self.search_input_field.blockSignals(False)
+            if hasattr(self, 'date_filter_start'): self.date_filter_start.blockSignals(False)
+            if hasattr(self, 'date_filter_end'): self.date_filter_end.blockSignals(False)
+            if hasattr(self, 'more_filters_button'): self.more_filters_button.blockSignals(False)
+
+
+            # Refresh client list with applied filters
+            self.filter_client_list_display_slot()
+            self.notify(self.tr("Filtre Appliqué"), self.tr("Le filtre sauvegardé '{0}' a été appliqué.").format(filter_data['filter_name']), type='INFO')
+
+        except Exception as e:
+            logging.error(f"Error applying saved filter ID {saved_filter_id}: {e}", exc_info=True)
+            self.notify(self.tr("Erreur Application Filtre"), self.tr("Une erreur est survenue lors de l'application du filtre."), type='ERROR')
+        finally:
+            # Reset combo to placeholder to allow re-selection or show current state is "custom"
+            # This also prevents the slot from re-triggering if a programmatic change happened during filter application
+            self.load_filter_combo.blockSignals(True)
+            self.load_filter_combo.setCurrentIndex(0)
+            self.load_filter_combo.blockSignals(False)
+
+    def save_current_filter_slot(self):
+        """Saves the current state of all filters under a user-provided name."""
+        if not self.current_user_id:
+            self.notify(self.tr("Erreur Utilisateur"), self.tr("Aucun utilisateur connecté. Impossible de sauvegarder le filtre."), type='ERROR')
+            return
+
+        filter_name = self.saved_filter_name_input.text().strip()
+        if not filter_name:
+            self.notify(self.tr("Nom Requis"), self.tr("Veuillez entrer un nom pour ce filtre sauvegardé."), type='WARNING')
+            self.saved_filter_name_input.setFocus()
+            return
+
+        # Check for duplicate filter name for this user (optional, DB unique constraint can also handle this)
+        # existing_filters = user_saved_filters_crud.get_saved_filters_for_user(self.current_user_id)
+        # if any(f['filter_name'] == filter_name for f in existing_filters):
+        #     reply = QMessageBox.question(self, self.tr("Nom Dupliqué"),
+        #                                  self.tr("Un filtre avec ce nom existe déjà. Voulez-vous le remplacer?"),
+        #                                  QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        #     if reply == QMessageBox.No:
+        #         return
+            # If Yes, would need to find existing ID and call update_saved_filter or delete then add.
+            # For simplicity now, we'll assume add_saved_filter handles duplicates or DB constraint does.
+
+        parameters_dict = {}
+
+        # Status Filter
+        status_data = self.status_filter_combo.currentData()
+        if status_data is not None: # Only save if not "All Statuses" (which is None)
+            parameters_dict['status_id'] = status_data
+
+        # Archive Filter
+        archive_data = self.client_archive_filter_combo.currentData()
+        # Save explicit value, even if it's the default (False for "Active Clients")
+        parameters_dict['archive_filter'] = archive_data # Stores False, True, or "all_status_types"
+
+        # Country Filter
+        country_data = self.country_filter_combo.currentData()
+        if country_data is not None: # Only save if not "All Countries"
+            parameters_dict['country_id'] = country_data
+
+        # Search Term
+        search_text = self.search_input_field.text().strip()
+        if search_text:
+            parameters_dict['search_term'] = search_text
+
+        # Date Filters
+        if hasattr(self, 'date_filter_start') and self.date_filter_start.date().isValid() and not self.date_filter_start.date().isNull():
+            parameters_dict['created_at_start'] = self.date_filter_start.date().toString("yyyy-MM-dd")
+
+        if hasattr(self, 'date_filter_end') and self.date_filter_end.date().isValid() and not self.date_filter_end.date().isNull():
+            parameters_dict['created_at_end'] = self.date_filter_end.date().toString("yyyy-MM-dd")
+
+        if not parameters_dict: # No actual filter criteria were set
+            self.notify(self.tr("Aucun Filtre Actif"), self.tr("Aucun critère de filtre n'est actuellement défini pour la sauvegarde."), type='INFO')
+            return
+
+        try:
+            new_filter_id = user_saved_filters_crud.add_saved_filter(
+                user_id=self.current_user_id,
+                filter_name=filter_name,
+                filter_parameters=parameters_dict
+            )
+            if new_filter_id:
+                self.notify(self.tr("Filtre Sauvegardé"), self.tr("Le filtre '{0}' a été sauvegardé avec succès.").format(filter_name), type='SUCCESS')
+                self.saved_filter_name_input.clear()
+                self.populate_saved_filters_combo() # Refresh the combo box
+                # Optionally, select the newly saved filter in the combo
+                new_idx = self.load_filter_combo.findData(new_filter_id)
+                if new_idx != -1:
+                    self.load_filter_combo.setCurrentIndex(new_idx)
+            else:
+                # This might happen if DB unique constraint on (user_id, filter_name) is active and name exists
+                self.notify(self.tr("Échec Sauvegarde"), self.tr("Impossible de sauvegarder le filtre. Un filtre avec ce nom existe peut-être déjà, ou une erreur de base de données s'est produite."), type='ERROR')
+        except Exception as e:
+            logging.error(f"Error saving filter '{filter_name}': {e}", exc_info=True)
+            self.notify(self.tr("Erreur Sauvegarde"), self.tr("Une erreur est survenue: {0}").format(str(e)), type='ERROR')
+
+    def open_manage_filters_dialog_slot(self):
+        """Opens the dialog to manage saved filters."""
+        if not self.current_user_id:
+            self.notify(self.tr("Erreur Utilisateur"), self.tr("Aucun utilisateur connecté. Impossible de gérer les filtres."), type='ERROR')
+            return
+
+        logging.info(f"Opening ManageSavedFiltersDialog for user {self.current_user_id}.")
+        dialog = ManageSavedFiltersDialog(current_user_id=self.current_user_id, parent=self)
+
+        # exec_() is blocking. We check result or flag after it closes.
+        dialog.exec_()
+
+        if dialog.changes_made: # Check the custom flag
+            logging.info("Changes were made in ManageSavedFiltersDialog. Refreshing load_filter_combo.")
+            self.populate_saved_filters_combo()
+            # Also reset the combo to the placeholder, as the list of available filters might have changed
+            self.load_filter_combo.setCurrentIndex(0)
+        else:
+            logging.info("No changes reported from ManageSavedFiltersDialog.")

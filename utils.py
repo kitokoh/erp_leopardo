@@ -143,10 +143,20 @@ def populate_docx_template(docx_path, client_data):
         return # Implicitly returns None
 
 # --- PDF Generation Logic ---
-def generate_pdf_for_document(source_file_path: str, client_info: dict, app_root_dir:str, parent_widget=None, target_language_code: str = "fr") -> str | None:
+def generate_pdf_for_document(
+    source_file_path: str,
+    client_info: dict,
+    app_root_dir:str,
+    parent_widget=None,
+    target_language_code: str = "fr",
+    project_id: int = None, # Added
+    additional_context: dict = None, # Added
+    document_type_for_context: str = None # Added
+) -> str | None:
     """
     Generates a PDF for a given source document (HTML, XLSX, DOCX).
     Uses app_root_dir for resolving paths to resources like default logos if needed.
+    Accepts project_id and additional_context to enrich the document context.
     Includes logic to check for product language match for proforma invoices.
     """
     from html_editor import HtmlEditor # Moved here to break circular import
@@ -180,10 +190,11 @@ def generate_pdf_for_document(source_file_path: str, client_info: dict, app_root
     # The 'company_id' for get_document_context_data is the seller/our company.
     document_context = db_manager.get_document_context_data(
         client_id=client_info['client_id'],
-        company_id=default_company_id, # This should be the ID of "our" company
+        company_id=default_company_id,
         target_language_code=target_language_code,
-        project_id=client_info.get('project_id'), # Pass project_id if available in client_info
-        additional_context={'document_title': file_name} # Example additional context
+        project_id=project_id, # Use the passed project_id
+        document_type=document_type_for_context, # Pass the specific document type for context
+        additional_data=additional_context if additional_context else {'document_title': file_name} # Pass additional_context
     )
 
     if file_ext.lower() == '.html':
@@ -275,3 +286,4 @@ def verify_password(plain_password: str, hashed_password: str) -> tuple[bool, st
         # Log unexpected errors during verification, e.g., malformed hash, unknown scheme
         logging.error(f"Error verifying password or during hash update check: {e}", exc_info=True)
         return False, None # Return False and no new hash on error
+

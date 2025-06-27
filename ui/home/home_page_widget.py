@@ -1,88 +1,97 @@
 # -*- coding: utf-8 -*-
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QGridLayout, QPushButton, QLabel, QSizePolicy,
-    QScrollArea
+    QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QPushButton, QLabel,
+    QSizePolicy, QScrollArea, QStackedWidget, QFrame, QGraphicsDropShadowEffect
 )
-from PyQt5.QtCore import Qt, pyqtSlot, QSize
-from PyQt5.QtGui import QFont, QIcon, QMovie
+from PyQt5.QtCore import Qt, pyqtSlot, QSize, QFile, QTextStream
+from PyQt5.QtGui import QFont, QIcon, QMovie, QColor
+
 import os
-import random # Added for random GIF selection
+import random
 
 class HomePageWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("HomePageWidget")
         self._init_ui()
+        self._load_styles()
+
+    def _load_styles(self):
+        style_sheet_path = os.path.join(os.path.dirname(__file__), "home_page_style.qss")
+        if os.path.exists(style_sheet_path):
+            file = QFile(style_sheet_path)
+            if file.open(QFile.ReadOnly | QFile.Text):
+                stream = QTextStream(file)
+                self.setStyleSheet(stream.readAll())
+                file.close()
+            else:
+                print(f"Warning: Could not open stylesheet file: {style_sheet_path}")
+        else:
+            print(f"Warning: Stylesheet file not found: {style_sheet_path}")
+
 
     def _init_ui(self):
-        main_v_layout = QVBoxLayout(self) # Layout principal vertical
-        main_v_layout.setContentsMargins(20, 20, 20, 20)
-        main_v_layout.setSpacing(20)
+        main_v_layout = QVBoxLayout(self)
+        main_v_layout.setContentsMargins(0,0,0,0)
+        main_v_layout.setSpacing(0)
 
-        # Welcome Message
-        welcome_label = QLabel(self.tr("Bienvenue à votre Gestionnaire d'Application"))
-        welcome_label.setObjectName("homePageWelcomeLabel")
-        welcome_font = QFont()
-        welcome_font.setPointSize(28)
-        welcome_font.setBold(True)
-        welcome_label.setFont(welcome_font)
-        welcome_label.setAlignment(Qt.AlignCenter)
-        main_v_layout.addWidget(welcome_label)
+        # --- Message de bienvenue (Supprimé) ---
 
-        # GIF Area
+        # --- Section Centrale: GIF (gauche) et Boutons (droite) ---
+        center_h_layout = QHBoxLayout()
+        center_h_layout.setContentsMargins(10, 10, 10, 10) # Marges pour cette section (ajouté top margin)
+
+        center_h_layout.setSpacing(15)
+
+        # Colonne Gauche: GIF
         gif_label = QLabel()
-
+        gif_label.setObjectName("homePageGifLabel")
         available_gifs = ["1.gif", "2.gif", "3.gif"]
         chosen_gif_name = random.choice(available_gifs)
-
-        # Path construction for when this script is in ui/home/
         gif_path = os.path.join(os.path.dirname(__file__), "..", "..", "resources", "gifshome", chosen_gif_name)
-
         if not os.path.exists(gif_path):
-            # Fallback assuming script might be run from project root or resources is directly accessible
-            gif_path_alt_base = os.path.join("resources", "gifshome")
-            if os.path.isdir(gif_path_alt_base):
-                 gif_path = os.path.join(gif_path_alt_base, chosen_gif_name)
-            else: # Final fallback if resources/gifshome not found from typical locations
-                 gif_path = chosen_gif_name # This will likely fail if not in current dir, but it's a last resort
+             gif_path_alt_base = os.path.join("resources", "gifshome")
+             if os.path.isdir(gif_path_alt_base): gif_path = os.path.join(gif_path_alt_base, chosen_gif_name)
+             else: gif_path = chosen_gif_name
+
 
         if os.path.exists(gif_path):
             self.movie = QMovie(gif_path)
             gif_label.setMovie(self.movie)
-
-            target_height = 200
-            # Ensure pixmap is valid before trying to get its dimensions
-            if not self.movie.currentPixmap().isNull():
-                scaled_width = int(target_height * self.movie.currentPixmap().width() / self.movie.currentPixmap().height())
-                self.movie.setScaledSize(QSize(scaled_width, target_height))
-            else:
-                # Default/fallback size if pixmap is null (e.g. GIF not loaded yet or invalid)
-                self.movie.setScaledSize(QSize(300, target_height))
-
+            # Tentative de redimensionnement du QMovie lui-même avant de l'assigner
+            # ou de contrôler la taille du QLabel.
+            # Pour un contrôle proportionnel, on peut écouter le signal resized du QLabel parent.
+            # Pour l'instant, fixons une taille pour la prévisibilité.
+            # self.movie.setScaledSize(QSize(350, 300)) # Ajustez au besoin
+            gif_label.setFixedSize(QSize(350, 300)) # Donner une taille fixe au QLabel
+            gif_label.setScaledContents(True) # S'assurer que le contenu du QMovie s'adapte au QLabel
 
             self.movie.start()
             gif_label.setAlignment(Qt.AlignCenter)
-            main_v_layout.addWidget(gif_label)
-        else:
-            gif_placeholder_label = QLabel(self.tr("GIF non trouvé ({0}) dans :\n{1}\nVeuillez vérifier les chemins.").format(chosen_gif_name, gif_path))
-            gif_placeholder_label.setAlignment(Qt.AlignCenter)
-            gif_placeholder_label.setStyleSheet("color: red; font-style: italic;")
-            main_v_layout.addWidget(gif_placeholder_label)
 
-        # Scroll Area for module buttons
+        else:
+            gif_label.setText(self.tr("GIF '{0}' non trouvé.").format(chosen_gif_name))
+            gif_label.setStyleSheet("color: red;")
+            gif_label.setAlignment(Qt.AlignCenter)
+
+        center_h_layout.addWidget(gif_label, 1)
+
+
+        # Colonne Droite: Boutons de modules
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        scroll_area.setStyleSheet("QScrollArea { border: none; background-color: transparent; min-height: 300px; }")
+        scroll_area.setStyleSheet("QScrollArea { border: none; background-color: transparent; }")
 
-        content_widget = QWidget()
-        content_widget.setObjectName("homePageButtonGridContainer")
-        content_widget.setStyleSheet("background-color: transparent;")
+        button_container_widget = QWidget()
+        button_container_widget.setObjectName("homePageButtonGridContainer")
+        button_container_widget.setStyleSheet("background-color: transparent;")
 
-        grid_layout = QGridLayout()
-        grid_layout.setContentsMargins(10, 10, 10, 10)
-        grid_layout.setSpacing(20)
+        grid_layout = QGridLayout(button_container_widget)
+        grid_layout.setContentsMargins(5, 5, 5, 5)
+        grid_layout.setSpacing(10)
+
 
         self.modules = [
             {"name": self.tr("Gestion Documents Client"), "object_name": "btnClientDocuments", "icon": ":/icons/modern/folder-docs.svg", "slot": self.go_to_documents},
@@ -95,39 +104,70 @@ class HomePageWidget(QWidget):
             {"name": self.tr("Gestion des Connaissances"), "object_name": "btnExperienceManagement", "icon": ":/icons/book.svg", "slot": self.go_to_experience_management},
             {"name": self.tr("Intégration Botpress"), "object_name": "btnBotpressIntegration", "icon": ":/icons/placeholder_icon.svg", "slot": self.go_to_botpress_integration},
             {"name": self.tr("Gestion Caméras"), "object_name": "btnCameraManagement", "icon": ":/icons/video.svg", "slot": self.go_to_camera_management},
-            {"name": self.tr("Paramètres"), "object_name": "btnSettings", "icon": ":/icons/modern/settings.svg", "slot": self.go_to_settings}
+            {"name": self.tr("Paramètres"), "object_name": "btnSettings", "icon": ":/icons/modern/settings.svg", "slot": self.go_to_settings},
+            {"name": self.tr("Module X"), "object_name": "btnModuleX", "icon": ":/icons/placeholder_icon.svg", "slot": self.go_to_settings}
         ]
-
         row, col = 0, 0
-        num_columns = 3
+        num_columns = 4
 
-        for i, module in enumerate(self.modules):
-            button = QPushButton(module["name"])
-            button.setObjectName(module["object_name"])
-            if module["icon"] and QIcon.hasThemeIcon(module["icon"]):
-                button.setIcon(QIcon(module["icon"]))
-                button.setIconSize(QSize(32,32))
+
+        for i, module_data in enumerate(self.modules):
+            button = QPushButton(module_data["name"])
+            button.setObjectName(module_data["object_name"])
+            if module_data["icon"] and QIcon.hasThemeIcon(module_data["icon"]):
+                button.setIcon(QIcon(module_data["icon"]))
+                button.setIconSize(QSize(32, 32)) # Taille d'icône réduite pour boutons plus petits
 
             button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-            button.clicked.connect(module["slot"])
-            grid_layout.addWidget(button, row, col)
 
+            shadow = QGraphicsDropShadowEffect()
+            shadow.setBlurRadius(12) # Ombre un peu moins étendue
+            shadow.setXOffset(1)    # Offset plus subtil
+            shadow.setYOffset(2)    # Offset plus subtil
+            shadow.setColor(QColor(0, 0, 0, 80)) # Ombre plus légère
+            button.setGraphicsEffect(shadow)
+
+            button.clicked.connect(module_data["slot"])
+            grid_layout.addWidget(button, row, col)
             col += 1
             if col >= num_columns:
                 col = 0
                 row += 1
 
-        content_widget.setLayout(grid_layout)
-        scroll_area.setWidget(content_widget)
-        main_v_layout.addWidget(scroll_area)
+        grid_layout.setRowStretch(row + 1, 1)
+        grid_layout.setColumnStretch(num_columns, 1)
+
+        button_container_widget.setLayout(grid_layout)
+        scroll_area.setWidget(button_container_widget)
+        center_h_layout.addWidget(scroll_area, 2)
+
+        main_v_layout.addLayout(center_h_layout)
+
+        self.bottom_content_area = QStackedWidget()
+        self.bottom_content_area.setObjectName("homePageBottomContentArea")
+        self.bottom_content_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        main_v_layout.addWidget(self.bottom_content_area, 1)
+
 
         self.setLayout(main_v_layout)
 
-    # Slots de navigation... (inchangés)
+    def set_bottom_widget(self, widget_to_display):
+        while self.bottom_content_area.count() > 0:
+            self.bottom_content_area.removeWidget(self.bottom_content_area.widget(0))
+
+        if widget_to_display:
+            self.bottom_content_area.addWidget(widget_to_display)
+            self.bottom_content_area.setCurrentWidget(widget_to_display)
+            self.bottom_content_area.setVisible(True)
+        else:
+            self.bottom_content_area.setVisible(False)
+
+
     @pyqtSlot()
     def go_to_documents(self):
         if hasattr(self.parent(), 'show_documents_view'):
             self.parent().show_documents_view()
+
 
     @pyqtSlot()
     def go_to_project_management(self):
@@ -136,8 +176,16 @@ class HomePageWidget(QWidget):
 
     @pyqtSlot()
     def go_to_statistics(self):
-        if hasattr(self.parent(), 'show_statistics_view'):
+        if hasattr(self.parent(), 'get_statistics_widget_instance'):
+            stats_widget = self.parent().get_statistics_widget_instance()
+            if stats_widget:
+                self.set_bottom_widget(stats_widget)
+            else:
+                 if hasattr(self.parent(), 'show_statistics_view'):
+                    self.parent().show_statistics_view()
+        elif hasattr(self.parent(), 'show_statistics_view'):
             self.parent().show_statistics_view()
+
 
     @pyqtSlot()
     def go_to_product_management(self):
@@ -182,34 +230,56 @@ class HomePageWidget(QWidget):
 if __name__ == '__main__':
     from PyQt5.QtWidgets import QApplication
     import sys
-    # import icons_rc # Décommentez si vous testez ce fichier isolément et utilisez les ressources
+
+
+    try:
+        import icons_rc
+    except ImportError:
+        print("Warning: icons_rc.py not found. Icons might not display in direct test.")
 
     app = QApplication(sys.argv)
     class MockMainWindow(QWidget):
         def __init__(self):
             super().__init__()
-            self.setWindowTitle("Mock Main Window")
-            layout = QVBoxLayout(self)
-            # Simuler l'import depuis le nouveau chemin pour le test __main__
-            # Ceci ne fonctionnera que si le script est exécuté depuis la racine du projet
-            # et que ui/home est dans le PYTHONPATH.
-            # Pour un test robuste, il faudrait ajuster sys.path ici.
-            # from ui.home.home_page_widget import HomePageWidget
-            self.home_page = HomePageWidget(self) # Supposant que l'import global fonctionne
-            layout.addWidget(self.home_page)
-            self.resize(800, 900)
+            self.setWindowTitle("Mock Main Window for HomePageWidget Test")
+            self.main_layout = QVBoxLayout(self)
 
-        def show_documents_view(self): print("Navigating to Documents View")
-        def show_project_management_view(self): print("Navigating to Project Management")
-        def show_statistics_view(self): print("Navigating to Statistics")
-        def show_product_management_page(self): print("Navigating to Product Management")
-        def show_partner_management_view(self): print("Navigating to Partner Management")
-        def show_inventory_browser_view(self): print("Navigating to Inventory Management")
-        def show_recruitment_view(self): print("Navigating to Recruitment")
-        def show_experience_module_view(self): print("Navigating to Experience Management")
-        def show_botpress_integration_view(self): print("Navigating to Botpress Integration")
-        def show_camera_management_view(self): print("Navigating to Camera Management")
-        def show_settings_page(self): print("Navigating to Settings Page")
+
+            self.statistics_dashboard_instance = QLabel("Contenu de la Page Statistiques (Mock)")
+            self.statistics_dashboard_instance.setAlignment(Qt.AlignCenter)
+            self.statistics_dashboard_instance.setStyleSheet("background-color: lightgreen; font-size: 18px;")
+
+            self.home_page = HomePageWidget(self)
+            self.main_layout.addWidget(self.home_page)
+            self.resize(1200, 800)
+
+        def get_statistics_widget_instance(self):
+            return self.statistics_dashboard_instance
+
+        def show_documents_view(self): print("Mock: Navigating to Documents View")
+        def show_project_management_view(self): print("Mock: Navigating to Project Management")
+        def show_statistics_view(self):
+            print("Mock: Navigating to Statistics (Fallback - full page)")
+            temp_stats_page = QLabel("PAGE STATS COMPLÈTE (FALLBACK)")
+            temp_stats_page.setAlignment(Qt.AlignCenter)
+            temp_stats_page.setStyleSheet("background-color: yellow; font-size: 22px;")
+
+            while self.main_layout.count():
+                 item = self.main_layout.takeAt(0)
+                 widget = item.widget()
+                 if widget:
+                     widget.deleteLater()
+            self.main_layout.addWidget(temp_stats_page)
+
+
+        def show_product_management_page(self): print("Mock: Navigating to Product Management")
+        def show_partner_management_view(self): print("Mock: Navigating to Partner Management")
+        def show_inventory_browser_view(self): print("Mock: Navigating to Inventory Management")
+        def show_recruitment_view(self): print("Mock: Navigating to Recruitment")
+        def show_experience_module_view(self): print("Mock: Navigating to Experience Management")
+        def show_botpress_integration_view(self): print("Mock: Navigating to Botpress Integration")
+        def show_camera_management_view(self): print("Mock: Navigating to Camera Management")
+        def show_settings_page(self): print("Mock: Navigating to Settings Page")
 
     main_win = MockMainWindow()
     main_win.show()

@@ -175,6 +175,7 @@ def _update_user_password_hash_only(user_id: str, new_hashed_password: str, conn
         logger.error(f"Database error updating password hash for user ID '{user_id}': {e}", exc_info=True)
         return False
 
+
 @_manage_conn
 def verify_user_password(username: str, password: str, conn: sqlite3.Connection = None) -> dict | None:
     """
