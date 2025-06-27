@@ -3421,6 +3421,16 @@ class ClientWidget(QWidget):
 
     def _handle_generate_and_open_pdf_action(self, document_data: dict):
         QApplication.setOverrideCursor(Qt.WaitCursor)
+        # Show "In Progress" notification
+        if self.notification_manager:
+            self.notification_manager.show(
+                title=self.tr("Génération PDF"),
+                message=self.tr("Génération du PDF en cours... Veuillez patienter."),
+                type='INFO',
+                duration=3000 # Keep it reasonably short, actual feedback will follow
+            )
+        QApplication.processEvents() # Ensure the notification is displayed
+
         generated_pdf_path_final = None
         try:
             if not self.client_info or 'client_id' not in self.client_info:
