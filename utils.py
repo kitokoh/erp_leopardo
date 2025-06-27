@@ -242,3 +242,27 @@ def generate_pdf_for_document(source_file_path: str, client_info: dict, app_root
 # For load_config, it now explicitly takes app_root_dir.
 # populate_docx_template does not seem to need APP_ROOT_DIR directly.
 # save_config and get_config_file_path/get_config_dir are self-contained.
+
+# --- Password Hashing Utilities ---
+from passlib.context import CryptContext
+
+# Setup CryptContext - this should ideally be done once per application
+# Using bcrypt as it's specified in requirements.txt (passlib[bcrypt])
+# Deprecated algorithms can be added if migrating from older hashes.
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto"
+)
+
+def hash_password(password: str) -> str:
+    """Hashes a password using the configured context."""
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verifies a plain password against a hashed one."""
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception as e:
+        # Log unexpected errors during verification, e.g., malformed hash
+        logging.error(f"Error verifying password: {e}", exc_info=True)
+        return False

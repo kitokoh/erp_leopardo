@@ -552,6 +552,7 @@ class ClientWidget(QWidget):
                     parent=self,
                     template_data=template_data  # Pass the fetched template data
                 )
+                # logging.info(f"ClientWidget.handle_generate_template_button_clicked: About to open CreateDocumentDialog. Client Info: {self.client_info}, Config available: {bool(self.config)}") # DEBUG LOG REMOVED
                 if dialog.exec_() == QDialog.Accepted:
                     self.populate_doc_table()  # Refresh documents tab
             else:
@@ -612,9 +613,21 @@ class ClientWidget(QWidget):
             self.documents_empty_label.setFont(font_docs_empty)
             docs_layout.addWidget(self.documents_empty_label)
             self.doc_table = QTableWidget()
-            self.doc_table.setColumnCount(5)
-            self.doc_table.setHorizontalHeaderLabels([self.tr("Nom"), self.tr("Type"), self.tr("Langue"), self.tr("Date"), self.tr("Actions")])
+            # Increased column count for new "Quick Actions" column
+            self.doc_table.setColumnCount(6)
+            self.doc_table.setHorizontalHeaderLabels([
+                self.tr("Nom"), self.tr("Type"), self.tr("Langue"),
+                self.tr("Date"), self.tr("Fichier Original"), self.tr("Actions Rapides") # Added "Fichier Original" and "Actions Rapides"
+            ])
             self.doc_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            # Adjust column widths - make Actions Rapides and Fichier Original fit content
+            self.doc_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch) # Nom
+            self.doc_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents) # Type
+            self.doc_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents) # Langue
+            self.doc_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents) # Date
+            self.doc_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents) # Fichier Original
+            self.doc_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents) # Actions Rapides
+
             self.doc_table.setSelectionBehavior(QAbstractItemView.SelectRows)
             self.doc_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
             docs_layout.addWidget(self.doc_table)
@@ -1772,6 +1785,47 @@ class ClientWidget(QWidget):
         self.notes_group_box.toggled.connect(self._handle_notes_section_toggled)
         self.tabs_group_box.toggled.connect(self._handle_tabs_section_toggled)
 
+    def delete_client_document_entry(self, document_id, file_path):
+        """
+        Deletes a client document entry from the database and the corresponding file from disk.
+        """
+        if not document_id:
+            QMessageBox.warning(self, self.tr("Erreur"), self.tr("ID du document manquant."))
+            return
+
+        reply = QMessageBox.question(self, self.tr("Confirmer Suppression"),
+                                     self.tr("Êtes-vous sûr de vouloir supprimer définitivement ce document ({0})?\nLe fichier '{1}' sera également supprimé du disque.").format(document_id, os.path.basename(file_path or "N/A")),
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+
+        if reply == QMessageBox.Yes:
+            try:
+                # Attempt to delete from DB
+                # Assuming db_manager.delete_client_document is now implemented correctly
+                db_deleted = db_manager.delete_client_document(document_id)
+
+                if db_deleted:
+                    logging.info(f"Document ID {document_id} deleted from database.")
+                    # Attempt to delete file from disk
+                    if file_path and os.path.exists(file_path):
+                        try:
+                            os.remove(file_path)
+                            logging.info(f"File {file_path} deleted from disk.")
+                            QMessageBox.information(self, self.tr("Succès"), self.tr("Document et fichier supprimés avec succès."))
+                        except OSError as e_file:
+                            logging.error(f"Error deleting file {file_path}: {e_file}", exc_info=True)
+                            QMessageBox.warning(self, self.tr("Erreur Fichier"), self.tr("Document supprimé de la base de données, mais échec de la suppression du fichier:\n{0}").format(str(e_file)))
+                    else:
+                        logging.warning(f"File path not provided or file does not exist for document ID {document_id}: {file_path}. DB entry deleted.")
+                        QMessageBox.information(self, self.tr("Succès (Partiel)"), self.tr("Entrée de document supprimée de la base de données. Fichier non trouvé ou chemin non spécifié."))
+                else:
+                    QMessageBox.warning(self, self.tr("Erreur DB"), self.tr("Impossible de supprimer l'entrée du document de la base de données (ID: {0}).").format(document_id))
+
+            except Exception as e:
+                logging.error(f"Error in delete_client_document_entry for doc ID {document_id}: {e}", exc_info=True)
+                QMessageBox.critical(self, self.tr("Erreur Suppression"), self.tr("Une erreur inattendue est survenue:\n{0}").format(str(e)))
+            finally:
+                self.populate_doc_table() # Refresh the document list
+
     def _handle_edit_pdf_action(self, file_path, document_id):
         if file_path and os.path.exists(file_path):
             QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
@@ -2287,6 +2341,47 @@ class ClientWidget(QWidget):
         self.client_info_group_box.toggled.connect(self._handle_client_info_section_toggled)
         self.notes_group_box.toggled.connect(self._handle_notes_section_toggled)
         self.tabs_group_box.toggled.connect(self._handle_tabs_section_toggled)
+
+    def delete_client_document_entry(self, document_id, file_path):
+        """
+        Deletes a client document entry from the database and the corresponding file from disk.
+        """
+        if not document_id:
+            QMessageBox.warning(self, self.tr("Erreur"), self.tr("ID du document manquant."))
+            return
+
+        # Ensure file_path is a string for os.path.basename
+        file_display_name = os.path.basename(file_path) if file_path else self.tr("Inconnu")
+
+        reply = QMessageBox.question(self, self.tr("Confirmer Suppression"),
+                                     self.tr("Êtes-vous sûr de vouloir supprimer définitivement ce document (ID: {0})?\nLe fichier '{1}' sera également supprimé du disque.").format(document_id, file_display_name),
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+
+        if reply == QMessageBox.Yes:
+            try:
+                db_deleted = db_manager.delete_client_document(document_id)
+
+                if db_deleted:
+                    logging.info(f"Document ID {document_id} deleted from database.")
+                    if file_path and os.path.exists(file_path):
+                        try:
+                            os.remove(file_path)
+                            logging.info(f"File {file_path} deleted from disk.")
+                            self.notify(self.tr("Succès"), self.tr("Document et fichier supprimés avec succès."), type='SUCCESS')
+                        except OSError as e_file:
+                            logging.error(f"Error deleting file {file_path}: {e_file}", exc_info=True)
+                            self.notify(self.tr("Erreur Fichier"), self.tr("Document supprimé de la base de données, mais échec de la suppression du fichier:\n{0}").format(str(e_file)), type='ERROR')
+                    else:
+                        logging.warning(f"File path not provided or file does not exist for document ID {document_id}: {file_path}. DB entry deleted.")
+                        self.notify(self.tr("Succès (Partiel)"), self.tr("Entrée de document supprimée de la base de données. Fichier non trouvé ou chemin non spécifié."), type='WARNING')
+                else:
+                    self.notify(self.tr("Erreur DB"), self.tr("Impossible de supprimer l'entrée du document de la base de données (ID: {0}). Vérifiez les logs.").format(document_id), type='ERROR')
+
+            except Exception as e:
+                logging.error(f"Error in delete_client_document_entry for doc ID {document_id}: {e}", exc_info=True)
+                self.notify(self.tr("Erreur Suppression"), self.tr("Une erreur inattendue est survenue:\n{0}").format(str(e)), type='CRITICAL')
+            finally:
+                self.populate_doc_table()
 
     def _handle_edit_pdf_action(self, file_path, document_id):
         if file_path and os.path.exists(file_path):
@@ -3324,45 +3419,99 @@ class ClientWidget(QWidget):
                     self.tr("Impossible d'ajouter le document : {0}").format(str(e))
                 )
 
-    def _handle_open_pdf_action(self, file_path):
-        QApplication.setOverrideCursor(Qt.WaitCursor) # Set wait cursor
+    def _handle_generate_and_open_pdf_action(self, document_data: dict):
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        generated_pdf_path_final = None
         try:
             if not self.client_info or 'client_id' not in self.client_info:
                 QMessageBox.warning(self, self.tr("Erreur Client"), self.tr("Les informations du client ne sont pas disponibles."))
-                return # Return early, finally will still execute
+                return
 
-            # Extract target_language_code from the file_path
-            try:
-                target_language_code = os.path.basename(os.path.dirname(file_path))
-                if target_language_code not in ["en", "fr", "ar", "tr", "pt"]:
-                    client_langs = self.client_info.get("selected_languages", [])
-                    if isinstance(client_langs, str):
-                        client_langs = [lang.strip() for lang in client_langs.split(',') if lang.strip()]
-                    target_language_code = client_langs[0] if client_langs else "fr"
-                    logging.info(f"Language code not recognized from path {file_path}. Using fallback/default: {target_language_code}")
+            source_html_file_path = None
+            # Ensure base_client_path is absolute
+            client_base_folder_relative = self.client_info.get("base_folder_path") or self.client_info.get("default_base_folder_path")
+            if not client_base_folder_relative :
+                QMessageBox.warning(self, self.tr("Erreur Configuration"), self.tr("Le dossier de base du client n'est pas configuré."))
+                return
 
-            except Exception as e:
-                QMessageBox.warning(self, self.tr("Erreur Chemin Fichier"), self.tr("Impossible d'extraire le code langue depuis le chemin:\n{0}\nErreur: {1}").format(file_path, str(e)))
-                return # Return early
+            # self.app_root_dir should be set in ClientWidget's __init__
+            if not self.app_root_dir or not os.path.isdir(self.app_root_dir):
+                 logging.error(f"ClientWidget: self.app_root_dir '{self.app_root_dir}' is invalid.")
+                 QMessageBox.critical(self, self.tr("Erreur Configuration"), self.tr("Le dossier racine de l'application n'est pas correctement configuré."))
+                 return
 
-            app_root_dir = self.config.get('app_root_dir', os.path.dirname(sys.argv[0]))
-            if MAIN_MODULE_CONFIG and 'app_root_dir' in MAIN_MODULE_CONFIG:
-                app_root_dir = MAIN_MODULE_CONFIG['app_root_dir']
+            base_client_path = os.path.join(self.app_root_dir, client_base_folder_relative)
+            base_client_path = os.path.normpath(base_client_path)
 
-            generated_pdf_path = self.generate_pdf_for_document(
-                source_file_path=file_path,
+            relative_path_from_db = document_data.get('file_path_relative')
+            file_name_on_disk = document_data.get('file_name_on_disk', '') # Get the actual filename
+
+            if not file_name_on_disk:
+                logging.error(f"File name on disk is missing for document ID: {document_data.get('document_id')}")
+                QMessageBox.warning(self, self.tr("Données Document Imcomplètes"), self.tr("Le nom du fichier sur le disque est manquant."))
+                return
+
+            if base_client_path and relative_path_from_db:
+                # Construct the full path using file_name_on_disk and the directory part of file_path_relative
+                # This assumes file_path_relative might contain subdirectories like lang/doctype
+                path_directory_part = os.path.dirname(relative_path_from_db) # e.g., "fr/Facture Proforma" or "fr" or ""
+                source_html_file_path = os.path.join(base_client_path, path_directory_part, file_name_on_disk)
+                source_html_file_path = os.path.normpath(source_html_file_path) # Normalize path
+
+                if not os.path.exists(source_html_file_path):
+                    logging.error(f"Source HTML file not found at calculated path: {source_html_file_path}")
+                    # Try a fallback: if relative_path_from_db is the direct path from base_client_path
+                    fallback_path = os.path.normpath(os.path.join(base_client_path, relative_path_from_db))
+                    if os.path.exists(fallback_path) and os.path.basename(fallback_path) == file_name_on_disk:
+                        source_html_file_path = fallback_path
+                        logging.info(f"Used fallback path for source HTML: {source_html_file_path}")
+                    else:
+                        QMessageBox.warning(self, self.tr("Fichier Source Introuvable"), self.tr("Le fichier HTML source est introuvable : {0}").format(source_html_file_path))
+                        return
+            else:
+                QMessageBox.warning(self, self.tr("Chemin Invalide"), self.tr("Chemin du fichier source HTML non défini ou dossier client manquant."))
+                return
+
+            target_language_code = document_data.get('language_code', 'fr') # Default to 'fr'
+            if not target_language_code: # Further fallback if 'language_code' is empty string or None
+                target_language_code = 'fr'
+                logging.warning(f"Document data for {document_data.get('document_id')} missing language_code, defaulting to 'fr'.")
+
+            app_root_dir_from_config = self.config.get('app_root_dir', self.app_root_dir)
+
+            additional_context_for_pdf = {
+                'document_type': document_data.get('document_type_generated'), # Original type of the template
+                'order_identifier': document_data.get('order_identifier'),
+                # Any other specific overrides needed by context_builder for this regeneration
+            }
+            project_id_for_pdf = document_data.get('project_id')
+
+            generated_pdf_path_final = self.generate_pdf_for_document(
+                source_file_path=source_html_file_path,
                 client_info=self.client_info,
-                app_root_dir=app_root_dir,
+                app_root_dir=app_root_dir_from_config,
                 parent_widget=self,
-                target_language_code=target_language_code
+                target_language_code=target_language_code, # Language for context data
+                project_id=project_id_for_pdf,
+                additional_context=additional_context_for_pdf,
+                # document_type_for_context should be the specific type of the document being generated
+                # for context_builder to fetch correct notes, etc.
+                document_type_for_context=document_data.get('document_type_generated')
             )
-            if generated_pdf_path:
-                QDesktopServices.openUrl(QUrl.fromLocalFile(generated_pdf_path))
-            # else:
-                # Optional: If generate_pdf_for_document returns None on failure, inform user
-                # QMessageBox.warning(self, self.tr("Erreur PDF"), self.tr("Le fichier PDF n'a pas pu être généré."))
+
+            if generated_pdf_path_final and os.path.exists(generated_pdf_path_final):
+                QDesktopServices.openUrl(QUrl.fromLocalFile(generated_pdf_path_final))
+                # Refresh the table in case the PDF generation updated modification dates or created new entries
+                self.populate_doc_table() # Refresh to show new/updated PDF related info if any
+            elif generated_pdf_path_final:
+                 QMessageBox.warning(self, self.tr("Erreur Génération PDF"), self.tr("Le fichier PDF semble avoir été généré mais est introuvable : {0}").format(generated_pdf_path_final))
+            # else: self.generate_pdf_for_document would have shown an error.
+
+        except Exception as e:
+            logging.error(f"Error in _handle_generate_and_open_pdf_action: {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur Inattendue"), self.tr("Une erreur inattendue est survenue lors de la génération du PDF:\n{0}").format(str(e)))
         finally:
-            QApplication.restoreOverrideCursor() # Restore cursor in all cases
+            QApplication.restoreOverrideCursor()
 
     def populate_details_layout(self):
         # Clear existing rows from the layout
@@ -3829,7 +3978,7 @@ class ClientWidget(QWidget):
             filtered_list = []
             logging.info("PT_DEBUG: populate_doc_table - Starting client-side filtering.")
             for i, doc_data in enumerate(client_documents_from_db):
-                logging.debug(f"PT_DEBUG: populate_doc_table - Filtering doc {i+1}, ID: {doc_data.get('document_id')}")
+                # logging.debug(f"PT_DEBUG: populate_doc_table - Filtering doc {i+1}, ID: {doc_data.get('document_id')}") # Reduced verbosity
                 doc_passes_lang_filter = True
                 doc_passes_type_filter = True
 
@@ -3942,7 +4091,8 @@ class ClientWidget(QWidget):
                 action_widget = QWidget(); action_layout = QHBoxLayout(action_widget); action_layout.setContentsMargins(2,2,2,2); action_layout.setSpacing(5)
 
                 pdf_btn = QPushButton(""); pdf_btn.setIcon(QIcon(":/icons/file-text.svg")); pdf_btn.setToolTip(self.tr("Générer/Ouvrir PDF")); pdf_btn.setFixedSize(30,30)
-                pdf_btn.clicked.connect(lambda _, p=full_file_path: self._handle_open_pdf_action(p))
+                # Pass the full doc_data to the handler
+                pdf_btn.clicked.connect(lambda _, doc=doc_data: self._handle_generate_and_open_pdf_action(doc))
                 action_layout.addWidget(pdf_btn)
 
                 source_btn = QPushButton(""); source_btn.setIcon(QIcon(":/icons/eye.svg")); source_btn.setToolTip(self.tr("Afficher source")); source_btn.setFixedSize(30,30)
@@ -3968,9 +4118,15 @@ class ClientWidget(QWidget):
                         edit_pdf_btn = QPushButton(""); edit_pdf_btn.setIcon(QIcon(":/icons/pencil.svg")); edit_pdf_btn.setToolTip(self.tr("Modifier PDF")); edit_pdf_btn.setFixedSize(30, 30)
                         edit_pdf_btn.clicked.connect(lambda _, p=full_file_path, doc_id=document_id: self._handle_edit_pdf_action(p, doc_id))
                         action_layout.addWidget(edit_pdf_btn)
-                    elif doc_name.lower().endswith(('.xlsx', '.html')):
-                        edit_btn = QPushButton(""); edit_btn.setIcon(QIcon(":/icons/pencil.svg")); edit_btn.setToolTip(self.tr("Modifier document")); edit_btn.setFixedSize(30,30)
-                        edit_btn.clicked.connect(lambda _, p=full_file_path: self.open_document(p))
+                    elif doc_name.lower().endswith('.html'): # Specific to HTML for HtmlEditor and PDF regen
+                        edit_btn = QPushButton(""); edit_btn.setIcon(QIcon(":/icons/pencil.svg")); edit_btn.setToolTip(self.tr("Modifier document HTML")); edit_btn.setFixedSize(30,30)
+                        # Pass doc_data to open_document
+                        edit_btn.clicked.connect(lambda _, d=doc_data: self.open_document(d))
+                        action_layout.addWidget(edit_btn)
+                    elif doc_name.lower().endswith('.xlsx'): # Specific to Excel for ExcelEditor
+                        edit_btn = QPushButton(""); edit_btn.setIcon(QIcon(":/icons/pencil.svg")); edit_btn.setToolTip(self.tr("Modifier document Excel")); edit_btn.setFixedSize(30,30)
+                        # Pass only full_file_path for Excel as PDF regen is not directly tied here
+                        edit_btn.clicked.connect(lambda _, p=full_file_path: self.open_document(p)) # Keep old behavior for non-HTML
                         action_layout.addWidget(edit_btn)
                     else:
                         spacer_widget = QWidget(); spacer_widget.setFixedSize(30,30); action_layout.addWidget(spacer_widget)
@@ -3985,13 +4141,125 @@ class ClientWidget(QWidget):
                     spacer_widget = QWidget(); spacer_widget.setFixedSize(30,30); action_layout.addWidget(spacer_widget)
 
                 action_layout.addStretch(); action_widget.setLayout(action_layout)
-                logging.debug(f"PT_DEBUG: populate_doc_table - Row {row_idx}: Setting cell widget.")
+                logging.debug(f"PT_DEBUG: populate_doc_table - Row {row_idx}: Setting legacy actions cell widget (column 4).")
+                # This is the old "Actions" column, now "Fichier Original"
                 self.doc_table.setCellWidget(row_idx, 4, action_widget)
+
+                # --- New Quick Actions Column (Column 5) ---
+                quick_actions_widget = QWidget()
+                quick_actions_layout = QHBoxLayout(quick_actions_widget)
+                quick_actions_layout.setContentsMargins(2, 2, 2, 2)
+                quick_actions_layout.setSpacing(5)
+
+                btn_preview_quick = QPushButton("")
+                btn_preview_quick.setProperty("class", "tableActionButton") # Added class property
+                btn_preview_quick.setIcon(QIcon(":/icons/eye.svg"))
+                btn_preview_quick.setToolTip(self.tr("Aperçu rapide du document (meilleur effort)"))
+                btn_preview_quick.setFixedSize(28, 28) # Smaller buttons
+                # Store document data needed for the action
+                btn_preview_quick.setProperty("document_id", document_id)
+                btn_preview_quick.setProperty("file_path", full_file_path)
+                btn_preview_quick.setProperty("file_name", doc_name)
+                btn_preview_quick.clicked.connect(self.on_preview_doc_button_clicked)
+                quick_actions_layout.addWidget(btn_preview_quick)
+
+                btn_download_quick = QPushButton("")
+                btn_download_quick.setProperty("class", "tableActionButton") # Added class property
+                btn_download_quick.setIcon(QIcon(":/icons/download.svg"))
+                btn_download_quick.setToolTip(self.tr("Télécharger ce document"))
+                btn_download_quick.setFixedSize(28, 28)
+                btn_download_quick.setProperty("document_id", document_id)
+                btn_download_quick.setProperty("file_path", full_file_path)
+                btn_download_quick.setProperty("file_name", doc_name) # Original name for download
+                btn_download_quick.clicked.connect(self.on_download_doc_button_clicked)
+                quick_actions_layout.addWidget(btn_download_quick)
+
+                quick_actions_layout.addStretch()
+                quick_actions_widget.setLayout(quick_actions_layout)
+                self.doc_table.setCellWidget(row_idx, 5, quick_actions_widget) # New column index
+                # --- End New Quick Actions Column ---
+
                 logging.info(f"PT_DEBUG: populate_doc_table - Finished populating row {row_idx + 1}/{len(filtered_list)}.")
             logging.info("PT_DEBUG: populate_doc_table - Finished loop for populating rows.")
             logging.info("PT_DEBUG: populate_doc_table - END (SUCCESS)")
         finally:
             self._is_populating_docs = False
+
+    def preview_document_file(self, file_path: str):
+        """
+        Opens the specified document file using the system's default application.
+        This serves as a general preview mechanism.
+        """
+        if not file_path or not os.path.exists(file_path):
+            QMessageBox.warning(self, self.tr("Aperçu Impossible"),
+                                self.tr("Le fichier est introuvable ou le chemin est invalide:\n{0}").format(file_path or self.tr("Non spécifié")))
+            return
+
+        try:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
+        except Exception as e:
+            logging.error(f"Error previewing document {file_path}: {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur d'Aperçu"),
+                                 self.tr("Impossible d'ouvrir le document pour l'aperçu:\n{0}").format(str(e)))
+
+    def on_preview_doc_button_clicked(self):
+        button = self.sender()
+        if button:
+            file_path = button.property("file_path")
+            if file_path: # Path might exist even if file doesn't, preview_document_file will check os.path.exists
+                self.preview_document_file(file_path)
+            else:
+                QMessageBox.warning(self, self.tr("Aperçu Impossible"), self.tr("Chemin du fichier non disponible pour l'aperçu."))
+
+    def download_document_file(self, source_file_path: str, original_file_name: str = None):
+        """
+        Prompts the user to save a copy of the specified document file.
+        """
+        if not source_file_path or not os.path.exists(source_file_path):
+            QMessageBox.warning(self, self.tr("Téléchargement Impossible"),
+                                self.tr("Le fichier source est introuvable ou le chemin est invalide:\n{0}").format(source_file_path or self.tr("Non spécifié")))
+            return
+
+        if not original_file_name:
+            original_file_name = os.path.basename(source_file_path)
+
+        # Suggest a filename for saving
+        downloads_path = QStandardPaths.writableLocation(QStandardPaths.DownloadLocation)
+        if not downloads_path: # Fallback if download location is not available
+            downloads_path = QStandardPaths.writableLocation(QStandardPaths.DocumentsLocation)
+        if not downloads_path: # Ultimate fallback
+            downloads_path = os.path.expanduser("~")
+
+        suggested_save_path = os.path.join(downloads_path, original_file_name)
+
+        destination_file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            self.tr("Télécharger le document sous..."),
+            suggested_save_path,
+            self.tr("Tous les fichiers (*.*)")
+        )
+
+        if destination_file_path:
+            try:
+                shutil.copy(source_file_path, destination_file_path)
+                QMessageBox.information(self, self.tr("Téléchargement Réussi"),
+                                        self.tr("Document '{0}' téléchargé avec succès vers:\n{1}").format(original_file_name, destination_file_path))
+            except Exception as e:
+                logging.error(f"Error downloading document from {source_file_path} to {destination_file_path}: {e}", exc_info=True)
+                QMessageBox.critical(self, self.tr("Erreur de Téléchargement"),
+                                     self.tr("Impossible de télécharger le document:\n{0}").format(str(e)))
+
+    def on_download_doc_button_clicked(self):
+        button = self.sender()
+        if button:
+            file_path = button.property("file_path")
+            original_file_name = button.property("file_name")
+            if file_path and os.path.exists(file_path):
+                self.download_document_file(file_path, original_file_name) # Call existing method
+            elif file_path:
+                QMessageBox.warning(self, self.tr("Téléchargement Impossible"), self.tr("Le fichier source '{0}' est introuvable.").format(os.path.basename(file_path)))
+            else:
+                QMessageBox.warning(self, self.tr("Téléchargement Impossible"), self.tr("Chemin du fichier source non disponible."))
 
     def handle_edit_source_template(self, document_data):
         source_template_id = document_data.get('source_template_id')
@@ -4090,7 +4358,8 @@ class ClientWidget(QWidget):
 
 
     def open_create_docs_dialog(self):
-        dialog = self.CreateDocumentDialog(self.client_info, self.config, self)
+        # logging.info(f"ClientWidget.open_create_docs_dialog: About to open CreateDocumentDialog. Client Info: {self.client_info}, Config available: {bool(self.config)}") # DEBUG LOG REMOVED
+        dialog = self.CreateDocumentDialog(self.client_info, self.config, self.current_user_id, self) # Pass current_user_id
         if dialog.exec_() == QDialog.Accepted: self.populate_doc_table()
 
     def open_compile_pdf_dialog(self):
@@ -4113,26 +4382,83 @@ class ClientWidget(QWidget):
                 file_path = file_path_item.data(Qt.UserRole)
                 if file_path and os.path.exists(file_path): self.delete_document(file_path)
 
-    def open_document(self, file_path):
-        if os.path.exists(file_path):
-            try:
-                editor_client_data = { "client_id": self.client_info.get("client_id"), "client_name": self.client_info.get("client_name", ""), "company_name": self.client_info.get("company_name", ""), "need": self.client_info.get("need", ""), "primary_need_description": self.client_info.get("need", ""), "project_identifier": self.client_info.get("project_identifier", ""), "country": self.client_info.get("country", ""), "country_id": self.client_info.get("country_id"), "city": self.client_info.get("city", ""), "city_id": self.client_info.get("city_id"), "price": self.client_info.get("price", 0), "status": self.client_info.get("status"), "status_id": self.client_info.get("status_id"), "selected_languages": self.client_info.get("selected_languages"), "notes": self.client_info.get("notes"), "creation_date": self.client_info.get("creation_date"), "category": self.client_info.get("category"), "base_folder_path": self.client_info.get("base_folder_path") }
-                if file_path.lower().endswith('.xlsx'):
-                    editor = ExcelEditor(file_path, parent=self)
-                    if editor.exec_() == QDialog.Accepted:
-                        # ... (archiving and PDF generation logic remains the same) ...
-                        self.generate_pdf_for_document(file_path, self.client_info, self)
-                    self.populate_doc_table()
-                elif file_path.lower().endswith('.html'):
-                    html_editor_dialog = HtmlEditor(file_path, client_data=editor_client_data, parent=self)
-                    if html_editor_dialog.exec_() == QDialog.Accepted:
-                        # ... (archiving and PDF generation logic remains the same) ...
-                        generated_pdf_path = self.generate_pdf_for_document(file_path, self.client_info, self)
-                        if generated_pdf_path: print(f"Updated PDF generated at: {generated_pdf_path}")
-                    self.populate_doc_table()
-                else: QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
-            except Exception as e: QMessageBox.warning(self, self.tr("Erreur Ouverture Fichier"), self.tr("Impossible d'ouvrir le fichier:\n{0}").format(str(e)))
-        else: QMessageBox.warning(self, self.tr("Fichier Introuvable"), self.tr("Le fichier n'existe plus.")); self.populate_doc_table()
+    def open_document(self, document_data_or_file_path):
+        file_path_to_open = None
+        doc_data_for_pdf_regen = None
+
+        if isinstance(document_data_or_file_path, dict):
+            doc_data_for_pdf_regen = document_data_or_file_path
+            # Reconstruct file_path_to_open from doc_data_for_pdf_regen
+            base_client_path = self.client_info.get("base_folder_path") or self.client_info.get("default_base_folder_path", "")
+            relative_path_from_db = doc_data_for_pdf_regen.get('file_path_relative')
+            file_name_on_disk = doc_data_for_pdf_regen.get('file_name_on_disk', '')
+
+            if not base_client_path or not self.app_root_dir or not os.path.isdir(self.app_root_dir):
+                QMessageBox.warning(self, self.tr("Erreur Configuration"), self.tr("Chemin de base client ou racine application invalide."))
+                return
+
+            abs_base_client_path = os.path.normpath(os.path.join(self.app_root_dir, base_client_path))
+
+            if abs_base_client_path and relative_path_from_db and file_name_on_disk:
+                path_directory_part = os.path.dirname(relative_path_from_db)
+                file_path_to_open = os.path.normpath(os.path.join(abs_base_client_path, path_directory_part, file_name_on_disk))
+            else:
+                QMessageBox.warning(self, self.tr("Erreur Chemin"), self.tr("Impossible de déterminer le chemin du fichier à partir des données du document."))
+                return
+        elif isinstance(document_data_or_file_path, str):
+            file_path_to_open = document_data_or_file_path # This case is for .xlsx or non-HTML files where only path is passed
+        else:
+            QMessageBox.warning(self, self.tr("Erreur Interne"), self.tr("Type de données invalide pour ouvrir le document."))
+            return
+
+        if not file_path_to_open or not os.path.exists(file_path_to_open):
+            QMessageBox.warning(self, self.tr("Fichier Introuvable"), self.tr("Le fichier '{0}' n'existe plus.").format(file_path_to_open or "Inconnu"))
+            self.populate_doc_table()
+            return
+
+        try:
+            editor_client_data_for_html_editor = {
+                "client_id": self.client_info.get("client_id"), "client_name": self.client_info.get("client_name", ""),
+                "company_name": self.client_info.get("company_name", ""), "need": self.client_info.get("need", ""),
+                "primary_need_description": self.client_info.get("primary_need_description", self.client_info.get("need", "")), # Ensure primary_need_description is populated
+                "project_identifier": self.client_info.get("project_identifier", ""),
+                "country": self.client_info.get("country", ""), "country_id": self.client_info.get("country_id"),
+                "city": self.client_info.get("city", ""), "city_id": self.client_info.get("city_id"),
+                "price": self.client_info.get("price", 0), "status": self.client_info.get("status"),
+                "status_id": self.client_info.get("status_id"),
+                "selected_languages": self.client_info.get("selected_languages"),
+                "notes": self.client_info.get("notes"), "creation_date": self.client_info.get("creation_date"),
+                "category": self.client_info.get("category"),
+                "base_folder_path": self.client_info.get("base_folder_path")
+            }
+
+            if file_path_to_open.lower().endswith('.xlsx'):
+                editor = ExcelEditor(file_path_to_open, parent=self)
+                if editor.exec_() == QDialog.Accepted:
+                    # For Excel, direct PDF regeneration might not be standard without specific context.
+                    # If generate_pdf_for_document can handle Excel source, it could be called.
+                    # For now, just repopulate.
+                    pass
+                self.populate_doc_table() # Refresh table for potential changes
+            elif file_path_to_open.lower().endswith('.html'):
+                html_editor_dialog = HtmlEditor(file_path_to_open, client_data=editor_client_data_for_html_editor, parent=self)
+                if html_editor_dialog.exec_() == QDialog.Accepted:
+                    self.populate_doc_table() # Refresh table as HTML content changed
+                    if doc_data_for_pdf_regen: # Ensure we have the full doc_data
+                        reply = QMessageBox.question(self, self.tr("Régénérer PDF"),
+                                                     self.tr("Le document HTML a été sauvegardé. Voulez-vous régénérer le fichier PDF maintenant?"),
+                                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+                        if reply == QMessageBox.Yes:
+                            self._handle_generate_and_open_pdf_action(doc_data_for_pdf_regen)
+                    else:
+                        logging.warning("doc_data_for_pdf_regen was None after HTML edit. Cannot prompt for PDF regeneration.")
+                else: # Editor cancelled or closed
+                    self.populate_doc_table() # Still refresh, e.g. if modification date is displayed and important
+            else:
+                QDesktopServices.openUrl(QUrl.fromLocalFile(file_path_to_open))
+        except Exception as e:
+            QMessageBox.warning(self, self.tr("Erreur Ouverture Fichier"), self.tr("Impossible d'ouvrir le document:\n{0}").format(str(e)))
+            logging.error(f"Error opening document {file_path_to_open}: {e}", exc_info=True)
 
     def delete_document(self, file_path):
         if not os.path.exists(file_path): return

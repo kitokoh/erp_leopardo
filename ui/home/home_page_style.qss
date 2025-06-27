@@ -23,18 +23,21 @@ QWidget#homePageButtonGridContainer QPushButton {
     border-radius: 10px;       /* Coins arrondis */
     padding: 10px;             /* Padding réduit */
     font-size: 12px;           /* Police réduite */
+
     font-weight: bold;
     color: #333333;
     text-align: center;
     min-height: 80px;          /* Hauteur réduite */
     /* min-width n'est pas fixé, la grille s'en chargera avec 4 colonnes */
     /* Les ombres sont maintenant gérées par QGraphicsDropShadowEffect en Python */
+
 }
 
 QWidget#homePageButtonGridContainer QPushButton:hover {
     background-color: #E3F2FD;
     border-color: #007BFF;
     color: #0056B3;
+
 }
 
 QWidget#homePageButtonGridContainer QPushButton:pressed {

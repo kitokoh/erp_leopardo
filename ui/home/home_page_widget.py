@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, pyqtSlot, QSize, QFile, QTextStream
 from PyQt5.QtGui import QFont, QIcon, QMovie, QColor
+
 import os
 import random
 
@@ -39,6 +40,7 @@ class HomePageWidget(QWidget):
         # --- Section Centrale: GIF (gauche) et Boutons (droite) ---
         center_h_layout = QHBoxLayout()
         center_h_layout.setContentsMargins(10, 10, 10, 10) # Marges pour cette section (ajouté top margin)
+
         center_h_layout.setSpacing(15)
 
         # Colonne Gauche: GIF
@@ -51,6 +53,7 @@ class HomePageWidget(QWidget):
              gif_path_alt_base = os.path.join("resources", "gifshome")
              if os.path.isdir(gif_path_alt_base): gif_path = os.path.join(gif_path_alt_base, chosen_gif_name)
              else: gif_path = chosen_gif_name
+
 
         if os.path.exists(gif_path):
             self.movie = QMovie(gif_path)
@@ -65,12 +68,14 @@ class HomePageWidget(QWidget):
 
             self.movie.start()
             gif_label.setAlignment(Qt.AlignCenter)
+
         else:
             gif_label.setText(self.tr("GIF '{0}' non trouvé.").format(chosen_gif_name))
             gif_label.setStyleSheet("color: red;")
             gif_label.setAlignment(Qt.AlignCenter)
 
         center_h_layout.addWidget(gif_label, 1)
+
 
         # Colonne Droite: Boutons de modules
         scroll_area = QScrollArea()
@@ -86,6 +91,7 @@ class HomePageWidget(QWidget):
         grid_layout = QGridLayout(button_container_widget)
         grid_layout.setContentsMargins(5, 5, 5, 5)
         grid_layout.setSpacing(10)
+
 
         self.modules = [
             {"name": self.tr("Gestion Documents Client"), "object_name": "btnClientDocuments", "icon": ":/icons/modern/folder-docs.svg", "slot": self.go_to_documents},
@@ -103,6 +109,7 @@ class HomePageWidget(QWidget):
         ]
         row, col = 0, 0
         num_columns = 4
+
 
         for i, module_data in enumerate(self.modules):
             button = QPushButton(module_data["name"])
@@ -141,6 +148,7 @@ class HomePageWidget(QWidget):
         self.bottom_content_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         main_v_layout.addWidget(self.bottom_content_area, 1)
 
+
         self.setLayout(main_v_layout)
 
     def set_bottom_widget(self, widget_to_display):
@@ -154,10 +162,12 @@ class HomePageWidget(QWidget):
         else:
             self.bottom_content_area.setVisible(False)
 
+
     @pyqtSlot()
     def go_to_documents(self):
         if hasattr(self.parent(), 'show_documents_view'):
             self.parent().show_documents_view()
+
 
     @pyqtSlot()
     def go_to_project_management(self):
@@ -175,6 +185,7 @@ class HomePageWidget(QWidget):
                     self.parent().show_statistics_view()
         elif hasattr(self.parent(), 'show_statistics_view'):
             self.parent().show_statistics_view()
+
 
     @pyqtSlot()
     def go_to_product_management(self):
@@ -220,6 +231,7 @@ if __name__ == '__main__':
     from PyQt5.QtWidgets import QApplication
     import sys
 
+
     try:
         import icons_rc
     except ImportError:
@@ -231,6 +243,7 @@ if __name__ == '__main__':
             super().__init__()
             self.setWindowTitle("Mock Main Window for HomePageWidget Test")
             self.main_layout = QVBoxLayout(self)
+
 
             self.statistics_dashboard_instance = QLabel("Contenu de la Page Statistiques (Mock)")
             self.statistics_dashboard_instance.setAlignment(Qt.AlignCenter)
@@ -257,6 +270,7 @@ if __name__ == '__main__':
                  if widget:
                      widget.deleteLater()
             self.main_layout.addWidget(temp_stats_page)
+
 
         def show_product_management_page(self): print("Mock: Navigating to Product Management")
         def show_partner_management_view(self): print("Mock: Navigating to Partner Management")
