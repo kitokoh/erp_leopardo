@@ -117,6 +117,25 @@ sequenceDiagram
     *   Le `DocumentManager` peut alors afficher une notification de succès à l'utilisateur.
     *   Le document PDF généré peut être automatiquement ouvert pour prévisualisation.
     *   L'utilisateur peut ensuite choisir d'effectuer d'autres actions, comme envoyer la facture proforma par e-mail (ce qui impliquerait le [Module Gestion des E-mails (Interface Utilisateur)](./module_gestion_emails_ui.md)).
+1.  **Initiation**: L'utilisateur, depuis `DocumentManager`, choisit de créer une nouvelle facture proforma.
+2.  **Ouverture du Dialogue**: `CreateDocumentDialog` (ou un dialogue similaire) s'ouvre.
+3.  **Sélection des Données**:
+    *   L'utilisateur sélectionne un client.
+    *   L'utilisateur ajoute des produits/services à la proforma, spécifiant les quantités et les prix (qui peuvent être récupérés de la base de données).
+    *   L'utilisateur peut spécifier des conditions particulières, des dates, etc.
+4.  **Validation et Collecte du Contexte**:
+    *   Le dialogue valide les entrées.
+    *   `document_generator/context_builder.py` est sollicité pour assembler toutes les données nécessaires (informations client, détails de l'entreprise de l'utilisateur, liste des produits, totaux, taxes, etc.) dans un dictionnaire de contexte.
+5.  **Génération du Document**:
+    *   La logique de génération (par exemple, dans `html_generator.py` ou une fonction dédiée) prend le contexte et le modèle HTML de la facture proforma.
+    *   Le moteur de template (Jinja2) remplit le modèle avec les données du contexte, produisant un fichier HTML.
+6.  **Conversion en PDF (si applicable)**:
+    *   Le fichier HTML est passé à `html_to_pdf_util.py` pour être converti en PDF.
+7.  **Sauvegarde et Affichage**:
+    *   Le PDF généré est sauvegardé à un emplacement approprié.
+    *   Les métadonnées du document sont enregistrées en base de données (via un CRUD spécifique, par exemple `proforma_invoices_crud.py`).
+    *   Le document peut être automatiquement ouvert pour prévisualisation ou l'utilisateur peut être notifié de sa création.
+8.  **Actions Postérieures**: L'utilisateur peut ensuite choisir d'envoyer la proforma par e-mail, de l'imprimer, etc.
 
 ## 4. Interactions avec d'Autres Modules
 

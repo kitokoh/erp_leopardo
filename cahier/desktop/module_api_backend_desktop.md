@@ -177,3 +177,4 @@ Ce qui suit est une liste des principaux fichiers de routeurs identifiés dans l
     *   `POST /templates/`: Uploader un nouveau modèle.
 
 *(Note : Les chemins exacts des endpoints, les méthodes HTTP et les paramètres peuvent varier. Cette liste est une supposition éclairée basée sur les noms des fichiers routeurs et les fonctionnalités typiques.)*
+

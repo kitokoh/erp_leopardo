@@ -412,6 +412,7 @@ erDiagram
 ```
 *(Note: Ce diagramme est une simplification. La liaison des documents CV/LM directement à `CANDIDATES` est une simplification ; une table `CANDIDATE_DOCUMENTS` serait plus flexible. `CANDIDATE_APPLICATIONS` est introduite pour gérer le fait qu'un candidat peut postuler à plusieurs offres.)*
 
+
 ## 5. Couche d'Accès aux Données (CRUDs)
 
 *   Le dossier `db/cruds/` contient des modules Python chacun étant dédié aux opérations CRUD (Create, Read, Update, Delete) pour une ou plusieurs tables/modèles.
