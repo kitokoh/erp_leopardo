@@ -269,11 +269,21 @@ def hash_password(password: str) -> str:
     """Hashes a password using the configured context."""
     return pwd_context.hash(password)
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verifies a plain password against a hashed one."""
+def verify_password(plain_password: str, hashed_password: str) -> tuple[bool, str | None]:
+    """
+    Verifies a plain password against a hashed one and checks if the hash should be updated.
+
+    Returns:
+        tuple[bool, str | None]: (is_verified, new_hash_if_needed_or_None)
+    """
     try:
-        return pwd_context.verify(plain_password, hashed_password)
+        # verify_and_update returns (verified, new_hash_or_None)
+        # new_hash_or_None is None if the hash is already in the default format.
+        # It's a new hash string if the old hash was valid but used a deprecated scheme.
+        verified, new_hash = pwd_context.verify_and_update(plain_password, hashed_password)
+        return verified, new_hash
     except Exception as e:
-        # Log unexpected errors during verification, e.g., malformed hash
-        logging.error(f"Error verifying password: {e}", exc_info=True)
-        return False
+        # Log unexpected errors during verification, e.g., malformed hash, unknown scheme
+        logging.error(f"Error verifying password or during hash update check: {e}", exc_info=True)
+        return False, None # Return False and no new hash on error
+
