@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 def format_currency(amount, currency_symbol='€', decimal_places=2, language_code='en'):
     """
     Formats a numerical amount as a currency string, with basic localization.
-    Example:
+
         format_currency(Decimal('1234.567'), currency_symbol='$', language_code='en') == '$1,234.57'
         format_currency(Decimal('1234.567'), currency_symbol='€', language_code='fr') == '1 234,57 €'
     """
@@ -59,6 +59,7 @@ def format_currency(amount, currency_symbol='€', decimal_places=2, language_co
     rounded_amount = amount.quantize(quantizer, ROUND_HALF_UP)
 
     abs_rounded_amount = abs(rounded_amount) # For formatting, sign handled later
+
 
     parts = str(abs_rounded_amount).split('.')
     integer_part_str = parts[0]
@@ -144,6 +145,7 @@ def get_document_context(
 
         _labels = {
             "fr": {
+
             "proforma_invoice_title": "FACTURE PROFORMA",
             "from_seller": "De :",
             "to_client": "À :",
@@ -275,6 +277,7 @@ def get_document_context(
     # Date formatting based on locale (simple version)
     # Storing the original YYYY-MM-DD date as well for potential machine use or other formatting needs
     context["doc"]["current_date_iso"] = context["doc"]["current_date"]
+
     try:
         current_date_obj = datetime.datetime.strptime(context["doc"]["current_date"], "%Y-%m-%d").date()
         if language_code == "fr":
@@ -297,6 +300,7 @@ def get_document_context(
                                                             additional_data.get('proforma_id')))
     if not doc_identifier and document_type and 'proforma' in document_type.lower():
         doc_identifier = f"PF-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}" # Basic generated ID
+
 
     context["doc"]["proforma_id"] = doc_identifier if doc_identifier else "N/A"
     # For other document types, a more generic 'document_reference' might be useful.
@@ -356,6 +360,7 @@ def get_document_context(
             context["seller"]["vat_id"] = other_info.get("vat_id", seller_company.get("vat_id")) # Prioritize other_info
             context["seller"]["registration_number"] = other_info.get("registration_number")
 
+
             # Full address from DB, and construct city_zip_country if possible (difficult if address is one string)
             context["seller"]["address_full"] = seller_company.get("address")
             # Attempt to construct city_zip_country if parts are in other_info or payment_info, or parse from address_full
@@ -388,12 +393,14 @@ def get_document_context(
             client_ctx["company_name"] = client_data.get("company_name")
             client_ctx["display_name"] = client_data.get("company_name") or client_data.get("name")
 
+
             # Address fields from Clients table structure (assuming these are direct columns)
             # clients_crud.py implies these are direct fields from `get_all_clients_with_details` context preparation
             # but `get_client_by_id` might return raw IDs. Let's assume direct names are available if fetched with details,
             # otherwise, we need to fetch them using IDs. For now, assuming `get_client_by_id` provides enough.
             client_ctx["address_line1"] = client_data.get("address_line1", client_data.get("default_base_folder_path")) # Fallback for address_line1
             client_ctx["address_line2"] = client_data.get("address_line2")
+
             client_ctx["postal_code"] = client_data.get("postal_code")
 
             # VAT ID and Registration Number for Client (from notes or distributor_specific_info)
@@ -524,6 +531,7 @@ def get_document_context(
                     if file_path and app_root_dir:
                         media_root = AppGlobalConfig.get('media_files_path')
                         if not media_root and app_root_dir:
+
                             media_root = os.path.join(app_root_dir, 'media_files') # Adjusted default to media_files
                         if media_root:
                             abs_media_path = os.path.join(media_root, file_path.lstrip(os.sep))
