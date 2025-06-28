@@ -323,6 +323,7 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                 )
             logging.info(f"Called generate_pdf_for_document for AUTO PROFORMA. File: {template_base_filename}, Lang: {target_proforma_lang}, allow_empty_products=True. Result path: {generated_pdf_path}") # NEW LOG
 
+
                 if not generated_pdf_path or not os.path.exists(generated_pdf_path):
                     logging.error(f"Automatic Proforma PDF generation failed for client {actual_new_client_id}.")
                     raise Exception("Automatic Proforma PDF generation failed.")

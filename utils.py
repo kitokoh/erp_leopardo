@@ -212,6 +212,7 @@ def generate_pdf_for_document(
                  QMessageBox.information(parent_widget, QCoreApplication.translate("utils.generate_pdf", "Information"),
                                         QCoreApplication.translate("utils.generate_pdf", f"Aucun produit n'est lié à ce client/projet (ou aucun ne correspond à la langue '{target_language_code}'). La génération du PDF pour '{file_name}' est annulée."))
                  return None
+
             # If document_context.get('products') is not empty here, it means there ARE products for the target language.
 
         try:
