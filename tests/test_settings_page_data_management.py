@@ -180,7 +180,7 @@ class TestSettingsPageDataManagement(unittest.TestCase):
         self.mock_qfiledialog.getSaveFileName.return_value = (dummy_filepath, "CSV Files (*.csv)")
 
         # Mock open to raise IOError
-        with patch('builtins.open', mock_open() as m_open):
+        with patch('builtins.open', new_callable=mock_open) as m_open:
             m_open.side_effect = IOError("Disk full")
             self.settings_page._handle_export_products()
 

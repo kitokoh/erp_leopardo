@@ -46,8 +46,13 @@ opencv-python-headless==4.11.0.86
 
 # Development & Testing Tools
 pytest>=7.0.0
+pytest-qt>=4.0.0
+python-multipart>=0.0.5 # For FastAPI form data
 black>=23.0.0
 flake8>=6.0.0
+icalendar>=5.0.0 # For conference_manager tests
+reportlab>=3.6.0 # For excel_editor
+PyQtWebEngine>=5.15.5 # For QtWebEngineWidgets
 isort>=5.10.0
 
 # Optional/Experimental (Review if needed)

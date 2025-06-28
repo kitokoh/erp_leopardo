@@ -105,7 +105,9 @@
             <p>SWIFT/BIC: {{ seller.bank_swift_bic }}</p>
             <p>Adresse de la banque: {{ seller.bank_address }}</p>
             <hr>
-            <p>{{ doc.proforma_notes }}</p>
+            {% if doc.client_specific_footer_notes %}
+            <p>{{doc.client_specific_footer_notes}}</p>
+            {% endif %}
             <p style="margin-top: 10px;"><em>Ceci est une facture proforma et ne constitue pas une demande de paiement.</em></p>
             <p><em>Merci de votre confiance !</em></p>
             <p style="font-size: 0.8em; color: #999; margin-top: 20px;">{{ seller.company_name }} - {{ seller.address }} - Numéro de TVA: {{ seller.vat_id }} - Numéro d'enregistrement: {{ seller.registration_number }}</p>

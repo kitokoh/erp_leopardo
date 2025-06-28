@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import QMessageBox, QDialog, QInputDialog # QInputDialog wa
 # from PyQt5.QtCore import QStandardPaths # Removed as not used by these functions
 
 # Import necessary functions directly from their new CRUD module locations
-from controllers.client_controller import ClientController # Added
+from client_management.client_controller import ClientController # Added
 from controllers.contact_controller import ContactController # Added
 from db.cruds.locations_crud import get_country_by_id, get_city_by_id # These are fine as locations_crud is not refactored to class yet
 from db.cruds.status_settings_crud import get_status_setting_by_name, get_status_setting_by_id # Fine

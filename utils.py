@@ -194,7 +194,7 @@ def generate_pdf_for_document(
         target_language_code=target_language_code,
         project_id=project_id, # Use the passed project_id
         document_type=document_type_for_context, # Pass the specific document type for context
-        additional_data=additional_context if additional_context else {'document_title': file_name} # Pass additional_context
+        additional_context=additional_context if additional_context else {'document_title': file_name} # Pass additional_context
     )
 
     if file_ext.lower() == '.html':
