@@ -142,7 +142,7 @@ class CreateDocumentDialog(QDialog):
             client_languages = [lang.strip() for lang in client_languages.split(',') if lang.strip()]
 
         # Use all known system languages if client has none or for broader selection
-        system_languages = ["fr", "en", "ar", "tr", "pt"] # Define or get from config
+        system_languages = ["fr", "en", "ar", "tr", "pt", "ru"] # Define or get from config
 
         effective_langs_for_combo = sorted(list(set(client_languages + system_languages)))
 
