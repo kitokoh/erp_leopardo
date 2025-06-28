@@ -2,85 +2,219 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Proforma Invoice</title>
+    <title>Facture Proforma</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
-        .container { width: 90%; margin: auto; }
-        .header, .footer { text-align: center; margin-bottom: 30px; }
-        .header h1 { color: #444; }
-        .details-section { display: flex; justify-content: space-between; margin-bottom: 30px; }
-        .company-details, .client-details { width: 48%; padding: 10px; background-color: #f9f9f9; border: 1px solid #eee; }
-        .invoice-meta { clear: both; margin-bottom: 20px; background-color: #f9f9f9; padding: 15px; border: 1px solid #eee; }
-        .invoice-meta p { margin: 5px 0; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background-color: #e9e9e9; font-weight: bold; }
-        .total-section { text-align: right; margin-top: 20px; padding-right:10px;}
-        .total-section h3 { color: #555; }
-        .footer p { font-size: 0.9em; color: #777; }
-        .logo { max-width: 150px; max-height: 70px; margin-bottom: 10px; }
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            color: #333;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+        .container {
+            width: 800px; /* Fixed width for better PDF rendering consistency */
+            margin: 30px auto;
+            background-color: #fff;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #007bff; /* Accent color */
+        }
+        .header .logo-container {
+            flex-grow: 1;
+        }
+        .header .logo {
+            max-width: 200px;
+            max-height: 80px;
+        }
+        .header h1 {
+            color: #007bff;
+            font-size: 28px;
+            margin: 0;
+            text-align: right;
+            font-weight: 300;
+            white-space: nowrap;
+        }
+        .details-section {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+        }
+        .company-details, .client-details {
+            width: 48%;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            border: 1px solid #e7e7e7;
+        }
+        .company-details h3, .client-details h3 {
+            margin-top: 0;
+            color: #007bff;
+            font-size: 14px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+        .company-details p, .client-details p {
+            margin: 4px 0;
+            font-size: 11px;
+        }
+        .invoice-meta {
+            margin-bottom: 30px;
+            background-color: #f0f8ff; /* Light blue accent */
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .invoice-meta p {
+            margin: 6px 0;
+            font-size: 12px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px; /* Increased padding */
+            text-align: left;
+            font-size: 11px;
+        }
+        th {
+            background-color: #007bff; /* Primary accent color */
+            color: #fff;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 11px;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .number { /* Class for numerical cells */
+            text-align: right;
+        }
+        .total-section {
+            text-align: right;
+            margin-top: 30px;
+            padding-right: 10px;
+        }
+        .total-section p {
+            margin: 5px 0;
+            font-size: 12px;
+        }
+        .total-section h3 {
+            color: #007bff;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            font-size: 10px;
+            color: #666;
+        }
+        .footer p {
+            margin: 3px 0;
+        }
+        .bank-details {
+            margin-bottom:20px;
+            padding:15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            text-align:left;
+        }
+        .bank-details p {
+            margin: 4px 0;
+            font-size: 11px;
+        }
+        .bank-details strong {
+            color: #007bff;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <img src="{{SELLER_LOGO_PATH}}" alt="Company Logo" class="logo" />
-            <h1>PROFORMA INVOICE</h1>
+            {% if seller.logo_url %}
+            <img src="{{ seller.logo_url }}" alt="Company Logo" class="logo" />
+            {% endif %}
+            <h1>FACTURE PROFORMA</h1> {# Kept French static text, assuming template per lang #}
         </div>
 
         <div class="details-section">
             <div class="company-details">
-                <h3>From:</h3>
-                <p><strong>{{SELLER_COMPANY_NAME}}</strong></p>
-                <p>{{SELLER_ADDRESS_LINE1}}</p>
-                <p>{{SELLER_CITY_ZIP_COUNTRY}}</p>
-                <p>Phone: {{SELLER_PHONE}}</p>
-                <p>Email: {{SELLER_EMAIL}}</p>
-                <p>VAT ID: {{SELLER_VAT_ID}}</p>
+                <h3>De :</h3> {# Kept French static text #}
+                <p><strong>{{ seller.name }}</strong></p>
+                <p>{{ seller.address_full }}</p>
+                {# seller.city_zip_country might be less useful if address_full is comprehensive #}
+                {# <p>{{ seller.city_zip_country }}</p> #}
+                <p>Téléphone : {{ seller.phone }}</p>
+                <p>Email : {{ seller.email }}</p>
+                <p>N° TVA : {{ seller.vat_id }}</p>
+                <p>N° de registre : {{ seller.registration_number }}</p>
             </div>
 
             <div class="client-details">
-                <h3>To:</h3>
-                <p><strong>{{CLIENT_NAME}}</strong></p>
-                <p>{{CLIENT_ADDRESS_LINE1}}</p>
-                <p>{{CLIENT_CITY_ZIP_COUNTRY}}</p>
-                <p>Contact: {{PRIMARY_CONTACT_NAME}}</p>
-                <p>Email: {{PRIMARY_CONTACT_EMAIL}}</p>
-                <p>VAT ID: {{CLIENT_VAT_ID}}</p>
+                <h3>À :</h3> {# Kept French static text #}
+                <p><strong>{{ client.display_name }}</strong></p>
+                <p>{{ client.address_full }}</p>
+                {# <p>{{ client.city_zip_country }}</p> #}
+                <p>Contact : {{ client.contact_name }}</p>
+                <p>Email : {{ client.contact_email }}</p>
+                <p>N° TVA : {{ client.vat_id }}</p>
             </div>
         </div>
 
         <div class="invoice-meta">
-            <p><strong>Proforma Invoice No:</strong> {{PROFORMA_ID}}</p>
-            <p><strong>Date:</strong> {{DATE}}</p>
-            <p><strong>Project ID:</strong> {{PROJECT_ID}}</p>
-            <p><strong>Payment Terms:</strong> {{PAYMENT_TERMS}}</p>
-            <p><strong>Delivery Terms:</strong> {{DELIVERY_TERMS}}</p>
+            <p><strong>Facture Proforma N° :</strong> {{ doc.proforma_id | default(placeholders.PROFORMA_ID) }}</p>
+            <p><strong>Date :</strong> {{ doc.current_date | default(placeholders.DATE) }}</p>
+            <p><strong>ID Projet :</strong> {{ project.identifier | default(placeholders.PROJECT_IDENTIFIER) }}</p>
+            <p><strong>Conditions de Paiement :</strong> {{ doc.payment_terms | default(placeholders.PAYMENT_TERMS) }}</p>
+            <p><strong>Conditions de Livraison :</strong> {{ doc.delivery_terms | default(placeholders.DELIVERY_TERMS) }}</p>
         </div>
 
         <table>
             <thead>
                 <tr>
-                    <th>#</th>
-                    <th>Item Description</th>
-                    <th>Quantity</th>
-                    <th>Unit Price</th>
-                    <th>Total Price</th>
+                    <th style="width:5%;">{{ labels.item_ref | default('#') }}</th>
+                    <th style="width:45%;">{{ labels.item_description | default('Description') }}</th>
+                    <th style="width:15%;" class="number">{{ labels.quantity | default('Quantity') }}</th>
+                    <th style="width:15%;" class="number">{{ labels.unit_price | default('Unit Price') }}</th>
+                    <th style="width:20%;" class="number">{{ labels.total_price | default('Total Price') }}</th>
                 </tr>
             </thead>
             <tbody>
-                <!-- Structure des lignes de produits générée par get_proforma_invoice_context_data -->
-                <!-- Chaque ligne ressemble à :
+                {% for product in products %}
                 <tr>
-                    <td>#</td> (index)
-                    <td>{{product.product_code}}</td>
-                    <td><strong>{{product.name}}</strong><br><small>{{product.description}}</small></td>
-                    <td class='number'>{{product.quantity}}</td>
-                    <td class='number'>{{product.unit_price_formatted}}</td>
-                    <td class='number'>{{product.total_price_formatted}}</td>
+                    <td class="number">{{ loop.index }}</td>
+                    <td>
+                        <strong>{{ product.name }}</strong>
+                        {% if product.sku and product.sku != 'N/A' %}<br><small>SKU: {{ product.sku }}</small>{% endif %}
+                        {% if product.description and product.description != product.name and product.description != product.sku %}
+                        <br><small>{{ product.description }}</small>
+                        {% endif %}
+                    </td>
+                    <td class="number">{{ product.quantity }}</td>
+                    <td class="number">{{ product.unit_price }}</td> {# Already formatted string from context #}
+                    <td class="number">{{ product.total_price }}</td> {# Already formatted string from context #}
                 </tr>
-                -->
-                {{{doc.products_table_rows}}}
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center;">{{ labels.no_products_listed | default("Aucun produit listé.") }}</td>
+                </tr>
+                {% endfor %}
             </tbody>
         </table>
 
