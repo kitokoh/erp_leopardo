@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <title>Proforma Invoice</title>
@@ -69,30 +69,48 @@
                 </tr>
             </thead>
             <tbody>
-                <tr><td>1</td><td>Advanced Gizmo</td><td>1</td><td>€250.00</td><td>€250.00</td></tr> <!-- Populated by db.py -->
-                <!-- Example Row (to be replaced by HtmlEditor):
+                <!-- Structure des lignes de produits générée par get_proforma_invoice_context_data -->
+                <!-- Chaque ligne ressemble à :
                 <tr>
-                    <td>1</td>
-                    <td>Product A</td>
-                    <td>2</td>
-                    <td>€100.00</td>
-                    <td>€200.00</td>
+                    <td>#</td> (index)
+                    <td></td>
+                    <td><strong></strong><br><small></small></td>
+                    <td class='number'></td>
+                    <td class='number'></td>
+                    <td class='number'></td>
                 </tr>
                 -->
+                }
             </tbody>
         </table>
 
-        <div class="total-section">
-            <p>Subtotal: </p>
-            <p>Discount (%): </p>
-            <p>VAT (%): </p>
-            <h3><strong>Total Amount Due: </strong></h3>
+        <div class="invoice-meta" style="margin-top: 20px;">
+            <p><strong>Référence Commande Client:</strong> </p>
+            <p><strong>Date Commande Client:</strong> </p>
         </div>
 
-        <div class="footer">
-            <p>Bank Details: , Account: , Swift/BIC: </p>
-            <p>This is a proforma invoice and is not a demand for payment.</p>
-            <p>Thank you for your business!</p>
+        <div class="total-section">
+            <p>Sous-total: </p>
+            <p>Remise (%): </p>
+            <p>TVA (%): </p>
+            <h3><strong>Montant Total: </strong></h3>
+            <!-- <p>()</p> -->
+        </div>
+
+        <div class="footer" style="margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px;">
+            <p><strong>Nos coordonnées bancaires :</strong></p>
+            <p>Banque: </p>
+            <p>Titulaire du compte: </p>
+            <p>IBAN: </p>
+            <p>SWIFT/BIC: </p>
+            <p>Adresse de la banque: </p>
+            <hr>
+            {% if doc.client_specific_footer_notes %}
+            <p></p>
+            {% endif %}
+            <p style="margin-top: 10px;"><em>Ceci est une facture proforma et ne constitue pas une demande de paiement.</em></p>
+            <p><em>Merci de votre confiance !</em></p>
+            <p style="font-size: 0.8em; color: #999; margin-top: 20px;"> - 123 Default Street - Numéro de TVA: N/A - Numéro d'enregistrement: N/A</p>
         </div>
     </div>
 </body>
