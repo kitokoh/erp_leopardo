@@ -40,7 +40,7 @@ from document_manager_logic import create_final_invoice_and_update_db
 
 
 # Globals imported from main (temporary, to be refactored)
-SUPPORTED_LANGUAGES = ["en", "fr", "ar", "tr", "pt"] # Define supported languages
+SUPPORTED_LANGUAGES = ["en", "fr", "ar", "tr", "pt", "ru"] # Define supported languages
 
 MAIN_MODULE_CONTACT_DIALOG = None
 MAIN_MODULE_PRODUCT_DIALOG = None

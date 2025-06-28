@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ru" dir="{{ lang.text_direction | default('ltr') }}">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ labels.proforma_invoice_title | default('Проформа-инвойс') }}</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            color: #333;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+        .container {
+            width: 800px; /* Fixed width for better PDF rendering consistency */
+            margin: 30px auto;
+            background-color: #fff;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #007bff; /* Accent color */
+        }
+        .header .logo-container {
+            flex-grow: 1;
+        }
+        .header .logo {
+            max-width: 200px;
+            max-height: 80px;
+        }
+        .header h1 {
+            color: #007bff;
+            font-size: 28px;
+            margin: 0;
+            text-align: right;
+            font-weight: 300;
+            white-space: nowrap;
+        }
+        .details-section {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+        }
+        .company-details, .client-details {
+            width: 48%;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            border: 1px solid #e7e7e7;
+        }
+        .company-details h3, .client-details h3 {
+            margin-top: 0;
+            color: #007bff;
+            font-size: 14px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+        .company-details p, .client-details p {
+            margin: 4px 0;
+            font-size: 11px;
+        }
+        .invoice-meta {
+            margin-bottom: 30px;
+            background-color: #f0f8ff; /* Light blue accent */
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .invoice-meta p {
+            margin: 6px 0;
+            font-size: 12px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px; /* Increased padding */
+            text-align: left;
+            font-size: 11px;
+        }
+        th {
+            background-color: #007bff; /* Primary accent color */
+            color: #fff;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 11px;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .number { /* Class for numerical cells */
+            text-align: right;
+        }
+        .total-section {
+            text-align: right;
+            margin-top: 30px;
+            padding-right: 10px;
+        }
+        .total-section p {
+            margin: 5px 0;
+            font-size: 12px;
+        }
+        .total-section h3 {
+            color: #007bff;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            font-size: 10px;
+            color: #666;
+        }
+        .footer p {
+            margin: 3px 0;
+        }
+        .bank-details {
+            margin-bottom:20px;
+            padding:15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            text-align:left;
+        }
+        .bank-details p {
+            margin: 4px 0;
+            font-size: 11px;
+        }
+        .bank-details strong {
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo-container">
+                {% if seller.logo_url %}
+                <img src="{{ seller.logo_url }}" alt="{{ labels.company_logo_alt | default('Company Logo') }}" class="logo" />
+                {% endif %}
+            </div>
+            <h1>{{ labels.proforma_invoice_title | default('Проформа-Инвойс') }}</h1>
+        </div>
+
+        <div class="details-section">
+            <div class="company-details">
+                <h3>{{ labels.from_seller | default('От:') }}</h3>
+                <p><strong>{{ seller.name | default('N/A') }}</strong></p>
+                <p>{{ seller.address_full | default('N/A') }}</p>
+                <p>{{ labels.phone_label | default('Телефон:') }} {{ seller.phone | default('N/A') }}</p>
+                <p>{{ labels.email_label | default('Email:') }} {{ seller.email | default('N/A') }}</p>
+                <p>{{ labels.vat_id_label | default('ИНН:') }} {{ seller.vat_id | default('N/A') }}</p>
+                <p>{{ labels.reg_no_label | default('Рег. номер:') }} {{ seller.registration_number | default('N/A') }}</p>
+            </div>
+
+            <div class="client-details">
+                <h3>{{ labels.to_client | default('Кому:') }}</h3>
+                <p><strong>{{ client.display_name | default('N/A') }}</strong></p>
+                <p>{{ client.address_full | default('N/A') }}</p>
+                <p>{{ labels.contact_label | default('Контакт:') }} {{ client.contact_name | default('N/A') }}</p>
+                <p>{{ labels.email_label | default('Email:') }} {{ client.contact_email | default('N/A') }}</p>
+                <p>{{ labels.vat_id_label | default('ИНН:') }} {{ client.vat_id | default('N/A') }}</p>
+            </div>
+        </div>
+
+        <div class="invoice-meta">
+            <p><strong>{{ labels.proforma_no | default('Проформа №:') }}</strong> {{ doc.proforma_id | default('N/A') }}</p>
+            <p><strong>{{ labels.date_label | default('Дата:') }}</strong> {{ doc.current_date_formatted | default('N/A') }}</p>
+            <p><strong>{{ labels.project_id_label | default('ID Проекта:') }}</strong> {{ project.identifier | default('N/A') }}</p>
+            <p><strong>{{ labels.payment_terms_label | default('Условия оплаты:') }}</strong> {{ doc.payment_terms | default('N/A') }}</p>
+            <p><strong>{{ labels.delivery_terms_label | default('Условия поставки:') }}</strong> {{ doc.delivery_terms | default('N/A') }}</p>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:5%;">{{ labels.item_ref | default('#') }}</th>
+                    <th style="width:45%;">{{ labels.item_description | default('Описание') }}</th>
+                    <th style="width:15%;" class="number">{{ labels.quantity | default('Кол-во') }}</th>
+                    <th style="width:15%;" class="number">{{ labels.unit_price | default('Цена за ед.') }}</th>
+                    <th style="width:20%;" class="number">{{ labels.total_price | default('Сумма') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for product in products %}
+                <tr>
+                    <td class="number">{{ loop.index }}</td>
+                    <td>
+                        <strong>{{ product.name }}</strong>
+                        {% if product.sku and product.sku != 'N/A' %}<br><small>SKU: {{ product.sku }}</small>{% endif %}
+                        {% if product.description and product.description != product.name and product.description != product.sku %}
+                        <br><small>{{ product.description }}</small>
+                        {% endif %}
+                    </td>
+                    <td class="number">{{ product.quantity }}</td>
+                    <td class="number">{{ product.unit_price }}</td>
+                    <td class="number">{{ product.total_price }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center;">{{ labels.no_products_listed | default("Нет товаров в списке.") }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="invoice-meta" style="margin-top: 20px;">
+            <p><strong>{{ labels.client_order_ref_label | default('Номер заказа клиента:') }}</strong> {{ order.client_order_number | default('N/A') }}</p>
+            <p><strong>{{ labels.client_order_date_label | default('Дата заказа клиента:') }}</strong> {{ order.client_order_date | default('N/A') }}</p>
+        </div>
+
+        <div class="total-section">
+            <p>{{ labels.sub_total | default('Подытог:') }} {{ doc.subtotal_amount | default('N/A') }}</p>
+            {% if doc.discount_amount_raw and doc.discount_amount_raw > 0 %}
+            <p>{{ labels.discount | default('Скидка') }} ({{ doc.discount_rate * 100 }}%) : {{ doc.discount_amount | default('N/A') }}</p>
+            {% endif %}
+            <p>{{ labels.vat | default('НДС') }} ({{ doc.vat_rate * 100 }}%) : {{ doc.vat_amount | default('N/A') }}</p>
+            <h3><strong>{{ labels.grand_total | default('Итого:') }} {{ doc.grand_total_amount | default('N/A') }}</strong></h3>
+        </div>
+
+        <div class="bank-details">
+            <p><strong>{{ labels.bank_details_title | default('Наши банковские реквизиты:') }}</strong></p>
+            <p>{{ labels.bank_name | default('Банк:') }} {{ seller.bank_name | default('N/A') }}</p>
+            <p>{{ labels.account_holder | default('Получатель:') }} {{ seller.bank_account_holder_name | default('N/A') }}</p>
+            <p>{{ labels.iban | default('IBAN:') }} {{ seller.bank_iban | default('N/A') }}</p>
+            <p>{{ labels.swift_bic | default('SWIFT/BIC:') }} {{ seller.bank_swift_bic | default('N/A') }}</p>
+            <p>{{ labels.bank_address | default('Адрес банка:') }} {{ seller.bank_address | default('N/A') }}</p>
+        </div>
+
+        <div class="footer">
+            <hr>
+            {% if doc.client_specific_footer_notes %}
+            <p>{{doc.client_specific_footer_notes}}</p>
+            {% endif %}
+            <p style="margin-top: 10px;"><em>{{ labels.proforma_notice | default('Это проформа-инвойс, не является требованием к оплате.') }}</em></p>
+            <p><em>{{ labels.thank_you_message | default('Спасибо за ваш бизнес!') }}</em></p>
+            <p style="font-size: 0.8em; color: #999; margin-top: 20px;">{{ seller.name | default('') }} - {{ seller.address_full | default('') }} - {{ labels.vat_id_label | default('ИНН:') }} {{ seller.vat_id | default('') }} - {{ labels.reg_no_label | default('Рег. номер:') }} {{ seller.registration_number | default('') }}</p>
+        </div>
+    </div>
+</body>
+</html>

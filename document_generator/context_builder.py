@@ -229,7 +229,46 @@ def get_document_context(
             "swift_bic": "رمز سويفت/BIC:",
             "bank_address": "عنوان البنك:",
             "proforma_notice": "هذه فاتورة أولية وليست مطالبة بالدفع.",
-            "thank_you_message": "شكرا لتعاملكم معنا!"
+            "thank_you_message": "شكرا لتعاملكم معنا!",
+            "no_products_listed": "لا توجد منتجات مدرجة."
+        },
+        "ru": {
+            "proforma_invoice_title": "ПРОФОРМА-ИНВОЙС",
+            "from_seller": "От:",
+            "to_client": "Кому:",
+            "proforma_no": "Проформа-инвойс №:",
+            "date_label": "Дата:",
+            "project_id_label": "ID Проекта:",
+            "payment_terms_label": "Условия оплаты:",
+            "delivery_terms_label": "Условия поставки:",
+            "item_ref": "Арт.",
+            "item_description": "Описание товара",
+            "quantity": "Кол-во",
+            "unit_price": "Цена за ед.",
+            "total_price": "Сумма",
+            "client_order_ref_label": "Номер заказа клиента:",
+            "client_order_date_label": "Дата заказа клиента:",
+            "sub_total": "Подытог:",
+            "discount": "Скидка",
+            "vat": "НДС",
+            "grand_total": "Итого:",
+            "bank_details_title": "Наши банковские реквизиты:",
+            "bank_name": "Банк:",
+            "account_holder": "Получатель:",
+            "iban": "IBAN:",
+            "swift_bic": "SWIFT/BIC:",
+            "bank_address": "Адрес банка:",
+            "proforma_notice": "Это проформа-инвойс и не является требованием к оплате.",
+            "thank_you_message": "Спасибо за ваш бизнес!",
+            "no_products_listed": "Товары отсутствуют.",
+            # Adding new labels used in the RU template that might not be in EN/FR yet
+            "company_logo_alt": "Логотип компании",
+            "phone_label": "Телефон:",
+            "email_label": "Email:",
+            "vat_id_label": "ИНН:", # Often used for VAT ID in RU context
+            "reg_no_label": "Рег. номер:",
+            "contact_label": "Контакт:"
+
         }
     }
     context["labels"] = _labels.get(language_code, _labels.get("en", {})) # Default to English labels if lang or specific label not found
@@ -249,6 +288,22 @@ def get_document_context(
     except ValueError:
         logger.warning(f"Could not parse current_date '{context['doc']['current_date']}' for formatting.")
         context["doc"]["current_date_formatted"] = context["doc"]["current_date"] # Fallback to original string
+
+    # Set document identifier (e.g., proforma_id, invoice_number)
+    # This could come from additional_data if regenerating an existing document, or be generated.
+    # The template uses `doc.proforma_id`. Let's ensure this key is populated.
+    # `additional_data` might contain `document_id` (from ClientDocuments table) or `invoice_number`.
+    doc_identifier = additional_data.get('document_id',
+                                        additional_data.get('invoice_number',
+                                                            additional_data.get('proforma_id')))
+    if not doc_identifier and document_type and 'proforma' in document_type.lower():
+        doc_identifier = f"PF-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}" # Basic generated ID
+
+    context["doc"]["proforma_id"] = doc_identifier if doc_identifier else "N/A"
+    # For other document types, a more generic 'document_reference' might be useful.
+    context["doc"]["document_reference"] = doc_identifier if doc_identifier else "N/A"
+
+
 
         # 3. Seller Information (seller section)
         seller_company = get_company_by_id(conn, company_id)
@@ -327,18 +382,43 @@ def get_document_context(
             logger.error(f"Seller company with ID {company_id} not found.")
 
         # 4. Client Information (client section)
-        client_data = get_client_by_id(conn, client_id)
+        client_data = get_client_by_id(conn, client_id) # client_data is a dict from the DB row
         if client_data:
             client_ctx = context["client"] # shortcut
-            client_ctx["id"] = client_data.get("id")
-            client_ctx["individual_name"] = client_data.get("name") # Individual client name field from DB
+            client_ctx["id"] = client_data.get("client_id") # Use "client_id" as per schema
+            client_ctx["individual_name"] = client_data.get("name")
             client_ctx["company_name"] = client_data.get("company_name")
             client_ctx["display_name"] = client_data.get("company_name") or client_data.get("name")
 
-            client_ctx["address_line1"] = client_data.get("address_line1")
+            # Address fields from Clients table structure (assuming these are direct columns)
+            # clients_crud.py implies these are direct fields from `get_all_clients_with_details` context preparation
+            # but `get_client_by_id` might return raw IDs. Let's assume direct names are available if fetched with details,
+            # otherwise, we need to fetch them using IDs. For now, assuming `get_client_by_id` provides enough.
+            client_ctx["address_line1"] = client_data.get("address_line1", client_data.get("default_base_folder_path")) # Fallback for address_line1
             client_ctx["address_line2"] = client_data.get("address_line2")
             client_ctx["postal_code"] = client_data.get("postal_code")
-            client_ctx["vat_id"] = client_data.get("vat_id")
+
+            # VAT ID and Registration Number for Client (from notes or distributor_specific_info)
+            client_notes_raw = client_data.get('notes', "")
+            client_dist_info_raw = client_data.get('distributor_specific_info', "")
+
+            client_notes_json = {}
+            client_notes_kv = {}
+            if isinstance(client_notes_raw, str):
+                try: client_notes_json = json.loads(client_notes_raw) if client_notes_raw.strip().startswith('{') else {}
+                except json.JSONDecodeError: pass # Keep empty if not valid JSON
+                # Basic KV parsing could be added here if notes are not always JSON
+
+            client_dist_info_json = {}
+            if isinstance(client_dist_info_raw, str):
+                try: client_dist_info_json = json.loads(client_dist_info_raw) if client_dist_info_raw.strip().startswith('{') else {}
+                except json.JSONDecodeError: pass
+
+            # Prioritize distributor_specific_info, then notes, then direct field if it existed (it doesn't for vat_id in Clients)
+            client_ctx["vat_id"] = client_dist_info_json.get("vat_id", client_notes_json.get("vat_id", additional_data.get("client_vat_id")))
+            client_ctx["registration_number"] = client_dist_info_json.get("registration_number", client_notes_json.get("registration_number", additional_data.get("client_registration_number")))
+
+
 
             client_city_id = client_data.get("city_id")
             if client_city_id:
@@ -385,108 +465,100 @@ def get_document_context(
 
 
         # 6. Product Information (products section)
-        product_ids_to_fetch = additional_data.get('lite_selected_products', []) # List of product IDs
-        if not product_ids_to_fetch and 'linked_product_ids_for_doc' in additional_data:
-             product_ids_to_fetch = additional_data.get('linked_product_ids_for_doc', [])
+        # Initial fetch of products linked to client/project. These are ClientProjectProducts records.
+        linked_products_data = get_products_for_client_or_project(conn, client_id=client_id, project_id=project_id)
+        linked_products_data = linked_products_data if linked_products_data else []
 
-        products_raw = []
-        if product_ids_to_fetch:
-            for pid in product_ids_to_fetch:
-                prod = get_product_by_id(conn, pid) # Assumes quantity is handled elsewhere or is 1
-                if prod:
-                    # Check if quantity is provided in additional_data, perhaps per product_id
-                    quantity = additional_data.get("products_quantities", {}).get(pid, 1)
-                    prod_with_quantity = {**prod, "quantity": quantity}
-                    products_raw.append(prod_with_quantity)
-        else:
-            # Default: fetch all products linked to client or project
-            products_raw = get_products_for_client_or_project(conn, client_id=client_id, project_id=project_id)
-            # Ensure products_raw have a quantity, default to 1 if not present
-            for prod in products_raw:
-                if "quantity" not in prod:
-                    prod["quantity"] = 1
-
-
+        processed_products_for_context = []
         total_items_price = Decimal("0.0")
-        for prod_data in products_raw:
-            product_id = prod_data.get("id")
-            if not product_id:
-                logger.warning(f"Skipping product with missing ID: {prod_data}")
+
+        for linked_prod_info in linked_products_data:
+            global_product_id = linked_prod_info.get("product_id") # This is the ID from the global Products table
+            if not global_product_id:
+                logger.warning(f"Skipping linked product entry due to missing global_product_id: {linked_prod_info}")
                 continue
 
-            # Base product details are already in prod_data if fetched by get_product_by_id
-            # If get_products_for_client_or_project doesn't return full details, fetch them:
-            # current_product_details = get_product_by_id(conn, product_id) or {}
-            current_product_details = prod_data # Assuming prod_data has all base fields
+            # Fetch full details of the global product
+            global_product_details = get_product_by_id(conn, global_product_id)
+            if not global_product_details:
+                logger.warning(f"Global product details not found for product_id: {global_product_id} (linked via client_project_product_id: {linked_prod_info.get('client_project_product_id')}). Skipping.")
+                continue
 
-            # Fetch product equivalents for the given language
-            # This simulates products_crud.get_product_equivalents(product_id, language_code)
-            # or the logic from _get_batch_products_and_equivalents
-            equivalents = get_product_equivalencies_for_product(conn, product_id, language_code)
+            display_name = None
+            display_description = None
+            product_matches_target_language = False
 
-            translated_name = current_product_details.get("name") # Default to original name
-            translated_description = current_product_details.get("description") # Default to original desc
+            # Check for equivalents in the target language
+            # `language_code` here is the target_language_code for the document
+            equivalents = get_product_equivalencies_for_product(conn, global_product_id, language_code)
+            if equivalents:
+                equivalent_product = equivalents[0] # Assuming first equivalent is the desired one
+                display_name = equivalent_product.get("name", global_product_details.get("name"))
+                display_description = equivalent_product.get("description", global_product_details.get("description"))
+                product_matches_target_language = True
+            elif global_product_details.get("language_code") == language_code:
+                # No specific equivalent, but the global product itself is in the target language
+                display_name = global_product_details.get("name")
+                display_description = global_product_details.get("description")
+                product_matches_target_language = True
 
-            if equivalents: # Assuming equivalents is a list and we take the first one or best match
-                # This logic might need refinement based on how equivalents are structured
-                best_equivalent = equivalents[0] # Simplistic choice
-                translated_name = best_equivalent.get("name", translated_name)
-                translated_description = best_equivalent.get("description", translated_description)
+            if not product_matches_target_language:
+                logger.info(f"Product ID {global_product_id} (Name: {global_product_details.get('name')}) will be excluded. Original lang: {global_product_details.get('language_code')}, Target lang: {language_code}.")
+                continue # Skip this product as it doesn't match the target language
 
-            # Fetch media links
-            # This simulates products_crud.get_media_links_for_product(product_id)
-            media_links_raw = get_media_links_for_product(conn, product_id)
+            # Product matches target language, proceed to add to context
+            quantity = Decimal(str(linked_prod_info.get("quantity", 1)))
+
+            unit_price_override = linked_prod_info.get("unit_price_override")
+            if unit_price_override is not None:
+                unit_price = Decimal(str(unit_price_override))
+            else:
+                unit_price = Decimal(str(global_product_details.get("base_unit_price", "0.00")))
+
+            item_total_price = quantity * unit_price
+            total_items_price += item_total_price
+
+            # Media links processing (remains similar)
+            media_links_raw = get_media_links_for_product(conn, global_product_id)
             media_links_processed = []
             if media_links_raw:
                 for media_link in media_links_raw:
                     file_path = media_link.get("file_path")
-                    if file_path and app_root_dir: # MEDIA_FILES_BASE_PATH was a dummy, use app_root_dir or config
-                        # Use a configured base path for media, or derive from app_root_dir if necessary.
-                        # Let's assume AppGlobalConfig.get('media_files_path', os.path.join(app_root_dir, 'media'))
-                        # For simplicity, if app_root_dir is given, we'll use it. Otherwise, try config.
-
+                    if file_path and app_root_dir:
                         media_root = AppGlobalConfig.get('media_files_path')
-                        if not media_root and app_root_dir: # Fallback if media_files_path not in config
-                            media_root = os.path.join(app_root_dir, 'media')
-
+                        if not media_root and app_root_dir:
+                            media_root = os.path.join(app_root_dir, 'media_files') # Adjusted default to media_files
                         if media_root:
                             abs_media_path = os.path.join(media_root, file_path.lstrip(os.sep))
                             if os.path.exists(abs_media_path):
                                  media_links_processed.append({
-                                     "url": f"file://{abs_media_path.replace(os.sep, '/')}",
+                                     "url": f"file:///{abs_media_path.replace(os.sep, '/')}",
                                      "type": media_link.get("type", "image"),
                                      "description": media_link.get("description")
                                  })
                             else:
-                                logger.warning(f"Media file not found: {abs_media_path} for product {product_id} (media_root: {media_root})")
+                                logger.warning(f"Media file not found: {abs_media_path} for product {global_product_id} (media_root: {media_root})")
                         else:
-                             logger.warning(f"Media root path could not be determined. Cannot resolve media path for product {product_id}: {file_path}")
-                    # Removed: elif file_path and not app_root_dir, as media_root logic covers this.
+                             logger.warning(f"Media root path could not be determined. Cannot resolve media path for product {global_product_id}: {file_path}")
 
-
-            quantity = Decimal(str(prod_data.get("quantity", 1)))
-            unit_price = Decimal(str(current_product_details.get("unit_price", "0.00")))
-            item_total_price = quantity * unit_price
-
-            context["products"].append({
-                "id": product_id,
-                "original_name": current_product_details.get("name"),
-                "original_description": current_product_details.get("description"),
-                "sku": current_product_details.get("sku"),
-                "name": translated_name,
-                "description": translated_description,
+            processed_products_for_context.append({
+                "id": global_product_id,
+                "original_name": global_product_details.get("name"),
+                "original_description": global_product_details.get("description"),
+                "sku": global_product_details.get("product_code"), # Use product_code for SKU
+                "name": display_name,
+                "description": display_description,
                 "quantity": quantity,
                 "unit_price": format_currency(unit_price, context["doc"]["currency_symbol"]),
                 "total_price": format_currency(item_total_price, context["doc"]["currency_symbol"]),
                 "unit_price_decimal": unit_price,
                 "total_price_decimal": item_total_price,
                 "media_links": media_links_processed,
-                # Add other product fields as necessary
             })
-            total_items_price += item_total_price
 
+        context["products"] = processed_products_for_context
         # 7. Totals Calculation (doc section)
-        subtotal = total_items_price
+        subtotal = total_items_price # Use the sum calculated from language-filtered products
         discount_amount = subtotal * context["doc"]["discount_rate"]
         subtotal_after_discount = subtotal - discount_amount
         vat_amount = subtotal_after_discount * context["doc"]["vat_rate"]
