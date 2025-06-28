@@ -458,6 +458,7 @@ def get_document_context(
             if found_equivalent_in_lang:
                 display_name = found_equivalent_in_lang.get("name", global_product_details.get("name"))
                 display_description = found_equivalent_in_lang.get("description", global_product_details.get("description"))
+
                 product_matches_target_language = True
             elif global_product_details.get("language_code") == language_code:
                 display_name = global_product_details.get("name")

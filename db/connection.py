@@ -186,4 +186,60 @@ def get_db_connection(db_path_override=None):
     else:
         raise ValueError(f"Unsupported database_type: '{database_type}'. Please check configuration.")
 
-__all__ = ["get_db_connection"]
+# --- SQLAlchemy Setup ---
+# This setup is primarily for SQLite, as per the existing get_db_connection logic.
+# If other database types are fully implemented, this might need adjustment
+# or conditional engine creation based on database_type.
+
+from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+
+# Initialize these as None first, in case app_setup fails (though it's critical)
+engine = None
+SessionLocal = None
+Base = declarative_base()
+
+if app_setup:
+    app_config = app_setup.get_app_config()
+    database_path_for_engine = app_config.get('database_path')
+    database_type_for_engine = app_config.get('database_type', 'sqlite')
+
+    if database_type_for_engine == 'sqlite':
+        if database_path_for_engine:
+            # Ensure the path is absolute or correctly relative for SQLAlchemy
+            if not os.path.isabs(database_path_for_engine) and project_root:
+                 # Assuming database_path_for_engine is relative to project_root if not absolute
+                 database_path_for_engine = os.path.join(project_root, database_path_for_engine)
+
+            # SQLite connection string format: "sqlite:///filepath"
+            # For Windows, if the path starts with a drive letter e.g. C:\, it needs an extra slash.
+            # os.path.abspath will resolve this.
+            absolute_db_path = os.path.abspath(database_path_for_engine)
+
+            if sys.platform == "win32" and absolute_db_path[1:3] == ":\\": # Checks for C:\ format
+                engine_url = f"sqlite:///{absolute_db_path}"
+            else:
+                engine_url = f"sqlite:///{absolute_db_path}"
+
+            logging.info(f"db.connection: SQLAlchemy engine will connect to: {engine_url}")
+            try:
+                engine = create_engine(engine_url, connect_args={"check_same_thread": False}) # check_same_thread for SQLite
+                SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+                logging.info("db.connection: SQLAlchemy engine and SessionLocal created successfully for SQLite.")
+            except Exception as e:
+                logging.error(f"db.connection: Failed to create SQLAlchemy engine or SessionLocal: {e}", exc_info=True)
+                engine = None # Ensure it's None if creation failed
+                SessionLocal = None # Ensure it's None
+        else:
+            logging.error("db.connection: 'database_path' not found in config for SQLAlchemy SQLite engine setup. SQLAlchemy ORM features might be unavailable.")
+    # Add elif for 'postgresql', 'mysql' if SQLAlchemy ORM support is extended to them.
+    # For now, only SQLite gets an engine for ORM use via this setup.
+    else:
+        logging.warning(f"db.connection: SQLAlchemy engine setup not configured for database_type '{database_type_for_engine}'. ORM features might be limited to modules managing their own connections.")
+
+else:
+    logging.error("db.connection: app_setup not available during SQLAlchemy setup. Engine and SessionLocal will be None.")
+
+
+__all__ = ["get_db_connection", "engine", "SessionLocal", "Base"]
