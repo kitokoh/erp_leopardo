@@ -2049,6 +2049,64 @@ CREATE TABLE IF NOT EXISTS motivational_messages (
         # Depending on policy, might want to rollback or raise
     # --- End Accounting Module Tables and Indexes ---
 
+    # --- Calendar Module Tables ---
+    print("DEBUG_INIT_DB: Creating Calendar Module Tables...")
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS CompanyCalendarSettings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL UNIQUE, -- Assuming user_id is a string UUID from Users table
+        business_type TEXT, -- B2B, B2C, Both
+        activity_category TEXT,
+        country_iso TEXT NOT NULL, -- ISO 3166-1 alpha-2 country code
+        region TEXT, -- Subdivision of the country
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
+    )
+    """)
+    print("DEBUG_INIT_DB: Table CompanyCalendarSettings created or exists.")
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS UserCalendarEvents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL, -- Assuming user_id is a string UUID from Users table
+        event_date DATE NOT NULL, -- For non-recurring, this is THE date. For recurring, this is the START date.
+        event_type TEXT NOT NULL, -- Holiday, RemoteWork, WorkDay, OtherPersonal
+        description TEXT,
+        recurrence_rule TEXT, -- RRULE string (RFC 5545)
+        recurrence_end_date DATE, -- Date until which recurrence applies
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
+    )
+    """)
+    print("DEBUG_INIT_DB: Table UserCalendarEvents created or exists.")
+
+    # Indexes for Calendar Module
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_companycalendarsettings_user_id ON CompanyCalendarSettings(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_user_id ON UserCalendarEvents(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_date ON UserCalendarEvents(event_date)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_type ON UserCalendarEvents(event_type)")
+    print("DEBUG_INIT_DB: Indexes for Calendar Module created or already exist.")
+
+    # CustomHolidays Table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS CustomHolidays (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        holiday_date DATE NOT NULL,
+        description TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE,
+        UNIQUE (user_id, holiday_date) -- Prevent duplicate custom holidays for the same user on the same date
+    )
+    """)
+    print("DEBUG_INIT_DB: Table CustomHolidays created or exists.")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_customholidays_user_id_date ON CustomHolidays(user_id, holiday_date)")
+    print("DEBUG_INIT_DB: Index for CustomHolidays created or exists.")
+    # --- End Calendar Module Tables ---
+
 
     # --- Seed Data (from db/schema.py, ensuring use of db_config) ---
     try:

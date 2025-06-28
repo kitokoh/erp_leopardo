@@ -22,6 +22,8 @@ httpx>=0.23.0
 # pywhatkit
 watchdog
 # PyAudio
+holidays>=0.23 # For calendar public holidays, version might need adjustment
+pycountry>=23.12.11 # For country list in calendar settings
 h11>=0.12.0 # Required by Uvicorn for HTTP tooling
 pytest>=7.0.0 # Added for running tests
 SQLAlchemy>=1.4.0 # Added for ORM
