@@ -61,6 +61,7 @@ def _get_batch_products_and_equivalents(product_ids: list[int], target_language_
 def get_document_context_data(
     client_id: str, company_id: str, target_language_code: str,
     project_id: str = None,
+
     # linked_product_ids_for_doc is now primarily handled by the logic within the enhanced context builder
     # based on what's in additional_context or by fetching all for client/project.
     # We can remove it from this wrapper's direct signature if it's fully managed by the callee.
@@ -68,6 +69,7 @@ def get_document_context_data(
     linked_product_ids_for_doc: list[int] = None,
     document_type: str = None,
     additional_context: dict = None,
+
     conn_passed: sqlite3.Connection = None, # conn_passed might be for the enhanced context builder if it needs one
     app_root_dir: str = None # New argument
 ) -> dict:
