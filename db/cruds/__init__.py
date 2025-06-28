@@ -25,7 +25,13 @@ from .freight_forwarders_crud import get_all_freight_forwarders, add_freight_for
 from .google_sync_crud import get_user_google_account_by_google_account_id, update_user_google_account, add_user_google_account, get_user_google_account_by_user_id, get_user_google_account_by_id as get_google_account_by_id, delete_user_google_account, get_all_user_google_accounts, add_contact_sync_log, get_contact_sync_log_by_local_contact, get_contact_sync_log_by_google_contact_id, get_contact_sync_log_by_id, update_contact_sync_log, delete_contact_sync_log, get_contacts_pending_sync, get_all_sync_logs_for_account
 # hr_reports_crud functions expect SQLAlchemy Session.
 from .hr_reports_crud import get_department_headcounts as get_department_headcounts_sqla, get_upcoming_anniversaries as get_upcoming_anniversaries_sqla, get_leave_summary_by_type as get_leave_summary_by_type_sqla
-from .internal_stock_items_crud import add_internal_stock_item, get_internal_stock_item_by_id, get_all_internal_stock_items, update_internal_stock_item, delete_internal_stock_item
+from .internal_stock_items_crud import (
+    add_item as add_internal_stock_item,
+    get_item_by_id as get_internal_stock_item_by_id,
+    get_items as get_all_internal_stock_items,
+    update_item as update_internal_stock_item,
+    delete_item as delete_internal_stock_item
+)
 from .kpis_crud import get_kpis_for_project, add_kpi, update_kpi, delete_kpi
 # leave_crud functions expect SQLAlchemy Session.
 from .leave_crud import create_leave_type as create_leave_type_sqla, get_leave_type as get_leave_type_sqla, get_leave_types as get_leave_types_sqla, update_leave_type as update_leave_type_sqla, delete_leave_type as delete_leave_type_sqla, create_leave_balance as create_leave_balance_sqla, get_leave_balance as get_leave_balance_sqla, get_leave_balances_for_employee as get_leave_balances_for_employee_sqla, update_leave_balance as update_leave_balance_sqla, create_leave_request as create_leave_request_sqla, get_leave_request as get_leave_request_sqla, get_leave_requests_for_employee as get_leave_requests_for_employee_sqla, get_leave_requests_by_status as get_leave_requests_by_status_sqla, update_leave_request_status as update_leave_request_status_sqla
@@ -35,11 +41,23 @@ from .milestones_crud import get_milestones_for_project, add_milestone, get_mile
 # performance_crud functions expect SQLAlchemy Session.
 from .performance_crud import create_goal as create_goal_sqla, get_goal as get_goal_sqla, get_goals_for_employee as get_goals_for_employee_sqla, update_goal as update_goal_sqla, delete_goal as delete_goal_sqla, create_review_cycle as create_review_cycle_sqla, get_review_cycle as get_review_cycle_sqla, get_review_cycles as get_review_cycles_sqla, update_review_cycle as update_review_cycle_sqla, delete_review_cycle as delete_review_cycle_sqla, create_performance_review as create_performance_review_sqla, get_performance_review as get_performance_review_sqla, get_performance_reviews_for_employee as get_performance_reviews_for_employee_sqla, get_performance_reviews_by_reviewer as get_performance_reviews_by_reviewer_sqla, update_performance_review as update_performance_review_sqla, delete_performance_review as delete_performance_review_sqla
 from .partners_crud import get_all_partner_categories, get_all_partners, get_partners_in_category, get_categories_for_partner, get_partner_by_id as get_partner_details_by_id, get_documents_for_partner, add_partner_document, update_partner_document, delete_partner_document, get_partner_document_by_id, get_contacts_for_partner, add_partner_contact, update_partner_contact, delete_partner_contact, add_partner, update_partner, delete_partner, link_partner_to_category, unlink_partner_from_category, get_or_add_partner_category, get_partner_category_by_name, add_partner_category, delete_partner_category, update_partner_category, get_partner_category_by_id, add_partner_interaction, get_interactions_for_partner, update_partner_interaction, delete_partner_interaction
-from .product_media_links_crud import add_product_media_link, get_media_links_for_product, delete_product_media_link, get_product_media_link_by_id
+from .product_media_links_crud import (
+    link_media_to_product as add_product_media_link,
+    get_media_links_for_product,
+    unlink_media_from_product as delete_product_media_link,
+    get_media_link_by_link_id as get_product_media_link_by_id
+)
 from .products_crud import get_product_by_id, add_product as add_global_product, get_product_by_name, get_product_by_code, get_all_products as get_all_global_products, update_product as update_global_product, delete_product as soft_delete_global_product, get_products as get_active_products_by_lang, update_product_price, get_products_by_name_pattern, get_all_products_for_selection_filtered, get_total_products_count as get_global_total_products_count, add_or_update_product_dimension, get_product_dimension, delete_product_dimension, add_product_equivalence, get_equivalent_products, get_all_product_equivalencies, remove_product_equivalence
 from .projects_crud import get_all_projects, get_project_by_id, add_project, update_project, delete_project, get_total_projects_count as get_total_project_count_stat, get_active_projects_count as get_active_project_count_stat, get_projects_by_client_id
 from .status_settings_crud import get_status_setting_by_id, get_all_status_settings, get_status_setting_by_name, add_status_setting, update_status_setting, delete_status_setting
-from .tags_crud import add_tag, get_tag_by_id, get_all_tags, update_tag, delete_tag, get_tags_for_item, add_tag_to_item, remove_tag_from_item
+from .tags_crud import (
+    create_tag as add_tag,
+    get_tag as get_tag_by_id,
+    get_tags as get_all_tags,
+    update_tag,
+    delete_tag
+)
+# NOTE: get_tags_for_item, add_tag_to_item, remove_tag_from_item were removed as they are not defined in tags_crud.py
 from .tasks_crud import get_tasks_by_project_id, add_task, update_task, delete_task, get_task_by_id, get_tasks_by_assignee_id, get_tasks_by_project_id_ordered_by_sequence, add_task_dependency, get_predecessor_tasks, remove_task_dependency, get_all_tasks
 from .team_members_crud import get_all_team_members, get_team_member_by_id, add_team_member, update_team_member, delete_team_member
 from .template_categories_crud import get_all_template_categories, add_template_category, update_template_category, delete_template_category, get_template_category_by_id, get_template_category_by_name
@@ -202,7 +220,9 @@ __all__ = [
     # Functions from status_settings_crud
     'get_status_setting_by_id', 'get_all_status_settings', 'get_status_setting_by_name', 'add_status_setting', 'update_status_setting', 'delete_status_setting',
     # Functions from tags_crud
-    'add_tag', 'get_tag_by_id', 'get_all_tags', 'update_tag', 'delete_tag', 'get_tags_for_item', 'add_tag_to_item', 'remove_tag_from_item',
+    'add_tag', 'get_tag_by_id', 'get_all_tags', 'update_tag', 'delete_tag',
+    # The following were removed as they are not defined in tags_crud.py:
+    # 'get_tags_for_item', 'add_tag_to_item', 'remove_tag_from_item',
     # Functions from tasks_crud
     'get_tasks_by_project_id', 'add_task', 'update_task', 'delete_task', 'get_task_by_id', 'get_tasks_by_assignee_id',
     'get_tasks_by_project_id_ordered_by_sequence', 'add_task_dependency', 'get_predecessor_tasks', 'remove_task_dependency', 'get_all_tasks',
