@@ -366,24 +366,24 @@ class StatisticsDashboard(QWidget):
 
             if not os.path.exists(geojson_path):
                 logging.error(f"GeoJSON file not found at: {geojson_path}")
-            error_message = self.tr("Les données géographiques de la carte (GeoJSON) sont introuvables. La carte ne peut pas être affichée. Veuillez vérifier l'installation de l'application ou contacter le support.")
-            self._set_map_error_html(error_message)
-
-                return
+                error_message = self.tr("Les données géographiques de la carte (GeoJSON) sont introuvables. La carte ne peut pas être affichée. Veuillez vérifier l'installation de l'application ou contacter le support.")
+                self._set_map_error_html(error_message)
+                return # This return exits the update_map method if geojson is not found.
 
             m = folium.Map(location=[20, 0], zoom_start=2, tiles="CartoDB positron")
-            clients_by_country_counts = get_client_counts_by_country()
+            
+            # Moved the database call for clients_by_country_counts here,
+            # as it's needed regardless of the geojson file existing (if the path check passes).
+            # This also simplifies the try-except structure.
+            try:
+                clients_by_country_counts = get_client_counts_by_country()
+            except Exception as db_exc:
+                logging.error(f"Database error while fetching client counts for map: {db_exc}", exc_info=True)
+                error_message = self.tr("Erreur de récupération des données statistiques pour la carte : {error_details}. L'affichage de la carte est indisponible.").format(error_details=str(db_exc))
+                self._set_map_error_html(error_message)
+                return
 
-        try:
-            clients_by_country_counts = get_client_counts_by_country()
-        except Exception as db_exc:
-            logging.error(f"Database error while fetching client counts for map: {db_exc}", exc_info=True)
-            error_message = self.tr("Erreur de récupération des données statistiques pour la carte : {error_details}. L'affichage de la carte est indisponible.").format(error_details=str(db_exc))
-            self._set_map_error_html(error_message)
-            return
-
-
-
+            # The rest of the map generation logic follows...
             if clients_by_country_counts:
                 counts_dict = {item['country_name']: item['client_count'] for item in clients_by_country_counts}
                 max_observed_clients = max(item['client_count'] for item in clients_by_country_counts) if clients_by_country_counts else 0
