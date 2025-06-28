@@ -268,7 +268,10 @@ def get_document_context(
             "vat_id_label": "ИНН:", # Often used for VAT ID in RU context
             "reg_no_label": "Рег. номер:",
             "contact_label": "Контакт:"
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/fix/default-client-language
         }
     }
     context["labels"] = _labels.get(language_code, _labels.get("en", {})) # Default to English labels if lang or specific label not found
@@ -303,7 +306,10 @@ def get_document_context(
     # For other document types, a more generic 'document_reference' might be useful.
     context["doc"]["document_reference"] = doc_identifier if doc_identifier else "N/A"
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/fix/default-client-language
 
         # 3. Seller Information (seller section)
         seller_company = get_company_by_id(conn, company_id)
@@ -418,7 +424,10 @@ def get_document_context(
             client_ctx["vat_id"] = client_dist_info_json.get("vat_id", client_notes_json.get("vat_id", additional_data.get("client_vat_id")))
             client_ctx["registration_number"] = client_dist_info_json.get("registration_number", client_notes_json.get("registration_number", additional_data.get("client_registration_number")))
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/fix/default-client-language
 
             client_city_id = client_data.get("city_id")
             if client_city_id:
