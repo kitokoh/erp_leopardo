@@ -82,6 +82,7 @@ def create_tables(conn: sqlite3.Connection, drop_first: bool = False):
         rappel_active BOOLEAN NOT NULL DEFAULT 1,
         minutes_rappel_avant INTEGER,
         utilisateur_id TEXT,
+        duree_minutes INTEGER,
         FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE SET NULL
         -- Pas de clé étrangère pour utilisateur_id pour l'instant, car pas de table utilisateurs dédiée
     );

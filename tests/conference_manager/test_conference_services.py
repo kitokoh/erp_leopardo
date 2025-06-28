@@ -183,11 +183,13 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
             description_calendrier="Présentation Alpha pour Calendrier",
             rappel_active=True,
             minutes_rappel_avant=15,
-            utilisateur_id="user_test_123"
+            utilisateur_id="user_test_123",
+            duree_minutes=90
         )
         self.assertIsNotNone(conf_obj.id)
         self.assertEqual(conf_obj.titre, titre_conf)
         self.assertEqual(conf_obj.utilisateur_id, "user_test_123")
+        self.assertEqual(conf_obj.duree_minutes, 90)
         # SQLite peut stocker les datetime avec une précision différente, donc comparer les attributs pertinents
         if conf_obj.date_heure_programmation and date_prog:
             self.assertEqual(conf_obj.date_heure_programmation.date(), date_prog.date())
@@ -210,6 +212,13 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
         self.assertEqual(retrieved_conf.lieu, "Salle B01")
         self.assertTrue(retrieved_conf.rappel_active)
         self.assertEqual(retrieved_conf.minutes_rappel_avant, 15)
+        self.assertEqual(retrieved_conf.duree_minutes, 90)
+
+    def test_creer_conference_duree_par_defaut(self):
+        conf = services.creer_conference(titre="Conf Duree Defaut")
+        self.assertEqual(conf.duree_minutes, 60) # Vérifie la valeur par défaut du modèle
+        retrieved_conf = services.obtenir_details_conference(conf.id)
+        self.assertEqual(retrieved_conf.duree_minutes, 60)
 
 
     def test_creer_conference_rappel_inactif_pas_de_minutes(self):
@@ -302,7 +311,8 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
             statut=nouveau_statut,
             date_heure_programmation=nouvelle_date_prog,
             client_id=self.client2.id, # Changer de client
-            utilisateur_id="user_alpha"
+            utilisateur_id="user_alpha",
+            duree_minutes=45
         )
         self.assertIsNotNone(updated_conf)
         self.assertEqual(updated_conf.titre, nouveau_titre)
@@ -310,8 +320,27 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
         self.assertEqual(updated_conf.statut, nouveau_statut)
         self.assertEqual(updated_conf.client_id, self.client2.id)
         self.assertEqual(updated_conf.utilisateur_id, "user_alpha")
+        self.assertEqual(updated_conf.duree_minutes, 45)
         if updated_conf.date_heure_programmation and nouvelle_date_prog:
              self.assertEqual(updated_conf.date_heure_programmation.date(), nouvelle_date_prog.date())
+
+    def test_mettre_a_jour_conference_duree(self):
+        conf = services.creer_conference(titre="Conf pour test duree", duree_minutes=30)
+        self.assertEqual(conf.duree_minutes, 30)
+
+        # Mettre à jour duree_minutes
+        updated_conf = services.mettre_a_jour_conference(conf.id, duree_minutes=90)
+        self.assertIsNotNone(updated_conf)
+        self.assertEqual(updated_conf.duree_minutes, 90)
+        relu_conf = services.obtenir_details_conference(conf.id)
+        self.assertEqual(relu_conf.duree_minutes, 90)
+
+        # Mettre duree_minutes à None (via valeur négative)
+        updated_conf_no_duree = services.mettre_a_jour_conference(conf.id, duree_minutes=-1)
+        self.assertIsNotNone(updated_conf_no_duree)
+        self.assertIsNone(updated_conf_no_duree.duree_minutes)
+        relu_conf_no_duree = services.obtenir_details_conference(conf.id)
+        self.assertIsNone(relu_conf_no_duree.duree_minutes)
 
 
     def test_mettre_a_jour_conference_utilisateur_id(self):
@@ -553,12 +582,14 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
         self.assertIn(f"Description Calendrier:\n{desc_cal_test}", rapport)
         self.assertIn("Rappel Actif: Oui", rapport)
         self.assertIn(f"Rappel Avant (minutes): {minutes_rappel}", rapport)
+        self.assertIn(f"Durée Prévue: {conf.duree_minutes} minutes", rapport)
 
 
     def test_generer_texte_rapport_conference_minimale(self):
         conf_obj = services.creer_conference(
             titre="Conf Rapport Minimal",
-            rappel_active=False # Tester avec rappel inactif
+            rappel_active=False, # Tester avec rappel inactif
+            duree_minutes=None # Tester avec durée non spécifiée
         )
         services.mettre_a_jour_conference(conf_obj.id, statut=Conference.CONFERENCE_STATUT_IN_PROGRESS)
 
@@ -572,6 +603,7 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
         self.assertIn("Lieu: Non spécifié", rapport)
         self.assertIn("Date Programmée: Non spécifiée", rapport)
         self.assertIn("Participants Externes: Aucun", rapport)
+        self.assertIn("Durée Prévue: Non spécifiée", rapport)
         self.assertIn("Description Calendrier:\nAucune description pour calendrier.", rapport)
         self.assertIn("Notes / Rapport Détaillé:\nAucune note enregistrée.", rapport)
         self.assertIn(Conference.CONFERENCE_STATUT_IN_PROGRESS, rapport)
@@ -679,7 +711,8 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
             lieu="Bureau 101",
             client_id=self.client1.id,
             rappel_active=True,
-            minutes_rappel_avant=30
+            minutes_rappel_avant=30,
+            duree_minutes=75
         )
         self.assertIsNotNone(conf)
 
@@ -698,8 +731,8 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
         # On va vérifier la présence de la date et de l'heure au moins.
         self.assertIn(f"DTSTART:{date_prog.strftime('%Y%m%dT%H%M%S')}", ics_content.replace("Z",""))
 
-        # Vérifier la durée par défaut de 60 minutes
-        date_fin_attendue = date_prog + timedelta(minutes=60)
+        # Vérifier la durée (doit utiliser les 75 minutes de la conférence)
+        date_fin_attendue = date_prog + timedelta(minutes=75)
         self.assertIn(f"DTEND:{date_fin_attendue.strftime('%Y%m%dT%H%M%S')}", ics_content.replace("Z",""))
 
         self.assertIn(f"LOCATION:Bureau 101", ics_content)

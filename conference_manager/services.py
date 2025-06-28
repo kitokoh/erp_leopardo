@@ -196,7 +196,8 @@ def creer_conference(titre: str,
                      description_calendrier: Optional[str] = None,
                      rappel_active: bool = True,
                      minutes_rappel_avant: Optional[int] = 30,
-                     utilisateur_id: Optional[str] = None
+                     utilisateur_id: Optional[str] = None,
+                     duree_minutes: Optional[int] = 60
                      ) -> Conference:
     """Crée une nouvelle conférence et la stocke en base de données SQLite."""
     if not titre or not titre.strip():
@@ -217,7 +218,8 @@ def creer_conference(titre: str,
         description_calendrier=description_calendrier,
         rappel_active=rappel_active,
         minutes_rappel_avant=minutes_rappel_avant,
-        utilisateur_id=utilisateur_id
+        utilisateur_id=utilisateur_id,
+        duree_minutes=duree_minutes
     )
 
     # La vérification obtenir_client utilise déjà _get_service_db_connection
@@ -229,8 +231,8 @@ def creer_conference(titre: str,
     sql = """INSERT INTO conferences (id, titre, date_heure_creation, date_heure_programmation,
                                     notes_rapport, client_id, participants_externes, statut,
                                     lieu, description_calendrier, rappel_active, minutes_rappel_avant,
-                                    utilisateur_id)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                                    utilisateur_id, duree_minutes)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
     try:
         cursor = conn.cursor()
         cursor.execute(sql, (
@@ -246,7 +248,8 @@ def creer_conference(titre: str,
             nouvelle_conference_obj.description_calendrier,
             1 if nouvelle_conference_obj.rappel_active else 0, # Convertir bool en int pour SQLite
             nouvelle_conference_obj.minutes_rappel_avant,
-            nouvelle_conference_obj.utilisateur_id
+            nouvelle_conference_obj.utilisateur_id,
+            nouvelle_conference_obj.duree_minutes
         ))
         conn.commit()
     except sqlite3.IntegrityError as e:
@@ -282,7 +285,8 @@ def _row_to_conference_obj(row: sqlite3.Row) -> Optional[Conference]:
         description_calendrier=row["description_calendrier"],
         rappel_active=bool(row["rappel_active"]), # Convertir int (0/1) de SQLite en bool
         minutes_rappel_avant=row["minutes_rappel_avant"],
-        utilisateur_id=row["utilisateur_id"]
+        utilisateur_id=row["utilisateur_id"],
+        duree_minutes=row["duree_minutes"]
     )
 
 def obtenir_details_conference(conference_id: str) -> Optional[Conference]:
@@ -317,13 +321,12 @@ def mettre_a_jour_conference(conference_id: str,
                              lieu: Optional[str] = None,
                              description_calendrier: Optional[str] = None,
                              rappel_active: Optional[bool] = None,
-                             minutes_rappel_avant: Optional[int] = None, # Utiliser une valeur spéciale pour supprimer ? ex: -1
-                             utilisateur_id: Optional[str] = None # Peut être "" pour dé-assigner
+                             minutes_rappel_avant: Optional[int] = None,
+                             utilisateur_id: Optional[str] = None,
+                             duree_minutes: Optional[int] = None
                             ) -> Optional[Conference]:
     """Met à jour les champs spécifiés d'une conférence existante."""
 
-    # Vérifier qu'au moins un champ est fourni pour la mise à jour.
-    # On utilise une sentinelle pour différencier un argument non fourni (None) d'une volonté de mettre à None.
     _sentinel = object()
     provided_args = {
         'titre': titre, 'date_heure_programmation': date_heure_programmation,
@@ -331,10 +334,9 @@ def mettre_a_jour_conference(conference_id: str,
         'participants_externes': participants_externes, 'statut': statut,
         'lieu': lieu, 'description_calendrier': description_calendrier,
         'rappel_active': rappel_active, 'minutes_rappel_avant': minutes_rappel_avant,
-        'utilisateur_id': utilisateur_id
+        'utilisateur_id': utilisateur_id, 'duree_minutes': duree_minutes
     }
-    # Si tous les arguments passés sont None (non fournis explicitement pour mise à jour)
-    if all(value is None for value in provided_args.values()):
+    if all(value is None for value in provided_args.values()): # type: ignore
          raise ValueError("Aucun champ fourni pour la mise à jour de la conférence.")
 
     # Récupérer la conférence existante pour vérifier son existence
@@ -417,6 +419,14 @@ def mettre_a_jour_conference(conference_id: str,
     if utilisateur_id is not None:
         fields_to_update.append("utilisateur_id = ?")
         params.append(utilisateur_id if utilisateur_id.strip() else None) # Stocker NULL si vide
+
+    if duree_minutes is not None:
+        if duree_minutes < 0: # On peut choisir de mettre à NULL si durée négative
+            fields_to_update.append("duree_minutes = ?")
+            params.append(None)
+        else:
+            fields_to_update.append("duree_minutes = ?")
+            params.append(duree_minutes)
 
 
     if not fields_to_update:
@@ -865,8 +875,12 @@ def generer_contenu_ics_pour_conference(conference_id: str, default_duration_min
     event.add('summary', conference.titre)
     event.add('dtstart', conference.date_heure_programmation)
 
-    # Calculer dtend basé sur une durée par défaut
-    dt_end = conference.date_heure_programmation + timedelta(minutes=default_duration_minutes)
+    # Calculer dtend basé sur conference.duree_minutes si disponible et positive, sinon durée par défaut
+    duration_to_use = default_duration_minutes
+    if conference.duree_minutes is not None and conference.duree_minutes > 0:
+        duration_to_use = conference.duree_minutes
+
+    dt_end = conference.date_heure_programmation + timedelta(minutes=duration_to_use)
     event.add('dtend', dt_end)
 
     # dtstamp est généralement l'heure de création/modification de l'événement .ics lui-même
@@ -940,6 +954,11 @@ def generer_texte_rapport_conference(conference_id: str) -> str:
         rapport_lignes.append(f"Lieu: {conference.lieu}")
     else:
         rapport_lignes.append("Lieu: Non spécifié")
+
+    if conference.duree_minutes is not None and conference.duree_minutes > 0:
+        rapport_lignes.append(f"Durée Prévue: {conference.duree_minutes} minutes")
+    else:
+        rapport_lignes.append("Durée Prévue: Non spécifiée")
 
     if conference.participants_externes:
         rapport_lignes.append(f"Participants Externes: {conference.participants_externes}")

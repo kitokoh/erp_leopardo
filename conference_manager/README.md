@@ -11,8 +11,9 @@ This module is responsible for managing conferences, including scheduling, note-
 - List and view conference details.
 - Generate conference reports (text format, now including calendar and reminder info).
 - Identify conferences needing imminent reminders.
-- Export conference details to iCalendar (.ics) format, including reminders.
+- Export conference details to iCalendar (.ics) format, including reminders and specific duration.
 - Associate conferences with a user ID and filter conferences by user ID.
+- Specify conference duration in minutes.
 
 ## Structure
 
