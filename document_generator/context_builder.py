@@ -16,11 +16,11 @@ from db.cruds import (
     get_city_by_id,
     get_project_by_id,
     get_client_document_notes,
-    get_equivalent_products, # Corrected function name
+    get_equivalent_products,
     get_media_links_for_product, 
     get_personnel_for_company,
 )
-from db.utils import get_db_connection
+from db.connection import get_db_connection # Changed from db.utils
 # Assuming these config variables are correctly defined in your project.
 # from db_config import APP_ROOT_DIR_CONTEXT, LOGO_SUBDIR_CONTEXT # Removed
 # from config import MEDIA_FILES_BASE_PATH # Removed
@@ -488,11 +488,19 @@ def get_document_context(
 
             # Check for equivalents in the target language
             # `language_code` here is the target_language_code for the document
-            equivalents = get_product_equivalencies_for_product(conn, global_product_id, language_code) 
-            if equivalents: 
-                equivalent_product = equivalents[0] # Assuming first equivalent is the desired one
-                display_name = equivalent_product.get("name", global_product_details.get("name"))
-                display_description = equivalent_product.get("description", global_product_details.get("description"))
+            # get_equivalent_products is imported from db.cruds which points to products_crud_instance.get_equivalent_products
+            all_raw_equivalents = get_equivalent_products(global_product_id, conn=conn) # Fetches all equivalents
+
+            found_equivalent_in_lang = None
+            if all_raw_equivalents: # Check if the list is not empty
+                for eq_prod in all_raw_equivalents:
+                    if eq_prod.get("language_code") == language_code:
+                        found_equivalent_in_lang = eq_prod
+                        break # Found the first matching equivalent
+
+            if found_equivalent_in_lang:
+                display_name = found_equivalent_in_lang.get("name", global_product_details.get("name")) # Fallback to global name
+                display_description = found_equivalent_in_lang.get("description", global_product_details.get("description")) # Fallback to global desc
                 product_matches_target_language = True
             elif global_product_details.get("language_code") == language_code:
                 # No specific equivalent, but the global product itself is in the target language
