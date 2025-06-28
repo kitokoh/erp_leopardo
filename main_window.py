@@ -1652,12 +1652,23 @@ class DocumentManager(QMainWindow):
                      f"client_data_to_show name={client_data_to_show.get('client_name')}, "
                      f"email={client_data_to_show.get('email')}, phone={client_data_to_show.get('phone')}")
 
-        # Ensure selected_languages is a list, even if it's null/empty from DB
-        selected_languages_str = client_data_to_show.get('selected_languages')
-        if isinstance(selected_languages_str, str) and selected_languages_str.strip():
-            client_data_to_show['selected_languages'] = [lang.strip() for lang in selected_languages_str.split(',') if lang.strip()]
-        elif not isinstance(client_data_to_show.get('selected_languages'), list): # If it's not a list already (e.g. None or empty string from .get())
-            client_data_to_show['selected_languages'] = []
+        # Ensure selected_languages is a list, defaulting to ['fr'] if null/empty from DB
+        selected_languages_value = client_data_to_show.get('selected_languages')
+        if isinstance(selected_languages_value, str) and selected_languages_value.strip():
+            # If it's a non-empty string, parse it
+            parsed_langs = [lang.strip() for lang in selected_languages_value.split(',') if lang.strip()]
+            client_data_to_show['selected_languages'] = parsed_langs if parsed_langs else ['fr']
+        elif isinstance(selected_languages_value, list):
+            # If it's already a list (e.g. from tests or direct data manipulation)
+            # Use as is, but default to ['fr'] if the list is empty
+            client_data_to_show['selected_languages'] = selected_languages_value if selected_languages_value else ['fr']
+        else:
+            # If it's None, empty string, or any other type, default to ['fr']
+            client_data_to_show['selected_languages'] = ['fr']
+
+        # A final safety net: if after all processing selected_languages is somehow empty (e.g. parsed string resulted in empty list), default to ['fr']
+        if not client_data_to_show.get('selected_languages'):
+            client_data_to_show['selected_languages'] = ['fr']
 
         logging.info(f"open_client_tab_by_id: client_data_to_show after augmentation: {client_data_to_show}")
 
