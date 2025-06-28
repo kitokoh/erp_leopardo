@@ -3,19 +3,19 @@ from unittest.mock import MagicMock, patch, call, ANY
 from PyQt5.QtWidgets import QApplication, QDialog
 
 # Ensure QApplication instance exists
-app = None
-def setUpModule():
-    global app
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication([])
+# app = None # Managed by pytest-qt
+# def setUpModule():
+#     global app
+#     app = QApplication.instance()
+#     if app is None:
+#         app = QApplication([])
 
-def tearDownModule():
-    global app
-    app = None
+# def tearDownModule():
+#     global app
+#     app = None
 
 # Adjust the import path based on your project structure
-from client_widget import ClientWidget
+from client_management.client_widget import ClientWidget
 
 # Mock external dependencies that ClientWidget uses directly or indirectly
 # These might be imported at the module level of client_widget.py or its imports

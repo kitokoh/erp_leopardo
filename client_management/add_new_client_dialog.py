@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 # import db as db_manager # Removed
-from controllers.client_controller import ClientController # Added
+from .client_controller import ClientController # Added
 # from db.cruds.templates_crud import get_all_templates # Removed
 
 class AddNewClientDialog(QDialog):

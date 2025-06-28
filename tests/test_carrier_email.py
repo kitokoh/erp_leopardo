@@ -4,11 +4,11 @@ from unittest.mock import patch, MagicMock, PropertyMock
 # QApplication needs to be instantiated for Qt widgets
 from PyQt5.QtWidgets import QApplication, QPushButton
 # Ensure the application instance is created once
-app = QApplication.instance() if QApplication.instance() else QApplication([])
+# app = QApplication.instance() if QApplication.instance() else QApplication([]) # Managed by pytest-qt
 
 from carrier_email_dialog import CarrierEmailDialog
 # For testing ClientWidget logic, we might need ClientWidget itself or a mock
-# from client_widget import ClientWidget # Assuming direct import for now if needed
+# from client_management.client_widget import ClientWidget # Assuming direct import for now if needed
 
 # Mock db_manager as it's used by CarrierEmailDialog and potentially ClientWidget logic
 # The actual db_manager is in 'db.py', but CarrierEmailDialog imports it as 'db_manager'
