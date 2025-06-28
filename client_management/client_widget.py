@@ -23,6 +23,7 @@ from PyQt5.QtWidgets import QListWidgetItem
 from PyQt5.QtGui import QPixmap
 
 import db as db_manager
+from db.cruds import client_documents_crud # Added for document deletion
 from db.cruds.clients_crud import clients_crud_instance
 from excel_editor import ExcelEditor
 from html_editor import HtmlEditor
@@ -39,7 +40,7 @@ from document_manager_logic import create_final_invoice_and_update_db
 
 
 # Globals imported from main (temporary, to be refactored)
-SUPPORTED_LANGUAGES = ["en", "fr", "ar", "tr", "pt"] # Define supported languages
+SUPPORTED_LANGUAGES = ["en", "fr", "ar", "tr", "pt", "ru"] # Define supported languages
 
 MAIN_MODULE_CONTACT_DIALOG = None
 MAIN_MODULE_PRODUCT_DIALOG = None
@@ -1810,19 +1811,19 @@ class ClientWidget(QWidget):
                         try:
                             os.remove(file_path)
                             logging.info(f"File {file_path} deleted from disk.")
-                            QMessageBox.information(self, self.tr("Succès"), self.tr("Document et fichier supprimés avec succès."))
+                            self.notification_manager.show(self.tr("Succès"), self.tr("Document et fichier supprimés avec succès."), type='SUCCESS')
                         except OSError as e_file:
                             logging.error(f"Error deleting file {file_path}: {e_file}", exc_info=True)
-                            QMessageBox.warning(self, self.tr("Erreur Fichier"), self.tr("Document supprimé de la base de données, mais échec de la suppression du fichier:\n{0}").format(str(e_file)))
+                            self.notification_manager.show(self.tr("Erreur Fichier"), self.tr("Document supprimé de la base de données, mais échec de la suppression du fichier:\n{0}").format(str(e_file)), type='ERROR')
                     else:
                         logging.warning(f"File path not provided or file does not exist for document ID {document_id}: {file_path}. DB entry deleted.")
-                        QMessageBox.information(self, self.tr("Succès (Partiel)"), self.tr("Entrée de document supprimée de la base de données. Fichier non trouvé ou chemin non spécifié."))
+                        self.notification_manager.show(self.tr("Succès (Partiel)"), self.tr("Entrée de document supprimée de la base de données. Fichier non trouvé ou chemin non spécifié."), type='WARNING')
                 else:
-                    QMessageBox.warning(self, self.tr("Erreur DB"), self.tr("Impossible de supprimer l'entrée du document de la base de données (ID: {0}).").format(document_id))
+                    self.notification_manager.show(self.tr("Erreur DB"), self.tr("Impossible de supprimer l'entrée du document de la base de données (ID: {0}). Vérifiez les logs.").format(document_id), type='ERROR')
 
             except Exception as e:
                 logging.error(f"Error in delete_client_document_entry for doc ID {document_id}: {e}", exc_info=True)
-                QMessageBox.critical(self, self.tr("Erreur Suppression"), self.tr("Une erreur inattendue est survenue:\n{0}").format(str(e)))
+                self.notification_manager.show(self.tr("Erreur Suppression"), self.tr("Une erreur inattendue est survenue:\n{0}").format(str(e)), type='CRITICAL')
             finally:
                 self.populate_doc_table() # Refresh the document list
 
