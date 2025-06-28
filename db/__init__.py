@@ -1,17 +1,8 @@
-import sys
-import os
+# import sys # No longer needed for sys.path manipulation here
+# import os # No longer needed for sys.path manipulation here
 
-# Temporarily add the parent directory to sys.path to allow importing from config.py
-parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
-
-try:
-    from config import DATABASE_PATH
-finally:
-    # Remove the parent directory from sys.path
-    if parent_dir in sys.path:
-        sys.path.remove(parent_dir)
+# Assuming main.py or the entry script handles adding project root to sys.path
+from config import DATABASE_PATH # This should work if project root is in sys.path
 
 DATABASE_NAME = DATABASE_PATH
 

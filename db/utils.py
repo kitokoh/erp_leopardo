@@ -8,20 +8,13 @@ import logging # Keep logging import
 import shutil
 
 # --- Configuration Import ---
-# Get the application root directory (parent of 'db' directory)
-app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if app_dir not in sys.path:
-    sys.path.insert(0, app_dir) # Insert at the beginning to ensure it's checked first
-
+# Assuming main.py or the entry script handles adding project root to sys.path
 try:
-    import config  # This should now find config.py at the root
+    import config # This should now find config.py at the root if sys.path is correct
     db_config = config # Alias config as db_config for compatibility
 except ImportError as e:
-    # This block should ideally not be reached if config.py exists at the root
-    logging.critical(f"CRITICAL: config.py not found at root ({app_dir}) by db/utils.py. Error: {e}")
-    # Optionally, re-raise the error or exit, as the application cannot function without config.
-    raise ImportError(f"config.py is essential and was not found at {app_dir}") from e
-
+    logging.critical(f"CRITICAL: config.py not found. Ensure project root is in sys.path. Error: {e}")
+    raise ImportError(f"config.py is essential and was not found.") from e
 # --- End Configuration Import ---
 
 # CRUD function imports
