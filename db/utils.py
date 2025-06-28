@@ -32,7 +32,7 @@ except ImportError as e:
 
 
 # get_db_connection moved to db.connection
-from .connection import get_db_connection
+# from .connection import get_db_connection # Removed top-level import to break circular dependency
 
 
 def format_currency(amount: float | None, symbol: str = "€", precision: int = 2) -> str:
@@ -44,12 +44,14 @@ def format_currency(amount: float | None, symbol: str = "€", precision: int = 
 
 def _get_batch_products_and_equivalents(product_ids: list[int], target_language_code: str, conn_passed=None) -> dict:
     # from .. import db # Avoid importing full db package
-    from ..cruds.products_crud import get_product_by_id_details as products_get_product_by_id_details
+    from .cruds.products_crud import get_product_by_id as products_get_product_by_id_details # Actual function name
+
     # Note: If other db.crud functions are needed, they must be imported specifically.
     if not product_ids: return {}
 
     conn_is_internal = False
     if conn_passed is None:
+        from .connection import get_db_connection # Deferred import
         conn = get_db_connection()
         conn_is_internal = True
     else:
@@ -60,7 +62,7 @@ def _get_batch_products_and_equivalents(product_ids: list[int], target_language_
         cursor = conn.cursor()
 
         for pid_original in product_ids:
-            product_detail = products_get_product_by_id_details(id=pid_original, conn=conn) # Use specific import
+            product_detail = products_get_product_by_id_details(product_id=pid_original, conn=conn) # Use specific import
             if product_detail:
                 results[pid_original]['original'] = product_detail
 
@@ -102,13 +104,16 @@ def get_document_context_data(
     additional_context: dict = None, conn_passed: sqlite3.Connection = None
 ) -> dict:
     # Import specific CRUD functions to avoid circular dependency with db package
-    from .cruds.companies_crud import get_company_by_id, get_personnel_for_company
-    from ..cruds.clients_crud import get_client_by_id
-    from ..cruds.locations_crud import get_country_by_id, get_city_by_id
-    from ..cruds.contacts_crud import get_contacts_for_client
-    from ..cruds.projects_crud import get_project_by_id
-    from ..cruds.client_project_products_crud import get_client_project_product_by_id, get_products_for_client_or_project
-    from ..cruds.templates_crud import get_client_document_notes # Assuming this is where it is
+    # from .cruds.companies_crud import get_company_by_id, get_personnel_for_company
+    from .cruds.companies_crud import get_company_by_id 
+    from .cruds.company_personnel_crud import get_personnel_for_company
+
+    from .cruds.clients_crud import get_client_by_id
+    from .cruds.locations_crud import get_country_by_id, get_city_by_id
+    from .cruds.contacts_crud import get_contacts_for_client
+    from .cruds.projects_crud import get_project_by_id
+    from .cruds.client_project_products_crud import get_client_project_product_by_id, get_products_for_client_or_project
+    # from .cruds.templates_crud import get_client_document_notes # Commented out as function not found in templates_crud
 
     context = {"doc": {}, "client": {}, "seller": {}, "project": {}, "products": [], "lang": {}, "additional": {}}
     effective_additional_context = additional_context if isinstance(additional_context, dict) else {}
@@ -116,6 +121,7 @@ def get_document_context_data(
 
     conn_is_internal = False
     if conn_passed is None:
+        from .connection import get_db_connection # Deferred import
         conn = get_db_connection()
         conn_is_internal = True
     else:
@@ -330,10 +336,14 @@ def get_document_context_data(
         context["doc"]["vat_amount"] = format_currency(vat_val, context["doc"]["currency_symbol"])
         context["doc"]["grand_total_amount"] = format_currency(subtotal_after_discount + vat_val, context["doc"]["currency_symbol"])
 
-        doc_type_for_notes = effective_additional_context.get('current_document_type_for_notes')
-        if doc_type_for_notes and client_id and target_language_code:
-            notes = get_client_document_notes(client_id=client_id, document_type=doc_type_for_notes, language_code=target_language_code, is_active=True, conn=conn)
-            if notes: context['doc']['client_specific_footer_notes'] = notes[0]['note_content'].replace('\n','<br>')
+        # doc_type_for_notes = effective_additional_context.get('current_document_type_for_notes')
+        # if doc_type_for_notes and client_id and target_language_code:
+        #     # notes = get_client_document_notes(client_id=client_id, document_type=doc_type_for_notes, language_code=target_language_code, is_active=True, conn=conn)
+        #     # if notes: context['doc']['client_specific_footer_notes'] = notes[0]['note_content'].replace('\n','<br>')
+        #     context['doc']['client_specific_footer_notes'] = "Client specific notes temporarily unavailable." # Placeholder
+        # else:
+        #     context['doc']['client_specific_footer_notes'] = None
+
 
         # Mapping to buyer_*, seller_* placeholders (ensure these are consistent)
         context["buyer_company_name"] = context["client"].get("company_name", "N/A")

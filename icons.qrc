@@ -64,6 +64,8 @@
     <file alias="credit-card.svg">icons/placeholder_icon.svg</file>
     <file alias="modern/settings.svg">icons/settings.svg</file>
     <file alias="search.svg">icons/search.svg</file>
+    <file alias="upload.svg">icons/upload-cloud.svg</file> <!-- Fixed to point to existing upload-cloud.svg -->
+    <file alias="upload-cloud.svg">icons/upload-cloud.svg</file>
     <file alias="arrow-left-circle.svg">icons/arrow-left-circle.svg</file>
     <file alias="mic.svg">icons/placeholder_icon.svg</file>
     <file alias="edit.svg">icons/edit-2.svg</file>

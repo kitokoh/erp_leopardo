@@ -5,7 +5,7 @@ import logging
 from typing import Dict, List, Optional, Any
 
 from .generic_crud import GenericCRUD, _manage_conn
-from ..utils import get_db_connection # Assuming get_db_connection is in ..utils
+from ..connection import get_db_connection # Corrected import path
 
 # Configure logging
 logger = logging.getLogger(__name__)

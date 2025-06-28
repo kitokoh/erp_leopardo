@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 import json
 import logging
-from .generic_crud import _manage_conn, get_db_connection
+from .generic_crud import _manage_conn # get_db_connection is not used directly
 from .products_crud import get_product_by_id # Important dependency
 
 logger = logging.getLogger(__name__)
@@ -36,12 +36,17 @@ def add_product_to_client_or_project(link_data: dict, conn: sqlite3.Connection =
 
     sql="""INSERT INTO ClientProjectProducts
              (client_id, project_id, product_id, quantity, unit_price_override,
-              total_price_calculated, serial_number, purchase_confirmed_at, added_at)
-             VALUES (?,?,?,?,?,?,?,?,?)"""
+              total_price_calculated, serial_number, purchase_confirmed_at, added_at, added_by_user_id)
+             VALUES (?,?,?,?,?,?,?,?,?,?)""" # Added added_by_user_id
     params=(client_id, link_data.get('project_id'), product_id, qty, override_price,
             total_price, link_data.get('serial_number'),
-            link_data.get('purchase_confirmed_at'), datetime.utcnow().isoformat()+"Z")
-    logger.debug(f"Executing SQL: {sql} with params: {params}")
+            link_data.get('purchase_confirmed_at'), datetime.utcnow().isoformat()+"Z",
+            link_data.get('added_by_user_id')) # Added added_by_user_id
+
+    # Enhanced logging for diagnostics
+    logger.info(f"Executing SQL for add_product_to_client_or_project: {sql}")
+    logger.info(f"With parameters: {params}")
+
     try:
         cursor.execute(sql,params)
         last_id = cursor.lastrowid

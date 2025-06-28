@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
 from PyQt5.QtCore import Qt, QVariant # Added QVariant for custom data roles
 import requests # For making API calls
 import json # For handling JSON data, especially in error messages
+import logging
 
 # Assuming API base URL is something like this. This should be configurable.
 API_BASE_URL = "http://localhost:8000/recruitment" # Adjusted to match FastAPI router prefix
@@ -56,7 +57,12 @@ class JobOpeningsWidget(QWidget):
         self.setLayout(self.main_layout)
 
         self.update_action_buttons_state()
-        self.load_job_openings()
+        # self.load_job_openings() # Removed automatic loading
+
+        # Add a refresh button
+        self.refresh_button = QPushButton("Refresh List")
+        self.refresh_button.clicked.connect(self.load_job_openings)
+        self.actions_layout.addWidget(self.refresh_button, 0, Qt.AlignRight) # Add to the right
 
     def load_job_openings(self):
         self.job_openings_table.setRowCount(0)
@@ -80,9 +86,14 @@ class JobOpeningsWidget(QWidget):
 
             # self.job_openings_table.resizeColumnsToContents()
         except requests.exceptions.RequestException as e:
-            QMessageBox.critical(self, "API Error", f"Failed to load job openings: {e}")
-        except json.JSONDecodeError:
-            QMessageBox.critical(self, "API Error", "Failed to parse job openings data from server.")
+            # Changed from QMessageBox.critical to logging.warning for less intrusive error when API is offline
+            logging.warning(f"API Error - Failed to load job openings: {e}")
+            # Optionally, update a status bar or label in the UI if available
+            # For example: self.status_label.setText("Could not connect to recruitment server.")
+            QMessageBox.warning(self, self.tr("Network Error"), self.tr("Could not connect to the recruitment server to load job openings. Please ensure the API is running and accessible."))
+        except json.JSONDecodeError as e:
+            logging.error(f"API Error - Failed to parse job openings data: {e}")
+            QMessageBox.critical(self, "API Data Error", f"Failed to parse job openings data from server: {e}")
 
 
     def open_add_job_dialog(self):

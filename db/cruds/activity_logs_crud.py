@@ -1,5 +1,5 @@
 import sqlite3
-from .generic_crud import _manage_conn, get_db_connection
+from .generic_crud import _manage_conn # get_db_connection is not used directly
 import logging
 from datetime import datetime
 

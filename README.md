@@ -119,3 +119,20 @@ The application uses custom fonts for PDF generation, particularly for cover pag
 ```
 
 This structure provides a general overview. The exact names for database files or default template files might vary slightly based on the implementation.
+
+## Documentation du Projet
+
+Une documentation plus détaillée sur l'architecture, les modules et les spécifications du projet est disponible dans le dossier [`cahier/`](./cahier/).
+
+Cette documentation est organisée en sous-dossiers :
+
+*   **[`cahier/mobile/`](./cahier/mobile/)**: Contient la documentation spécifique à l'application mobile compagnon (développée en Kivy).
+    *   Cahier des charges global de l'application mobile.
+    *   Architecture conceptuelle de l'application mobile.
+    *   Descriptions détaillées des modules de l'application mobile.
+*   **[`cahier/desktop/`](./cahier/desktop/)**: Contient la documentation spécifique à l'application desktop principale (PyQt5) décrite dans ce README.
+    *   Cahier des charges de l'application desktop.
+    *   Architecture générale de l'application desktop.
+    *   Descriptions détaillées des différents modules fonctionnels et techniques de l'application desktop.
+
+N'hésitez pas à consulter ces documents pour une compréhension plus approfondie du projet.

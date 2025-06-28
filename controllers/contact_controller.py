@@ -3,7 +3,8 @@ from db.cruds import contacts_crud # Assuming this is where the CRUD functions a
 import logging
 
 class ContactController:
-    def __init__(self):
+    def __init__(self, current_user_id=None): # Added current_user_id
+        self.current_user_id = current_user_id
         # In the future, we might pass a specific DB connection or configuration
         # For now, contacts_crud functions are expected to handle their own DB connections
         pass
@@ -55,6 +56,15 @@ class ContactController:
         if not contact_data or not contact_data.get('email'): # Basic validation
             logging.warning("ContactController.add_contact: Attempted to add contact with missing email.")
             return None
+
+        # Add created_by_user_id from the controller instance
+        if self.current_user_id:
+            contact_data['created_by_user_id'] = self.current_user_id
+        else:
+            logging.warning("ContactController.add_contact: current_user_id not set in controller. Contact will be created without user audit trail.")
+            # Optionally, prevent creation if user_id is mandatory:
+            # return None
+
         try:
             # contacts_crud.add_contact is expected to return the new contact's ID
             new_contact_id = contacts_crud.add_contact(contact_data)
@@ -72,6 +82,15 @@ class ContactController:
         if not contact_id or not contact_data:
             logging.warning("ContactController.update_contact: Missing contact_id or data.")
             return False
+
+        # Add updated_by_user_id from the controller instance
+        if self.current_user_id:
+            contact_data['updated_by_user_id'] = self.current_user_id
+        else:
+            logging.warning(f"ContactController.update_contact: current_user_id not set. Contact {contact_id} will be updated without user audit trail.")
+            # Optionally, prevent update if user_id is mandatory for updates:
+            # return False
+
         try:
             # contacts_crud.update_contact is expected to return a boolean or affected row count
             success = contacts_crud.update_contact(contact_id, contact_data)
@@ -91,7 +110,13 @@ class ContactController:
         try:
             # contacts_crud.link_contact_to_client is expected to return link ID
             # Role is accepted in signature for future use but not passed to CRUD yet.
-            link_id = contacts_crud.link_contact_to_client(client_id, contact_id, is_primary, can_receive_documents)
+            link_id = contacts_crud.link_contact_to_client(
+                client_id,
+                contact_id,
+                is_primary,
+                can_receive_documents,
+                added_by_user_id=self.current_user_id # Pass stored user_id
+            )
             return link_id
         except Exception as e:
             logging.error(f"Error linking contact {contact_id} to client {client_id}: {e}")

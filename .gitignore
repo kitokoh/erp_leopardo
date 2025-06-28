@@ -1,44 +1,120 @@
-# Environnement virtuel Python
+### Environnements virtuels Python ###
 env/
 venv/
 ENV/
 .venv/
+pythonenv/
+pyenv/
+env/
+__pycache__/
+*.log
+*.pyc
 
-# Fichiers Python compilés
+### Fichiers Python compilés et cache ###
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyd
+*.pyo
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+pip-wheel-metadata/
 
-# Fichiers de log et de debug
+### Fichiers de logs et de débogage ###
 *.log
+*.log.*
+logs/
+debug.log
+*.debug
+*.error
+*.stderr
+*.stdout
 
-# Fichiers de cache / temporaires
+### Fichiers temporaires et de sauvegarde ###
 *.tmp
 *.bak
 *.swp
+*~
+*.old
+*.swo
+*.swp
 
-# Fichiers de sortie (PDF, images générées)
-*.pdf
-*.png
-*.jpg
+### Fichiers de sortie et assets générés ###
+# *.pdf
+# *.png
+# *.jpg
+# *.jpeg
+# *.gif
+# *.svg
+# *.ico
+# *.xlsx
+# *.csv
+*.dat
+*.data
 
-# Configuration d’IDE (VSCode, PyCharm, etc.)
+### Configuration d'IDE ###
 .vscode/
 .idea/
 *.sublime-project
 *.sublime-workspace
+*.code-workspace
+.project
+.pydevproject
+*.komodoproject
+*.kdev4
 
-# Fichiers système
+### Fichiers système ###
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
 Thumbs.db
 desktop.ini
+ehthumbs.db
+[Tt]humbs.db
 
-# Fonts téléchargées si elles ne doivent pas être versionnées
-fonts/
-
-# Fichier de base de données SQLite (si présent)
+### Bases de données ###
 *.sqlite3
 *.db
+*.db-journal
+*.sql
+*.mdb
+*.sdb
 
-# Autres fichiers utilisateurs
+### Environnement et configurations ###
 *.env
+.env*
+!.env.example
+.env.local
+.env.development
+.env.test
+.env.production
+secrets.yml
+config.yml
+settings.yml
+
+### Dossiers spécifiques ###
+fonts/
+downloads/
+uploads/
+media/
+staticfiles/
+node_modules/
+bower_components/
+
+### Documentation générée ###
+docs/_build/
+docs/_generated/
+docs/_static/
+docs/_templates/
+
+### Packages et dépendances ###
+*.whl
+*.tar.gz
+*.egg-info
+Pipfile.lock
+poetry.lock

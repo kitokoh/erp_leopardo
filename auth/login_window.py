@@ -5,8 +5,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QPixmap, QFont
 from PyQt5.QtCore import Qt, QSettings
-from db import verify_user_password # Import the db.py from the root directory - No longer needed for user auth
-# from db.cruds.users_crud import users_crud_instance # Import the UsersCRUD instance
+from db import verify_user_password # Correctly imports the new function from db/__init__.py
 import uuid
 import logging # Added for logging
 import random # Added for promotional text

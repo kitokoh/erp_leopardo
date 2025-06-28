@@ -1,9 +1,12 @@
 import sqlite3
 import os
 import json
-from datetime import datetime
+import logging # Added missing import
+from datetime import datetime, date # Added date
 import uuid
 import hashlib
+from decimal import Decimal # Added Decimal
+from sqlalchemy import create_engine # Added create_engine
 import sys # Ensure sys is imported for path manipulation
 
 # Get the project root directory
@@ -93,42 +96,60 @@ def initialize_database():
     Initializes the database by creating tables if they don't already exist.
     Combines schema from db/ca.py and db/schema.py.
     """
-    # Use DATABASE_PATH from config (imported at the top)
-    conn = sqlite3.connect(config.DATABASE_PATH)
-    conn.row_factory = sqlite3.Row # Essential for accessing columns by name
-    cursor = conn.cursor()
+    # Create SQLAlchemy engine
+    engine = create_engine(f"sqlite:///{config.DATABASE_PATH}")
 
-    # Create Users table (base from ca.py)
+    # Use DATABASE_PATH from config (imported at the top)
+    conn = sqlite3.connect(config.DATABASE_PATH) # Keep for direct cursor use
+    conn.row_factory = sqlite3.Row # Essential for accessing columns by name
+    cursor = conn.cursor() # Keep for direct cursor use
+
+    # Create Roles table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Roles (
+        role_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        role_name TEXT NOT NULL UNIQUE,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    print("DEBUG_INIT_DB: Table Roles created or exists.")
+
+    # Create Users table (modified)
+    # - Changed 'role' to 'role_id' with FOREIGN KEY
+    # - Renamed 'password_hash' to 'hashed_password'
+    # - Removed 'salt' column (assuming werkzeug handles salt within the hash)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS Users (
         user_id TEXT PRIMARY KEY,
         username TEXT NOT NULL UNIQUE,
-        password_hash TEXT NOT NULL,
-        salt TEXT NOT NULL, -- Added for password salting
+        hashed_password TEXT NOT NULL,
         full_name TEXT,
         email TEXT NOT NULL UNIQUE,
-        role TEXT NOT NULL, -- e.g., 'admin', 'manager', 'member'
+        role_id INTEGER NOT NULL,
         is_active BOOLEAN DEFAULT TRUE,
-        is_deleted INTEGER DEFAULT 0, -- Added for soft delete
-        deleted_at TEXT, -- Added for soft delete
+        is_deleted INTEGER DEFAULT 0,
+        deleted_at TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        last_login_at TIMESTAMP
+        last_login_at TIMESTAMP,
+        FOREIGN KEY (role_id) REFERENCES Roles (role_id)
     )
     """)
+    print("DEBUG_INIT_DB: Table Users created or exists (with role_id FK).")
 
-    # Ensure salt, is_deleted, and deleted_at columns exist in Users table
+    # Ensure is_deleted, and deleted_at columns exist in Users table (for migration from older schemas)
     cursor.execute("PRAGMA table_info(Users)")
     users_columns_info = cursor.fetchall()
     users_column_names = [info['name'] for info in users_columns_info]
 
-    if 'salt' not in users_column_names:
-        try:
-            # Using a temporary default for NOT NULL. Real salting should occur on user creation/update.
-            cursor.execute("ALTER TABLE Users ADD COLUMN salt TEXT NOT NULL DEFAULT 'tempsalt'")
-            print("Added 'salt' column to Users table with a temporary default.")
-        except sqlite3.Error as e_alter_salt:
-            print(f"Error adding 'salt' column to Users table: {e_alter_salt}")
+    # Migration for 'salt' and 'role' columns if they exist from an old schema:
+    # This is complex. For now, we assume a fresh setup or that users_crud handles the new schema.
+    # If 'salt' column exists and needs removal, or 'role' text column needs migration to 'role_id',
+    # that would require more complex ALTER TABLE (rename, create new, copy data, drop old)
+    # which is too risky without knowing existing data.
+    # The CREATE TABLE above defines the target schema.
 
     if 'is_deleted' not in users_column_names:
         try:
@@ -524,24 +545,81 @@ def initialize_database():
         organization_name TEXT,
         organization_title TEXT,
         birthday_date TEXT,
+        created_by_user_id TEXT, -- Added column
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL -- Added FK
     )
     """)
+
+    # Ensure created_by_user_id column exists in Contacts table for existing databases
+    cursor.execute("PRAGMA table_info(Contacts)")
+    contacts_columns_info = cursor.fetchall()
+    contacts_column_names = [info['name'] for info in contacts_columns_info]
+
+    if 'created_by_user_id' not in contacts_column_names:
+        try:
+            cursor.execute("ALTER TABLE Contacts ADD COLUMN created_by_user_id TEXT REFERENCES Users(user_id) ON DELETE SET NULL")
+            print("DEBUG_INIT_DB: Added 'created_by_user_id' column to Contacts table.")
+        except sqlite3.Error as e_alter_contacts_creator:
+            print(f"DEBUG_INIT_DB: Error adding 'created_by_user_id' column to Contacts table: {e_alter_contacts_creator}")
+            # Note: Older SQLite versions might not support adding FK via ALTER TABLE.
+            # The FK in CREATE TABLE is for new DBs. For existing, this adds the column. App logic must handle.
 
     # Create ClientContacts table (base from ca.py)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS ClientContacts (
         client_contact_id INTEGER PRIMARY KEY AUTOINCREMENT,
         client_id TEXT NOT NULL,
-        contact_id TEXT NOT NULL, -- Changed from INTEGER in some versions, keep TEXT if Contacts.contact_id is TEXT
+        contact_id INTEGER NOT NULL, -- Standardized to INTEGER to match Contacts.contact_id
         is_primary_for_client BOOLEAN DEFAULT FALSE,
         can_receive_documents BOOLEAN DEFAULT TRUE,
+        added_by_user_id TEXT, -- Added column
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Added column
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Added column
         FOREIGN KEY (client_id) REFERENCES Clients (client_id) ON DELETE CASCADE,
-        FOREIGN KEY (contact_id) REFERENCES Contacts (contact_id) ON DELETE CASCADE, -- Assuming contact_id is INTEGER in Contacts
+        FOREIGN KEY (contact_id) REFERENCES Contacts (contact_id) ON DELETE CASCADE,
+        FOREIGN KEY (added_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL, -- Added FK
         UNIQUE (client_id, contact_id)
     )
     """)
+
+    # Ensure added_by_user_id, created_at, updated_at columns exist in ClientContacts table for existing databases
+    cursor.execute("PRAGMA table_info(ClientContacts)")
+    cc_columns_info = cursor.fetchall()
+    cc_column_names = [info['name'] for info in cc_columns_info]
+
+    if 'contact_id' in cc_column_names: # Check if table exists and has contact_id
+        # Check current type of contact_id
+        contact_id_col_info = next((col for col in cc_columns_info if col['name'] == 'contact_id'), None)
+        if contact_id_col_info and contact_id_col_info['type'].upper() == 'TEXT':
+            logging.warning("ClientContacts.contact_id is TEXT, ideally should be INTEGER. Manual migration might be needed if data exists and FK is to be enforced strictly.")
+            # For now, we won't attempt to change type of existing column due to complexity with data.
+            # The CREATE TABLE statement above defines it as INTEGER for new DBs.
+
+    if 'added_by_user_id' not in cc_column_names:
+        try:
+            cursor.execute("ALTER TABLE ClientContacts ADD COLUMN added_by_user_id TEXT REFERENCES Users(user_id) ON DELETE SET NULL")
+            print("DEBUG_INIT_DB: Added 'added_by_user_id' column to ClientContacts table.")
+        except sqlite3.Error as e_alter_cc_adder:
+            print(f"DEBUG_INIT_DB: Error adding 'added_by_user_id' column to ClientContacts table: {e_alter_cc_adder}")
+
+    if 'created_at' not in cc_column_names:
+        try:
+            # Adding with DEFAULT CURRENT_TIMESTAMP might only work on newer SQLite versions with ALTER.
+            # Simpler to add NULLable and let app logic handle if needed, or backfill.
+            cursor.execute("ALTER TABLE ClientContacts ADD COLUMN created_at TIMESTAMP")
+            print("DEBUG_INIT_DB: Added 'created_at' column to ClientContacts table (will be NULL for existing rows).")
+        except sqlite3.Error as e_alter_cc_created:
+            print(f"DEBUG_INIT_DB: Error adding 'created_at' column to ClientContacts table: {e_alter_cc_created}")
+
+    if 'updated_at' not in cc_column_names:
+        try:
+            cursor.execute("ALTER TABLE ClientContacts ADD COLUMN updated_at TIMESTAMP")
+            print("DEBUG_INIT_DB: Added 'updated_at' column to ClientContacts table (will be NULL for existing rows).")
+        except sqlite3.Error as e_alter_cc_updated:
+            print(f"DEBUG_INIT_DB: Error adding 'updated_at' column to ClientContacts table: {e_alter_cc_updated}")
+
     # Note: Contacts.contact_id is INTEGER AUTOINCREMENT, so ClientContacts.contact_id should be INTEGER.
     # The schema from ca.py for Contacts has INTEGER. The ClientContacts table in ca.py has contact_id TEXT. This is a mismatch.
     # Standardizing to INTEGER for contact_id in ClientContacts.
@@ -584,11 +662,13 @@ def initialize_database():
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         is_deleted INTEGER DEFAULT 0, -- Added for soft delete
         deleted_at TEXT, -- Added for soft delete
+        created_by_user_id TEXT, -- Added for tracking who created the product
+        FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL, -- Added FK
         UNIQUE (product_name, language_code)
     )
     """)
 
-    # Ensure is_deleted and deleted_at columns exist for soft delete in Products table
+    # Ensure is_deleted, deleted_at, and created_by_user_id columns exist for soft delete in Products table
     cursor.execute("PRAGMA table_info(Products)")
     products_columns_info = cursor.fetchall()
     products_column_names = [info['name'] for info in products_columns_info]
@@ -606,6 +686,16 @@ def initialize_database():
             print("Added 'deleted_at' column to Products table.")
         except sqlite3.Error as e_alter_deleted_at_prod:
             print(f"Error adding 'deleted_at' column to Products table: {e_alter_deleted_at_prod}")
+
+    if 'created_by_user_id' not in products_column_names:
+        try:
+            cursor.execute("ALTER TABLE Products ADD COLUMN created_by_user_id TEXT")
+            # Cannot add FOREIGN KEY constraint with ALTER TABLE in older SQLite versions easily.
+            # The FK in CREATE TABLE is for new DBs. For existing, this adds the column.
+            # App logic or a more complex migration would be needed for full FK on existing tables.
+            print("Added 'created_by_user_id' column to Products table.")
+        except sqlite3.Error as e_alter_created_by_prod:
+            print(f"Error adding 'created_by_user_id' column to Products table: {e_alter_created_by_prod}")
 
     # Create ProductDimensions table (from ca.py)
     cursor.execute("""
@@ -645,37 +735,61 @@ def initialize_database():
         serial_number TEXT,
         purchase_confirmed_at TIMESTAMP,
         added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        added_by_user_id TEXT, -- Added column
         FOREIGN KEY (client_id) REFERENCES Clients (client_id) ON DELETE CASCADE,
         FOREIGN KEY (project_id) REFERENCES Projects (project_id) ON DELETE CASCADE,
         FOREIGN KEY (product_id) REFERENCES Products (product_id) ON DELETE CASCADE,
+        FOREIGN KEY (added_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL, -- Added FK
         UNIQUE (client_id, project_id, product_id)
     )
     """)
 
-    # Ensure serial_number column exists in ClientProjectProducts table
+    # Ensure serial_number, purchase_confirmed_at, and added_by_user_id columns exist in ClientProjectProducts table
+    logging.info("DEBUG_INIT_DB: Verifying/Updating schema for ClientProjectProducts...")
     cursor.execute("PRAGMA table_info(ClientProjectProducts)")
-    cpp_columns_info_check = cursor.fetchall() # Use a different variable name to avoid conflict
-    cpp_column_names_check = [info['name'] for info in cpp_columns_info_check]
+    cpp_columns_info_before_alter = cursor.fetchall()
+    cpp_column_names_before_alter = [info['name'] for info in cpp_columns_info_before_alter]
+    logging.info(f"DEBUG_INIT_DB: ClientProjectProducts schema BEFORE alter: {cpp_column_names_before_alter}")
 
-    if 'serial_number' not in cpp_column_names_check:
+    if 'serial_number' not in cpp_column_names_before_alter:
         try:
+            logging.info("DEBUG_INIT_DB: 'serial_number' column missing in ClientProjectProducts. Attempting to add...")
             cursor.execute("ALTER TABLE ClientProjectProducts ADD COLUMN serial_number TEXT")
-            print("Added 'serial_number' column to ClientProjectProducts table.")
+            logging.info("DEBUG_INIT_DB: Successfully ADDED 'serial_number' column to ClientProjectProducts.")
         except sqlite3.Error as e_alter_cpp_sn:
-            print(f"Error adding 'serial_number' column to ClientProjectProducts table: {e_alter_cpp_sn}")
-    # The existing check for purchase_confirmed_at can remain as is.
+            logging.error(f"DEBUG_INIT_DB: FAILED to add 'serial_number' column to ClientProjectProducts: {e_alter_cpp_sn}")
+    else:
+        logging.info("DEBUG_INIT_DB: 'serial_number' column already exists in ClientProjectProducts.")
 
-    # Ensure purchase_confirmed_at column exists in ClientProjectProducts table
-    cursor.execute("PRAGMA table_info(ClientProjectProducts)")
-    cpp_columns_info = cursor.fetchall()
-    cpp_column_names = [info['name'] for info in cpp_columns_info]
-
-    if 'purchase_confirmed_at' not in cpp_column_names:
+    if 'purchase_confirmed_at' not in cpp_column_names_before_alter:
         try:
+            logging.info("DEBUG_INIT_DB: 'purchase_confirmed_at' column missing in ClientProjectProducts. Attempting to add...")
             cursor.execute("ALTER TABLE ClientProjectProducts ADD COLUMN purchase_confirmed_at TIMESTAMP")
-            print("Added 'purchase_confirmed_at' column to ClientProjectProducts table.")
-        except sqlite3.Error as e_alter_cpp:
-            print(f"Error adding 'purchase_confirmed_at' column to ClientProjectProducts table: {e_alter_cpp}")
+            logging.info("DEBUG_INIT_DB: Successfully ADDED 'purchase_confirmed_at' column to ClientProjectProducts.")
+        except sqlite3.Error as e_alter_cpp_pca:
+            logging.error(f"DEBUG_INIT_DB: FAILED to add 'purchase_confirmed_at' column to ClientProjectProducts: {e_alter_cpp_pca}")
+    else:
+        logging.info("DEBUG_INIT_DB: 'purchase_confirmed_at' column already exists in ClientProjectProducts.")
+
+    if 'added_by_user_id' not in cpp_column_names_before_alter:
+        try:
+            logging.info("DEBUG_INIT_DB: 'added_by_user_id' column missing in ClientProjectProducts. Attempting to add...")
+            # Note: SQLite versions before 3.20.0 might not support ADD COLUMN with FOREIGN KEY constraint directly.
+            # The REFERENCES clause here might be ignored by older SQLite versions silently during ALTER TABLE.
+            # The FK constraint in CREATE TABLE IF NOT EXISTS is the primary definition for new databases.
+            cursor.execute("ALTER TABLE ClientProjectProducts ADD COLUMN added_by_user_id TEXT REFERENCES Users(user_id) ON DELETE SET NULL")
+            logging.info("DEBUG_INIT_DB: Successfully ADDED 'added_by_user_id' column to ClientProjectProducts.")
+        except sqlite3.Error as e_alter_cpp_creator:
+            logging.error(f"DEBUG_INIT_DB: FAILED to add 'added_by_user_id' column to ClientProjectProducts: {e_alter_cpp_creator}")
+    else:
+        logging.info("DEBUG_INIT_DB: 'added_by_user_id' column already exists in ClientProjectProducts.")
+
+    # Log schema AFTER all attempts
+    cursor.execute("PRAGMA table_info(ClientProjectProducts)")
+    cpp_columns_info_after_alter = cursor.fetchall()
+    cpp_column_names_after_alter = [info['name'] for info in cpp_columns_info_after_alter]
+    logging.info(f"DEBUG_INIT_DB: ClientProjectProducts schema AFTER all alter attempts: {cpp_column_names_after_alter}")
+
 
     # Create ScheduledEmails table (from ca.py)
     cursor.execute("""
@@ -1513,23 +1627,9 @@ CREATE TABLE IF NOT EXISTS Templates (
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
+    """) # Added missing closing triple quotes
 
--- Table for motivational messages
-CREATE TABLE IF NOT EXISTS motivational_messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    language_code TEXT NOT NULL,
-    message TEXT NOT NULL,
-    day_of_year INTEGER, -- Optional: For unique daily messages, can be NULL
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(language_code, message), -- Avoid duplicate messages per language
-    UNIQUE(language_code, day_of_year) -- Avoid multiple messages for the same day in the same language
-);
-    """)
-#-- Table for motivational messages
     cursor.execute("""
-
 CREATE TABLE IF NOT EXISTS motivational_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     language_code TEXT NOT NULL,
@@ -1541,6 +1641,21 @@ CREATE TABLE IF NOT EXISTS motivational_messages (
     UNIQUE(language_code, message), -- Avoid duplicate messages per language
     UNIQUE(language_code, day_of_year) -- Avoid multiple messages for the same day in the same language
 )
+                       """)
+
+    cursor.execute("""
+
+CREATE TABLE IF NOT EXISTS user_motivational_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    message TEXT NOT NULL,
+    language_code TEXT, -- Optional: if user messages can be language specific
+    is_active BOOLEAN DEFAULT TRUE,
+    -- created_by_user_id TEXT, -- Optional: Link to a user ID if app has users
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(message) -- Avoid globally duplicate user messages, or (created_by_user_id, message) if user-specific
+)
+
     """)
 
     # ItemStorageLocations Table
@@ -1984,30 +2099,228 @@ CREATE TABLE IF NOT EXISTS motivational_messages (
     print("DEBUG_INIT_DB: Indexes for Company Expense and Facture tables created or already exist.")
     # --- End Company Expense Module Tables and Indexes ---
 
+    # --- UserSavedFilters Table (Added for filter saving functionality) ---
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS user_saved_filters (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        filter_name TEXT NOT NULL,
+        filter_parameters_json TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE,
+        UNIQUE (user_id, filter_name)
+    )
+    """)
+    print("DEBUG_INIT_DB: Table user_saved_filters created or exists.")
+    # --- End UserSavedFilters Table ---
+
+    # Commit schema changes made via raw SQLite connection before proceeding to SQLAlchemy part
+    try:
+        logging.info("DEBUG_INIT_DB: Committing main schema/index changes before accounting module DDL.")
+        conn.commit()
+        logging.info("DEBUG_INIT_DB: Main schema/index changes committed.")
+    except sqlite3.Error as e_commit_main_schema:
+        logging.error(f"DEBUG_INIT_DB: Error committing main schema changes: {e_commit_main_schema}", exc_info=True)
+        conn.rollback()
+        conn.close()
+        raise # Critical to have main schema committed
+
+    # --- Accounting Module Tables ---
+    # SQLAlchemy engine will establish its own connection from the DATABASE_PATH,
+    # or use connection pooling. The previous commit ensures the DB file is up-to-date.
+    try:
+        logging.info("DEBUG_INIT_DB: Creating Accounting Module Tables using SQLAlchemy engine.") # Changed print to logging
+        # Need to import accounting models
+        from accounting import models as acc_models
+
+        # Create schema 'accounting' if it doesn't exist (for PostgreSQL, not directly applicable for SQLite)
+        # For SQLite, tables will be prefixed or handled by SQLAlchemy's metadata if schema is used.
+        # If using SQLite and `{'schema': 'accounting'}` in table args, SQLAlchemy creates table as `accounting_tablename`.
+        # If truly needing separate schema for other DBs, that's a DB-level command.
+
+        # Use the SQLAlchemy engine for table creation
+        acc_models.Base.metadata.create_all(bind=engine, checkfirst=True)
+
+        # print("DEBUG_INIT_DB: Table acc_fiscal_years created or exists.")
+        # print("DEBUG_INIT_DB: Table acc_currencies created or exists.")
+        # print("DEBUG_INIT_DB: Table acc_tax_rates created or exists.")
+        # print("DEBUG_INIT_DB: Table acc_chart_of_accounts created or exists.")
+        # print("DEBUG_INIT_DB: Table acc_journal_entries created or exists.")
+        # print("DEBUG_INIT_DB: Table acc_journal_items created or exists.")
+        # print("DEBUG_INIT_DB: Table acc_financial_statements created or exists.")
+
+        print("DEBUG_INIT_DB: Accounting Module Tables creation attempted using SQLAlchemy engine.")
+
+        # --- Indexes for Accounting Module (still use raw conn and cursor for these IF NOT managed by SQLAlchemy models) ---
+        # If indexes are part of SQLAlchemy model definitions (e.g., index=True on Column),
+        # `create_all` might handle them. Otherwise, explicit creation is needed.
+        # The current code uses cursor.execute for these, which is fine if they are not defined in SQLAlchemy models.
+        # For safety and explicitness, I will keep the manual index creation for now.
+        print("DEBUG_INIT_DB: Creating Accounting Module Indexes (manual via cursor)...")
+        # FiscalYear
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fiscal_years_name ON acc_fiscal_years(name)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fiscal_years_start_date ON acc_fiscal_years(start_date)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fiscal_years_end_date ON acc_fiscal_years(end_date)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fiscal_years_status ON acc_fiscal_years(status)")
+        # Currency
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_currencies_name ON acc_currencies(name)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_currencies_is_base ON acc_currencies(is_base_currency)")
+        # TaxRate
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_tax_rates_name ON acc_tax_rates(name)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_tax_rates_type ON acc_tax_rates(tax_type)")
+        # ChartOfAccounts
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_coa_code ON acc_chart_of_accounts(code)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_coa_name ON acc_chart_of_accounts(name)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_coa_type ON acc_chart_of_accounts(account_type)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_coa_parent_id ON acc_chart_of_accounts(parent_id)")
+        # JournalEntry
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_journal_entries_date ON acc_journal_entries(entry_date)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_journal_entries_ref ON acc_journal_entries(reference_number)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_journal_entries_fy_id ON acc_journal_entries(fiscal_year_id)")
+        # JournalItem
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_journal_items_entry_id ON acc_journal_items(journal_entry_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_journal_items_account_id ON acc_journal_items(account_id)")
+        # FinancialStatement
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fin_stmt_name ON acc_financial_statements(name)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fin_stmt_type ON acc_financial_statements(statement_type)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fin_stmt_fy_id ON acc_financial_statements(fiscal_year_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fin_stmt_period_end ON acc_financial_statements(period_end_date)")
+        print("DEBUG_INIT_DB: Accounting Module Indexes creation attempted.")
+        conn.commit() # Commit schema changes including manual indexes for accounting
+        print("DEBUG_INIT_DB: Accounting Module Indexes creation attempted and committed.")
+
+
+    except Exception as e_acc_schema:
+        print(f"CRITICAL ERROR during Accounting module schema/index creation: {e_acc_schema}")
+        conn.rollback() # Rollback if using raw conn for anything in this block
+    # --- End Accounting Module Tables and Indexes ---
+
+    # --- Calendar Module Tables ---
+    print("DEBUG_INIT_DB: Creating Calendar Module Tables...")
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS CompanyCalendarSettings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL UNIQUE, -- Assuming user_id is a string UUID from Users table
+        business_type TEXT, -- B2B, B2C, Both
+        activity_category TEXT,
+        country_iso TEXT NOT NULL, -- ISO 3166-1 alpha-2 country code
+        region TEXT, -- Subdivision of the country
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
+    )
+    """)
+    print("DEBUG_INIT_DB: Table CompanyCalendarSettings created or exists.")
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS UserCalendarEvents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL, -- Assuming user_id is a string UUID from Users table
+        event_date DATE NOT NULL,
+        event_type TEXT NOT NULL, -- Holiday, RemoteWork, WorkDay, OtherPersonal
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
+    )
+    """)
+    print("DEBUG_INIT_DB: Table UserCalendarEvents created or exists.")
+
+    # Indexes for Calendar Module
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_companycalendarsettings_user_id ON CompanyCalendarSettings(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_user_id ON UserCalendarEvents(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_date ON UserCalendarEvents(event_date)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_type ON UserCalendarEvents(event_type)")
+    print("DEBUG_INIT_DB: Indexes for Calendar Module created or already exist.")
+    # --- End Calendar Module Tables ---
+
+
     # --- Seed Data (from db/schema.py, ensuring use of db_config) ---
     try:
         print("DEBUG_INIT_DB: Starting data seeding phase.")
 
-        # User Seeding (Admin user)
-        print("DEBUG_INIT_DB: Checking/Seeding Users...")
-        cursor.execute("SELECT COUNT(*) FROM Users")
-        if cursor.fetchone()['COUNT(*)'] == 0: # Use dict access due to row_factory
-            admin_uid = str(uuid.uuid4())
-            # Generate salt and hash for default admin - direct SQL insertion for bootstrap
-            admin_salt = os.urandom(16).hex()
-            admin_password_bytes = config.DEFAULT_ADMIN_PASSWORD.encode('utf-8')
-            admin_salt_bytes = bytes.fromhex(admin_salt)
-            admin_pass_hash = hashlib.sha256(admin_salt_bytes + admin_password_bytes).hexdigest()
+        # Accounting Module Seeding (example: base currency, default fiscal year)
+        try:
+            from accounting import cruds as acc_cruds
+            from accounting import models as acc_models_pydantic # Pydantic models
+            from sqlalchemy.orm import Session
 
-            cursor.execute("""
-                INSERT OR IGNORE INTO Users
-                    (user_id, username, password_hash, salt, full_name, email, role, is_deleted, deleted_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (admin_uid, config.DEFAULT_ADMIN_USERNAME, admin_pass_hash, admin_salt,
-                  'Default Admin', f'{config.DEFAULT_ADMIN_USERNAME}@example.com', SUPER_ADMIN, 0, None))
-            print(f"Admin user '{config.DEFAULT_ADMIN_USERNAME}' seeded with salt and hash.")
-            print("DEBUG_INIT_DB: Admin user potentially seeded.")
-        print("DEBUG_INIT_DB: User seeding check complete.")
+            # Use a SQLAlchemy session for CRUD operations
+            with Session(engine) as session:
+                base_curr = acc_cruds.currency.get_base_currency(db=session)
+                if not base_curr:
+                    print("DEBUG_INIT_DB: No base currency found. Seeding USD as base.")
+                    usd_currency_in = acc_models_pydantic.CurrencyCreate(
+                        code="USD",
+                        name="US Dollar",
+                        symbol="$",
+                        exchange_rate_to_base=Decimal("1.000000"),
+                        is_base_currency=True
+                    )
+                    acc_cruds.currency.create(db=session, obj_in=usd_currency_in)
+                    print("DEBUG_INIT_DB: USD seeded as base currency.")
+
+                current_year_name = f"FY{datetime.now().year}"
+                existing_fy = acc_cruds.fiscal_year.get_by_name(db=session, name=current_year_name)
+                if not existing_fy:
+                    print(f"DEBUG_INIT_DB: No fiscal year found for {current_year_name}. Seeding it now.")
+                    default_fy_in = acc_models_pydantic.FiscalYearCreate(
+                        name=current_year_name,
+                        start_date=date(datetime.now().year, 1, 1),
+                        end_date=date(datetime.now().year, 12, 31),
+                        status=acc_models_pydantic.FiscalYearStatusEnum.OPEN
+                    )
+                    acc_cruds.fiscal_year.create(db=session, obj_in=default_fy_in)
+                    print(f"DEBUG_INIT_DB: Fiscal year {current_year_name} seeded.")
+
+                if not acc_cruds.chart_of_accounts.get_multi(db=session, limit=1): # Check if any account exists
+                    print("DEBUG_INIT_DB: Chart of Accounts is empty. Seeding minimal accounts.")
+                    accounts_to_seed = [
+                        {"code": "1010", "name": "Cash", "account_type": acc_models_pydantic.AccountTypeEnum.ASSET},
+                        {"code": "1020", "name": "Accounts Receivable", "account_type": acc_models_pydantic.AccountTypeEnum.ASSET},
+                        {"code": "2010", "name": "Accounts Payable", "account_type": acc_models_pydantic.AccountTypeEnum.LIABILITY},
+                        {"code": "3010", "name": "Common Stock", "account_type": acc_models_pydantic.AccountTypeEnum.EQUITY},
+                        {"code": "4010", "name": "Sales Revenue", "account_type": acc_models_pydantic.AccountTypeEnum.REVENUE},
+                        {"code": "5010", "name": "Office Supplies Expense", "account_type": acc_models_pydantic.AccountTypeEnum.EXPENSE},
+                    ]
+                    for acc_data in accounts_to_seed:
+                        acc_in = acc_models_pydantic.ChartOfAccountsCreate(**acc_data)
+                        if not acc_cruds.chart_of_accounts.get_by_code(db=session, code=acc_in.code):
+                            acc_cruds.chart_of_accounts.create(db=session, obj_in=acc_in)
+                    print("DEBUG_INIT_DB: Minimal Chart of Accounts seeded.")
+
+                session.commit() # Commit SQLAlchemy session changes
+                print("DEBUG_INIT_DB: Accounting module specific seed data committed using SQLAlchemy session.")
+
+        except ImportError:
+            print("DEBUG_INIT_DB: Could not import accounting cruds/models for seeding. Skipping accounting seed data.")
+        except Exception as e_acc_seed:
+            print(f"DEBUG_INIT_DB: Error during accounting data seeding: {e_acc_seed}")
+            conn.rollback() # Rollback accounting seed data on error
+            print("DEBUG_INIT_DB: Rollback due to accounting seeding error.")
+
+
+        # User Seeding (Admin user) - This initial seeding attempt is now handled by db_seed.py
+        # print("DEBUG_INIT_DB: Checking/Seeding Users...")
+        # cursor.execute("SELECT COUNT(*) FROM Users")
+        # if cursor.fetchone()['COUNT(*)'] == 0: # Use dict access due to row_factory
+        #     admin_uid = str(uuid.uuid4())
+        #     # Generate salt and hash for default admin - direct SQL insertion for bootstrap
+        #     admin_salt = os.urandom(16).hex()
+        #     admin_password_bytes = config.DEFAULT_ADMIN_PASSWORD.encode('utf-8')
+        #     admin_salt_bytes = bytes.fromhex(admin_salt)
+        #     admin_pass_hash = hashlib.sha256(admin_salt_bytes + admin_password_bytes).hexdigest()
+
+        #     cursor.execute("""
+        #         INSERT OR IGNORE INTO Users
+        #             (user_id, username, password_hash, salt, full_name, email, role, is_deleted, deleted_at)
+        #         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        #     """, (admin_uid, config.DEFAULT_ADMIN_USERNAME, admin_pass_hash, admin_salt,
+        #           'Default Admin', f'{config.DEFAULT_ADMIN_USERNAME}@example.com', SUPER_ADMIN, 0, None))
+        #     print(f"Admin user '{config.DEFAULT_ADMIN_USERNAME}' seeded with salt and hash.")
+        #     print("DEBUG_INIT_DB: Admin user potentially seeded.")
+        # print("DEBUG_INIT_DB: User seeding check complete.") # End of commented block
 
         # Application Settings Seeding
         print("DEBUG_INIT_DB: Seeding Application Settings...")

@@ -2,10 +2,31 @@
 import sys
 import os
 
-# Determine project root and add to sys.path
+# Determine project root
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-if PROJECT_ROOT not in sys.path:
+
+# Ensure PROJECT_ROOT is at the beginning of sys.path for consistent module resolution
+if PROJECT_ROOT in sys.path:
+    # If it's present but not at the start, remove and re-insert at the front
+    if sys.path[0] != PROJECT_ROOT:
+        sys.path.remove(PROJECT_ROOT)
+        sys.path.insert(0, PROJECT_ROOT)
+        # Optional: log that it was moved
+        # import logging
+        # logging.info(f"Moved {PROJECT_ROOT} to the start of sys.path.")
+else:
+    # If it's not present at all, insert it at the start
     sys.path.insert(0, PROJECT_ROOT)
+    # Optional: log that it was added
+    # import logging
+    # logging.info(f"Added {PROJECT_ROOT} to the start of sys.path.")
+
+# For diagnostics (can be removed or commented out in production)
+# print(f"[{os.path.basename(__file__)}] Effective sys.path[0]: {sys.path[0]}")
+# print(f"[{os.path.basename(__file__)}] Full sys.path: {sys.path}")
+
+
+from main_window import DocumentManager # The main application window
 
 import logging # For main.py's own logging needs, and for translator parts if setup_logging isn't called first
 import icons_rc # Import the compiled resource file
@@ -33,15 +54,18 @@ from PyQt5.QtWidgets import QDialog # Required for QDialog.Accepted check
 import db # Added import for db module
 from db.db_seed import run_seed
 from db import get_all_companies, add_company # Specific imports for company check
+from db.cruds import users_crud # Corrected import for users_crud
 # from db.cruds.application_settings_crud import get_setting # Removed direct import
 # from db.init_schema import initialize_database # This will be db.initialize_database after this change
-from auth.login_window import LoginWindow # Added for authentication
+# from auth.login_window import LoginWindow # Replaced by LoginDialog
+from dialogs.login_dialog import LoginDialog # New LoginDialog
+from auth import authentication as auth_service # Import the auth service
+
 from PyQt5.QtWidgets import QDialog # Required for QDialog.Accepted check (already present, but good to note)
 # from initial_setup_dialog import InitialSetupDialog # Redundant import, already imported above
 # import db as db_manager # For db initialization - already imported above, now using 'import db'
-from main_window import DocumentManager # The main application window
 from notifications import NotificationManager # Added for notifications
-from db.cruds.users_crud import users_crud_instance # Added for default operational user
+# from db.cruds.users_crud import users_crud_instance # users_crud is used directly by auth_service
 from PyQt5.QtWidgets import QMessageBox # Added for error dialog
 from PyQt5.QtWidgets import QSplashScreen
 
@@ -54,7 +78,8 @@ CURRENT_USER_ROLE = None
 CURRENT_USER_ID = None
 SESSION_START_TIME = None
 # Initialize from CONFIG, providing a default if key is missing
-SESSION_TIMEOUT_SECONDS = CONFIG.get("session_timeout_minutes", 30) * 60
+# SESSION_TIMEOUT_SECONDS = CONFIG.get("session_timeout_minutes", 30) * 60
+SESSION_TIMEOUT_SECONDS = 12 * 30 * 24 * 60 * 60 # Approx 12 months
 
 # Global variable for the API server process
 api_server_process = None
@@ -190,8 +215,10 @@ def main():
     setup_logging()
     logging.info("Application starting...")
 
-    # Start the API server
-    start_api_server()
+    # Start the API server - Commented out as per user request for local PyQt app
+    # start_api_server()
+    # logging.info("API server auto-start is disabled for local PyQt execution.") # Log message removed
+
 
     # Register the function to stop the API server on application exit
     # This ensures that if start_api_server() actually started a process,
@@ -200,6 +227,22 @@ def main():
 
     # Initialize database after logging and API server start attempt
     db.initialize_database()
+
+    # --- Coordinated Data Seeding ---
+    # This block handles the seeding of initial data after the schema is created,
+    # using the dedicated seeding module.
+    # MOVED EARLIER: run_seed() needs to happen AFTER initialize_database() and BEFORE UI elements try to read seeded settings.
+    try:
+        logging.info("Attempting to run data seeding if necessary...")
+        run_seed() # Call the main seeding function from db_seed.py
+        # run_seed() handles its own connection, commit, rollback, and logging.
+        logging.info("Data seeding process via run_seed() completed.")
+    except Exception as e_seed_run:
+        # Catch any unexpected error from run_seed() itself, though it should handle its own.
+        logging.error(f"An unexpected error occurred when calling run_seed(): {e_seed_run}", exc_info=True)
+        # Depending on severity, might want to sys.exit(1) here if seeding is critical for app function
+    # --- End Coordinated Data Seeding ---
+
     # Log the configured session timeout value
     logging.info(f"Session timeout is set to: {SESSION_TIMEOUT_SECONDS // 60} minutes ({SESSION_TIMEOUT_SECONDS} seconds).")
 
@@ -219,17 +262,20 @@ def main():
     # Display Splash Screen using the new SplashWindow
     from ui.splash_screen import SplashWindow # Import the new class
 
-    # Determine current language for splash screen
-    # This duplicates some logic from later in main() for translations, consider refactoring
-    current_app_lang = QLocale.system().name().split('_')[0]
-    language_code_from_db_for_splash = db.get_setting('user_selected_language') # Use db.get_setting
-    if language_code_from_db_for_splash and isinstance(language_code_from_db_for_splash, str) and language_code_from_db_for_splash.strip():
-        current_app_lang = language_code_from_db_for_splash.strip()
-    else:
-        # Use system lang if available in config, else default from config, else 'en'
-        sys_lang = QLocale.system().name().split('_')[0]
-        current_app_lang = CONFIG.get("language", sys_lang if sys_lang in ["en", "fr", "ar"] else "en")
-
+    # Determine current language for splash screen - NOW SAFE TO CALL db.get_setting
+    current_app_lang = QLocale.system().name().split('_')[0] # Default
+    try:
+        language_code_from_db_for_splash = db.get_setting('user_selected_language')
+        if language_code_from_db_for_splash and isinstance(language_code_from_db_for_splash, str) and language_code_from_db_for_splash.strip():
+            current_app_lang = language_code_from_db_for_splash.strip()
+            logging.info(f"Splash screen language '{current_app_lang}' loaded from database setting.")
+        else:
+            sys_lang = QLocale.system().name().split('_')[0]
+            current_app_lang = CONFIG.get("language", sys_lang if sys_lang in ["en", "fr", "ar"] else "en")
+            logging.info(f"Splash screen language '{current_app_lang}' from config/system (DB setting not found or invalid).")
+    except Exception as e_splash_lang:
+        logging.error(f"Error getting language for splash screen, defaulting. Error: {e_splash_lang}")
+        # current_app_lang remains system default or 'en'
 
     # APP_ROOT_DIR is available here from app_setup import
     splash = SplashWindow(app_root_dir=APP_ROOT_DIR, language_code=current_app_lang)
@@ -486,110 +532,69 @@ def main():
     proceed_to_main_app = False # Initialize before bypass and remember me
 
     # --- Development/Testing: Bypass Login ---
-    if BYPASS_LOGIN_FOR_TESTING:
-        logging.warning("Login screen is being bypassed due to BYPASS_LOGIN_FOR_TESTING flag.")
-        try:
-            # Ensure db operations can be performed to get admin user
-            from db.cruds.users_crud import users_crud_instance
-            # from auth.roles import SUPER_ADMIN # Make sure SUPER_ADMIN is imported if not already (it is)
-
-            admin_user = users_crud_instance.get_user_by_username("admin") # Assuming "admin" is the default admin username
-            if admin_user:
-                CURRENT_USER_ID = admin_user['user_id']
-                CURRENT_USER_ROLE = SUPER_ADMIN # Assign super_admin role
-                CURRENT_SESSION_TOKEN = "BYPASS_TOKEN_ADMIN_SUPER"
-                SESSION_START_TIME = datetime.datetime.now()
-                proceed_to_main_app = True # This sets it to True if bypass is successful
-                logging.info(f"Bypassed login. Logged in as default admin: {admin_user['username']} (ID: {CURRENT_USER_ID}), Role: {CURRENT_USER_ROLE}")
-            else:
-                logging.error("BYPASS_LOGIN_FOR_TESTING: Could not find default admin user 'admin'. Login cannot be bypassed.")
-                # proceed_to_main_app will remain False, forcing normal login
-        except Exception as e_bypass:
-            logging.error(f"BYPASS_LOGIN_FOR_TESTING: Error during login bypass: {e_bypass}", exc_info=True)
-            # proceed_to_main_app will remain False, normal login flow will occur.
-    # --- End Development/Testing: Bypass Login ---
+    # BYPASS_LOGIN_FOR_TESTING flag is removed; login is now mandatory.
+    # If bypass is needed for development, it should be handled by temporarily
+    # modifying the login logic or providing default credentials.
 
     # 10. Authentication Flow
-    settings = QSettings()
+    # QSettings for "Remember Me" is not implemented in this phase.
+    # Login will be required each time.
 
-    # Now check "Remember Me" ONLY if bypass did not occur
-    if not proceed_to_main_app:
-        remember_me_active = settings.value("auth/remember_me_active", False, type=bool)
-        if remember_me_active:
-            logging.info("Found active 'Remember Me' flag.")
-            stored_token = settings.value("auth/session_token", None)
-            stored_user_id = settings.value("auth/user_id", None)
-            stored_username = settings.value("auth/username", "Unknown") # Default for logging
-            stored_user_role = settings.value("auth/user_role", None)
+    logged_in_user_info = None # To store user details after successful login
 
-            if stored_token and stored_user_id and stored_user_role:
-                logging.info(f"Attempting to restore session for user: {stored_username} (ID: {stored_user_id}) with stored token.")
+    # --- Remember Me - Attempt Auto Login ---
+    remembered_username = auth_service.get_remembered_user()
+    if remembered_username:
+        logging.info(f"Attempting auto-login for remembered user: {remembered_username}")
+        # In a real token system, we'd validate the token here.
+        # For this simplified version, we fetch user details directly.
+        # This assumes the user still exists and is active.
+        user_details = users_crud.get_user_by_username(remembered_username) # Corrected usage
 
-                # global CURRENT_SESSION_TOKEN, CURRENT_USER_ID, CURRENT_USER_ROLE, SESSION_START_TIME # Already global
-                CURRENT_SESSION_TOKEN = stored_token
-                CURRENT_USER_ID = stored_user_id
-                CURRENT_USER_ROLE = stored_user_role
-                SESSION_START_TIME = datetime.datetime.now() # Reset session timer
-
-                logging.info(f"Session restored for user: {stored_username}, Role: {CURRENT_USER_ROLE}. Token: {CURRENT_SESSION_TOKEN}")
-                logging.info(f"Session (restored) started at: {SESSION_START_TIME}")
-                proceed_to_main_app = True
-            else:
-                logging.warning("Found 'Remember Me' flag but token or user details are missing. Clearing invalid 'Remember Me' data.")
-                settings.setValue("auth/remember_me_active", False)
-                settings.remove("auth/session_token")
-                settings.remove("auth/user_id")
-                settings.remove("auth/username")
-                settings.remove("auth/user_role")
+        if user_details and user_details.get('is_active'):
+            auth_service.set_current_user(user_details) # Set the user as current
+            logged_in_user_info = user_details
+            proceed_to_main_app = True
+            logging.info(f"Auto-login successful for user: {remembered_username}")
+            SESSION_START_TIME = datetime.datetime.now() # Start session timer
         else:
-            logging.info("'Remember Me' is not active.")
+            logging.warning(f"Auto-login failed for remembered user: {remembered_username}. User not found or inactive. Clearing preference.")
+            auth_service.clear_remember_me_preference()
+            proceed_to_main_app = False # Fallback to manual login
+    else:
+        proceed_to_main_app = False # No remembered user, proceed to manual login
 
-    if not proceed_to_main_app:
-        logging.info("Proceeding to show LoginWindow.")
-        login_dialog = LoginWindow()
-        login_result = login_dialog.exec_()
-
-        if login_result == QDialog.Accepted:
-            session_token = login_dialog.get_session_token()
-            logged_in_user = login_dialog.get_current_user()
-
-            # global CURRENT_SESSION_TOKEN, CURRENT_USER_ROLE, CURRENT_USER_ID, SESSION_START_TIME # Already global
-            CURRENT_SESSION_TOKEN = session_token # These are assigned again here for clarity
-            if logged_in_user:
-                CURRENT_USER_ROLE = logged_in_user.get('role')
-                CURRENT_USER_ID = logged_in_user.get('user_id')
-                SESSION_START_TIME = datetime.datetime.now()
-                logging.info(f"Login successful. User: {logged_in_user.get('username')}, Role: {CURRENT_USER_ROLE}, Token: {CURRENT_SESSION_TOKEN}, Session started: {SESSION_START_TIME}")
-            else: # Should not happen if dialog.accept() is called correctly
-                logging.error("Login reported successful by dialog, but no user data retrieved. Exiting.")
-                sys.exit(1)
-            proceed_to_main_app = True # Mark to proceed
-        else:
-            logging.warning("Login dialog was not accepted (failed, cancelled, or closed). Attempting to use default operational user.")
-            DEFAULT_OPERATIONAL_USERNAME = "default_operational_user"
-            try:
-                # Assuming users_crud_instance does not require explicit connection management here
-                # or it handles it internally for read-only operations like get_user_by_username.
-                # If main.py initializes a global DB connection that CRUD instances can use, that's also fine.
-                default_user = users_crud_instance.get_user_by_username(DEFAULT_OPERATIONAL_USERNAME)
-                if default_user:
-                    CURRENT_USER_ID = default_user.get('user_id')
-                    CURRENT_USER_ROLE = default_user.get('role')
-                    SESSION_START_TIME = datetime.datetime.now()
-                    CURRENT_SESSION_TOKEN = "default_user_session_token" # Placeholder token
-                    logging.info(f"Proceeding with default operational user: {DEFAULT_OPERATIONAL_USERNAME} (ID: {CURRENT_USER_ID}, Role: {CURRENT_USER_ROLE})")
-                    proceed_to_main_app = True
+    if not proceed_to_main_app: # If auto-login didn't happen or failed
+        while True: # Loop until successful login or explicit exit
+            login_dialog = LoginDialog()
+            if login_dialog.exec_() == QDialog.Accepted:
+                user_data_from_dialog = login_dialog.get_user_data() # This is already the full user_info from auth_service.login
+                if user_data_from_dialog:
+                    logged_in_user_info = user_data_from_dialog # Already set by auth_service.login and retrieved
+                    if logged_in_user_info: # Should always be true if user_data_from_dialog is not None
+                        logging.info(f"Manual login successful. User: {logged_in_user_info.get('username')}, Role: {logged_in_user_info.get('role_name')}")
+                        # Save remember me preference based on checkbox in LoginDialog
+                        # This is now handled inside auth_service.login based on the 'remember_me' param
+                        # auth_service.save_remember_me_preference(logged_in_user_info['username'], login_dialog.is_remember_me_checked())
+                        SESSION_START_TIME = datetime.datetime.now() # Start session timer
+                        proceed_to_main_app = True
+                        break # Exit login loop
+                    else:
+                        logging.error("Login dialog accepted, but no user data found in auth_service after manual login. Critical error.")
+                        QMessageBox.critical(None, "Erreur Critique de Connexion", "Impossible de récupérer les informations utilisateur après la connexion.")
+                        splash.hide()
+                        sys.exit(1)
                 else:
-                    logging.critical(f"Default operational user '{DEFAULT_OPERATIONAL_USERNAME}' not found in the database.")
-                    QMessageBox.critical(None, "Critical Error", f"Default operational user profile ('{DEFAULT_OPERATIONAL_USERNAME}') not found. Application cannot start. Please contact support or run database seeding.")
-                    sys.exit(1)
-            except Exception as e_default_user:
-                logging.critical(f"An error occurred while trying to fetch the default operational user '{DEFAULT_OPERATIONAL_USERNAME}': {e_default_user}", exc_info=True)
-                QMessageBox.critical(None, "Critical Database Error", f"An error occurred while accessing user data. Application cannot start. Check logs for details.")
-                sys.exit(1)
+                    logging.error("Login dialog accepted, but get_user_data() returned None from manual login.")
+                    QMessageBox.critical(None, "Erreur de Connexion", "Échec de la récupération des données utilisateur.")
+            else: # LoginDialog was cancelled or closed
+                logging.warning("Login dialog was cancelled or closed by the user. Exiting application.")
+                splash.hide()
+                sys.exit(0)
 
-    if proceed_to_main_app:
-        main_window = DocumentManager(APP_ROOT_DIR, CURRENT_USER_ID)
+    if proceed_to_main_app and logged_in_user_info:
+        # Pass the full user_info dictionary to DocumentManager
+        main_window = DocumentManager(APP_ROOT_DIR, logged_in_user_info)
 
         # Setup Notification Manager
         # Ensure 'app' is the QApplication instance, available in this scope

@@ -1,6 +1,8 @@
 import os
 import random
 import logging
+import datetime # Added for day_of_year calculation
+
 from PyQt5.QtWidgets import QLabel, QVBoxLayout, QWidget, QApplication
 from PyQt5.QtGui import QPixmap, QMovie, QFont, QPalette, QColor, QBrush
 from PyQt5.QtCore import Qt, QSize, QTimer, QLocale, QPropertyAnimation, QEasingCurve, pyqtProperty
@@ -8,7 +10,9 @@ from PyQt5.QtCore import Qt, QSize, QTimer, QLocale, QPropertyAnimation, QEasing
 # Assuming db connection and GenericCRUD are accessible
 # This might require adjusting imports based on your project structure
 # For example, if db.cruds.generic_crud is the path:
-from db.cruds.generic_crud import GenericCRUD, get_db_connection
+
+from db.connection import get_db_connection # Corrected import
+from db.cruds.generic_crud import GenericCRUD
 
 
 class SplashWindow(QWidget):
@@ -36,28 +40,70 @@ class SplashWindow(QWidget):
         conn = None
         try:
             conn = get_db_connection()
-            messages_crud = GenericCRUD(conn, 'motivational_messages', 'id')
+            messages_crud = GenericCRUD(table_name='motivational_messages', primary_key='id')
 
-            # Prioritize messages for the current language
-            # Fetch messages where day_of_year is NULL (generic messages) and is_active is TRUE
-            messages = messages_crud.get_by_attributes(
+            current_day_of_year = datetime.date.today().timetuple().tm_yday
+
+            conn = get_db_connection()
+
+            # Pool for all potential messages
+            candidate_messages = []
+
+            # 1. Fetch User-Customized Messages (prioritize these)
+            # These are considered general purpose for now, not tied to day_of_year
+            user_messages_crud = GenericCRUD(table_name='user_motivational_messages', primary_key='id')
+            # Fetch user messages for current language OR language_code IS NULL (language-neutral)
+            user_lang_specific = user_messages_crud.get_by_attributes(
+                {"language_code": self.language_code, "is_active": True}
+            )
+            user_lang_neutral = user_messages_crud.get_by_attributes(
+                {"language_code": None, "is_active": True} # Assuming NULL language_code for neutral
+            )
+            if user_lang_specific:
+                candidate_messages.extend([m['message'] for m in user_lang_specific])
+            if user_lang_neutral:
+                candidate_messages.extend([m['message'] for m in user_lang_neutral])
+
+            if candidate_messages: # If user messages are found, pick one and return
+                logging.info(f"Found user-customized messages (lang: {self.language_code} or neutral). Using one.")
+                return random.choice(candidate_messages)
+
+            # 2. If no user messages, proceed with system messages
+            system_messages_crud = GenericCRUD(table_name='motivational_messages', primary_key='id')
+            current_day_of_year = datetime.date.today().timetuple().tm_yday
+
+            # Try to fetch a system message for the current language and specific day_of_year
+            daily_sys_messages = system_messages_crud.get_by_attributes(
+                {"language_code": self.language_code, "is_active": True, "day_of_year": current_day_of_year}
+            )
+            if daily_sys_messages:
+                logging.info(f"Found daily system message for lang '{self.language_code}', day {current_day_of_year}.")
+                return random.choice(daily_sys_messages)['message']
+
+            # If no daily system message, try to fetch a generic system message for the current language
+            logging.debug(f"No daily system message. Trying generic for lang '{self.language_code}'.")
+            generic_sys_lang_messages = system_messages_crud.get_by_attributes(
                 {"language_code": self.language_code, "is_active": True, "day_of_year": None}
             )
+            if generic_sys_lang_messages:
+                logging.info(f"Found generic system message for lang '{self.language_code}'.")
+                return random.choice(generic_sys_lang_messages)['message']
 
-            if not messages:
-                # Fallback to English if no messages for current language or if current lang is not 'en'
-                logging.warning(f"No motivational messages found for language '{self.language_code}'. Falling back to 'en'.")
-                messages = messages_crud.get_by_attributes(
+            # If still no system message, try to fetch a generic 'en' system message
+            if self.language_code != 'en':
+                logging.warning(f"No generic system messages for lang '{self.language_code}'. Falling back to 'en' generic system.")
+                english_generic_sys_messages = system_messages_crud.get_by_attributes(
                     {"language_code": "en", "is_active": True, "day_of_year": None}
                 )
+                if english_generic_sys_messages:
+                    logging.info("Found generic system message for lang 'en'.")
+                    return random.choice(english_generic_sys_messages)['message']
 
-            if not messages:
-                # Ultimate fallback if English also has no messages
-                logging.error("No motivational messages found for 'en' or the specified language. Using hardcoded default.")
-                return "Welcome! / Bienvenue !"
+            # Ultimate fallback
+            logging.error("No messages found in DB (user, daily system, generic system). Using hardcoded default.")
+            return "Welcome! / Bienvenue !" # Corrected Indentation and removed dead code below
 
-            return random.choice(messages)['message']
-
+        # Dead code, removed: return random.choice(messages)['message']
 
         except Exception as e:
             logging.error(f"Error fetching motivational message from DB: {e}", exc_info=True)

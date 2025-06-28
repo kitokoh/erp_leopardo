@@ -14,6 +14,7 @@ from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtWidgets import QGridLayout
 from contact_manager.sync_service import handle_contact_change_from_platform # For Google Sync
 import logging # Added for logging
+from PyQt5.QtWidgets import QGroupBox
 
 # Adjust path to import db_manager from the parent directory / current dir
 current_dir = os.path.dirname(os.path.abspath(__file__))

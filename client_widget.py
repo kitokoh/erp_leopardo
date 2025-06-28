@@ -17,7 +17,7 @@ from PyQt5.QtWidgets import (
     QSizePolicy # Added QSizePolicy
 )
 from PyQt5.QtGui import QIcon, QDesktopServices, QFont, QColor, QPixmap, QTextCursor
-from PyQt5.QtCore import Qt, QUrl, QCoreApplication, QEvent
+from PyQt5.QtCore import Qt, QUrl, QCoreApplication, QEvent, QStandardPaths
 from PyQt5.QtWidgets import QFormLayout
 from PyQt5.QtWidgets import QListWidgetItem
 from PyQt5.QtGui import QPixmap
@@ -81,21 +81,28 @@ def _import_main_elements():
         MAIN_MODULE_SEND_WHATSAPP_DIALOG = WhatsAppDialogModule
 
 
+from auth.permissions import has_permission, \
+    P_EDIT_CLIENT_FULL, P_EDIT_CLIENT_BASIC, P_MANAGE_CLIENT_CONTACTS, \
+    P_LINK_PRODUCTS_TO_CLIENT, P_MANAGE_CLIENT_DOCUMENTS, P_ARCHIVE_CLIENT, \
+    P_MANAGE_CLIENT_ASSIGNMENTS, P_MANAGE_CLIENT_BILLING # Define more as needed
+
 class ClientWidget(QWidget):
     CONTACT_PAGE_LIMIT = 15 # Class attribute for page limit
 
-    def __init__(self, client_info, config, app_root_dir, notification_manager, current_user_id, parent=None): # Add current_user_id
+    def __init__(self, client_info, config, app_root_dir, notification_manager, current_user_info: dict, parent=None): # Changed to current_user_info
         super().__init__(parent)
-        logging.info(f"ClientWidget.__init__: INSTANTIATION STARTED for client_id={client_info.get('client_id')}, user_id={current_user_id}")
+        self.current_user_info = current_user_info # Store full user info
+        self.current_user_id = self.current_user_info.get('user_id') # Extract for existing code
+        self._is_populating_docs = False # Initialize re-entrancy guard
+
+        logging.info(f"ClientWidget.__init__: INSTANTIATION STARTED for client_id={client_info.get('client_id')}, user: {self.current_user_info.get('username')}")
         logging.info(f"ClientWidget.__init__: Received client_info: {client_info}")
-        # logging.info(f"ClientWidget initialized with client_info: {client_info}") # Redundant with above
         logging.info(f"ClientWidget __init__: client_id={client_info.get('client_id')}, client_name={client_info.get('client_name')}")
         self.client_info = client_info
         self.notification_manager = notification_manager
-        self.current_user_id = current_user_id # Store current_user_id
-        # self.config = config # Original config passed, will be set by _import_main_elements
+        # self.config = config # Will be set by _import_main_elements
 
-        # Dynamically import main elements to avoid circular import at module load time
+        # Dynamically import main elements
         logging.info("ClientWidget.__init__: Calling _import_main_elements()...")
         _import_main_elements()
         logging.info("ClientWidget.__init__: Finished _import_main_elements().")
@@ -293,10 +300,120 @@ class ClientWidget(QWidget):
              self.notes_group_box.toggled.connect(self._handle_notes_section_toggled)
         if hasattr(self, 'tabs_group_box'):
              self.tabs_group_box.toggled.connect(self._handle_tabs_section_toggled)
+
+        # Apply permissions
+        self._apply_permissions()
+
         # Event filter for notes auto-save
         if hasattr(self, 'notes_edit'):
             self.notes_edit.installEventFilter(self)
         logging.info(f"ClientWidget.setup_ui: FULL UI SETUP COMPLETED for client_id={self.client_info.get('client_id')}")
+
+    def _apply_permissions(self):
+        """Applies role-based permissions to UI elements within ClientWidget."""
+        role_name = self.current_user_info.get('role_name') if self.current_user_info else None
+        if not role_name:
+            # Default to least privilege if role_name is somehow not available
+            # This state should ideally not be reached if login is enforced.
+            logging.warning("ClientWidget._apply_permissions: No role_name found, disabling most actions.")
+            can_edit_full = False
+            can_edit_basic = False
+            can_manage_contacts = False
+            can_link_products = False
+            can_manage_documents = False
+            can_manage_assignments = False # New permission P_MANAGE_CLIENT_ASSIGNMENTS
+            can_manage_billing = False     # New permission P_MANAGE_CLIENT_BILLING
+        else:
+            can_edit_full = has_permission(role_name, P_EDIT_CLIENT_FULL)
+            can_edit_basic = has_permission(role_name, P_EDIT_CLIENT_BASIC) # For notes, status
+            can_manage_contacts = has_permission(role_name, P_MANAGE_CLIENT_CONTACTS)
+            can_link_products = has_permission(role_name, P_LINK_PRODUCTS_TO_CLIENT)
+            can_manage_documents = has_permission(role_name, P_MANAGE_CLIENT_DOCUMENTS)
+            # Assuming new permissions P_MANAGE_CLIENT_ASSIGNMENTS, P_MANAGE_CLIENT_BILLING exist in auth.permissions
+            # If not, these will default to False. Add them to auth/permissions.py
+            can_manage_assignments = has_permission(role_name, P_MANAGE_CLIENT_ASSIGNMENTS)
+            can_manage_billing = has_permission(role_name, P_MANAGE_CLIENT_BILLING)
+
+
+        # Client Info Header Buttons
+        if hasattr(self, 'create_docs_btn'): # Send Email
+            self.create_docs_btn.setEnabled(can_manage_documents) # Emailing often tied to doc management
+        if hasattr(self, 'compile_pdf_btn'):
+            self.compile_pdf_btn.setEnabled(can_manage_documents)
+        if hasattr(self, 'edit_save_client_btn'):
+            self.edit_save_client_btn.setEnabled(can_edit_full or can_edit_basic)
+        if hasattr(self, 'send_whatsapp_btn'): # Assuming this is contact related
+            self.send_whatsapp_btn.setEnabled(can_manage_contacts)
+
+        # Status ComboBox
+        if hasattr(self, 'status_combo'):
+            self.status_combo.setEnabled(can_edit_full or can_edit_basic)
+
+        # Notes Section
+        if hasattr(self, 'notes_edit'):
+            self.notes_edit.setReadOnly(not (can_edit_full or can_edit_basic))
+
+        # Documents Tab Buttons
+        if hasattr(self, 'add_doc_btn'): # Import Document
+            self.add_doc_btn.setEnabled(can_manage_documents)
+        if hasattr(self, 'add_template_btn'): # Generate via Template
+            self.add_template_btn.setEnabled(can_manage_documents)
+        # Action buttons within doc_table are handled in populate_doc_table
+
+        # Contacts Tab Buttons
+        if hasattr(self, 'add_contact_btn'):
+            self.add_contact_btn.setEnabled(can_manage_contacts)
+        if hasattr(self, 'edit_contact_btn'):
+            self.edit_contact_btn.setEnabled(can_manage_contacts)
+        if hasattr(self, 'remove_contact_btn'):
+            self.remove_contact_btn.setEnabled(can_manage_contacts)
+
+        # Products Tab Buttons
+        if hasattr(self, 'add_product_btn'):
+            self.add_product_btn.setEnabled(can_link_products)
+        if hasattr(self, 'edit_product_btn'):
+            # Editing a product line might require more specific permissions than just linking
+            # For now, linking implies ability to edit the link details (qty, price_override)
+            self.edit_product_btn.setEnabled(can_link_products)
+        if hasattr(self, 'remove_product_btn'):
+            self.remove_product_btn.setEnabled(can_link_products)
+
+        # Document Notes Tab Buttons
+        if hasattr(self, 'add_doc_note_button'):
+            self.add_doc_note_button.setEnabled(can_manage_documents) # Or a specific P_MANAGE_DOCUMENT_NOTES
+        # Action buttons in document_notes_table handled in load_document_notes_table
+
+        # Product Dimensions Tab
+        if hasattr(self, 'edit_client_product_dimensions_button'):
+            # This modifies client-specific product data, linked to product linking ability.
+            self.edit_client_product_dimensions_button.setEnabled(can_link_products)
+            # The button's enabled state also depends on a product being selected in dim_product_selector_combo,
+            # which is handled by on_dim_product_selected. This RBAC check is an additional layer.
+            if not can_link_products:
+                 self.dim_product_selector_combo.setEnabled(False) # Disable selector if no perm
+            else:
+                 self.dim_product_selector_combo.setEnabled(True)
+
+
+        # Assignments Tab Buttons (Vendors, Techs, Transporters, Forwarders, MTA)
+        # Using P_MANAGE_CLIENT_ASSIGNMENTS as a general permission for all these
+        if hasattr(self, 'add_assigned_vendor_btn'): self.add_assigned_vendor_btn.setEnabled(can_manage_assignments)
+        if hasattr(self, 'remove_assigned_vendor_btn'): self.remove_assigned_vendor_btn.setEnabled(can_manage_assignments) # Initial state also depends on selection
+        if hasattr(self, 'add_assigned_technician_btn'): self.add_assigned_technician_btn.setEnabled(can_manage_assignments)
+        if hasattr(self, 'remove_assigned_technician_btn'): self.remove_assigned_technician_btn.setEnabled(can_manage_assignments)
+        if hasattr(self, 'add_assigned_transporter_btn'): self.add_assigned_transporter_btn.setEnabled(can_manage_assignments)
+        if hasattr(self, 'remove_assigned_transporter_btn'): self.remove_assigned_transporter_btn.setEnabled(can_manage_assignments)
+        if hasattr(self, 'add_assigned_forwarder_btn'): self.add_assigned_forwarder_btn.setEnabled(can_manage_assignments)
+        if hasattr(self, 'remove_assigned_forwarder_btn'): self.remove_assigned_forwarder_btn.setEnabled(can_manage_assignments)
+        if hasattr(self, 'add_assigned_mta_btn'): self.add_assigned_mta_btn.setEnabled(can_manage_assignments) # Initial state also depends on project selection
+        if hasattr(self, 'remove_assigned_mta_btn'): self.remove_assigned_mta_btn.setEnabled(can_manage_assignments)
+
+        # Billing Tab
+        if hasattr(self, 'generate_invoice_button'):
+            self.generate_invoice_button.setEnabled(can_manage_billing)
+
+        logging.info(f"ClientWidget permissions applied for role: {role_name}")
+
 
     def _setup_notes_section(self, main_layout):
         try:
@@ -435,6 +552,7 @@ class ClientWidget(QWidget):
                     parent=self,
                     template_data=template_data  # Pass the fetched template data
                 )
+                # logging.info(f"ClientWidget.handle_generate_template_button_clicked: About to open CreateDocumentDialog. Client Info: {self.client_info}, Config available: {bool(self.config)}") # DEBUG LOG REMOVED
                 if dialog.exec_() == QDialog.Accepted:
                     self.populate_doc_table()  # Refresh documents tab
             else:
@@ -495,9 +613,21 @@ class ClientWidget(QWidget):
             self.documents_empty_label.setFont(font_docs_empty)
             docs_layout.addWidget(self.documents_empty_label)
             self.doc_table = QTableWidget()
-            self.doc_table.setColumnCount(5)
-            self.doc_table.setHorizontalHeaderLabels([self.tr("Nom"), self.tr("Type"), self.tr("Langue"), self.tr("Date"), self.tr("Actions")])
+            # Increased column count for new "Quick Actions" column
+            self.doc_table.setColumnCount(6)
+            self.doc_table.setHorizontalHeaderLabels([
+                self.tr("Nom"), self.tr("Type"), self.tr("Langue"),
+                self.tr("Date"), self.tr("Fichier Original"), self.tr("Actions Rapides") # Added "Fichier Original" and "Actions Rapides"
+            ])
             self.doc_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            # Adjust column widths - make Actions Rapides and Fichier Original fit content
+            self.doc_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch) # Nom
+            self.doc_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents) # Type
+            self.doc_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents) # Langue
+            self.doc_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents) # Date
+            self.doc_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents) # Fichier Original
+            self.doc_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents) # Actions Rapides
+
             self.doc_table.setSelectionBehavior(QAbstractItemView.SelectRows)
             self.doc_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
             docs_layout.addWidget(self.doc_table)
@@ -1655,6 +1785,47 @@ class ClientWidget(QWidget):
         self.notes_group_box.toggled.connect(self._handle_notes_section_toggled)
         self.tabs_group_box.toggled.connect(self._handle_tabs_section_toggled)
 
+    def delete_client_document_entry(self, document_id, file_path):
+        """
+        Deletes a client document entry from the database and the corresponding file from disk.
+        """
+        if not document_id:
+            QMessageBox.warning(self, self.tr("Erreur"), self.tr("ID du document manquant."))
+            return
+
+        reply = QMessageBox.question(self, self.tr("Confirmer Suppression"),
+                                     self.tr("Êtes-vous sûr de vouloir supprimer définitivement ce document ({0})?\nLe fichier '{1}' sera également supprimé du disque.").format(document_id, os.path.basename(file_path or "N/A")),
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+
+        if reply == QMessageBox.Yes:
+            try:
+                # Attempt to delete from DB
+                # Assuming db_manager.delete_client_document is now implemented correctly
+                db_deleted = db_manager.delete_client_document(document_id)
+
+                if db_deleted:
+                    logging.info(f"Document ID {document_id} deleted from database.")
+                    # Attempt to delete file from disk
+                    if file_path and os.path.exists(file_path):
+                        try:
+                            os.remove(file_path)
+                            logging.info(f"File {file_path} deleted from disk.")
+                            QMessageBox.information(self, self.tr("Succès"), self.tr("Document et fichier supprimés avec succès."))
+                        except OSError as e_file:
+                            logging.error(f"Error deleting file {file_path}: {e_file}", exc_info=True)
+                            QMessageBox.warning(self, self.tr("Erreur Fichier"), self.tr("Document supprimé de la base de données, mais échec de la suppression du fichier:\n{0}").format(str(e_file)))
+                    else:
+                        logging.warning(f"File path not provided or file does not exist for document ID {document_id}: {file_path}. DB entry deleted.")
+                        QMessageBox.information(self, self.tr("Succès (Partiel)"), self.tr("Entrée de document supprimée de la base de données. Fichier non trouvé ou chemin non spécifié."))
+                else:
+                    QMessageBox.warning(self, self.tr("Erreur DB"), self.tr("Impossible de supprimer l'entrée du document de la base de données (ID: {0}).").format(document_id))
+
+            except Exception as e:
+                logging.error(f"Error in delete_client_document_entry for doc ID {document_id}: {e}", exc_info=True)
+                QMessageBox.critical(self, self.tr("Erreur Suppression"), self.tr("Une erreur inattendue est survenue:\n{0}").format(str(e)))
+            finally:
+                self.populate_doc_table() # Refresh the document list
+
     def _handle_edit_pdf_action(self, file_path, document_id):
         if file_path and os.path.exists(file_path):
             QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
@@ -2170,6 +2341,47 @@ class ClientWidget(QWidget):
         self.client_info_group_box.toggled.connect(self._handle_client_info_section_toggled)
         self.notes_group_box.toggled.connect(self._handle_notes_section_toggled)
         self.tabs_group_box.toggled.connect(self._handle_tabs_section_toggled)
+
+    def delete_client_document_entry(self, document_id, file_path):
+        """
+        Deletes a client document entry from the database and the corresponding file from disk.
+        """
+        if not document_id:
+            QMessageBox.warning(self, self.tr("Erreur"), self.tr("ID du document manquant."))
+            return
+
+        # Ensure file_path is a string for os.path.basename
+        file_display_name = os.path.basename(file_path) if file_path else self.tr("Inconnu")
+
+        reply = QMessageBox.question(self, self.tr("Confirmer Suppression"),
+                                     self.tr("Êtes-vous sûr de vouloir supprimer définitivement ce document (ID: {0})?\nLe fichier '{1}' sera également supprimé du disque.").format(document_id, file_display_name),
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+
+        if reply == QMessageBox.Yes:
+            try:
+                db_deleted = db_manager.delete_client_document(document_id)
+
+                if db_deleted:
+                    logging.info(f"Document ID {document_id} deleted from database.")
+                    if file_path and os.path.exists(file_path):
+                        try:
+                            os.remove(file_path)
+                            logging.info(f"File {file_path} deleted from disk.")
+                            self.notify(self.tr("Succès"), self.tr("Document et fichier supprimés avec succès."), type='SUCCESS')
+                        except OSError as e_file:
+                            logging.error(f"Error deleting file {file_path}: {e_file}", exc_info=True)
+                            self.notify(self.tr("Erreur Fichier"), self.tr("Document supprimé de la base de données, mais échec de la suppression du fichier:\n{0}").format(str(e_file)), type='ERROR')
+                    else:
+                        logging.warning(f"File path not provided or file does not exist for document ID {document_id}: {file_path}. DB entry deleted.")
+                        self.notify(self.tr("Succès (Partiel)"), self.tr("Entrée de document supprimée de la base de données. Fichier non trouvé ou chemin non spécifié."), type='WARNING')
+                else:
+                    self.notify(self.tr("Erreur DB"), self.tr("Impossible de supprimer l'entrée du document de la base de données (ID: {0}). Vérifiez les logs.").format(document_id), type='ERROR')
+
+            except Exception as e:
+                logging.error(f"Error in delete_client_document_entry for doc ID {document_id}: {e}", exc_info=True)
+                self.notify(self.tr("Erreur Suppression"), self.tr("Une erreur inattendue est survenue:\n{0}").format(str(e)), type='CRITICAL')
+            finally:
+                self.populate_doc_table()
 
     def _handle_edit_pdf_action(self, file_path, document_id):
         if file_path and os.path.exists(file_path):
@@ -2926,18 +3138,26 @@ class ClientWidget(QWidget):
                 actions_layout.setContentsMargins(5, 0, 5, 0)
                 actions_layout.setSpacing(5)
 
-                edit_button = QPushButton(QIcon(":/icons/pencil.svg"), "")
-                edit_button.setToolTip(self.tr("Modifier cette note"))
-                edit_button.clicked.connect(lambda checked, n_id=note_id: self.on_edit_document_note_clicked(n_id))
-                actions_layout.addWidget(edit_button)
+                role_name = self.current_user_info.get('role_name') if self.current_user_info else None
+                # Assuming P_MANAGE_CLIENT_DOCUMENTS or a new P_MANAGE_DOCUMENT_NOTES controls this
+                can_manage_doc_notes = has_permission(role_name, P_MANAGE_CLIENT_DOCUMENTS)
 
-                delete_button = QPushButton(QIcon(":/icons/trash.svg"), "")
-                delete_button.setToolTip(self.tr("Supprimer cette note"))
-                delete_button.setObjectName("dangerButton")
-                delete_button.clicked.connect(lambda checked, n_id=note_id: self.on_delete_document_note_clicked(n_id))
-                actions_layout.addWidget(delete_button)
+                if can_manage_doc_notes:
+                    edit_button = QPushButton(QIcon(":/icons/pencil.svg"), "")
+                    edit_button.setToolTip(self.tr("Modifier cette note"))
+                    edit_button.clicked.connect(lambda checked, n_id=note_id: self.on_edit_document_note_clicked(n_id))
+                    actions_layout.addWidget(edit_button)
 
-                actions_layout.addStretch()
+                    delete_button = QPushButton(QIcon(":/icons/trash.svg"), "")
+                    delete_button.setToolTip(self.tr("Supprimer cette note"))
+                    delete_button.setObjectName("dangerButton")
+                    delete_button.clicked.connect(lambda checked, n_id=note_id: self.on_delete_document_note_clicked(n_id))
+                    actions_layout.addWidget(delete_button)
+                else:
+                    # Add spacers or leave empty if no permissions
+                    actions_layout.addStretch()
+
+                actions_layout.addStretch() # Ensure this is outside the conditional if buttons were added
                 self.document_notes_table.setCellWidget(row_idx, 4, actions_widget)
 
 
@@ -3047,7 +3267,13 @@ class ClientWidget(QWidget):
             try:
                 # Determine the target directory using the selected language
                 # AND POTENTIAL order_identifier (conceptual for now, as add_document doesn't create DB entry)
-                client_base_path = self.client_info["base_folder_path"]
+                client_base_path = self.client_info.get("base_folder_path")
+                if not client_base_path:
+                    client_base_path = self.client_info.get("default_base_folder_path", "")
+
+                if not client_base_path or not os.path.isdir(client_base_path):
+                    QMessageBox.warning(self, self.tr("Erreur Dossier Client"), self.tr("Le chemin du dossier de base du client n'est pas configuré ou est invalide."))
+                    return
 
                 # --- Conceptual: How order_identifier would be handled if add_document created DB entries ---
                 # For now, this part is more about the file system structure if an order_id were available.
@@ -3193,45 +3419,111 @@ class ClientWidget(QWidget):
                     self.tr("Impossible d'ajouter le document : {0}").format(str(e))
                 )
 
-    def _handle_open_pdf_action(self, file_path):
-        QApplication.setOverrideCursor(Qt.WaitCursor) # Set wait cursor
+    def _handle_generate_and_open_pdf_action(self, document_data: dict):
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        # Show "In Progress" notification
+        if self.notification_manager:
+            self.notification_manager.show(
+                title=self.tr("Génération PDF"),
+                message=self.tr("Génération du PDF en cours... Veuillez patienter."),
+                type='INFO',
+                duration=3000 # Keep it reasonably short, actual feedback will follow
+            )
+        QApplication.processEvents() # Ensure the notification is displayed
+
+
+        generated_pdf_path_final = None
         try:
             if not self.client_info or 'client_id' not in self.client_info:
                 QMessageBox.warning(self, self.tr("Erreur Client"), self.tr("Les informations du client ne sont pas disponibles."))
-                return # Return early, finally will still execute
+                return
 
-            # Extract target_language_code from the file_path
-            try:
-                target_language_code = os.path.basename(os.path.dirname(file_path))
-                if target_language_code not in ["en", "fr", "ar", "tr", "pt"]:
-                    client_langs = self.client_info.get("selected_languages", [])
-                    if isinstance(client_langs, str):
-                        client_langs = [lang.strip() for lang in client_langs.split(',') if lang.strip()]
-                    target_language_code = client_langs[0] if client_langs else "fr"
-                    logging.info(f"Language code not recognized from path {file_path}. Using fallback/default: {target_language_code}")
+            source_html_file_path = None
+            # Ensure base_client_path is absolute
+            client_base_folder_relative = self.client_info.get("base_folder_path") or self.client_info.get("default_base_folder_path")
+            if not client_base_folder_relative :
+                QMessageBox.warning(self, self.tr("Erreur Configuration"), self.tr("Le dossier de base du client n'est pas configuré."))
+                return
 
-            except Exception as e:
-                QMessageBox.warning(self, self.tr("Erreur Chemin Fichier"), self.tr("Impossible d'extraire le code langue depuis le chemin:\n{0}\nErreur: {1}").format(file_path, str(e)))
-                return # Return early
+            # self.app_root_dir should be set in ClientWidget's __init__
+            if not self.app_root_dir or not os.path.isdir(self.app_root_dir):
+                 logging.error(f"ClientWidget: self.app_root_dir '{self.app_root_dir}' is invalid.")
+                 QMessageBox.critical(self, self.tr("Erreur Configuration"), self.tr("Le dossier racine de l'application n'est pas correctement configuré."))
+                 return
 
-            app_root_dir = self.config.get('app_root_dir', os.path.dirname(sys.argv[0]))
-            if MAIN_MODULE_CONFIG and 'app_root_dir' in MAIN_MODULE_CONFIG:
-                app_root_dir = MAIN_MODULE_CONFIG['app_root_dir']
+            base_client_path = os.path.join(self.app_root_dir, client_base_folder_relative)
+            base_client_path = os.path.normpath(base_client_path)
 
-            generated_pdf_path = self.generate_pdf_for_document(
-                source_file_path=file_path,
+            relative_path_from_db = document_data.get('file_path_relative')
+            file_name_on_disk = document_data.get('file_name_on_disk', '') # Get the actual filename
+
+            if not file_name_on_disk:
+                logging.error(f"File name on disk is missing for document ID: {document_data.get('document_id')}")
+                QMessageBox.warning(self, self.tr("Données Document Imcomplètes"), self.tr("Le nom du fichier sur le disque est manquant."))
+                return
+
+            if base_client_path and relative_path_from_db:
+                # Construct the full path using file_name_on_disk and the directory part of file_path_relative
+                # This assumes file_path_relative might contain subdirectories like lang/doctype
+                path_directory_part = os.path.dirname(relative_path_from_db) # e.g., "fr/Facture Proforma" or "fr" or ""
+                source_html_file_path = os.path.join(base_client_path, path_directory_part, file_name_on_disk)
+                source_html_file_path = os.path.normpath(source_html_file_path) # Normalize path
+
+                if not os.path.exists(source_html_file_path):
+                    logging.error(f"Source HTML file not found at calculated path: {source_html_file_path}")
+                    # Try a fallback: if relative_path_from_db is the direct path from base_client_path
+                    fallback_path = os.path.normpath(os.path.join(base_client_path, relative_path_from_db))
+                    if os.path.exists(fallback_path) and os.path.basename(fallback_path) == file_name_on_disk:
+                        source_html_file_path = fallback_path
+                        logging.info(f"Used fallback path for source HTML: {source_html_file_path}")
+                    else:
+                        QMessageBox.warning(self, self.tr("Fichier Source Introuvable"), self.tr("Le fichier HTML source est introuvable : {0}").format(source_html_file_path))
+                        return
+            else:
+                QMessageBox.warning(self, self.tr("Chemin Invalide"), self.tr("Chemin du fichier source HTML non défini ou dossier client manquant."))
+                return
+
+            target_language_code = document_data.get('language_code', 'fr') # Default to 'fr'
+            if not target_language_code: # Further fallback if 'language_code' is empty string or None
+                target_language_code = 'fr'
+                logging.warning(f"Document data for {document_data.get('document_id')} missing language_code, defaulting to 'fr'.")
+
+            app_root_dir_from_config = self.config.get('app_root_dir', self.app_root_dir)
+
+
+            additional_context_for_pdf = {
+                'document_type': document_data.get('document_type_generated'), # Original type of the template
+                'order_identifier': document_data.get('order_identifier'),
+                # Any other specific overrides needed by context_builder for this regeneration
+            }
+            project_id_for_pdf = document_data.get('project_id')
+
+            generated_pdf_path_final = self.generate_pdf_for_document(
+                source_file_path=source_html_file_path,
                 client_info=self.client_info,
-                app_root_dir=app_root_dir,
+                app_root_dir=app_root_dir_from_config,
                 parent_widget=self,
-                target_language_code=target_language_code
+                target_language_code=target_language_code, # Language for context data
+                project_id=project_id_for_pdf,
+                additional_context=additional_context_for_pdf,
+                # document_type_for_context should be the specific type of the document being generated
+                # for context_builder to fetch correct notes, etc.
+                document_type_for_context=document_data.get('document_type_generated')
             )
-            if generated_pdf_path:
-                QDesktopServices.openUrl(QUrl.fromLocalFile(generated_pdf_path))
-            # else:
-                # Optional: If generate_pdf_for_document returns None on failure, inform user
-                # QMessageBox.warning(self, self.tr("Erreur PDF"), self.tr("Le fichier PDF n'a pas pu être généré."))
+
+            if generated_pdf_path_final and os.path.exists(generated_pdf_path_final):
+                QDesktopServices.openUrl(QUrl.fromLocalFile(generated_pdf_path_final))
+                # Refresh the table in case the PDF generation updated modification dates or created new entries
+                self.populate_doc_table() # Refresh to show new/updated PDF related info if any
+            elif generated_pdf_path_final:
+                 QMessageBox.warning(self, self.tr("Erreur Génération PDF"), self.tr("Le fichier PDF semble avoir été généré mais est introuvable : {0}").format(generated_pdf_path_final))
+            # else: self.generate_pdf_for_document would have shown an error.
+
+        except Exception as e:
+            logging.error(f"Error in _handle_generate_and_open_pdf_action: {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur Inattendue"), self.tr("Une erreur inattendue est survenue lors de la génération du PDF:\n{0}").format(str(e)))
         finally:
-            QApplication.restoreOverrideCursor() # Restore cursor in all cases
+            QApplication.restoreOverrideCursor()
 
     def populate_details_layout(self):
         # Clear existing rows from the layout
@@ -3601,306 +3893,385 @@ class ClientWidget(QWidget):
                 logging.warning("Notification manager not available. Cannot show notification: Erreur Notes - Erreur de sauvegarde des notes: {0}.".format(str(e)))
 
     def populate_doc_table(self):
-        logging.debug("ClientWidget.populate_doc_table: Method started.")
-        logging.debug("ClientWidget.populate_doc_table: Setting row count to 0.")
-        self.doc_table.setRowCount(0) # Clear table first
-        logging.debug("ClientWidget.populate_doc_table: Row count set to 0.")
+        if hasattr(self, '_is_populating_docs') and self._is_populating_docs:
+            logging.warning("PT_DEBUG: populate_doc_table - Re-entrant call detected, returning.")
+            return
+        self._is_populating_docs = True
+        try: # This try now encompasses the whole method body
+            logging.debug("ClientWidget.populate_doc_table: Method started.")
+            logging.debug("ClientWidget.populate_doc_table: Setting row count to 0.")
+            self.doc_table.setRowCount(0) # Clear table first
+            logging.info("PT_DEBUG: populate_doc_table - START")
 
-        logging.debug("ClientWidget.populate_doc_table: Setting initial visibility for documents_empty_label and doc_table.")
-        if hasattr(self, 'documents_empty_label'): self.documents_empty_label.setVisible(True)
-        self.doc_table.setVisible(False)
-        logging.debug("ClientWidget.populate_doc_table: Initial visibility set.")
-
-        logging.debug("ClientWidget.populate_doc_table: Getting client_id.")
-        client_id = self.client_info.get("client_id")
-        logging.debug(f"ClientWidget.populate_doc_table: client_id is {client_id}.")
-        if not client_id:
             if hasattr(self, 'documents_empty_label'): self.documents_empty_label.setVisible(True)
-            logging.warning("ClientWidget.populate_doc_table: client_id is missing from client_info. Returning early.")
-            return
-        logging.debug("ClientWidget.populate_doc_table: Client ID obtained.")
-
-        logging.debug("ClientWidget.populate_doc_table: Starting order filter population.")
-        order_events = db_manager.get_distinct_purchase_confirmed_at_for_client(client_id)
-        logging.debug(f"ClientWidget.populate_doc_table: Fetched order_events: {order_events}")
-        is_distributor_type = self.client_info.get('category') == 'Distributeur'
-        logging.debug(f"ClientWidget.populate_doc_table: is_distributor_type: {is_distributor_type}")
-        has_multiple_orders = order_events and len(order_events) > 1
-        logging.debug(f"ClientWidget.populate_doc_table: has_multiple_orders: {has_multiple_orders}")
-        show_order_filter_dropdown = is_distributor_type or has_multiple_orders
-        logging.debug(f"ClientWidget.populate_doc_table: show_order_filter_dropdown: {show_order_filter_dropdown}")
-
-        current_order_filter_selection = None
-        if show_order_filter_dropdown:
-            logging.debug("ClientWidget.populate_doc_table: Populating doc_order_filter_combo.")
-            current_order_filter_selection = self.doc_order_filter_combo.currentData()
-            logging.debug(f"ClientWidget.populate_doc_table: current_order_filter_selection before clear: {current_order_filter_selection}")
-            self.doc_order_filter_combo.blockSignals(True)
-            self.doc_order_filter_combo.clear()
-            self.doc_order_filter_combo.addItem(self.tr("Toutes les Commandes"), "ALL")
-            self.doc_order_filter_combo.addItem(self.tr("Documents Généraux (sans commande)"), "NONE")
-            if order_events:
-                logging.debug("ClientWidget.populate_doc_table: Looping through order_events.")
-                for i, event_ts in enumerate(order_events):
-                    logging.debug(f"ClientWidget.populate_doc_table: Processing order_event {i+1}/{len(order_events)}: {event_ts}")
-                    if event_ts:
-                        try:
-                            dt_obj = datetime.fromisoformat(event_ts.replace('Z', '+00:00'))
-                            display_text = self.tr("Commande du {0}").format(dt_obj.strftime('%Y-%m-%d %H:%M'))
-                            self.doc_order_filter_combo.addItem(display_text, event_ts)
-                            logging.debug(f"ClientWidget.populate_doc_table: Added item '{display_text}' with data '{event_ts}' to combo.")
-                        except ValueError:
-                            self.doc_order_filter_combo.addItem(self.tr("Commande du {0} (brut)").format(event_ts), event_ts)
-                            logging.warning(f"ClientWidget.populate_doc_table: Added raw item for event_ts '{event_ts}' due to ValueError.")
-                logging.debug("ClientWidget.populate_doc_table: Finished looping through order_events.")
-            if current_order_filter_selection:
-                index = self.doc_order_filter_combo.findData(current_order_filter_selection)
-                logging.debug(f"ClientWidget.populate_doc_table: Found index {index} for current_order_filter_selection '{current_order_filter_selection}'.")
-                if index >= 0: self.doc_order_filter_combo.setCurrentIndex(index)
-                else: self.doc_order_filter_combo.setCurrentIndex(0)
-            else:
-                 self.doc_order_filter_combo.setCurrentIndex(0)
-                 logging.debug("ClientWidget.populate_doc_table: current_order_filter_selection was None, set to index 0.")
-            self.doc_order_filter_combo.blockSignals(False)
-            logging.debug("ClientWidget.populate_doc_table: Finished populating doc_order_filter_combo.")
-        else:
-            logging.debug("ClientWidget.populate_doc_table: Order filter not applicable, clearing and disabling combo.")
-            self.doc_order_filter_combo.clear()
-            self.doc_order_filter_combo.addItem(self.tr("N/A"), "ALL")
-            self.doc_order_filter_combo.setEnabled(False)
-        logging.debug("ClientWidget.populate_doc_table: Order filter population completed.")
-
-        logging.debug("ClientWidget.populate_doc_table: Preparing DB filters.")
-        db_filters = {} 
-        selected_order_filter_data = self.doc_order_filter_combo.currentData()
-        logging.debug(f"ClientWidget.populate_doc_table: selected_order_filter_data: {selected_order_filter_data}")
-        if selected_order_filter_data == "NONE":
-            db_filters['order_identifier'] = None
-        elif selected_order_filter_data != "ALL":
-            db_filters['order_identifier'] = selected_order_filter_data
-        logging.debug(f"ClientWidget.populate_doc_table: db_filters prepared: {db_filters}")
-
-        logging.debug("ClientWidget.populate_doc_table: Fetching documents from DB.")
-        client_documents_from_db = db_manager.get_documents_for_client(client_id, filters=db_filters)
-        client_documents_from_db = client_documents_from_db if client_documents_from_db else []
-        logging.debug(f"ClientWidget.populate_doc_table: Fetched {len(client_documents_from_db)} documents from DB initially.")
-
-        logging.debug("ClientWidget.populate_doc_table: Getting language and type filter values.")
-        selected_lang_filter = self.doc_language_filter_combo.currentData()
-        selected_type_filter = self.doc_type_filter_combo.currentData()
-        logging.debug(f"ClientWidget.populate_doc_table: selected_lang_filter: {selected_lang_filter}, selected_type_filter: {selected_type_filter}")
-
-        filtered_list = []
-        logging.debug("ClientWidget.populate_doc_table: Starting client-side filtering of documents.")
-        for i, doc_data in enumerate(client_documents_from_db):
-            logging.debug(f"ClientWidget.populate_doc_table: Filtering document {i+1}/{len(client_documents_from_db)}, ID: {doc_data.get('document_id')}")
-            doc_passes_lang_filter = True
-            doc_passes_type_filter = True
-
-            logging.debug("ClientWidget.populate_doc_table: Applying language filter.")
-            if selected_lang_filter != "ALL":
-                doc_lang = doc_data.get('language_code')
-                if not doc_lang and doc_data.get('file_path_relative'):
-                    path_parts = doc_data.get('file_path_relative').split(os.sep)
-                    if len(path_parts) > 1 and path_parts[0] in SUPPORTED_LANGUAGES:
-                        doc_lang = path_parts[0]
-                if doc_lang != selected_lang_filter:
-                    doc_passes_lang_filter = False
-            logging.debug(f"ClientWidget.populate_doc_table: Language filter result: {doc_passes_lang_filter}")
-
-            logging.debug("ClientWidget.populate_doc_table: Applying type filter.")
-            if selected_type_filter != "ALL":
-                doc_type_generated = doc_data.get('document_type_generated', '').upper()
-                file_name_on_disk = doc_data.get('file_name_on_disk', '').lower()
-
-                is_html = doc_type_generated == 'HTML' or file_name_on_disk.endswith('.html')
-                is_pdf = doc_type_generated == 'PDF' or file_name_on_disk.endswith('.pdf')
-                is_xlsx = doc_type_generated == 'XLSX' or file_name_on_disk.endswith('.xlsx')
-                is_docx = doc_type_generated == 'DOCX' or file_name_on_disk.endswith('.docx')
-
-                if selected_type_filter == "HTML":
-                    if not is_html: doc_passes_type_filter = False
-                elif selected_type_filter == "PDF":
-                    if not is_pdf: doc_passes_type_filter = False
-                elif selected_type_filter == "XLSX":
-                    if not is_xlsx: doc_passes_type_filter = False
-                elif selected_type_filter == "DOCX":
-                    if not is_docx: doc_passes_type_filter = False
-                elif selected_type_filter == "OTHER":
-                    if is_html or is_pdf or is_xlsx or is_docx:
-                        doc_passes_type_filter = False
-            logging.debug(f"ClientWidget.populate_doc_table: Type filter result: {doc_passes_type_filter}")
-
-            if doc_passes_lang_filter and doc_passes_type_filter:
-                filtered_list.append(doc_data)
-                logging.debug(f"ClientWidget.populate_doc_table: Document ID {doc_data.get('document_id')} passed filters, added to list.")
-        logging.debug("ClientWidget.populate_doc_table: Client-side filtering completed.")
-
-        logging.debug("ClientWidget.populate_doc_table: Getting base_client_path.")
-        base_client_path = self.client_info.get("base_folder_path")
-        logging.debug(f"ClientWidget.populate_doc_table: base_client_path: {base_client_path}")
-        if not base_client_path or not os.path.isdir(base_client_path):
-            logging.error(f"ClientWidget.populate_doc_table: base_folder_path '{base_client_path}' is missing or not a directory for client_id {client_id}.")
-            if hasattr(self, 'documents_empty_label'):
-                self.documents_empty_label.setText(self.tr("Erreur: Dossier client de base non trouvé ou inaccessible."))
-                self.documents_empty_label.setVisible(True)
             self.doc_table.setVisible(False)
-            logging.info("ClientWidget.populate_doc_table: METHOD COMPLETED due to invalid base_client_path.")
-            return
-        logging.debug("ClientWidget.populate_doc_table: base_client_path is valid.")
+            logging.info("PT_DEBUG: populate_doc_table - Initial visibility set.")
 
-        logging.debug("ClientWidget.populate_doc_table: Checking if filtered_list is empty.")
-        if not filtered_list:
-            if hasattr(self, 'documents_empty_label'):
-                 self.documents_empty_label.setText(self.tr("Aucun document ne correspond aux filtres sélectionnés.\nModifiez vos filtres ou ajoutez/générez des documents."))
-                 self.documents_empty_label.setVisible(True)
-            self.doc_table.setVisible(False)
-            logging.info("ClientWidget.populate_doc_table: No documents after filtering. METHOD SUCCESSFULLY COMPLETED.")
-            return
-        logging.debug(f"ClientWidget.populate_doc_table: Filtered list contains {len(filtered_list)} documents.")
+            client_id = self.client_info.get("client_id")
+            logging.info(f"PT_DEBUG: populate_doc_table - client_id: {client_id}")
+            if not client_id:
+                if hasattr(self, 'documents_empty_label'): self.documents_empty_label.setVisible(True)
+                logging.warning("PT_DEBUG: populate_doc_table - client_id is missing. Returning early.")
+                self._is_populating_docs = False # Ensure guard is reset before early return
+                return # Early return for missing client_id
+            logging.info("PT_DEBUG: populate_doc_table - Client ID obtained.")
 
-        logging.debug("ClientWidget.populate_doc_table: Setting visibility for table and empty label (documents found).")
-        if hasattr(self, 'documents_empty_label'): self.documents_empty_label.setVisible(False)
-        self.doc_table.setVisible(True)
-        self.doc_table.setRowCount(len(filtered_list))
-        logging.debug("ClientWidget.populate_doc_table: Visibility set, row count set for doc_table.")
+            logging.info("PT_DEBUG: populate_doc_table - Starting order filter population.")
+            order_events = []
+            try:
+                logging.info("PT_DEBUG: populate_doc_table - Attempting to fetch order_events.")
+                order_events = db_manager.get_distinct_purchase_confirmed_at_for_client(client_id)
+                logging.info(f"PT_DEBUG: populate_doc_table - Fetched order_events: {order_events}")
+            except Exception as e_oe:
+                logging.error(f"PT_DEBUG: populate_doc_table - Error fetching order_events: {e_oe}", exc_info=True)
+                # Continue with empty order_events
 
-        logging.debug("ClientWidget.populate_doc_table: Starting loop to populate doc_table rows.")
-        for row_idx, doc_data in enumerate(filtered_list):
-            logging.debug(f"ClientWidget.populate_doc_table: Populating row {row_idx + 1}/{len(filtered_list)}.")
-            
-            logging.debug("ClientWidget.populate_doc_table: Getting document details.")
-            document_id = doc_data.get('document_id')
-            doc_name = doc_data.get('document_name', 'N/A')
-            file_path_relative_from_db = doc_data.get('file_path_relative', '')
-            order_identifier_for_doc = doc_data.get('order_identifier')
-            logging.debug(f"ClientWidget.populate_doc_table: doc_id: {document_id}, name: {doc_name}, relative_path: {file_path_relative_from_db}, order_id: {order_identifier_for_doc}")
+            is_distributor_type = self.client_info.get('category') == 'Distributeur'
+            has_multiple_orders = order_events and len(order_events) > 1
+            show_order_filter_dropdown = is_distributor_type or has_multiple_orders
+            logging.info(f"PT_DEBUG: populate_doc_table - show_order_filter_dropdown: {show_order_filter_dropdown}")
 
-            logging.debug("ClientWidget.populate_doc_table: Inferring language_code.")
-            language_code = doc_data.get('language_code', "N/A")
-            if language_code == "N/A" and file_path_relative_from_db:
-                path_parts = file_path_relative_from_db.split(os.sep)
-                if len(path_parts) > 1 and path_parts[0] in SUPPORTED_LANGUAGES:
-                    language_code = path_parts[0]
-            logging.debug(f"ClientWidget.populate_doc_table: Inferred language_code: {language_code}")
-
-            logging.debug("ClientWidget.populate_doc_table: Constructing full_file_path.")
-            full_file_path = ""
-            if file_path_relative_from_db:
-                if order_identifier_for_doc:
-                    safe_order_subfolder = str(order_identifier_for_doc).replace(':', '_').replace(' ', '_')
-                    full_file_path = os.path.join(base_client_path, safe_order_subfolder, file_path_relative_from_db)
+            current_order_filter_selection = None
+            if show_order_filter_dropdown:
+                logging.info("PT_DEBUG: populate_doc_table - Populating doc_order_filter_combo.")
+                current_order_filter_selection = self.doc_order_filter_combo.currentData()
+                self.doc_order_filter_combo.blockSignals(True)
+                self.doc_order_filter_combo.clear()
+                self.doc_order_filter_combo.addItem(self.tr("Toutes les Commandes"), "ALL")
+                self.doc_order_filter_combo.addItem(self.tr("Documents Généraux (sans commande)"), "NONE")
+                if order_events:
+                    for i, event_ts in enumerate(order_events):
+                        logging.info(f"PT_DEBUG: populate_doc_table - Processing order_event {i+1}/{len(order_events)}: {event_ts}")
+                        if event_ts:
+                            try:
+                                dt_obj = datetime.fromisoformat(event_ts.replace('Z', '+00:00'))
+                                display_text = self.tr("Commande du {0}").format(dt_obj.strftime('%Y-%m-%d %H:%M'))
+                                self.doc_order_filter_combo.addItem(display_text, event_ts)
+                            except ValueError:
+                                self.doc_order_filter_combo.addItem(self.tr("Commande du {0} (brut)").format(event_ts), event_ts)
+                                logging.warning(f"PT_DEBUG: populate_doc_table - Added raw item for event_ts '{event_ts}' due to ValueError.")
+                if current_order_filter_selection:
+                    index = self.doc_order_filter_combo.findData(current_order_filter_selection)
+                    if index >= 0: self.doc_order_filter_combo.setCurrentIndex(index)
+                    else: self.doc_order_filter_combo.setCurrentIndex(0)
                 else:
-                    full_file_path = os.path.join(base_client_path, file_path_relative_from_db)
-                logging.debug(f"ClientWidget.populate_doc_table: Constructed full_file_path: {full_file_path}")
-
-                if not os.path.exists(full_file_path):
-                    logging.warning(f"ClientWidget.populate_doc_table: Document file path does not exist: {full_file_path} for doc_id {document_id}")
+                     self.doc_order_filter_combo.setCurrentIndex(0)
+                self.doc_order_filter_combo.blockSignals(False)
+                logging.info("PT_DEBUG: populate_doc_table - Finished populating doc_order_filter_combo.")
             else:
-                logging.warning(f"ClientWidget.populate_doc_table: Missing file_path_relative for doc_id {document_id}, client_id {client_id}")
-            
-            logging.debug("ClientWidget.populate_doc_table: Creating QTableWidgetItems for row.")
-            name_item = QTableWidgetItem(doc_name)
-            name_item.setData(Qt.UserRole, full_file_path if full_file_path else None)
+                logging.info("PT_DEBUG: populate_doc_table - Order filter not applicable.")
+                self.doc_order_filter_combo.clear()
+                self.doc_order_filter_combo.addItem(self.tr("N/A"), "ALL")
+                self.doc_order_filter_combo.setEnabled(False)
+            logging.info("PT_DEBUG: populate_doc_table - Order filter setup completed.")
 
-            file_type_str = doc_data.get('document_type_generated', 'N/A')
-            created_at_str = doc_data.get('created_at', '')
-            mod_time_formatted = ""
-            if created_at_str:
-                try:
-                    dt_obj = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
-                    mod_time_formatted = dt_obj.strftime('%Y-%m-%d %H:%M')
-                except ValueError:
-                    mod_time_formatted = created_at_str
-            logging.debug(f"ClientWidget.populate_doc_table: file_type: {file_type_str}, mod_time: {mod_time_formatted}")
+            db_filters = {}
+            selected_order_filter_data = self.doc_order_filter_combo.currentData()
+            if selected_order_filter_data == "NONE":
+                db_filters['order_identifier'] = None
+            elif selected_order_filter_data != "ALL":
+                db_filters['order_identifier'] = selected_order_filter_data
+            logging.info(f"PT_DEBUG: populate_doc_table - DB filters prepared: {db_filters}")
 
-            logging.debug("ClientWidget.populate_doc_table: Setting items in table row.")
-            self.doc_table.setItem(row_idx, 0, name_item)
-            self.doc_table.setItem(row_idx, 1, QTableWidgetItem(file_type_str))
-            self.doc_table.setItem(row_idx, 2, QTableWidgetItem(language_code))
-            self.doc_table.setItem(row_idx, 3, QTableWidgetItem(mod_time_formatted))
-            logging.debug("ClientWidget.populate_doc_table: Basic items set.")
+            client_documents_from_db = []
+            try:
+                logging.info("PT_DEBUG: populate_doc_table - Fetching documents from DB...")
+                client_documents_from_db = db_manager.get_documents_for_client(client_id, filters=db_filters)
+                client_documents_from_db = client_documents_from_db if client_documents_from_db else []
+                logging.info(f"PT_DEBUG: populate_doc_table - Fetched {len(client_documents_from_db)} documents from DB.")
+            except Exception as e_docs_fetch:
+                logging.error(f"PT_DEBUG: populate_doc_table - Error fetching documents: {e_docs_fetch}", exc_info=True)
+                # Continue with empty list
 
-            logging.debug("ClientWidget.populate_doc_table: Creating action widget and layout.")
-            action_widget = QWidget(); action_layout = QHBoxLayout(action_widget); action_layout.setContentsMargins(2,2,2,2); action_layout.setSpacing(5)
-            logging.debug("ClientWidget.populate_doc_table: Action widget and layout created.")
+            selected_lang_filter = self.doc_language_filter_combo.currentData()
+            selected_type_filter = self.doc_type_filter_combo.currentData()
+            logging.info(f"PT_DEBUG: populate_doc_table - Lang filter: {selected_lang_filter}, Type filter: {selected_type_filter}")
 
-            logging.debug("ClientWidget.populate_doc_table: Creating PDF button.")
-            pdf_btn = QPushButton("")
-            pdf_btn.setIcon(QIcon(":/icons/file-text.svg"))
-            pdf_btn.setToolTip(self.tr("Générer/Ouvrir PDF du document"))
-            pdf_btn.setFixedSize(30,30)
-            pdf_btn.clicked.connect(lambda _, p=full_file_path: self._handle_open_pdf_action(p))
-            action_layout.addWidget(pdf_btn)
-            logging.debug("ClientWidget.populate_doc_table: PDF button created and added.")
+            filtered_list = []
+            logging.info("PT_DEBUG: populate_doc_table - Starting client-side filtering.")
+            for i, doc_data in enumerate(client_documents_from_db):
+                # logging.debug(f"PT_DEBUG: populate_doc_table - Filtering doc {i+1}, ID: {doc_data.get('document_id')}") # Reduced verbosity
+                doc_passes_lang_filter = True
+                doc_passes_type_filter = True
 
-            source_template_id = doc_data.get('source_template_id')
-            logging.debug(f"ClientWidget.populate_doc_table: source_template_id: {source_template_id}")
+                if selected_lang_filter != "ALL":
+                    doc_lang = doc_data.get('language_code')
+                    if not doc_lang and doc_data.get('file_path_relative'): # Infer from path
+                        path_parts = doc_data.get('file_path_relative').split(os.sep)
+                        if len(path_parts) > 1 and path_parts[0] in SUPPORTED_LANGUAGES:
+                            doc_lang = path_parts[0]
+                    if doc_lang != selected_lang_filter:
+                        doc_passes_lang_filter = False
 
-            logging.debug("ClientWidget.populate_doc_table: Creating source button.")
-            source_btn = QPushButton("")
-            source_btn.setIcon(QIcon(":/icons/eye.svg"))
-            source_btn.setToolTip(self.tr("Afficher le fichier source"))
-            source_btn.setFixedSize(30,30)
-            source_btn.clicked.connect(lambda _, p=full_file_path: QDesktopServices.openUrl(QUrl.fromLocalFile(p)))
-            action_layout.addWidget(source_btn)
-            logging.debug("ClientWidget.populate_doc_table: Source button created and added.")
+                if selected_type_filter != "ALL":
+                    doc_type_generated = doc_data.get('document_type_generated', '').upper()
+                    file_name_on_disk = doc_data.get('file_name_on_disk', '').lower()
+                    is_html = doc_type_generated == 'HTML' or file_name_on_disk.endswith('.html')
+                    is_pdf = doc_type_generated == 'PDF' or file_name_on_disk.endswith('.pdf')
+                    is_xlsx = doc_type_generated == 'XLSX' or file_name_on_disk.endswith('.xlsx')
+                    is_docx = doc_type_generated == 'DOCX' or file_name_on_disk.endswith('.docx')
+                    if selected_type_filter == "HTML" and not is_html: doc_passes_type_filter = False
+                    elif selected_type_filter == "PDF" and not is_pdf: doc_passes_type_filter = False
+                    elif selected_type_filter == "XLSX" and not is_xlsx: doc_passes_type_filter = False
+                    elif selected_type_filter == "DOCX" and not is_docx: doc_passes_type_filter = False
+                    elif selected_type_filter == "OTHER" and (is_html or is_pdf or is_xlsx or is_docx): doc_passes_type_filter = False
 
-            can_edit_source_template = False
-            if source_template_id:
-                logging.debug(f"ClientWidget.populate_doc_table: Checking template info for ID {source_template_id}.")
-                template_info_for_edit_btn = db_manager.get_template_by_id(source_template_id)
-                if template_info_for_edit_btn and template_info_for_edit_btn.get('template_type', '').startswith('html'):
-                    can_edit_source_template = True
-            logging.debug(f"ClientWidget.populate_doc_table: can_edit_source_template: {can_edit_source_template}")
+                if doc_passes_lang_filter and doc_passes_type_filter:
+                    filtered_list.append(doc_data)
+            logging.info("PT_DEBUG: populate_doc_table - Client-side filtering completed. Count: {len(filtered_list)}")
 
-            if can_edit_source_template:
-                logging.debug("ClientWidget.populate_doc_table: Creating edit source template button.")
-                edit_source_template_btn = QPushButton("")
-                edit_source_template_btn.setIcon(QIcon(":/icons/edit-2.svg"))
-                edit_source_template_btn.setToolTip(self.tr("Modifier le modèle source de ce document"))
-                edit_source_template_btn.setFixedSize(30,30)
-                edit_source_template_btn.clicked.connect(lambda _, doc_d=doc_data: self.handle_edit_source_template(doc_d))
-                action_layout.addWidget(edit_source_template_btn)
-                logging.debug("ClientWidget.populate_doc_table: Edit source template button created and added.")
-            elif file_type_str.upper() == "PDF":
-                logging.debug("ClientWidget.populate_doc_table: Creating edit PDF button.")
-                edit_pdf_btn = QPushButton(self.tr("Modifier PDF"))
-                edit_pdf_btn.setIcon(QIcon(":/icons/pencil.svg"))
-                edit_pdf_btn.setToolTip(self.tr("Modifier le fichier PDF"))
-                edit_pdf_btn.setFixedSize(30, 30)
-                edit_pdf_btn.clicked.connect(lambda _, p=full_file_path, doc_id=document_id: self._handle_edit_pdf_action(p, doc_id))
-                action_layout.addWidget(edit_pdf_btn)
-                logging.debug("ClientWidget.populate_doc_table: Edit PDF button created and added.")
-            elif doc_name.lower().endswith(('.xlsx', '.html')):
-                logging.debug("ClientWidget.populate_doc_table: Creating direct edit button for office doc.")
-                edit_btn = QPushButton("")
-                edit_btn.setIcon(QIcon(":/icons/pencil.svg"))
-                edit_btn.setToolTip(self.tr("Modifier le contenu du document"))
-                edit_btn.setFixedSize(30,30)
-                edit_btn.clicked.connect(lambda _, p=full_file_path: self.open_document(p))
-                action_layout.addWidget(edit_btn)
-                logging.debug("ClientWidget.populate_doc_table: Direct edit button created and added.")
+            base_client_path = self.client_info.get("base_folder_path")
+            if not base_client_path: # Fallback to default_base_folder_path
+                base_client_path = self.client_info.get("default_base_folder_path", "")
+            logging.info(f"PT_DEBUG: populate_doc_table - base_client_path (after fallback): {base_client_path}")
+
+            if not base_client_path or not os.path.isdir(base_client_path):
+                logging.error(f"PT_DEBUG: populate_doc_table - Invalid base_folder_path: {base_client_path}")
+                if hasattr(self, 'documents_empty_label'):
+                    self.documents_empty_label.setText(self.tr("Erreur: Dossier client introuvable ou non configuré."))
+                    self.documents_empty_label.setVisible(True)
+                self.doc_table.setVisible(False)
+                logging.info("PT_DEBUG: populate_doc_table - END (invalid base_client_path)")
+                # Ensure guard is reset before early return due to invalid path
+                # This return was missing the reset, which was the SyntaxError cause.
+                # The 'finally' block will now handle this.
+                return # Early return for invalid base_client_path
+            logging.info("PT_DEBUG: populate_doc_table - base_client_path is valid.")
+
+            if not filtered_list:
+                if hasattr(self, 'documents_empty_label'):
+                     self.documents_empty_label.setText(self.tr("Aucun document pour les filtres."))
+                     self.documents_empty_label.setVisible(True)
+                self.doc_table.setVisible(False)
+                logging.info("PT_DEBUG: populate_doc_table - END (no documents after filtering)")
+                 # Ensure guard is reset before early return
+                # This return was missing the reset.
+                # The 'finally' block will now handle this.
+                return # Early return if no documents match
+            logging.info(f"PT_DEBUG: populate_doc_table - Filtered list has {len(filtered_list)} documents.")
+
+            if hasattr(self, 'documents_empty_label'): self.documents_empty_label.setVisible(False)
+            self.doc_table.setVisible(True)
+            self.doc_table.setRowCount(len(filtered_list))
+            logging.info("PT_DEBUG: populate_doc_table - Table visible, row count set.")
+
+            logging.info("PT_DEBUG: populate_doc_table - Starting loop to populate rows.")
+            for row_idx, doc_data in enumerate(filtered_list):
+                logging.info(f"PT_DEBUG: populate_doc_table - Populating row {row_idx + 1}/{len(filtered_list)}, doc_id: {doc_data.get('document_id')}")
+
+                document_id = doc_data.get('document_id')
+                doc_name = doc_data.get('document_name', 'N/A')
+                file_path_relative_from_db = doc_data.get('file_path_relative', '')
+                order_identifier_for_doc = doc_data.get('order_identifier')
+
+                language_code = doc_data.get('language_code', "N/A")
+                if language_code == "N/A" and file_path_relative_from_db: # Infer
+                    path_parts = file_path_relative_from_db.split(os.sep)
+                    if len(path_parts) > 1 and path_parts[0] in SUPPORTED_LANGUAGES: language_code = path_parts[0]
+
+                full_file_path = ""
+                if file_path_relative_from_db:
+                    if order_identifier_for_doc:
+                        safe_order_subfolder = str(order_identifier_for_doc).replace(':', '_').replace(' ', '_')
+                        full_file_path = os.path.join(base_client_path, safe_order_subfolder, file_path_relative_from_db)
+                    else:
+                        full_file_path = os.path.join(base_client_path, file_path_relative_from_db)
+                    if not os.path.exists(full_file_path):
+                        logging.warning(f"PT_DEBUG: populate_doc_table - File not found: {full_file_path} for doc_id {document_id}")
+                else:
+                    logging.warning(f"PT_DEBUG: populate_doc_table - Missing relative path for doc_id {document_id}")
+
+                name_item = QTableWidgetItem(doc_name)
+                name_item.setData(Qt.UserRole, full_file_path if full_file_path else None)
+
+                file_type_str = doc_data.get('document_type_generated', 'N/A')
+                created_at_str = doc_data.get('created_at', '')
+                mod_time_formatted = ""
+                if created_at_str:
+                    try:
+                        dt_obj = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
+                        mod_time_formatted = dt_obj.strftime('%Y-%m-%d %H:%M')
+                    except ValueError: mod_time_formatted = created_at_str
+
+                logging.debug(f"PT_DEBUG: populate_doc_table - Row {row_idx}: Setting basic items.")
+                self.doc_table.setItem(row_idx, 0, name_item)
+                self.doc_table.setItem(row_idx, 1, QTableWidgetItem(file_type_str))
+                self.doc_table.setItem(row_idx, 2, QTableWidgetItem(language_code))
+                self.doc_table.setItem(row_idx, 3, QTableWidgetItem(mod_time_formatted))
+
+                logging.debug(f"PT_DEBUG: populate_doc_table - Row {row_idx}: Creating action widget.")
+                action_widget = QWidget(); action_layout = QHBoxLayout(action_widget); action_layout.setContentsMargins(2,2,2,2); action_layout.setSpacing(5)
+
+                pdf_btn = QPushButton(""); pdf_btn.setIcon(QIcon(":/icons/file-text.svg")); pdf_btn.setToolTip(self.tr("Générer/Ouvrir PDF")); pdf_btn.setFixedSize(30,30)
+                # Pass the full doc_data to the handler
+                pdf_btn.clicked.connect(lambda _, doc=doc_data: self._handle_generate_and_open_pdf_action(doc))
+                action_layout.addWidget(pdf_btn)
+
+                source_btn = QPushButton(""); source_btn.setIcon(QIcon(":/icons/eye.svg")); source_btn.setToolTip(self.tr("Afficher source")); source_btn.setFixedSize(30,30)
+                source_btn.clicked.connect(lambda _, p=full_file_path: QDesktopServices.openUrl(QUrl.fromLocalFile(p)))
+                action_layout.addWidget(source_btn)
+
+                source_template_id = doc_data.get('source_template_id')
+                can_edit_source_template = False
+                if source_template_id:
+                    template_info_for_edit_btn = db_manager.get_template_by_id(source_template_id)
+                    if template_info_for_edit_btn and template_info_for_edit_btn.get('template_type', '').startswith('html'):
+                        can_edit_source_template = True
+
+                role_name = self.current_user_info.get('role_name') if self.current_user_info else None
+                can_manage_docs = has_permission(role_name, P_MANAGE_CLIENT_DOCUMENTS)
+
+                if can_manage_docs:
+                    if can_edit_source_template:
+                        edit_source_template_btn = QPushButton(""); edit_source_template_btn.setIcon(QIcon(":/icons/edit-2.svg")); edit_source_template_btn.setToolTip(self.tr("Modifier modèle source")); edit_source_template_btn.setFixedSize(30,30)
+                        edit_source_template_btn.clicked.connect(lambda _, doc_d=doc_data: self.handle_edit_source_template(doc_d))
+                        action_layout.addWidget(edit_source_template_btn)
+                    elif file_type_str.upper() == "PDF":
+                        edit_pdf_btn = QPushButton(""); edit_pdf_btn.setIcon(QIcon(":/icons/pencil.svg")); edit_pdf_btn.setToolTip(self.tr("Modifier PDF")); edit_pdf_btn.setFixedSize(30, 30)
+                        edit_pdf_btn.clicked.connect(lambda _, p=full_file_path, doc_id=document_id: self._handle_edit_pdf_action(p, doc_id))
+                        action_layout.addWidget(edit_pdf_btn)
+                    elif doc_name.lower().endswith('.html'): # Specific to HTML for HtmlEditor and PDF regen
+                        edit_btn = QPushButton(""); edit_btn.setIcon(QIcon(":/icons/pencil.svg")); edit_btn.setToolTip(self.tr("Modifier document HTML")); edit_btn.setFixedSize(30,30)
+                        # Pass doc_data to open_document
+                        edit_btn.clicked.connect(lambda _, d=doc_data: self.open_document(d))
+                        action_layout.addWidget(edit_btn)
+                    elif doc_name.lower().endswith('.xlsx'): # Specific to Excel for ExcelEditor
+                        edit_btn = QPushButton(""); edit_btn.setIcon(QIcon(":/icons/pencil.svg")); edit_btn.setToolTip(self.tr("Modifier document Excel")); edit_btn.setFixedSize(30,30)
+                        # Pass only full_file_path for Excel as PDF regen is not directly tied here
+                        edit_btn.clicked.connect(lambda _, p=full_file_path: self.open_document(p)) # Keep old behavior for non-HTML
+                        action_layout.addWidget(edit_btn)
+                    else:
+                        spacer_widget = QWidget(); spacer_widget.setFixedSize(30,30); action_layout.addWidget(spacer_widget)
+                else: # No permission to manage/edit
+                    spacer_widget = QWidget(); spacer_widget.setFixedSize(30,30); action_layout.addWidget(spacer_widget)
+
+                if can_manage_docs:
+                    delete_btn = QPushButton(""); delete_btn.setIcon(QIcon(":/icons/trash.svg")); delete_btn.setToolTip(self.tr("Supprimer document")); delete_btn.setFixedSize(30,30)
+                    delete_btn.clicked.connect(lambda _, doc_id=document_id, p=full_file_path: self.delete_client_document_entry(doc_id, p))
+                    action_layout.addWidget(delete_btn)
+                else: # No permission to delete
+                    spacer_widget = QWidget(); spacer_widget.setFixedSize(30,30); action_layout.addWidget(spacer_widget)
+
+                action_layout.addStretch(); action_widget.setLayout(action_layout)
+                logging.debug(f"PT_DEBUG: populate_doc_table - Row {row_idx}: Setting legacy actions cell widget (column 4).")
+                # This is the old "Actions" column, now "Fichier Original"
+                self.doc_table.setCellWidget(row_idx, 4, action_widget)
+
+                # --- New Quick Actions Column (Column 5) ---
+                quick_actions_widget = QWidget()
+                quick_actions_layout = QHBoxLayout(quick_actions_widget)
+                quick_actions_layout.setContentsMargins(2, 2, 2, 2)
+                quick_actions_layout.setSpacing(5)
+
+                btn_preview_quick = QPushButton("")
+                btn_preview_quick.setProperty("class", "tableActionButton") # Added class property
+                btn_preview_quick.setIcon(QIcon(":/icons/eye.svg"))
+                btn_preview_quick.setToolTip(self.tr("Aperçu rapide du document (meilleur effort)"))
+                btn_preview_quick.setFixedSize(28, 28) # Smaller buttons
+                # Store document data needed for the action
+                btn_preview_quick.setProperty("document_id", document_id)
+                btn_preview_quick.setProperty("file_path", full_file_path)
+                btn_preview_quick.setProperty("file_name", doc_name)
+                btn_preview_quick.clicked.connect(self.on_preview_doc_button_clicked)
+                quick_actions_layout.addWidget(btn_preview_quick)
+
+                btn_download_quick = QPushButton("")
+                btn_download_quick.setProperty("class", "tableActionButton") # Added class property
+                btn_download_quick.setIcon(QIcon(":/icons/download.svg"))
+                btn_download_quick.setToolTip(self.tr("Télécharger ce document"))
+                btn_download_quick.setFixedSize(28, 28)
+                btn_download_quick.setProperty("document_id", document_id)
+                btn_download_quick.setProperty("file_path", full_file_path)
+                btn_download_quick.setProperty("file_name", doc_name) # Original name for download
+                btn_download_quick.clicked.connect(self.on_download_doc_button_clicked)
+                quick_actions_layout.addWidget(btn_download_quick)
+
+                quick_actions_layout.addStretch()
+                quick_actions_widget.setLayout(quick_actions_layout)
+                self.doc_table.setCellWidget(row_idx, 5, quick_actions_widget) # New column index
+                # --- End New Quick Actions Column ---
+
+                logging.info(f"PT_DEBUG: populate_doc_table - Finished populating row {row_idx + 1}/{len(filtered_list)}.")
+            logging.info("PT_DEBUG: populate_doc_table - Finished loop for populating rows.")
+            logging.info("PT_DEBUG: populate_doc_table - END (SUCCESS)")
+        finally:
+            self._is_populating_docs = False
+
+    def preview_document_file(self, file_path: str):
+        """
+        Opens the specified document file using the system's default application.
+        This serves as a general preview mechanism.
+        """
+        if not file_path or not os.path.exists(file_path):
+            QMessageBox.warning(self, self.tr("Aperçu Impossible"),
+                                self.tr("Le fichier est introuvable ou le chemin est invalide:\n{0}").format(file_path or self.tr("Non spécifié")))
+            return
+
+        try:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
+        except Exception as e:
+            logging.error(f"Error previewing document {file_path}: {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur d'Aperçu"),
+                                 self.tr("Impossible d'ouvrir le document pour l'aperçu:\n{0}").format(str(e)))
+
+    def on_preview_doc_button_clicked(self):
+        button = self.sender()
+        if button:
+            file_path = button.property("file_path")
+            if file_path: # Path might exist even if file doesn't, preview_document_file will check os.path.exists
+                self.preview_document_file(file_path)
             else:
-                logging.debug("ClientWidget.populate_doc_table: Adding spacer widget for action buttons.")
-                spacer_widget = QWidget(); spacer_widget.setFixedSize(30,30); action_layout.addWidget(spacer_widget)
-                logging.debug("ClientWidget.populate_doc_table: Spacer widget added.")
+                QMessageBox.warning(self, self.tr("Aperçu Impossible"), self.tr("Chemin du fichier non disponible pour l'aperçu."))
 
-            logging.debug("ClientWidget.populate_doc_table: Creating delete button.")
-            delete_btn = QPushButton("")
-            delete_btn.setIcon(QIcon(":/icons/trash.svg"))
-            delete_btn.setToolTip(self.tr("Supprimer le document (fichier et DB)"))
-            delete_btn.setFixedSize(30,30)
-            delete_btn.clicked.connect(lambda _, doc_id=document_id, p=full_file_path: self.delete_client_document_entry(doc_id, p))
-            action_layout.addWidget(delete_btn)
-            logging.debug("ClientWidget.populate_doc_table: Delete button created and added.")
+    def download_document_file(self, source_file_path: str, original_file_name: str = None):
+        """
+        Prompts the user to save a copy of the specified document file.
+        """
+        if not source_file_path or not os.path.exists(source_file_path):
+            QMessageBox.warning(self, self.tr("Téléchargement Impossible"),
+                                self.tr("Le fichier source est introuvable ou le chemin est invalide:\n{0}").format(source_file_path or self.tr("Non spécifié")))
+            return
 
-            action_layout.addStretch(); action_widget.setLayout(action_layout)
-            logging.debug("ClientWidget.populate_doc_table: Setting cell widget for actions.")
-            self.doc_table.setCellWidget(row_idx, 4, action_widget)
-            logging.debug(f"ClientWidget.populate_doc_table: Finished populating row {row_idx + 1}/{len(filtered_list)}.")
-        logging.debug("ClientWidget.populate_doc_table: Finished loop for populating doc_table rows.")
-        logging.info("ClientWidget.populate_doc_table: METHOD SUCCESSFULLY COMPLETED")
+        if not original_file_name:
+            original_file_name = os.path.basename(source_file_path)
+
+        # Suggest a filename for saving
+        downloads_path = QStandardPaths.writableLocation(QStandardPaths.DownloadLocation)
+        if not downloads_path: # Fallback if download location is not available
+            downloads_path = QStandardPaths.writableLocation(QStandardPaths.DocumentsLocation)
+        if not downloads_path: # Ultimate fallback
+            downloads_path = os.path.expanduser("~")
+
+        suggested_save_path = os.path.join(downloads_path, original_file_name)
+
+        destination_file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            self.tr("Télécharger le document sous..."),
+            suggested_save_path,
+            self.tr("Tous les fichiers (*.*)")
+        )
+
+        if destination_file_path:
+            try:
+                shutil.copy(source_file_path, destination_file_path)
+                QMessageBox.information(self, self.tr("Téléchargement Réussi"),
+                                        self.tr("Document '{0}' téléchargé avec succès vers:\n{1}").format(original_file_name, destination_file_path))
+            except Exception as e:
+                logging.error(f"Error downloading document from {source_file_path} to {destination_file_path}: {e}", exc_info=True)
+                QMessageBox.critical(self, self.tr("Erreur de Téléchargement"),
+                                     self.tr("Impossible de télécharger le document:\n{0}").format(str(e)))
+
+    def on_download_doc_button_clicked(self):
+        button = self.sender()
+        if button:
+            file_path = button.property("file_path")
+            original_file_name = button.property("file_name")
+            if file_path and os.path.exists(file_path):
+                self.download_document_file(file_path, original_file_name) # Call existing method
+            elif file_path:
+                QMessageBox.warning(self, self.tr("Téléchargement Impossible"), self.tr("Le fichier source '{0}' est introuvable.").format(os.path.basename(file_path)))
+            else:
+                QMessageBox.warning(self, self.tr("Téléchargement Impossible"), self.tr("Chemin du fichier source non disponible."))
 
     def handle_edit_source_template(self, document_data):
         source_template_id = document_data.get('source_template_id')
@@ -3999,7 +4370,8 @@ class ClientWidget(QWidget):
 
 
     def open_create_docs_dialog(self):
-        dialog = self.CreateDocumentDialog(self.client_info, self.config, self)
+        # logging.info(f"ClientWidget.open_create_docs_dialog: About to open CreateDocumentDialog. Client Info: {self.client_info}, Config available: {bool(self.config)}") # DEBUG LOG REMOVED
+        dialog = self.CreateDocumentDialog(self.client_info, self.config, self.current_user_id, self) # Pass current_user_id
         if dialog.exec_() == QDialog.Accepted: self.populate_doc_table()
 
     def open_compile_pdf_dialog(self):
@@ -4022,26 +4394,83 @@ class ClientWidget(QWidget):
                 file_path = file_path_item.data(Qt.UserRole)
                 if file_path and os.path.exists(file_path): self.delete_document(file_path)
 
-    def open_document(self, file_path):
-        if os.path.exists(file_path):
-            try:
-                editor_client_data = { "client_id": self.client_info.get("client_id"), "client_name": self.client_info.get("client_name", ""), "company_name": self.client_info.get("company_name", ""), "need": self.client_info.get("need", ""), "primary_need_description": self.client_info.get("need", ""), "project_identifier": self.client_info.get("project_identifier", ""), "country": self.client_info.get("country", ""), "country_id": self.client_info.get("country_id"), "city": self.client_info.get("city", ""), "city_id": self.client_info.get("city_id"), "price": self.client_info.get("price", 0), "status": self.client_info.get("status"), "status_id": self.client_info.get("status_id"), "selected_languages": self.client_info.get("selected_languages"), "notes": self.client_info.get("notes"), "creation_date": self.client_info.get("creation_date"), "category": self.client_info.get("category"), "base_folder_path": self.client_info.get("base_folder_path") }
-                if file_path.lower().endswith('.xlsx'):
-                    editor = ExcelEditor(file_path, parent=self)
-                    if editor.exec_() == QDialog.Accepted:
-                        # ... (archiving and PDF generation logic remains the same) ...
-                        self.generate_pdf_for_document(file_path, self.client_info, self)
-                    self.populate_doc_table()
-                elif file_path.lower().endswith('.html'):
-                    html_editor_dialog = HtmlEditor(file_path, client_data=editor_client_data, parent=self)
-                    if html_editor_dialog.exec_() == QDialog.Accepted:
-                        # ... (archiving and PDF generation logic remains the same) ...
-                        generated_pdf_path = self.generate_pdf_for_document(file_path, self.client_info, self)
-                        if generated_pdf_path: print(f"Updated PDF generated at: {generated_pdf_path}")
-                    self.populate_doc_table()
-                else: QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
-            except Exception as e: QMessageBox.warning(self, self.tr("Erreur Ouverture Fichier"), self.tr("Impossible d'ouvrir le fichier:\n{0}").format(str(e)))
-        else: QMessageBox.warning(self, self.tr("Fichier Introuvable"), self.tr("Le fichier n'existe plus.")); self.populate_doc_table()
+    def open_document(self, document_data_or_file_path):
+        file_path_to_open = None
+        doc_data_for_pdf_regen = None
+
+        if isinstance(document_data_or_file_path, dict):
+            doc_data_for_pdf_regen = document_data_or_file_path
+            # Reconstruct file_path_to_open from doc_data_for_pdf_regen
+            base_client_path = self.client_info.get("base_folder_path") or self.client_info.get("default_base_folder_path", "")
+            relative_path_from_db = doc_data_for_pdf_regen.get('file_path_relative')
+            file_name_on_disk = doc_data_for_pdf_regen.get('file_name_on_disk', '')
+
+            if not base_client_path or not self.app_root_dir or not os.path.isdir(self.app_root_dir):
+                QMessageBox.warning(self, self.tr("Erreur Configuration"), self.tr("Chemin de base client ou racine application invalide."))
+                return
+
+            abs_base_client_path = os.path.normpath(os.path.join(self.app_root_dir, base_client_path))
+
+            if abs_base_client_path and relative_path_from_db and file_name_on_disk:
+                path_directory_part = os.path.dirname(relative_path_from_db)
+                file_path_to_open = os.path.normpath(os.path.join(abs_base_client_path, path_directory_part, file_name_on_disk))
+            else:
+                QMessageBox.warning(self, self.tr("Erreur Chemin"), self.tr("Impossible de déterminer le chemin du fichier à partir des données du document."))
+                return
+        elif isinstance(document_data_or_file_path, str):
+            file_path_to_open = document_data_or_file_path # This case is for .xlsx or non-HTML files where only path is passed
+        else:
+            QMessageBox.warning(self, self.tr("Erreur Interne"), self.tr("Type de données invalide pour ouvrir le document."))
+            return
+
+        if not file_path_to_open or not os.path.exists(file_path_to_open):
+            QMessageBox.warning(self, self.tr("Fichier Introuvable"), self.tr("Le fichier '{0}' n'existe plus.").format(file_path_to_open or "Inconnu"))
+            self.populate_doc_table()
+            return
+
+        try:
+            editor_client_data_for_html_editor = {
+                "client_id": self.client_info.get("client_id"), "client_name": self.client_info.get("client_name", ""),
+                "company_name": self.client_info.get("company_name", ""), "need": self.client_info.get("need", ""),
+                "primary_need_description": self.client_info.get("primary_need_description", self.client_info.get("need", "")), # Ensure primary_need_description is populated
+                "project_identifier": self.client_info.get("project_identifier", ""),
+                "country": self.client_info.get("country", ""), "country_id": self.client_info.get("country_id"),
+                "city": self.client_info.get("city", ""), "city_id": self.client_info.get("city_id"),
+                "price": self.client_info.get("price", 0), "status": self.client_info.get("status"),
+                "status_id": self.client_info.get("status_id"),
+                "selected_languages": self.client_info.get("selected_languages"),
+                "notes": self.client_info.get("notes"), "creation_date": self.client_info.get("creation_date"),
+                "category": self.client_info.get("category"),
+                "base_folder_path": self.client_info.get("base_folder_path")
+            }
+
+            if file_path_to_open.lower().endswith('.xlsx'):
+                editor = ExcelEditor(file_path_to_open, parent=self)
+                if editor.exec_() == QDialog.Accepted:
+                    # For Excel, direct PDF regeneration might not be standard without specific context.
+                    # If generate_pdf_for_document can handle Excel source, it could be called.
+                    # For now, just repopulate.
+                    pass
+                self.populate_doc_table() # Refresh table for potential changes
+            elif file_path_to_open.lower().endswith('.html'):
+                html_editor_dialog = HtmlEditor(file_path_to_open, client_data=editor_client_data_for_html_editor, parent=self)
+                if html_editor_dialog.exec_() == QDialog.Accepted:
+                    self.populate_doc_table() # Refresh table as HTML content changed
+                    if doc_data_for_pdf_regen: # Ensure we have the full doc_data
+                        reply = QMessageBox.question(self, self.tr("Régénérer PDF"),
+                                                     self.tr("Le document HTML a été sauvegardé. Voulez-vous régénérer le fichier PDF maintenant?"),
+                                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+                        if reply == QMessageBox.Yes:
+                            self._handle_generate_and_open_pdf_action(doc_data_for_pdf_regen)
+                    else:
+                        logging.warning("doc_data_for_pdf_regen was None after HTML edit. Cannot prompt for PDF regeneration.")
+                else: # Editor cancelled or closed
+                    self.populate_doc_table() # Still refresh, e.g. if modification date is displayed and important
+            else:
+                QDesktopServices.openUrl(QUrl.fromLocalFile(file_path_to_open))
+        except Exception as e:
+            QMessageBox.warning(self, self.tr("Erreur Ouverture Fichier"), self.tr("Impossible d'ouvrir le document:\n{0}").format(str(e)))
+            logging.error(f"Error opening document {file_path_to_open}: {e}", exc_info=True)
 
     def delete_document(self, file_path):
         if not os.path.exists(file_path): return
@@ -4331,6 +4760,28 @@ class ClientWidget(QWidget):
 
             if products_list_data or processed_count > 0:
                 self.load_products()
+
+                # After products are added and table reloaded, update client's total price
+                client_uuid = self.client_info.get("client_id")
+                if client_uuid:
+                    try:
+                        linked_prods = db_manager.get_products_for_client_or_project(client_uuid, project_id=None)
+                        if linked_prods is None: linked_prods = []
+                        new_total_client_price = sum(
+                            p.get('total_price_calculated', 0.0) for p in linked_prods if p.get('total_price_calculated') is not None
+                        )
+
+                        if db_manager.update_client(client_uuid, {'price': new_total_client_price}):
+                            self.client_info['price'] = new_total_client_price
+                            logging.info(f"Client {client_uuid} total price updated to {new_total_client_price} after adding product(s).")
+                            # Refresh the main details display if not in edit mode
+                            if not self.is_editing_client and hasattr(self, 'populate_details_layout'):
+                                self.populate_details_layout()
+                        else:
+                            logging.error(f"Failed to update client {client_uuid} total price in DB after adding product(s).")
+                    except Exception as e:
+                        logging.error(f"Error updating client total price after adding product(s) for client {client_uuid}: {e}", exc_info=True)
+
 
     def edit_product(self):
         selected_row = self.products_table.currentRow();
