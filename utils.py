@@ -201,17 +201,18 @@ def generate_pdf_for_document(
 
     if file_ext.lower() == '.html':
         # "No Products" Check for proforma invoices, conditional on allow_empty_products
-        if not allow_empty_products and ("proforma" in file_name.lower() or "invoice" in file_name.lower()): # Heuristic check
-            # products_in_target_lang = [p for p in document_context.get('products', []) if p.get('is_language_match')] # is_language_match is not in context
+        logging.debug(f"PDF Generation for {file_name}: allow_empty_products = {allow_empty_products}") # NEW LOG
+        if not allow_empty_products and ("proforma" in file_name.lower() or "invoice" in file_name.lower()):
+            logging.debug(f"PDF Generation for {file_name}: Running product check because allow_empty_products is False.") # NEW LOG
             # The context_builder now only includes products that match the target language.
             # So, we only need to check if the 'products' list in the context is empty.
 
-            # Check if any products are in the context at all
             if not document_context.get('products'):
+                 logging.info(f"PDF Generation for {file_name}: No products in context. Cancelling.") # NEW LOG
                  QMessageBox.information(parent_widget, QCoreApplication.translate("utils.generate_pdf", "Information"),
                                         QCoreApplication.translate("utils.generate_pdf", f"Aucun produit n'est lié à ce client/projet (ou aucun ne correspond à la langue '{target_language_code}'). La génération du PDF pour '{file_name}' est annulée."))
                  return None
-            # The check for products_in_target_lang is implicitly handled now because context_builder only adds matched products.
+
             # If document_context.get('products') is not empty here, it means there ARE products for the target language.
 
         try:

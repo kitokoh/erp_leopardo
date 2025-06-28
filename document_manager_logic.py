@@ -320,8 +320,9 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                     additional_context=proforma_specific_additional_context,
                 document_type_for_context=default_proforma_template.get('template_type'),
                 allow_empty_products=True # Allow empty products for auto-generated Proforma
-
                 )
+            logging.info(f"Called generate_pdf_for_document for AUTO PROFORMA. File: {template_base_filename}, Lang: {target_proforma_lang}, allow_empty_products=True. Result path: {generated_pdf_path}") # NEW LOG
+
 
                 if not generated_pdf_path or not os.path.exists(generated_pdf_path):
                     logging.error(f"Automatic Proforma PDF generation failed for client {actual_new_client_id}.")
