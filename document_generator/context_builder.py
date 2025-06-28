@@ -16,11 +16,11 @@ from db.cruds import (
     get_city_by_id,
     get_project_by_id,
     get_client_document_notes,
-    get_equivalent_products, # Corrected function name
+    get_equivalent_products,
     get_media_links_for_product, 
     get_personnel_for_company,
 )
-from db.utils import get_db_connection
+from db.connection import get_db_connection # Changed from db.utils
 # Assuming these config variables are correctly defined in your project.
 # from db_config import APP_ROOT_DIR_CONTEXT, LOGO_SUBDIR_CONTEXT # Removed
 # from config import MEDIA_FILES_BASE_PATH # Removed
