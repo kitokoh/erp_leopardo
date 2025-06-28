@@ -318,7 +318,9 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                     target_language_code=target_proforma_lang,
                     project_id=new_project_id_central_db,
                     additional_context=proforma_specific_additional_context,
-                    document_type_for_context=default_proforma_template.get('template_type')
+                document_type_for_context=default_proforma_template.get('template_type'),
+                allow_empty_products=True # Allow empty products for auto-generated Proforma
+
                 )
 
                 if not generated_pdf_path or not os.path.exists(generated_pdf_path):
