@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Proforma Invoice</title>
@@ -92,6 +92,9 @@
         <div class="footer">
             <p>Bank Details: , Account: , Swift/BIC: </p>
             <p>This is a proforma invoice and is not a demand for payment.</p>
+            {% if doc.client_specific_footer_notes %}
+            <p style="margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px;"></p>
+            {% endif %}
             <p>Thank you for your business!</p>
         </div>
     </div>
