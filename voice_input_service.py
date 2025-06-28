@@ -1,4 +1,7 @@
-import speech_recognition as sr
+try:
+    import speech_recognition as sr
+except ImportError:
+    sr = None # speech_recognition is optional
 import logging
 import re
 
@@ -7,8 +10,12 @@ class VoiceInputService:
         """
         Initializes the voice input service, recognizer, microphone, and logger.
         """
-        self.recognizer = sr.Recognizer()
-        self.microphone = None  # Initialize as None
+        if sr:
+            self.recognizer = sr.Recognizer()
+            self.microphone = None  # Initialize as None
+        else:
+            self.recognizer = None
+            self.microphone = None
 
         # Configure logger
         self.logger = logging.getLogger(__name__)
@@ -55,12 +62,16 @@ class VoiceInputService:
                   - "success" (bool): True if recognition was successful, False otherwise.
                   - "text" (str, optional): The recognized text if successful.
                   - "error" (str, optional): An error code if not successful
-                                            ('unknown_value', 'request_error', 'unexpected_error', 'microphone_error').
+                                            ('unknown_value', 'request_error', 'unexpected_error', 'microphone_error', 'module_not_available').
                   - "message" (str, optional): A descriptive error message if not successful.
         """
-        if not self.microphone:
-            self.logger.error("Microphone not initialized. Cannot recognize speech.")
-            return {"success": False, "error": "microphone_error", "message": "Microphone not available or not initialized."}
+        if not sr:
+            self.logger.warning("SpeechRecognition library not available. Cannot recognize speech.")
+            return {"success": False, "error": "module_not_available", "message": "SpeechRecognition library not installed."}
+
+        if not self.recognizer or not self.microphone: # Check if recognizer was initialized
+            self.logger.error("Microphone or Recognizer not initialized. Cannot recognize speech.")
+            return {"success": False, "error": "microphone_error", "message": "Microphone not available or recognizer not initialized."}
 
         with self.microphone as source:
             self.logger.info("Ajustement au bruit ambiant pendant 1 seconde...")

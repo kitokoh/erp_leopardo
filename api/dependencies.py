@@ -48,24 +48,8 @@ class PermissionRequired:
 
 from sqlalchemy.orm import Session # Required for type hinting get_db
 
-# Attempt to import the real SessionLocal, but provide a mock if it fails
-try:
-    from db.database import SessionLocal # This is the ideal location
-except ImportError:
-    # This mock allows tests to import 'get_db' without db.database existing yet.
-    # It won't provide a functional database session.
-    class MockSessionLocalForDeps:
-        def __call__(self):
-            class MockDBSession:
-                def close(self): pass
-                def query(self, *args): return self # Chainable
-                def add(self, *args): pass
-                def commit(self): pass
-                def rollback(self): pass
-                def refresh(self, *args): pass
-                # Add other SQLAlchemy session methods if needed by type hints or basic usage
-            return MockDBSession()
-    SessionLocal = MockSessionLocalForDeps()
+# Attempt to import the real SessionLocal
+from db.database import SessionLocal # Use the newly created SQLAlchemy SessionLocal
 
 
 async def get_db() -> Session: # FastAPI expects a generator or async generator

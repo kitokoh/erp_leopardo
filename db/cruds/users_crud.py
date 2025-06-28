@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 import logging
 # from werkzeug.security import generate_password_hash, check_password_hash # Replaced by passlib
-from utils import hash_password, verify_password # Using passlib functions from utils
+from app_config_utils import hash_password, verify_password # Using passlib functions from utils
 from .generic_crud import _manage_conn
 
 logger = logging.getLogger(__name__)

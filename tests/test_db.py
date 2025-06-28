@@ -11,39 +11,55 @@ class TestDBContactsPagination(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.original_db_name = db_manager.DATABASE_NAME
-        cls.test_db_name = "test_pagination_db.sqlite"
-        db_manager.DATABASE_NAME = cls.test_db_name
-
+        cls.test_db_name = ":memory:"
         # Ensure a clean slate if a previous test run failed
-        if os.path.exists(cls.test_db_name):
-            os.remove(cls.test_db_name)
+        # No need to remove file for :memory: db
 
-        db_manager.initialize_database()
+        # Set the override before initializing the database
+        db_manager.connection.set_test_db_path_override(cls.test_db_name)
+        db_manager.initialize_database(db_path_to_use=cls.test_db_name)
 
     @classmethod
     def tearDownClass(cls):
-        db_manager.DATABASE_NAME = cls.original_db_name
-        if os.path.exists(cls.test_db_name):
-            os.remove(cls.test_db_name)
+        db_manager.connection.clear_test_db_path_override()
+        # No need to remove file for :memory: db
 
     def setUp(self):
-        # The database schema is already initialized in setUpClass.
+        # The database schema is already initialized in setUpClass
+        # and get_db_connection will use the override path.
         # We need to clear data from tables for each test for isolation.
-        conn = db_manager.get_db_connection() # Uses cls.test_db_name
+        conn = db_manager.get_db_connection()
         cursor = conn.cursor()
-        # Order of deletion matters if there are foreign key constraints.
-        # Start with tables that are "dependents" or join tables.
-        cursor.execute("DELETE FROM ClientContacts")
-        cursor.execute("DELETE FROM Contacts")
-        cursor.execute("DELETE FROM Clients")
-        # Add other tables if necessary, e.g., Users if created_by_user_id has FK
-        # For now, assuming these are the core tables for these tests.
-        conn.commit()
-        conn.close()
+
+        # DEBUG: Isolate lock issue
+        try:
+            print(f"Attempting DELETE FROM SAVTickets on {self.test_db_name}")
+            cursor.execute("DELETE FROM SAVTickets")
+            conn.commit()
+            print(f"DELETE FROM SAVTickets committed on {self.test_db_name}")
+
+            # Minimal deletes for TestDBContactsPagination to function if SAVTickets was the only lock
+            print(f"Attempting other deletes on {self.test_db_name}")
+            cursor.execute("DELETE FROM ClientContacts")
+            cursor.execute("DELETE FROM ClientNotes")
+            cursor.execute("DELETE FROM ClientDocuments")
+            cursor.execute("DELETE FROM Templates")
+            cursor.execute("DELETE FROM Contacts")
+            cursor.execute("DELETE FROM Clients")
+            conn.commit()
+            print(f"Other core deletes committed on {self.test_db_name}")
+
+        except sqlite3.Error as e:
+            print(f"Error during delete in setUp for {self.test_db_name}: {e}")
+            # conn.rollback() # Rollback might not be needed if error is before commit
+            raise # Re-raise to see the original error in test output
+        finally:
+            if conn: # Ensure conn is not closed if an error occurred before close
+                conn.close()
+                print(f"Connection closed for {self.test_db_name} in setUp")
 
         # Add a test client
-        # Assuming add_client and other db functions use the modified DATABASE_NAME internally
+        # db_manager.add_client will use get_db_connection which respects the override
         self.test_client_id = db_manager.add_client({'client_name': 'Test Client For Pagination', 'project_identifier': 'PAG_TEST'})
         self.assertIsNotNone(self.test_client_id, "Failed to create test client")
 
@@ -113,32 +129,56 @@ class TestCarrierEmailDB(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.original_db_name = db_manager.DATABASE_NAME
-        cls.test_db_name = "test_carrier_email_db.sqlite" # Use a different DB for these tests or ensure clean tables
-        db_manager.DATABASE_NAME = cls.test_db_name
+        cls.test_db_name = ":memory:"
+        # No need to remove file for :memory: db
 
-        if os.path.exists(cls.test_db_name):
-            os.remove(cls.test_db_name)
-        db_manager.initialize_database() # This will create Client_Transporters with email_status
+        db_manager.connection.set_test_db_path_override(cls.test_db_name)
+        db_manager.initialize_database(db_path_to_use=cls.test_db_name)
 
     @classmethod
     def tearDownClass(cls):
-        db_manager.DATABASE_NAME = cls.original_db_name
-        if os.path.exists(cls.test_db_name):
-            os.remove(cls.test_db_name)
+        db_manager.connection.clear_test_db_path_override()
+        # No need to remove file for :memory: db
 
     def setUp(self):
+        # get_db_connection will use the override path.
         conn = db_manager.get_db_connection()
         cursor = conn.cursor()
-        # Clear relevant tables before each test
-        cursor.execute("DELETE FROM Client_Transporters")
-        cursor.execute("DELETE FROM Transporters")
+        cursor = conn.cursor()
+
+        # Comprehensive deletion order (same as above, ensure consistency)
+        cursor.execute("DELETE FROM SAVTickets")
+        cursor.execute("DELETE FROM proforma_invoices")
+        cursor.execute("DELETE FROM Invoices")
+        cursor.execute("DELETE FROM ClientProjectProducts")
+        cursor.execute("DELETE FROM Tasks")
+        cursor.execute("DELETE FROM KPIs")
+        cursor.execute("DELETE FROM Projects")
+        cursor.execute("DELETE FROM ClientDocuments")
+        cursor.execute("DELETE FROM ImportantDates")
+        cursor.execute("DELETE FROM Templates")
+        cursor.execute("DELETE FROM ClientContacts")
+        cursor.execute("DELETE FROM CompanyPersonnelContacts")
+        cursor.execute("DELETE FROM ContactListMembers")
+        cursor.execute("DELETE FROM PartnerContacts")
+        cursor.execute("DELETE FROM ClientNotes")
+        cursor.execute("DELETE FROM Client_AssignedPersonnel")
+        cursor.execute("DELETE FROM Client_Transporters") # Specific to TestCarrierEmailDB
+        cursor.execute("DELETE FROM Client_FreightForwarders")
+        cursor.execute("DELETE FROM ClientOrder_MoneyTransferAgents")
+        cursor.execute("DELETE FROM CoverPages")
+        cursor.execute("DELETE FROM ActivityLog WHERE related_client_id IS NOT NULL")
+
+        cursor.execute("DELETE FROM Contacts")
+        cursor.execute("DELETE FROM Transporters") # Specific to TestCarrierEmailDB
         cursor.execute("DELETE FROM Clients")
-        # Add other necessary table cleanups if foreign keys are involved
+        # Other tables as needed
+
         conn.commit()
         conn.close()
 
         # Add a test client
+        # db_manager.add_client will use get_db_connection which respects the override
         self.client_id = db_manager.add_client({'client_name': 'Test Client for Carrier Email', 'project_identifier': 'CARRIER_EMAIL_TEST'})
         self.assertIsNotNone(self.client_id, "Failed to create test client for carrier email tests")
 

@@ -12,7 +12,7 @@ sys.path.append(APP_ROOT)
 # For get_next_invoice_number
 from db.cruds.application_settings_crud import get_next_invoice_number, set_setting, get_setting
 from db.init_schema import initialize_database
-import db.db_config as db_config
+import config as db_config # Corrected import
 
 # For get_final_invoice_context_data
 from proforma_invoice_utils import get_final_invoice_context_data

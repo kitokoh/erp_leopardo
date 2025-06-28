@@ -91,16 +91,20 @@ def _populate_default_cover_page_templates(conn_passed):
     print("Default cover page templates population attempt finished.")
 
 
-def initialize_database():
+def initialize_database(db_path_to_use: str = None):
     """
     Initializes the database by creating tables if they don't already exist.
     Combines schema from db/ca.py and db/schema.py.
+    Args:
+        db_path_to_use (str, optional): Path to the database file.
+                                         If None, uses config.DATABASE_PATH.
     """
+    actual_db_path = db_path_to_use if db_path_to_use else config.DATABASE_PATH
     # Create SQLAlchemy engine
-    engine = create_engine(f"sqlite:///{config.DATABASE_PATH}")
+    engine = create_engine(f"sqlite:///{actual_db_path}")
 
     # Use DATABASE_PATH from config (imported at the top)
-    conn = sqlite3.connect(config.DATABASE_PATH) # Keep for direct cursor use
+    conn = sqlite3.connect(actual_db_path) # Keep for direct cursor use
     conn.row_factory = sqlite3.Row # Essential for accessing columns by name
     cursor = conn.cursor() # Keep for direct cursor use
 
@@ -2343,7 +2347,12 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         conn.rollback() # Rollback in case of error during seeding
         print("DEBUG_INIT_DB: Rollback due to seeding error.")
     finally:
-        conn.close()
+        if 'engine' in locals() and engine: # Ensure engine was created
+            engine.dispose() # Dispose of SQLAlchemy engine connections
+            logging.info("DEBUG_INIT_DB: SQLAlchemy engine connections disposed.")
+        if 'conn' in locals() and conn: # Ensure conn was created
+            conn.close()
+            logging.info("DEBUG_INIT_DB: Main SQLite connection closed.")
 
 if __name__ == '__main__':
     print(f"Running init_schema.py directly. Using database path: {config.DATABASE_PATH}")

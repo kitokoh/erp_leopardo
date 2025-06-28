@@ -67,40 +67,71 @@ if 'app_setup' not in sys.modules:
     logging.critical("db.connection: 'app_setup' module was not successfully imported. This is a fatal error for database configuration.")
     raise ImportError("db.connection: Failed to make 'app_setup' available.")
 
+# Module-level variable for test database path override
+_TEST_DB_PATH_OVERRIDE = None
+
+def set_test_db_path_override(path: str):
+    """Sets the database path override for testing purposes."""
+    global _TEST_DB_PATH_OVERRIDE
+    _TEST_DB_PATH_OVERRIDE = path
+    logging.info(f"Test DB path override set to: {path}")
+
+def clear_test_db_path_override():
+    """Clears the database path override for testing."""
+    global _TEST_DB_PATH_OVERRIDE
+    _TEST_DB_PATH_OVERRIDE = None
+    logging.info("Test DB path override cleared.")
 
 def get_db_connection(db_path_override=None):
     """
     Returns a new database connection object.
-    Uses 'database_path' from the centralized app_setup.CONFIG by default.
-    An optional db_path_override can be provided (e.g., for tests).
+    Priority for path:
+    1. Explicit db_path_override argument.
+    2. Module-level _TEST_DB_PATH_OVERRIDE (if set).
+    3. 'database_path' from the centralized app_setup.CONFIG.
     """
+    global _TEST_DB_PATH_OVERRIDE
+    path_to_connect = None
+    database_type = 'sqlite' # Default, will be updated from config if possible
+
     if db_path_override:
         path_to_connect = db_path_override
+        # If path is overridden, we assume it's SQLite for testing unless specified otherwise
+        # Or, we could try to infer type from app_config if override is just for path
+        if app_setup:
+            app_config_temp = app_setup.get_app_config()
+            database_type = app_config_temp.get('database_type', 'sqlite')
+
+    elif _TEST_DB_PATH_OVERRIDE:
+        path_to_connect = _TEST_DB_PATH_OVERRIDE
+        # Same assumption as above for database_type
+        if app_setup:
+            app_config_temp = app_setup.get_app_config()
+            database_type = app_config_temp.get('database_type', 'sqlite')
     else:
         if app_setup:
             app_config = app_setup.get_app_config()
-            path_to_connect = app_config.get('database_path') # Used by SQLite and potentially others
-            database_type = app_config.get('database_type', 'sqlite') # Default to 'sqlite' if not set
-        else: # app_setup is not available, fall back to defaults or raise error if path not overridden
-            logging.warning("db.connection: app_setup not available. Using default 'sqlite' type. Path must be overridden for non-test scenarios.")
-            path_to_connect = None # Must be overridden by db_path_override
-            database_type = 'sqlite'
+            path_to_connect = app_config.get('database_path')
+            database_type = app_config.get('database_type', 'sqlite')
+        else:
+            logging.warning("db.connection: app_setup not available. Using default 'sqlite' type. Path must be determined by override or test override.")
+            # path_to_connect remains None, database_type is 'sqlite'
+            # This state should be problematic if not using an override, caught below.
 
-
-        if not path_to_connect and database_type == 'sqlite' and not db_path_override: # Path is critical for SQLite if no override
-            logging.critical(
-                "CRITICAL: 'database_path' is missing or empty in the application configuration for SQLite, and no override was provided. "
-                "This path is essential for SQLite database connectivity. "
-                "Please check the configuration setup."
-            )
-            raise ValueError("SQLite database path not found in application configuration. Cannot establish connection.")
+    if not path_to_connect and database_type == 'sqlite': # Path is critical for SQLite
+        logging.critical(
+            "CRITICAL: SQLite database path could not be determined. "
+            "Checked explicit override, test override, and application configuration. "
+            "Please ensure one of these provides a valid path for SQLite."
+        )
+        raise ValueError("SQLite database path not found. Cannot establish connection.")
 
     if database_type == 'sqlite':
-        if not path_to_connect: # Should be caught above if db_path_override is also None, but as a safeguard.
-            raise ValueError("SQLite connection requires a valid database path.")
-        conn = sqlite3.connect(path_to_connect)
+        # path_to_connect should be valid here due to the check above for sqlite
+        conn = sqlite3.connect(path_to_connect, timeout=10) # Increased timeout for busy DB
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON;") # Enforce foreign key constraints
+        conn.execute("PRAGMA busy_timeout = 5000;") # Wait 5 seconds if DB is locked
         return conn
     elif database_type == 'postgresql':
         # --- PostgreSQL Connection (Not Implemented) ---
