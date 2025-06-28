@@ -149,9 +149,10 @@ def generate_pdf_for_document(
     app_root_dir:str,
     parent_widget=None,
     target_language_code: str = "fr",
-    project_id: int = None, # Added
-    additional_context: dict = None, # Added
-    document_type_for_context: str = None # Added
+    project_id: int = None,
+    additional_context: dict = None,
+    document_type_for_context: str = None,
+    allow_empty_products: bool = False # New flag
 ) -> str | None:
     """
     Generates a PDF for a given source document (HTML, XLSX, DOCX).
@@ -199,19 +200,19 @@ def generate_pdf_for_document(
     )
 
     if file_ext.lower() == '.html':
-        # "No Products" Check for proforma invoices
-        # A more robust check might involve looking at a template type if available
-        if "proforma" in file_name.lower() or "invoice" in file_name.lower(): # Heuristic check
-            products_in_target_lang = [p for p in document_context.get('products', []) if p.get('is_language_match')]
-            if not document_context.get('products'): # No products linked at all
+        # "No Products" Check for proforma invoices, conditional on allow_empty_products
+        logging.debug(f"PDF Generation for {file_name}: allow_empty_products = {allow_empty_products}") # NEW LOG
+        if not allow_empty_products and ("proforma" in file_name.lower() or "invoice" in file_name.lower()):
+            logging.debug(f"PDF Generation for {file_name}: Running product check because allow_empty_products is False.") # NEW LOG
+            # The context_builder now only includes products that match the target language.
+            # So, we only need to check if the 'products' list in the context is empty.
+
+            if not document_context.get('products'):
+                 logging.info(f"PDF Generation for {file_name}: No products in context. Cancelling.") # NEW LOG
                  QMessageBox.information(parent_widget, QCoreApplication.translate("utils.generate_pdf", "Information"),
-                                        QCoreApplication.translate("utils.generate_pdf", f"Aucun produit n'est lié à ce client/projet. La génération du PDF pour '{file_name}' est annulée."))
+                                        QCoreApplication.translate("utils.generate_pdf", f"Aucun produit n'est lié à ce client/projet (ou aucun ne correspond à la langue '{target_language_code}'). La génération du PDF pour '{file_name}' est annulée."))
                  return None
-            elif not products_in_target_lang:
-                lang_name = target_language_code # Ideally, get full language name
-                QMessageBox.information(parent_widget, QCoreApplication.translate("utils.generate_pdf", "Information"),
-                                        QCoreApplication.translate("utils.generate_pdf", f"Aucun produit trouvé en langue '{lang_name}' pour ce client/projet. La génération du PDF pour '{file_name}' est annulée."))
-                return None
+            # If document_context.get('products') is not empty here, it means there ARE products for the target language.
 
         try:
             with open(source_file_path, 'r', encoding='utf-8') as f:
