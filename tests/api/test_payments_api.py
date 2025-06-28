@@ -288,4 +288,3 @@ if __name__ == '__main__':
     # Need to import sqlite3 for _execute_sql_for_setup
     import sqlite3
     unittest.main()
-```

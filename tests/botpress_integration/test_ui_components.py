@@ -6,9 +6,9 @@ from PyQt5.QtWidgets import QApplication, QWidget
 from PyQt5.QtCore import Qt
 
 # Ensure a QApplication instance exists for widget testing
-app = QApplication.instance()
-if app is None:
-    app = QApplication(sys.argv)
+# app = QApplication.instance()
+# if app is None:
+#     app = QApplication(sys.argv)
 
 # Adjust import paths as necessary
 from botpress_integration.ui_components import BotpressIntegrationUI

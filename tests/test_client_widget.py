@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 # Assuming client_widget.py is in the parent directory or accessible via PYTHONPATH
-from client_widget import ClientWidget
+from client_management.client_widget import ClientWidget
 from PyQt5.QtWidgets import QApplication, QWidget
 
 # Required for QApplication instance

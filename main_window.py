@@ -111,7 +111,7 @@ from PyQt5.QtWidgets import QDateEdit
 
 
 
-from client_widget import ClientWidget
+from client_management.client_widget import ClientWidget
 from project_management import MainDashboard as ProjectManagementDashboard
 from statistics_module import StatisticsDashboard
 from statistics_panel import CollapsibleStatisticsWidget

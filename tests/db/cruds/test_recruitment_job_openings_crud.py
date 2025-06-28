@@ -48,6 +48,3 @@ class TestMinimalRecruitmentJobOpeningsCRUD(unittest.TestCase):
         new_id = add_job_opening(job_data, conn=self.conn)
         self.assertIsNotNone(new_id)
         self.assertTrue(isinstance(new_id, str))
-
-# No if __name__ == '__main__' block
-```

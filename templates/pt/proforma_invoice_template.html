@@ -92,6 +92,9 @@
         <div class="footer">
             <p>Bank Details: {{BANK_NAME}}, Account: {{BANK_ACCOUNT_NUMBER}}, Swift/BIC: {{BANK_SWIFT_BIC}}</p>
             <p>This is a proforma invoice and is not a demand for payment.</p>
+            {% if doc.client_specific_footer_notes %}
+            <p style="margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px;">{{doc.client_specific_footer_notes}}</p>
+            {% endif %}
             <p>Thank you for your business!</p>
         </div>
     </div>

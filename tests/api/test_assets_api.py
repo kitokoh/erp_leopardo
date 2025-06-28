@@ -340,7 +340,5 @@ class TestAssetsAPI(unittest.TestCase):
         #    sys.modules['media_manager.operations'].add_media_item = original_add_media_item
         pass # Skipping execution of upload test due to mocking complexity without unittest.mock.patch
 
-
-if __name__ == "__main__":
-    unittest.main()
-```
+# if __name__ == "__main__":
+#     unittest.main()
