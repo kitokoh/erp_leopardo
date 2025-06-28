@@ -1071,20 +1071,57 @@ CREATE TABLE IF NOT EXISTS Templates (
         source_template_id INTEGER, version_tag TEXT, notes TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         created_by_user_id TEXT,
+        is_deleted INTEGER DEFAULT 0,
+        deleted_at TEXT,
         FOREIGN KEY (client_id) REFERENCES Clients (client_id),
         FOREIGN KEY (project_id) REFERENCES Projects (project_id),
         FOREIGN KEY (source_template_id) REFERENCES Templates (template_id),
-        FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id)
+        FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id),
+        FOREIGN KEY (parent_document_id) REFERENCES ClientDocuments (document_id) ON DELETE SET NULL
     )""")
+
+    # Ensure is_deleted, deleted_at, order_identifier, parent_document_id, is_latest_version columns exist
     cursor.execute("PRAGMA table_info(ClientDocuments)")
-    columns_cd = [column['name'] for column in cursor.fetchall()]
-    if 'order_identifier' not in columns_cd:
+    cd_columns_info = cursor.fetchall()
+    cd_column_names = [info['name'] for info in cd_columns_info]
+
+    if 'order_identifier' not in cd_column_names:
         try:
             cursor.execute("ALTER TABLE ClientDocuments ADD COLUMN order_identifier TEXT")
             print("Added 'order_identifier' column to ClientDocuments table.")
-            # No commit here
         except sqlite3.Error as e:
             print(f"Error adding 'order_identifier' column to ClientDocuments: {e}")
+
+    if 'is_deleted' not in cd_column_names:
+        try:
+            cursor.execute("ALTER TABLE ClientDocuments ADD COLUMN is_deleted INTEGER DEFAULT 0")
+            print("Added 'is_deleted' column to ClientDocuments table.")
+        except sqlite3.Error as e_alter_cd_is_deleted:
+            print(f"Error adding 'is_deleted' column to ClientDocuments table: {e_alter_cd_is_deleted}")
+
+    if 'deleted_at' not in cd_column_names:
+        try:
+            cursor.execute("ALTER TABLE ClientDocuments ADD COLUMN deleted_at TEXT")
+            print("Added 'deleted_at' column to ClientDocuments table.")
+        except sqlite3.Error as e_alter_cd_deleted_at:
+            print(f"Error adding 'deleted_at' column to ClientDocuments table: {e_alter_cd_deleted_at}")
+
+    if 'parent_document_id' not in cd_column_names:
+        try:
+            # SQLite does not allow adding a FOREIGN KEY constraint via ALTER TABLE in older versions.
+            # The constraint is defined in CREATE TABLE for new DBs.
+            # For existing DBs, this adds the column. App logic must handle relationships if FK isn't enforced by DB.
+            cursor.execute("ALTER TABLE ClientDocuments ADD COLUMN parent_document_id TEXT")
+            print("Added 'parent_document_id' column to ClientDocuments table.")
+        except sqlite3.Error as e_alter_cd_parent_id:
+            print(f"Error adding 'parent_document_id' column to ClientDocuments table: {e_alter_cd_parent_id}")
+
+    if 'is_latest_version' not in cd_column_names:
+        try:
+            cursor.execute("ALTER TABLE ClientDocuments ADD COLUMN is_latest_version INTEGER DEFAULT 1")
+            print("Added 'is_latest_version' column to ClientDocuments table.")
+        except sqlite3.Error as e_alter_cd_is_latest:
+            print(f"Error adding 'is_latest_version' column to ClientDocuments table: {e_alter_cd_is_latest}")
 
     # Create ClientDocumentNotes table (from ca.py)
     cursor.execute("""
