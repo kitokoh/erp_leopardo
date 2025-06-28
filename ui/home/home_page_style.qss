@@ -1,0 +1,57 @@
+/* Specific Styles for HomePageWidget */
+
+QWidget#HomePageWidget {
+    background-color: #F5F7FA; /* Secondary Background, plus doux que blanc pur */
+    /* Ou un dégradé léger :
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                stop:0 #FFFFFF, stop:1 #F0F4F8);
+    */
+}
+
+QLabel#homePageWelcomeLabel {
+    color: #007BFF; /* Couleur accentuée du thème */
+    font-family: "Open Sans", "Segoe UI", Arial, sans-serif; /* Assurer la cohérence */
+    padding-bottom: 10px; /* Un peu d'espace en dessous */
+    background-color: transparent; /* S'assurer qu'il n'y a pas de fond coloré par défaut */
+}
+
+/* HomePageWidget Button Styles (Cartes de Module) */
+/* Ciblé via le conteneur pour spécificité */
+QWidget#homePageButtonGridContainer QPushButton {
+    background-color: #FFFFFF;
+    border: 1px solid #DDE2E6; /* Conserver une bordure fine pour la définition de la carte */
+    border-radius: 10px;       /* Coins arrondis */
+    padding: 10px;             /* Padding réduit */
+    font-size: 12px;           /* Police réduite */
+    font-weight: bold;
+    color: #333333;
+    text-align: center;
+    min-height: 80px;          /* Hauteur réduite */
+    /* min-width n'est pas fixé, la grille s'en chargera avec 4 colonnes */
+    /* Les ombres sont maintenant gérées par QGraphicsDropShadowEffect en Python */
+}
+
+QWidget#homePageButtonGridContainer QPushButton:hover {
+    background-color: #E3F2FD;
+    border-color: #007BFF;
+    color: #0056B3;
+}
+
+QWidget#homePageButtonGridContainer QPushButton:pressed {
+    background-color: #CCE5FF;
+    border-color: #004085;
+    color: #004085;
+}
+
+/* QLabel pour le GIF */
+QLabel#homePageGifLabel {
+    background-color: transparent; /* Pas de fond pour le label du GIF */
+    /* La taille sera gérée par le QMovie et la politique de taille du widget */
+}
+
+/* Conteneur pour la zone inférieure (ex: statistiques) */
+QStackedWidget#homePageBottomContentArea {
+    /* background-color: lightblue; */ /* Pour débogage de la zone */
+    border-top: 1px solid #DDE2E6; /* Séparateur optionnel */
+    /* min-height: 200px; */ /* Hauteur minimale si nécessaire */
+}
