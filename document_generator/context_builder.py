@@ -97,23 +97,12 @@ def get_document_context(
     project_id: int = None,
     document_type: str = None, # e.g., 'proforma_invoice', 'technical_sheet'
     additional_data: dict = None,
-    db_conn=None,
-    app_root_dir: str = None # Added app_root_dir parameter
+    db_conn=None, # This parameter is now effectively ignored by internal calls if they are all decorated
+    app_root_dir: str = None
 ) -> dict:
     """
     Fetches and structures data for document generation.
-
-    Args:
-        client_id: ID of the client.
-        company_id: ID of the seller company.
-        language_code: Language code for translations (e.g., 'en', 'es').
-        project_id: Optional ID of the project.
-        document_type: Optional type of the document being generated.
-        additional_data: Optional dictionary for overrides or extra information.
-        db_conn: Optional existing database connection.
-
-    Returns:
-        A dictionary containing structured data for the document.
+    Connections to DB for CRUD operations are managed by @_manage_conn decorator on CRUD functions.
     """
     if additional_data is None:
         additional_data = {}
@@ -129,14 +118,14 @@ def get_document_context(
         "additional": additional_data,
     }
 
-    conn = db_conn if db_conn else get_db_connection()
+    # conn = db_conn if db_conn else get_db_connection() # Connection now managed by @_manage_conn on each CRUD call
 
     try:
         # 1. Document Info (doc section)
         context["doc"]["current_date"] = datetime.date.today().strftime("%Y-%m-%d")
         context["doc"]["current_year"] = datetime.date.today().year
-        context["doc"]["currency_symbol"] = additional_data.get("currency_symbol", "€") # This might need to be lang specific
-        context["doc"]["vat_rate"] = Decimal(additional_data.get("vat_rate", "0.20")) # Example VAT
+        context["doc"]["currency_symbol"] = additional_data.get("currency_symbol", "€")
+        context["doc"]["vat_rate"] = Decimal(additional_data.get("vat_rate", "0.20"))
         context["doc"]["discount_rate"] = Decimal(additional_data.get("discount_rate", "0.00"))
 
         # 2. Language Info (lang section) & Localized Labels
@@ -149,17 +138,17 @@ def get_document_context(
             "from_seller": "De :",
             "to_client": "À :",
             "proforma_no": "Facture Proforma N° :",
-            "date_label": "Date :", # Changed from "date" to avoid conflict with actual date value
-            "project_id_label": "ID Projet :", # Changed from "project_id"
-            "payment_terms_label": "Conditions de Paiement :", # Changed
-            "delivery_terms_label": "Conditions de Livraison :", # Changed
+            "date_label": "Date :",
+            "project_id_label": "ID Projet :",
+            "payment_terms_label": "Conditions de Paiement :",
+            "delivery_terms_label": "Conditions de Livraison :",
             "item_ref": "Réf.",
             "item_description": "Description",
             "quantity": "Quantité",
             "unit_price": "Prix Unitaire",
             "total_price": "Prix Total",
-            "client_order_ref_label": "Référence Commande Client :", # Changed
-            "client_order_date_label": "Date Commande Client :", # Changed
+            "client_order_ref_label": "Référence Commande Client :",
+            "client_order_date_label": "Date Commande Client :",
             "sub_total": "Sous-total :",
             "discount": "Remise",
             "vat": "TVA",
@@ -262,66 +251,56 @@ def get_document_context(
             "proforma_notice": "Это проформа-инвойс и не является требованием к оплате.",
             "thank_you_message": "Спасибо за ваш бизнес!",
             "no_products_listed": "Товары отсутствуют.",
-            # Adding new labels used in the RU template that might not be in EN/FR yet
             "company_logo_alt": "Логотип компании",
             "phone_label": "Телефон:",
             "email_label": "Email:",
-            "vat_id_label": "ИНН:", # Often used for VAT ID in RU context
+            "vat_id_label": "ИНН:",
             "reg_no_label": "Рег. номер:",
             "contact_label": "Контакт:"
             }
         }
-        context["labels"] = _labels.get(language_code, _labels.get("en", {})) # Default to English labels if lang or specific label not found
+        context["labels"] = _labels.get(language_code, _labels.get("en", {}))
 
-    # Date formatting based on locale (simple version)
-        # Storing the original YYYY-MM-DD date as well for potential machine use or other formatting needs
         context["doc"]["current_date_iso"] = context["doc"]["current_date"] 
         try:
             current_date_obj = datetime.datetime.strptime(context["doc"]["current_date"], "%Y-%m-%d").date()
             if language_code == "fr":
                 context["doc"]["current_date_formatted"] = current_date_obj.strftime("%d/%m/%Y")
-            elif language_code == "en": # Add other locales as needed
+            elif language_code == "en":
                 context["doc"]["current_date_formatted"] = current_date_obj.strftime("%m/%d/%Y")
-            # Add other locales or use Babel for more robust i18n date formatting
-            else: # Default
+            else:
                 context["doc"]["current_date_formatted"] = current_date_obj.strftime("%Y-%m-%d")
         except ValueError:
             logger.warning(f"Could not parse current_date '{context['doc']['current_date']}' for formatting.")
-            context["doc"]["current_date_formatted"] = context["doc"]["current_date"] # Fallback to original string
+            context["doc"]["current_date_formatted"] = context["doc"]["current_date"]
 
-        # Set document identifier (e.g., proforma_id, invoice_number)
-        # This could come from additional_data if regenerating an existing document, or be generated.
-        # The template uses `doc.proforma_id`. Let's ensure this key is populated.
-        # `additional_data` might contain `document_id` (from ClientDocuments table) or `invoice_number`.
         doc_identifier = additional_data.get('document_id', 
                                             additional_data.get('invoice_number', 
                                                                 additional_data.get('proforma_id')))
         if not doc_identifier and document_type and 'proforma' in document_type.lower():
-            doc_identifier = f"PF-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}" # Basic generated ID
+            doc_identifier = f"PF-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
         
         context["doc"]["proforma_id"] = doc_identifier if doc_identifier else "N/A"
-        # For other document types, a more generic 'document_reference' might be useful.
         context["doc"]["document_reference"] = doc_identifier if doc_identifier else "N/A"
 
-
         # 3. Seller Information (seller section)
-        seller_company = get_company_by_id(conn, company_id)
+        seller_company = get_company_by_id(company_id) # Removed conn
         if seller_company:
             context["seller"]["name"] = seller_company.get("name")
             context["seller"]["address_line1"] = seller_company.get("address_line1")
             context["seller"]["address_line2"] = seller_company.get("address_line2")
-            context["seller"]["city"] = seller_company.get("city_name") # Assuming city_name is available
+            context["seller"]["city"] = seller_company.get("city_name")
             context["seller"]["postal_code"] = seller_company.get("postal_code")
-            context["seller"]["country"] = seller_company.get("country_name") # Assuming country_name is available
+            context["seller"]["country"] = seller_company.get("country_name")
             context["seller"]["phone"] = seller_company.get("phone")
             context["seller"]["email"] = seller_company.get("email")
             context["seller"]["website"] = seller_company.get("website")
             context["seller"]["vat_id"] = seller_company.get("vat_id")
 
             logo_relative_path = seller_company.get("logo_path")
-            logo_filename = seller_company.get("logo_path") # Assume this is 'my_logo.png' or similar
+            logo_filename = seller_company.get("logo_path")
             if logo_filename and app_root_dir:
-                logo_subdir = AppGlobalConfig.get('company_logo_dir', 'company_logos') # Get from config or default
+                logo_subdir = AppGlobalConfig.get('company_logo_dir', 'company_logos')
                 logo_abs_path = os.path.join(app_root_dir, logo_subdir, logo_filename)
                 if os.path.exists(logo_abs_path):
                     context["seller"]["logo_url"] = f"file:///{logo_abs_path.replace(os.sep, '/')}"
@@ -333,8 +312,6 @@ def get_document_context(
                 if not app_root_dir and logo_filename :
                     logger.warning(f"app_root_dir not provided, cannot resolve seller logo path for '{logo_filename}'")
 
-
-            # Parse payment_info and other_info for more seller details
             payment_info_str = seller_company.get("payment_info", "{}")
             other_info_str = seller_company.get("other_info", "{}")
             try:
@@ -354,25 +331,19 @@ def get_document_context(
             context["seller"]["bank_swift_bic"] = payment_info.get("swift_bic")
             context["seller"]["bank_address"] = payment_info.get("bank_address")
             
-            context["seller"]["vat_id"] = other_info.get("vat_id", seller_company.get("vat_id")) # Prioritize other_info
+            context["seller"]["vat_id"] = other_info.get("vat_id", seller_company.get("vat_id"))
             context["seller"]["registration_number"] = other_info.get("registration_number")
             
-            # Full address from DB, and construct city_zip_country if possible (difficult if address is one string)
             context["seller"]["address_full"] = seller_company.get("address")
-            # Attempt to construct city_zip_country if parts are in other_info or payment_info, or parse from address_full
-            # This is a simplified approach; robust parsing is complex.
             seller_city = other_info.get("city", payment_info.get("city", ""))
             seller_postal = other_info.get("postal_code", payment_info.get("postal_code", ""))
-            seller_country_name = other_info.get("country", payment_info.get("country", "")) # Already have country_name from direct field
+            seller_country_name = other_info.get("country", payment_info.get("country", ""))
 
-            _s_parts = [seller_city, seller_postal, context["seller"]["country"]] # Use already fetched country_name
+            _s_parts = [seller_city, seller_postal, context["seller"]["country"]]
             context["seller"]["city_zip_country"] = ", ".join(filter(None, [str(p).strip() for p in _s_parts if p])) or ""
 
-
-            # Seller representative (simplified - picks the first one or based on a flag)
-            personnel_list = get_personnel_for_company(conn, company_id)
+            personnel_list = get_personnel_for_company(company_id) # Removed conn
             if personnel_list:
-                # Prioritize personnel marked as 'representative' or similar if such a field exists
                 representative = next((p for p in personnel_list if p.get("is_representative")), personnel_list[0])
                 context["seller"]["representative_name"] = representative.get("full_name")
                 context["seller"]["representative_email"] = representative.get("email")
@@ -381,23 +352,18 @@ def get_document_context(
             logger.error(f"Seller company with ID {company_id} not found.")
 
         # 4. Client Information (client section)
-        client_data = get_client_by_id(conn, client_id) # client_data is a dict from the DB row
+        client_data = get_client_by_id(client_id) # Removed conn
         if client_data:
-            client_ctx = context["client"] # shortcut
-            client_ctx["id"] = client_data.get("client_id") # Use "client_id" as per schema
+            client_ctx = context["client"]
+            client_ctx["id"] = client_data.get("client_id")
             client_ctx["individual_name"] = client_data.get("name") 
             client_ctx["company_name"] = client_data.get("company_name")
             client_ctx["display_name"] = client_data.get("company_name") or client_data.get("name")
             
-            # Address fields from Clients table structure (assuming these are direct columns)
-            # clients_crud.py implies these are direct fields from `get_all_clients_with_details` context preparation
-            # but `get_client_by_id` might return raw IDs. Let's assume direct names are available if fetched with details,
-            # otherwise, we need to fetch them using IDs. For now, assuming `get_client_by_id` provides enough.
-            client_ctx["address_line1"] = client_data.get("address_line1", client_data.get("default_base_folder_path")) # Fallback for address_line1
+            client_ctx["address_line1"] = client_data.get("address_line1", client_data.get("default_base_folder_path"))
             client_ctx["address_line2"] = client_data.get("address_line2") 
             client_ctx["postal_code"] = client_data.get("postal_code")
 
-            # VAT ID and Registration Number for Client (from notes or distributor_specific_info)
             client_notes_raw = client_data.get('notes', "")
             client_dist_info_raw = client_data.get('distributor_specific_info', "")
 
@@ -405,27 +371,24 @@ def get_document_context(
             client_notes_kv = {}
             if isinstance(client_notes_raw, str):
                 try: client_notes_json = json.loads(client_notes_raw) if client_notes_raw.strip().startswith('{') else {}
-                except json.JSONDecodeError: pass # Keep empty if not valid JSON
-                # Basic KV parsing could be added here if notes are not always JSON
+                except json.JSONDecodeError: pass
             
             client_dist_info_json = {}
             if isinstance(client_dist_info_raw, str):
                 try: client_dist_info_json = json.loads(client_dist_info_raw) if client_dist_info_raw.strip().startswith('{') else {}
                 except json.JSONDecodeError: pass
 
-            # Prioritize distributor_specific_info, then notes, then direct field if it existed (it doesn't for vat_id in Clients)
             client_ctx["vat_id"] = client_dist_info_json.get("vat_id", client_notes_json.get("vat_id", additional_data.get("client_vat_id")))
             client_ctx["registration_number"] = client_dist_info_json.get("registration_number", client_notes_json.get("registration_number", additional_data.get("client_registration_number")))
 
-
             client_city_id = client_data.get("city_id")
             if client_city_id:
-                city = get_city_by_id(conn, client_city_id)
+                city = get_city_by_id(client_city_id) # Removed conn
                 client_ctx["city"] = city.get("name") if city else None
 
             client_country_id = client_data.get("country_id")
             if client_country_id:
-                country = get_country_by_id(conn, client_country_id)
+                country = get_country_by_id(client_country_id) # Removed conn
                 client_ctx["country"] = country.get("name") if country else None
             
             _c_parts = [client_ctx.get("city"), client_ctx.get("postal_code"), client_ctx.get("country")]
@@ -435,7 +398,7 @@ def get_document_context(
             client_ctx["address_full"] = ", ".join(filter(None, [str(p).strip() for p in _c_addr_parts if p])) or ""
 
             primary_contact = None
-            contacts = get_contacts_for_client(conn, client_id)
+            contacts = get_contacts_for_client(client_id) # Removed conn
             if contacts:
                 primary_contact = next((c for c in contacts if c.get("is_primary")), contacts[0] if contacts else None)
                 if primary_contact:
@@ -447,7 +410,7 @@ def get_document_context(
 
         # 5. Project Information (project section)
         if project_id:
-            project_data = get_project_by_id(conn, project_id)
+            project_data = get_project_by_id(project_id) # Removed conn
             if project_data:
                 context["project"]["id"] = project_data.get("id")
                 context["project"]["name"] = project_data.get("name")
@@ -457,27 +420,24 @@ def get_document_context(
         elif "project_name" in additional_data or "project_identifier" in additional_data:
             context["project"]["name"] = additional_data.get("project_name")
             context["project"]["identifier"] = additional_data.get("project_identifier")
-        elif client_data and client_data.get("default_project_identifier"): # Fallback to client's default project
+        elif client_data and client_data.get("default_project_identifier"):
              context["project"]["identifier"] = client_data.get("default_project_identifier")
-             context["project"]["name"] = client_data.get("default_project_name") # if available
-
+             context["project"]["name"] = client_data.get("default_project_name")
 
         # 6. Product Information (products section)
-        # Initial fetch of products linked to client/project. These are ClientProjectProducts records.
-        linked_products_data = get_products_for_client_or_project(conn, client_id=client_id, project_id=project_id)
+        linked_products_data = get_products_for_client_or_project(client_id=client_id, project_id=project_id) # Removed conn
         linked_products_data = linked_products_data if linked_products_data else []
 
         processed_products_for_context = []
         total_items_price = Decimal("0.0")
 
         for linked_prod_info in linked_products_data:
-            global_product_id = linked_prod_info.get("product_id") # This is the ID from the global Products table
+            global_product_id = linked_prod_info.get("product_id")
             if not global_product_id:
                 logger.warning(f"Skipping linked product entry due to missing global_product_id: {linked_prod_info}")
                 continue
 
-            # Fetch full details of the global product
-            global_product_details = get_product_by_id(conn, global_product_id)
+            global_product_details = get_product_by_id(global_product_id) # Removed conn
             if not global_product_details:
                 logger.warning(f"Global product details not found for product_id: {global_product_id} (linked via client_project_product_id: {linked_prod_info.get('client_project_product_id')}). Skipping.")
                 continue
@@ -486,33 +446,29 @@ def get_document_context(
             display_description = None
             product_matches_target_language = False
 
-            # Check for equivalents in the target language
-            # `language_code` here is the target_language_code for the document
-            # get_equivalent_products is imported from db.cruds which points to products_crud_instance.get_equivalent_products
-            all_raw_equivalents = get_equivalent_products(global_product_id, conn=conn) # Fetches all equivalents
+            all_raw_equivalents = get_equivalent_products(global_product_id) # Removed conn
 
             found_equivalent_in_lang = None
-            if all_raw_equivalents: # Check if the list is not empty
+            if all_raw_equivalents:
                 for eq_prod in all_raw_equivalents:
                     if eq_prod.get("language_code") == language_code:
                         found_equivalent_in_lang = eq_prod
-                        break # Found the first matching equivalent
+                        break
 
             if found_equivalent_in_lang:
-                display_name = found_equivalent_in_lang.get("name", global_product_details.get("name")) # Fallback to global name
-                display_description = found_equivalent_in_lang.get("description", global_product_details.get("description")) # Fallback to global desc
+                display_name = found_equivalent_in_lang.get("name", global_product_details.get("name"))
+                display_description = found_equivalent_in_lang.get("description", global_product_details.get("description"))
+
                 product_matches_target_language = True
             elif global_product_details.get("language_code") == language_code:
-                # No specific equivalent, but the global product itself is in the target language
                 display_name = global_product_details.get("name")
                 display_description = global_product_details.get("description")
                 product_matches_target_language = True
             
             if not product_matches_target_language:
                 logger.info(f"Product ID {global_product_id} (Name: {global_product_details.get('name')}) will be excluded. Original lang: {global_product_details.get('language_code')}, Target lang: {language_code}.")
-                continue # Skip this product as it doesn't match the target language
+                continue
 
-            # Product matches target language, proceed to add to context
             quantity = Decimal(str(linked_prod_info.get("quantity", 1)))
             
             unit_price_override = linked_prod_info.get("unit_price_override")
@@ -524,8 +480,7 @@ def get_document_context(
             item_total_price = quantity * unit_price
             total_items_price += item_total_price
 
-            # Media links processing (remains similar)
-            media_links_raw = get_media_links_for_product(conn, global_product_id)
+            media_links_raw = get_media_links_for_product(global_product_id) # Removed conn
             media_links_processed = []
             if media_links_raw:
                 for media_link in media_links_raw:
@@ -533,7 +488,7 @@ def get_document_context(
                     if file_path and app_root_dir:
                         media_root = AppGlobalConfig.get('media_files_path')
                         if not media_root and app_root_dir: 
-                            media_root = os.path.join(app_root_dir, 'media_files') # Adjusted default to media_files
+                            media_root = os.path.join(app_root_dir, 'media_files')
                         if media_root:
                             abs_media_path = os.path.join(media_root, file_path.lstrip(os.sep))
                             if os.path.exists(abs_media_path):
@@ -551,7 +506,7 @@ def get_document_context(
                 "id": global_product_id,
                 "original_name": global_product_details.get("name"),
                 "original_description": global_product_details.get("description"),
-                "sku": global_product_details.get("product_code"), # Use product_code for SKU
+                "sku": global_product_details.get("product_code"),
                 "name": display_name,
                 "description": display_description,
                 "quantity": quantity,
@@ -563,8 +518,7 @@ def get_document_context(
             })
         
         context["products"] = processed_products_for_context
-        # 7. Totals Calculation (doc section)
-        subtotal = total_items_price # Use the sum calculated from language-filtered products
+        subtotal = total_items_price
         discount_amount = subtotal * context["doc"]["discount_rate"]
         subtotal_after_discount = subtotal - discount_amount
         vat_amount = subtotal_after_discount * context["doc"]["vat_rate"]
@@ -581,19 +535,13 @@ def get_document_context(
         context["doc"]["vat_amount"] = format_currency(vat_amount, cs)
         context["doc"]["grand_total_amount"] = format_currency(grand_total, cs)
 
-
-        # 8. Client-Specific Notes (doc section)
-        # Ensure document_type is passed if notes are type-specific
         doc_type_for_notes = additional_data.get("document_type_for_notes", document_type)
         if doc_type_for_notes and client_id and language_code:
-            notes = get_client_document_notes(conn, client_id, doc_type_for_notes, language_code)
-            context["doc"]["client_specific_notes"] = notes # Assuming notes is a list of strings or a single string
+            notes = get_client_document_notes(client_id, doc_type_for_notes, language_code) # Removed conn
+            context["doc"]["client_specific_notes"] = notes
         else:
             context["doc"]["client_specific_notes"] = []
 
-
-        # 9. Placeholders Dictionary (placeholders section)
-        # Basic placeholders, can be expanded
         context["placeholders"]["BUYER_COMPANY_NAME"] = context["client"].get("company_name", context["client"].get("name"))
         context["placeholders"]["BUYER_CONTACT_NAME"] = context["client"].get("contact_name")
         context["placeholders"]["BUYER_ADDRESS_LINE1"] = context["client"].get("address_line1")
@@ -612,16 +560,11 @@ def get_document_context(
         context["placeholders"]["SUBTOTAL_AMOUNT"] = context["doc"]["subtotal_amount"]
         context["placeholders"]["CURRENCY_SYMBOL"] = context["doc"]["currency_symbol"]
 
-        # Add all product details to placeholders, prefixed for lists
-        # For simplicity, this example doesn't create complex list placeholders here.
-        # Typically, templating engines handle lists of objects directly.
-
     except Exception as e:
         logger.error(f"Error building document context: {e}", exc_info=True)
-        # Ensure a partial context is still returned to avoid breaking consumers
-    finally:
-        if db_conn is None and conn: # Only close if created within this function
-            conn.close()
+    # finally: # The conn variable is no longer managed at this level
+        # if db_conn is None and conn:
+            # conn.close()
 
     return context
 
