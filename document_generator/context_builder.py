@@ -16,8 +16,8 @@ from db.cruds import (
     get_city_by_id,
     get_project_by_id,
     get_client_document_notes,
-    get_product_equivalencies_for_product, # Placeholder, might need to be products_crud.get_product_equivalents
-    get_media_links_for_product, # Placeholder, might need to be products_crud.get_media_links_for_product
+    get_equivalent_products, # Corrected function name
+    get_media_links_for_product,
     get_personnel_for_company,
 )
 from db.utils import get_db_connection
