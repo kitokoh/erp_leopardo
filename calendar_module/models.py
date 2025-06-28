@@ -11,7 +11,7 @@ class CompanyCalendarSettings(BaseModel):
     region: Optional[str] = Field(None, description="Subdivision of the country, e.g., state, province. Varies by country.")
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class UserCalendarEvent(BaseModel):
     id: Optional[int] = None
@@ -21,7 +21,7 @@ class UserCalendarEvent(BaseModel):
     description: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Example for SQLAlchemy models (to be defined in db/models.py or similar if following project structure)
 # from sqlalchemy import Column, Integer, String, Date, ForeignKey

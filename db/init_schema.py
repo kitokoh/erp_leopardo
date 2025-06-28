@@ -10,7 +10,7 @@ from sqlalchemy import create_engine # Added create_engine
 import sys # Ensure sys is imported for path manipulation
 
 # Get the project root directory
-# This allows importing config.py from the root
+# This allows importing config.py from the root and db.connection
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
@@ -26,6 +26,20 @@ except ImportError:
         # Add other necessary fallbacks if init_schema.py uses them directly
         # For example, APP_ROOT_DIR if it were used directly for paths here.
     config = config_fallback
+
+# Import the main SQLAlchemy components from db.connection
+try:
+    from db.connection import Base as MainBase, engine as main_engine
+    # Import specific models that use MainBase and need table creation here
+    from calculator.models import CalculationHistory
+    # from other_module.models import OtherModelUsingMainBase # Example for future models
+    MAIN_SQLALCHEMY_COMPONENTS_LOADED = True
+except ImportError as e_main_sqlalchemy:
+    logging.error(f"db.init_schema: Could not import MainBase or main_engine from db.connection: {e_main_sqlalchemy}. Tables using MainBase (e.g., CalculatorHistory) might not be created by this script.")
+    MAIN_SQLALCHEMY_COMPONENTS_LOADED = False
+    MainBase = None # Ensure it's None so later checks don't fail with NameError
+    main_engine = None
+
 
 from auth.roles import SUPER_ADMIN
 
@@ -2234,6 +2248,18 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_type ON UserCalendarEvents(event_type)")
     print("DEBUG_INIT_DB: Indexes for Calendar Module created or already exist.")
     # --- End Calendar Module Tables ---
+
+    # --- Create tables for MainBase (e.g., CalculatorHistory) ---
+    if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None and main_engine is not None:
+        try:
+            logging.info("DEBUG_INIT_DB: Creating tables for MainBase (e.g., CalculatorHistory) using SQLAlchemy main_engine.")
+            MainBase.metadata.create_all(bind=main_engine, checkfirst=True)
+            logging.info("DEBUG_INIT_DB: Tables for MainBase created successfully.")
+        except Exception as e_main_base_create:
+            logging.error(f"DEBUG_INIT_DB: Error creating tables for MainBase: {e_main_base_create}", exc_info=True)
+            # Decide if this is critical enough to rollback or raise. For now, logging error.
+    else:
+        logging.warning("DEBUG_INIT_DB: Main SQLAlchemy components (MainBase, main_engine) not loaded. Skipping MainBase.metadata.create_all().")
 
 
     # --- Seed Data (from db/schema.py, ensuring use of db_config) ---
