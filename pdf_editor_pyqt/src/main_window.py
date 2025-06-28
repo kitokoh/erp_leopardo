@@ -30,7 +30,7 @@ class TextDisplayDialog(QDialog):
         self.text_edit.setPlainText(text_content)
         self.text_edit.setReadOnly(True)
         layout.addWidget(self.text_edit)
-        button_layout = QDialogHBoxLayout()
+        button_layout = QHBoxLayout()
         self.copy_button = QDialogButton("Copier dans le Presse-papiers", self)
         self.copy_button.clicked.connect(self.copy_to_clipboard)
         button_layout.addWidget(self.copy_button)
@@ -111,6 +111,8 @@ class MainWindow(QMainWindow):
         self.selected_widget = None
         self.property_widget_layout = None
         self.current_prop_widgets = []
+        self.pending_redactions = [] # For QRectF in scene coords
+        self.pending_redaction_items = [] # For QGraphicsRectItems on scene
         self._create_actions()
         self._create_menu_bar()
         self._create_tool_bars()
@@ -205,13 +207,13 @@ class MainWindow(QMainWindow):
         self.split_pdf_by_range_action.setEnabled(False) # Activer quand un doc est ouvert
 
         # Redaction Actions
-        self.redaction_tool_action = QAction(QIcon.fromTheme("edit-redact", QIcon(":/icons/edit-redact.png")), "&Mode Rédaction", self)
+        self.redaction_tool_action = QAction(QIcon.fromTheme("edit-redact", QIcon(":/icons/edit-redact.png")), "&Mode Rédaction", self) # Icon name might need adjustment
         self.redaction_tool_action.setCheckable(True)
         self.redaction_tool_action.setStatusTip("Activer le mode pour marquer les zones à rédiger")
         self.redaction_tool_action.triggered.connect(self.toggle_redaction_mode)
         self.redaction_tool_action.setEnabled(False)
 
-        self.apply_redactions_action = QAction(QIcon.fromTheme("document-encrypt", QIcon(":/icons/apply-redact.png")), "&Appliquer les Rédactions", self)
+        self.apply_redactions_action = QAction(QIcon.fromTheme("document-encrypt", QIcon(":/icons/apply-redactions.png")), "&Appliquer les Rédactions", self) # Icon name might need adjustment
         self.apply_redactions_action.setStatusTip("Appliquer les marques de rédaction sur la page actuelle pour supprimer définitivement le contenu")
         self.apply_redactions_action.triggered.connect(self.apply_redactions_on_current_page)
         self.apply_redactions_action.setEnabled(False)
@@ -323,11 +325,12 @@ class MainWindow(QMainWindow):
         self.properties_label_info.setText("Aucun élément sélectionné.")
         self.update_field_action.setEnabled(False)
 
-    def _reset_ui_on_error(self): # ... (Ajouter la désactivation de merge_pdfs_action si elle dépendait d'un doc ouvert)
+    def _reset_ui_on_error(self):
         self.pdf_scene.clear(); self.pdf_view_item = QGraphicsPixmapItem(); self.pdf_scene.addItem(self.pdf_view_item); self.pdf_view_item.setPixmap(QPixmap())
         self.setWindowTitle("Éditeur PDF PyQt");
         self.page_thumbnails_list.clear()
-        self.bookmarks_tree.clear() # Clear bookmarks
+        self.bookmarks_tree.clear()
+        self._clear_pending_redactions() # Clear pending redaction marks
         self.update_navigation_controls()
         actions_to_disable = [
             self.save_action, self.save_as_action, self.zoom_in_action, self.zoom_out_action, self.zoom_original_action,
@@ -347,14 +350,14 @@ class MainWindow(QMainWindow):
             if hasattr(action, 'isCheckable') and action.isCheckable(): action.setChecked(False)
         self._clear_selected_item_feedback(); self.current_tool_mode = "pointer"; self.statusBar().showMessage("Erreur. Prêt.")
 
-    def open_file(self): # ... (Laisser merge_pdfs_action toujours active ou gérer son état séparément)
+    def open_file(self):
         if not self._ask_save_before_action(): return
         if self.current_pdf_document:
             try: self.current_pdf_document.close()
             except Exception as e: logging.warning(f"Erreur fermeture: {e}")
             self.current_pdf_document = None
-            # _reset_ui_on_error() also clears thumbnails and bookmarks
-            self._reset_ui_on_error() # Call reset which also clears bookmarks
+            # _reset_ui_on_error() also clears thumbnails, bookmarks, and pending redactions
+            self._reset_ui_on_error()
         file_path, _ = QFileDialog.getOpenFileName(self, "Ouvrir PDF", "", "Fichiers PDF (*.pdf)")
         if file_path:
             try:
@@ -387,44 +390,30 @@ class MainWindow(QMainWindow):
 
         toc = self.current_pdf_document.get_toc(simple=False)
         if not toc:
-            # Add a placeholder item if no bookmarks
-            # item = QTreeWidgetItem(self.bookmarks_tree, ["Aucun signet dans ce document."])
-            # item.setDisabled(True)
             return
 
-        # Helper function to recursively add items
         def add_items_recursively(parent_item, toc_list, current_level_toc_entries):
-            last_item_at_this_level = None
-
             for i, entry in enumerate(current_level_toc_entries):
-                level, title, page_num, dest_dict = entry # PyMuPDF 1.19+ uses dict for 4th element
-
+                level, title, page_num, dest_dict = entry
                 item = QTreeWidgetItem([title])
-                # Store 0-indexed page and destination details
                 item.setData(0, Qt.UserRole, {'page': page_num - 1, 'dest_details': dest_dict})
-
                 parent_item.addChild(item)
-                last_item_at_this_level = item
 
-                # Find children for this item
                 children_toc_entries = []
-                # Look ahead in the main toc_list for entries that are direct children of the current item
-                start_search_idx = toc_list.index(entry) + 1 # Start searching after current entry
+                start_search_idx = toc_list.index(entry) + 1
                 for k in range(start_search_idx, len(toc_list)):
                     next_entry = toc_list[k]
                     next_level = next_entry[0]
                     if next_level == level + 1:
                         children_toc_entries.append(next_entry)
-                    elif next_level <= level: # Reached sibling or ancestor, stop collecting children
+                    elif next_level <= level:
                         break
-
                 if children_toc_entries:
                     add_items_recursively(item, toc_list, children_toc_entries)
 
-        # Filter top-level items (level 1) to start the recursion
         top_level_items = [entry for entry in toc if entry[0] == 1]
         add_items_recursively(self.bookmarks_tree, toc, top_level_items)
-        self.bookmarks_tree.expandAll() # Optionally expand all items
+        self.bookmarks_tree.expandAll()
 
     def _on_bookmark_clicked(self, item: QTreeWidgetItem, column: int):
         data = item.data(0, Qt.UserRole)
@@ -441,12 +430,9 @@ class MainWindow(QMainWindow):
 
         logging.info(f"Bookmark clicked: Navigating to page {page_num_0_indexed + 1}. Details: {dest_details}")
 
-        # Navigate to page first. This will call update_page_view.
         self.go_to_page(page_num_0_indexed)
 
-        # Define the logic to apply specific destination details
         def _apply_specific_destination_details():
-            # Check context again, as it might have changed due to QTimer
             if not self.current_pdf_document or self.current_page_number != page_num_0_indexed:
                 logging.info("Page context changed before specific destination could be applied for bookmark.")
                 return
@@ -457,68 +443,52 @@ class MainWindow(QMainWindow):
             zoom_changed = False
             if new_zoom > 0 and abs(self.current_zoom_factor - new_zoom) > 0.01:
                 logging.debug(f"Bookmark zoom: Setting zoom to: {new_zoom}")
-                self.set_zoom_factor(new_zoom) # This calls update_page_view
+                self.set_zoom_factor(new_zoom)
                 zoom_changed = True
 
-            # If zoom was changed, scrolling needs to happen after the view is updated for the new zoom.
-            # Otherwise, scroll immediately.
             if zoom_changed:
                 QTimer.singleShot(0, lambda: self._scroll_to_destination_point(dest_details, page_num_0_indexed))
             else:
                 self._scroll_to_destination_point(dest_details, page_num_0_indexed)
 
-        # Use QTimer.singleShot to ensure page navigation and initial rendering complete
-        # before attempting to apply specific zoom/scroll.
         QTimer.singleShot(0, _apply_specific_destination_details)
 
     def _scroll_to_destination_point(self, dest_details: dict, target_page_num_0_indexed: int):
-        # This helper is called after any potential zoom adjustment by _apply_specific_destination_details
-        # and ensures operations are on the correct page.
         if not self.current_pdf_document or self.current_page_number != target_page_num_0_indexed:
             logging.warning(f"Scroll attempt aborted: page context changed (current: {self.current_page_number}, target: {target_page_num_0_indexed}).")
             return
 
-        to_point_data = dest_details.get('to') # Expected to be fitz.Point
-        scroll_area = self.centralWidget() # This is the QScrollArea
+        to_point_data = dest_details.get('to')
+        scroll_area = self.centralWidget()
 
         if not (scroll_area and isinstance(scroll_area, QScrollArea)):
             logging.warning("Could not find QScrollArea to adjust scrollbars for bookmark destination.")
             return
 
         if to_point_data and isinstance(to_point_data, fitz.Point):
-            # 'to' point is the desired top-left of the viewport in PDF coordinates
             scene_x = to_point_data.x * self.current_zoom_factor
             scene_y = to_point_data.y * self.current_zoom_factor
             logging.debug(f"Scrolling to PDF point {to_point_data}, scene point ({scene_x}, {scene_y}) at zoom {self.current_zoom_factor}")
             scroll_area.horizontalScrollBar().setValue(int(scene_x))
             scroll_area.verticalScrollBar().setValue(int(scene_y))
         elif dest_details.get('top') is not None:
-            # This is a simplified fallback for some XYZ destination types where 'top' might be the primary vertical scroll.
-            # PyMuPDF's get_toc `dest_details` for `kind=fitz.LINK_GOTO` might have:
-            # 'page', 'kind', 'to':Point(x,y), 'zoom':float
-            # or for XYZ type destinations: 'page', 'kind', 'left', 'top', 'right', 'bottom', 'zoom'
-            # Here, we check 'top' if 'to' (as Point) wasn't definitive.
-            pdf_y = dest_details.get('top', 0.0) # Default to 0.0 if 'top' not found
-
-            # Heuristic: If 'zoom' is 0 (often means fit page/width) and 'to' point's y is 0,
-            # then a non-zero 'top' might be the intended scroll.
-            # Or, if 'to' was not a Point but 'top' is present and non-zero.
+            pdf_y = dest_details.get('top', 0.0)
             should_scroll_y = False
-            if pdf_y > 0: # If top is explicitly set to something other than page top
+            if pdf_y > 0:
                 should_scroll_y = True
             elif dest_details.get('zoom', -1) == 0 and (not to_point_data or to_point_data.y == 0) and pdf_y == 0:
-                # This case might be a "FitH" or "FitV" to the very top of the page.
-                # Scrolling to 0 is effectively already done by go_to_page if no other scroll applied.
-                # However, if 'left' was also 0, it's often "FitPage", where no specific scroll is needed after zoom.
-                # If 'left' is non-zero, it might be "FitH" at y=0.
-                if dest_details.get('left', -1) != 0 : # A non-zero left with top=0, zoom=0 could mean FitH at top
-                     should_scroll_y = True # Scroll to y=0
+                if dest_details.get('left', -1) != 0 :
+                     should_scroll_y = True
 
             if should_scroll_y:
                 scene_y = pdf_y * self.current_zoom_factor
                 logging.debug(f"Scrolling to Y-pos based on 'top' heuristic: PDF Y={pdf_y}, Scene Y={scene_y} at zoom {self.current_zoom_factor}")
                 scroll_area.verticalScrollBar().setValue(int(scene_y))
-        # If neither 'to' (as Point) nor a specific 'top' condition is met, no further scroll adjustment.
+
+    def apply_redactions_on_current_page(self):
+        # This will be implemented in a later step
+        QMessageBox.information(self, "Info", "Apply redactions functionality to be implemented.")
+        pass
 
 
     # ... (Autres méthodes jusqu'à extract_images_from_document)
@@ -527,10 +497,13 @@ class MainWindow(QMainWindow):
             if self.current_pdf_document and self.current_pdf_document.page_count == 0 :
                 self._clear_selected_item_feedback(); self.pdf_scene.clear(); self.pdf_view_item = QGraphicsPixmapItem(); self.pdf_scene.addItem(self.pdf_view_item); self.pdf_view_item.setPixmap(QPixmap())
                 self.setWindowTitle("Éditeur PDF PyQt - Document Vide"); self.update_navigation_controls()
-            else: self._reset_ui_on_error()
+            else: self._reset_ui_on_error() # This also calls _clear_pending_redactions
             return
+
+        self._clear_pending_redactions() # Clear marks when page view updates (e.g. page change, zoom)
+
         try: page = self.current_pdf_document.load_page(self.current_page_number)
-        except Exception as e: self._reset_ui_on_error(); return
+        except Exception as e: self._reset_ui_on_error(); return # This also calls _clear_pending_redactions
         matrix = fitz.Matrix(self.current_zoom_factor, self.current_zoom_factor); pix = page.get_pixmap(matrix=matrix)
         qimage = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format_RGB888 if pix.alpha == 0 else QImage.Format_RGBA8888)
         pixmap = QPixmap.fromImage(qimage); self._clear_selected_item_feedback()
@@ -563,37 +536,73 @@ class MainWindow(QMainWindow):
 
     def go_to_page(self, page_num):
         if self.current_pdf_document and 0 <= page_num < self.current_pdf_document.page_count:
-            if self.current_page_number == page_num and self.pdf_view_item.pixmap() and not self.pdf_view_item.pixmap().isNull(): return
-            self.current_page_number = page_num; self.update_page_view(); self.page_thumbnails_list.setCurrentRow(self.current_page_number)
+            # Only update if page actually changes, or if the view is currently empty
+            if self.current_page_number != page_num or not self.pdf_view_item.pixmap() or self.pdf_view_item.pixmap().isNull():
+                self.current_page_number = page_num
+                self.update_page_view() # This will also clear pending redactions for the new page
+                self.page_thumbnails_list.setCurrentRow(self.current_page_number)
+            # If it's the same page and already rendered, do nothing to avoid redundant updates / clearing redaction marks
+            # unless explicitly desired by other operations.
 
     def go_to_previous_page(self): self.go_to_page(self.current_page_number - 1)
     def go_to_next_page(self): self.go_to_page(self.current_page_number + 1)
     def go_to_page_from_thumbnail(self, item): self.go_to_page(self.page_thumbnails_list.row(item))
     def go_to_page_from_spinbox(self, value): self.go_to_page(value - 1)
-    def zoom(self, factor): self.current_zoom_factor *= factor; self.update_page_view(); self.zoom_original_action.setEnabled(self.current_zoom_factor != 1.0)
-    def set_zoom_factor(self, factor): self.current_zoom_factor = factor; self.update_page_view(); self.zoom_original_action.setEnabled(self.current_zoom_factor != 1.0)
+    def zoom(self, factor):
+        new_zoom = self.current_zoom_factor * factor
+        # Add some clamping if desired, e.g., self.current_zoom_factor = max(0.1, min(new_zoom, 10.0))
+        self.current_zoom_factor = new_zoom
+        self.update_page_view(); # This will also clear pending redactions
+        self.zoom_original_action.setEnabled(abs(self.current_zoom_factor - 1.0) > 0.01)
+
+    def set_zoom_factor(self, factor):
+        self.current_zoom_factor = factor
+        self.update_page_view(); # This will also clear pending redactions
+        self.zoom_original_action.setEnabled(abs(self.current_zoom_factor - 1.0) > 0.01)
+
     def save_file(self):
         if not self.current_pdf_document: return
         file_path_to_save = self.current_pdf_document.name if hasattr(self.current_pdf_document, 'name') and self.current_pdf_document.name else ""
         if not file_path_to_save: self.save_file_as(); return
-        try: self.current_pdf_document.save(file_path_to_save, garbage=3, deflate=True); self.statusBar().showMessage(f"Fichier sauvegardé : {file_path_to_save}"); self.is_document_modified = False
+        try:
+            # Before saving, ensure any temporary scene items (like selection_rect_item) are removed
+            if self.selection_rect_item and self.selection_rect_item.scene():
+                 self.pdf_scene.removeItem(self.selection_rect_item)
+                 self.selection_rect_item = None
+
+            self.current_pdf_document.save(file_path_to_save, garbage=3, deflate=True);
+            self.statusBar().showMessage(f"Fichier sauvegardé : {file_path_to_save}");
+            self.is_document_modified = False
         except Exception as e: QMessageBox.critical(self, "Erreur sauvegarde", f"Erreur : {e}")
+
     def save_file_as(self):
         if not self.current_pdf_document: QMessageBox.warning(self, "Aucun document", "Aucun document ouvert."); return
         current_path = self.current_pdf_document.name if hasattr(self.current_pdf_document, 'name') and self.current_pdf_document.name else ""
         file_path, _ = QFileDialog.getSaveFileName(self, "Enregistrer PDF sous...", current_path, "Fichiers PDF (*.pdf)")
         if file_path:
-            try: self.current_pdf_document.save(file_path, garbage=3, deflate=True); self.statusBar().showMessage(f"Sauvegardé sous : {file_path}")
-                original_page_number = self.current_page_number; self.current_pdf_document.close(); self.current_pdf_document = fitz.open(file_path)
+            try:
+                if self.selection_rect_item and self.selection_rect_item.scene(): # Clear temp item
+                    self.pdf_scene.removeItem(self.selection_rect_item)
+                    self.selection_rect_item = None
+
+                self.current_pdf_document.save(file_path, garbage=3, deflate=True);
+                self.statusBar().showMessage(f"Sauvegardé sous : {file_path}")
+                original_page_number = self.current_page_number;
+                self.current_pdf_document.close();
+                self.current_pdf_document = fitz.open(file_path) # Re-open the saved document
                 self.current_page_number = original_page_number
-                if self.current_page_number >= self.current_pdf_document.page_count: self.current_page_number = max(0, self.current_pdf_document.page_count -1)
-                self.update_page_view(); self.update_thumbnails(); self.update_navigation_controls(); self.is_document_modified = False
+                if self.current_page_number >= self.current_pdf_document.page_count:
+                    self.current_page_number = max(0, self.current_pdf_document.page_count -1)
+                self.update_page_view(); self.update_thumbnails(); self.update_navigation_controls();
+                self.is_document_modified = False
             except Exception as e: QMessageBox.critical(self, "Erreur sauvegarde", f"Erreur : {e}")
+
     def _ask_save_before_action(self):
         if not self.is_document_modified or not self.current_pdf_document: return True
         user_choice = QMessageBox.question(self, "Modifications non sauvegardées", "Sauvegarder les modifications ?", QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel, QMessageBox.Cancel)
         if user_choice == QMessageBox.Save: self.save_file(); return not self.is_document_modified
         return user_choice == QMessageBox.Discard
+
     def closeEvent(self, event):
         if self._ask_save_before_action():
             if self.current_pdf_document:
@@ -601,74 +610,211 @@ class MainWindow(QMainWindow):
                 except Exception as e: logging.warning(f"Erreur fermeture doc: {e}")
             super().closeEvent(event)
         else: event.ignore()
+
     def on_thumbnail_rows_moved(self, parent, start_row, end_row, destination_parent, destination_row):
         if not self.current_pdf_document: return
-        if (end_row - start_row + 1) == 1:
+        if (end_row - start_row + 1) == 1: # Only single item drag is properly handled for now
             moved_idx, new_idx = start_row, destination_row
             if new_idx > moved_idx: new_idx -= 1
             if moved_idx == new_idx: return
             try:
-                xref = self.current_pdf_document[self.current_page_number].xref
-                self.current_pdf_document.move_page(moved_idx, new_idx); self.is_document_modified = True; self.update_thumbnails()
-                new_cp_idx = next((i for i, p in enumerate(self.current_pdf_document) if p.xref == xref), -1)
-                self.current_page_number = new_cp_idx if new_cp_idx != -1 else (0 if self.current_pdf_document.page_count > 0 else -1)
-                if self.current_pdf_document.page_count == 0: self._reset_ui_on_error()
-                else: self.update_navigation_controls(); self.page_thumbnails_list.setCurrentRow(self.current_page_number)
-                doc_name = self.current_pdf_document.name or "Nouveau"; self.setWindowTitle(f"Éditeur PDF - Page {self.current_page_number + 1 if self.current_page_number >=0 else 0}/{self.current_pdf_document.page_count} [{doc_name}]")
+                current_page_xref = self.current_pdf_document[self.current_page_number].xref
+                self.current_pdf_document.move_page(moved_idx, new_idx)
+                self.is_document_modified = True
+                self.update_thumbnails() # Rebuild thumbnails in new order
+
+                # Try to find the previously current page by its xref to update current_page_number
+                new_current_page_idx = -1
+                for i, page_obj in enumerate(self.current_pdf_document):
+                    if page_obj.xref == current_page_xref:
+                        new_current_page_idx = i
+                        break
+
+                if new_current_page_idx != -1:
+                    self.current_page_number = new_current_page_idx
+                elif self.current_pdf_document.page_count > 0: # Fallback if xref not found (should not happen)
+                    self.current_page_number = min(max(0, moved_idx), self.current_pdf_document.page_count -1)
+                else: # No pages left
+                    self.current_page_number = -1
+
+                if self.current_pdf_document.page_count == 0:
+                    self._reset_ui_on_error()
+                else:
+                    self.update_navigation_controls()
+                    self.page_thumbnails_list.setCurrentRow(self.current_page_number) # Highlight moved page if it was current
+                    self.go_to_page(self.current_page_number) # Ensure view updates if current page index changed due to move
+
+                doc_name = self.current_pdf_document.name or "Nouveau Document"
+                self.setWindowTitle(f"Éditeur PDF PyQt - Page {self.current_page_number + 1 if self.current_page_number >=0 else 'N/A'}/{self.current_pdf_document.page_count} [{doc_name}]")
                 self.statusBar().showMessage("Ordre des pages modifié.")
-            except Exception as e: QMessageBox.critical(self, "Erreur réorganisation", f"Erreur: {e}"); self.update_thumbnails()
-        else: self.update_thumbnails(); QMessageBox.information(self, "Limitée", "Déplacement multiple non supporté.")
+            except Exception as e:
+                QMessageBox.critical(self, "Erreur réorganisation", f"Erreur: {e}")
+                self.update_thumbnails() # Refresh to original state on error
+        else:
+            self.update_thumbnails() # Multi-item drag not supported, refresh
+            QMessageBox.information(self, "Fonctionnalité Limitée", "Le déplacement de plusieurs miniatures à la fois n'est pas encore pleinement supporté.")
+
     def delete_current_page(self):
         if not self.current_pdf_document or self.current_pdf_document.page_count == 0: return
-        idx = self.current_page_number
-        msg = "Supprimer la dernière page ?" if self.current_pdf_document.page_count == 1 else f"Supprimer page {idx + 1} ?"
-        if QMessageBox.question(self, "Confirmation", msg, QMessageBox.Yes | QMessageBox.No, QMessageBox.No) == QMessageBox.No: return
+        idx_to_delete = self.current_page_number
+        num_pages_before_delete = self.current_pdf_document.page_count
+
+        msg = f"Supprimer la page {idx_to_delete + 1} sur {num_pages_before_delete} ?"
+        if num_pages_before_delete == 1:
+            msg = "Supprimer la dernière page du document ?"
+
+        if QMessageBox.question(self, "Confirmation de Suppression", msg, QMessageBox.Yes | QMessageBox.No, QMessageBox.No) == QMessageBox.No:
+            return
         try:
-            self.current_pdf_document.delete_page(idx); self.is_document_modified = True; self.statusBar().showMessage(f"Page {idx + 1} supprimée.")
-            if self.current_pdf_document.page_count == 0: self.current_page_number = -1; self._reset_ui_on_error(); self.delete_page_action.setEnabled(False)
-            else: self.current_page_number = min(idx, self.current_pdf_document.page_count - 1); self.update_page_view(); self.update_thumbnails(); self.update_navigation_controls()
+            self.current_pdf_document.delete_page(idx_to_delete)
+            self.is_document_modified = True
+            self.statusBar().showMessage(f"Page {idx_to_delete + 1} supprimée.")
+
+            if self.current_pdf_document.page_count == 0:
+                self.current_page_number = -1
+                self._reset_ui_on_error() # Resets UI, disables page-specific actions
+                self.delete_page_action.setEnabled(False) # Explicitly disable delete action
+            else:
+                # Adjust current page number if necessary
+                self.current_page_number = min(idx_to_delete, self.current_pdf_document.page_count - 1)
+                self.update_page_view() # This will also clear pending redactions
+                self.update_thumbnails()
+                self.update_navigation_controls()
             self.save_action.setEnabled(True)
-        except Exception as e: QMessageBox.critical(self, "Erreur suppression", f"Erreur: {e}"); self.update_thumbnails()
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur de Suppression", f"Erreur: {e}")
+            self.update_thumbnails() # Refresh in case of error
+
     def insert_blank_page(self):
-        if not self.current_pdf_document: QMessageBox.warning(self, "Aucun document", "Ouvrez un document."); return
-        idx = self.current_page_number + 1 if self.current_pdf_document.page_count > 0 and self.current_page_number != -1 else 0
-        w, h = fitz.paper_size("a4")
-        if self.current_pdf_document.page_count > 0 and self.current_page_number != -1:
-            try: r = self.current_pdf_document[self.current_page_number].rect; w, h = r.width, r.height
-            except: pass
-        msg = f"Insérer page vierge à position {idx + 1} ({int(w)}x{int(h)}) ?"
-        if QMessageBox.question(self, "Insérer Page", msg, QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes) == QMessageBox.No: return
+        if not self.current_pdf_document:
+            QMessageBox.warning(self, "Aucun Document", "Ouvrez ou créez un document pour insérer une page.")
+            return
+
+        insert_at_idx = self.current_page_number + 1 # Default insert after current
+        if self.current_pdf_document.page_count == 0: # If document is empty
+            insert_at_idx = 0
+
+        page_width, page_height = fitz.paper_size("a4") # Default to A4
+        if self.current_pdf_document.page_count > 0 and self.current_page_number != -1 :
+            try:
+                current_page_rect = self.current_pdf_document[self.current_page_number].rect
+                page_width, page_height = current_page_rect.width, current_page_rect.height
+            except Exception as e:
+                logging.warning(f"Could not get current page size, defaulting to A4. Error: {e}")
+
+        msg = f"Insérer une page vierge à la position {insert_at_idx + 1} (taille: {int(page_width)}x{int(page_height)})?"
+        if QMessageBox.question(self, "Insérer Page Vierge", msg, QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes) == QMessageBox.No:
+            return
         try:
-            self.current_pdf_document.new_page(pno=idx, width=w, height=h); self.is_document_modified = True
-            self.statusBar().showMessage(f"Page vierge insérée à {idx + 1}."); self.current_page_number = idx
-            self.update_page_view(); self.update_thumbnails(); self.update_navigation_controls(); self.delete_page_action.setEnabled(True); self.save_action.setEnabled(True)
-        except Exception as e: QMessageBox.critical(self, "Erreur insertion", f"Erreur: {e}"); self.update_thumbnails()
+            self.current_pdf_document.new_page(pno=insert_at_idx, width=page_width, height=page_height)
+            self.is_document_modified = True
+            self.statusBar().showMessage(f"Page vierge insérée à la position {insert_at_idx + 1}.")
+            self.current_page_number = insert_at_idx # Go to the new page
+
+            self.update_page_view() # This will also clear pending redactions
+            self.update_thumbnails()
+            self.update_navigation_controls()
+            self.delete_page_action.setEnabled(True) # Enable if it was disabled (e.g. for empty doc)
+            self.save_action.setEnabled(True)
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur d'Insertion", f"Erreur: {e}")
+            self.update_thumbnails()
+
     def import_pages_from_pdf(self):
-        if not self.current_pdf_document: QMessageBox.warning(self, "Aucun document", "Ouvrez un document."); return
-        src_path, _ = QFileDialog.getOpenFileName(self, "Sélectionner PDF source", "", "Fichiers PDF (*.pdf)")
-        if not src_path: return
+        if not self.current_pdf_document:
+            QMessageBox.warning(self, "Aucun Document", "Ouvrez ou créez un document cible d'abord.")
+            return
+
+        src_path, _ = QFileDialog.getOpenFileName(self, "Sélectionner le PDF source à importer", "", "Fichiers PDF (*.pdf)")
+        if not src_path:
+            return
+
         try:
             src_doc = fitz.open(src_path)
-            if src_doc.page_count == 0: QMessageBox.information(self, "PDF Source Vide", "Source vide."); src_doc.close(); return
-            idx = self.current_pdf_document.page_count; self.current_pdf_document.insert_pdf(src_doc); self.is_document_modified = True; src_doc.close()
-            self.statusBar().showMessage(f"{src_doc.page_count} pages importées."); self.current_page_number = idx
-            self.update_page_view(); self.update_thumbnails(); self.update_navigation_controls(); self.save_action.setEnabled(True)
-        except Exception as e: QMessageBox.critical(self, "Erreur importation", f"Erreur: {e}");
-        if 'src_doc' in locals() and src_doc.is_open: src_doc.close(); self.update_thumbnails()
+            if src_doc.page_count == 0:
+                QMessageBox.information(self, "PDF Source Vide", "Le document PDF source sélectionné est vide.")
+                src_doc.close()
+                return
+
+            # For simplicity, always append. Could add dialog for choosing insertion point.
+            insert_at_idx = self.current_pdf_document.page_count
+
+            self.current_pdf_document.insert_pdf(src_doc) # Appends all pages from src_doc
+            self.is_document_modified = True
+            src_doc.close()
+
+            self.statusBar().showMessage(f"{src_doc.page_count} page(s) importée(s) à la fin du document.")
+            self.current_page_number = insert_at_idx # Go to the first imported page
+
+            self.update_page_view()
+            self.update_thumbnails()
+            self.update_navigation_controls()
+            self.save_action.setEnabled(True)
+            if self.current_pdf_document.page_count > 0:
+                self.delete_page_action.setEnabled(True)
+
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur d'Importation", f"Erreur lors de l'importation des pages: {e}")
+            if 'src_doc' in locals() and src_doc.is_open:
+                src_doc.close()
+            self.update_thumbnails() # Refresh thumbnails in case of partial success or error
+
     def rotate_current_page(self, angle):
         if not self.current_pdf_document or self.current_pdf_document.page_count == 0 or self.current_page_number < 0 : return
-        try: p = self.current_pdf_document[self.current_page_number]; p.set_rotation((p.rotation + angle) % 360); self.is_document_modified = True
-            self.statusBar().showMessage(f"Page {self.current_page_number + 1} pivotée."); self._refresh_page_and_thumbnail()
-        except Exception as e: QMessageBox.critical(self, "Erreur rotation", f"Erreur: {e}")
+        try:
+            page = self.current_pdf_document[self.current_page_number]
+            page.set_rotation((page.rotation + angle) % 360)
+            self.is_document_modified = True
+            self.statusBar().showMessage(f"Page {self.current_page_number + 1} pivotée de {angle} degrés.")
+            self._refresh_page_and_thumbnail() # This calls update_page_view which clears pending redactions
+        except Exception as e: QMessageBox.critical(self, "Erreur de Rotation", f"Erreur: {e}")
+
     def crop_current_page(self):
         if not self.current_pdf_document or self.current_pdf_document.page_count == 0 or self.current_page_number < 0: return
-        p_idx, p = self.current_page_number, self.current_pdf_document[self.current_page_number]; o_r, c_cb = p.rect, p.cropbox or p.rect
-        r_str, ok = QInputDialog.getText(self, "Rogner Page", f"P{p_idx+1} CropBox (x0 y0 x1 y1)\nAct: {c_cb.x0:.0f} {c_cb.y0:.0f} {c_cb.x1:.0f} {c_cb.y1:.0f}\nMedia: {o_r.x0:.0f} {o_r.y0:.0f} {o_r.x1:.0f} {o_r.y1:.0f}.", QLineEdit.Normal, f"{c_cb.x0:.0f} {c_cb.y0:.0f} {c_cb.x1:.0f} {c_cb.y1:.0f}")
-        if ok and r_str:
-            try: c = list(map(float, r_str.split())); n_cb = fitz.Rect(c[0],c[1],c[2],c[3])
-                if not (o_r.contains(n_cb) and n_cb.is_valid and not n_cb.is_empty): QMessageBox.warning(self, "Inv.", "CropBox invalide."); return
-                p.set_cropbox(n_cb); self.is_document_modified = True; self.statusBar().showMessage(f"P{p_idx+1} rognée."); self._refresh_page_and_thumbnail()
-            except Exception as e: QMessageBox.critical(self, "Erreur Rognage", f"Erreur: {e}")
+
+        page_index = self.current_page_number
+        page = self.current_pdf_document.load_page(page_index)
+        original_mediabox = page.rect # This is the MediaBox
+        current_cropbox = page.cropbox if page.cropbox else original_mediabox # Fallback to MediaBox if CropBox not set
+
+        # Present current cropbox, allow user to input new one relative to MediaBox
+        # Coords are (x0, y0, x1, y1)
+        cropbox_str = f"{current_cropbox.x0:.2f} {current_cropbox.y0:.2f} {current_cropbox.x1:.2f} {current_cropbox.y1:.2f}"
+        prompt_text = (f"Page {page_index + 1} - Définir le CropBox (x0 y0 x1 y1).\n"
+                       f"CropBox Actuel: {cropbox_str}\n"
+                       f"MediaBox (limites): {original_mediabox.x0:.2f} {original_mediabox.y0:.2f} {original_mediabox.x1:.2f} {original_mediabox.y1:.2f}\n"
+                       "Entrez les nouvelles coordonnées du CropBox:")
+
+        new_cropbox_str, ok = QInputDialog.getText(self, "Rogner la Page", prompt_text, QLineEdit.Normal, cropbox_str)
+
+        if ok and new_cropbox_str:
+            try:
+                coords = list(map(float, new_cropbox_str.split()))
+                if len(coords) != 4:
+                    raise ValueError("Quatre coordonnées sont requises (x0 y0 x1 y1).")
+
+                new_cropbox_rect = fitz.Rect(coords[0], coords[1], coords[2], coords[3]).normalize()
+
+                # Validate new_cropbox: must be valid, not empty, and within MediaBox
+                if not new_cropbox_rect.is_valid or new_cropbox_rect.is_empty:
+                    QMessageBox.warning(self, "CropBox Invalide", "Les coordonnées du CropBox forment un rectangle invalide ou vide.")
+                    return
+
+                # CropBox should ideally be contained within or equal to MediaBox.
+                # However, PDF spec allows it to be outside, but viewers might clip to MediaBox.
+                # For simplicity, let's allow it as long as it's valid. User should be aware of MediaBox.
+                # A stricter check: if not original_mediabox.contains(new_cropbox_rect):
+                #    QMessageBox.warning(self, "CropBox Invalide", "Le CropBox doit être contenu dans le MediaBox de la page.")
+                #    return
+
+                page.set_cropbox(new_cropbox_rect)
+                self.is_document_modified = True
+                self.statusBar().showMessage(f"Page {page_index + 1} rognée (CropBox modifié).")
+                self._refresh_page_and_thumbnail() # This calls update_page_view which clears pending redactions
+            except ValueError as ve:
+                QMessageBox.critical(self, "Erreur de Format", f"Format des coordonnées invalide: {ve}")
+            except Exception as e:
+                QMessageBox.critical(self, "Erreur de Rognage", f"Une erreur est survenue lors du rognage: {e}")
 
     # --- Gestion des outils d'annotation ---
     def toggle_highlight_mode(self, checked):
@@ -694,8 +840,7 @@ class MainWindow(QMainWindow):
         elif self.current_tool_mode == "freetext_annot": self._update_tool_mode_ui(None)
     def toggle_insert_image_mode(self, checked):
         if checked: self.current_tool_mode = "insert_image"; self._update_tool_mode_ui("Insertion d'Image"); self._deselect_all_tool_actions_but_one(self.insert_image_action)
-        # elif self.current_tool_mode == "insert_image": self._update_tool_mode_ui(None) # This was duplicated and incorrect
-        elif self.current_tool_mode == "redaction" and not checked: self._update_tool_mode_ui(None)
+        elif self.current_tool_mode == "insert_image" and not checked: self._update_tool_mode_ui(None)
 
 
     def toggle_redaction_mode(self, checked):
@@ -703,9 +848,9 @@ class MainWindow(QMainWindow):
             self.current_tool_mode = "redaction"
             self._update_tool_mode_ui("Rédaction")
             self._deselect_all_tool_actions_but_one(self.redaction_tool_action)
-            # self.apply_redactions_action.setEnabled(True) # Enable when marks are made
-        elif self.current_tool_mode == "redaction": # Only switch back if currently in redaction mode
-            self._update_tool_mode_ui(None)
+            # self.apply_redactions_action state depends on self.pending_redactions
+        elif self.current_tool_mode == "redaction":
+            self._update_tool_mode_ui(None) # This will call _clear_pending_redactions
 
 
     def _deselect_all_tool_actions_but_one(self, current_action: QAction):
@@ -724,13 +869,35 @@ class MainWindow(QMainWindow):
             cursor_shape = Qt.CrossCursor
             if mode_name == "text_annot": cursor_shape = Qt.PointingHandCursor
             elif mode_name == "pointer": cursor_shape = Qt.ArrowCursor
-            # For redaction, CrossCursor is fine.
+
             self.pdf_view.setCursor(cursor_shape)
             self._clear_selected_item_feedback()
-        else:
+
+            # If switching to a mode that is NOT redaction, and current mode WAS redaction, clear pending.
+            if self.current_tool_mode == "redaction" and mode_name != "Rédaction":
+                self._clear_pending_redactions()
+            # If switching to redaction mode, pending marks from *previous* pages should have already been cleared
+            # by update_page_view. Marks on current page persist until applied or cleared by page/tool change.
+
+        else: # Switching to pointer mode
+            if self.current_tool_mode == "redaction": # If was in redaction, clear marks
+                self._clear_pending_redactions()
             logging.debug("Mode Pointeur/Sélection activé."); self.current_tool_mode = "pointer"
             self.statusBar().showMessage("Prêt."); self.pdf_view.setCursor(Qt.ArrowCursor)
             self._deselect_all_tool_actions_but_one(None)
+
+    def _clear_pending_redactions(self):
+        if hasattr(self, 'pending_redaction_items'):
+            for item in self.pending_redaction_items:
+                if item.scene() == self.pdf_scene:
+                    self.pdf_scene.removeItem(item)
+            self.pending_redaction_items = []
+        if hasattr(self, 'pending_redactions'):
+            self.pending_redactions = []
+
+        if hasattr(self, 'apply_redactions_action'):
+            self.apply_redactions_action.setEnabled(False)
+
 
     def graphics_view_mouse_press(self, event: QMouseEvent):
         scene_pos = self.pdf_view.mapToScene(event.pos())
@@ -764,36 +931,53 @@ class MainWindow(QMainWindow):
                         pen = QPen(Qt.blue, 2, Qt.DotLine); self.selected_annotation_bbox_item.setPen(pen)
                         self.pdf_scene.addItem(self.selected_annotation_bbox_item)
 
-        elif self.current_tool_mode in ["highlight", "rect_annot", "circle_annot", "freetext_annot", "insert_image"] and event.button() == Qt.LeftButton:
+        elif self.current_tool_mode in ["highlight", "rect_annot", "circle_annot", "freetext_annot", "insert_image", "redaction"] and event.button() == Qt.LeftButton:
             self.selection_start_point = scene_pos
-            if self.selection_rect_item: self.pdf_scene.removeItem(self.selection_rect_item); self.selection_rect_item = None
+            if self.selection_rect_item:
+                if self.selection_rect_item.scene() == self.pdf_scene: self.pdf_scene.removeItem(self.selection_rect_item)
+                self.selection_rect_item = None
+
             self.selection_rect_item = QGraphicsRectItem(QRectF(self.selection_start_point, self.selection_start_point))
             pen_color = Qt.black
+            pen_style = Qt.DashLine
             if self.current_tool_mode in ["rect_annot", "circle_annot", "freetext_annot", "insert_image"]:
                 pen_color = QColor.fromRgbF(*(self.shape_border_color if self.shape_border_color else (0,0,0)))
-            pen = QPen(pen_color); pen.setStyle(Qt.DashLine)
-            self.selection_rect_item.setPen(pen); self.pdf_scene.addItem(self.selection_rect_item)
+            elif self.current_tool_mode == "redaction":
+                pen_color = Qt.red
+                # self.selection_rect_item.setBrush(QColor(0,0,0,30)) # Optional light fill for temp item
+
+            pen = QPen(pen_color); pen.setStyle(pen_style)
+            self.selection_rect_item.setPen(pen)
+            self.pdf_scene.addItem(self.selection_rect_item)
+
         elif self.current_tool_mode == "line_annot" and event.button() == Qt.LeftButton:
             self.selection_start_point = scene_pos
-            if self.selection_rect_item: self.pdf_scene.removeItem(self.selection_rect_item); self.selection_rect_item = None
+            if self.selection_rect_item:
+                if self.selection_rect_item.scene() == self.pdf_scene: self.pdf_scene.removeItem(self.selection_rect_item)
+                self.selection_rect_item = None
             self.selection_rect_item = QGraphicsLineItem(QLineF(self.selection_start_point, self.selection_start_point))
             pen = QPen(QColor.fromRgbF(*(self.shape_border_color if self.shape_border_color else (0,0,0))))
             pen.setWidthF(self.shape_border_width * self.current_zoom_factor); pen.setStyle(Qt.DashLine)
             self.selection_rect_item.setPen(pen); self.pdf_scene.addItem(self.selection_rect_item)
+
         elif self.current_tool_mode == "text_annot" and event.button() == Qt.LeftButton:
             self.selection_start_point = scene_pos
+
         elif self.current_tool_mode == "ink" and event.button() == Qt.LeftButton:
             self.current_ink_stroke = [scene_pos]
-            if self.temp_ink_item: self.pdf_scene.removeItem(self.temp_ink_item)
+            if self.temp_ink_item:
+                if self.temp_ink_item.scene() == self.pdf_scene: self.pdf_scene.removeItem(self.temp_ink_item)
+                self.temp_ink_item = None
             path = QPainterPath(self.current_ink_stroke[0])
             self.temp_ink_item = QGraphicsPathItem(path)
             pen = QPen(QColor.fromRgbF(*self.ink_color)); pen.setWidthF(self.ink_thickness * self.current_zoom_factor)
             self.temp_ink_item.setPen(pen); self.pdf_scene.addItem(self.temp_ink_item)
+
         else: super(QGraphicsView, self.pdf_view).mousePressEvent(event)
 
     def graphics_view_mouse_move(self, event: QMouseEvent):
         current_point = self.pdf_view.mapToScene(event.pos())
-        if self.current_tool_mode in ["highlight", "rect_annot", "circle_annot", "freetext_annot", "insert_image"] and self.selection_start_point:
+        if self.current_tool_mode in ["highlight", "rect_annot", "circle_annot", "freetext_annot", "insert_image", "redaction"] and self.selection_start_point:
             if self.selection_rect_item and isinstance(self.selection_rect_item, QGraphicsRectItem):
                 self.selection_rect_item.setRect(QRectF(self.selection_start_point, current_point).normalized())
         elif self.current_tool_mode == "line_annot" and self.selection_start_point:
@@ -809,29 +993,49 @@ class MainWindow(QMainWindow):
 
     def graphics_view_mouse_release(self, event: QMouseEvent):
         end_point = self.pdf_view.mapToScene(event.pos())
-        if self.selection_rect_item: self.pdf_scene.removeItem(self.selection_rect_item); self.selection_rect_item = None
+        if self.selection_rect_item: # This is the temporary item for dragging
+            if self.selection_rect_item.scene() == self.pdf_scene: self.pdf_scene.removeItem(self.selection_rect_item)
+            self.selection_rect_item = None
 
         if event.button() == Qt.LeftButton and self.selection_start_point:
-            rect_scene = QRectF(self.selection_start_point, end_point).normalized()
-            if self.current_tool_mode == "highlight": self.apply_highlight(rect_scene)
-            elif self.current_tool_mode == "rect_annot": self.apply_rect_annot(rect_scene)
-            elif self.current_tool_mode == "circle_annot": self.apply_circle_annot(rect_scene)
+            final_rect_scene = QRectF(self.selection_start_point, end_point).normalized()
+
+            if self.current_tool_mode == "redaction":
+                if final_rect_scene.width() > 1 and final_rect_scene.height() > 1: # Avoid tiny accidental rects
+                    persistent_redaction_mark = QGraphicsRectItem(final_rect_scene)
+                    persistent_redaction_mark.setPen(QPen(Qt.red, 1, Qt.SolidLine))
+                    persistent_redaction_mark.setBrush(QColor(0, 0, 0, 70)) # Semi-transparent black
+                    self.pdf_scene.addItem(persistent_redaction_mark)
+
+                    self.pending_redaction_items.append(persistent_redaction_mark)
+                    self.pending_redactions.append(final_rect_scene)
+                    self.apply_redactions_action.setEnabled(True)
+                    logging.debug(f"Added pending redaction mark: {final_rect_scene}")
+                else:
+                    logging.debug("Redaction rectangle too small, not added.")
+
+            elif self.current_tool_mode == "highlight": self.apply_highlight(final_rect_scene)
+            elif self.current_tool_mode == "rect_annot": self.apply_rect_annot(final_rect_scene)
+            elif self.current_tool_mode == "circle_annot": self.apply_circle_annot(final_rect_scene)
             elif self.current_tool_mode == "line_annot": self.apply_line_annot(self.selection_start_point, end_point)
             elif self.current_tool_mode == "freetext_annot":
-                if rect_scene.width() > 5 and rect_scene.height() > 5: self.apply_freetext_annot(rect_scene)
+                if final_rect_scene.width() > 5 and final_rect_scene.height() > 5: self.apply_freetext_annot(final_rect_scene)
                 else: self.freetext_annot_action.setChecked(False)
             elif self.current_tool_mode == "insert_image":
-                if rect_scene.width() > 5 and rect_scene.height() > 5: self.apply_insert_image(rect_scene)
+                if final_rect_scene.width() > 5 and final_rect_scene.height() > 5: self.apply_insert_image(final_rect_scene)
                 else: self.insert_image_action.setChecked(False)
             elif self.current_tool_mode == "text_annot":
                  if (self.selection_start_point - end_point).manhattanLength() < 5: self.apply_text_annot(self.selection_start_point)
 
         if self.current_tool_mode == "ink" and self.current_ink_stroke and event.button() == Qt.LeftButton:
-            if self.temp_ink_item: self.pdf_scene.removeItem(self.temp_ink_item); self.temp_ink_item = None
+            if self.temp_ink_item:
+                if self.temp_ink_item.scene() == self.pdf_scene: self.pdf_scene.removeItem(self.temp_ink_item)
+                self.temp_ink_item = None
             if len(self.current_ink_stroke) > 1: self.apply_ink(self.current_ink_stroke)
             self.current_ink_stroke = []
 
-        if self.current_tool_mode != "pointer" : self.selection_start_point = None
+        if self.current_tool_mode != "pointer" :
+            self.selection_start_point = None
 
 
     def apply_highlight(self, selection_rect_scene: QRectF):
@@ -1000,8 +1204,8 @@ class MainWindow(QMainWindow):
             except Exception as e: QMessageBox.critical(self, "Erreur MàJ Champ", f"Erreur: {e}")
 
     def _refresh_page_and_thumbnail(self):
-        self.update_page_view()
-        if 0 <= self.current_page_number < self.page_thumbnails_list.count():
+        self.update_page_view() # This will also clear pending redactions for the current page
+        if self.current_pdf_document and 0 <= self.current_page_number < self.page_thumbnails_list.count():
             list_item = self.page_thumbnails_list.item(self.current_page_number)
             if list_item:
                 page_for_thumb = self.current_pdf_document.load_page(self.current_page_number)
@@ -1267,17 +1471,53 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "Erreur de Division", f"Une erreur est survenue: {e}")
                 if 'new_pdf' in locals() and new_pdf.is_open: new_pdf.close()
 
+    def apply_redactions_on_current_page(self):
+        if not self.current_pdf_document or self.current_page_number < 0:
+            QMessageBox.warning(self, "Aucun Document/Page", "Aucun document ou page valide n'est sélectionné.")
+            return
+
+        if not self.pending_redactions:
+            QMessageBox.information(self, "Aucune Marque", "Aucune marque de rédaction à appliquer.")
+            return
+
+        reply = QMessageBox.question(self, "Appliquer les Rédactions",
+                                     "Ceci va supprimer définitivement le contenu sous les marques de rédaction sur la page actuelle. Continuer?",
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+
+        if reply == QMessageBox.Yes:
+            try:
+                page = self.current_pdf_document.load_page(self.current_page_number)
+
+                for q_rect_scene in self.pending_redactions:
+                    pdf_x0 = q_rect_scene.left() / self.current_zoom_factor
+                    pdf_y0 = q_rect_scene.top() / self.current_zoom_factor
+                    pdf_x1 = q_rect_scene.right() / self.current_zoom_factor
+                    pdf_y1 = q_rect_scene.bottom() / self.current_zoom_factor
+                    pdf_rect = fitz.Rect(pdf_x0, pdf_y0, pdf_x1, pdf_y1).normalize()
+
+                    # Add redaction annotation (PyMuPDF default fill is black)
+                    page.add_redact_annot(pdf_rect, fill=(0,0,0))
+
+                page.apply_redactions() # Actually remove content
+                self.is_document_modified = True
+
+                self._clear_pending_redactions() # Clears lists and visual items, disables apply action
+
+                self._refresh_page_and_thumbnail() # Update view to show redacted content
+                self.statusBar().showMessage("Rédactions appliquées à la page actuelle.")
+                logging.info(f"Redactions applied to page {self.current_page_number + 1}")
+
+            except Exception as e:
+                logging.error(f"Erreur lors de l'application des rédactions: {e}", exc_info=True)
+                QMessageBox.critical(self, "Erreur de Rédaction", f"Une erreur est survenue: {e}")
+                # Optionally, try to restore visual marks if apply failed mid-way, though complex.
+                # For now, just clear them as something went wrong.
+                self._clear_pending_redactions()
+                self._refresh_page_and_thumbnail() # Refresh to show current state after error
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     main_win = MainWindow()
     main_win.show()
     sys.exit(app.exec_())
-
-[end of pdf_editor_pyqt/src/main_window.py]
-
-[end of pdf_editor_pyqt/src/main_window.py]
-
-[end of pdf_editor_pyqt/src/main_window.py]
-
-[end of pdf_editor_pyqt/src/main_window.py]
