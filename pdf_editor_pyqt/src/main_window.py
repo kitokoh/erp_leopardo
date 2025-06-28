@@ -113,6 +113,12 @@ class MainWindow(QMainWindow):
         self.current_prop_widgets = []
         self.pending_redactions = [] # For QRectF in scene coords
         self.pending_redaction_items = [] # For QGraphicsRectItems on scene
+        # Redaction appearance attributes
+        self.redaction_fill_color = (0, 0, 0)  # Default black
+        self.redaction_overlay_text = ""
+        self.redaction_text_color = (1, 1, 1)  # Default white
+        self.redaction_fontname = "helv"       # Default Helvetica
+        self.redaction_fontsize = 0            # Default auto-size
         self._create_actions()
         self._create_menu_bar()
         self._create_tool_bars()
@@ -218,6 +224,16 @@ class MainWindow(QMainWindow):
         self.apply_redactions_action.triggered.connect(self.apply_redactions_on_current_page)
         self.apply_redactions_action.setEnabled(False)
 
+        self.set_redaction_fill_color_action = QAction(QIcon.fromTheme("format-fill-color", QIcon(":/icons/redaction-fill-color.png")), "Couleur Remplissage Rédaction...", self)
+        self.set_redaction_fill_color_action.setStatusTip("Choisir la couleur de remplissage pour les zones rédigées")
+        self.set_redaction_fill_color_action.triggered.connect(self._set_redaction_fill_color) # Placeholder
+        self.set_redaction_fill_color_action.setEnabled(False)
+
+        self.set_redaction_overlay_text_action = QAction(QIcon.fromTheme("draw-text", QIcon(":/icons/redaction-overlay-text.png")), "Texte Superposé Rédaction...", self)
+        self.set_redaction_overlay_text_action.setStatusTip("Définir un texte à superposer sur les zones rédigées")
+        self.set_redaction_overlay_text_action.triggered.connect(self._set_redaction_overlay_text) # Placeholder
+        self.set_redaction_overlay_text_action.setEnabled(False)
+
 
     def _create_menu_bar(self):
         # ... (Ajouter l'action de fusion au menu Outils ou Fichier)
@@ -256,6 +272,9 @@ class MainWindow(QMainWindow):
         security_submenu = tools_menu.addMenu("&Sécurité") # Ou directement dans Outils
         security_submenu.addAction(self.redaction_tool_action)
         security_submenu.addAction(self.apply_redactions_action)
+        security_submenu.addSeparator()
+        security_submenu.addAction(self.set_redaction_fill_color_action)
+        security_submenu.addAction(self.set_redaction_overlay_text_action)
         help_menu = menu_bar.addMenu("&Aide")
 
     def _create_tool_bars(self):
@@ -286,6 +305,9 @@ class MainWindow(QMainWindow):
         security_tool_bar.setIconSize(QSize(24,24))
         security_tool_bar.addAction(self.redaction_tool_action)
         security_tool_bar.addAction(self.apply_redactions_action)
+        security_tool_bar.addSeparator()
+        security_tool_bar.addAction(self.set_redaction_fill_color_action)
+        security_tool_bar.addAction(self.set_redaction_overlay_text_action)
 
 
     def _setup_central_widget(self): # ... (inchangé)
@@ -342,7 +364,8 @@ class MainWindow(QMainWindow):
             self.freetext_annot_action, self.insert_image_action, self.delete_selected_annot_action,
             self.update_field_action, self.extract_text_page_action, self.extract_text_doc_action,
             self.extract_images_doc_action, self.split_pdf_each_page_action, self.split_pdf_by_range_action,
-            self.redaction_tool_action, self.apply_redactions_action
+            self.redaction_tool_action, self.apply_redactions_action,
+            self.set_redaction_fill_color_action, self.set_redaction_overlay_text_action
             # self.merge_pdfs_action # Ne dépend pas d'un doc ouvert
         ]
         for action in actions_to_disable:
@@ -373,7 +396,8 @@ class MainWindow(QMainWindow):
                     self.freetext_annot_action, self.insert_image_action,
                     self.extract_text_page_action, self.extract_text_doc_action, self.extract_images_doc_action,
                     self.split_pdf_each_page_action, self.split_pdf_by_range_action,
-                    self.redaction_tool_action # Apply redactions will be enabled when marks are made
+                    self.redaction_tool_action, # Apply redactions will be enabled when marks are made
+                    self.set_redaction_fill_color_action, self.set_redaction_overlay_text_action
                 ]
                 for action in actions_to_enable: action.setEnabled(True)
                 # self.merge_pdfs_action.setEnabled(True) # Toujours active
@@ -1471,6 +1495,26 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "Erreur de Division", f"Une erreur est survenue: {e}")
                 if 'new_pdf' in locals() and new_pdf.is_open: new_pdf.close()
 
+    def _set_redaction_fill_color(self):
+        current_color_qt = QColor(
+            int(self.redaction_fill_color[0] * 255),
+            int(self.redaction_fill_color[1] * 255),
+            int(self.redaction_fill_color[2] * 255)
+        )
+        color = QColorDialog.getColor(current_color_qt, self, "Choisir la couleur de remplissage pour la rédaction")
+        if color.isValid():
+            self.redaction_fill_color = (color.redF(), color.greenF(), color.blueF())
+            logging.info(f"Couleur de remplissage de rédaction définie sur : {self.redaction_fill_color}")
+
+    def _set_redaction_overlay_text(self):
+        text, ok = QInputDialog.getText(self, "Texte Superposé pour Rédaction",
+                                        "Entrez le texte à superposer (laissez vide pour aucun texte):",
+                                        QLineEdit.Normal, self.redaction_overlay_text)
+        if ok:
+            self.redaction_overlay_text = text
+            logging.info(f"Texte superposé de rédaction défini sur : '{self.redaction_overlay_text}'")
+
+
     def apply_redactions_on_current_page(self):
         if not self.current_pdf_document or self.current_page_number < 0:
             QMessageBox.warning(self, "Aucun Document/Page", "Aucun document ou page valide n'est sélectionné.")
@@ -1495,8 +1539,20 @@ class MainWindow(QMainWindow):
                     pdf_y1 = q_rect_scene.bottom() / self.current_zoom_factor
                     pdf_rect = fitz.Rect(pdf_x0, pdf_y0, pdf_x1, pdf_y1).normalize()
 
-                    # Add redaction annotation (PyMuPDF default fill is black)
-                    page.add_redact_annot(pdf_rect, fill=(0,0,0))
+                    annot_params = {
+                        "fill": self.redaction_fill_color
+                    }
+                    if self.redaction_overlay_text:
+                        annot_params["text"] = self.redaction_overlay_text
+                        annot_params["fontname"] = self.redaction_fontname
+                        annot_params["fontsize"] = self.redaction_fontsize
+                        annot_params["text_color"] = self.redaction_text_color
+                        annot_params["align"] = fitz.TEXT_ALIGN_CENTER
+                        # Note: PyMuPDF might auto-adjust fontsize if it's 0 to fit the text.
+                        # If specific size is desired and text is too long, it might get clipped or look bad.
+                        # More advanced text fitting might be needed for complex cases.
+
+                    page.add_redact_annot(pdf_rect, **annot_params)
 
                 page.apply_redactions() # Actually remove content
                 self.is_document_modified = True
