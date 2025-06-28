@@ -56,6 +56,6 @@ PyQtWebEngine>=5.15.5 # For QtWebEngineWidgets
 isort>=5.10.0
 
 # Optional/Experimental (Review if needed)
-# SpeechRecognition==3.14.3 # Voice input, ensure it's truly used or move to optional
+SpeechRecognition==3.14.3 # Voice input, ensure it's truly used or move to optional
 # pywhatkit # For WhatsApp integration, review usage
-# PyAudio # Dependency for SpeechRecognition with microphones
+PyAudio # Dependency for SpeechRecognition with microphones

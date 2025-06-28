@@ -42,7 +42,7 @@ class ProformaInvoiceItemResponse(ProformaInvoiceItemBase):
     # proforma_invoice_id: str # Usually included if item is fetched independently, but often omitted if part of ProformaInvoiceResponse
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class ProformaInvoiceBase(BaseModel):
     client_id: str
@@ -79,7 +79,7 @@ class ProformaInvoiceResponse(ProformaInvoiceBase):
     final_invoice_pdf_url: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
         # use_enum_values = True # For Pydantic v1 if status is returned as string
 
 router = APIRouter(
