@@ -8,20 +8,13 @@ import logging # Keep logging import
 import shutil
 
 # --- Configuration Import ---
-# Get the application root directory (parent of 'db' directory)
-app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if app_dir not in sys.path:
-    sys.path.insert(0, app_dir) # Insert at the beginning to ensure it's checked first
-
+# Assuming main.py or the entry script handles adding project root to sys.path
 try:
-    import config  # This should now find config.py at the root
+    import config # This should now find config.py at the root if sys.path is correct
     db_config = config # Alias config as db_config for compatibility
 except ImportError as e:
-    # This block should ideally not be reached if config.py exists at the root
-    logging.critical(f"CRITICAL: config.py not found at root ({app_dir}) by db/utils.py. Error: {e}")
-    # Optionally, re-raise the error or exit, as the application cannot function without config.
-    raise ImportError(f"config.py is essential and was not found at {app_dir}") from e
-
+    logging.critical(f"CRITICAL: config.py not found. Ensure project root is in sys.path. Error: {e}")
+    raise ImportError(f"config.py is essential and was not found.") from e
 # --- End Configuration Import ---
 
 # CRUD function imports
@@ -67,14 +60,14 @@ def _get_batch_products_and_equivalents(product_ids: list[int], target_language_
 
 def get_document_context_data(
     client_id: str, company_id: str, target_language_code: str,
-    project_id: str = None,
+    project_id: str = None, 
     # linked_product_ids_for_doc is now primarily handled by the logic within the enhanced context builder
     # based on what's in additional_context or by fetching all for client/project.
     # We can remove it from this wrapper's direct signature if it's fully managed by the callee.
     # For now, keep it to pass through if present in additional_context.
-    linked_product_ids_for_doc: list[int] = None,
-    document_type: str = None,
-    additional_context: dict = None,
+    linked_product_ids_for_doc: list[int] = None, 
+    document_type: str = None, 
+    additional_context: dict = None, 
     conn_passed: sqlite3.Connection = None, # conn_passed might be for the enhanced context builder if it needs one
     app_root_dir: str = None # New argument
 ) -> dict:
@@ -82,7 +75,7 @@ def get_document_context_data(
     Wrapper function to call the enhanced document context builder.
     """
     logging.info(f"db.utils.get_document_context_data called, forwarding to enhanced context builder. app_root_dir: {app_root_dir}")
-
+    
     # Prepare additional_data for the enhanced context builder
     # The enhanced context builder uses 'additional_data' as its kwarg name.
     effective_additional_data = additional_context if isinstance(additional_context, dict) else {}
@@ -93,7 +86,7 @@ def get_document_context_data(
     # The enhanced context builder in context_builder.py handles its own connection if db_conn is None.
     # So, we don't strictly need to pass conn_passed via additional_data unless it's specifically designed for it.
     # The enhanced context builder takes `db_conn` as a direct argument.
-
+    
     return _get_enhanced_document_context(
         client_id=client_id,
         company_id=company_id,

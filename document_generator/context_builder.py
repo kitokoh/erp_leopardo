@@ -16,8 +16,8 @@ from db.cruds import (
     get_city_by_id,
     get_project_by_id,
     get_client_document_notes,
-    get_product_equivalencies_for_product, # Placeholder, might need to be products_crud.get_product_equivalents
-    get_media_links_for_product, # Placeholder, might need to be products_crud.get_media_links_for_product
+    get_equivalent_products, # Corrected function name
+    get_media_links_for_product, 
     get_personnel_for_company,
 )
 from db.utils import get_db_connection
@@ -34,6 +34,7 @@ from app_setup import CONFIG as AppGlobalConfig
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+    # Ensure all context population logic is within the main try-except-finally block.
 def format_currency(amount, currency_symbol='€', decimal_places=2, language_code='en'):
     """
     Formats a numerical amount as a currency string, with basic localization.
@@ -138,12 +139,12 @@ def get_document_context(
         context["doc"]["vat_rate"] = Decimal(additional_data.get("vat_rate", "0.20")) # Example VAT
         context["doc"]["discount_rate"] = Decimal(additional_data.get("discount_rate", "0.00"))
 
-    # 2. Language Info (lang section) & Localized Labels
+        # 2. Language Info (lang section) & Localized Labels
         context["lang"]["code"] = language_code
-    context["lang"]["text_direction"] = "rtl" if language_code == "ar" else "ltr"
+        context["lang"]["text_direction"] = "rtl" if language_code == "ar" else "ltr"
 
-    _labels = {
-        "fr": {
+        _labels = {
+            "fr": {
             "proforma_invoice_title": "FACTURE PROFORMA",
             "from_seller": "De :",
             "to_client": "À :",
@@ -268,36 +269,36 @@ def get_document_context(
             "vat_id_label": "ИНН:", # Often used for VAT ID in RU context
             "reg_no_label": "Рег. номер:",
             "contact_label": "Контакт:"
+            }
         }
-    }
-    context["labels"] = _labels.get(language_code, _labels.get("en", {})) # Default to English labels if lang or specific label not found
+        context["labels"] = _labels.get(language_code, _labels.get("en", {})) # Default to English labels if lang or specific label not found
 
     # Date formatting based on locale (simple version)
-    # Storing the original YYYY-MM-DD date as well for potential machine use or other formatting needs
-    context["doc"]["current_date_iso"] = context["doc"]["current_date"] 
-    try:
-        current_date_obj = datetime.datetime.strptime(context["doc"]["current_date"], "%Y-%m-%d").date()
-        if language_code == "fr":
-            context["doc"]["current_date_formatted"] = current_date_obj.strftime("%d/%m/%Y")
-        elif language_code == "en": # Add other locales as needed
-            context["doc"]["current_date_formatted"] = current_date_obj.strftime("%m/%d/%Y")
-        # Add other locales or use Babel for more robust i18n date formatting
-        else: # Default
-            context["doc"]["current_date_formatted"] = current_date_obj.strftime("%Y-%m-%d")
-    except ValueError:
-        logger.warning(f"Could not parse current_date '{context['doc']['current_date']}' for formatting.")
-        context["doc"]["current_date_formatted"] = context["doc"]["current_date"] # Fallback to original string
+        # Storing the original YYYY-MM-DD date as well for potential machine use or other formatting needs
+        context["doc"]["current_date_iso"] = context["doc"]["current_date"] 
+        try:
+            current_date_obj = datetime.datetime.strptime(context["doc"]["current_date"], "%Y-%m-%d").date()
+            if language_code == "fr":
+                context["doc"]["current_date_formatted"] = current_date_obj.strftime("%d/%m/%Y")
+            elif language_code == "en": # Add other locales as needed
+                context["doc"]["current_date_formatted"] = current_date_obj.strftime("%m/%d/%Y")
+            # Add other locales or use Babel for more robust i18n date formatting
+            else: # Default
+                context["doc"]["current_date_formatted"] = current_date_obj.strftime("%Y-%m-%d")
+        except ValueError:
+            logger.warning(f"Could not parse current_date '{context['doc']['current_date']}' for formatting.")
+            context["doc"]["current_date_formatted"] = context["doc"]["current_date"] # Fallback to original string
 
-    # Set document identifier (e.g., proforma_id, invoice_number)
-    # This could come from additional_data if regenerating an existing document, or be generated.
-    # The template uses `doc.proforma_id`. Let's ensure this key is populated.
-    # `additional_data` might contain `document_id` (from ClientDocuments table) or `invoice_number`.
-    doc_identifier = additional_data.get('document_id', 
-                                        additional_data.get('invoice_number', 
-                                                            additional_data.get('proforma_id')))
-    if not doc_identifier and document_type and 'proforma' in document_type.lower():
-        doc_identifier = f"PF-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}" # Basic generated ID
-    
+        # Set document identifier (e.g., proforma_id, invoice_number)
+        # This could come from additional_data if regenerating an existing document, or be generated.
+        # The template uses `doc.proforma_id`. Let's ensure this key is populated.
+        # `additional_data` might contain `document_id` (from ClientDocuments table) or `invoice_number`.
+        doc_identifier = additional_data.get('document_id', 
+                                            additional_data.get('invoice_number', 
+                                                                additional_data.get('proforma_id')))
+        if not doc_identifier and document_type and 'proforma' in document_type.lower():
+            doc_identifier = f"PF-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}" # Basic generated ID
+        
         context["doc"]["proforma_id"] = doc_identifier if doc_identifier else "N/A"
         # For other document types, a more generic 'document_reference' might be useful.
         context["doc"]["document_reference"] = doc_identifier if doc_identifier else "N/A"
@@ -305,7 +306,6 @@ def get_document_context(
 
         # 3. Seller Information (seller section)
         seller_company = get_company_by_id(conn, company_id)
-    
         if seller_company:
             context["seller"]["name"] = seller_company.get("name")
             context["seller"]["address_line1"] = seller_company.get("address_line1")
