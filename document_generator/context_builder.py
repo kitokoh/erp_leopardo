@@ -134,7 +134,7 @@ def get_document_context(
         # 1. Document Info (doc section)
         context["doc"]["current_date"] = datetime.date.today().strftime("%Y-%m-%d")
         context["doc"]["current_year"] = datetime.date.today().year
-    context["doc"]["currency_symbol"] = additional_data.get("currency_symbol", "€") # This might need to be lang specific
+        context["doc"]["currency_symbol"] = additional_data.get("currency_symbol", "€") # This might need to be lang specific
         context["doc"]["vat_rate"] = Decimal(additional_data.get("vat_rate", "0.20")) # Example VAT
         context["doc"]["discount_rate"] = Decimal(additional_data.get("discount_rate", "0.00"))
 
@@ -298,13 +298,14 @@ def get_document_context(
     if not doc_identifier and document_type and 'proforma' in document_type.lower():
         doc_identifier = f"PF-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}" # Basic generated ID
     
-    context["doc"]["proforma_id"] = doc_identifier if doc_identifier else "N/A"
-    # For other document types, a more generic 'document_reference' might be useful.
-    context["doc"]["document_reference"] = doc_identifier if doc_identifier else "N/A"
+        context["doc"]["proforma_id"] = doc_identifier if doc_identifier else "N/A"
+        # For other document types, a more generic 'document_reference' might be useful.
+        context["doc"]["document_reference"] = doc_identifier if doc_identifier else "N/A"
 
 
         # 3. Seller Information (seller section)
         seller_company = get_company_by_id(conn, company_id)
+    
         if seller_company:
             context["seller"]["name"] = seller_company.get("name")
             context["seller"]["address_line1"] = seller_company.get("address_line1")
