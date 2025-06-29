@@ -76,7 +76,8 @@ from document_manager_logic import (
     perform_old_clients_check,
     handle_open_edit_client_dialog,
     archive_client_status,
-    permanently_delete_client
+    permanently_delete_client,
+    ensure_client_folder_path # Import the new helper
 )
 from dialogs import (
     TemplateDialog, AddNewClientDialog, ManageProductMasterDialog
@@ -1645,33 +1646,8 @@ class DocumentManager(QMainWindow):
         logging.info(f"open_client_tab_by_id: client_data_to_show after fetching from DB: {client_data_to_show}")
 
         if client_data_to_show:
-            # Ensure default_base_folder_path exists and is valid, then alias to base_folder_path
-            current_default_path = client_data_to_show.get("default_base_folder_path")
-            if not current_default_path or not current_default_path.strip():
-                client_name_for_folder = client_data_to_show.get("client_name", "unknown_client")
-                client_id_for_folder = client_data_to_show.get("client_id", "no_id")
-                sane_client_name = "".join(c if c.isalnum() else "_" for c in client_name_for_folder)
+            client_data_to_show = ensure_client_folder_path(client_data_to_show, self.app_root_dir) # Use helper
 
-                # Ensure clients_dir itself is a valid part of the path construction
-                # CONFIG.get('clients_dir', 'clients') gives the relative path like 'clients'
-                clients_base_subdir = CONFIG.get('clients_dir', 'clients') # e.g., "clients"
-
-                relative_folder = os.path.join(clients_base_subdir, f"{sane_client_name}_{client_id_for_folder[:8]}")
-                client_data_to_show["default_base_folder_path"] = relative_folder
-
-                abs_folder_path = os.path.join(self.app_root_dir, relative_folder)
-                try:
-                    os.makedirs(abs_folder_path, exist_ok=True)
-                    logging.info(f"Ensured client folder exists at: {abs_folder_path}")
-                    # Update the database so this path is persistent
-                    clients_crud_instance.update_client(client_id_to_open, {"default_base_folder_path": relative_folder})
-                    logging.info(f"Client {client_id_to_open} was missing default_base_folder_path. Constructed, assigned, and DB updated: {relative_folder}.")
-                except OSError as e_mkdir:
-                    logging.error(f"Failed to create directory {abs_folder_path}: {e_mkdir}")
-                    # Proceeding without this could still lead to issues, but client_data_to_show will have the path
-
-            # Ensure base_folder_path is an alias to default_base_folder_path for ClientWidget
-            client_data_to_show["base_folder_path"] = client_data_to_show.get("default_base_folder_path")
 
         if client_data_to_show and 'created_at' in client_data_to_show and client_data_to_show['created_at']:
             try:
@@ -1904,6 +1880,9 @@ class DocumentManager(QMainWindow):
                     fresh_client_data = clients_crud_instance.get_client_by_id(client_id, include_deleted=False) # Assuming active clients in tabs
 
                     if fresh_client_data:
+                        # Ensure folder path is handled consistently
+                        fresh_client_data = ensure_client_folder_path(fresh_client_data, self.app_root_dir) # Use helper
+
                         # Augment data with related names (country, city, status text)
                         # This ensures that if a status name was changed, it's reflected.
                         if 'country' not in fresh_client_data and fresh_client_data.get('country_id'):
@@ -1921,12 +1900,15 @@ class DocumentManager(QMainWindow):
                         selected_languages_str = fresh_client_data.get('selected_languages')
                         if isinstance(selected_languages_str, str) and selected_languages_str.strip():
                             fresh_client_data['selected_languages'] = [lang.strip() for lang in selected_languages_str.split(',') if lang.strip()]
-                        elif not isinstance(fresh_client_data.get('selected_languages'), list):
+                        elif not isinstance(fresh_client_data.get('selected_languages'), list): # If it's already a list, use it
+                            pass # No change needed if it's already a list (even if empty)
+                        else: # None or other non-string, non-list types
                             fresh_client_data['selected_languages'] = []
+
 
                         # Call refresh_display on the ClientWidget with the fresh, augmented data
                         if hasattr(client_widget, 'refresh_display'):
-                            logging.debug(f"Calling refresh_display() for ClientWidget of client ID: {client_id}")
+                            logging.debug(f"Calling refresh_display() for ClientWidget of client ID: {client_id} with data: {fresh_client_data}")
                             client_widget.refresh_display(fresh_client_data)
                             logging.info(f"Refreshed client tab display for client ID: {client_id}")
                         else:

@@ -59,3 +59,4 @@ isort>=5.10.0
 SpeechRecognition==3.14.3 # Voice input, ensure it's truly used or move to optional
 # pywhatkit # For WhatsApp integration, review usage
 PyAudio # Dependency for SpeechRecognition with microphones
+Jinja2>=3.0.0 # For HTML templating
