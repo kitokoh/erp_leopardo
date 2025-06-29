@@ -414,6 +414,11 @@ def get_document_context(
                     client_ctx["contact_name"] = primary_contact.get("name")
                     client_ctx["contact_email"] = primary_contact.get("email")
                     client_ctx["contact_phone"] = primary_contact.get("phone")
+                context["contacts_list"] = contacts if contacts else [] # Ensure it's a list
+                context["contacts_list_empty"] = not bool(contacts) # Add boolean for empty list check
+            else: # if contacts is None or empty
+                context["contacts_list"] = []
+                context["contacts_list_empty"] = True
         else:
             logger.error(f"Client with ID {client_id} not found.")
 
