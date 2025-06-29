@@ -220,6 +220,10 @@ def generate_pdf_for_document(
                             QCoreApplication.translate("utils.generate_pdf", "ID Client manquant. Impossible de générer le PDF."))
         return None
 
+    file_name, file_ext = os.path.splitext(os.path.basename(source_file_path))
+    current_timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S") # Changed to include time
+    output_pdf_filename = f"{file_name}_{current_timestamp_str}.pdf" # Changed to use timestamp
+    output_pdf_path = os.path.join(os.path.dirname(source_file_path), output_pdf_filename)
     file_name_base_template, file_ext = os.path.splitext(os.path.basename(source_file_path)) # file_name_base_template is like 'proforma_invoice_template'
 
     # Determine a more descriptive PDF filename

@@ -377,10 +377,11 @@ class CreateDocumentDialog(QDialog):
             company_id=default_company_id,
             target_language_code=language_code_for_generation, # Use the context language here
             project_id=project_id_for_context_arg,
-            additional_context=additional_context_for_gen
+            additional_context=additional_context_for_gen,
+            app_root_dir=self.app_root_dir # Passer app_root_dir ici
         )
         if not document_context:
-            logging.warning(f"Failed to get full document context for template_id {template_id}. Document might be incomplete.")
+            logging.warning(f"Failed to get full document context for template_id {template_id} using app_root_dir '{self.app_root_dir}'. Document might be incomplete.")
             document_context = {}
 
         # Determine Output Filename and Path

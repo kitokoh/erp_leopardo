@@ -4016,6 +4016,9 @@ class ClientWidget(QWidget):
                 return # Early return for missing client_id
             logging.info("PT_DEBUG: populate_doc_table - Client ID obtained.")
 
+            filtered_list = [] # Initialize filtered_list
+
+
             # --- Path Correction: Use absolute path directly ---
             base_client_path_abs = self.client_info.get("default_base_folder_path")
             if not base_client_path_abs: # Fallback
