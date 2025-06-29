@@ -20,6 +20,9 @@ from PyQt5.QtGui import QIcon, QDesktopServices, QFont, QColor, QPixmap, QTextCu
 from PyQt5.QtCore import Qt, QUrl, QCoreApplication, QEvent, QStandardPaths
 from PyQt5.QtWidgets import QFormLayout
 from PyQt5.QtWidgets import QListWidgetItem
+
+# Import for ProformaDialog
+from invoicing.proforma_dialog import ProformaDialog
 from PyQt5.QtGui import QPixmap
 
 import db as db_manager
@@ -176,6 +179,13 @@ class ClientWidget(QWidget):
                 pass # Not connected or already disconnected
             self.create_docs_btn.clicked.connect(self.open_send_email_dialog)
             action_layout.addWidget(self.create_docs_btn)
+
+            self.generate_proforma_btn = QPushButton(self.tr("Générer Proforma"))
+            self.generate_proforma_btn.setIcon(QIcon(":/icons/file-text.svg")) # Placeholder, consider a specific icon
+            self.generate_proforma_btn.setToolTip(self.tr("Générer une nouvelle facture proforma pour ce client"))
+            self.generate_proforma_btn.setObjectName("primaryButton")
+            self.generate_proforma_btn.clicked.connect(self.open_proforma_dialog)
+            action_layout.addWidget(self.generate_proforma_btn)
 
             self.compile_pdf_btn = QPushButton(self.tr("Compiler PDF"))
             self.compile_pdf_btn.setIcon(QIcon.fromTheme("document-export"))
@@ -339,6 +349,8 @@ class ClientWidget(QWidget):
         # Client Info Header Buttons
         if hasattr(self, 'create_docs_btn'): # Send Email
             self.create_docs_btn.setEnabled(can_manage_documents) # Emailing often tied to doc management
+        if hasattr(self, 'generate_proforma_btn'): # New Proforma Button
+            self.generate_proforma_btn.setEnabled(can_manage_documents) # Tied to document management permission for now
         if hasattr(self, 'compile_pdf_btn'):
             self.compile_pdf_btn.setEnabled(can_manage_documents)
         if hasattr(self, 'edit_save_client_btn'):
@@ -5251,6 +5263,24 @@ class ClientWidget(QWidget):
             else: # Save failed, remain in edit mode
                 self.is_editing_client = True # Keep state as editing
                 # Button text and icon remain "Sauvegarder"
+
+    def open_proforma_dialog(self):
+        """Opens the ProformaDialog for the current client."""
+        if not self.client_info:
+            QMessageBox.warning(self, self.tr("Erreur Client"), self.tr("Les informations du client ne sont pas chargées."))
+            return
+        if not self.current_user_info: # Ensure current_user_info is available
+            QMessageBox.warning(self, self.tr("Erreur Utilisateur"), self.tr("Les informations de l'utilisateur actuel ne sont pas disponibles."))
+            return
+
+        # Ensure ProformaDialog is imported (already done at the top of the file)
+        dialog = ProformaDialog(client_info=self.client_info, current_user_info=self.current_user_info, parent=self)
+        if dialog.exec_() == QDialog.Accepted:
+            logging.info("ProformaDialog accepted, refreshing document table.")
+            if hasattr(self, 'populate_doc_table'):
+                self.populate_doc_table() # Refresh to show the new proforma document
+        else:
+            logging.info("ProformaDialog cancelled.")
 
     def switchTo_edit_client_view(self):
         # Disconnect signals that auto-save
