@@ -325,6 +325,7 @@ def main():
             # The 'else' branch for user-entered company data (from the simulated dialog) is removed
             # as there's no dialog interaction.
 
+
             # If the prompt was shown because of the config flag (and not strictly first_launch path that also sets it)
             if show_setup_prompt_config_value and not first_launch_detected:
                 should_reset_config_flag_after_dialog = True
