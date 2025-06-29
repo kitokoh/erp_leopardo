@@ -162,7 +162,8 @@ CONFIGURABLE_MODULES = [
     # If it needs to be configurable, add a 'key' and handle its state in _load_module_states and settings.
     {'key': 'module_calendar_enabled', 'name': 'calendar', 'action_attr': 'calendar_module_action', 'widget_attr': 'calendar_module_widget_instance'},
     {'key': 'module_camera_management_enabled', 'name': 'camera_management', 'action_attr': 'camera_management_action', 'widget_attr': 'camera_management_widget_instance'},
-    {'key': 'module_calculator_enabled', 'name': 'calculator', 'action_attr': 'calculator_module_action', 'widget_attr': 'calculator_module_widget_instance'} # Added Calculator module
+    {'key': 'module_calculator_enabled', 'name': 'calculator', 'action_attr': 'calculator_module_action', 'widget_attr': 'calculator_module_widget_instance'}, # Added Calculator module
+    {'key': 'module_pdf_editor_enabled', 'name': 'pdf_editor', 'action_attr': 'pdf_editor_action', 'widget_attr': 'pdf_editor_widget_instance'} # Added PDF Editor module
 ]
 
 class ClientListItemWidget(QWidget):
@@ -379,6 +380,18 @@ class DocumentManager(QMainWindow):
         else:
             self.calculator_module_widget_instance = None
             logging.info("DocumentManager: Calculator module disabled, widget not created.")
+
+        # PDF Editor Module Instance (initialized as None, created on demand by show_pdf_editor_view)
+        self.pdf_editor_widget_instance = None
+        # No need to add to stack here if show_pdf_editor_view handles it,
+        # but for consistency with other modules that are pre-loaded if enabled:
+        if self.module_states.get('pdf_editor', True):
+            # We will let show_pdf_editor_view handle the actual creation and adding to stack
+            # to ensure dynamic import and error handling are centralized there.
+            # However, the action in the menu will be enabled/disabled based on this state.
+            logging.info("DocumentManager: PDF Editor module is enabled. Widget will be loaded on demand.")
+        else:
+            logging.info("DocumentManager: PDF Editor module is disabled. Widget will not be loaded.")
 
 
         self.main_area_stack.setCurrentWidget(self.home_page_widget_instance) # Set Home Page as default view
@@ -1043,10 +1056,15 @@ class DocumentManager(QMainWindow):
         self.calculator_module_action = QAction(QIcon(":/icons/bar-chart.svg"), self.tr("Calculatrices"), self) # Placeholder icon
         self.calculator_module_action.triggered.connect(self.show_calculator_module_view)
 
+        # Action for PDF Editor Module
+        self.pdf_editor_action = QAction(QIcon(":/icons/pdf.svg"), self.tr("Éditeur PDF"), self) # Assuming pdf.svg exists
+        self.pdf_editor_action.triggered.connect(self.show_pdf_editor_view)
+
 
         # Populate searchable_actions_map
         self.searchable_actions_map[self.tr("Accueil")] = self.home_action
         self.searchable_actions_map[self.tr("Calculatrices")] = self.calculator_module_action # Added Calculator action
+        self.searchable_actions_map[self.tr("Éditeur PDF")] = self.pdf_editor_action
         self.searchable_actions_map[self.tr("Paramètres")] = self.settings_action
         # self.searchable_actions_map[self.tr("Gérer les Modèles")] removed
         self.searchable_actions_map[self.tr("Gérer les Statuts")] = self.status_action
@@ -1196,7 +1214,8 @@ class DocumentManager(QMainWindow):
                                      P_ACCESS_RECRUITMENT_MODULE, P_ACCESS_EXPERIENCE_MODULE, \
                                      P_ACCESS_CALENDAR_MODULE, P_ACCESS_BOTPRESS_MODULE, \
                                      P_ACCESS_CARRIER_MAP_MODULE, P_ACCESS_CAMERA_MODULE, \
-                                     P_MANAGE_GLOBAL_PRODUCTS, P_ACCESS_CALCULATOR_MODULE, P_MANAGE_STATUSES # Added P_MANAGE_STATUSES
+                                      P_MANAGE_GLOBAL_PRODUCTS, P_ACCESS_CALCULATOR_MODULE, P_MANAGE_STATUSES, \
+                                      P_ACCESS_PDF_EDITOR_MODULE # Added P_ACCESS_PDF_EDITOR_MODULE
 
         role_name = self.current_user_info.get('role_name') if self.current_user_info else None
         if not role_name: # Should not happen if login is enforced, but good for safety
@@ -1259,6 +1278,12 @@ class DocumentManager(QMainWindow):
                 logging.warning("P_ACCESS_CALCULATOR_MODULE permission constant not found. Calculator module visibility based on module_states only.")
                 self.calculator_module_action.setVisible(self.module_states.get('calculator', False))
 
+        if hasattr(self, 'pdf_editor_action') and self.pdf_editor_action:
+            if 'P_ACCESS_PDF_EDITOR_MODULE' in locals() or 'P_ACCESS_PDF_EDITOR_MODULE' in globals():
+                 self.pdf_editor_action.setVisible(has_permission(role_name, P_ACCESS_PDF_EDITOR_MODULE))
+            else:
+                logging.warning("P_ACCESS_PDF_EDITOR_MODULE permission constant not found. PDF Editor module visibility based on module_states only.")
+                self.pdf_editor_action.setVisible(self.module_states.get('pdf_editor', False))
 
         # Main Buttons on Document View
         self.add_new_client_button.setEnabled(can_create_client)
@@ -2005,6 +2030,45 @@ class DocumentManager(QMainWindow):
         else:
             logging.warning("Calculator module widget instance is None. Cannot show view.")
             QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Calculatrices est désactivé ou non initialisé."))
+
+    def show_pdf_editor_view(self):
+        """Switches the main stacked widget to display the PDF Editor module."""
+        if not hasattr(self, 'pdf_editor_widget_instance') or self.pdf_editor_widget_instance is None:
+            if self.module_states.get('pdf_editor', True): # Check if module is enabled
+                try:
+                    # Dynamically import here to avoid circular dependencies or issues if module is not always present
+                    from pdf_editor_pyqt.src.main_window import MainWindow as PdfEditorMainWindow
+                    self.pdf_editor_widget_instance = PdfEditorMainWindow() # Create instance
+                    self.main_area_stack.addWidget(self.pdf_editor_widget_instance) # Add to stack
+                    logging.info("PDF Editor module widget instance created and added to stack.")
+                except ImportError as e:
+                    logging.error(f"Failed to import PDF Editor module: {e}", exc_info=True)
+                    QMessageBox.critical(self, self.tr("Erreur Module"), self.tr("Impossible de charger le module Éditeur PDF. Vérifiez l'installation."))
+                    # Optionally disable the action to prevent further attempts if import fails
+                    if hasattr(self, 'pdf_editor_action'):
+                        self.pdf_editor_action.setEnabled(False)
+                    return # Do not proceed if import failed
+                except Exception as e:
+                    logging.error(f"Failed to initialize PDF Editor module: {e}", exc_info=True)
+                    QMessageBox.critical(self, self.tr("Erreur Initialisation Module"), self.tr("Une erreur est survenue lors de l'initialisation de l'Éditeur PDF."))
+                    if hasattr(self, 'pdf_editor_action'):
+                        self.pdf_editor_action.setEnabled(False)
+                    return
+            else: # Module is explicitly disabled in settings
+                logging.warning("PDF Editor module is disabled in settings. Cannot show view.")
+                QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Éditeur PDF est désactivé dans les paramètres."))
+                return
+
+
+        if self.pdf_editor_widget_instance:
+            self.main_area_stack.setCurrentWidget(self.pdf_editor_widget_instance)
+        else:
+            # This path might be reached if module was enabled, but instance creation failed and was caught above.
+            # Or if module got disabled after an initial successful creation (less likely without app restart).
+            logging.warning("PDF Editor module widget instance is None (either disabled or failed to initialize). Cannot show view.")
+            # Notification already shown by the creation block if it failed.
+
+
     # --- Saved Filters Methods ---
     def populate_saved_filters_combo(self):
         """Populates the combo box with filters saved by the current user."""
