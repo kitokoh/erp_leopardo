@@ -3,6 +3,8 @@ import os
 import shutil
 import logging # Added for logging
 from datetime import datetime
+import httpx # Added for API calls
+import json # Added for payload
 
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLineEdit,
@@ -288,28 +290,45 @@ class CreateDocumentDialog(QDialog):
                 continue
 
             generated_file_path = self._generate_document_from_template_id(template_id, actual_generation_language)
-            if generated_file_path and os.path.exists(generated_file_path):
-                generated_paths.append(generated_file_path)
-            elif generated_file_path:
+            # generated_file_path can now be a dict for API proformas
+            if isinstance(generated_file_path, dict) and generated_file_path.get('type') == 'api_proforma':
+                if generated_file_path.get('success'):
+                    generated_paths.append(generated_file_path) # Store the dict
+                else:
+                    QMessageBox.warning(self, self.tr("Échec Génération Proforma API"),
+                                        generated_file_path.get('error_message', self.tr("Une erreur inconnue est survenue.")))
+            elif isinstance(generated_file_path, str) and os.path.exists(generated_file_path): # Local file
+                generated_paths.append({'type': 'local_file', 'path': generated_file_path})
+            elif generated_file_path: # Path string but file doesn't exist
                  QMessageBox.warning(self, self.tr("Erreur Fichier Partiel"), self.tr("Le fichier pour le modèle '{0}' semble avoir été généré mais est introuvable : {1}").format(template_details.get('template_name'),generated_file_path))
-
 
         if generated_paths:
             if len(generated_paths) == 1:
-                try:
-                    QDesktopServices.openUrl(QUrl.fromLocalFile(generated_paths[0]))
-                except Exception as e:
-                    logging.error(f"Error opening file {generated_paths[0]}: {e}", exc_info=True)
-                    QMessageBox.warning(self, self.tr("Erreur Ouverture"), self.tr("Impossible d'ouvrir le document généré : {0}").format(str(e)))
+                doc_info = generated_paths[0]
+                if doc_info.get('type') == 'api_proforma':
+                    # For API proforma, show success message with Document ID. Actual opening might be handled by a download URL elsewhere.
+                    # For now, we don't automatically open the API URL from here.
+                    QMessageBox.information(self, self.tr("Proforma Générée"),
+                                            self.tr("Facture Proforma '{0}' générée avec succès via API. Document ID: {1}").format(doc_info.get('file_name', 'N/A'), doc_info.get('client_document_id', 'N/A')))
+                elif doc_info.get('type') == 'local_file':
+                    try:
+                        QDesktopServices.openUrl(QUrl.fromLocalFile(doc_info['path']))
+                    except Exception as e:
+                        logging.error(f"Error opening file {doc_info['path']}: {e}", exc_info=True)
+                        QMessageBox.warning(self, self.tr("Erreur Ouverture"), self.tr("Impossible d'ouvrir le document généré : {0}").format(str(e)))
             else:
-                QMessageBox.information(self, self.tr("Documents Générés"),
-                                        self.tr("{0} documents ont été générés. Vous pouvez les trouver dans le dossier client.").format(len(generated_paths)))
-                # Optionally open the client folder
+                # Mix of API and local files possible, adjust message
+                num_local = sum(1 for d in generated_paths if d.get('type') == 'local_file')
+                num_api = sum(1 for d in generated_paths if d.get('type') == 'api_proforma')
+                messages = []
+                if num_local > 0: messages.append(self.tr("{0} document(s) locaux générés.").format(num_local))
+                if num_api > 0: messages.append(self.tr("{0} facture(s) proforma générée(s) via API.").format(num_api))
+
+                QMessageBox.information(self, self.tr("Documents Générés"), " ".join(messages) + "\n" + self.tr("Vous pouvez les trouver dans le dossier client ou via les IDs de document."))
                 self._handle_view_client_folder()
             self.accept()
         elif selected_template_ids and not generated_paths: # Attempted but all failed
             QMessageBox.warning(self, self.tr("Échec Génération"), self.tr("Aucun document n'a pu être généré avec succès."))
-
 
     def _handle_view_client_folder(self):
         client_base_folder = self.client_info.get("base_folder_path")
@@ -339,18 +358,20 @@ class CreateDocumentDialog(QDialog):
             return None
 
         template_base_filename = chosen_template.get('base_file_name')
-        # The template's own language is important for finding its file.
         template_inherent_language = chosen_template.get('language_code')
-        template_actual_type = chosen_template.get('template_type') # e.g., 'PROFORMA_INVOICE_HTML', 'document_excel'
+        template_actual_type = chosen_template.get('template_type')
         template_display_name_for_output = chosen_template.get('template_name', 'Document')
 
+        # Proforma Invoice API Handling
+        if template_actual_type == "PROFORMA_INVOICE_HTML": # Check against the specific type for proforma
+            return self._generate_proforma_via_api(chosen_template, language_code_for_generation)
 
+        # --- Existing local generation logic for other document types ---
         template_file_on_disk_abs = os.path.join(self.config.get("templates_dir", "templates"), template_inherent_language, template_base_filename)
         if not os.path.exists(template_file_on_disk_abs):
              QMessageBox.warning(self, self.tr("Fichier Modèle Introuvable"), self.tr("Le fichier modèle '{0}' (lang: {1}) est introuvable.").format(template_base_filename, template_inherent_language))
              return None
 
-        # Prepare Context Data
         default_company_obj = db_manager.get_default_company()
         default_company_id = default_company_obj['company_id'] if default_company_obj else None
         if not default_company_id:
@@ -358,33 +379,25 @@ class CreateDocumentDialog(QDialog):
 
         client_id_for_context = self.client_info.get('client_id')
         project_id_for_context_arg = self.client_info.get('project_id')
-
-        # Determine the document_type_for_notes (e.g., 'PROFORMA_INVOICE_HTML') from the template's type
-        # This ensures correct notes are fetched based on the actual template type being generated.
         document_type_for_notes_fetch = template_actual_type
-
         additional_context_for_gen = {
             'document_type': template_actual_type,
             'current_document_type_for_notes': document_type_for_notes_fetch,
         }
-        # Add specific context if needed, e.g., for DELIVERY_NOTE as before
-        # This needs to map template_actual_type to specific context keys if they differ from the general mapping.
-        # Example: if template_actual_type == "PACKING_LIST_HTML" or template_actual_type == "PACKING_LIST_EXCEL":
-        #    ... add packing_details context ...
 
         document_context = db_manager.get_document_context_data(
             client_id=client_id_for_context,
             company_id=default_company_id,
-            target_language_code=language_code_for_generation, # Use the context language here
+            target_language_code=language_code_for_generation,
             project_id=project_id_for_context_arg,
             additional_context=additional_context_for_gen,
-            app_root_dir=self.app_root_dir # Passer app_root_dir ici
+            app_root_dir=self.app_root_dir
         )
         if not document_context:
-            logging.warning(f"Failed to get full document context for template_id {template_id} using app_root_dir '{self.app_root_dir}'. Document might be incomplete.")
+            logging.warning(f"Failed to get full document context for template_id {template_id}. Document might be incomplete.")
             document_context = {}
 
-        # Determine Output Filename and Path
+        # Determine Output Filename and Path (This part is common for local generation)
         client_base_folder_relative = self.client_info.get("base_folder_path") or self.client_info.get("default_base_folder_path")
         client_base_folder_absolute = None
 
@@ -606,6 +619,103 @@ class CreateDocumentDialog(QDialog):
                 try: os.remove(final_generated_file_path)
                 except OSError: logging.warning(f"Failed to cleanup {final_generated_file_path} after DB error.")
             return None
+
+        # Return path for locally generated files
+        return {'type': 'local_file', 'path': final_generated_file_path}
+
+
+    def _generate_proforma_via_api(self, template_details, language_code_for_generation):
+        logging.info(f"Generating Proforma via API for template: {template_details.get('template_name')}")
+        client_id = self.client_info.get('client_id')
+        project_id = self.client_info.get('project_id') # This might be None
+        default_company = db_manager.get_default_company()
+        company_id = default_company.get('company_id') if default_company else None
+
+        if not client_id or not company_id:
+            msg = self.tr("Client ID ou Société par défaut manquants pour la génération de proforma via API.")
+            QMessageBox.critical(self, self.tr("Erreur de Données"), msg)
+            return {'type': 'api_proforma', 'success': False, 'error_message': msg}
+
+        # Gather line items (simplified approach)
+        linked_products = db_manager.get_products_for_client_or_project(client_id=client_id, project_id=project_id)
+        api_items = []
+        if linked_products:
+            for prod in linked_products:
+                unit_price = prod.get('unit_price_override') if prod.get('unit_price_override') is not None else prod.get('base_unit_price', 0.0)
+                # Ensure quantity is float, default to 1.0 if not present or invalid
+                try:
+                    quantity = float(prod.get('quantity', 1.0))
+                    if quantity <= 0: quantity = 1.0 # Default to 1 if zero or negative
+                except (ValueError, TypeError):
+                    quantity = 1.0
+
+                api_items.append({
+                    "product_id": prod.get("product_id"),
+                    "description": prod.get("product_name", self.tr("Produit sans nom")),
+                    "quantity": quantity,
+                    "unit_price": float(unit_price), # Ensure float
+                    "total_price": quantity * float(unit_price) # API also calculates this, but good to be consistent
+                })
+
+        if not api_items:
+            reply = QMessageBox.warning(self, self.tr("Aucun Produit"),
+                                        self.tr("Aucun produit n'est actuellement lié à ce client/projet. La facture proforma sera générée sans lignes de produits. Voulez-vous continuer?"),
+                                        QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if reply == QMessageBox.No:
+                return {'type': 'api_proforma', 'success': False, 'error_message': self.tr("Génération annulée par l'utilisateur (aucun produit).")}
+
+        payload = {
+            "client_id": client_id,
+            "project_id": project_id,
+            "company_id": company_id,
+            "currency": self.client_info.get('currency', 'EUR'), # Default or from client info
+            "payment_terms": self.client_info.get('payment_terms', self.tr("Paiement anticipé")),
+            "delivery_terms": self.client_info.get('delivery_terms', self.tr("Selon accord")),
+            "incoterms": self.client_info.get('incoterms', "EXW"),
+            "named_place_of_delivery": self.client_info.get('named_place', self.tr("Lieu du vendeur")),
+            "notes": self.client_info.get('proforma_notes', ''), # Add specific proforma notes if available
+            "items": api_items,
+            "vat_rate_percentage": float(self.config.get('default_vat_rate', 20.0)),
+            "discount_rate_percentage": float(self.config.get('default_discount_rate', 0.0)),
+            "target_language_code": language_code_for_generation
+        }
+
+        api_base_url = self.config.get("api_base_url", "http://localhost:8001") # Get from config
+        proforma_api_url = f"{api_base_url}/api/proformas/"
+
+        try:
+            # Assuming the desktop app has access to the current user's token if API requires auth
+            # For now, let's assume no auth or auth is handled by a global requests session.
+            # If auth is needed: headers = {"Authorization": f"Bearer {token}"}
+            with httpx.Client() as client:
+                response = client.post(proforma_api_url, json=payload)
+
+            if response.status_code == 201: # Created
+                response_data = response.json()
+                logging.info(f"Proforma API call successful: {response_data}")
+                return {
+                    'type': 'api_proforma',
+                    'success': True,
+                    'client_document_id': response_data.get('linked_document_id'),
+                    'proforma_id': response_data.get('id'),
+                    'file_name': response_data.get('proforma_invoice_number', 'Proforma') + ".pdf",
+                    'pdf_url': response_data.get('proforma_pdf_url') # Relative API URL
+                }
+            else:
+                error_detail = response.text
+                try: # Try to parse JSON error from API
+                    error_detail_json = response.json()
+                    error_detail = error_detail_json.get("detail", response.text)
+                except json.JSONDecodeError:
+                    pass # Keep raw text if not JSON
+                logging.error(f"Proforma API call failed ({response.status_code}): {error_detail}")
+                return {'type': 'api_proforma', 'success': False, 'error_message': self.tr("Erreur API Proforma ({0}): {1}").format(response.status_code, error_detail)}
+        except httpx.RequestError as e:
+            logging.error(f"Error calling Proforma API: {e}", exc_info=True)
+            return {'type': 'api_proforma', 'success': False, 'error_message': self.tr("Erreur de connexion à l'API Proforma: {0}").format(str(e))}
+        except Exception as e_api:
+            logging.error(f"Unexpected error during Proforma API call: {e_api}", exc_info=True)
+            return {'type': 'api_proforma', 'success': False, 'error_message': self.tr("Erreur inattendue (API Proforma): {0}").format(str(e_api))}
 
     # Remove old methods related to template list display
     def has_multiple_purchase_events(self): return False

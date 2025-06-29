@@ -1071,6 +1071,7 @@ CREATE TABLE IF NOT EXISTS Templates (
         source_template_id INTEGER, version_tag TEXT, notes TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         created_by_user_id TEXT,
+        parent_document_id TEXT, -- Added column for versioning/linking
         is_deleted INTEGER DEFAULT 0,
         deleted_at TEXT,
         FOREIGN KEY (client_id) REFERENCES Clients (client_id),
