@@ -399,7 +399,7 @@ def main():
             # This replaces the simulated dialog object and its acceptance.
             # The key logic is to create a default company if 'use_default_company' path was taken.
             # We assume 'use_default_company' is the desired path if no actual dialog is shown.
-
+            
             # Directly proceed to default company creation logic:
             logging.info("Attempting to add a default company as no companies exist and conditions are met.")
             default_company_data = {
@@ -420,54 +420,6 @@ def main():
                 should_reset_config_flag_after_dialog = True
         else:
             logging.info("No companies found, but setup prompt is not enabled by config and not first launch. Skipping company creation.")
-    else: # Companies exist
-        logging.info("Companies found in the database. No need to prompt for company info now.")
-        # If companies exist, but the flag was true, it implies the user wanted to see the prompt (even if not strictly necessary).
-        # Reset it as the condition (no companies) for the prompt to be useful wasn't met, or it was already met.
-        if show_setup_prompt_config_value:
-             should_reset_config_flag_after_dialog = True
-
-
-    if should_reset_config_flag_after_dialog:
-        logging.info("Resetting 'show_initial_setup_on_startup' flag to False.")
-        CONFIG["show_initial_setup_on_startup"] = False
-        save_config(CONFIG)
-
-    proceed_to_main_app = False # Initialize before bypass and remember me
-                    default_company_data = {
-                        "company_name": "My Business", "address": "Not specified", "is_default": True,
-                        "logo_path": None, "payment_info": "", "other_info": "Default company created."
-                    }
-                    new_company_id = add_company(default_company_data)
-                    if new_company_id:
-                        logging.info(f"Default company 'My Business' added with ID: {new_company_id}.")
-                        companies_exist = True # Update companies_exist status
-                    else:
-                        logging.error("Failed to add default company.")
-                else: # User entered data
-                    user_company_data = prompt_dialog.get_company_data()
-                    if user_company_data and user_company_data['company_name']:
-                        company_to_add = {
-                            "company_name": user_company_data['company_name'],
-                            "address": user_company_data.get('address', ''), "is_default": True,
-                            "logo_path": None, "payment_info": "", "other_info": "Company created via prompt."
-                        }
-                        new_company_id = add_company(company_to_add)
-                        if new_company_id:
-                            logging.info(f"User-defined company '{company_to_add['company_name']}' added with ID: {new_company_id}.")
-                            companies_exist = True # Update companies_exist status
-                        else:
-                            logging.error(f"Failed to add user-defined company '{company_to_add['company_name']}'.")
-                    else:
-                        logging.warning("Company prompt accepted, but no company name provided. No company added.")
-            else: # Dialog was cancelled
-                logging.warning("User cancelled company prompt.")
-
-            # If the prompt was shown because of the config flag (and not strictly first_launch path that also sets it)
-            if show_setup_prompt_config_value and not first_launch_detected:
-                should_reset_config_flag_after_dialog = True
-        else:
-            logging.info("No companies found, but setup prompt is not enabled by config and not first launch. Skipping company prompt.")
     else: # Companies exist
         logging.info("Companies found in the database. No need to prompt for company info now.")
         # If companies exist, but the flag was true, it implies the user wanted to see the prompt (even if not strictly necessary).
