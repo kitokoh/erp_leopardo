@@ -148,12 +148,30 @@ def render_html_template(template_string: str, context: dict) -> str:
         # 3. Process simple placeholders {{key.subkey}}
         def replace_placeholder(match):
             key = match.group(1).strip()
-            logger.debug(f"render_html_template (replace_placeholder): Matched placeholder key='{key}'")
-            val = get_value_from_context(key, context) # get_value_from_context now has its own detailed logging
-            logger.debug(f"render_html_template (replace_placeholder): Value for key='{key}': '{str(val)[:100]}'")
+            # More verbose logging for specific keys of interest
+            if key in ["main_image_path", "seller.logo_url", "doc.logo_path"]:
+                logger.info(f"render_html_template (replace_placeholder): SPECIAL KEY MATCHED key='{key}'")
+            else:
+                logger.debug(f"render_html_template (replace_placeholder): Matched placeholder key='{key}'")
+
+            val = get_value_from_context(key, context)
+
+            if key in ["main_image_path", "seller.logo_url", "doc.logo_path"]:
+                logger.info(f"render_html_template (replace_placeholder): SPECIAL KEY VALUE for key='{key}': '{str(val)[:200]}'")
+            else:
+                logger.debug(f"render_html_template (replace_placeholder): Value for key='{key}': '{str(val)[:100]}'")
             return str(val)
 
+        # Log template before and after main placeholder substitution
+        # logger.debug(f"render_html_template: Template BEFORE simple placeholder substitution:\n{processed_template[:1000]}")
         processed_template = re.sub(r'\{\{([^}]+?)\}\}', replace_placeholder, processed_template)
+        # logger.debug(f"render_html_template: Template AFTER simple placeholder substitution:\n{processed_template[:1000]}")
+
+        if "{{ main_image_path }}" in processed_template or "{{ seller.logo_url }}" in processed_template:
+            logger.warning("render_html_template: Placeholders for main_image_path or seller.logo_url still exist in processed_template before returning!")
+            logger.debug(f"Problematic template snippet (around main_image_path): {processed_template[max(0, processed_template.find('main_image_path')-20):processed_template.find('main_image_path')+40]}")
+            logger.debug(f"Problematic template snippet (around seller.logo_url): {processed_template[max(0, processed_template.find('seller.logo_url')-20):processed_template.find('seller.logo_url')+40]}")
+
 
         logger.debug("render_html_template: FINISHED processing template successfully.")
         return processed_template
