@@ -1786,6 +1786,44 @@ class ClientWidget(QWidget):
         self.notes_group_box.toggled.connect(self._handle_notes_section_toggled)
         self.tabs_group_box.toggled.connect(self._handle_tabs_section_toggled)
 
+    def handle_create_new_version_clicked(self, old_document_id, source_template_id):
+        """
+        Handles the click of the 'Create New Version' button for a document.
+        Opens CreateDocumentDialog with parameters to indicate versioning.
+        """
+        if not self.client_info or not self.client_info.get('client_id'):
+            QMessageBox.warning(self, self.tr("Erreur Client"), self.tr("Informations client non disponibles."))
+            return
+
+        if not old_document_id or not source_template_id:
+            QMessageBox.warning(self, self.tr("Données Manquantes"), self.tr("ID du document original ou ID du modèle source manquant."))
+            return
+
+        logging.info(f"Creating new version for old_doc_id: {old_document_id}, using source_template_id: {source_template_id}")
+
+        # Ensure CreateDocumentDialog is available
+        if not hasattr(self, 'CreateDocumentDialog') or self.CreateDocumentDialog is None:
+            logging.error("CreateDocumentDialog is not available in ClientWidget for versioning.")
+            QMessageBox.critical(self, self.tr("Erreur Composant"), self.tr("Le composant de création de document n'est pas chargé."))
+            return
+
+        dialog = self.CreateDocumentDialog(
+            client_info=self.client_info,
+            config=self.config,
+            current_user_id=self.current_user_id, # Pass current_user_id
+            parent=self,
+            template_data={'template_id': source_template_id}, # To pre-select the original template
+            old_document_id_to_version=old_document_id      # Pass the ID of the document to version
+        )
+
+        if dialog.exec_() == QDialog.Accepted:
+            self.populate_doc_table()  # Refresh documents tab to show the new version
+            self.notification_manager.show(
+                self.tr("Nouvelle Version Créée"),
+                self.tr("Une nouvelle version du document a été créée avec succès."),
+                type='SUCCESS'
+            )
+
     def delete_client_document_entry(self, document_id, file_path):
         """
         Deletes a client document entry from the database and the corresponding file from disk.
@@ -3980,6 +4018,7 @@ class ClientWidget(QWidget):
 
             filtered_list = [] # Initialize filtered_list
 
+
             # --- Path Correction: Use absolute path directly ---
             base_client_path_abs = self.client_info.get("default_base_folder_path")
             if not base_client_path_abs: # Fallback
@@ -4149,6 +4188,29 @@ class ClientWidget(QWidget):
                 btn_download_quick.setProperty("file_name", doc_name) # Original name for download
                 btn_download_quick.clicked.connect(self.on_download_doc_button_clicked)
                 quick_actions_layout.addWidget(btn_download_quick)
+
+                # Button for "New Version"
+                btn_new_version = QPushButton("")
+                btn_new_version.setProperty("class", "tableActionButton")
+                btn_new_version.setIcon(QIcon(":/icons/plus-square.svg")) # Placeholder icon
+                btn_new_version.setToolTip(self.tr("Créer une nouvelle version de ce document"))
+                btn_new_version.setFixedSize(28, 28)
+
+                source_template_id_for_version = doc_data.get('source_template_id')
+                if source_template_id_for_version and can_manage_docs: # Enable only if it's from a template and user has permission
+                    btn_new_version.clicked.connect(
+                        lambda checked, doc_id=document_id, templ_id=source_template_id_for_version: \
+                        self.handle_create_new_version_clicked(doc_id, templ_id)
+                    )
+                else:
+                    btn_new_version.setEnabled(False)
+                    if not source_template_id_for_version:
+                        btn_new_version.setToolTip(self.tr("Impossible de créer une version pour un document non basé sur un modèle."))
+                    elif not can_manage_docs:
+                         btn_new_version.setToolTip(self.tr("Permissions insuffisantes pour créer une nouvelle version."))
+
+
+                quick_actions_layout.addWidget(btn_new_version)
 
                 quick_actions_layout.addStretch()
                 quick_actions_widget.setLayout(quick_actions_layout)
