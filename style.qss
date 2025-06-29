@@ -1171,6 +1171,69 @@ QPushButton#moreFiltersButton:checked { /* When active/expanded */
     color: #007BFF;
 }
 
+/* == END OF MENU STYLING ENHANCEMENTS == */
+
+/* HomePageWidget Specific Styles */
+QWidget#HomePageWidget {
+    background-color: #F5F7FA; /* Secondary Background, plus doux que blanc pur */
+    /* Ou un dégradé léger :
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                stop:0 #FFFFFF, stop:1 #F0F4F8);
+    */
+}
+
+QLabel#homePageWelcomeLabel {
+    color: #007BFF; /* Couleur accentuée du thème */
+    font-family: "Open Sans", "Segoe UI", Arial, sans-serif; /* Assurer la cohérence */
+    /* Pour une ombre de texte (peut être coûteux en performance, à tester) :
+       text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1); (Pas directement supporté en QSS standard)
+       Alternative : utiliser un QLabel superposé avec un offset léger et une couleur plus sombre.
+       Pour l'instant, je vais me concentrer sur la couleur et la police.
+    */
+    padding-bottom: 10px; /* Un peu d'espace en dessous */
+    background-color: transparent; /* S'assurer qu'il n'y a pas de fond coloré par défaut */
+}
+
+/* HomePageWidget Button Styles (Cartes de Module) */
+QWidget#homePageButtonGridContainer QPushButton {
+    background-color: #FFFFFF; /* Fond blanc pour l'aspect carte */
+    border: 1px solid #DDE2E6; /* Bordure légère et moderne */
+    border-radius: 12px;       /* Coins plus arrondis */
+    padding: 20px;
+    font-size: 14px;
+    font-weight: bold;
+    color: #333333;
+    text-align: center;
+    min-height: 120px; /* Hauteur augmentée pour icône + texte */
+    min-width: 200px;  /* Largeur augmentée */
+    /* transition: all 0.2s ease-in-out; */ /* Pour des transitions douces (pas universellement supporté en QSS) */
+    /* Effet d'ombre via bordure plus foncée en bas et à droite pour simuler la profondeur */
+    border-bottom-width: 2px;
+    border-right-width: 2px;
+    border-bottom-color: #C0C6CC;
+    border-right-color: #C0C6CC;
+}
+
+QWidget#homePageButtonGridContainer QPushButton:hover {
+    background-color: #E3F2FD; /* Bleu très clair au survol, rappel de l'accent */
+    border-color: #007BFF;     /* Bordure accentuée au survol */
+    color: #0056B3;            /* Texte plus foncé au survol */
+    /* Léger agrandissement au survol si possible (pas direct en QSS, mais l'effet de bordure peut aider) */
+    border-bottom-width: 2px; /* Maintenir l'effet d'ombre */
+    border-right-width: 2px;
+    border-bottom-color: #0056B3; /* Ombre plus prononcée */
+    border-right-color: #0056B3;
+}
+
+QWidget#homePageButtonGridContainer QPushButton:pressed {
+    background-color: #CCE5FF; /* Bleu un peu plus foncé quand pressé */
+    border-color: #004085;
+    color: #004085;
+}
+
+/* Style pour les icônes à l'intérieur des boutons de la page d'accueil si nécessaire */
+/* Actuellement, la taille est définie en Python. On pourrait ajouter des filtres ou des effets ici si Qt le supporte. */
+/* QWidget#homePageButtonGridContainer QPushButton::icon { ... } */
 /* Reset Filters Button */
 QPushButton#resetFiltersButton {
     background-color: #FFFFFF;

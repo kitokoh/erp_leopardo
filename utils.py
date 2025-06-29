@@ -225,6 +225,7 @@ def generate_pdf_for_document(
     output_pdf_filename = f"{file_name}_{current_timestamp_str}.pdf" # Changed to use timestamp
     output_pdf_path = os.path.join(os.path.dirname(source_file_path), output_pdf_filename)
 
+
     # Fetch default company ID for context data
     default_company_obj = db_manager.get_default_company()
     default_company_id = default_company_obj['company_id'] if default_company_obj else None
