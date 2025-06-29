@@ -28,7 +28,8 @@ else:
 
 from main_window import DocumentManager # The main application window
 
-from main_window import DocumentManager # The main application window
+# Import DocumentManager later, after QApplication is created.
+# from main_window import DocumentManager
 
 import logging # For main.py's own logging needs, and for translator parts if setup_logging isn't called first
 import icons_rc # Import the compiled resource file
@@ -164,6 +165,10 @@ def main():
 
     # 4. Create QApplication Instance
     app = QApplication(sys.argv)
+
+    # ***** IMPORT DE DocumentManager DÉPLACÉ ICI *****
+    from main_window import DocumentManager # <<<< IMPORT TARDIF
+
 
     # Attempt to initialize QtWebEngine context early
     try:
