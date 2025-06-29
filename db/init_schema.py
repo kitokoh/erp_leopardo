@@ -10,7 +10,7 @@ from sqlalchemy import create_engine # Added create_engine
 import sys # Ensure sys is imported for path manipulation
 
 # Get the project root directory
-# This allows importing config.py from the root
+# This allows importing config.py from the root and db.connection
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
@@ -26,6 +26,20 @@ except ImportError:
         # Add other necessary fallbacks if init_schema.py uses them directly
         # For example, APP_ROOT_DIR if it were used directly for paths here.
     config = config_fallback
+
+# Import the main SQLAlchemy components from db.connection
+try:
+    from db.connection import Base as MainBase, engine as main_engine
+    # Import specific models that use MainBase and need table creation here
+    from calculator.models import CalculationHistory
+    # from other_module.models import OtherModelUsingMainBase # Example for future models
+    MAIN_SQLALCHEMY_COMPONENTS_LOADED = True
+except ImportError as e_main_sqlalchemy:
+    logging.error(f"db.init_schema: Could not import MainBase or main_engine from db.connection: {e_main_sqlalchemy}. Tables using MainBase (e.g., CalculatorHistory) might not be created by this script.")
+    MAIN_SQLALCHEMY_COMPONENTS_LOADED = False
+    MainBase = None # Ensure it's None so later checks don't fail with NameError
+    main_engine = None
+
 
 from auth.roles import SUPER_ADMIN
 
@@ -1057,20 +1071,57 @@ CREATE TABLE IF NOT EXISTS Templates (
         source_template_id INTEGER, version_tag TEXT, notes TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         created_by_user_id TEXT,
+        is_deleted INTEGER DEFAULT 0,
+        deleted_at TEXT,
         FOREIGN KEY (client_id) REFERENCES Clients (client_id),
         FOREIGN KEY (project_id) REFERENCES Projects (project_id),
         FOREIGN KEY (source_template_id) REFERENCES Templates (template_id),
-        FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id)
+        FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id),
+        FOREIGN KEY (parent_document_id) REFERENCES ClientDocuments (document_id) ON DELETE SET NULL
     )""")
+
+    # Ensure is_deleted, deleted_at, order_identifier, parent_document_id, is_latest_version columns exist
     cursor.execute("PRAGMA table_info(ClientDocuments)")
-    columns_cd = [column['name'] for column in cursor.fetchall()]
-    if 'order_identifier' not in columns_cd:
+    cd_columns_info = cursor.fetchall()
+    cd_column_names = [info['name'] for info in cd_columns_info]
+
+    if 'order_identifier' not in cd_column_names:
         try:
             cursor.execute("ALTER TABLE ClientDocuments ADD COLUMN order_identifier TEXT")
             print("Added 'order_identifier' column to ClientDocuments table.")
-            # No commit here
         except sqlite3.Error as e:
             print(f"Error adding 'order_identifier' column to ClientDocuments: {e}")
+
+    if 'is_deleted' not in cd_column_names:
+        try:
+            cursor.execute("ALTER TABLE ClientDocuments ADD COLUMN is_deleted INTEGER DEFAULT 0")
+            print("Added 'is_deleted' column to ClientDocuments table.")
+        except sqlite3.Error as e_alter_cd_is_deleted:
+            print(f"Error adding 'is_deleted' column to ClientDocuments table: {e_alter_cd_is_deleted}")
+
+    if 'deleted_at' not in cd_column_names:
+        try:
+            cursor.execute("ALTER TABLE ClientDocuments ADD COLUMN deleted_at TEXT")
+            print("Added 'deleted_at' column to ClientDocuments table.")
+        except sqlite3.Error as e_alter_cd_deleted_at:
+            print(f"Error adding 'deleted_at' column to ClientDocuments table: {e_alter_cd_deleted_at}")
+
+    if 'parent_document_id' not in cd_column_names:
+        try:
+            # SQLite does not allow adding a FOREIGN KEY constraint via ALTER TABLE in older versions.
+            # The constraint is defined in CREATE TABLE for new DBs.
+            # For existing DBs, this adds the column. App logic must handle relationships if FK isn't enforced by DB.
+            cursor.execute("ALTER TABLE ClientDocuments ADD COLUMN parent_document_id TEXT")
+            print("Added 'parent_document_id' column to ClientDocuments table.")
+        except sqlite3.Error as e_alter_cd_parent_id:
+            print(f"Error adding 'parent_document_id' column to ClientDocuments table: {e_alter_cd_parent_id}")
+
+    if 'is_latest_version' not in cd_column_names:
+        try:
+            cursor.execute("ALTER TABLE ClientDocuments ADD COLUMN is_latest_version INTEGER DEFAULT 1")
+            print("Added 'is_latest_version' column to ClientDocuments table.")
+        except sqlite3.Error as e_alter_cd_is_latest:
+            print(f"Error adding 'is_latest_version' column to ClientDocuments table: {e_alter_cd_is_latest}")
 
     # Create ClientDocumentNotes table (from ca.py)
     cursor.execute("""
@@ -2099,6 +2150,22 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     print("DEBUG_INIT_DB: Indexes for Company Expense and Facture tables created or already exist.")
     # --- End Company Expense Module Tables and Indexes ---
 
+    # --- UserSavedFilters Table (Added for filter saving functionality) ---
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS user_saved_filters (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        filter_name TEXT NOT NULL,
+        filter_parameters_json TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE,
+        UNIQUE (user_id, filter_name)
+    )
+    """)
+    print("DEBUG_INIT_DB: Table user_saved_filters created or exists.")
+    # --- End UserSavedFilters Table ---
+
     # Commit schema changes made via raw SQLite connection before proceeding to SQLAlchemy part
     try:
         logging.info("DEBUG_INIT_DB: Committing main schema/index changes before accounting module DDL.")
@@ -2218,6 +2285,18 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_type ON UserCalendarEvents(event_type)")
     print("DEBUG_INIT_DB: Indexes for Calendar Module created or already exist.")
     # --- End Calendar Module Tables ---
+
+    # --- Create tables for MainBase (e.g., CalculatorHistory) ---
+    if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None and main_engine is not None:
+        try:
+            logging.info("DEBUG_INIT_DB: Creating tables for MainBase (e.g., CalculatorHistory) using SQLAlchemy main_engine.")
+            MainBase.metadata.create_all(bind=main_engine, checkfirst=True)
+            logging.info("DEBUG_INIT_DB: Tables for MainBase created successfully.")
+        except Exception as e_main_base_create:
+            logging.error(f"DEBUG_INIT_DB: Error creating tables for MainBase: {e_main_base_create}", exc_info=True)
+            # Decide if this is critical enough to rollback or raise. For now, logging error.
+    else:
+        logging.warning("DEBUG_INIT_DB: Main SQLAlchemy components (MainBase, main_engine) not loaded. Skipping MainBase.metadata.create_all().")
 
 
     # --- Seed Data (from db/schema.py, ensuring use of db_config) ---

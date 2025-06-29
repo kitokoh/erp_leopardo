@@ -43,15 +43,15 @@ debug.log
 *.swp
 
 ### Fichiers de sortie et assets générés ###
-*.pdf
-*.png
-*.jpg
-*.jpeg
-*.gif
-*.svg
-*.ico
-*.xlsx
-*.csv
+# *.pdf
+# *.png
+# *.jpg
+# *.jpeg
+# *.gif
+# *.svg
+# *.ico
+# *.xlsx
+# *.csv
 *.dat
 *.data
 

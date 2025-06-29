@@ -1,40 +1,61 @@
-numpy==2.2.6
-pandas==2.2.3
-PyPDF2==3.0.1
+# Core Application & UI
 PyQt5==5.15.11
 PyQt5-Qt5==5.15.2
 PyQt5_sip==12.17.0
+
+# Document Handling
+openpyxl>=3.0.0
+python-docx>=0.8.0
+lxml>=4.5.0 # Dependency for python-docx
+PyPDF2==3.0.1
+WeasyPrint>=50.0 # For PDF generation from HTML
+
+# API & Web Services
+fastapi>=0.100.0
+uvicorn[standard]>=0.20.0
+httpx>=0.23.0 # HTTP client for FastAPI tests and potentially other services
+h11>=0.12.0 # Required by Uvicorn
+
+# Database & ORM
+SQLAlchemy>=1.4.0
+aiofiles==24.1.0 # For async file operations, often with FastAPI
+
+# Authentication & Security
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+email-validator>=2.0.0 # For Pydantic EmailStr validation
+werkzeug>=2.0.0 # For password hashing, and other utilities
+
+# Data Handling & Utilities
+numpy==2.2.6
+pandas==2.2.3
 python-dateutil==2.9.0.post0
 pytz==2025.2
 six==1.17.0
 tzdata==2025.2
-WeasyPrint>=50.0
-openpyxl>=3.0
-python-docx>=0.8
-lxml>=4.5.0 # Added explicit dependency for python-docx
-fastapi>=0.100.0
-uvicorn[standard]>=0.20.0
-python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
-pytest>=7.0.0
-httpx>=0.23.0
-# SpeechRecognition
-# pywhatkit
-watchdog
-# PyAudio
-holidays>=0.23 # For calendar public holidays, version might need adjustment
-h11>=0.12.0 # Required by Uvicorn for HTTP tooling
-pytest>=7.0.0 # Added for running tests
-SQLAlchemy>=1.4.0 # Added for ORM
-email-validator>=2.0.0 # Added for Pydantic EmailStr validation
-aiofiles==24.1.0
+watchdog # For monitoring file system events
+
+# Calendar & Holidays
+holidays>=0.23 # For calendar public holidays
+
+# Media & Graphics (Note: some duplicates were removed)
 pyqtgraph==0.13.7
-matplotlib==3.10.3
+matplotlib==3.10.3 # Check if used directly or only via pyqtgraph. If latter, could be transitive.
 folium==0.20.0
-SpeechRecognition==3.14.3
-pyqtgraph==0.13.7
-matplotlib==3.10.3
-folium==0.20.0
-SpeechRecognition==3.14.3
 opencv-python-headless==4.11.0.86
-werkzeug>=2.0.0 # For password hashing
+
+# Development & Testing Tools
+pytest>=7.0.0
+pytest-qt>=4.0.0
+python-multipart>=0.0.5 # For FastAPI form data
+black>=23.0.0
+flake8>=6.0.0
+icalendar>=5.0.0 # For conference_manager tests
+reportlab>=3.6.0 # For excel_editor
+PyQtWebEngine>=5.15.5 # For QtWebEngineWidgets
+isort>=5.10.0
+
+# Optional/Experimental (Review if needed)
+SpeechRecognition==3.14.3 # Voice input, ensure it's truly used or move to optional
+# pywhatkit # For WhatsApp integration, review usage
+PyAudio # Dependency for SpeechRecognition with microphones

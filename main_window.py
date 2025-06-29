@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
+from PyQt5.QtCore import QDate
 
 # --- BEGIN WORKAROUND for ModuleNotFoundError ---
 # Ensure the project root is in sys.path when main_window.py is loaded.
@@ -47,7 +48,7 @@ from PyQt5.QtWidgets import (
 
 )
 from PyQt5.QtGui import QIcon, QDesktopServices, QFont
-from PyQt5.QtCore import Qt, QUrl, QTimer, pyqtSlot, QByteArray # Added QByteArray
+from PyQt5.QtCore import Qt, QUrl, QTimer, pyqtSlot, QByteArray, QDate # Added QDate
 # QWebEngineView might still be used by ClientWidget or other parts, so keep for now unless confirmed unused.
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 # from PyQt5.QtWebChannel import QWebChannel # QWebChannel removed as DocumentManager no longer uses its own map.
@@ -101,14 +102,19 @@ except Exception:
     pass
 # --- END TARGETED sys.path FIX ---
 from product_management.page import ProductManagementPage # Added
+from PyQt5.QtWidgets import QSizePolicy
 
 from dialogs.status_management_dialog import StatusManagementDialog # Added for status management
+from dialogs.manage_saved_filters_dialog import ManageSavedFiltersDialog # Import for managing saved filters
+
+from PyQt5.QtWidgets import QDateEdit
 
 
-from client_widget import ClientWidget
+
+from client_management.client_widget import ClientWidget
 from project_management import MainDashboard as ProjectManagementDashboard
 from statistics_module import StatisticsDashboard
-from statistics_panel import CollapsibleStatisticsWidget
+# from statistics_panel import CollapsibleStatisticsWidget # Unused in main_window
 
 from utils import save_config
 from company_management import CompanyTabWidget
@@ -121,6 +127,8 @@ from partners.partner_main_widget import PartnerMainWidget # Partner Management
 from inventory_browser_widget import InventoryBrowserWidget # Inventory Management
 from camera_management.camera_management_widget import CameraManagementWidget # Camera Management
 
+from PyQt5.QtGui import QColor, QPalette # For ClientListItemWidget text color
+
 from recruitment.recruitment_dashboard import RecruitmentDashboard # Import RecruitmentDashboard
 
 from ui.home.home_page_widget import HomePageWidget # Updated import path
@@ -129,9 +137,15 @@ from download_monitor_service import DownloadMonitorService
 from dialogs.assign_document_dialog import AssignDocumentToClientDialog
 from db.cruds.client_documents_crud import add_client_document # For assign dialog
 import os # For path checks in download monitor init
+from db.cruds import user_saved_filters_crud # Import for saved filters
 
 from calendar_module.calendar_widget import CalendarWidget # Import CalendarWidget
 from user_management.page import UserManagementPage # Import UserManagementPage
+
+from calculator.main_calculator_widget import MainCalculatorWidget # Import Calculator Widget
+# from db.connection import SessionLocal as AppSessionLocal_MW # Import SessionLocal for calculator
+from user_management.user_menu_button import UserMenuButton # Import UserMenuButton
+from dialogs.edit_user_dialog import EditUserDialog # For handling edit/add user requests
 
 # Definition of configurable modules
 CONFIGURABLE_MODULES = [
@@ -146,8 +160,86 @@ CONFIGURABLE_MODULES = [
     # Add Calendar module here - for now, not making it 'configurable' via DB setting, always enabled.
     # If it needs to be configurable, add a 'key' and handle its state in _load_module_states and settings.
     {'key': 'module_calendar_enabled', 'name': 'calendar', 'action_attr': 'calendar_module_action', 'widget_attr': 'calendar_module_widget_instance'},
-    {'key': 'module_camera_management_enabled', 'name': 'camera_management', 'action_attr': 'camera_management_action', 'widget_attr': 'camera_management_widget_instance'}
+    {'key': 'module_camera_management_enabled', 'name': 'camera_management', 'action_attr': 'camera_management_action', 'widget_attr': 'camera_management_widget_instance'},
+    {'key': 'module_calculator_enabled', 'name': 'calculator', 'action_attr': 'calculator_module_action', 'widget_attr': 'calculator_module_widget_instance'} # Added Calculator module
 ]
+
+class ClientListItemWidget(QWidget):
+    def __init__(self, client_data, parent=None):
+        super().__init__(parent)
+        self.client_data = client_data
+        # Get the main DocumentManager instance to call its methods (like tr)
+        # This assumes ClientListItemWidget is instantiated with DocumentManager as an ancestor or direct parent.
+        # A more robust way might be to pass DocumentManager instance if deeply nested.
+        self.doc_manager = parent # Assuming parent is DocumentManager or provides tr
+        while self.doc_manager and not isinstance(self.doc_manager, DocumentManager):
+            self.doc_manager = self.doc_manager.parent()
+
+        if not self.doc_manager:
+            # Fallback if DocumentManager not found in parent hierarchy
+            # This might happen if parent is QListWidget, then its parent etc.
+            # For simplicity, we assume it can be found or tr will work via QCoreApplication.translate
+            # A cleaner way is to pass doc_manager instance explicitly if this becomes an issue.
+            # logging.warning("ClientListItemWidget: DocumentManager instance not found via parent hierarchy.")
+            pass
+
+        self.init_ui()
+
+    def _tr(self, text):
+        if self.doc_manager and hasattr(self.doc_manager, 'tr'):
+            return self.doc_manager.tr(text)
+        return QApplication.translate("ClientListItemWidget", text) # Fallback
+
+    def init_ui(self):
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(5, 3, 5, 3)
+        main_layout.setSpacing(1) # Reduced spacing
+
+        # Line 1: Status Icon + Client Name
+        line1_layout = QHBoxLayout()
+        line1_layout.setSpacing(4)
+
+        status_icon_label = QLabel()
+        status_name = self.client_data.get("status", "")
+        icon_html = self._get_status_icon_html(status_name)
+        status_icon_label.setText(icon_html)
+        status_icon_label.setFixedWidth(12) # Adjusted for typical font size of icon
+        line1_layout.addWidget(status_icon_label)
+
+        client_name_label = QLabel(f"<b>{self.client_data.get('client_name', 'N/A')}</b>")
+        client_name_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        line1_layout.addWidget(client_name_label)
+        line1_layout.addStretch()
+        main_layout.addLayout(line1_layout)
+
+        # Line 2: Additional Info (e.g., Project Identifier)
+        project_identifier = self.client_data.get('project_identifier', '')
+        if project_identifier:
+            additional_info_label = QLabel(f"<small>{self._tr('Projet:')} {project_identifier}</small>")
+            additional_info_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+
+            palette = additional_info_label.palette()
+            palette.setColor(QPalette.WindowText, QColor(Qt.darkGray))
+            additional_info_label.setPalette(palette)
+
+            additional_info_layout = QHBoxLayout()
+            additional_info_layout.addSpacing(15)
+            additional_info_layout.addWidget(additional_info_label)
+            additional_info_layout.addStretch()
+            main_layout.addLayout(additional_info_layout)
+
+        self.setStyleSheet("background:transparent;")
+
+    def _get_status_icon_html(self, status_name_str):
+        status_lower = status_name_str.lower() if status_name_str else ""
+        # Colors chosen for visibility against typical delegate backgrounds
+        if "actif" in status_lower or "active" in status_lower: return "<span style='font-size:10pt; color: #28A745;'>●</span>" # Green
+        elif "prospect" in status_lower: return "<span style='font-size:10pt; color: #007BFF;'>●</span>" # Blue
+        elif "inactif" in status_lower or "inactive" in status_lower: return "<span style='font-size:10pt; color: #FFC107;'>●</span>" # Yellow/Orange
+        elif "archivé" in status_lower or "archived" in status_lower: return "<span style='font-size:10pt; color: #6c757d;'>●</span>" # Grey
+        elif "complété" in status_lower or "completed" in status_lower: return "<span style='font-size:10pt; color: #663399;'>●</span>" # Purple
+        else: return "<span style='font-size:10pt; color: #343A40;'>○</span>" # Dark Grey/Black circle for others
+
 
 class DocumentManager(QMainWindow):
     def __init__(self, app_root_dir, current_user_info: dict): # Changed current_user_id to current_user_info
@@ -272,6 +364,22 @@ class DocumentManager(QMainWindow):
         self.user_management_page_instance = UserManagementPage(current_user_info=self.current_user_info, parent=self)
         self.main_area_stack.addWidget(self.user_management_page_instance)
 
+        # Calculator Module
+        if self.module_states.get('calculator', True): # Default to True if not in DB settings yet
+            # Pass self as app_auth_manager (it holds current_user_info and can have methods)
+            # Pass AppSessionLocal_MW as db_session_factory
+            self.calculator_module_widget_instance = MainCalculatorWidget(
+                parent=self,
+                app_auth_manager=self, # DocumentManager can act as a source for user info
+                db_session_factory=None
+            )
+            self.main_area_stack.addWidget(self.calculator_module_widget_instance)
+            logging.info("DocumentManager: Calculator module widget instance created and added to stack.")
+        else:
+            self.calculator_module_widget_instance = None
+            logging.info("DocumentManager: Calculator module disabled, widget not created.")
+
+
         self.main_area_stack.setCurrentWidget(self.home_page_widget_instance) # Set Home Page as default view
         self.create_actions_main(); self.create_menus_main() # Menus and actions are created before _apply_permissions
         
@@ -282,6 +390,38 @@ class DocumentManager(QMainWindow):
         # self.update_integrated_map() # Method removed
         self.check_timer = QTimer(self); self.check_timer.timeout.connect(self.check_old_clients_routine_slot); self.check_timer.start(3600000)
         self.init_or_update_download_monitor() # Initialize or update based on config
+        self.populate_saved_filters_combo() # Populate saved filters on init
+
+
+        # Set bottom widget for HomePageWidget if statistics module is enabled
+        if self.home_page_widget_instance and hasattr(self.home_page_widget_instance, 'set_bottom_widget'):
+            stats_widget_instance = self.get_statistics_widget_instance()
+            if stats_widget_instance:
+                self.home_page_widget_instance.set_bottom_widget(stats_widget_instance)
+            else: # Optionally hide or set a default placeholder if stats are disabled/unavailable
+                self.home_page_widget_instance.set_bottom_widget(None)
+
+
+    def get_statistics_widget_instance(self):
+        """Returns the instance of the statistics dashboard if available."""
+        if self.module_states.get('statistics', True) and hasattr(self, 'statistics_dashboard_instance'):
+            return self.statistics_dashboard_instance
+        return None
+
+        # Set bottom widget for HomePageWidget if statistics module is enabled
+        if self.home_page_widget_instance and hasattr(self.home_page_widget_instance, 'set_bottom_widget'):
+            stats_widget_instance = self.get_statistics_widget_instance()
+            if stats_widget_instance:
+                self.home_page_widget_instance.set_bottom_widget(stats_widget_instance)
+            else: # Optionally hide or set a default placeholder if stats are disabled/unavailable
+                self.home_page_widget_instance.set_bottom_widget(None)
+
+
+    def get_statistics_widget_instance(self):
+        """Returns the instance of the statistics dashboard if available."""
+        if self.module_states.get('statistics', True) and hasattr(self, 'statistics_dashboard_instance'):
+            return self.statistics_dashboard_instance
+        return None
 
         # Set bottom widget for HomePageWidget if statistics module is enabled
         if self.home_page_widget_instance and hasattr(self.home_page_widget_instance, 'set_bottom_widget'):
@@ -524,76 +664,161 @@ class DocumentManager(QMainWindow):
         filter_search_group = QGroupBox(self.tr("Filtres et Recherche Clients"))
         filter_search_main_layout = QVBoxLayout(filter_search_group) # Changed to QVBoxLayout
 
-        # --- Status and Archive Filters Group (Horizontal) ---
-        status_archive_filter_group_layout = QHBoxLayout()
+        # --- Top line filters (Status, Search, More Filters button) ---
+        top_filter_line_layout = QHBoxLayout()
 
         # Status Filter
-        status_filter_layout = QVBoxLayout()
-        status_label = QLabel(self.tr("Statut:"))
+        # status_filter_layout_group = QWidget() # Use a QWidget as a container for label and combo
+        # status_filter_v_layout = QVBoxLayout(status_filter_layout_group)
+        # status_filter_v_layout.setContentsMargins(0,0,0,0)
+        # status_label = QLabel(self.tr("Statut:")) # Label for status
         self.status_filter_combo = QComboBox(); self.status_filter_combo.addItem(self.tr("Tous les statuts"), None)
         self.load_statuses_into_filter_combo(); self.status_filter_combo.currentIndexChanged.connect(self.filter_client_list_display_slot)
-        status_filter_layout.addWidget(status_label)
-        status_filter_layout.addWidget(self.status_filter_combo)
-        status_archive_filter_group_layout.addLayout(status_filter_layout)
+        self.status_filter_combo.setToolTip(self.tr("Filtrer par statut"))
+        # status_filter_v_layout.addWidget(status_label)
+        # status_filter_v_layout.addWidget(self.status_filter_combo)
+        top_filter_line_layout.addWidget(self.status_filter_combo) # Add combo directly
 
-        # Archive Filter
-        archive_filter_layout = QVBoxLayout()
+        # Search Input
+        # search_input_layout_group = QWidget() # Container for label and input
+        # search_input_v_layout = QVBoxLayout(search_input_layout_group)
+        # search_input_v_layout.setContentsMargins(0,0,0,0)
+        # self.search_label = QLabel(self.tr("Recherche:")) # Label for search
+        # self.search_label.setVisible(False) # Hide label for compactness
+        self.search_input_field = QLineEdit(); self.search_input_field.setPlaceholderText(self.tr("Rechercher client..."))
+        self.search_input_field.textChanged.connect(self.filter_client_list_display_slot)
+        # search_input_v_layout.addWidget(self.search_label)
+        # search_input_v_layout.addWidget(self.search_input_field)
+        top_filter_line_layout.addWidget(self.search_input_field) # Add input directly
+
+        top_filter_line_layout.addStretch(1) # Pushes search and status to left, allows buttons to be at the end
+
+        # "More Filters" Button (Icon Only)
+        self.more_filters_button = QPushButton("") # No text
+        self.more_filters_button.setObjectName("moreFiltersButton")
+        self.more_filters_button.setIcon(QIcon(":/icons/chevron-down.svg"))
+        self.more_filters_button.setCheckable(True)
+        self.more_filters_button.toggled.connect(self.toggle_more_filters_visibility)
+        self.more_filters_button.setToolTip(self.tr("Afficher/Masquer plus de filtres"))
+        top_filter_line_layout.addWidget(self.more_filters_button)
+
+        # "Réinitialiser Filtres" Button (Icon Only, moved to top line)
+        self.reset_filters_button = QPushButton("") # No text
+        self.reset_filters_button.setObjectName("resetFiltersButton")
+        self.reset_filters_button.setIcon(QIcon(":/icons/refresh-cw.svg"))
+        self.reset_filters_button.clicked.connect(self.reset_all_filters_slot)
+        self.reset_filters_button.setToolTip(self.tr("Réinitialiser tous les filtres"))
+        top_filter_line_layout.addWidget(self.reset_filters_button)
+
+        filter_search_main_layout.addLayout(top_filter_line_layout) # This is the single visible line of filters
+
+
+        # --- Collapsible Filter Widget ---
+        self.collapsible_filter_widget = QWidget()
+        collapsible_layout = QVBoxLayout(self.collapsible_filter_widget)
+        # Remove top margin if it creates unwanted space when hidden, or ensure widget is fully hidden
+        collapsible_layout.setContentsMargins(0, 2, 0, 0) # Minimal top margin when visible
+
+
+        # Archive Filter (moved into collapsible area)
+        archive_filter_layout_group = QWidget()
+        archive_filter_v_layout = QVBoxLayout(archive_filter_layout_group)
+        archive_filter_v_layout.setContentsMargins(0,0,0,0)
         archive_label = QLabel(self.tr("Filtre Archive:"))
         self.client_archive_filter_combo = QComboBox()
         self.client_archive_filter_combo.addItem(self.tr("Clients Actifs"), False)
         self.client_archive_filter_combo.addItem(self.tr("Clients Archivés (supprimés logiquement)"), True)
         self.client_archive_filter_combo.addItem(self.tr("Tout"), "all_status_types")
         self.client_archive_filter_combo.setCurrentIndex(0); self.client_archive_filter_combo.currentIndexChanged.connect(self.filter_client_list_display_slot)
-        archive_filter_layout.addWidget(archive_label)
-        archive_filter_layout.addWidget(self.client_archive_filter_combo)
-        status_archive_filter_group_layout.addLayout(archive_filter_layout)
-        status_archive_filter_group_layout.addStretch(1) # Push status/archive filters to the left
+        archive_filter_v_layout.addWidget(archive_label)
+        archive_filter_v_layout.addWidget(self.client_archive_filter_combo)
+        collapsible_layout.addWidget(archive_filter_layout_group)
 
-        filter_search_main_layout.addLayout(status_archive_filter_group_layout) # Add horizontal group to main vertical
-
-        # --- Country Filter Group (Horizontal) ---
-        country_filter_group_layout = QHBoxLayout()
-        country_filter_layout = QVBoxLayout()
+        # Country Filter (moved into collapsible area)
+        country_filter_layout_group = QWidget()
+        country_filter_v_layout = QVBoxLayout(country_filter_layout_group)
+        country_filter_v_layout.setContentsMargins(0,0,0,0)
         country_label = QLabel(self.tr("Pays:"))
         self.country_filter_combo = QComboBox()
         self.country_filter_combo.addItem(self.tr("Tous les pays"), None)
         self.load_countries_into_filter_combo()
         self.country_filter_combo.currentIndexChanged.connect(self.filter_client_list_display_slot)
-        country_filter_layout.addWidget(country_label)
-        country_filter_layout.addWidget(self.country_filter_combo)
-        country_filter_group_layout.addLayout(country_filter_layout)
-        country_filter_group_layout.addStretch(1) # Push country filter to the left
+        country_filter_v_layout.addWidget(country_label)
+        country_filter_v_layout.addWidget(self.country_filter_combo)
+        collapsible_layout.addWidget(country_filter_layout_group)
 
-        filter_search_main_layout.addLayout(country_filter_group_layout) # Add horizontal group to main vertical
+        # --- Date Filter Group (Horizontal, within collapsible area) ---
+        date_filter_group_layout = QHBoxLayout()
+        date_filter_label_start = QLabel(self.tr("Créé de:"))
+        self.date_filter_start = QDateEdit()
+        self.date_filter_start.setCalendarPopup(True)
+        # self.date_filter_start.setClearButtonEnabled(True)
+        self.date_filter_start.setDate(QDate()) # Null date initially
+        self.date_filter_start.setDisplayFormat("yyyy-MM-dd")
+        self.date_filter_start.dateChanged.connect(self.filter_client_list_display_slot)
 
-        # --- Search Input Group (Horizontal) ---
-        search_group_layout = QHBoxLayout()
-        # Original search_layout (QVBoxLayout for label + QHBoxLayout for icon/input)
-        search_layout = QVBoxLayout()
-        self.search_label = QLabel(self.tr("Recherche:"))
-        self.search_label.setVisible(False)
-        search_layout.addWidget(self.search_label)
+        date_filter_label_end = QLabel(self.tr("à:"))
+        self.date_filter_end = QDateEdit()
+        self.date_filter_end.setCalendarPopup(True)
+        # self.date_filter_end.setClearButtonEnabled(True)
 
-        search_bar_line_layout = QHBoxLayout()
-        self.search_icon_btn = QPushButton()
-        self.search_icon_btn.setIcon(QIcon.fromTheme("edit-find", QIcon(":/icons/search.svg")))
-        self.search_icon_btn.setToolTip(self.tr("Afficher/Cacher la barre de recherche"))
-        search_bar_line_layout.addWidget(self.search_icon_btn)
+        self.date_filter_end.setDate(QDate()) # Null date initially
+        self.date_filter_end.setDisplayFormat("yyyy-MM-dd")
+        self.date_filter_end.dateChanged.connect(self.filter_client_list_display_slot)
 
-        self.search_input_field = QLineEdit(); self.search_input_field.setPlaceholderText(self.tr("Rechercher client..."))
-        self.search_input_field.setVisible(False)
-        self.search_input_field.textChanged.connect(self.filter_client_list_display_slot)
-        search_bar_line_layout.addWidget(self.search_input_field)
+        date_filter_group_layout.addWidget(date_filter_label_start)
+        date_filter_group_layout.addWidget(self.date_filter_start)
+        date_filter_group_layout.addWidget(date_filter_label_end)
+        date_filter_group_layout.addWidget(self.date_filter_end)
+        date_filter_group_layout.addStretch(1)
+        collapsible_layout.addLayout(date_filter_group_layout)
+        # --- End Date Filter Group ---
 
-        search_layout.addLayout(search_bar_line_layout)
-        search_group_layout.addLayout(search_layout) # Add the search VBox to the HBox
-        search_group_layout.addStretch(1) # Push search elements to the left
+        self.collapsible_filter_widget.setVisible(False) # Initially hidden
+        filter_search_main_layout.addWidget(self.collapsible_filter_widget)
 
-        filter_search_main_layout.addLayout(search_group_layout) # Add horizontal group to main vertical
+        # --- Saved Filters UI ---
+        saved_filters_group = QGroupBox(self.tr("Filtres Sauvegardés")) # Optional: GroupBox for clarity
+        saved_filters_main_layout = QVBoxLayout(saved_filters_group)
 
-        self.search_icon_btn.clicked.connect(self.toggle_search_input_visibility)
+        load_filters_layout = QHBoxLayout()
+        load_filters_layout.addWidget(QLabel(self.tr("Charger:")))
+        self.load_filter_combo = QComboBox()
+        self.load_filter_combo.addItem(self.tr("--- Sélectionner un filtre ---"), None)
+        self.load_filter_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        load_filters_layout.addWidget(self.load_filter_combo)
+        self.manage_filters_button = QPushButton(self.tr("Gérer..."))
+        self.manage_filters_button.setIcon(QIcon(":/icons/settings.svg"))
+        self.manage_filters_button.setToolTip(self.tr("Gérer les filtres sauvegardés"))
+        self.manage_filters_button.clicked.connect(self.open_manage_filters_dialog_slot) # Connect placeholder
+        load_filters_layout.addWidget(self.manage_filters_button)
+        saved_filters_main_layout.addLayout(load_filters_layout)
 
-        filter_search_main_layout.addStretch(1) # Pushes all filter groups upwards if there's vertical space
+        # Connect signal for loading a saved filter
+        self.load_filter_combo.activated[int].connect(self.apply_saved_filter_slot)
+
+
+        save_filter_layout = QHBoxLayout()
+        self.saved_filter_name_input = QLineEdit()
+        self.saved_filter_name_input.setPlaceholderText(self.tr("Nom du nouveau filtre sauvegardé"))
+        save_filter_layout.addWidget(self.saved_filter_name_input)
+        self.save_filter_button = QPushButton(self.tr("Sauvegarder Actuel"))
+        self.save_filter_button.setIcon(QIcon(":/icons/save.svg"))
+        self.save_filter_button.setToolTip(self.tr("Sauvegarder la configuration actuelle des filtres"))
+        self.save_filter_button.clicked.connect(self.save_current_filter_slot) # Connect save button
+        save_filter_layout.addWidget(self.save_filter_button)
+        saved_filters_main_layout.addLayout(save_filter_layout)
+
+        filter_search_main_layout.addWidget(saved_filters_group) # Add the group to the main filter layout
+        # --- End Saved Filters UI ---
+
+        # Remove the previous layout for reset_button_layout as it's now on the top line
+        # filter_search_main_layout.addLayout(reset_button_layout) # This line is removed
+
+
+        # The main stretch for filter_search_main_layout should be removed if we want the client list
+        # to be directly under the collapsible_filter_widget (or top_filter_line_layout when collapsed).
+        # filter_search_main_layout.addStretch(1) # REMOVE THIS to prevent pushing client list down
         left_pane_layout.addWidget(filter_search_group)
 
         self.client_list_widget = QListWidget(); self.client_list_widget.setAlternatingRowColors(True)
@@ -607,9 +832,19 @@ class DocumentManager(QMainWindow):
         self.page_info_label = QLabel(self.tr("Page 1")); pagination_layout.addWidget(self.prev_page_button); pagination_layout.addWidget(self.page_info_label); pagination_layout.addWidget(self.next_page_button)
         left_pane_layout.addLayout(pagination_layout)
         
-        self.add_new_client_button = QPushButton(self.tr("Ajouter un Nouveau Client")); self.add_new_client_button.setIcon(QIcon(":/icons/user-add.svg")); self.add_new_client_button.setObjectName("primaryButton"); self.add_new_client_button.clicked.connect(self.open_add_new_client_dialog); left_pane_layout.addWidget(self.add_new_client_button)
+        # Buttons in a single row
+        client_actions_layout = QHBoxLayout()
+        self.add_new_client_button = QPushButton(self.tr("Ajouter Nouveau Client")); self.add_new_client_button.setIcon(QIcon(":/icons/user-add.svg")); self.add_new_client_button.setObjectName("primaryButton"); self.add_new_client_button.clicked.connect(self.open_add_new_client_dialog)
+        client_actions_layout.addWidget(self.add_new_client_button)
 
-        self.add_client_by_voice_button = QPushButton(self.tr("Ajouter Client par Voix")); self.add_client_by_voice_button.setIcon(QIcon(":/icons/mic.svg")); self.add_client_by_voice_button.setObjectName("primaryButton"); self.add_client_by_voice_button.clicked.connect(self.handle_add_client_by_voice_clicked); left_pane_layout.addWidget(self.add_client_by_voice_button)
+        self.add_client_by_voice_button = QPushButton(self.tr("Ajouter par Voix")); self.add_client_by_voice_button.setIcon(QIcon(":/icons/mic.svg")); self.add_client_by_voice_button.setObjectName("primaryButton")
+        self.add_client_by_voice_button.clicked.connect(self.handle_add_client_by_voice_clicked)
+        self.add_client_by_voice_button.setEnabled(False) # Disable as requested
+        self.add_client_by_voice_button.setToolTip(self.tr("Fonctionnalité en cours de développement"))
+        client_actions_layout.addWidget(self.add_client_by_voice_button)
+
+
+        left_pane_layout.addLayout(client_actions_layout)
 
         # map_group_box removed from here
         left_pane_widget.setLayout(left_pane_layout)
@@ -628,15 +863,16 @@ class DocumentManager(QMainWindow):
                 splitter_state_byte_array = QByteArray.fromHex(saved_splitter_state_hex.encode('utf-8'))
                 if not self.main_splitter.restoreState(splitter_state_byte_array):
                     logging.warning("Failed to restore splitter state, applying defaults.")
-                    self.main_splitter.setSizes([int(self.width() * 0.12), int(self.width() * 0.88)])
+                    self.main_splitter.setSizes([int(self.width() * 0.20), int(self.width() * 0.80)]) # Adjusted default
                 else:
                     logging.info("Client list splitter state restored.")
             except Exception as e:
                 logging.error(f"Error restoring splitter state: {e}. Applying defaults.", exc_info=True)
-                self.main_splitter.setSizes([int(self.width() * 0.12), int(self.width() * 0.88)])
+                self.main_splitter.setSizes([int(self.width() * 0.20), int(self.width() * 0.80)]) # Adjusted default
         else:
-            self.main_splitter.setSizes([int(self.width() * 0.12), int(self.width() * 0.88)])
-            logging.info("Client list splitter: No saved state found, applied default sizes 12/88.")
+            # Adjusted default splitter sizes: left pane 20%, right pane 80%
+            self.main_splitter.setSizes([int(self.width() * 0.20), int(self.width() * 0.80)])
+            logging.info("Client list splitter: No saved state found, applied default sizes 20/80.")
 
         self.main_splitter.splitterMoved.connect(self.save_splitter_state)
 
@@ -646,6 +882,46 @@ class DocumentManager(QMainWindow):
         self.documents_page_widget.setLayout(docs_page_layout)
 
         self.main_area_stack.addWidget(self.documents_page_widget)
+
+    def toggle_more_filters_visibility(self, checked):
+        self.collapsible_filter_widget.setVisible(checked)
+        if checked:
+            self.more_filters_button.setIcon(QIcon(":/icons/chevron-up.svg")) # Change icon to up
+            # self.more_filters_button.setText(self.tr("Moins de Filtres")) # Text removed
+        else:
+            self.more_filters_button.setIcon(QIcon(":/icons/chevron-down.svg")) # Change icon to down
+            # self.more_filters_button.setText(self.tr("Plus de Filtres")) # Text removed
+
+
+    def reset_all_filters_slot(self):
+        """Resets all filter inputs to their default states and refreshes the client list."""
+        logging.info("Resetting all filters.")
+
+        # Reset ComboBoxes to their first item (index 0)
+        self.status_filter_combo.setCurrentIndex(0)
+        self.client_archive_filter_combo.setCurrentIndex(0)
+        self.country_filter_combo.setCurrentIndex(0)
+
+        # Clear the search input field
+        self.search_input_field.setText("")
+
+        # Clear date filters
+        if hasattr(self, 'date_filter_start'): # Check if attributes exist (they should)
+            self.date_filter_start.setDate(QDate())
+        if hasattr(self, 'date_filter_end'):
+            self.date_filter_end.setDate(QDate())
+
+
+        # Collapse the "More Filters" section if it's open
+        if self.collapsible_filter_widget.isVisible():
+            self.more_filters_button.setChecked(False) # This will trigger toggle_more_filters_visibility
+
+        # Refresh the client list
+        # Calling filter_client_list_display_slot will also reset pagination and load from DB
+        self.filter_client_list_display_slot()
+
+        self.notify(self.tr("Filtres Réinitialisés"), self.tr("Tous les filtres ont été réinitialisés."), type='INFO')
+
 
     def save_splitter_state(self, pos, index):
         """Saves the current state of the main_splitter."""
@@ -729,7 +1005,9 @@ class DocumentManager(QMainWindow):
 
         self.settings_action = QAction(QIcon(":/icons/modern/settings.svg"), self.tr("Paramètres"), self); self.settings_action.triggered.connect(self.show_settings_page) # Changed to show_settings_page
         # self.template_action removed
-        self.status_action = QAction(QIcon(":/icons/check-square.svg"), self.tr("Gérer les Statuts"), self); self.status_action.triggered.connect(self.open_status_management_dialog_slot); self.status_action.setEnabled(False); self.status_action.setToolTip(self.tr("Fonctionnalité de gestion des statuts prévue pour une future version."))
+        self.status_action = QAction(QIcon(":/icons/check-square.svg"), self.tr("Gérer les Statuts"), self); self.status_action.triggered.connect(self.open_status_management_dialog_slot)
+        # self.status_action.setEnabled(False); # No longer hard-disabled
+        # self.status_action.setToolTip(self.tr("Fonctionnalité de gestion des statuts prévue pour une future version.")) # Tooltip removed
         self.exit_action = QAction(QIcon(":/icons/log-out.svg"), self.tr("Quitter"), self); self.exit_action.setShortcut("Ctrl+Q"); self.exit_action.triggered.connect(self.close)
         self.project_management_action = QAction(QIcon(":/icons/dashboard.svg"), self.tr("Gestion de Projet"), self); self.project_management_action.triggered.connect(self.show_project_management_view)
         self.documents_view_action = QAction(QIcon(":/icons/modern/folder-docs.svg"), self.tr("Gestion Documents"), self); self.documents_view_action.triggered.connect(self.show_documents_view)
@@ -760,10 +1038,14 @@ class DocumentManager(QMainWindow):
         self.manage_users_action = QAction(QIcon(":/icons/users.svg"), self.tr("Gérer les Utilisateurs"), self)
         self.manage_users_action.triggered.connect(self.show_user_management_page) # Connect to show page method
 
+        # Action for Calculator Module
+        self.calculator_module_action = QAction(QIcon(":/icons/bar-chart.svg"), self.tr("Calculatrices"), self) # Placeholder icon
+        self.calculator_module_action.triggered.connect(self.show_calculator_module_view)
 
 
         # Populate searchable_actions_map
-        self.searchable_actions_map[self.tr("Accueil")] = self.home_action # Added Home action
+        self.searchable_actions_map[self.tr("Accueil")] = self.home_action
+        self.searchable_actions_map[self.tr("Calculatrices")] = self.calculator_module_action # Added Calculator action
         self.searchable_actions_map[self.tr("Paramètres")] = self.settings_action
         # self.searchable_actions_map[self.tr("Gérer les Modèles")] removed
         self.searchable_actions_map[self.tr("Gérer les Statuts")] = self.status_action
@@ -865,16 +1147,25 @@ class DocumentManager(QMainWindow):
         user_display_layout.setContentsMargins(5, 0, 5, 0) # Adjust margins as needed
         user_display_layout.setSpacing(10)
 
-        self.user_info_label = QLabel(self.tr("Non connecté"))
-        self.user_info_label.setObjectName("userInfoLabel") # For styling
-        user_display_layout.addWidget(self.user_info_label)
+        # self.user_info_label = QLabel(self.tr("Non connecté")) # Replaced by UserMenuButton
+        # self.user_info_label.setObjectName("userInfoLabel") # For styling
+        # user_display_layout.addWidget(self.user_info_label)
 
-        self.logout_button = QPushButton(self.tr("Déconnexion"))
-        self.logout_button.setIcon(QIcon(":/icons/log-out.svg")) # Ensure icon exists
-        self.logout_button.setFlat(True) # Make it look less like a bulky button in the menubar
-        self.logout_button.setToolTip(self.tr("Se déconnecter et revenir à l'écran de connexion"))
-        self.logout_button.clicked.connect(self._handle_logout)
-        user_display_layout.addWidget(self.logout_button)
+        # self.logout_button = QPushButton(self.tr("Déconnexion")) # Replaced by UserMenuButton
+        # self.logout_button.setIcon(QIcon(":/icons/log-out.svg"))
+        # self.logout_button.setFlat(True)
+        # self.logout_button.setToolTip(self.tr("Se déconnecter et revenir à l'écran de connexion"))
+        # self.logout_button.clicked.connect(self._handle_logout)
+        # user_display_layout.addWidget(self.logout_button)
+
+        self.user_menu_button_instance = UserMenuButton(current_user_info=self.current_user_info, parent=self)
+        self.user_menu_button_instance.setObjectName("userMenuButton") # Added object name
+        self.user_menu_button_instance.request_logout.connect(self._handle_logout)
+        self.user_menu_button_instance.request_show_user_management_page.connect(self.show_user_management_page)
+        self.user_menu_button_instance.request_open_edit_my_account_dialog.connect(self._handle_request_open_edit_my_account)
+        self.user_menu_button_instance.request_open_add_user_dialog.connect(self._handle_request_open_add_user)
+        user_display_layout.addWidget(self.user_menu_button_instance)
+
 
         # The following block redefining self.search_bar_line_edit is redundant
         # and was likely causing the issue. It's removed.
@@ -904,7 +1195,7 @@ class DocumentManager(QMainWindow):
                                      P_ACCESS_RECRUITMENT_MODULE, P_ACCESS_EXPERIENCE_MODULE, \
                                      P_ACCESS_CALENDAR_MODULE, P_ACCESS_BOTPRESS_MODULE, \
                                      P_ACCESS_CARRIER_MAP_MODULE, P_ACCESS_CAMERA_MODULE, \
-                                     P_MANAGE_GLOBAL_PRODUCTS # For Product Management Page action
+                                     P_MANAGE_GLOBAL_PRODUCTS, P_ACCESS_CALCULATOR_MODULE, P_MANAGE_STATUSES # Added P_MANAGE_STATUSES
 
         role_name = self.current_user_info.get('role_name') if self.current_user_info else None
         if not role_name: # Should not happen if login is enforced, but good for safety
@@ -917,8 +1208,8 @@ class DocumentManager(QMainWindow):
 
         # Menu Actions
         self.settings_action.setEnabled(is_admin_or_similar)
-        # self.status_action is currently hard-disabled with a tooltip. If it becomes a feature:
-        # self.status_action.setEnabled(has_permission(role_name, P_MANAGE_STATUSES))
+        if hasattr(self, 'status_action'): # Check if status_action exists
+            self.status_action.setEnabled(has_permission(role_name, P_MANAGE_STATUSES))
 
         # Admin Menu visibility
         self.admin_menu.menuAction().setVisible(has_permission(role_name, P_MANAGE_USERS)) # Hide/show whole menu
@@ -957,6 +1248,16 @@ class DocumentManager(QMainWindow):
         if self.camera_management_action:
              self.camera_management_action.setVisible(has_permission(role_name, P_ACCESS_CAMERA_MODULE))
 
+        if hasattr(self, 'calculator_module_action') and self.calculator_module_action:
+            # To make it visible by default if module is enabled, and then add specific permission later:
+            # self.calculator_module_action.setVisible(self.module_states.get('calculator', False))
+            # To use a specific permission (P_ACCESS_CALCULATOR_MODULE must be defined in auth/permissions.py):
+            if 'P_ACCESS_CALCULATOR_MODULE' in locals() or 'P_ACCESS_CALCULATOR_MODULE' in globals(): # Check if defined
+                 self.calculator_module_action.setVisible(has_permission(role_name, P_ACCESS_CALCULATOR_MODULE))
+            else: # Fallback if P_ACCESS_CALCULATOR_MODULE is not defined: make visible if module is on
+                logging.warning("P_ACCESS_CALCULATOR_MODULE permission constant not found. Calculator module visibility based on module_states only.")
+                self.calculator_module_action.setVisible(self.module_states.get('calculator', False))
+
 
         # Main Buttons on Document View
         self.add_new_client_button.setEnabled(can_create_client)
@@ -968,16 +1269,22 @@ class DocumentManager(QMainWindow):
 
 
     def _update_user_display(self):
-        if self.current_user_info:
-            username = self.current_user_info.get('username', 'N/A')
-            role_name = self.current_user_info.get('role_name', 'N/A')
-            self.user_info_label.setText(self.tr("Utilisateur: {0} ({1})").format(username, role_name))
-            self.logout_button.setVisible(True)
+        if hasattr(self, 'user_menu_button_instance') and self.user_menu_button_instance:
+            self.user_menu_button_instance.update_user_info(self.current_user_info)
         else:
-            self.user_info_label.setText(self.tr("Non connecté"))
-            self.logout_button.setVisible(False) # Hide logout if no one is logged in (e.g. at startup before login)
+            # Fallback or initial setup if button not yet created - though it should be.
+            # This path is less likely if create_menus_main is called after current_user_info is set.
+            if self.current_user_info:
+                # self.user_info_label.setText(self.tr("Utilisateur: {0} ({1})").format(username, role_name)) # Old label
+                # self.logout_button.setVisible(True) # Old button
+                pass
+            else:
+                # self.user_info_label.setText(self.tr("Non connecté")) # Old label
+                # self.logout_button.setVisible(False) # Old button
+                pass
 
     def _handle_logout(self):
+        # This method is now also connected to UserMenuButton.request_logout signal
         from auth import authentication as auth_service # Local import
         from dialogs.login_dialog import LoginDialog # Local import
 
@@ -1022,8 +1329,8 @@ class DocumentManager(QMainWindow):
             if new_user_info:
                 self.current_user_info = new_user_info
                 self.current_user_id = self.current_user_info.get('user_id') # Update user_id
-                self._update_user_display()
-                self._apply_permissions() # Re-apply permissions for the new user
+                self._update_user_display() # This will now call user_menu_button_instance.update_user_info()
+                self._apply_permissions() # Re-apply permissions for the new user (menus etc.)
                 self.load_clients_from_db_slot() # Reload data relevant to the new user
                 # Potentially re-initialize other parts of the UI based on the new user/role
                 self.show()
@@ -1033,6 +1340,50 @@ class DocumentManager(QMainWindow):
         else: # Login cancelled after logout
             QMessageBox.information(self, "Déconnexion", "Vous avez été déconnecté. L'application va se fermer.")
             QApplication.instance().quit() # Exit if user cancels login after logout
+
+    def _handle_request_open_edit_my_account(self):
+        if not self.current_user_info:
+            QMessageBox.warning(self, self.tr("Erreur"), self.tr("Aucun utilisateur n'est connecté."))
+            return
+
+        user_id_to_edit = self.current_user_info.get('user_id')
+        if not user_id_to_edit:
+            QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("ID utilisateur manquant pour l'utilisateur actuel."))
+            return
+
+        # Pass current_user_info as current_admin_user_info because the user is initiating the action on themselves.
+        # EditUserDialog's internal logic will handle permissions for self-edit (e.g. role change).
+        dialog = EditUserDialog(user_id=user_id_to_edit,
+                                current_admin_user_info=self.current_user_info,
+                                parent=self)
+        if dialog.exec_() == QDialog.Accepted:
+            # User data might have changed, re-fetch and update
+            # This is important if e.g. full_name changed, to update display in UserMenuButton
+            from auth import authentication as auth_service # Local import
+            updated_user_info = auth_service.get_current_user() # Should reflect any changes if auth_service was updated by EditUserDialog
+            if updated_user_info:
+                 self.current_user_info = updated_user_info # Update main window's copy
+                 self._update_user_display() # Refresh the UserMenuButton display
+            # No need to reload client list or anything like that for self-account edit
+            self.notify(self.tr("Compte Modifié"), self.tr("Vos informations de compte ont été mises à jour."), type='SUCCESS')
+
+
+    def _handle_request_open_add_user(self):
+        if not self.current_user_info:
+            QMessageBox.warning(self, self.tr("Erreur"), self.tr("Opération non permise sans être connecté."))
+            return
+
+        # current_user_info is passed as current_admin_user_info to EditUserDialog
+        # The dialog itself (or the CRUD operation) will use P_MANAGE_USERS from this admin_user_info
+        dialog = EditUserDialog(user_id=None, # Indicates "add" mode
+                                current_admin_user_info=self.current_user_info,
+                                parent=self)
+        if dialog.exec_() == QDialog.Accepted:
+            # If a user was added, and the current view is UserManagementPage, refresh its table
+            if self.main_area_stack.currentWidget() == self.user_management_page_instance:
+                if hasattr(self.user_management_page_instance, 'load_users_to_table'):
+                    self.user_management_page_instance.load_users_to_table()
+            self.notify(self.tr("Utilisateur Ajouté"), self.tr("Le nouvel utilisateur a été créé avec succès."), type='SUCCESS')
 
 
     @pyqtSlot(str)
@@ -1155,7 +1506,14 @@ class DocumentManager(QMainWindow):
         elif isinstance(archive_filter_data, bool): include_deleted_filter = archive_filter_data
         filters_for_crud = {};
         if status_id_filter is not None: filters_for_crud['status_id'] = status_id_filter
-        if country_id_filter is not None: filters_for_crud['country_id'] = country_id_filter # Add to filters
+        if country_id_filter is not None: filters_for_crud['country_id'] = country_id_filter
+
+        # Add date filters if they are set
+        if hasattr(self, 'date_filter_start') and self.date_filter_start.date().isValid() and not self.date_filter_start.date().isNull():
+            filters_for_crud['created_at_start'] = self.date_filter_start.date().toString("yyyy-MM-dd")
+
+        if hasattr(self, 'date_filter_end') and self.date_filter_end.date().isValid() and not self.date_filter_end.date().isNull():
+            filters_for_crud['created_at_end'] = self.date_filter_end.date().toString("yyyy-MM-dd")
 
         # Update total_filtered_clients count
         # Conceptual: if clients_crud_instance.get_all_clients_count existed:
@@ -1219,10 +1577,24 @@ class DocumentManager(QMainWindow):
     def set_client_status_archived(self, client_id): self.set_client_status_archived_slot(client_id)
     def delete_client_permanently(self, client_id): self.delete_client_permanently_slot(client_id)
 
-    def add_client_to_list_widget(self, client_dict_data): 
-        item = QListWidgetItem(client_dict_data["client_name"])
+    # Old get_status_visual_indicator removed as its logic is now in ClientListItemWidget
+
+    def add_client_to_list_widget(self, client_dict_data):
+        item = QListWidgetItem(self.client_list_widget)
+        # Pass self (DocumentManager instance) as parent to ClientListItemWidget
+        # so it can access tr() or other methods if needed.
+        # Or pass self.client_list_widget as parent for widget hierarchy.
+        custom_widget = ClientListItemWidget(client_dict_data, self.client_list_widget)
+        item.setSizeHint(custom_widget.sizeHint())
+
+        # Store the raw client_dict_data in the QListWidgetItem's UserRole
+        # This is crucial for context menus, click handling etc. to get the full data.
         item.setData(Qt.UserRole, client_dict_data)
+
         self.client_list_widget.addItem(item)
+        self.client_list_widget.setItemWidget(item, custom_widget)
+
+
 
     def load_countries_into_filter_combo(self):
         current_selection_data = self.country_filter_combo.currentData()
@@ -1306,12 +1678,23 @@ class DocumentManager(QMainWindow):
                      f"client_data_to_show name={client_data_to_show.get('client_name')}, "
                      f"email={client_data_to_show.get('email')}, phone={client_data_to_show.get('phone')}")
 
-        # Ensure selected_languages is a list, even if it's null/empty from DB
-        selected_languages_str = client_data_to_show.get('selected_languages')
-        if isinstance(selected_languages_str, str) and selected_languages_str.strip():
-            client_data_to_show['selected_languages'] = [lang.strip() for lang in selected_languages_str.split(',') if lang.strip()]
-        elif not isinstance(client_data_to_show.get('selected_languages'), list): # If it's not a list already (e.g. None or empty string from .get())
-            client_data_to_show['selected_languages'] = []
+        # Ensure selected_languages is a list, defaulting to ['fr'] if null/empty from DB
+        selected_languages_value = client_data_to_show.get('selected_languages')
+        if isinstance(selected_languages_value, str) and selected_languages_value.strip():
+            # If it's a non-empty string, parse it
+            parsed_langs = [lang.strip() for lang in selected_languages_value.split(',') if lang.strip()]
+            client_data_to_show['selected_languages'] = parsed_langs if parsed_langs else ['fr']
+        elif isinstance(selected_languages_value, list):
+            # If it's already a list (e.g. from tests or direct data manipulation)
+            # Use as is, but default to ['fr'] if the list is empty
+            client_data_to_show['selected_languages'] = selected_languages_value if selected_languages_value else ['fr']
+        else:
+            # If it's None, empty string, or any other type, default to ['fr']
+            client_data_to_show['selected_languages'] = ['fr']
+
+        # A final safety net: if after all processing selected_languages is somehow empty (e.g. parsed string resulted in empty list), default to ['fr']
+        if not client_data_to_show.get('selected_languages'):
+            client_data_to_show['selected_languages'] = ['fr']
 
         logging.info(f"open_client_tab_by_id: client_data_to_show after augmentation: {client_data_to_show}")
 
@@ -1593,3 +1976,236 @@ class DocumentManager(QMainWindow):
             logging.error("UserManagementPage instance is None. Cannot show user management view.")
             QMessageBox.critical(self, self.tr("Erreur Critique"),
                                  self.tr("La page de gestion des utilisateurs n'a pas pu être chargée."))
+
+    def show_calculator_module_view(self):
+        """Switches the main stacked widget to display the Calculator module."""
+        if self.calculator_module_widget_instance:
+            # Pass/update auth_manager and db_session_factory if they can change or need to be set late
+            # For now, assuming they are set at __init__
+            if hasattr(self.calculator_module_widget_instance, 'app_auth_manager') and \
+               self.calculator_module_widget_instance.app_auth_manager is None:
+                self.calculator_module_widget_instance.app_auth_manager = self # Pass self as auth manager
+
+            # Potentially refresh history or user specific things if needed when view is shown
+            # if hasattr(self.calculator_module_widget_instance, 'refresh_on_display'):
+            #     self.calculator_module_widget_instance.refresh_on_display()
+
+            self.main_area_stack.setCurrentWidget(self.calculator_module_widget_instance)
+        else:
+            logging.warning("Calculator module widget instance is None. Cannot show view.")
+            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Calculatrices est désactivé ou non initialisé."))
+    # --- Saved Filters Methods ---
+    def populate_saved_filters_combo(self):
+        """Populates the combo box with filters saved by the current user."""
+        self.load_filter_combo.blockSignals(True)
+        self.load_filter_combo.clear()
+        self.load_filter_combo.addItem(self.tr("--- Sélectionner un filtre ---"), None) # Placeholder
+
+        if not self.current_user_id:
+            logging.warning("populate_saved_filters_combo: No current_user_id, cannot load filters.")
+            self.load_filter_combo.blockSignals(False)
+            return
+
+        try:
+            saved_filters = user_saved_filters_crud.get_saved_filters_for_user(self.current_user_id)
+            if saved_filters:
+                for filt in saved_filters:
+                    self.load_filter_combo.addItem(filt['filter_name'], filt['id'])
+            logging.info(f"Populated saved filters combo with {len(saved_filters)} items for user {self.current_user_id}.")
+        except Exception as e:
+            logging.error(f"Error populating saved filters combo: {e}", exc_info=True)
+            self.notify(self.tr("Erreur Filtres Sauvegardés"), self.tr("Impossible de charger les filtres sauvegardés."), type='ERROR')
+        finally:
+            self.load_filter_combo.blockSignals(False)
+
+    def apply_saved_filter_slot(self, index: int):
+        """Applies the selected saved filter to the UI controls and refreshes the client list."""
+        if index == 0: # Placeholder selected
+            return
+
+        saved_filter_id = self.load_filter_combo.itemData(index)
+        if saved_filter_id is None:
+            return
+
+        logging.info(f"Applying saved filter with ID: {saved_filter_id}")
+
+        try:
+            filter_data = user_saved_filters_crud.get_saved_filter_by_id(saved_filter_id, self.current_user_id)
+            if not filter_data or 'filter_parameters' not in filter_data:
+                self.notify(self.tr("Erreur Chargement Filtre"), self.tr("Filtre non trouvé ou corrompu."), type='ERROR')
+                self.populate_saved_filters_combo() # Refresh combo in case filter was deleted elsewhere
+                return
+
+            params = filter_data['filter_parameters']
+
+            # Block signals on individual filter controls to prevent multiple refreshes
+            self.status_filter_combo.blockSignals(True)
+            self.client_archive_filter_combo.blockSignals(True)
+            self.country_filter_combo.blockSignals(True)
+            self.search_input_field.blockSignals(True)
+            if hasattr(self, 'date_filter_start'): self.date_filter_start.blockSignals(True)
+            if hasattr(self, 'date_filter_end'): self.date_filter_end.blockSignals(True)
+            if hasattr(self, 'more_filters_button'): self.more_filters_button.blockSignals(True)
+
+
+            # Apply status filter
+            status_idx = self.status_filter_combo.findData(params.get('status_id'))
+            self.status_filter_combo.setCurrentIndex(status_idx if status_idx != -1 else 0)
+
+            # Apply archive filter
+            archive_idx = self.client_archive_filter_combo.findData(params.get('archive_filter'))
+            self.client_archive_filter_combo.setCurrentIndex(archive_idx if archive_idx != -1 else 0)
+
+            # Apply country filter
+            country_idx = self.country_filter_combo.findData(params.get('country_id'))
+            self.country_filter_combo.setCurrentIndex(country_idx if country_idx != -1 else 0)
+
+            # Apply search term
+            self.search_input_field.setText(params.get('search_term', ''))
+
+            # Apply date filters
+            show_collapsible = False
+            if hasattr(self, 'date_filter_start'):
+                date_start_str = params.get('created_at_start')
+                if date_start_str:
+                    self.date_filter_start.setDate(QDate.fromString(date_start_str, "yyyy-MM-dd"))
+                    if self.date_filter_start.date().isValid(): show_collapsible = True
+                else:
+                    self.date_filter_start.setDate(QDate())
+
+            if hasattr(self, 'date_filter_end'):
+                date_end_str = params.get('created_at_end')
+                if date_end_str:
+                    self.date_filter_end.setDate(QDate.fromString(date_end_str, "yyyy-MM-dd"))
+                    if self.date_filter_end.date().isValid(): show_collapsible = True
+                else:
+                    self.date_filter_end.setDate(QDate())
+
+            # Determine if collapsible section should be shown
+            if params.get('country_id') is not None or params.get('archive_filter') is not None: # Check other collapsible filters
+                show_collapsible = True
+
+            if hasattr(self, 'more_filters_button') and hasattr(self, 'collapsible_filter_widget'):
+                if self.collapsible_filter_widget.isVisible() != show_collapsible:
+                    self.more_filters_button.setChecked(show_collapsible) # This will trigger toggle_more_filters_visibility
+
+            # Unblock signals
+            self.status_filter_combo.blockSignals(False)
+            self.client_archive_filter_combo.blockSignals(False)
+            self.country_filter_combo.blockSignals(False)
+            self.search_input_field.blockSignals(False)
+            if hasattr(self, 'date_filter_start'): self.date_filter_start.blockSignals(False)
+            if hasattr(self, 'date_filter_end'): self.date_filter_end.blockSignals(False)
+            if hasattr(self, 'more_filters_button'): self.more_filters_button.blockSignals(False)
+
+
+            # Refresh client list with applied filters
+            self.filter_client_list_display_slot()
+            self.notify(self.tr("Filtre Appliqué"), self.tr("Le filtre sauvegardé '{0}' a été appliqué.").format(filter_data['filter_name']), type='INFO')
+
+        except Exception as e:
+            logging.error(f"Error applying saved filter ID {saved_filter_id}: {e}", exc_info=True)
+            self.notify(self.tr("Erreur Application Filtre"), self.tr("Une erreur est survenue lors de l'application du filtre."), type='ERROR')
+        finally:
+            # Reset combo to placeholder to allow re-selection or show current state is "custom"
+            # This also prevents the slot from re-triggering if a programmatic change happened during filter application
+            self.load_filter_combo.blockSignals(True)
+            self.load_filter_combo.setCurrentIndex(0)
+            self.load_filter_combo.blockSignals(False)
+
+    def save_current_filter_slot(self):
+        """Saves the current state of all filters under a user-provided name."""
+        if not self.current_user_id:
+            self.notify(self.tr("Erreur Utilisateur"), self.tr("Aucun utilisateur connecté. Impossible de sauvegarder le filtre."), type='ERROR')
+            return
+
+        filter_name = self.saved_filter_name_input.text().strip()
+        if not filter_name:
+            self.notify(self.tr("Nom Requis"), self.tr("Veuillez entrer un nom pour ce filtre sauvegardé."), type='WARNING')
+            self.saved_filter_name_input.setFocus()
+            return
+
+        # Check for duplicate filter name for this user (optional, DB unique constraint can also handle this)
+        # existing_filters = user_saved_filters_crud.get_saved_filters_for_user(self.current_user_id)
+        # if any(f['filter_name'] == filter_name for f in existing_filters):
+        #     reply = QMessageBox.question(self, self.tr("Nom Dupliqué"),
+        #                                  self.tr("Un filtre avec ce nom existe déjà. Voulez-vous le remplacer?"),
+        #                                  QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        #     if reply == QMessageBox.No:
+        #         return
+            # If Yes, would need to find existing ID and call update_saved_filter or delete then add.
+            # For simplicity now, we'll assume add_saved_filter handles duplicates or DB constraint does.
+
+        parameters_dict = {}
+
+        # Status Filter
+        status_data = self.status_filter_combo.currentData()
+        if status_data is not None: # Only save if not "All Statuses" (which is None)
+            parameters_dict['status_id'] = status_data
+
+        # Archive Filter
+        archive_data = self.client_archive_filter_combo.currentData()
+        # Save explicit value, even if it's the default (False for "Active Clients")
+        parameters_dict['archive_filter'] = archive_data # Stores False, True, or "all_status_types"
+
+        # Country Filter
+        country_data = self.country_filter_combo.currentData()
+        if country_data is not None: # Only save if not "All Countries"
+            parameters_dict['country_id'] = country_data
+
+        # Search Term
+        search_text = self.search_input_field.text().strip()
+        if search_text:
+            parameters_dict['search_term'] = search_text
+
+        # Date Filters
+        if hasattr(self, 'date_filter_start') and self.date_filter_start.date().isValid() and not self.date_filter_start.date().isNull():
+            parameters_dict['created_at_start'] = self.date_filter_start.date().toString("yyyy-MM-dd")
+
+        if hasattr(self, 'date_filter_end') and self.date_filter_end.date().isValid() and not self.date_filter_end.date().isNull():
+            parameters_dict['created_at_end'] = self.date_filter_end.date().toString("yyyy-MM-dd")
+
+        if not parameters_dict: # No actual filter criteria were set
+            self.notify(self.tr("Aucun Filtre Actif"), self.tr("Aucun critère de filtre n'est actuellement défini pour la sauvegarde."), type='INFO')
+            return
+
+        try:
+            new_filter_id = user_saved_filters_crud.add_saved_filter(
+                user_id=self.current_user_id,
+                filter_name=filter_name,
+                filter_parameters=parameters_dict
+            )
+            if new_filter_id:
+                self.notify(self.tr("Filtre Sauvegardé"), self.tr("Le filtre '{0}' a été sauvegardé avec succès.").format(filter_name), type='SUCCESS')
+                self.saved_filter_name_input.clear()
+                self.populate_saved_filters_combo() # Refresh the combo box
+                # Optionally, select the newly saved filter in the combo
+                new_idx = self.load_filter_combo.findData(new_filter_id)
+                if new_idx != -1:
+                    self.load_filter_combo.setCurrentIndex(new_idx)
+            else:
+                # This might happen if DB unique constraint on (user_id, filter_name) is active and name exists
+                self.notify(self.tr("Échec Sauvegarde"), self.tr("Impossible de sauvegarder le filtre. Un filtre avec ce nom existe peut-être déjà, ou une erreur de base de données s'est produite."), type='ERROR')
+        except Exception as e:
+            logging.error(f"Error saving filter '{filter_name}': {e}", exc_info=True)
+            self.notify(self.tr("Erreur Sauvegarde"), self.tr("Une erreur est survenue: {0}").format(str(e)), type='ERROR')
+
+    def open_manage_filters_dialog_slot(self):
+        """Opens the dialog to manage saved filters."""
+        if not self.current_user_id:
+            self.notify(self.tr("Erreur Utilisateur"), self.tr("Aucun utilisateur connecté. Impossible de gérer les filtres."), type='ERROR')
+            return
+
+        logging.info(f"Opening ManageSavedFiltersDialog for user {self.current_user_id}.")
+        dialog = ManageSavedFiltersDialog(current_user_id=self.current_user_id, parent=self)
+
+        # exec_() is blocking. We check result or flag after it closes.
+        dialog.exec_()
+
+        if dialog.changes_made: # Check the custom flag
+            logging.info("Changes were made in ManageSavedFiltersDialog. Refreshing load_filter_combo.")
+            self.populate_saved_filters_combo()
+            # Also reset the combo to the placeholder, as the list of available filters might have changed
+            self.load_filter_combo.setCurrentIndex(0)
+        else:
+            logging.info("No changes reported from ManageSavedFiltersDialog.")

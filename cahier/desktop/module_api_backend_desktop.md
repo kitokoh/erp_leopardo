@@ -93,3 +93,88 @@ L'application ClientDocManager intègre un serveur API backend développé avec 
 *   **Concurrence**: Étant donné que l'API s'exécute dans le même environnement que l'application desktop (partageant potentiellement des ressources comme la base de données), la gestion de la concurrence et des transactions doit être soignée.
 *   **Dépendance au Cycle de Vie de l'Application Desktop**: Puisque le serveur API est lancé par `main.py`, il est lié au cycle de vie de l'application desktop. Si l'application desktop est fermée, l'API cesse de fonctionner. Pour une API destinée à une haute disponibilité, un déploiement séparé serait plus approprié.
 *   **Documentation Externe**: Bien que FastAPI génère une documentation OpenAPI, une documentation conceptuelle externe (comme ce document) reste utile pour expliquer le rôle de l'API dans l'écosystème global.
+
+## 7. Principaux Routeurs et Endpoints Attendus
+
+Ce qui suit est une liste des principaux fichiers de routeurs identifiés dans le dossier `api/` et une suggestion des types d'endpoints qu'ils pourraient exposer. Pour une liste exhaustive et détaillée des endpoints, des paramètres et des schémas de réponse, il faut se référer à la documentation OpenAPI auto-générée par FastAPI (généralement accessible via `/docs` sur l'URL de base de l'API).
+
+*   **`api/auth.py`**: Authentification
+    *   `POST /token`: Obtention d'un token d'accès (OAuth2 Password Flow).
+    *   `GET /users/me`: Récupération des informations de l'utilisateur courant (authentifié).
+
+*   **`api/assets.py`**: Gestion des Actifs de l'Entreprise
+    *   `GET /assets/`: Lister tous les actifs.
+    *   `POST /assets/`: Créer un nouvel actif.
+    *   `GET /assets/{asset_id}`: Obtenir les détails d'un actif spécifique.
+    *   `PUT /assets/{asset_id}`: Mettre à jour un actif.
+    *   `DELETE /assets/{asset_id}`: Supprimer un actif.
+    *   Endpoints pour les assignations et les médias liés aux actifs.
+
+*   **`api/company_expenses_api.py`**: Dépenses de l'Entreprise
+    *   `GET /company-expenses/`: Lister toutes les dépenses.
+    *   `POST /company-expenses/`: Enregistrer une nouvelle dépense.
+
+*   **`api/company_factures_api.py`**: Factures Fournisseurs
+    *   `GET /supplier-invoices/`: Lister toutes les factures fournisseurs.
+    *   `POST /supplier-invoices/`: Enregistrer une nouvelle facture fournisseur.
+
+*   **`api/documents.py`**: Gestion des Documents (génériques ou types non spécifiques)
+    *   `GET /documents/`: Lister les documents.
+    *   `POST /documents/`: Créer/uploader un nouveau document.
+    *   Endpoints pour la recherche, le téléchargement, la mise à jour des métadonnées.
+
+*   **`api/employee_documents.py`**: Documents des Employés
+    *   `GET /employees/{employee_id}/documents/`: Lister les documents d'un employé.
+    *   `POST /employees/{employee_id}/documents/`: Ajouter un document à un employé.
+
+*   **`api/employees.py`**: Gestion des Employés
+    *   `GET /employees/`: Lister tous les employés.
+    *   `POST /employees/`: Créer un nouvel employé.
+    *   `GET /employees/{employee_id}`: Détails d'un employé.
+    *   `PUT /employees/{employee_id}`: Mettre à jour un employé.
+
+*   **`api/hr_reports.py`**: Rapports RH
+    *   `GET /hr-reports/{report_type}`: Générer des rapports RH spécifiques.
+
+*   **`api/leave.py`**: Gestion des Congés
+    *   `GET /leave-requests/`: Lister les demandes de congé.
+    *   `POST /leave-requests/`: Soumettre une demande de congé.
+    *   `PUT /leave-requests/{request_id}/status`: Approuver/rejeter une demande.
+
+*   **`api/payments.py`**: Paiements (clients)
+    *   `GET /payments/`: Lister les paiements.
+    *   `POST /payments/`: Enregistrer un nouveau paiement pour une facture.
+
+*   **`api/performance.py`**: Suivi de Performance (employés)
+    *   `GET /performance-reviews/`: Lister les revues de performance.
+    *   `POST /performance-reviews/`: Créer une nouvelle revue.
+
+*   **`api/products.py`**: Gestion des Produits
+    *   `GET /products/`: Lister tous les produits.
+    *   `POST /products/`: Créer un nouveau produit.
+    *   `GET /products/{product_id}`: Détails d'un produit.
+    *   `PUT /products/{product_id}`: Mettre à jour un produit.
+
+*   **`api/proformas.py`**: Factures Proforma
+    *   `GET /proformas/`: Lister les factures proforma.
+    *   `POST /proformas/`: Créer une nouvelle facture proforma.
+    *   `GET /proformas/{proforma_id}`: Détails d'une proforma.
+
+*   **`api/recruitment.py`**: Recrutement
+    *   `GET /job-openings/`: Lister les offres d'emploi.
+    *   `POST /job-openings/`: Créer une offre.
+    *   `GET /candidates/`: Lister les candidats.
+    *   `POST /candidates/`: Ajouter un candidat.
+    *   Endpoints pour les entretiens, le suivi des candidatures.
+
+*   **`api/reports.py`**: Rapports Généraux
+    *   `GET /reports/{report_name}`: Générer des rapports spécifiques (ventes, financiers, etc.).
+    *   Paramètres pour les dates, filtres.
+
+*   **`api/templates.py`**: Gestion des Modèles de Documents
+    *   `GET /templates/`: Lister les modèles disponibles.
+    *   `GET /templates/{template_id}/content`: Obtenir le contenu d'un modèle (utilisé par l'app mobile).
+    *   `POST /templates/`: Uploader un nouveau modèle.
+
+*(Note : Les chemins exacts des endpoints, les méthodes HTTP et les paramètres peuvent varier. Cette liste est une supposition éclairée basée sur les noms des fichiers routeurs et les fonctionnalités typiques.)*
+

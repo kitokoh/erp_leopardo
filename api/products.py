@@ -8,7 +8,7 @@ import os # For URL construction if base URL comes from env
 import db.cruds.products_crud as products_crud
 import db.cruds.product_media_links_crud as product_media_links_crud
 from ..models import ( # Relative import from parent models.py
-    ProductResponse, ProductCreate, ProductUpdate,
+    ProductResponse, ProductCreate, ProductUpdate, ProductBase,
     LinkMediaToProductRequest, ProductImageLinkResponse, ProductImageLinkUpdateRequest,
     ReorderProductMediaLinksRequest,
     UserInDB # For authentication
@@ -58,6 +58,7 @@ def format_product_response(db_product: Dict[str, Any], request: Request) -> Pro
             ))
 
     # Create the ProductResponse object
+    # Ensure ProductBase is defined or imported if used here. Assuming it's imported from ..models
     product_data_for_model = {key: db_product[key] for key in ProductBase.__fields__ if key in db_product}
     product_data_for_model['product_id'] = db_product['product_id'] # Ensure product_id is included
 
@@ -116,11 +117,11 @@ async def get_product_by_code_api(
 
 @router.get("", response_model=List[ProductResponse]) # Simplified response for list view
 async def get_all_products_api(
-    request: Request,
     category: Optional[str] = Query(None),
     language_code: Optional[str] = Query(None),
     is_active: Optional[bool] = Query(None),
-    current_user: UserInDB = Depends(get_current_active_user) # Optional auth
+    current_user: UserInDB = Depends(get_current_active_user), # Optional auth
+    request: Request # Moved to last
 ):
     filters = {}
     if category is not None: filters['category'] = category

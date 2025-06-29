@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, pyqtSlot, QSize, QFile, QTextStream
 from PyQt5.QtGui import QFont, QIcon, QMovie, QColor
+
 import os
 import random
 
@@ -41,6 +42,7 @@ class HomePageWidget(QWidget):
         center_h_layout.setContentsMargins(10, 10, 10, 10)
         center_h_layout.setSpacing(15)
 
+
         gif_label = QLabel()
         gif_label.setObjectName("homePageGifLabel")
         available_gifs = ["1.gif", "2.gif", "3.gif"]
@@ -58,12 +60,14 @@ class HomePageWidget(QWidget):
             gif_label.setScaledContents(True)
             self.movie.start()
             gif_label.setAlignment(Qt.AlignCenter)
+
         else:
             gif_label.setText(self.tr("GIF '{0}' non trouvé.").format(chosen_gif_name))
             gif_label.setStyleSheet("color: red;")
             gif_label.setAlignment(Qt.AlignCenter)
 
         center_h_layout.addWidget(gif_label, 1)
+
 
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
@@ -78,6 +82,7 @@ class HomePageWidget(QWidget):
         grid_layout = QGridLayout(button_container_widget)
         grid_layout.setContentsMargins(5, 5, 5, 5)
         grid_layout.setSpacing(10)
+
 
         self.modules = [
             {"name": self.tr("Gestion Documents Client"), "object_name": "btnClientDocuments", "icon": ":/icons/modern/folder-docs.svg", "slot": self.go_to_documents},
@@ -96,6 +101,7 @@ class HomePageWidget(QWidget):
         row, col = 0, 0
         num_columns = 4
 
+
         for i, module_data in enumerate(self.modules):
             button = QPushButton(module_data["name"])
             button.setObjectName(module_data["object_name"])
@@ -111,6 +117,7 @@ class HomePageWidget(QWidget):
             # shadow.setYOffset(2)
             # shadow.setColor(QColor(0, 0, 0, 80))
             # button.setGraphicsEffect(shadow)
+
 
             button.clicked.connect(module_data["slot"])
             grid_layout.addWidget(button, row, col)
@@ -133,6 +140,7 @@ class HomePageWidget(QWidget):
         self.bottom_content_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         main_v_layout.addWidget(self.bottom_content_area, 1)
 
+
         self.setLayout(main_v_layout)
 
     def set_bottom_widget(self, widget_to_display):
@@ -140,6 +148,7 @@ class HomePageWidget(QWidget):
             widget = self.bottom_content_area.widget(0)
             self.bottom_content_area.removeWidget(widget)
             # widget.deleteLater() # Important pour éviter les fuites de mémoire si les widgets ne sont pas réutilisés
+
 
         if widget_to_display:
             self.bottom_content_area.addWidget(widget_to_display)
@@ -272,9 +281,11 @@ class HomePageWidget(QWidget):
             print(f"HomePageWidget: Parent does NOT have show_settings_page.")
 
 
+
 if __name__ == '__main__':
     from PyQt5.QtWidgets import QApplication
     import sys
+
 
     try:
         import icons_rc
@@ -287,6 +298,7 @@ if __name__ == '__main__':
             super().__init__()
             self.setWindowTitle("Mock Main Window for HomePageWidget Test")
             self.main_layout = QVBoxLayout(self)
+
 
             self.statistics_dashboard_instance = QLabel("Contenu de la Page Statistiques (Mock)")
             self.statistics_dashboard_instance.setAlignment(Qt.AlignCenter)
@@ -304,6 +316,7 @@ if __name__ == '__main__':
 
         def show_statistics_view(self):
             print("MockMainWindow: show_statistics_view called (Full Page Navigation Fallback)")
+
             temp_stats_page = QLabel("PAGE STATS COMPLÈTE (FALLBACK)")
             temp_stats_page.setAlignment(Qt.AlignCenter)
             temp_stats_page.setStyleSheet("background-color: yellow; font-size: 22px;")
@@ -334,6 +347,7 @@ if __name__ == '__main__':
         def show_botpress_integration_view(self): print("MockMainWindow: show_botpress_integration_view called")
         def show_camera_management_view(self): print("MockMainWindow: show_camera_management_view called")
         def show_settings_page(self): print("MockMainWindow: show_settings_page called")
+
 
     main_win = MockMainWindow()
     main_win.show()

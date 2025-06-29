@@ -52,6 +52,71 @@ Le module de Gestion des Documents est au cœur de l'application ClientDocManage
 
 ## 3. Flux de Travail Typique (Exemple : Création d'une Facture Proforma)
 
+Le diagramme de séquence ci-dessous illustre les principales interactions lors de la création d'une facture proforma :
+
+```mermaid
+sequenceDiagram
+    participant Utilisateur
+    participant DM as DocumentManager (UI)
+    participant CDD as CreateDocumentDialog (UI)
+    participant CB as "document_generator/context_builder.py"
+    participant HG as "document_generator/html_generator.py"
+    participant HTPU as "html_to_pdf_util.py"
+    participant PIC as "db/cruds/proforma_invoices_crud.py"
+    participant FS as Système de Fichiers
+    participant DB as Base de Données
+
+    Utilisateur->>DM: Choisit "Créer Facture Proforma"
+    DM->>CDD: Ouvre le dialogue CreateDocumentDialog
+    CDD-->>Utilisateur: Affiche le formulaire de saisie
+    Utilisateur->>CDD: Remplit les informations (client, produits, quantités, conditions)
+    CDD->>CDD: Valide les entrées de l'utilisateur
+    CDD->>CB: Sollicite la création du contexte documentaire
+    CB->>DB: Récupère les données nécessaires (détails client, produits, prix, etc.)
+    DB-->>CB: Retourne les données brutes
+    CB->>CB: Assemble le contexte complet
+    CB-->>CDD: Retourne le contexte documentaire
+    CDD->>HG: Demande la génération du document HTML avec le contexte et le modèle de proforma
+    HG->>HG: Utilise Jinja2 pour injecter le contexte dans le modèle HTML
+    HG-->>CDD: Retourne le contenu HTML généré
+    CDD->>HTPU: Demande la conversion du HTML en PDF
+    HTPU-->>CDD: Retourne les octets du fichier PDF
+    CDD->>FS: Sauvegarde le fichier PDF sur le disque
+    CDD->>PIC: Demande l'enregistrement des métadonnées de la facture proforma (incluant le chemin vers le PDF)
+    PIC->>DB: Insère les informations de la proforma dans la base de données
+    DB-->>PIC: Confirme l'insertion
+    PIC-->>CDD: Confirme l'enregistrement
+    CDD-->>DM: Ferme le dialogue et notifie le succès (ou l'échec)
+    DM-->>Utilisateur: Affiche le PDF généré ou une notification de succès
+    Utilisateur->>DM: Peut initier d'autres actions (ex: envoyer par e-mail)
+```
+
+**Description des étapes du flux :**
+
+1.  **Initiation**: L'utilisateur, depuis `DocumentManager` (la fenêtre principale), choisit l'action de créer une nouvelle facture proforma.
+2.  **Ouverture du Dialogue**: Le `DocumentManager` instancie et affiche le `CreateDocumentDialog` (ou un dialogue spécialisé équivalent).
+3.  **Sélection et Saisie des Données**:
+    *   Dans le `CreateDocumentDialog`, l'utilisateur sélectionne un client existant (probablement via un sélecteur qui interroge `db/cruds/clients_crud.py`).
+    *   L'utilisateur ajoute des produits ou services. Pour chaque ligne, il spécifie le produit (sélectionné depuis une liste issue de `db/cruds/products_crud.py`), la quantité, et le prix (qui peut être pré-rempli à partir des données du produit mais modifiable).
+    *   L'utilisateur peut également ajuster d'autres paramètres comme les conditions de paiement, les dates, ou ajouter des notes.
+4.  **Validation et Collecte du Contexte Documentaire**:
+    *   Une fois les saisies terminées, l'utilisateur valide le dialogue.
+    *   Le `CreateDocumentDialog` effectue une première validation des données.
+    *   Il fait appel au `document_generator/context_builder.py`. Ce dernier récupère toutes les informations détaillées nécessaires (données complètes du client, de l'entreprise de l'utilisateur, détails des produits, calculs de totaux, taxes, etc.) en interagissant avec les différents modules CRUD et la base de données. Le `context_builder` retourne un dictionnaire de contexte structuré.
+5.  **Génération du Document (HTML)**:
+    *   Le `CreateDocumentDialog` (ou une classe de service qu'il appelle) transmet le contexte et le chemin du modèle de facture proforma (ex: `templates/fr/proforma_invoice_template.html`) au `document_generator/html_generator.py`.
+    *   Le `html_generator.py` utilise un moteur de template (comme Jinja2) pour fusionner le contexte avec le modèle HTML, produisant ainsi le contenu HTML final de la facture proforma.
+6.  **Conversion en PDF (si applicable)**:
+    *   Le contenu HTML généré est ensuite passé au `html_to_pdf_util.py`.
+    *   Cet utilitaire convertit le HTML en un document PDF (sous forme d'octets).
+7.  **Sauvegarde et Enregistrement en Base de Données**:
+    *   Le fichier PDF (les octets) est sauvegardé sur le système de fichiers, dans un emplacement approprié (par exemple, un dossier spécifique au client ou un dossier général de documents). Le chemin du fichier est conservé.
+    *   Les métadonnées de la facture proforma (numéro, date, client_id, montant total, chemin vers le fichier PDF, etc.) sont enregistrées dans la base de données via `db/cruds/proforma_invoices_crud.py`.
+    *   Le `CreateDocumentDialog` se ferme et peut notifier le `DocumentManager` du succès de l'opération.
+8.  **Affichage et Actions Postérieures**:
+    *   Le `DocumentManager` peut alors afficher une notification de succès à l'utilisateur.
+    *   Le document PDF généré peut être automatiquement ouvert pour prévisualisation.
+    *   L'utilisateur peut ensuite choisir d'effectuer d'autres actions, comme envoyer la facture proforma par e-mail (ce qui impliquerait le [Module Gestion des E-mails (Interface Utilisateur)](./module_gestion_emails_ui.md)).
 1.  **Initiation**: L'utilisateur, depuis `DocumentManager`, choisit de créer une nouvelle facture proforma.
 2.  **Ouverture du Dialogue**: `CreateDocumentDialog` (ou un dialogue similaire) s'ouvre.
 3.  **Sélection des Données**:
