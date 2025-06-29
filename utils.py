@@ -220,10 +220,40 @@ def generate_pdf_for_document(
                             QCoreApplication.translate("utils.generate_pdf", "ID Client manquant. Impossible de générer le PDF."))
         return None
 
-    file_name, file_ext = os.path.splitext(os.path.basename(source_file_path))
-    current_timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S") # Changed to include time
-    output_pdf_filename = f"{file_name}_{current_timestamp_str}.pdf" # Changed to use timestamp
-    output_pdf_path = os.path.join(os.path.dirname(source_file_path), output_pdf_filename)
+    file_name_base_template, file_ext = os.path.splitext(os.path.basename(source_file_path)) # file_name_base_template is like 'proforma_invoice_template'
+
+    # Determine a more descriptive PDF filename
+    client_name_for_file = client_info.get('client_name', 'Client').replace(' ', '_').replace('/', '_')
+    doc_type_for_file = document_type_for_context if document_type_for_context else file_name_base_template
+    doc_type_for_file = doc_type_for_file.replace('_HTML', '').replace('_TEMPLATE', '').replace(' ', '_') # Basic cleanup
+    timestamp_for_file = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    output_pdf_filename = f"{doc_type_for_file}_{client_name_for_file}_{target_language_code}_{timestamp_for_file}.pdf"
+
+    # Determine correct output directory within client's folder structure
+    client_base_folder = client_info.get('base_folder_path') # This should be an absolute path
+    if not client_base_folder:
+        logging.error("Client base_folder_path missing in client_info. Cannot determine PDF save location.")
+        QMessageBox.critical(parent_widget, "Erreur Configuration Client", "Dossier de base du client non trouvé.")
+        return None
+
+    # Define a subfolder for the specific document type, e.g., "Proformas", "Devis"
+    # We can use document_type_for_context (like HTML_PROFORMA) and clean it up for a folder name
+    doc_type_folder_name = doc_type_for_file # Use the cleaned up doc_type_for_file
+    if not doc_type_folder_name or doc_type_folder_name == "template": # Fallback if cleanup was too aggressive
+        doc_type_folder_name = "DocumentsGeneres"
+
+    # Path: ClientBaseFolder / LanguageCode / DocumentTypeFolder / filename.pdf
+    target_save_directory = os.path.join(client_base_folder, target_language_code, doc_type_folder_name)
+    try:
+        os.makedirs(target_save_directory, exist_ok=True)
+    except OSError as e:
+        logging.error(f"Failed to create target directory {target_save_directory}: {e}")
+        QMessageBox.critical(parent_widget, "Erreur Dossier", f"Impossible de créer le dossier de sauvegarde : {target_save_directory}")
+        return None
+
+    output_pdf_path = os.path.join(target_save_directory, output_pdf_filename)
+
 
 
     # Fetch default company ID for context data
