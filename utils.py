@@ -221,8 +221,8 @@ def generate_pdf_for_document(
         return None
 
     file_name, file_ext = os.path.splitext(os.path.basename(source_file_path))
-    current_date_str = datetime.now().strftime("%Y%m%d")
-    output_pdf_filename = f"{file_name}_{current_date_str}.pdf"
+    current_timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S") # Changed to include time
+    output_pdf_filename = f"{file_name}_{current_timestamp_str}.pdf" # Changed to use timestamp
     output_pdf_path = os.path.join(os.path.dirname(source_file_path), output_pdf_filename)
 
     # Fetch default company ID for context data
