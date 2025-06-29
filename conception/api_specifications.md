@@ -205,7 +205,7 @@ class Product(ProductBase):
     id: int
 
     class Config:
-        orm_mode = True # Pour la compatibilité avec les modèles SQLAlchemy
+        from_attributes = True # Pour la compatibilité avec les modèles SQLAlchemy
 ```
 
 ## 7. Documentation de l'API (Swagger/OpenAPI)

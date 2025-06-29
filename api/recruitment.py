@@ -43,7 +43,7 @@ class JobOpeningResponse(JobOpeningBase):
     updated_at: datetime
 
     class Config:
-        orm_mode = True # For compatibility with ORM-like objects (dicts in our case)
+        from_attributes = True # For compatibility with ORM-like objects (dicts in our case)
 
 # --- API Router for Job Openings ---
 router_job_openings = APIRouter(tags=["Recruitment - Job Openings"])
@@ -171,7 +171,7 @@ class CandidateResponse(CandidateBase):
     # updated_at: Optional[datetime] # Schema for Candidates doesn't have updated_at
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # --- API Router for Candidates ---
 router_candidates = APIRouter(tags=["Recruitment - Candidates"])
@@ -330,7 +330,7 @@ class InterviewResponse(InterviewBase):
     updated_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # --- API Router for Interviews ---
 router_interviews = APIRouter(tags=["Recruitment - Interviews"])
@@ -480,7 +480,7 @@ class RecruitmentStepResponse(RecruitmentStepBase):
     job_opening_id: str # Include for context
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # --- API Router for Recruitment Steps (associated with Job Openings) ---
 router_recruitment_steps = APIRouter(tags=["Recruitment - Recruitment Steps"])
@@ -594,7 +594,7 @@ class CandidateProgressResponse(CandidateProgressBase):
 
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # --- API Router for Candidate Progress ---
 router_candidate_progress = APIRouter(tags=["Recruitment - Candidate Progress"])
