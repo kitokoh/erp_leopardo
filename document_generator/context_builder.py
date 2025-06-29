@@ -104,6 +104,7 @@ def get_document_context(
     Fetches and structures data for document generation.
     Connections to DB for CRUD operations are managed by @_manage_conn decorator on CRUD functions.
     """
+    logger.info(f"get_document_context called with app_root_dir: {app_root_dir}") # LOG app_root_dir
     if additional_data is None:
         additional_data = {}
 
@@ -299,18 +300,22 @@ def get_document_context(
 
             logo_relative_path = seller_company.get("logo_path")
             logo_filename = seller_company.get("logo_path")
+            context["seller"]["logo_url"] = "" # Default to empty string
+
             if logo_filename and app_root_dir:
                 logo_subdir = AppGlobalConfig.get('company_logo_dir', 'company_logos')
                 logo_abs_path = os.path.join(app_root_dir, logo_subdir, logo_filename)
+                logger.info(f"Attempting to resolve seller logo. Subdir: '{logo_subdir}', Filename: '{logo_filename}', Absolute path: '{logo_abs_path}'")
                 if os.path.exists(logo_abs_path):
                     context["seller"]["logo_url"] = f"file:///{logo_abs_path.replace(os.sep, '/')}"
                 else:
-                    context["seller"]["logo_url"] = None
-                    logger.warning(f"Seller logo file '{logo_filename}' not found at expected path: {logo_abs_path}")
-            else:
-                context["seller"]["logo_url"] = None
-                if not app_root_dir and logo_filename :
-                    logger.warning(f"app_root_dir not provided, cannot resolve seller logo path for '{logo_filename}'")
+                    logger.warning(f"Seller logo file '{logo_filename}' not found at expected path: {logo_abs_path}. 'logo_url' will be empty.")
+            elif logo_filename and not app_root_dir:
+                logger.warning(f"app_root_dir not provided for context_builder, cannot resolve seller logo path for '{logo_filename}'. 'logo_url' will be empty.")
+            elif not logo_filename:
+                logger.info("No logo_filename provided for seller company. 'logo_url' will be empty.")
+
+            logger.info(f"Final context['seller']['logo_url']: '{context['seller']['logo_url']}'")
 
             payment_info_str = seller_company.get("payment_info", "{}")
             other_info_str = seller_company.get("other_info", "{}")
