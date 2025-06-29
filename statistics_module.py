@@ -368,11 +368,10 @@ class StatisticsDashboard(QWidget):
                 logging.error(f"GeoJSON file not found at: {geojson_path}")
             error_message = self.tr("Les données géographiques de la carte (GeoJSON) sont introuvables. La carte ne peut pas être affichée. Veuillez vérifier l'installation de l'application ou contacter le support.")
             self._set_map_error_html(error_message)
-
-                return
+            return
 
             m = folium.Map(location=[20, 0], zoom_start=2, tiles="CartoDB positron")
-            clients_by_country_counts = get_client_counts_by_country()
+            # clients_by_country_counts = get_client_counts_by_country() # Removed redundant call
 
         try:
             clients_by_country_counts = get_client_counts_by_country()
