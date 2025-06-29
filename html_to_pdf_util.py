@@ -7,6 +7,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__) # Create logger instance at module level
 
 from jinja2 import Environment, select_autoescape, FileSystemLoader, BaseLoader, StrictUndefined
+
 from weasyprint import HTML
 from weasyprint.urls import URLFetchingError # Corrected import
 
@@ -46,6 +47,7 @@ def get_value_from_context(key: str, context_dict: dict, current_item: dict = No
 # The get_value_from_context function is no longer needed with Jinja2.
 # It can be removed or kept if used elsewhere, but render_html_template will not use it.
 
+
 def render_html_template(template_string: str, context: dict) -> str:
     """
     Renders an HTML template string with data from a context dictionary using Jinja2.
@@ -76,6 +78,7 @@ def render_html_template(template_string: str, context: dict) -> str:
         # Optionally, re-raise or return template_string or a specific error message string.
         # For now, re-raising to make it clear something is missing in the context.
         raise  # Re-raise the StrictUndefined error to make missing variables explicit
+
     except Exception as e_render:
         logger.error(f"render_html_template (Jinja2): Unhandled exception during rendering: {e_render}", exc_info=True)
         # Re-raise to be caught by the caller (e.g., HtmlEditor.populate_html_content)
