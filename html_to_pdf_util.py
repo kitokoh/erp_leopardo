@@ -1,5 +1,11 @@
 import os
 import re # Added re import
+import logging
+
+# Basic logging configuration to ensure it's initialized
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__) # Create logger instance at module level
+
 from weasyprint import HTML
 from weasyprint.urls import URLFetchingError # Corrected import
 
@@ -38,7 +44,8 @@ def get_value_from_context(key: str, context_dict: dict, current_item: dict = No
     Returns:
         The value found, or an empty string if not found or path is invalid.
     """
-    logger = logging.getLogger(__name__) # Use the same logger
+    # Ensure the module-level logger is used. This line should already be commented out or removed.
+    # logger = logging.getLogger(__name__)
     logger.debug(f"get_value_from_context: Attempting to get key='{key}'")
 
     if key.startswith("this.") and current_item is not None:
@@ -77,10 +84,10 @@ def render_html_template(template_string: str, context: dict) -> str:
     Renders an HTML template string with data from a context dictionary,
     supporting simple placeholders, conditional blocks, and loops.
     """
-    import logging
     # Ensure logger is configured if not already done globally
     # logging.basicConfig(level=logging.DEBUG) # Basic config if needed
-    logger = logging.getLogger(__name__) # Use a named logger
+    # Ensure the module-level logger is used. This line should already be commented out or removed.
+    # logger = logging.getLogger(__name__)
 
     logger.debug(f"render_html_template: START. Context keys: {list(context.keys()) if isinstance(context, dict) else 'Non-dict context'}")
     # For very detailed debugging, print small parts of context:
