@@ -7,7 +7,6 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__) # Create logger instance at module level
 
 from jinja2 import Environment, select_autoescape, FileSystemLoader, BaseLoader, StrictUndefined
-
 from weasyprint import HTML
 from weasyprint.urls import URLFetchingError # Corrected import
 
@@ -35,25 +34,36 @@ class WeasyPrintError(Exception):
 
 def get_value_from_context(key: str, context_dict: dict, current_item: dict = None) -> any:
     """
-    Retrieves a value from a nested context dictionary using a dot-notated key.
-    If key starts with "this." and current_item is provided, it resolves against current_item.
+    Retrieves a value from a context dictionary using a dot-separated key.
+    If the key is not found, it returns None.
 
     Args:
-        key: The dot-notated key (e.g., "client.name", "this.product_name").
-        context_dict: The main context dictionary.
-        current_item: The current item in a loop (optional).
+        key: The dot-separated key to retrieve (e.g., "doc.title").
+        context_dict: The dictionary containing the context data.
+        current_item: An optional current item dictionary for nested lookups.
 
     Returns:
-# The get_value_from_context function is no longer needed with Jinja2.
-# It can be removed or kept if used elsewhere, but render_html_template will not use it.
+        The value from the context dictionary or None if not found.
+    """
+    keys = key.split('.')
+    value = context_dict
 
+    for k in keys:
+        if isinstance(value, dict) and k in value:
+            value = value[k]
+        elif isinstance(value, list) and k.isdigit() and int(k) < len(value):
+            value = value[int(k)]
+        else:
+            return None  # Key not found
+
+    return value    
 
 def render_html_template(template_string: str, context: dict) -> str:
     """
     Renders an HTML template string with data from a context dictionary using Jinja2.
     """
     logger.debug(f"render_html_template (Jinja2): START. Context keys: {list(context.keys()) if isinstance(context, dict) else 'Non-dict context'}")
-
+    
     try:
         # Using StrictUndefined to raise an error for undefined variables in templates,
         # which can help catch issues earlier. Default is Undefined which renders as empty string.
@@ -63,14 +73,14 @@ def render_html_template(template_string: str, context: dict) -> str:
             autoescape=select_autoescape(['html', 'xml']),
             undefined=StrictUndefined # Makes it error out on undefined variables
         )
-
+        
         # Add a custom filter for currency formatting if needed within Jinja templates
         # For example: {{ my_value | currency }}
         # env.filters['currency'] = format_currency # Assuming format_currency is defined elsewhere or in this module
-
+        
         template = env.from_string(template_string)
         rendered_html = template.render(context)
-
+        
         logger.debug("render_html_template (Jinja2): FINISHED processing template successfully.")
         return rendered_html
     except StrictUndefined as e_strict:
@@ -78,7 +88,6 @@ def render_html_template(template_string: str, context: dict) -> str:
         # Optionally, re-raise or return template_string or a specific error message string.
         # For now, re-raising to make it clear something is missing in the context.
         raise  # Re-raise the StrictUndefined error to make missing variables explicit
-
     except Exception as e_render:
         logger.error(f"render_html_template (Jinja2): Unhandled exception during rendering: {e_render}", exc_info=True)
         # Re-raise to be caught by the caller (e.g., HtmlEditor.populate_html_content)
