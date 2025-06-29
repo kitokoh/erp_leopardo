@@ -28,12 +28,65 @@ from db.cruds.products_crud import get_product_by_name, add_product, products_cr
 from db.cruds.client_project_products_crud import add_product_to_client_or_project, get_products_for_client_or_project
 
 import logging # For logging errors or info
+from app_setup import CONFIG # For accessing clients_dir config
+
 # Confirm import of products_crud_instance at module load time
 if 'products_crud_instance' in globals():
     logging.info(f"DM_LOGIC: products_crud_instance successfully imported at module level: {products_crud_instance}")
 else:
     logging.error("DM_LOGIC: products_crud_instance is NOT DEFINED at module level after import line!")
 
+logger_dml = logging.getLogger(__name__) # Specific logger for this module
+
+def ensure_client_folder_path(client_data: dict, app_root_dir: str) -> dict:
+    if not client_data:
+        logger_dml.warning("ensure_client_folder_path called with no client_data.")
+        return client_data
+
+    logger_dml.debug(f"Ensuring folder path for client_data: {client_data.get('client_id')}")
+
+    current_default_path = client_data.get("default_base_folder_path")
+    path_was_missing_or_empty = not current_default_path or not current_default_path.strip()
+
+    if path_was_missing_or_empty:
+        client_name_for_folder = client_data.get("client_name", "unknown_client").strip()
+        client_id_for_folder = str(client_data.get("client_id", "no_id")).strip()
+
+        sane_client_name = "".join(c if c.isalnum() else "_" for c in client_name_for_folder if c.isalnum() or c in " _-")
+        if not sane_client_name: sane_client_name = "client" # Fallback if name is all special chars
+
+        clients_base_subdir = CONFIG.get('clients_dir', 'clients')
+
+        relative_folder = os.path.join(clients_base_subdir, f"{sane_client_name}_{client_id_for_folder[:8]}")
+        client_data["default_base_folder_path"] = relative_folder
+        current_default_path = relative_folder
+        logger_dml.info(f"Constructed missing default_base_folder_path: {relative_folder} for client {client_id_for_folder}")
+
+        if app_root_dir and client_id_for_folder != "no_id": # Only try to create/update if paths are valid
+            abs_folder_path = os.path.join(app_root_dir, relative_folder)
+            try:
+                os.makedirs(abs_folder_path, exist_ok=True)
+                logger_dml.info(f"Ensured client folder exists at: {abs_folder_path}")
+
+                # Update the database only if the path was genuinely missing and now constructed
+                # clients_crud_instance is already imported at the top of this file
+                clients_crud_instance.update_client(client_id_for_folder, {"default_base_folder_path": relative_folder})
+                logger_dml.info(f"Client {client_id_for_folder} DB updated with default_base_folder_path: {relative_folder}.")
+            except OSError as e_mkdir:
+                logger_dml.error(f"Failed to create directory {abs_folder_path}: {e_mkdir}")
+            except Exception as e_db_update: # Catch potential errors from update_client
+                logger_dml.error(f"Failed to update client {client_id_for_folder} with new folder path in DB: {e_db_update}")
+        elif not app_root_dir:
+            logger_dml.warning("app_root_dir not provided to ensure_client_folder_path. Cannot create directory or update DB.")
+        elif client_id_for_folder == "no_id":
+            logger_dml.warning("client_id is 'no_id'. Cannot create directory or update DB for folder path.")
+
+
+    # Ensure base_folder_path is an alias to the (potentially newly created) default_base_folder_path
+    client_data["base_folder_path"] = client_data.get("default_base_folder_path")
+    logger_dml.debug(f"Final client_data['base_folder_path'] for client {client_data.get('client_id')}: {client_data['base_folder_path']}")
+
+    return client_data
 
 # Import dialogs that are used within the moved logic
 # Assuming these dialogs are in a 'dialogs.py' or similar accessible location.
