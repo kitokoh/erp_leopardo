@@ -117,7 +117,20 @@
                 </tr>
             </thead>
             <tbody>
-                {{CONTACTS_TABLE_ROWS_CONTACT_PAGE}}
+                {{#each contacts_list}}
+                <tr>
+                    <td>{{this.organization_name}}</td>
+                    <td>{{this.name}}</td>
+                    <td>{{this.position}}</td>
+                    <td><a href="mailto:{{this.email}}">{{this.email}}</a></td>
+                    <td>{{this.phone}}</td>
+                </tr>
+                {{/each}}
+                {{#if contacts_list_empty}}
+                <tr>
+                    <td colspan="5" style="text-align: center;">Aucun contact disponible pour ce projet/client.</td>
+                </tr>
+                {{/if}}
             </tbody>
         </table>
 

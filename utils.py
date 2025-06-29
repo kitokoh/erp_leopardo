@@ -282,43 +282,51 @@ def generate_pdf_for_document(
 
     if file_ext.lower() == '.html':
         # "No Products" Check for proforma invoices, conditional on allow_empty_products
-        logging.debug(f"PDF Generation for {file_name}: allow_empty_products = {allow_empty_products}") # NEW LOG
+        logging.debug(f"PDF Generation for {file_name}: allow_empty_products = {allow_empty_products}")
         if not allow_empty_products and ("proforma" in file_name.lower() or "invoice" in file_name.lower()):
-            logging.debug(f"PDF Generation for {file_name}: Running product check because allow_empty_products is False.") # NEW LOG
-            # The context_builder now only includes products that match the target language.
-            # So, we only need to check if the 'products' list in the context is empty.
-
+            logging.debug(f"PDF Generation for {file_name}: Running product check because allow_empty_products is False.")
             if not document_context.get('products'):
-                 logging.info(f"PDF Generation for {file_name}: No products in context. Cancelling.") # NEW LOG
+                 logging.info(f"PDF Generation for {file_name}: No products in context. Cancelling.")
                  QMessageBox.information(parent_widget, QCoreApplication.translate("utils.generate_pdf", "Information"),
                                         QCoreApplication.translate("utils.generate_pdf", f"Aucun produit n'est lié à ce client/projet (ou aucun ne correspond à la langue '{target_language_code}'). La génération du PDF pour '{file_name}' est annulée."))
                  return None
-
-            # If document_context.get('products') is not empty here, it means there ARE products for the target language.
 
         try:
             with open(source_file_path, 'r', encoding='utf-8') as f:
                 html_content = f.read()
 
-            # HtmlEditor.populate_html_content now uses the enhanced context
-            processed_html = HtmlEditor.populate_html_content(html_content, document_context) # Pass the full context
+            processed_html = HtmlEditor.populate_html_content(html_content, document_context)
 
-            base_url = QUrl.fromLocalFile(os.path.dirname(source_file_path)).toString()
-            pdf_bytes = convert_html_to_pdf(processed_html, base_url=base_url)
+            # Save the intermediate processed HTML for debugging/inspection
+            intermediate_html_filename = f"{file_name}_{current_timestamp_str}_intermediate.html"
+            intermediate_html_path = os.path.join(os.path.dirname(output_pdf_path), intermediate_html_filename)
+            try:
+                with open(intermediate_html_path, 'w', encoding='utf-8') as f_html_intermediate:
+                    f_html_intermediate.write(processed_html)
+                logging.info(f"Intermediate processed HTML saved to: {intermediate_html_path}")
+                if parent_widget:
+                    try:
+                        QDesktopServices.openUrl(QUrl.fromLocalFile(intermediate_html_path))
+                        # No longer ask to proceed to PDF, just inform and stop.
+                        QMessageBox.information(parent_widget,
+                                                QCoreApplication.translate("utils.generate_pdf", "HTML Généré et Ouvert"),
+                                                QCoreApplication.translate("utils.generate_pdf", "Le fichier HTML traité a été sauvegardé et ouvert pour inspection:\n{0}\n\nLa génération de PDF est désactivée dans cette étape.").format(intermediate_html_path))
+                    except Exception as e_open_html:
+                        logging.error(f"Failed to auto-open intermediate HTML: {e_open_html}")
+                        QMessageBox.warning(parent_widget,
+                                             QCoreApplication.translate("utils.generate_pdf", "HTML Intermédiaire Enregistré"),
+                                             QCoreApplication.translate("utils.generate_pdf", "Le fichier HTML traité par Jinja2 a été sauvegardé ici (tentative d'ouverture échouée):\n{0}").format(intermediate_html_path))
+            except Exception as e_save_html:
+                logging.error(f"Failed to save intermediate HTML file at {intermediate_html_path}: {e_save_html}")
 
-            if pdf_bytes:
-                with open(output_pdf_path, 'wb') as f_pdf:
-                    f_pdf.write(pdf_bytes)
-                QMessageBox.information(parent_widget, QCoreApplication.translate("utils.generate_pdf", "Succès PDF"),
-                                        QCoreApplication.translate("utils.generate_pdf", "PDF généré avec succès:\n{0}").format(output_pdf_path))
-                return output_pdf_path
-            else:
-                QMessageBox.warning(parent_widget, QCoreApplication.translate("utils.generate_pdf", "Erreur PDF"),
-                                    QCoreApplication.translate("utils.generate_pdf", "La conversion HTML en PDF a échoué. Le contenu PDF résultant était vide."))
-                return None
-        except Exception as e:
-            QMessageBox.critical(parent_widget, QCoreApplication.translate("utils.generate_pdf", "Erreur HTML vers PDF"),
-                                 QCoreApplication.translate("utils.generate_pdf", "Erreur lors de la génération du PDF à partir du HTML:\n{0}").format(str(e)))
+            # MODIFICATION: Stop after saving and opening HTML. Return HTML path.
+            logging.info(f"generate_pdf_for_document: HTML preview generated: {intermediate_html_path}. PDF generation explicitly SKIPPED.")
+            return intermediate_html_path # Return path to the HTML
+
+        except Exception as e: # This catch includes Jinja2's UndefinedError now
+            logging.error(f"Error during HTML processing for {source_file_path}: {e}", exc_info=True)
+            QMessageBox.critical(parent_widget, QCoreApplication.translate("utils.generate_pdf", "Erreur Traitement HTML"),
+                                 QCoreApplication.translate("utils.generate_pdf", "Erreur lors du traitement du HTML:\n{0}").format(str(e)))
             return None
     elif file_ext.lower() in ['.xlsx', '.docx']:
         QMessageBox.information(parent_widget, QCoreApplication.translate("utils.generate_pdf", "Fonctionnalité non disponible"),
