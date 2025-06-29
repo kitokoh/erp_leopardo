@@ -296,7 +296,7 @@ class DocumentManager(QMainWindow):
             logging.info("DocumentManager: StatisticsDashboard instance created.") # Kept for diagnostics
             self.statistics_dashboard_instance.request_add_client_for_country.connect(self.handle_add_client_from_stats_map)
             self.statistics_dashboard_instance.request_view_client_details.connect(self.handle_view_client_from_stats_map)
-            self.main_area_stack.addWidget(self.statistics_dashboard_instance)
+            # self.main_area_stack.addWidget(self.statistics_dashboard_instance) # Ne pas ajouter ici, géré par HomePageWidget
         else:
             self.statistics_dashboard_instance = None
 
@@ -1471,10 +1471,17 @@ class DocumentManager(QMainWindow):
             QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Partner Management est désactivé."))
 
     def show_statistics_view(self):
-        if self.statistics_dashboard_instance:
-            self.main_area_stack.setCurrentWidget(self.statistics_dashboard_instance)
-        else:
-            logging.warning("Statistics Dashboard instance is None. Cannot show view.")
+        # Navigue vers la page d'accueil, qui affichera le widget statistiques
+        # dans sa zone inférieure si disponible.
+        self.show_home_view()
+        if self.home_page_widget_instance and self.statistics_dashboard_instance:
+            # HomePageWidget.set_bottom_widget s'assure qu'il est visible.
+            # On pourrait ajouter un focus spécifique ou un scroll si la page d'accueil est longue.
+            # Pour l'instant, s'assurer que HomePageWidget utilise bien l'instance est suffisant.
+            self.home_page_widget_instance.set_bottom_widget(self.statistics_dashboard_instance) # S'assurer qu'il est ré-assigné
+            logging.info("Navigated to Home Page. Statistics should be visible in its bottom area if configured.")
+        elif not self.statistics_dashboard_instance:
+            logging.warning("Statistics Dashboard instance is None. Cannot show statistics view.")
             QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Statistiques est désactivé."))
 
     def show_inventory_browser_view(self):
