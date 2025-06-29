@@ -4115,9 +4115,9 @@ class ClientWidget(QWidget):
                 if file_path_relative_from_db:
                     if order_identifier_for_doc:
                         safe_order_subfolder = str(order_identifier_for_doc).replace(':', '_').replace(' ', '_')
-                        full_file_path = os.path.join(base_client_path, safe_order_subfolder, file_path_relative_from_db)
+                        full_file_path = os.path.join(base_client_path_abs, safe_order_subfolder, file_path_relative_from_db)
                     else:
-                        full_file_path = os.path.join(base_client_path, file_path_relative_from_db)
+                        full_file_path = os.path.join(base_client_path_abs, file_path_relative_from_db)
                     if not os.path.exists(full_file_path):
                         logging.warning(f"PT_DEBUG: populate_doc_table - File not found: {full_file_path} for doc_id {document_id}")
                 else:
