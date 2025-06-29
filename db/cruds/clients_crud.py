@@ -768,6 +768,89 @@ class ClientsCRUD(GenericCRUD):
             logging.error(f"Unexpected error in get_active_clients_count_up_to_date: {ex}", exc_info=True)
             return 0
 
+    @_manage_conn
+    def get_client_acquisition_data(self, start_date: datetime, end_date: datetime, group_by_dimension: str, conn: sqlite3.Connection = None):
+        """
+        Récupère les données d'acquisition de clients sur une période donnée, regroupées par une dimension spécifiée.
+        Utilise sqlite3 pour la compatibilité avec le reste du CRUD.
+        Dimensions supportées: 'Mois', 'Année', 'Pays', 'Ville', 'Statut'.
+        """
+        # Ensure conn is available, otherwise _manage_conn should provide it or raise error.
+        # The decorator @_manage_conn handles the connection `conn`.
+
+        cursor = conn.cursor()
+        results = []
+        try:
+            # Ensure start_date and end_date are strings in ISO format for SQLite
+            start_date_str = start_date.isoformat()
+            end_date_str = end_date.isoformat()
+
+            base_sql_select = "SELECT "
+            base_sql_from = "FROM Clients c "
+            base_sql_where = "WHERE c.created_at >= ? AND c.created_at <= ? AND (c.is_deleted = 0 OR c.is_deleted IS NULL) "
+            params = [start_date_str, end_date_str]
+
+            if group_by_dimension == 'Mois':
+                select_clause = "strftime('%Y-%m', c.created_at) as period, COUNT(c.client_id) as client_count "
+                group_by_clause = "GROUP BY period ORDER BY period "
+                sql = base_sql_select + select_clause + base_sql_from + base_sql_where + group_by_clause
+                cursor.execute(sql, params)
+                raw_results = cursor.fetchall()
+                results = [(r['period'], r['client_count']) for r in raw_results]
+
+            elif group_by_dimension == 'Année':
+                select_clause = "strftime('%Y', c.created_at) as period, COUNT(c.client_id) as client_count "
+                group_by_clause = "GROUP BY period ORDER BY period "
+                sql = base_sql_select + select_clause + base_sql_from + base_sql_where + group_by_clause
+                cursor.execute(sql, params)
+                raw_results = cursor.fetchall()
+                results = [(r['period'], r['client_count']) for r in raw_results]
+
+            elif group_by_dimension == 'Pays':
+                select_clause = "co.country_name as country, COUNT(c.client_id) as client_count "
+                from_join_clause = base_sql_from + "JOIN Countries co ON c.country_id = co.country_id "
+                group_by_clause = "GROUP BY co.country_name ORDER BY client_count DESC "
+                sql = base_sql_select + select_clause + from_join_clause + base_sql_where + group_by_clause
+                cursor.execute(sql, params)
+                raw_results = cursor.fetchall()
+                results = [(r['country'], r['client_count']) for r in raw_results]
+
+            elif group_by_dimension == 'Ville':
+                # Assumes City table has country_id or Client table has country_id for context
+                # Let's assume Client.country_id and City.city_name are available
+                select_clause = "co.country_name || ' - ' || ci.city_name as city_country, COUNT(c.client_id) as client_count "
+                from_join_clause = base_sql_from + \
+                                   "JOIN Cities ci ON c.city_id = ci.city_id " + \
+                                   "JOIN Countries co ON c.country_id = co.country_id "
+                                   # If city links to country directly: JOIN Countries co ON ci.country_id = co.country_id
+                group_by_clause = "GROUP BY city_country ORDER BY client_count DESC "
+                sql = base_sql_select + select_clause + from_join_clause + base_sql_where + group_by_clause
+                cursor.execute(sql, params)
+                raw_results = cursor.fetchall()
+                results = [(r['city_country'], r['client_count']) for r in raw_results]
+
+            elif group_by_dimension == 'Statut':
+                select_clause = "s.status_name as status, COUNT(c.client_id) as client_count "
+                from_join_clause = base_sql_from + "JOIN StatusSettings s ON c.status_id = s.status_id "
+                # Filter by status_type = 'Client'
+                status_type_filter = "AND s.status_type = 'Client' "
+                group_by_clause = "GROUP BY s.status_name ORDER BY client_count DESC "
+                # Add status_type_filter to the WHERE clause
+                # Ensure base_sql_where ends with a space if status_type_filter is appended directly
+                sql = base_sql_select + select_clause + from_join_clause + base_sql_where.strip() + " " + status_type_filter + group_by_clause
+                cursor.execute(sql, params) # params remain the same as they are for date range
+                raw_results = cursor.fetchall()
+                results = [(r['status'], r['client_count']) for r in raw_results]
+
+            return results
+
+        except sqlite3.Error as e:
+            self.logger.error(f"SQLite error in get_client_acquisition_data (Dimension: {group_by_dimension}): {e}", exc_info=True)
+            return []
+        except Exception as ex:
+            self.logger.error(f"Unexpected error in get_client_acquisition_data (Dimension: {group_by_dimension}): {ex}", exc_info=True)
+            return []
+
 # Instantiate the CRUD class for easy import and use elsewhere
 clients_crud_instance = ClientsCRUD()
 
@@ -791,6 +874,9 @@ get_total_clients_count = clients_crud_instance.get_total_clients_count
 get_clients_count_created_between = clients_crud_instance.get_clients_count_created_between
 get_total_clients_count_up_to_date = clients_crud_instance.get_total_clients_count_up_to_date
 get_active_clients_count_up_to_date = clients_crud_instance.get_active_clients_count_up_to_date # Added export
+# Expose the new method if it's part of the instance
+get_client_acquisition_data = clients_crud_instance.get_client_acquisition_data
+
 
 __all__ = [
     "add_client",
@@ -812,6 +898,7 @@ __all__ = [
     "get_clients_count_created_between",
     "get_total_clients_count_up_to_date",
     "get_active_clients_count_up_to_date", # Added to __all__
+    "get_client_acquisition_data", # Added to __all__
     "ClientsCRUD", # Exporting the class itself for type hinting or direct instantiation
     "clients_crud_instance" # Exporting the instance if needed elsewhere
 ]
