@@ -5,7 +5,7 @@ import os
 
 # Adjust path to import ClientController from the parent directory's controllers folder
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from controllers.client_controller import ClientController
+from client_management.client_controller import ClientController
 
 # This is the existing test class. We will add/modify methods in it.
 class TestClientController(unittest.TestCase):

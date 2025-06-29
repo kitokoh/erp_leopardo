@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Facture Proforma</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            color: #333;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+        .container {
+            width: 800px; /* Fixed width for better PDF rendering consistency */
+            margin: 30px auto;
+            background-color: #fff;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #007bff; /* Accent color */
+        }
+        .header .logo-container {
+            flex-grow: 1;
+        }
+        .header .logo {
+            max-width: 200px;
+            max-height: 80px;
+        }
+        .header h1 {
+            color: #007bff;
+            font-size: 28px;
+            margin: 0;
+            text-align: right;
+            font-weight: 300;
+            white-space: nowrap;
+        }
+        .details-section {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+        }
+        .company-details, .client-details {
+            width: 48%;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            border: 1px solid #e7e7e7;
+        }
+        .company-details h3, .client-details h3 {
+            margin-top: 0;
+            color: #007bff;
+            font-size: 14px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+        .company-details p, .client-details p {
+            margin: 4px 0;
+            font-size: 11px;
+        }
+        .invoice-meta {
+            margin-bottom: 30px;
+            background-color: #f0f8ff; /* Light blue accent */
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .invoice-meta p {
+            margin: 6px 0;
+            font-size: 12px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px; /* Increased padding */
+            text-align: left;
+            font-size: 11px;
+        }
+        th {
+            background-color: #007bff; /* Primary accent color */
+            color: #fff;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 11px;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .number { /* Class for numerical cells */
+            text-align: right;
+        }
+        .total-section {
+            text-align: right;
+            margin-top: 30px;
+            padding-right: 10px;
+        }
+        .total-section p {
+            margin: 5px 0;
+            font-size: 12px;
+        }
+        .total-section h3 {
+            color: #007bff;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            font-size: 10px;
+            color: #666;
+        }
+        .footer p {
+            margin: 3px 0;
+        }
+        .bank-details {
+            margin-bottom:20px;
+            padding:15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            text-align:left;
+        }
+        .bank-details p {
+            margin: 4px 0;
+            font-size: 11px;
+        }
+        .bank-details strong {
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            {% if seller.logo_url %}
+            <img src="" alt="Company Logo" class="logo" />
+            {% endif %}
+            <h1>FACTURE PROFORMA</h1> {# Kept French static text, assuming template per lang #}
+        </div>
+
+        <div class="details-section">
+            <div class="company-details">
+                <h3>De :</h3> {# Kept French static text #}
+                <p><strong></strong></p>
+                <p></p>
+                {# seller.city_zip_country might be less useful if address_full is comprehensive #}
+                {# <p></p> #}
+                <p>Téléphone : </p>
+                <p>Email : </p>
+                <p>N° TVA : </p>
+                <p>N° de registre : </p>
+            </div>
+
+            <div class="client-details">
+                <h3>À :</h3> {# Kept French static text #}
+                <p><strong></strong></p>
+                <p></p>
+                {# <p></p> #}
+                <p>Contact : </p>
+                <p>Email : </p>
+                <p>N° TVA : </p>
+            </div>
+        </div>
+
+        <div class="invoice-meta">
+            <p><strong>Facture Proforma N° :</strong> </p>
+            <p><strong>Date :</strong> </p>
+            <p><strong>ID Projet :</strong> </p>
+            <p><strong>Conditions de Paiement :</strong> </p>
+            <p><strong>Conditions de Livraison :</strong> </p>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:5%;"></th>
+                    <th style="width:45%;"></th>
+                    <th style="width:15%;" class="number"></th>
+                    <th style="width:15%;" class="number"></th>
+                    <th style="width:20%;" class="number"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for product in products %}
+                <tr>
+                    <td class="number"></td>
+                    <td>
+                        <strong></strong>
+                        {% if product.sku and product.sku != 'N/A' %}<br><small>SKU: </small>{% endif %}
+                        {% if product.description and product.description != product.name and product.description != product.sku %}
+                        <br><small></small>
+                        {% endif %}
+                    </td>
+                    <td class="number"></td>
+                    <td class="number"></td> {# Already formatted string from context #}
+                    <td class="number"></td> {# Already formatted string from context #}
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center;"></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="invoice-meta" style="margin-top: 20px;">
+            <p><strong>Référence Commande Client:</strong> </p>
+            <p><strong>Date Commande Client:</strong> </p>
+        </div>
+
+        <div class="total-section">
+            <p>Sous-total: </p>
+            <p>Remise (%): </p>
+            <p>TVA (%): </p>
+            <h3><strong>Montant Total: </strong></h3>
+            <!-- <p>()</p> -->
+        </div>
+
+        <div class="footer" style="margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px;">
+            <p><strong>Nos coordonnées bancaires :</strong></p>
+            <p>Banque: </p>
+            <p>Titulaire du compte: </p>
+            <p>IBAN: </p>
+            <p>SWIFT/BIC: </p>
+            <p>Adresse de la banque: </p>
+            <hr>
+            {% if doc.client_specific_footer_notes %}
+            <p></p>
+            {% endif %}
+            <p style="margin-top: 10px;"><em>Ceci est une facture proforma et ne constitue pas une demande de paiement.</em></p>
+            <p><em>Merci de votre confiance !</em></p>
+            <p style="font-size: 0.8em; color: #999; margin-top: 20px;"> -  - Numéro de TVA:  - Numéro d'enregistrement: </p>
+        </div>
+    </div>
+</body>
+</html>

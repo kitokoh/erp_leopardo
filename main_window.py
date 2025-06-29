@@ -111,10 +111,10 @@ from PyQt5.QtWidgets import QDateEdit
 
 
 
-from client_widget import ClientWidget
+from client_management.client_widget import ClientWidget
 from project_management import MainDashboard as ProjectManagementDashboard
 from statistics_module import StatisticsDashboard
-from statistics_panel import CollapsibleStatisticsWidget
+# from statistics_panel import CollapsibleStatisticsWidget # Unused in main_window
 
 from utils import save_config
 from company_management import CompanyTabWidget
@@ -421,6 +421,24 @@ class DocumentManager(QMainWindow):
         """Returns the instance of the statistics dashboard if available."""
         if self.module_states.get('statistics', True) and hasattr(self, 'statistics_dashboard_instance'):
             return self.statistics_dashboard_instance
+        return None
+
+        # Set bottom widget for HomePageWidget if statistics module is enabled
+        if self.home_page_widget_instance and hasattr(self.home_page_widget_instance, 'set_bottom_widget'):
+            stats_widget_instance = self.get_statistics_widget_instance()
+            if stats_widget_instance:
+                self.home_page_widget_instance.set_bottom_widget(stats_widget_instance)
+            else: # Optionally hide or set a default placeholder if stats are disabled/unavailable
+                self.home_page_widget_instance.set_bottom_widget(None)
+
+
+    def get_statistics_widget_instance(self):
+        """Returns the instance of the statistics dashboard if available."""
+        print(f"DocumentManager: get_statistics_widget_instance called. Module state for statistics: {self.module_states.get('statistics', True)}")
+        if self.module_states.get('statistics', True) and hasattr(self, 'statistics_dashboard_instance'):
+            print(f"DocumentManager: Returning self.statistics_dashboard_instance: {self.statistics_dashboard_instance}")
+            return self.statistics_dashboard_instance
+        print(f"DocumentManager: Returning None from get_statistics_widget_instance.")
         return None
 
     def _load_module_states(self):
@@ -1399,6 +1417,7 @@ class DocumentManager(QMainWindow):
 
 
     def show_home_view(self):
+        print("DocumentManager: show_home_view called.")
         if self.home_page_widget_instance:
             self.main_area_stack.setCurrentWidget(self.home_page_widget_instance)
         else:
@@ -1413,9 +1432,12 @@ class DocumentManager(QMainWindow):
             logging.warning("Project Management widget instance is None. Cannot show view.")
             QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Gestion de Projet est désactivé."))
 
-    def show_documents_view(self): self.main_area_stack.setCurrentWidget(self.documents_page_widget)
+    def show_documents_view(self):
+        print("DocumentManager: show_documents_view called.")
+        self.main_area_stack.setCurrentWidget(self.documents_page_widget)
 
     def show_partner_management_view(self):
+        print("DocumentManager: show_partner_management_view called.")
         if self.partner_management_widget_instance:
             self.main_area_stack.setCurrentWidget(self.partner_management_widget_instance)
         else:
@@ -1430,6 +1452,7 @@ class DocumentManager(QMainWindow):
             QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Statistiques est désactivé."))
 
     def show_inventory_browser_view(self):
+        print("DocumentManager: show_inventory_browser_view called.")
         if self.inventory_browser_widget_instance:
             self.main_area_stack.setCurrentWidget(self.inventory_browser_widget_instance)
         else:
@@ -1444,6 +1467,7 @@ class DocumentManager(QMainWindow):
             QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Botpress Integration est désactivé."))
 
     def show_product_management_page(self):
+        print("DocumentManager: show_product_management_page called.")
         if self.product_management_page_instance:
             self.main_area_stack.setCurrentWidget(self.product_management_page_instance)
         else:
@@ -1456,7 +1480,9 @@ class DocumentManager(QMainWindow):
         else:
             logging.warning("Recruitment dashboard instance is None. Cannot show view.")
             QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Recrutement est désactivé."))
+
     def show_camera_management_view(self):
+        print("DocumentManager: show_camera_management_view called.")
         if self.camera_management_widget_instance:
             self.main_area_stack.setCurrentWidget(self.camera_management_widget_instance)
             if hasattr(self.camera_management_widget_instance, 'set_current_user_id'): # Ensure user_id is up-to-date
@@ -1652,12 +1678,23 @@ class DocumentManager(QMainWindow):
                      f"client_data_to_show name={client_data_to_show.get('client_name')}, "
                      f"email={client_data_to_show.get('email')}, phone={client_data_to_show.get('phone')}")
 
-        # Ensure selected_languages is a list, even if it's null/empty from DB
-        selected_languages_str = client_data_to_show.get('selected_languages')
-        if isinstance(selected_languages_str, str) and selected_languages_str.strip():
-            client_data_to_show['selected_languages'] = [lang.strip() for lang in selected_languages_str.split(',') if lang.strip()]
-        elif not isinstance(client_data_to_show.get('selected_languages'), list): # If it's not a list already (e.g. None or empty string from .get())
-            client_data_to_show['selected_languages'] = []
+        # Ensure selected_languages is a list, defaulting to ['fr'] if null/empty from DB
+        selected_languages_value = client_data_to_show.get('selected_languages')
+        if isinstance(selected_languages_value, str) and selected_languages_value.strip():
+            # If it's a non-empty string, parse it
+            parsed_langs = [lang.strip() for lang in selected_languages_value.split(',') if lang.strip()]
+            client_data_to_show['selected_languages'] = parsed_langs if parsed_langs else ['fr']
+        elif isinstance(selected_languages_value, list):
+            # If it's already a list (e.g. from tests or direct data manipulation)
+            # Use as is, but default to ['fr'] if the list is empty
+            client_data_to_show['selected_languages'] = selected_languages_value if selected_languages_value else ['fr']
+        else:
+            # If it's None, empty string, or any other type, default to ['fr']
+            client_data_to_show['selected_languages'] = ['fr']
+
+        # A final safety net: if after all processing selected_languages is somehow empty (e.g. parsed string resulted in empty list), default to ['fr']
+        if not client_data_to_show.get('selected_languages'):
+            client_data_to_show['selected_languages'] = ['fr']
 
         logging.info(f"open_client_tab_by_id: client_data_to_show after augmentation: {client_data_to_show}")
 
@@ -1750,17 +1787,24 @@ class DocumentManager(QMainWindow):
             self.settings_page_instance.company_tab.load_all_data()
 
         # After settings page is shown and potentially modified & saved by its own mechanism:
-        try:
+        # try:
             # Disconnect first to prevent multiple connections if settings page is shown multiple times
+            # self.settings_page_instance.save_settings_button.clicked.disconnect(self._handle_settings_saved) # This was causing issues if called multiple times
+        # except TypeError:  # Signal was not connected
+            # pass
+        # Ensure connected only once or manage connection state if page can be hidden/shown multiple times
+        try: # Try to disconnect first to avoid multiple connections
             self.settings_page_instance.save_settings_button.clicked.disconnect(self._handle_settings_saved)
-        except TypeError:  # Signal was not connected
-            pass
+        except TypeError: # It was not connected, so nothing to disconnect
+            pass # This is fine
         self.settings_page_instance.save_settings_button.clicked.connect(self._handle_settings_saved)
+
 
         logging.info("Switched to Settings Page and refreshed its data.")
 
     def _handle_settings_saved(self):
         """Called when 'Save All Settings' in SettingsPage is clicked."""
+        print("DocumentManager: _handle_settings_saved called.") # Debug print
         logging.info("Handling settings saved signal from SettingsPage...")
 
         current_states_copy = dict(self.module_states)
@@ -1897,6 +1941,7 @@ class DocumentManager(QMainWindow):
         pass
 
     def show_experience_module_view(self):
+        print("DocumentManager: show_experience_module_view called.")
         if self.experience_management_widget_instance:
             self.main_area_stack.setCurrentWidget(self.experience_management_widget_instance)
         else:
@@ -1921,6 +1966,7 @@ class DocumentManager(QMainWindow):
 
     def show_user_management_page(self):
         """Switches the main stacked widget to display the User Management page."""
+        print("DocumentManager: show_user_management_page called.")
         if self.user_management_page_instance:
             # Refresh data when page is shown, in case of external changes or role changes
             if hasattr(self.user_management_page_instance, 'load_users_to_table'):

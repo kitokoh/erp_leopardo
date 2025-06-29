@@ -11,6 +11,11 @@ from PyQt5.QtWebChannel import QWebChannel
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 
+# Matplotlib imports
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
+
 
 from datetime import datetime # Added for client acquisition stats
 from dateutil.relativedelta import relativedelta # Added for client acquisition stats
@@ -123,31 +128,50 @@ class StatisticsDashboard(QWidget):
             # This indicates a severe problem with the widget's construction or state.
             return
 
-        # Get the layout from the widget. If it's missing, __init__ might not have completed as expected.
-        target_layout = self.left_widget_for_map.layout()
-        if target_layout is None:
-            logging.warning("StatisticsDashboard: Layout for left_widget_for_map was None in _initialize_map_and_load_data. Attempting to recreate QVBoxLayout.")
-            # This is a recovery attempt. The layout should have been set in __init__.
-            target_layout = QVBoxLayout(self.left_widget_for_map) # This also sets it on the widget
-            target_layout.setContentsMargins(0,0,0,0)
-            # Store it back for consistency, though direct use of target_layout is preferred within this method.
-            self._left_map_actual_layout = target_layout
-        else:
-            # If the layout exists, ensure our reference is up-to-date.
-            self._left_map_actual_layout = target_layout
+        # self._left_map_actual_layout should have been initialized in __init__
+        # and is the correct layout for self.left_widget_for_map.
+        # We verify if self.left_widget_for_map.layout() still reports it,
+        # or if it somehow became None.
 
+        current_layout_on_widget = self.left_widget_for_map.layout()
 
-        if not self._left_map_actual_layout: # Double check after potential recreation
-            logging.critical("StatisticsDashboard: self._left_map_actual_layout is STILL None after attempting to get/recreate. Cannot proceed.")
+        if current_layout_on_widget is None:
+            logging.warning("StatisticsDashboard: self.left_widget_for_map.layout() is None. "
+                            "This is unexpected as it should have been set in __init__ via self._left_map_actual_layout. "
+                            "Attempting to re-apply self._left_map_actual_layout if it exists, or recreate.")
+            if self._left_map_actual_layout is not None:
+                # Re-apply the layout instance we stored in __init__
+                self.left_widget_for_map.setLayout(self._left_map_actual_layout)
+            else:
+                # This is a more critical state: self._left_map_actual_layout itself was not set in __init__
+                logging.error("StatisticsDashboard: self._left_map_actual_layout is also None. This indicates an issue in __init__. Recreating layout.")
+                self._left_map_actual_layout = QVBoxLayout(self.left_widget_for_map)
+                self._left_map_actual_layout.setContentsMargins(0,0,0,0)
+                # self.left_widget_for_map.setLayout() is implicitly called by QVBoxLayout constructor with parent
+        elif current_layout_on_widget is not self._left_map_actual_layout:
+            logging.warning("StatisticsDashboard: self.left_widget_for_map.layout() (is %s) is different from self._left_map_actual_layout (is %s). "
+                            "This is highly unexpected. Trusting the instance variable self._left_map_actual_layout.",
+                            id(current_layout_on_widget), id(self._left_map_actual_layout) )
+            # If the widget has a *different* layout, and we are sure _left_map_actual_layout is the one we want,
+            # we might need to re-set it. However, this situation implies external modification or a deep bug.
+            # For now, we assume self._left_map_actual_layout is the intended one.
+            # If self.left_widget_for_map.layout() returned a *different, valid* layout,
+            # and self._left_map_actual_layout was also valid but different,
+            # the original code would have updated self._left_map_actual_layout to match the widget.
+            # The current CRITICAL error implies self._left_map_actual_layout becomes None.
+            pass # We will proceed using self._left_map_actual_layout as defined in __init__
+
+        # Final check on self._left_map_actual_layout, which should be the one from __init__
+        if not self._left_map_actual_layout:
+            logging.critical("StatisticsDashboard: self._left_map_actual_layout is None after checks. Cannot proceed with map initialization.")
             return
 
         if self.map_view is None:
             # Parent QWebEngineView to self.left_widget_for_map, which is its container
-            self.map_view = QWebEngineView(self.left_widget_for_map)
-            # Add the map_view to the now confirmed target_layout (which is self._left_map_actual_layout)
+            self.map_view = QWebEngineView(self.left_widget_for_map) # Parent to the widget
+            # Add the map_view to self._left_map_actual_layout, which is confirmed or restored/recreated.
             self._left_map_actual_layout.addWidget(self.map_view)
-            logging.info("StatisticsDashboard: QWebEngineView (self.map_view) created and added to layout of left_widget_for_map.")
-
+            logging.info("StatisticsDashboard: QWebEngineView (self.map_view) created and added to _left_map_actual_layout.")
 
             self.map_interaction_handler = MapInteractionHandler(self)
             self.map_interaction_handler.country_clicked_signal.connect(self._on_map_country_clicked)
@@ -383,6 +407,8 @@ class StatisticsDashboard(QWidget):
 
 
 
+
+            # The rest of the map generation logic follows...
             if clients_by_country_counts:
                 counts_dict = {item['country_name']: item['client_count'] for item in clients_by_country_counts}
                 max_observed_clients = max(item['client_count'] for item in clients_by_country_counts) if clients_by_country_counts else 0
@@ -790,28 +816,39 @@ class StatisticsDashboard(QWidget):
             self.health_score_progress_bar.setValue(0)
 
     def _setup_segmentation_tab_ui_internal(self):
-        self.segmentation_tables = {} # Ensure this is initialized before use
+        self.segmentation_tables = {}
+        self.segmentation_canvases = {} # For Matplotlib canvases
+
         tab_configs = [
-            ("country", self.tr("Par Pays"), ["Pays", "Nombre de Clients"]),
-            ("city", self.tr("Par Ville"), ["Pays", "Ville", "Nombre de Clients"]),
-            ("status", self.tr("Par Statut"), ["Statut", "Nombre de Clients"]),
-            ("category", self.tr("Par Catégorie"), ["Catégorie", "Nombre de Clients"]),
-            ("product_popularity", self.tr("Par Popularité Produit"), [self.tr("Nom Produit"), self.tr("Nombre d'Utilisations")]) # Added
+            ("country", self.tr("Par Pays"), ["Pays", "Nombre de Clients"], "table"),
+            ("city", self.tr("Par Ville"), ["Pays", "Ville", "Nombre de Clients"], "table"),
+            ("status", self.tr("Par Statut"), [], "chart"), # No headers for chart tab directly
+            ("category", self.tr("Par Catégorie"), ["Catégorie", "Nombre de Clients"], "table"),
+            ("product_popularity", self.tr("Par Popularité Produit"), [self.tr("Nom Produit"), self.tr("Nombre d'Utilisations")], "table")
         ]
 
-        for key, title, headers in tab_configs:
+        for key, title, headers, tab_type in tab_configs:
             tab_widget = QWidget()
             tab_layout = QVBoxLayout(tab_widget)
-            table_widget = QTableWidget()
-            table_widget.setColumnCount(len(headers))
-            table_widget.setHorizontalHeaderLabels(headers)
-            table_widget.setEditTriggers(QTableWidget.NoEditTriggers)
-            table_widget.setSelectionBehavior(QTableWidget.SelectRows)
-            table_widget.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-            table_widget.setSortingEnabled(True)
-            tab_layout.addWidget(table_widget)
+
+            if tab_type == "table":
+                table_widget = QTableWidget()
+                table_widget.setColumnCount(len(headers))
+                table_widget.setHorizontalHeaderLabels(headers)
+                table_widget.setEditTriggers(QTableWidget.NoEditTriggers)
+                table_widget.setSelectionBehavior(QTableWidget.SelectRows)
+                table_widget.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+                table_widget.setSortingEnabled(True)
+                tab_layout.addWidget(table_widget)
+                self.segmentation_tables[key] = table_widget
+            elif tab_type == "chart":
+                # For chart tabs, we'll create a FigureCanvas later when data is available
+                # We can store the layout or a placeholder widget if needed.
+                # For simplicity, we'll store the layout and add the canvas to it in the update method.
+                self.segmentation_canvases[key] = tab_layout # Store the layout for the canvas
+
             self.segmentation_tabs.addTab(tab_widget, title)
-            self.segmentation_tables[key] = table_widget
+
 
     def _populate_table(self, table_key, data_fetch_func, column_keys):
         table = self.segmentation_tables.get(table_key)
@@ -825,19 +862,99 @@ class StatisticsDashboard(QWidget):
                 table.insertRow(row_idx)
                 for col_idx, col_key in enumerate(column_keys):
                     item_value = row_data.get(col_key, "")
-                    # Ensure QTableWidgetItem is used
                     table.setItem(row_idx, col_idx, QTableWidgetItem(str(item_value)))
         except Exception as e:
             logging.error(f"Error populating table {table_key}: {e}", exc_info=True)
         finally:
             table.setSortingEnabled(True)
 
+    def _update_status_segmentation_chart(self):
+        logging.info("Updating status segmentation chart...")
+        chart_layout = self.segmentation_canvases.get("status")
+        if not chart_layout:
+            logging.error("Chart layout for 'status' not found.")
+            return
+
+        # Clear previous canvas if any
+        while chart_layout.count():
+            item = chart_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
+        try:
+            status_data = get_client_segmentation_by_status()
+            if not status_data:
+                logging.info("No data for status segmentation chart.")
+                no_data_label = QLabel(self.tr("Aucune donnée de statut client disponible pour afficher le graphique."))
+                no_data_label.setAlignment(Qt.AlignCenter)
+                chart_layout.addWidget(no_data_label)
+                return
+
+            labels = [item.get('status_name', 'N/A') for item in status_data]
+            sizes = [item.get('client_count', 0) for item in status_data]
+
+            # Filter out zero sizes to prevent display issues with pie chart
+            filtered_labels = []
+            filtered_sizes = []
+            for label, size in zip(labels, sizes):
+                if size > 0:
+                    filtered_labels.append(label)
+                    filtered_sizes.append(size)
+
+            if not filtered_sizes: # All statuses have 0 clients
+                logging.info("All statuses have 0 clients for status segmentation chart.")
+                no_data_label = QLabel(self.tr("Aucun client trouvé pour les statuts existants."))
+                no_data_label.setAlignment(Qt.AlignCenter)
+                chart_layout.addWidget(no_data_label)
+                return
+
+            labels = filtered_labels
+            sizes = filtered_sizes
+
+            # Using a more Qt-friendly way to create the figure and canvas
+            # plt.style.use('seaborn-v0_8-whitegrid') # Optional: for styling
+
+            # Create a new figure and canvas each time to avoid issues with redrawing on the same canvas
+            # It's generally safer for dynamic updates in Qt.
+            fig = Figure(figsize=(5, 4), dpi=100) # Adjust figsize and dpi as needed
+            ax = fig.add_subplot(111)
+
+            # Generate distinct colors if many segments, or use default
+            # colors = plt.cm.get_cmap('viridis', len(labels)).colors # Example: 'viridis' colormap
+
+            wedges, texts, autotexts = ax.pie(
+                sizes,
+                autopct=lambda p: '{:.1f}% ({:.0f})'.format(p, p * sum(sizes) / 100), # Show percentage and absolute count
+                startangle=90,
+                # colors=colors # Optional: apply custom colors
+            )
+            ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+
+            # Add a legend
+            # Place legend outside the pie chart to avoid overlap, adjust bbox_to_anchor as needed
+            ax.legend(wedges, labels, title=self.tr("Statuts"), loc="center left", bbox_to_anchor=(1, 0, 0.5, 1))
+            fig.tight_layout() # Adjust layout to make room for legend if it's outside
+
+            canvas = FigureCanvas(fig)
+            chart_layout.addWidget(canvas)
+            canvas.draw()
+            logging.info("Status segmentation chart updated successfully.")
+
+        except Exception as e:
+            logging.error(f"Error updating status segmentation chart: {e}", exc_info=True)
+            error_label = QLabel(self.tr("Erreur lors de la génération du graphique des statuts."))
+            error_label.setAlignment(Qt.AlignCenter)
+            chart_layout.addWidget(error_label)
+
+
     def update_customer_segmentation_views(self):
         self._populate_table("country", get_client_counts_by_country, ["country_name", "client_count"])
         self._populate_table("city", get_client_segmentation_by_city, ["country_name", "city_name", "client_count"])
-        self._populate_table("status", get_client_segmentation_by_status, ["status_name", "client_count"])
+        # self._populate_table("status", get_client_segmentation_by_status, ["status_name", "client_count"]) # Replaced by chart
+        self._update_status_segmentation_chart() # New method for chart
         self._populate_table("category", get_client_segmentation_by_category, ["category", "client_count"])
-        self._populate_table("product_popularity", get_product_usage_counts, ["product_name", "usage_count"]) # Added
+        self._populate_table("product_popularity", get_product_usage_counts, ["product_name", "usage_count"])
 
     # --- End of Ported Methods ---
         # The old update_statistics_map method (which was the display-only map) is now removed.

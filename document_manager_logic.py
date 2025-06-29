@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import QMessageBox, QDialog, QInputDialog # QInputDialog wa
 # from PyQt5.QtCore import QStandardPaths # Removed as not used by these functions
 
 # Import necessary functions directly from their new CRUD module locations
-from controllers.client_controller import ClientController # Added
+from client_management.client_controller import ClientController # Added
 from controllers.contact_controller import ContactController # Added
 from db.cruds.locations_crud import get_country_by_id, get_city_by_id # These are fine as locations_crud is not refactored to class yet
 from db.cruds.status_settings_crud import get_status_setting_by_name, get_status_setting_by_id # Fine
@@ -239,6 +239,139 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
             doc_manager.add_client_to_list_widget(ui_map_data)
 
         if ui_map_data:
+            # --- BEGIN AUTO PROFORMA GENERATION ---
+            try:
+                logging.info(f"Starting automatic Proforma generation for new client ID: {actual_new_client_id}")
+
+                # 1. Determine Proforma Language
+                selected_langs_str = created_client_info.get("languages", "fr")
+                proforma_language_codes = [lang.strip() for lang in selected_langs_str.split(',') if lang.strip()]
+
+                if not proforma_language_codes:
+                    default_lang_from_config = doc_manager.config.get("default_document_language", "fr")
+                    proforma_language_codes = [default_lang_from_config]
+                    logging.info(f"No specific languages selected for client {actual_new_client_id}, defaulting Proforma to: {proforma_language_codes[0]}")
+
+                target_proforma_lang = proforma_language_codes[0]
+                logging.info(f"Target language for automatic Proforma: {target_proforma_lang}")
+
+                # 2. Fetch Default Proforma Template
+                from db.cruds import templates_crud
+                default_proforma_template = templates_crud.get_template_by_type_lang_default(
+                    template_type="HTML_PROFORMA",
+                    language_code=target_proforma_lang,
+                    client_id=None
+                )
+
+                if not default_proforma_template:
+                    logging.error(f"No default Proforma template found for language '{target_proforma_lang}'. Skipping auto-generation.")
+                    doc_manager.notify(title=doc_manager.tr("Modèle Proforma Manquant"),
+                                       message=doc_manager.tr("Aucun modèle Proforma par défaut trouvé pour la langue '{0}'. La génération automatique est annulée.").format(target_proforma_lang),
+                                       type='WARNING')
+                    raise Exception(f"Default Proforma template not found for {target_proforma_lang}")
+
+                template_base_filename = default_proforma_template.get('base_file_name')
+                template_inherent_language = default_proforma_template.get('language_code')
+
+                template_file_on_disk_abs = os.path.join(
+                    doc_manager.config.get("templates_dir", "templates"),
+                    template_inherent_language,
+                    template_base_filename
+                )
+
+                if not os.path.exists(template_file_on_disk_abs):
+                    logging.error(f"Default Proforma template file not found on disk: {template_file_on_disk_abs}")
+                    doc_manager.notify(title=doc_manager.tr("Fichier Modèle Introuvable"),
+                                       message=doc_manager.tr("Fichier modèle Proforma '{0}' introuvable pour la langue '{1}'. Génération auto annulée.").format(template_base_filename, target_proforma_lang),
+                                       type='ERROR')
+                    raise Exception(f"Default Proforma template file not found: {template_file_on_disk_abs}")
+
+                # 3. Determine Company ID (Default Company)
+                from db.cruds import companies_crud
+                default_company = companies_crud.get_default_company()
+                if not default_company or not default_company.get("company_id"):
+                    logging.error("No default company configured. Cannot generate Proforma.")
+                    doc_manager.notify(title=doc_manager.tr("Erreur Configuration Société"),
+                                       message=doc_manager.tr("Aucune société par défaut n'est configurée. La génération automatique de Proforma est annulée."),
+                                       type='ERROR')
+                    raise Exception("Default company not configured.")
+
+                auto_proforma_company_id = default_company.get("company_id")
+
+                # 4. Generate Proforma PDF
+                client_info_for_pdf_gen = created_client_info.copy()
+                client_info_for_pdf_gen['base_folder_path'] = base_folder_full_path
+
+                from utils import generate_pdf_for_document
+
+                proforma_doc_title_base = default_proforma_template.get('template_name', 'Facture_Proforma')
+                proforma_specific_additional_context = {
+                    'document_title': f"{proforma_doc_title_base} - {client_info_for_pdf_gen.get('client_name', 'Client')}",
+                    'proforma_id': f"PF-AUTO-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                }
+
+                generated_pdf_path = generate_pdf_for_document(
+                    source_file_path=template_file_on_disk_abs,
+                    client_info=client_info_for_pdf_gen,
+                    app_root_dir=doc_manager.app_root_dir,
+                    parent_widget=doc_manager,
+                    target_language_code=target_proforma_lang,
+                    project_id=new_project_id_central_db,
+                    additional_context=proforma_specific_additional_context,
+                document_type_for_context=default_proforma_template.get('template_type'),
+                allow_empty_products=True # Allow empty products for auto-generated Proforma
+                )
+            logging.info(f"Called generate_pdf_for_document for AUTO PROFORMA. File: {template_base_filename}, Lang: {target_proforma_lang}, allow_empty_products=True. Result path: {generated_pdf_path}") # NEW LOG
+
+
+                if not generated_pdf_path or not os.path.exists(generated_pdf_path):
+                    logging.error(f"Automatic Proforma PDF generation failed for client {actual_new_client_id}.")
+                    raise Exception("Automatic Proforma PDF generation failed.")
+
+                logging.info(f"Automatic Proforma PDF generated successfully: {generated_pdf_path}")
+
+                # 5. Save Document Record to ClientDocuments
+                from db.cruds import client_documents_crud
+                relative_pdf_path_for_db = os.path.relpath(generated_pdf_path, base_folder_full_path)
+
+                auto_proforma_doc_data = {
+                    'client_id': actual_new_client_id,
+                    'project_id': new_project_id_central_db,
+                    'order_identifier': proforma_specific_additional_context.get('proforma_id'),
+                    'document_name': os.path.basename(generated_pdf_path),
+                    'file_name_on_disk': os.path.basename(generated_pdf_path),
+                    'file_path_relative': relative_pdf_path_for_db,
+                    'document_type_generated': "PROFORMA_PDF",
+                    'source_template_id': default_proforma_template.get('template_id'),
+                    'user_id': doc_manager.current_user_id,
+                    'language_code': target_proforma_lang,
+                    'version_tag': "1.0"
+                }
+
+                new_client_doc_db_id = client_documents_crud.add_client_document(auto_proforma_doc_data)
+
+                if not new_client_doc_db_id:
+                    logging.error(f"Failed to save auto-generated Proforma to ClientDocuments for client {actual_new_client_id}.")
+                    if os.path.exists(generated_pdf_path):
+                        try: os.remove(generated_pdf_path)
+                        except OSError: logging.error(f"Failed to cleanup generated PDF: {generated_pdf_path}")
+                    doc_manager.notify(title=doc_manager.tr("Erreur DB Document"),
+                                       message=doc_manager.tr("Proforma PDF généré mais échec de l'enregistrement en base de données."),
+                                       type='ERROR')
+                    raise Exception("Failed to save auto-generated Proforma to ClientDocuments.")
+
+                logging.info(f"Auto-generated Proforma (Doc ID: {new_client_doc_db_id}) saved to ClientDocuments for client {actual_new_client_id}.")
+                doc_manager.notify(title=doc_manager.tr("Proforma Automatique Créée"),
+                                   message=doc_manager.tr("Une facture Proforma a été automatiquement générée et ajoutée pour le client en langue '{0}'.").format(target_proforma_lang),
+                                   type='SUCCESS')
+
+            except Exception as e_auto_proforma:
+                logging.error(f"Error during automatic Proforma generation for client {actual_new_client_id}: {e_auto_proforma}", exc_info=True)
+                doc_manager.notify(title=doc_manager.tr("Échec Proforma Auto"),
+                                   message=doc_manager.tr("La génération automatique de la Proforma a échoué. Raison: {0}").format(str(e_auto_proforma)),
+                                   type='WARNING')
+            # --- END AUTO PROFORMA GENERATION ---
+
             contact_controller = ContactController(current_user_id=doc_manager.current_user_id) # Pass user_id
 
             # Check if this is the first contact for the client

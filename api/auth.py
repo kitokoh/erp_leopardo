@@ -7,7 +7,7 @@ from typing import Optional
 import os # Added import
 
 import db as db_manager # To access user verification
-from .models import TokenData, UserInDB # Import UserInDB from local models
+from .models import TokenData, UserInDB, Token # Import UserInDB and Token from local models
 
 # Configuration (replace with your actual secret key and algorithm)
 SECRET_KEY = os.getenv("API_SECRET_KEY") # IMPORTANT: Change this in a real app!
