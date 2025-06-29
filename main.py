@@ -28,7 +28,8 @@ else:
 
 from main_window import DocumentManager # The main application window
 
-from main_window import DocumentManager # The main application window
+# Import DocumentManager later, after QApplication is created.
+# from main_window import DocumentManager
 
 import logging # For main.py's own logging needs, and for translator parts if setup_logging isn't called first
 import icons_rc # Import the compiled resource file
@@ -260,6 +261,24 @@ def main():
 
     # 4. Create QApplication Instance
     app = QApplication(sys.argv)
+
+    # ***** IMPORT DE DocumentManager DÉPLACÉ ICI *****
+    from main_window import DocumentManager # <<<< IMPORT TARDIF
+
+    # Attempt to initialize QtWebEngine context early
+    try:
+        from PyQt5.QtWebEngineWidgets import QWebEngineProfile # Ensure import
+        profile = QWebEngineProfile.defaultProfile()
+        if profile:
+            logging.info(f"QtWebEngine default profile initialized/accessed successfully. User Agent: {profile.httpUserAgent()}")
+        else:
+            logging.error("Failed to get QtWebEngine default profile.")
+            # This might indicate a more severe issue with QtWebEngine setup
+    except ImportError:
+        logging.error("PyQt5.QtWebEngineWidgets could not be imported. Web engine features will be unavailable.")
+        # Handle case where QtWebEngine is not installed/available
+    except Exception as e_webengine_init:
+        logging.error(f"Error during early QtWebEngine default profile access: {e_webengine_init}", exc_info=True)
 
     # Display Splash Screen using the new SplashWindow
     from ui.splash_screen import SplashWindow # Import the new class

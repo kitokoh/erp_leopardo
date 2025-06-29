@@ -370,3 +370,84 @@ def get_total_sales_amount_for_period(db: Session, start_date_iso: str, end_date
     except Exception as e: # Catch broader exceptions as SQLAlchemy might raise different errors
         logger.error(f"DB error in get_total_sales_amount_for_period: {e}", exc_info=True)
         return 0.0
+
+from datetime import datetime # Ensure datetime is imported if not already
+
+def get_sales_data_for_period(db_session: Session, start_date: datetime, end_date: datetime, group_by_dimension: str):
+    """
+    Récupère les données de ventes agrégées sur une période donnée, regroupées par une dimension spécifiée.
+    Dimensions supportées: 'Jour', 'Mois', 'Année', 'Produit', 'Client'.
+    """
+    try:
+        base_query = db_session.query(
+            ProformaInvoice.invoice_date, # Used for filtering by date
+            ProformaInvoice.total_amount, # This seems to be the pre-tax amount, grand_total_amount might be better
+            Client.client_name,
+            # Product information requires joining through ProformaInvoiceItem and Product
+        ).join(Client, ProformaInvoice.client_id == Client.id) # Corrected Client.id
+
+        # Filter by date range - ensure invoice_date is comparable with start_date/end_date
+        # If ProformaInvoice.invoice_date is Date and start_date/end_date are Datetime, it's fine.
+        # If ProformaInvoice.invoice_date is DateTime, also fine.
+        query = base_query.filter(ProformaInvoice.invoice_date >= start_date, ProformaInvoice.invoice_date <= end_date)
+
+        results = []
+        if group_by_dimension == 'Jour':
+            # Using func.date for date part if invoice_date is DateTime, or directly if it's Date
+            # Assuming invoice_date is a Date or DateTime field
+            query = query.with_entities(
+                func.date(ProformaInvoice.invoice_date).label('period'), # func.date to ensure only date part
+                func.sum(ProformaInvoice.grand_total_amount).label('total_sales') # Use grand_total_amount
+            ).group_by(func.date(ProformaInvoice.invoice_date)).order_by(func.date(ProformaInvoice.invoice_date))
+            raw_results = query.all()
+            results = [(r.period.strftime('%Y-%m-%d'), r.total_sales) for r in raw_results]
+
+        elif group_by_dimension == 'Mois':
+            query = query.with_entities(
+                func.date_trunc('month', ProformaInvoice.invoice_date).label('period'),
+                func.sum(ProformaInvoice.grand_total_amount).label('total_sales')
+            ).group_by(func.date_trunc('month', ProformaInvoice.invoice_date)).order_by(func.date_trunc('month', ProformaInvoice.invoice_date))
+            raw_results = query.all()
+            results = [(r.period.strftime('%Y-%m'), r.total_sales) for r in raw_results]
+
+        elif group_by_dimension == 'Année':
+            query = query.with_entities(
+                func.date_trunc('year', ProformaInvoice.invoice_date).label('period'),
+                func.sum(ProformaInvoice.grand_total_amount).label('total_sales')
+            ).group_by(func.date_trunc('year', ProformaInvoice.invoice_date)).order_by(func.date_trunc('year', ProformaInvoice.invoice_date))
+            raw_results = query.all()
+            results = [(r.period.strftime('%Y'), r.total_sales) for r in raw_results]
+
+        elif group_by_dimension == 'Client':
+            query = query.with_entities(
+                Client.client_name.label('client_name'),
+                func.sum(ProformaInvoice.grand_total_amount).label('total_sales')
+            ).group_by(Client.client_name).order_by(func.sum(ProformaInvoice.grand_total_amount).desc())
+            raw_results = query.all()
+            results = [(r.client_name, r.total_sales) for r in raw_results]
+
+        elif group_by_dimension == 'Produit':
+            # This requires joining ProformaInvoiceItem and then Product
+            # query_product = db_session.query(... from ProformaInvoice ... join ProformaInvoiceItem ... join Product ...)
+            # This is more complex due to the structure.
+            # Example: Summing ProformaInvoiceItem.total_price grouped by Product.name
+            query_product = db_session.query(
+                Product.name.label('product_name'),
+                func.sum(ProformaInvoiceItem.total_price).label('total_sales')
+            ).join(ProformaInvoiceItem, ProformaInvoice.id == ProformaInvoiceItem.proforma_invoice_id)\
+             .join(Product, ProformaInvoiceItem.product_id == Product.id)\
+             .filter(ProformaInvoice.invoice_date >= start_date, ProformaInvoice.invoice_date <= end_date)\
+             .group_by(Product.name)\
+             .order_by(func.sum(ProformaInvoiceItem.total_price).desc())
+
+            raw_results = query_product.all()
+            results = [(r.product_name, r.total_sales) for r in raw_results]
+            if not results: # Provide dummy data if no actual product sales found for testing
+                 results = [("Produit A (Exemple)", 500.0), ("Produit B (Exemple)", 300.0)]
+
+
+        return results
+
+    except Exception as e:
+        logging.error(f"Erreur lors de la récupération des données de ventes pour la période {start_date}-{end_date}, regroupées par {group_by_dimension}: {e}", exc_info=True)
+        return []

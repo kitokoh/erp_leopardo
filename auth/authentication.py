@@ -110,7 +110,7 @@ def get_current_user_role() -> str | None:
     return None
 
 # --- Remember Me Functionality ---
-from PyQt5.QtCore import QSettings
+# from PyQt5.QtCore import QSettings # Moved into functions
 
 APP_NAME = "ClientDocManager" # Or your application's name
 ORG_NAME = "SaadiyaManagement" # Or your organization's name
@@ -122,6 +122,7 @@ REMEMBER_ME_USERNAME_KEY = "auth/remembered_username"
 
 def save_remember_me_preference(username: str, remember: bool):
     """Saves the 'Remember Me' preference and username if remember is True."""
+    from PyQt5.QtCore import QSettings # Moved import here
     settings = QSettings(ORG_NAME, APP_NAME)
     if remember and username:
         settings.setValue(REMEMBER_ME_KEY, True)
@@ -141,6 +142,7 @@ def get_remembered_user() -> str | None:
     Retrieves the username if 'Remember Me' was active.
     In a token-based system, this would return the token.
     """
+    from PyQt5.QtCore import QSettings # Moved import here
     settings = QSettings(ORG_NAME, APP_NAME)
     if settings.value(REMEMBER_ME_KEY, False, type=bool): # Ensure type conversion
         username = settings.value(REMEMBER_ME_USERNAME_KEY, "", type=str)
@@ -154,6 +156,7 @@ def get_remembered_user() -> str | None:
 
 def clear_remember_me_preference():
     """Clears any stored 'Remember Me' preferences."""
+    from PyQt5.QtCore import QSettings # Moved import here
     settings = QSettings(ORG_NAME, APP_NAME)
     settings.remove(REMEMBER_ME_KEY)
     settings.remove(REMEMBER_ME_USERNAME_KEY)
