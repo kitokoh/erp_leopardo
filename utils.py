@@ -5,14 +5,16 @@ import sys
 import logging # Added logging
 from datetime import datetime
 
-from PyQt5.QtCore import QStandardPaths, QCoreApplication, QUrl
-from PyQt5.QtGui import QDesktopServices # Added for generate_pdf_for_document
-from PyQt5.QtWidgets import QMessageBox
+# PyQt5 imports moved into functions that use them
+# from PyQt5.QtCore import QStandardPaths, QCoreApplication, QUrl
+# from PyQt5.QtGui import QDesktopServices
+# from PyQt5.QtWidgets import QMessageBox
 
-from docx import Document
+from docx import Document # Remains, as it's not PyQt
 import db as db_manager # For generate_pdf_for_document
 
-from html_to_pdf_util import convert_html_to_pdf # For generate_pdf_for_document
+# html_to_pdf_util and HtmlEditor are imported locally in generate_pdf_for_document
+# from html_to_pdf_util import convert_html_to_pdf
 
 # MAIN_APP_ROOT_DIR import removed as app_root_dir is now passed to generate_pdf_for_document
 
@@ -24,6 +26,7 @@ CONFIG_FILE_NAME = "config.json"
 
 # --- Configuration Functions ---
 def get_config_dir():
+    from PyQt5.QtCore import QStandardPaths # Moved import here
     config_dir_path = os.path.join(
         QStandardPaths.writableLocation(QStandardPaths.AppConfigLocation),
         CONFIG_DIR_NAME
@@ -73,6 +76,9 @@ def save_config(config_data):
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config_data, f, indent=4, ensure_ascii=False)
     except IOError as e:
+        # Local import for QMessageBox and QCoreApplication for error display
+        from PyQt5.QtWidgets import QMessageBox
+        from PyQt5.QtCore import QCoreApplication
         QMessageBox.warning(None, QCoreApplication.translate("utils.save_config", "Erreur de Configuration"),
                             QCoreApplication.translate("utils.save_config", "Impossible d'enregistrer la configuration: {0}").format(e))
 
@@ -206,14 +212,21 @@ def generate_pdf_for_document(
     Accepts project_id and additional_context to enrich the document context.
     Includes logic to check for product language match for proforma invoices.
     """
-    from html_editor import HtmlEditor # Moved here to break circular import
+    # Local imports for PyQt5 modules
+    from PyQt5.QtCore import QUrl, QCoreApplication
+    from PyQt5.QtWidgets import QMessageBox
+    from PyQt5.QtGui import QDesktopServices # QDesktopServices may not be needed if not opening file
+
+    # Local imports for project modules that might use Qt or are substantial
+    from html_editor import HtmlEditor
+    from html_to_pdf_util import convert_html_to_pdf
 
     if not os.path.exists(source_file_path):
         logging.error(f"Source HTML file not found for PDF generation: {source_file_path}")
         QMessageBox.critical(parent_widget, "File Error", f"Source HTML file not found for PDF generation: {source_file_path}")
         return None
 
-    from html_editor import HtmlEditor # DEFERRED IMPORT
+    # from html_editor import HtmlEditor # DEFERRED IMPORT # Already imported locally above
 
     if not client_info or 'client_id' not in client_info:
         QMessageBox.warning(parent_widget, QCoreApplication.translate("utils.generate_pdf", "Erreur Client"),
