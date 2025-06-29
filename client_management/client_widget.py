@@ -3558,11 +3558,72 @@ class ClientWidget(QWidget):
                  QMessageBox.warning(self, self.tr("Erreur Génération PDF"), self.tr("Le fichier PDF semble avoir été généré mais est introuvable : {0}").format(generated_pdf_path_final))
             # else: self.generate_pdf_for_document would have shown an error.
 
+            # After successful generation and opening, add to DB and refresh table
+            if generated_pdf_path_final and os.path.exists(generated_pdf_path_final):
+                # Add to ClientDocuments Table
+                # file_name_on_disk_for_pdf = os.path.basename(generated_pdf_path_final)
+                # base_client_path_abs = os.path.normpath(os.path.join(self.app_root_dir, client_base_folder_relative))
+                # relative_path_for_db = os.path.relpath(generated_pdf_path_final, base_client_path_abs)
+
+                # Simplified relative path construction assuming PDF is saved in the same directory as source HTML
+                source_dir_relative = os.path.dirname(document_data.get('file_path_relative'))
+                pdf_file_name_on_disk = os.path.basename(generated_pdf_path_final)
+                relative_path_for_db_pdf = os.path.join(source_dir_relative, pdf_file_name_on_disk)
+
+
+                doc_db_data_pdf = {
+                    'client_id': self.client_info.get("client_id"),
+                    'project_id': document_data.get('project_id'),
+                    'order_identifier': document_data.get('order_identifier'),
+                    'document_name': pdf_file_name_on_disk, # Or a more descriptive name
+                    'file_name_on_disk': pdf_file_name_on_disk,
+                    'file_path_relative': relative_path_for_db_pdf,
+                    'document_type_generated': "PDF",
+                    'source_template_id': document_data.get('source_template_id'),
+                    'user_id': self.current_user_id,
+                    'language_code': document_data.get('language_code'),
+                    'notes': f"PDF généré à partir de {document_data.get('file_name_on_disk')}"
+                }
+                try:
+                    new_pdf_doc_id = db_manager.add_client_document(doc_db_data_pdf)
+                    if new_pdf_doc_id:
+                        logging.info(f"Generated PDF document '{pdf_file_name_on_disk}' (ID: {new_pdf_doc_id}) added to DB.")
+                        self.populate_doc_table() # Refresh to show the new PDF
+                        if self.notification_manager:
+                            self.notification_manager.show(
+                                title=self.tr("PDF Enregistré"),
+                                message=self.tr("Le PDF généré a été enregistré et ajouté à la liste des documents."),
+                                type='SUCCESS'
+                            )
+                    else:
+                        logging.error(f"Failed to add generated PDF {pdf_file_name_on_disk} to database.")
+                        if self.notification_manager:
+                            self.notification_manager.show(
+                                title=self.tr("Erreur DB"),
+                                message=self.tr("Le PDF a été généré mais son enregistrement en base de données a échoué."),
+                                type='ERROR'
+                            )
+                except Exception as e_db_add_pdf:
+                    logging.error(f"Error adding generated PDF {pdf_file_name_on_disk} to DB: {e_db_add_pdf}", exc_info=True)
+                    if self.notification_manager:
+                        self.notification_manager.show(
+                            title=self.tr("Erreur DB Critique"),
+                            message=self.tr("Erreur critique lors de l'enregistrement du PDF en DB:\n{0}").format(str(e_db_add_pdf)),
+                            type='CRITICAL'
+                        )
+
         except Exception as e:
             logging.error(f"Error in _handle_generate_and_open_pdf_action: {e}", exc_info=True)
             QMessageBox.critical(self, self.tr("Erreur Inattendue"), self.tr("Une erreur inattendue est survenue lors de la génération du PDF:\n{0}").format(str(e)))
+            if self.notification_manager:
+                 self.notification_manager.show(
+                    title=self.tr("Erreur PDF Inattendue"),
+                    message=self.tr("Erreur: {0}").format(str(e)),
+                    type='ERROR'
+                )
         finally:
             QApplication.restoreOverrideCursor()
+
 
     def populate_details_layout(self):
         # Clear existing rows from the layout
@@ -3955,119 +4016,19 @@ class ClientWidget(QWidget):
                 return # Early return for missing client_id
             logging.info("PT_DEBUG: populate_doc_table - Client ID obtained.")
 
-            logging.info("PT_DEBUG: populate_doc_table - Starting order filter population.")
-            order_events = []
-            try:
-                logging.info("PT_DEBUG: populate_doc_table - Attempting to fetch order_events.")
-                order_events = db_manager.get_distinct_purchase_confirmed_at_for_client(client_id)
-                logging.info(f"PT_DEBUG: populate_doc_table - Fetched order_events: {order_events}")
-            except Exception as e_oe:
-                logging.error(f"PT_DEBUG: populate_doc_table - Error fetching order_events: {e_oe}", exc_info=True)
-                # Continue with empty order_events
+            # --- Path Correction: Use absolute path directly ---
+            base_client_path_abs = self.client_info.get("default_base_folder_path")
+            if not base_client_path_abs: # Fallback
+                base_client_path_abs = self.client_info.get("base_folder_path", "")
 
-            is_distributor_type = self.client_info.get('category') == 'Distributeur'
-            has_multiple_orders = order_events and len(order_events) > 1
-            show_order_filter_dropdown = is_distributor_type or has_multiple_orders
-            logging.info(f"PT_DEBUG: populate_doc_table - show_order_filter_dropdown: {show_order_filter_dropdown}")
+            logging.info(f"PT_DEBUG: populate_doc_table - ClientInfo 'default_base_folder_path': {self.client_info.get('default_base_folder_path')}")
+            logging.info(f"PT_DEBUG: populate_doc_table - ClientInfo 'base_folder_path': {self.client_info.get('base_folder_path')}")
+            logging.info(f"PT_DEBUG: populate_doc_table - Effective absolute base_client_path used: {base_client_path_abs}")
 
-            current_order_filter_selection = None
-            if show_order_filter_dropdown:
-                logging.info("PT_DEBUG: populate_doc_table - Populating doc_order_filter_combo.")
-                current_order_filter_selection = self.doc_order_filter_combo.currentData()
-                self.doc_order_filter_combo.blockSignals(True)
-                self.doc_order_filter_combo.clear()
-                self.doc_order_filter_combo.addItem(self.tr("Toutes les Commandes"), "ALL")
-                self.doc_order_filter_combo.addItem(self.tr("Documents Généraux (sans commande)"), "NONE")
-                if order_events:
-                    for i, event_ts in enumerate(order_events):
-                        logging.info(f"PT_DEBUG: populate_doc_table - Processing order_event {i+1}/{len(order_events)}: {event_ts}")
-                        if event_ts:
-                            try:
-                                dt_obj = datetime.fromisoformat(event_ts.replace('Z', '+00:00'))
-                                display_text = self.tr("Commande du {0}").format(dt_obj.strftime('%Y-%m-%d %H:%M'))
-                                self.doc_order_filter_combo.addItem(display_text, event_ts)
-                            except ValueError:
-                                self.doc_order_filter_combo.addItem(self.tr("Commande du {0} (brut)").format(event_ts), event_ts)
-                                logging.warning(f"PT_DEBUG: populate_doc_table - Added raw item for event_ts '{event_ts}' due to ValueError.")
-                if current_order_filter_selection:
-                    index = self.doc_order_filter_combo.findData(current_order_filter_selection)
-                    if index >= 0: self.doc_order_filter_combo.setCurrentIndex(index)
-                    else: self.doc_order_filter_combo.setCurrentIndex(0)
-                else:
-                     self.doc_order_filter_combo.setCurrentIndex(0)
-                self.doc_order_filter_combo.blockSignals(False)
-                logging.info("PT_DEBUG: populate_doc_table - Finished populating doc_order_filter_combo.")
-            else:
-                logging.info("PT_DEBUG: populate_doc_table - Order filter not applicable.")
-                self.doc_order_filter_combo.clear()
-                self.doc_order_filter_combo.addItem(self.tr("N/A"), "ALL")
-                self.doc_order_filter_combo.setEnabled(False)
-            logging.info("PT_DEBUG: populate_doc_table - Order filter setup completed.")
-
-            db_filters = {}
-            selected_order_filter_data = self.doc_order_filter_combo.currentData()
-            if selected_order_filter_data == "NONE":
-                db_filters['order_identifier'] = None
-            elif selected_order_filter_data != "ALL":
-                db_filters['order_identifier'] = selected_order_filter_data
-            logging.info(f"PT_DEBUG: populate_doc_table - DB filters prepared: {db_filters}")
-
-            client_documents_from_db = []
-            try:
-                logging.info("PT_DEBUG: populate_doc_table - Fetching documents from DB...")
-                client_documents_from_db = db_manager.get_documents_for_client(client_id, filters=db_filters)
-                client_documents_from_db = client_documents_from_db if client_documents_from_db else []
-                logging.info(f"PT_DEBUG: populate_doc_table - Fetched {len(client_documents_from_db)} documents from DB.")
-            except Exception as e_docs_fetch:
-                logging.error(f"PT_DEBUG: populate_doc_table - Error fetching documents: {e_docs_fetch}", exc_info=True)
-                # Continue with empty list
-
-            selected_lang_filter = self.doc_language_filter_combo.currentData()
-            selected_type_filter = self.doc_type_filter_combo.currentData()
-            logging.info(f"PT_DEBUG: populate_doc_table - Lang filter: {selected_lang_filter}, Type filter: {selected_type_filter}")
-
-            filtered_list = []
-            logging.info("PT_DEBUG: populate_doc_table - Starting client-side filtering.")
-            for i, doc_data in enumerate(client_documents_from_db):
-                # logging.debug(f"PT_DEBUG: populate_doc_table - Filtering doc {i+1}, ID: {doc_data.get('document_id')}") # Reduced verbosity
-                doc_passes_lang_filter = True
-                doc_passes_type_filter = True
-
-                if selected_lang_filter != "ALL":
-                    doc_lang = doc_data.get('language_code')
-                    if not doc_lang and doc_data.get('file_path_relative'): # Infer from path
-                        path_parts = doc_data.get('file_path_relative').split(os.sep)
-                        if len(path_parts) > 1 and path_parts[0] in SUPPORTED_LANGUAGES:
-                            doc_lang = path_parts[0]
-                    if doc_lang != selected_lang_filter:
-                        doc_passes_lang_filter = False
-
-                if selected_type_filter != "ALL":
-                    doc_type_generated = doc_data.get('document_type_generated', '').upper()
-                    file_name_on_disk = doc_data.get('file_name_on_disk', '').lower()
-                    is_html = doc_type_generated == 'HTML' or file_name_on_disk.endswith('.html')
-                    is_pdf = doc_type_generated == 'PDF' or file_name_on_disk.endswith('.pdf')
-                    is_xlsx = doc_type_generated == 'XLSX' or file_name_on_disk.endswith('.xlsx')
-                    is_docx = doc_type_generated == 'DOCX' or file_name_on_disk.endswith('.docx')
-                    if selected_type_filter == "HTML" and not is_html: doc_passes_type_filter = False
-                    elif selected_type_filter == "PDF" and not is_pdf: doc_passes_type_filter = False
-                    elif selected_type_filter == "XLSX" and not is_xlsx: doc_passes_type_filter = False
-                    elif selected_type_filter == "DOCX" and not is_docx: doc_passes_type_filter = False
-                    elif selected_type_filter == "OTHER" and (is_html or is_pdf or is_xlsx or is_docx): doc_passes_type_filter = False
-
-                if doc_passes_lang_filter and doc_passes_type_filter:
-                    filtered_list.append(doc_data)
-            logging.info("PT_DEBUG: populate_doc_table - Client-side filtering completed. Count: {len(filtered_list)}")
-
-            base_client_path = self.client_info.get("base_folder_path")
-            if not base_client_path: # Fallback to default_base_folder_path
-                base_client_path = self.client_info.get("default_base_folder_path", "")
-            logging.info(f"PT_DEBUG: populate_doc_table - base_client_path (after fallback): {base_client_path}")
-
-            if not base_client_path or not os.path.isdir(base_client_path):
-                logging.error(f"PT_DEBUG: populate_doc_table - Invalid base_folder_path: {base_client_path}")
+            if not base_client_path_abs or not os.path.isdir(base_client_path_abs):
+                logging.error(f"PT_DEBUG: populate_doc_table - Invalid or missing absolute base_client_path: '{base_client_path_abs}'")
                 if hasattr(self, 'documents_empty_label'):
-                    self.documents_empty_label.setText(self.tr("Erreur: Dossier client introuvable ou non configuré."))
+                    self.documents_empty_label.setText(self.tr("Erreur: Dossier client (base_folder_path) introuvable ou non configuré."))
                     self.documents_empty_label.setVisible(True)
                 self.doc_table.setVisible(False)
                 logging.info("PT_DEBUG: populate_doc_table - END (invalid base_client_path)")

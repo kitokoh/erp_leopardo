@@ -39,11 +39,10 @@ class HomePageWidget(QWidget):
 
         # --- Section Centrale: GIF (gauche) et Boutons (droite) ---
         center_h_layout = QHBoxLayout()
-        center_h_layout.setContentsMargins(10, 10, 10, 10) # Marges pour cette section (ajouté top margin)
-
+        center_h_layout.setContentsMargins(10, 10, 10, 10)
         center_h_layout.setSpacing(15)
 
-        # Colonne Gauche: GIF
+
         gif_label = QLabel()
         gif_label.setObjectName("homePageGifLabel")
         available_gifs = ["1.gif", "2.gif", "3.gif"]
@@ -54,18 +53,11 @@ class HomePageWidget(QWidget):
              if os.path.isdir(gif_path_alt_base): gif_path = os.path.join(gif_path_alt_base, chosen_gif_name)
              else: gif_path = chosen_gif_name
 
-
         if os.path.exists(gif_path):
             self.movie = QMovie(gif_path)
             gif_label.setMovie(self.movie)
-            # Tentative de redimensionnement du QMovie lui-même avant de l'assigner
-            # ou de contrôler la taille du QLabel.
-            # Pour un contrôle proportionnel, on peut écouter le signal resized du QLabel parent.
-            # Pour l'instant, fixons une taille pour la prévisibilité.
-            # self.movie.setScaledSize(QSize(350, 300)) # Ajustez au besoin
-            gif_label.setFixedSize(QSize(350, 300)) # Donner une taille fixe au QLabel
-            gif_label.setScaledContents(True) # S'assurer que le contenu du QMovie s'adapte au QLabel
-
+            gif_label.setFixedSize(QSize(350, 300))
+            gif_label.setScaledContents(True)
             self.movie.start()
             gif_label.setAlignment(Qt.AlignCenter)
 
@@ -77,7 +69,6 @@ class HomePageWidget(QWidget):
         center_h_layout.addWidget(gif_label, 1)
 
 
-        # Colonne Droite: Boutons de modules
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -116,16 +107,17 @@ class HomePageWidget(QWidget):
             button.setObjectName(module_data["object_name"])
             if module_data["icon"] and QIcon.hasThemeIcon(module_data["icon"]):
                 button.setIcon(QIcon(module_data["icon"]))
-                button.setIconSize(QSize(32, 32)) # Taille d'icône réduite pour boutons plus petits
+                button.setIconSize(QSize(32, 32))
 
             button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
-            shadow = QGraphicsDropShadowEffect()
-            shadow.setBlurRadius(12) # Ombre un peu moins étendue
-            shadow.setXOffset(1)    # Offset plus subtil
-            shadow.setYOffset(2)    # Offset plus subtil
-            shadow.setColor(QColor(0, 0, 0, 80)) # Ombre plus légère
-            button.setGraphicsEffect(shadow)
+            # shadow = QGraphicsDropShadowEffect() # Temporairement désactivé
+            # shadow.setBlurRadius(12)
+            # shadow.setXOffset(1)
+            # shadow.setYOffset(2)
+            # shadow.setColor(QColor(0, 0, 0, 80))
+            # button.setGraphicsEffect(shadow)
+
 
             button.clicked.connect(module_data["slot"])
             grid_layout.addWidget(button, row, col)
@@ -153,7 +145,10 @@ class HomePageWidget(QWidget):
 
     def set_bottom_widget(self, widget_to_display):
         while self.bottom_content_area.count() > 0:
-            self.bottom_content_area.removeWidget(self.bottom_content_area.widget(0))
+            widget = self.bottom_content_area.widget(0)
+            self.bottom_content_area.removeWidget(widget)
+            # widget.deleteLater() # Important pour éviter les fuites de mémoire si les widgets ne sont pas réutilisés
+
 
         if widget_to_display:
             self.bottom_content_area.addWidget(widget_to_display)
@@ -162,70 +157,130 @@ class HomePageWidget(QWidget):
         else:
             self.bottom_content_area.setVisible(False)
 
-
     @pyqtSlot()
     def go_to_documents(self):
+        print(f"HomePageWidget: go_to_documents called.")
+        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
         if hasattr(self.parent(), 'show_documents_view'):
+            print(f"HomePageWidget: Parent HAS show_documents_view. Calling it.")
             self.parent().show_documents_view()
-
+        else:
+            print(f"HomePageWidget: Parent does NOT have show_documents_view.")
 
     @pyqtSlot()
     def go_to_project_management(self):
+        print(f"HomePageWidget: go_to_project_management called.")
+        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
         if hasattr(self.parent(), 'show_project_management_view'):
+            print(f"HomePageWidget: Parent HAS show_project_management_view. Calling it.")
             self.parent().show_project_management_view()
+        else:
+            print(f"HomePageWidget: Parent does NOT have show_project_management_view.")
 
     @pyqtSlot()
     def go_to_statistics(self):
+        print(f"HomePageWidget: go_to_statistics called.")
+        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
         if hasattr(self.parent(), 'get_statistics_widget_instance'):
+            print(f"HomePageWidget: Parent HAS get_statistics_widget_instance. Calling it.")
             stats_widget = self.parent().get_statistics_widget_instance()
             if stats_widget:
+                print(f"HomePageWidget: Statistics widget instance received. Calling set_bottom_widget.")
                 self.set_bottom_widget(stats_widget)
             else:
+                 print(f"HomePageWidget: get_statistics_widget_instance returned None. Fallback to show_statistics_view.")
                  if hasattr(self.parent(), 'show_statistics_view'):
+                    print(f"HomePageWidget: Parent HAS show_statistics_view. Calling it for fallback.")
                     self.parent().show_statistics_view()
+                 else:
+                    print(f"HomePageWidget: Parent does NOT have show_statistics_view for fallback.")
         elif hasattr(self.parent(), 'show_statistics_view'):
+            print(f"HomePageWidget: Parent has show_statistics_view (no get_statistics_widget_instance). Calling it.")
             self.parent().show_statistics_view()
-
+        else:
+            print(f"HomePageWidget: Parent does NOT have get_statistics_widget_instance OR show_statistics_view.")
 
     @pyqtSlot()
     def go_to_product_management(self):
+        print(f"HomePageWidget: go_to_product_management called.")
+        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
         if hasattr(self.parent(), 'show_product_management_page'):
+            print(f"HomePageWidget: Parent HAS show_product_management_page. Calling it.")
             self.parent().show_product_management_page()
+        else:
+            print(f"HomePageWidget: Parent does NOT have show_product_management_page.")
 
     @pyqtSlot()
     def go_to_partner_management(self):
+        print(f"HomePageWidget: go_to_partner_management called.")
+        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
         if hasattr(self.parent(), 'show_partner_management_view'):
+            print(f"HomePageWidget: Parent HAS show_partner_management_view. Calling it.")
             self.parent().show_partner_management_view()
+        else:
+            print(f"HomePageWidget: Parent does NOT have show_partner_management_view.")
 
     @pyqtSlot()
     def go_to_inventory_management(self):
+        print(f"HomePageWidget: go_to_inventory_management called.")
+        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
         if hasattr(self.parent(), 'show_inventory_browser_view'):
+            print(f"HomePageWidget: Parent HAS show_inventory_browser_view. Calling it.")
             self.parent().show_inventory_browser_view()
+        else:
+            print(f"HomePageWidget: Parent does NOT have show_inventory_browser_view.")
 
     @pyqtSlot()
     def go_to_recruitment(self):
+        print(f"HomePageWidget: go_to_recruitment called.")
+        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
         if hasattr(self.parent(), 'show_recruitment_view'):
+            print(f"HomePageWidget: Parent HAS show_recruitment_view. Calling it.")
             self.parent().show_recruitment_view()
+        else:
+            print(f"HomePageWidget: Parent does NOT have show_recruitment_view.")
 
     @pyqtSlot()
     def go_to_experience_management(self):
+        print(f"HomePageWidget: go_to_experience_management called.")
+        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
         if hasattr(self.parent(), 'show_experience_module_view'):
+            print(f"HomePageWidget: Parent HAS show_experience_module_view. Calling it.")
             self.parent().show_experience_module_view()
+        else:
+            print(f"HomePageWidget: Parent does NOT have show_experience_module_view.")
 
     @pyqtSlot()
     def go_to_botpress_integration(self):
+        print(f"HomePageWidget: go_to_botpress_integration called.")
+        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
         if hasattr(self.parent(), 'show_botpress_integration_view'):
+            print(f"HomePageWidget: Parent HAS show_botpress_integration_view. Calling it.")
             self.parent().show_botpress_integration_view()
+        else:
+            print(f"HomePageWidget: Parent does NOT have show_botpress_integration_view.")
 
     @pyqtSlot()
     def go_to_camera_management(self):
+        print(f"HomePageWidget: go_to_camera_management called.")
+        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
         if hasattr(self.parent(), 'show_camera_management_view'):
+            print(f"HomePageWidget: Parent HAS show_camera_management_view. Calling it.")
             self.parent().show_camera_management_view()
+        else:
+            print(f"HomePageWidget: Parent does NOT have show_camera_management_view.")
 
     @pyqtSlot()
     def go_to_settings(self):
+        print(f"HomePageWidget: go_to_settings called.")
+        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
         if hasattr(self.parent(), 'show_settings_page'):
+            print(f"HomePageWidget: Parent HAS show_settings_page. Calling it.")
             self.parent().show_settings_page()
+        else:
+            print(f"HomePageWidget: Parent does NOT have show_settings_page.")
+
+
 
 if __name__ == '__main__':
     from PyQt5.QtWidgets import QApplication
@@ -256,30 +311,43 @@ if __name__ == '__main__':
         def get_statistics_widget_instance(self):
             return self.statistics_dashboard_instance
 
-        def show_documents_view(self): print("Mock: Navigating to Documents View")
-        def show_project_management_view(self): print("Mock: Navigating to Project Management")
+        def show_documents_view(self): print("MockMainWindow: show_documents_view called")
+        def show_project_management_view(self): print("MockMainWindow: show_project_management_view called")
+
         def show_statistics_view(self):
-            print("Mock: Navigating to Statistics (Fallback - full page)")
+            print("MockMainWindow: show_statistics_view called (Full Page Navigation Fallback)")
+
             temp_stats_page = QLabel("PAGE STATS COMPLÈTE (FALLBACK)")
             temp_stats_page.setAlignment(Qt.AlignCenter)
             temp_stats_page.setStyleSheet("background-color: yellow; font-size: 22px;")
 
-            while self.main_layout.count():
-                 item = self.main_layout.takeAt(0)
-                 widget = item.widget()
-                 if widget:
-                     widget.deleteLater()
+            current_central_widget = self.main_layout.itemAt(0).widget() # Assuming HomePageWidget is the first
+            if current_central_widget:
+                current_central_widget.setVisible(False) # Hide HomePageWidget
+
+            # This is a very basic way to simulate page change in mock;
+            # in real app, QStackedWidget handles this.
+            # For simplicity, just add and show, previous one is hidden.
+            # If there was another page showing, it should be hidden too.
+            # This mock doesn't handle complex stack, just one level.
+            if hasattr(self, "_current_mock_page") and self._current_mock_page:
+                self._current_mock_page.setVisible(False)
+                self._current_mock_page.deleteLater()
+
             self.main_layout.addWidget(temp_stats_page)
+            self._current_mock_page = temp_stats_page
+            self._current_mock_page.setVisible(True)
 
 
-        def show_product_management_page(self): print("Mock: Navigating to Product Management")
-        def show_partner_management_view(self): print("Mock: Navigating to Partner Management")
-        def show_inventory_browser_view(self): print("Mock: Navigating to Inventory Management")
-        def show_recruitment_view(self): print("Mock: Navigating to Recruitment")
-        def show_experience_module_view(self): print("Mock: Navigating to Experience Management")
-        def show_botpress_integration_view(self): print("Mock: Navigating to Botpress Integration")
-        def show_camera_management_view(self): print("Mock: Navigating to Camera Management")
-        def show_settings_page(self): print("Mock: Navigating to Settings Page")
+        def show_product_management_page(self): print("MockMainWindow: show_product_management_page called")
+        def show_partner_management_view(self): print("MockMainWindow: show_partner_management_view called")
+        def show_inventory_browser_view(self): print("MockMainWindow: show_inventory_browser_view called")
+        def show_recruitment_view(self): print("MockMainWindow: show_recruitment_view called")
+        def show_experience_module_view(self): print("MockMainWindow: show_experience_module_view called")
+        def show_botpress_integration_view(self): print("MockMainWindow: show_botpress_integration_view called")
+        def show_camera_management_view(self): print("MockMainWindow: show_camera_management_view called")
+        def show_settings_page(self): print("MockMainWindow: show_settings_page called")
+
 
     main_win = MockMainWindow()
     main_win.show()

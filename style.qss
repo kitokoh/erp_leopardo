@@ -988,78 +988,98 @@ QListView#menuBarSearchCompleterView::item:selected {
     /* Already covered by selection-background-color and selection-color on the QListView */
 }
 
-/* == MENU STYLING ENHANCEMENTS == */
+/* == MENU STYLING ENHANCEMENTS (Improved for better UX) == */
 
 QMenuBar {
-    background-color: #FFFFFF; /* Clean white background for the menu bar */
-    border-bottom: 1px solid #DDE2E6; /* Subtle separator from content */
-    padding: 2px; /* Overall padding for the menu bar */
-    font-size: 10pt; /* Ensure consistent font size */
+    background-color: #F5F7FA; /* Light grey, less stark than white */
+    border-bottom: 1px solid #DDE2E6;
+    padding: 5px 8px; /* Increased padding for a more spacious feel */
+    font-size: 10pt; /* Consistent font size */
+    font-weight: 500; /* Slightly bolder for menu bar items */
 }
 
 QMenuBar::item {
-    spacing: 4px; /* Spacing between menu bar items */
-    padding: 6px 12px; /* Padding within each menu bar item */
+    spacing: 6px; /* Increased spacing between menu bar items */
+    padding: 8px 15px; /* More padding within each menu bar item */
     background: transparent;
-    color: #263238; /* Primary Text */
-    border-radius: 4px; /* Slightly rounded corners for items */
+    color: #34495E; /* Darker, more saturated blue-grey for text */
+    border-radius: 5px; /* Slightly more rounded corners */
+    /* transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out; */ /* For smoother transitions (conceptual) */
 }
 
-QMenuBar::item:selected { /* When menu is open */
-    background-color: #E3F2FD; /* Light blue background */
-    color: #007BFF; /* Accent color for text */
+QMenuBar::item:selected { /* When menu is open or hovered */
+    background-color: #007BFF; /* Accent blue background */
+    color: #FFFFFF; /* White text for contrast */
 }
 
-QMenuBar::item:pressed, QMenuBar::item:hover { /* Hover and press */
-    background-color: #F0F4F8; /* A very light grey/blue for hover */
-    color: #0056B3; /* Darker Accent Blue for text on hover */
-}
-
-/* QMenu (Dropdowns) - Refinements */
-QMenu {
-    background-color: #FFFFFF;
-    border: 1px solid #DDE2E6; /* Slightly lighter border */
-    padding: 6px; /* Increase padding slightly */
-    border-radius: 5px; /* Slightly more rounding */
-}
-
-QMenu::item {
-    padding: 7px 22px 7px 18px; /* Adjusted padding: top/bottom, right, left */
-    color: #263238;
-    background-color: transparent;
-    border-radius: 4px; /* Rounded corners for items */
-    margin: 1px 0; /* Small margin between items */
-}
-
-QMenu::item:selected { /* Hover/selected state in dropdown */
-    background-color: #007BFF;
+QMenuBar::item:pressed { /* When menu item is pressed */
+    background-color: #0056B3; /* Darker Accent Blue */
     color: #FFFFFF;
 }
 
+/* QMenu (Dropdowns) - Refinements for a premium feel */
+QMenu {
+    background-color: #FFFFFF; /* Clean white background */
+    border: 1px solid #C0C6CC; /* Slightly darker border for better definition */
+    padding: 8px; /* Generous padding around the menu items */
+    border-radius: 6px; /* More pronounced rounding */
+    /* box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); */ /* Conceptual shadow for depth (not directly supported) */
+}
+
+QMenu::item {
+    padding: 10px 25px 10px 20px; /* Increased padding: T/B, R, L */
+    color: #2C3E50; /* Dark slate blue for text */
+    background-color: transparent;
+    border-radius: 4px;
+    margin: 2px 0; /* Slightly more margin between items */
+    font-size: 10pt;
+    /* transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out; */ /* Conceptual */
+}
+
+QMenu::item:selected { /* Hover/selected state in dropdown */
+    background-color: #007BFF; /* Accent blue */
+    color: #FFFFFF; /* White text */
+}
+
+QMenu::item:disabled {
+    color: #95A5A6; /* Greyed out for disabled items */
+    background-color: transparent;
+}
+
 QMenu::icon {
-    padding-left: 5px; /* Space for icons */
-    /* size: 16px 16px; */ /* Consider for explicit icon sizing */
+    padding-left: 8px; /* More space for icons */
+    padding-right: 8px; /* Space between icon and text */
+    /* size: 18px 18px; */ /* Slightly larger icons if desired */
 }
 
 QMenu::separator {
     height: 1px;
-    background: #ECEFF1; /* Lighter separator */
-    margin: 5px 2px; /* Adjusted margin */
+    background: #EAECEE; /* Very light separator */
+    margin: 6px 4px; /* More vertical margin, less horizontal */
 }
 
 QMenu::indicator { /* For checkable menu items */
-    width: 18px;
-    height: 18px;
-    left: 8px; /* Adjust position */
-    /* Non-exclusive means checkable, exclusive means radio button style */
+    width: 20px; /* Slightly larger indicator */
+    height: 20px;
+    left: 10px; /* Adjusted position */
 }
 
 QMenu::indicator:non-exclusive:checked {
-    image: url(:/icons/check.svg); /* Ensure this icon is suitable */
+    image: url(:/icons/check.svg); /* Ensure icon is modern and clear */
+    /* Consider adding a subtle background to the indicator itself if needed */
 }
 
 QMenu::indicator:non-exclusive:unchecked {
-    image: none; /* Or a specific unchecked image if available/desired */
+    /* image: url(:/icons/checkbox-unchecked.svg); */ /* Optional: specific unchecked icon */
+    image: none;
+}
+
+/* Style for sub-menus */
+QMenu::right-arrow { /* Arrow for sub-menus */
+    image: url(:/icons/chevron-right.svg); /* Ensure icon is modern */
+    width: 16px;
+    height: 16px;
+    right: 8px; /* Position from the right edge */
 }
 
 /* == END OF MENU STYLING ENHANCEMENTS == */
@@ -1151,6 +1171,69 @@ QPushButton#moreFiltersButton:checked { /* When active/expanded */
     color: #007BFF;
 }
 
+/* == END OF MENU STYLING ENHANCEMENTS == */
+
+/* HomePageWidget Specific Styles */
+QWidget#HomePageWidget {
+    background-color: #F5F7FA; /* Secondary Background, plus doux que blanc pur */
+    /* Ou un dégradé léger :
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                stop:0 #FFFFFF, stop:1 #F0F4F8);
+    */
+}
+
+QLabel#homePageWelcomeLabel {
+    color: #007BFF; /* Couleur accentuée du thème */
+    font-family: "Open Sans", "Segoe UI", Arial, sans-serif; /* Assurer la cohérence */
+    /* Pour une ombre de texte (peut être coûteux en performance, à tester) :
+       text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1); (Pas directement supporté en QSS standard)
+       Alternative : utiliser un QLabel superposé avec un offset léger et une couleur plus sombre.
+       Pour l'instant, je vais me concentrer sur la couleur et la police.
+    */
+    padding-bottom: 10px; /* Un peu d'espace en dessous */
+    background-color: transparent; /* S'assurer qu'il n'y a pas de fond coloré par défaut */
+}
+
+/* HomePageWidget Button Styles (Cartes de Module) */
+QWidget#homePageButtonGridContainer QPushButton {
+    background-color: #FFFFFF; /* Fond blanc pour l'aspect carte */
+    border: 1px solid #DDE2E6; /* Bordure légère et moderne */
+    border-radius: 12px;       /* Coins plus arrondis */
+    padding: 20px;
+    font-size: 14px;
+    font-weight: bold;
+    color: #333333;
+    text-align: center;
+    min-height: 120px; /* Hauteur augmentée pour icône + texte */
+    min-width: 200px;  /* Largeur augmentée */
+    /* transition: all 0.2s ease-in-out; */ /* Pour des transitions douces (pas universellement supporté en QSS) */
+    /* Effet d'ombre via bordure plus foncée en bas et à droite pour simuler la profondeur */
+    border-bottom-width: 2px;
+    border-right-width: 2px;
+    border-bottom-color: #C0C6CC;
+    border-right-color: #C0C6CC;
+}
+
+QWidget#homePageButtonGridContainer QPushButton:hover {
+    background-color: #E3F2FD; /* Bleu très clair au survol, rappel de l'accent */
+    border-color: #007BFF;     /* Bordure accentuée au survol */
+    color: #0056B3;            /* Texte plus foncé au survol */
+    /* Léger agrandissement au survol si possible (pas direct en QSS, mais l'effet de bordure peut aider) */
+    border-bottom-width: 2px; /* Maintenir l'effet d'ombre */
+    border-right-width: 2px;
+    border-bottom-color: #0056B3; /* Ombre plus prononcée */
+    border-right-color: #0056B3;
+}
+
+QWidget#homePageButtonGridContainer QPushButton:pressed {
+    background-color: #CCE5FF; /* Bleu un peu plus foncé quand pressé */
+    border-color: #004085;
+    color: #004085;
+}
+
+/* Style pour les icônes à l'intérieur des boutons de la page d'accueil si nécessaire */
+/* Actuellement, la taille est définie en Python. On pourrait ajouter des filtres ou des effets ici si Qt le supporte. */
+/* QWidget#homePageButtonGridContainer QPushButton::icon { ... } */
 /* Reset Filters Button */
 QPushButton#resetFiltersButton {
     background-color: #FFFFFF;
