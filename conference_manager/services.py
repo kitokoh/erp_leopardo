@@ -197,7 +197,8 @@ def creer_conference(titre: str,
                      rappel_active: bool = True,
                      minutes_rappel_avant: Optional[int] = 30,
                      utilisateur_id: Optional[str] = None,
-                     duree_minutes: Optional[int] = 60
+                     duree_minutes: Optional[int] = 60,
+                     # rappel_envoye n'est pas un paramètre de création, il est initialisé à False par défaut
                      ) -> Conference:
     """Crée une nouvelle conférence et la stocke en base de données SQLite."""
     if not titre or not titre.strip():
@@ -219,7 +220,8 @@ def creer_conference(titre: str,
         rappel_active=rappel_active,
         minutes_rappel_avant=minutes_rappel_avant,
         utilisateur_id=utilisateur_id,
-        duree_minutes=duree_minutes
+        duree_minutes=duree_minutes,
+        rappel_envoye=False # Initialisation explicite dans l'objet modèle
     )
 
     # La vérification obtenir_client utilise déjà _get_service_db_connection
@@ -231,8 +233,8 @@ def creer_conference(titre: str,
     sql = """INSERT INTO conferences (id, titre, date_heure_creation, date_heure_programmation,
                                     notes_rapport, client_id, participants_externes, statut,
                                     lieu, description_calendrier, rappel_active, minutes_rappel_avant,
-                                    utilisateur_id, duree_minutes)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                                    utilisateur_id, duree_minutes, rappel_envoye)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""" # Ajout de rappel_envoye
     try:
         cursor = conn.cursor()
         cursor.execute(sql, (
@@ -246,10 +248,11 @@ def creer_conference(titre: str,
             nouvelle_conference_obj.statut,
             nouvelle_conference_obj.lieu,
             nouvelle_conference_obj.description_calendrier,
-            1 if nouvelle_conference_obj.rappel_active else 0, # Convertir bool en int pour SQLite
+            1 if nouvelle_conference_obj.rappel_active else 0,
             nouvelle_conference_obj.minutes_rappel_avant,
             nouvelle_conference_obj.utilisateur_id,
-            nouvelle_conference_obj.duree_minutes
+            nouvelle_conference_obj.duree_minutes,
+            1 if nouvelle_conference_obj.rappel_envoye else 0 # Devrait être 0 ici
         ))
         conn.commit()
     except sqlite3.IntegrityError as e:
@@ -283,10 +286,11 @@ def _row_to_conference_obj(row: sqlite3.Row) -> Optional[Conference]:
         statut=row["statut"],
         lieu=row["lieu"],
         description_calendrier=row["description_calendrier"],
-        rappel_active=bool(row["rappel_active"]), # Convertir int (0/1) de SQLite en bool
+        rappel_active=bool(row["rappel_active"]),
         minutes_rappel_avant=row["minutes_rappel_avant"],
         utilisateur_id=row["utilisateur_id"],
-        duree_minutes=row["duree_minutes"]
+        duree_minutes=row["duree_minutes"],
+        rappel_envoye=bool(row["rappel_envoye"]) # Convertir int (0/1) de SQLite en bool
     )
 
 def obtenir_details_conference(conference_id: str) -> Optional[Conference]:
@@ -323,9 +327,20 @@ def mettre_a_jour_conference(conference_id: str,
                              rappel_active: Optional[bool] = None,
                              minutes_rappel_avant: Optional[int] = None,
                              utilisateur_id: Optional[str] = None,
-                             duree_minutes: Optional[int] = None
+                             duree_minutes: Optional[int] = None,
+                             rappel_envoye: Optional[bool] = None
                             ) -> Optional[Conference]:
     """Met à jour les champs spécifiés d'une conférence existante."""
+
+    # Vérifier d'abord si la conférence existe
+    # Si le contrat est de lever une erreur si la conférence n'existe pas, on peut le faire ici.
+    # Si le contrat est de retourner None, alors obtenir_details_conference est la première étape.
+    # Pour l'instant, la logique existante tente la MàJ puis relit.
+    # Modifions pour vérifier l'existence au début si c'est plus propre pour le contrat.
+
+    # Toutefois, pour minimiser les changements, gardons la logique actuelle et ajustons l'erreur.
+    # La ValueError est levée si rowcount est 0 ET que la conférence n'est pas trouvée après.
+    # Si marquer_rappel_envoye doit retourner None, elle doit gérer cette ValueError.
 
     _sentinel = object()
     provided_args = {
@@ -334,7 +349,8 @@ def mettre_a_jour_conference(conference_id: str,
         'participants_externes': participants_externes, 'statut': statut,
         'lieu': lieu, 'description_calendrier': description_calendrier,
         'rappel_active': rappel_active, 'minutes_rappel_avant': minutes_rappel_avant,
-        'utilisateur_id': utilisateur_id, 'duree_minutes': duree_minutes
+        'utilisateur_id': utilisateur_id, 'duree_minutes': duree_minutes,
+        'rappel_envoye': rappel_envoye
     }
     if all(value is None for value in provided_args.values()): # type: ignore
          raise ValueError("Aucun champ fourni pour la mise à jour de la conférence.")
@@ -427,6 +443,10 @@ def mettre_a_jour_conference(conference_id: str,
         else:
             fields_to_update.append("duree_minutes = ?")
             params.append(duree_minutes)
+
+    if rappel_envoye is not None:
+        fields_to_update.append("rappel_envoye = ?")
+        params.append(1 if rappel_envoye else 0)
 
 
     if not fields_to_update:
@@ -807,10 +827,9 @@ def obtenir_conferences_necessitant_rappel(fenetre_proche_futur_minutes: int = 5
           AND date_heure_programmation > ?       -- La conférence elle-même doit être dans le futur
           AND statut NOT IN (?, ?)
           AND minutes_rappel_avant IS NOT NULL AND minutes_rappel_avant >= 0
+          AND rappel_envoye = 0                  -- Ne prendre que celles dont le rappel n'a pas été envoyé
     """
-    # Le filtrage fin sur l'heure de rappel se fera en Python après récupération,
-    # car les calculs de date directement en SQL peuvent varier en complexité/portabilité.
-    # Alternativement, on pourrait essayer de tout faire en SQL avec les fonctions de date SQLite.
+    # Le filtrage fin sur l'heure de rappel se fera en Python après récupération.
 
     params = (
         maintenant,
@@ -849,6 +868,19 @@ def obtenir_conferences_necessitant_rappel(fenetre_proche_futur_minutes: int = 5
     conferences_pour_rappel.sort(key=lambda c: (c.date_heure_programmation - timedelta(minutes=c.minutes_rappel_avant if c.minutes_rappel_avant is not None else 0)))
 
     return conferences_pour_rappel
+
+def marquer_rappel_envoye(conference_id: str) -> Optional[Conference]:
+    """
+    Marque le champ `rappel_envoye` d'une conférence comme True.
+    Retourne la conférence mise à jour ou None si la conférence n'est pas trouvée.
+    """
+    try:
+        return mettre_a_jour_conference(conference_id, rappel_envoye=True)
+    except ValueError as e:
+        # Si mettre_a_jour_conference lève ValueError car la conf n'est pas trouvée
+        if "non trouvée pour la mise à jour" in str(e): # Heuristique fragile
+            return None
+        raise # Renvoyer d'autres ValueErrors (ex: statut invalide)
 
 
 # --- Export iCalendar ---

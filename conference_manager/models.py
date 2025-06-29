@@ -42,7 +42,8 @@ class Conference:
                  rappel_active: bool = True,
                  minutes_rappel_avant: Optional[int] = 30,
                  utilisateur_id: Optional[str] = None,
-                 duree_minutes: Optional[int] = 60): # Valeur par défaut de 60 minutes
+                 duree_minutes: Optional[int] = 60, # Valeur par défaut de 60 minutes
+                 rappel_envoye: bool = False):
 
         self.id: str = conference_id if conference_id else str(uuid.uuid4())
         self.titre: str = titre
@@ -62,9 +63,10 @@ class Conference:
         self.minutes_rappel_avant: Optional[int] = minutes_rappel_avant if rappel_active else None # Pas de minutes si rappel inactif
         self.utilisateur_id: Optional[str] = utilisateur_id
         self.duree_minutes: Optional[int] = duree_minutes
+        self.rappel_envoye: bool = rappel_envoye
 
     def __repr__(self) -> str:
-        return f"<Conference(id={self.id}, titre='{self.titre}', statut='{self.statut}', utilisateur_id='{self.utilisateur_id}', duree_minutes={self.duree_minutes})>"
+        return f"<Conference(id={self.id}, titre='{self.titre}', statut='{self.statut}', utilisateur_id='{self.utilisateur_id}', rappel_envoye={self.rappel_envoye})>"
 
 # Example usage (optional, for testing or demonstration)
 if __name__ == '__main__':

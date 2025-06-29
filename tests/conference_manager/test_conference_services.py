@@ -203,6 +203,7 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
         self.assertEqual(conf_obj.description_calendrier, "Présentation Alpha pour Calendrier")
         self.assertTrue(conf_obj.rappel_active)
         self.assertEqual(conf_obj.minutes_rappel_avant, 15)
+        self.assertFalse(conf_obj.rappel_envoye, "rappel_envoye devrait être False par défaut à la création")
 
 
         retrieved_conf = services.obtenir_details_conference(conf_obj.id)
@@ -213,6 +214,7 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
         self.assertTrue(retrieved_conf.rappel_active)
         self.assertEqual(retrieved_conf.minutes_rappel_avant, 15)
         self.assertEqual(retrieved_conf.duree_minutes, 90)
+        self.assertFalse(retrieved_conf.rappel_envoye)
 
     def test_creer_conference_duree_par_defaut(self):
         conf = services.creer_conference(titre="Conf Duree Defaut")
@@ -312,7 +314,8 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
             date_heure_programmation=nouvelle_date_prog,
             client_id=self.client2.id, # Changer de client
             utilisateur_id="user_alpha",
-            duree_minutes=45
+            duree_minutes=45,
+            rappel_envoye=True
         )
         self.assertIsNotNone(updated_conf)
         self.assertEqual(updated_conf.titre, nouveau_titre)
@@ -321,6 +324,7 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
         self.assertEqual(updated_conf.client_id, self.client2.id)
         self.assertEqual(updated_conf.utilisateur_id, "user_alpha")
         self.assertEqual(updated_conf.duree_minutes, 45)
+        self.assertTrue(updated_conf.rappel_envoye)
         if updated_conf.date_heure_programmation and nouvelle_date_prog:
              self.assertEqual(updated_conf.date_heure_programmation.date(), nouvelle_date_prog.date())
 
@@ -663,6 +667,13 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
             date_heure_programmation=maintenant + timedelta(minutes=3), # Dans 3 mins
             rappel_active=True, minutes_rappel_avant=0 # Rappel maintenant/dans 3 mins
         )
+        # Conférence dont le rappel serait bon mais déjà envoyé
+        conf_rappel_deja_envoye = services.creer_conference(
+            titre="Conf Rappel Déjà Envoyé",
+            date_heure_programmation=maintenant + timedelta(minutes=12),
+            rappel_active=True, minutes_rappel_avant=10 # Rappel dans 2 mins
+        )
+        services.mettre_a_jour_conference(conf_rappel_deja_envoye.id, rappel_envoye=True)
 
 
         # Utiliser une fenêtre de 5 minutes pour le test
@@ -678,26 +689,37 @@ class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer 
         self.assertNotIn(conf_rappel_inactif.id, ids_pour_rappel, "Rappel inactif ne devrait pas être inclus")
         if conf_passee_avec_rappel : self.assertNotIn(conf_passee_avec_rappel.id, ids_pour_rappel, "Conférence passée ne devrait pas être incluse")
         if conf_rappel_sans_minutes: self.assertNotIn(conf_rappel_sans_minutes.id, ids_pour_rappel, "Conférence avec rappel mais sans minutes ne devrait pas être incluse")
+        self.assertNotIn(conf_rappel_deja_envoye.id, ids_pour_rappel, "Conférence avec rappel déjà envoyé ne devrait pas être incluse")
 
-        # Vérifier l'ordre: conf_rappel_passe (son heure de rappel est la plus ancienne),
-        # puis conf_rappel_zero_minute, puis conf_rappel_imminent
-        # Les heures de rappel sont :
-        # Passe: maintenant - 30m
-        # ZeroMinute: maintenant + 3m
-        # Imminent: maintenant + 2m
-        # L'ordre devrait être Passé, Imminent, ZeroMinute
         expected_order_ids = [
-            conf_rappel_passe.id, # Heure rappel = maintenant - 30m
-            conf_rappel_imminent.id, # Heure rappel = maintenant + 2m
-            conf_rappel_zero_minute.id, # Heure rappel = maintenant + 3m
+            conf_rappel_passe.id,
+            conf_rappel_imminent.id,
+            conf_rappel_zero_minute.id,
         ]
 
-        # Filtrer les expected_order_ids pour ne garder que ceux présents dans ids_pour_rappel, dans le bon ordre
         actual_ordered_ids_in_expected_subset = [id_val for id_val in expected_order_ids if id_val in ids_pour_rappel]
 
         self.assertEqual(len(ids_pour_rappel), len(actual_ordered_ids_in_expected_subset), "Nombre d'éléments pour rappel ne correspond pas")
-        if len(ids_pour_rappel) == len(actual_ordered_ids_in_expected_subset): # Pour éviter erreur si tailles differentes
+        if len(ids_pour_rappel) == len(actual_ordered_ids_in_expected_subset):
             self.assertEqual(ids_pour_rappel, actual_ordered_ids_in_expected_subset, "L'ordre des rappels n'est pas correct.")
+
+    def test_marquer_rappel_envoye(self):
+        conf = services.creer_conference(titre="Conf pour Marquer Rappel")
+        self.assertFalse(conf.rappel_envoye, "Initialement, rappel_envoye doit être False.")
+
+        updated_conf = services.marquer_rappel_envoye(conf.id)
+        self.assertIsNotNone(updated_conf)
+        self.assertTrue(updated_conf.rappel_envoye, "rappel_envoye devrait être True après marquage.")
+
+        # Vérifier en relisant depuis la BD
+        relu_conf = services.obtenir_details_conference(conf.id)
+        self.assertIsNotNone(relu_conf)
+        self.assertTrue(relu_conf.rappel_envoye)
+
+    def test_marquer_rappel_envoye_conference_inexistante(self):
+        updated_conf = services.marquer_rappel_envoye("id-conf-bidon-rappel")
+        self.assertIsNone(updated_conf, "Devrait retourner None si la conférence n'existe pas.")
+
 
     # --- Tests pour l'Export iCalendar ---
     def test_generer_contenu_ics_pour_conference(self):
