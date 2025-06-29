@@ -397,7 +397,6 @@ class StatisticsDashboard(QWidget):
             m = folium.Map(location=[20, 0], zoom_start=2, tiles="CartoDB positron")
             # clients_by_country_counts = get_client_counts_by_country() # Removed redundant call
 
-        try:
             clients_by_country_counts = get_client_counts_by_country()
         except Exception as db_exc:
             logging.error(f"Database error while fetching client counts for map: {db_exc}", exc_info=True)
