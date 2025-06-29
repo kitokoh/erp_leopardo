@@ -7,10 +7,10 @@ from datetime import datetime
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLineEdit,
     QPushButton, QDialogButtonBox, QMessageBox, QLabel,
-    QListWidget, QListWidgetItem, QComboBox, QGroupBox, QWidget
+    QListWidget, QListWidgetItem, QComboBox, QGroupBox, QWidget, QApplication
 )
-from PyQt5.QtGui import QIcon, QColor # QColor was used for item background (optional)
-from PyQt5.QtCore import Qt # Qt is used for e.g. Qt.UserRole
+from PyQt5.QtGui import QIcon, QColor, QDesktopServices # QColor was used for item background (optional)
+from PyQt5.QtCore import Qt, QUrl # Qt is used for e.g. Qt.UserRole
 
 import db as db_manager
 # get_template_category_by_name is not directly used anymore, get_all_template_categories is.
@@ -22,535 +22,594 @@ from html_editor import HtmlEditor
 from utils import populate_docx_template
 # clients_crud_instance is not used by CreateDocumentDialog
 import icons_rc # Import for Qt resource file
+from PyQt5.QtWidgets import QFormLayout
+
+# List of template types to be excluded from the "Generate via model" dialog (typically email templates)
+# This list should be maintained to match the template_type values used for email templates in the database.
+EMAIL_TEMPLATE_TYPES_TO_EXCLUDE = [
+    "EMAIL_WELCOME", "EMAIL_RESET_PASSWORD", "EMAIL_NEWSLETTER_SUBSCRIPTION",
+    "EMAIL_FOLLOW_UP", "EMAIL_HOLIDAY_CHRISTMAS", "EMAIL_HOLIDAY_NEWYEAR",
+    "EMAIL_SAV_TICKET_OPENED", "EMAIL_SAV_TICKET_RESOLVED",
+    "GENERIC_EMAIL_MESSAGE", "NEWSLETTER_BASE"
+    # Add any other specific email template types used in your system
+]
 
 class CreateDocumentDialog(QDialog):
-    def __init__(self, client_info, config, current_user_id, parent=None, template_data=None): # Added current_user_id
+    # Maps internal type keys to user-friendly names and template_type filters
+    DOCUMENT_TYPE_MAPPING = {
+        "DEVIS": {"name": "Devis", "template_type_filter": "DEVIS_HTML"},
+        "PROFORMA": {"name": "Facture Proforma", "template_type_filter": "PROFORMA_INVOICE_HTML"},
+        "ORDER_FORM": {"name": "Bon de Commande", "template_type_filter": "ORDER_FORM_HTML"},
+        "DELIVERY_NOTE": {"name": "Note de Livraison", "template_type_filter": "PACKING_LIST_HTML"},
+        "SALES_CONTRACT": {"name": "Contrat de Vente", "template_type_filter": "SALES_CONTRACT_HTML"},
+        "TECHNICAL_SPECIFICATIONS": {"name": "Spécifications Techniques", "template_type_filter": "TECHNICAL_SPECIFICATIONS_HTML"},
+        "WARRANTY_DOCUMENT": {"name": "Document de Garantie", "template_type_filter": "WARRANTY_DOCUMENT_HTML"},
+        "COVER_PAGE": {"name": "Page de Garde", "template_type_filter": "COVER_PAGE_HTML"},
+        "PRODUCT_IMAGES": {"name": "Images Produits", "template_type_filter": "PRODUCT_IMAGES_HTML"},
+        "CONTACT_PAGE": {"name": "Page Contact", "template_type_filter": "CONTACT_PAGE_HTML"},
+        # Excel types
+        "PROFORMA_EXCEL": {"name": "Facture Proforma (Excel)", "template_type_filter": "PROFORMA_EXCEL"},
+        "PACKING_LIST_EXCEL": {"name": "Liste de Colisage (Excel)", "template_type_filter": "PACKING_LIST_EXCEL"},
+        "SALES_CONTRACT_EXCEL": {"name": "Contrat de Vente (Excel)", "template_type_filter": "SALES_CONTRACT_EXCEL"},
+        "TECHNICAL_SPECIFICATIONS_EXCEL": {"name": "Spécifications Techniques (Excel)", "template_type_filter": "TECHNICAL_SPECIFICATIONS_EXCEL"},
+    }
+
+    def __init__(self, client_info, config, current_user_id, parent=None, template_data=None, old_document_id_to_version=None):
         super().__init__(parent)
         self.client_info = client_info
-        self.config = config # Store config passed from main
-        self.current_user_id = current_user_id # Store current_user_id
-        self.template_data = template_data # Store template_data
-        self.setWindowTitle(self.tr("Créer des Documents"))
-        self.setMinimumSize(600, 500)
-        self._initial_load_complete = False
-        self.setup_ui()
+        self.config = config
+        self.app_root_dir = config.get("app_root_dir", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        self.current_user_id = current_user_id
+        self.pre_selected_template_id = template_data.get('template_id') if template_data else None
+        self.old_document_id_to_version = old_document_id_to_version # Store for versioning
 
-    def _create_icon_label_widget(self, icon_name, label_text): # This method was in original dialogs.py, but might not be used by this specific class. Let's check.
-        # Upon review, this method is NOT used by CreateDocumentDialog. I will remove it.
-        pass
+        self.setWindowTitle(self.tr("Générer Document(s) Client via Modèle"))
+        if self.old_document_id_to_version:
+            self.setWindowTitle(self.tr("Créer une Nouvelle Version du Document"))
+        self.setMinimumSize(600, 400) # Adjusted size
+        self._init_ui()
+        if self.pre_selected_template_id:
+            self._select_and_load_pre_selected_template()
 
-    def setup_ui(self):
+
+    def _init_ui(self):
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(15, 15, 15, 15)
-        main_layout.setSpacing(15) # Increased main layout spacing
 
-        header_label = QLabel(self.tr("Sélectionner Documents à Créer"))
-        header_label.setObjectName("dialogHeaderLabel")
-        main_layout.addWidget(header_label)
+        # Filters layout
+        filters_group_box = QGroupBox(self.tr("Filtres"))
+        filters_layout = QHBoxLayout(filters_group_box) # Use QHBoxLayout for horizontal alignment
 
-        filters_group = QGroupBox(self.tr("Filtres"))
-        # Create a single QHBoxLayout for all filter controls and set it directly for the group
-        combined_filter_layout = QHBoxLayout(filters_group) # Set as layout for filters_group
-        combined_filter_layout.setSpacing(10)
-        combined_filter_layout.setContentsMargins(10, 10, 10, 10) # Add some margins inside the group box
+        self.doc_type_combo = QComboBox()
+        self.language_combo = QComboBox()
 
-        # Language Filter
-        self.language_filter_label = QLabel(self.tr("Langue:"))
-        combined_filter_layout.addWidget(self.language_filter_label)
-        self.language_filter_combo = QComboBox()
-        self.language_filter_combo.addItems([self.tr("All"), "fr", "en", "ar", "tr", "pt"])
-        self.language_filter_combo.setCurrentText(self.tr("All"))
-        combined_filter_layout.addWidget(self.language_filter_combo)
+        doc_type_label = QLabel(self.tr("Type:"))
+        filters_layout.addWidget(doc_type_label)
+        filters_layout.addWidget(self.doc_type_combo)
+        filters_layout.addSpacing(15) # Add some space between filter groups
 
-        # Extension Filter
-        combined_filter_layout.addSpacing(15)
-        self.extension_filter_label = QLabel(self.tr("Extension:"))
-        combined_filter_layout.addWidget(self.extension_filter_label)
-        self.extension_filter_combo = QComboBox()
-        self.extension_filter_combo.addItems([self.tr("All"), "HTML", "XLSX", "DOCX"])
-        self.extension_filter_combo.setCurrentText(self.tr("All"))
-        combined_filter_layout.addWidget(self.extension_filter_combo)
+        language_label = QLabel(self.tr("Langue:"))
+        filters_layout.addWidget(language_label)
+        filters_layout.addWidget(self.language_combo)
+        filters_layout.addStretch(1) # Push filters to the left
 
-        # Search Bar
-        combined_filter_layout.addSpacing(15)
-        self.search_bar_label = QLabel(self.tr("Rechercher:"))
-        combined_filter_layout.addWidget(self.search_bar_label)
-        self.search_bar = QLineEdit()
-        self.search_bar.setPlaceholderText(self.tr("Filtrer par nom..."))
-        combined_filter_layout.addWidget(self.search_bar)
+        main_layout.addWidget(filters_group_box)
 
-        from PyQt5.QtWidgets import QSizePolicy
+        # Template List
+        self.template_list_widget = QListWidget()
+        self.template_list_widget.setSelectionMode(QListWidget.ExtendedSelection)
+        main_layout.addWidget(QLabel(self.tr("Modèles Disponibles (sélectionnez un ou plusieurs):")))
+        main_layout.addWidget(self.template_list_widget, 1) # Give list widget stretch factor
 
+        self._load_document_types_and_languages() # Populates combos
 
-        self.search_bar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        # Connect signals for filtering the template list
+        self.doc_type_combo.currentIndexChanged.connect(self._filter_and_load_templates_for_selection)
+        self.language_combo.currentIndexChanged.connect(self._filter_and_load_templates_for_selection)
 
-        main_layout.addWidget(filters_group)
+        self._filter_and_load_templates_for_selection() # Initial load
 
-        self.order_select_combo = None
-        client_category = self.client_info.get('category', '')
-        client_id_for_events = self.client_info.get('client_id')
+        # Buttons
+        button_layout = QHBoxLayout()
+        self.view_folder_button = QPushButton(QIcon(":/icons/folder.svg"), self.tr("Voir Dossier Client"))
+        self.view_folder_button.clicked.connect(self._handle_view_client_folder)
+        button_layout.addWidget(self.view_folder_button)
+        button_layout.addStretch(1)
 
-        has_multiple_events = False
-        if client_id_for_events:
-            has_multiple_events = self.has_multiple_purchase_events()
+        self.generate_open_button = QPushButton(QIcon(":/icons/file-plus.svg"), self.tr("Générer Sélectionnés"))
+        self.generate_open_button.setObjectName("primaryButton")
+        self.generate_open_button.clicked.connect(self._handle_generate_selected_and_open)
+        button_layout.addWidget(self.generate_open_button)
 
-        if client_category == 'Distributeur' or has_multiple_events:
-            order_group = QGroupBox(self.tr("Association Commande"))
-            order_group_layout = QHBoxLayout(order_group) # Set as layout for order_group
-            order_group_layout.setSpacing(10)
-            order_group_layout.setContentsMargins(10, 10, 10, 10) # Add margins
+        main_layout.addLayout(button_layout)
 
-            self.order_select_combo = QComboBox()
-            self.order_select_combo.addItem(self.tr("Document Général (pas de commande spécifique)"), "NONE")
-            if client_id_for_events:
-                purchase_events = db_manager.get_distinct_purchase_confirmed_at_for_client(client_id_for_events)
-                if purchase_events:
-                    for event_ts in purchase_events:
-                        if event_ts:
-                            try:
-                                dt_obj = datetime.fromisoformat(event_ts.replace('Z', '+00:00'))
-                                display_text = self.tr("Commande du {0}").format(dt_obj.strftime('%Y-%m-%d %H:%M'))
-                                self.order_select_combo.addItem(display_text, event_ts)
-                            except ValueError:
-                                # logging.warning(f"Could not parse purchase event timestamp: {event_ts}") # Consider logging
-                                self.order_select_combo.addItem(self.tr("Commande du {0} (brut)").format(event_ts), event_ts)
-            order_group_layout.addWidget(QLabel(self.tr("Associer à la Commande:")))
-            order_group_layout.addWidget(self.order_select_combo)
-            order_group_layout.addStretch()
-            main_layout.addWidget(order_group)
+        dialog_button_box = QDialogButtonBox(QDialogButtonBox.Cancel)
+        dialog_button_box.rejected.connect(self.reject)
+        main_layout.addWidget(dialog_button_box)
 
-        templates_group = QGroupBox(self.tr("Modèles Disponibles"))
-        templates_group_layout = QVBoxLayout(templates_group) # Set as layout for templates_group
-        templates_group_layout.setSpacing(10) # Or keep default if it looks better
-        templates_group_layout.setContentsMargins(10, 10, 10, 10) # Add margins
-        self.templates_list = QListWidget()
-        self.templates_list.setSelectionMode(QListWidget.MultiSelection)
-        self.templates_list.setAlternatingRowColors(True)
-        self.templates_list.setStyleSheet("QListWidget::item:hover { background-color: #e6f7ff; }")
-        templates_group_layout.addWidget(self.templates_list)
-        main_layout.addWidget(templates_group)
+    def _load_document_types_and_languages(self):
+        # Populate Document Types
+        self.doc_type_combo.blockSignals(True)
+        self.doc_type_combo.clear()
+        self.doc_type_combo.addItem(self.tr("Tous Types"), "ALL") # Add an "All" option
+        for key, info in self.DOCUMENT_TYPE_MAPPING.items():
+            self.doc_type_combo.addItem(self.tr(info["name"]), info["template_type_filter"]) # Store template_type_filter as data
+        self.doc_type_combo.blockSignals(False)
 
-        self.language_filter_combo.currentTextChanged.connect(self.load_templates)
-        self.extension_filter_combo.currentTextChanged.connect(self.load_templates)
-        self.search_bar.textChanged.connect(self.load_templates)
+        # Populate Languages
+        self.language_combo.blockSignals(True)
+        self.language_combo.clear()
+        self.language_combo.addItem(self.tr("Toutes Langues"), "ALL") # Add an "All" option
 
-        self.load_templates()
-        main_layout.addStretch(1)
+        client_languages = self.client_info.get('selected_languages', [])
+        if isinstance(client_languages, str):
+            client_languages = [lang.strip() for lang in client_languages.split(',') if lang.strip()]
 
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        create_btn = button_box.button(QDialogButtonBox.Ok)
-        create_btn.setText(self.tr("Créer Documents"))
-        create_btn.setIcon(QIcon(":/icons/file-plus.svg"))
-        create_btn.setObjectName("primaryButton")
-        cancel_btn = button_box.button(QDialogButtonBox.Cancel)
-        cancel_btn.setText(self.tr("Annuler"))
-        cancel_btn.setIcon(QIcon(":/icons/dialog-cancel.svg"))
-        button_box.accepted.connect(self.create_documents)
-        button_box.rejected.connect(self.reject)
-        main_layout.addWidget(button_box)
+        # Use all known system languages if client has none or for broader selection
+        system_languages = ["fr", "en", "ar", "tr", "pt", "ru"] # Define or get from config
 
-    def has_multiple_purchase_events(self):
-        if not self.client_info or not self.client_info.get('client_id'):
-            return False
-        try:
-            events = db_manager.get_distinct_purchase_confirmed_at_for_client(self.client_info['client_id'])
-            return len(events) > 1 if events else False
-        except Exception as e:
-            # logging.error(f"Error checking for multiple purchase events: {e}") # Consider logging
-            print(f"Error checking for multiple purchase events: {e}") # Keep print if logging not set up
-            return False
+        effective_langs_for_combo = sorted(list(set(client_languages + system_languages)))
 
-    def load_templates(self):
-        self.templates_list.clear()
-        if not self._initial_load_complete:
-            primary_language = None; client_langs = self.client_info.get('selected_languages')
-            if client_langs:
-                if isinstance(client_langs, list) and client_langs: primary_language = client_langs[0]
-                elif isinstance(client_langs, str) and client_langs.strip(): primary_language = client_langs.split(',')[0].strip()
-            if primary_language and self.language_filter_combo.currentText() == self.tr("All"):
-                for i in range(self.language_filter_combo.count()):
-                    if self.language_filter_combo.itemText(i) == primary_language: self.language_filter_combo.setCurrentText(primary_language); break
-            self._initial_load_complete = True
+        for lang_code in effective_langs_for_combo:
+            self.language_combo.addItem(lang_code.upper(), lang_code)
 
-        selected_lang = self.language_filter_combo.currentText(); selected_ext_display = self.extension_filter_combo.currentText(); search_text = self.search_bar.text().lower()
-        ext_map = {"HTML": ".html", "XLSX": ".xlsx", "DOCX": ".docx"}
-        type_map_from_ext = {".html": "document_html", ".xlsx": "document_excel", ".docx": "document_word"} # Add other types if needed
+        if not effective_langs_for_combo and self.language_combo.count() <= 1: # Count <=1 due to "All"
+            self.language_combo.addItem("FR", "fr") # Fallback
+        self.language_combo.blockSignals(False)
 
-        selected_ext_val = ext_map.get(selected_ext_display)
-        # template_type_filter will be applied locally after DB fetch
-        # The DB query will use template_type_filter_list for broad document types
+    def _filter_and_load_templates_for_selection(self):
+        self.template_list_widget.clear()
 
-        effective_lang_filter = selected_lang if selected_lang != self.tr("All") else None
-        current_client_id = self.client_info.get('client_id')
-        # logging.info(f"Loading templates with lang_filter: {effective_lang_filter}, ext_filter (maps to type): {template_type_filter}, search: '{search_text}'")
-        logging.info(f"Loading templates with lang_filter: {effective_lang_filter}, UI ext_filter: {selected_ext_display}, search: '{search_text}'")
+        selected_type_filter = self.doc_type_combo.currentData()
+        selected_lang_filter = self.language_combo.currentData()
 
-        try:
-            # Fetch client-specific and global templates based on filters
-            category_ids_to_filter = []
-            # Define desired purposes
-            desired_purposes = ['client_document', 'utility', 'document_global'] # Expanded list
-            all_categories = get_all_template_categories()
+        filter_params = {'apply_visibility_filter': True}
+        if selected_type_filter and selected_type_filter != "ALL":
+            filter_params['template_type_filter_list'] = [selected_type_filter]
+        if selected_lang_filter and selected_lang_filter != "ALL":
+            filter_params['language_code_filter'] = selected_lang_filter
 
-            if all_categories:
-                for category in all_categories:
-                    purpose = category.get('purpose')
-                    if purpose in ['client_document', 'utility', 'document_global']:
+        # Prioritize client-specific templates then global ones
+        client_id = self.client_info.get('client_id')
 
-                        category_ids_to_filter.append(category['category_id'])
+        # Fetch client-specific templates matching filters
+        client_specific_templates = []
+        if client_id:
+            client_filter_params = filter_params.copy()
+            client_filter_params['client_id_filter'] = client_id
+            client_specific_templates = db_manager.get_all_templates(**client_filter_params) or []
 
-            logging.info(f"Category IDs to filter by (purposes: {desired_purposes}): {category_ids_to_filter}")
+        # Fetch global templates matching filters
+        global_filter_params = filter_params.copy()
+        global_filter_params['client_id_filter'] = None # Explicitly for global
+        global_templates = db_manager.get_all_templates(**global_filter_params) or []
 
-            # If no specific categories are found for the desired purposes,
-            # we should probably not filter by category at all, or ensure get_all_templates handles an empty list gracefully.
-            # For now, we'll pass None if category_ids_to_filter is empty, assuming get_all_templates
-            # interprets None as "do not filter by category".
-            actual_category_id_filter = category_ids_to_filter if category_ids_to_filter else None 
-            if not actual_category_id_filter:
-                 logging.warning(f"No categories found for desired purposes {desired_purposes}. No category filter will be applied to db_manager.get_all_templates.")
+        # Combine and display, prioritizing client-specific and avoiding duplicates if a global was copied to client
+        displayed_template_ids = set()
 
-            # Define the list of template types that are considered "documents"
-            # These should match the 'template_type' values in the Templates table for document templates.
-            document_template_types = [
-                'document_html', 'document_excel', 'document_word', 'document_pdf', 
-                'document_other', # Types génériques pour les utilitaires
-                'PROFORMA_INVOICE_HTML', 
-                'PACKING_LIST_HTML', 
-                'SALES_CONTRACT_HTML',
-                'TECHNICAL_SPECIFICATIONS_HTML', # Ce type est aussi dans utility_documents
-                'WARRANTY_DOCUMENT_HTML',      # Ce type est aussi dans utility_documents
-                'COVER_PAGE_HTML',             # Ce type est aussi dans utility_documents
-                'EXCEL_PROFORMA_INVOICE', 
-                'EXCEL_SALES_CONTRACT', 
-                'EXCEL_PACKING_LIST', 
-                'EXCEL_TECHNICAL_SPECIFICATIONS',
-            ]
-            logging.info(f"DB query will use template_type_filter_list: {document_template_types} and category_filter: {actual_category_id_filter}")
+        for template in client_specific_templates:
+            item_text = f"{template.get('template_name')} ({template.get('language_code')}) - Client"
+            list_item = QListWidgetItem(item_text)
+            list_item.setData(Qt.UserRole, template.get('template_id'))
+            self.template_list_widget.addItem(list_item)
+            displayed_template_ids.add(template.get('template_id'))
+            if self.pre_selected_template_id and template.get('template_id') == self.pre_selected_template_id:
+                list_item.setSelected(True)
 
-            templates_from_db = db_manager.get_all_templates(
-                template_type_filter_list=document_template_types, # Reactivate type filter
-                language_code_filter=effective_lang_filter,
-                client_id_filter=current_client_id, # Fetches client-specific and global templates
-                category_id_filter=actual_category_id_filter, # Reactivate category filter
-                apply_visibility_filter=True # Ensure visibility is checked
-            )
-            if templates_from_db is None: templates_from_db = [] # Ensure it's a list
-            logging.info(f"Fetched {len(templates_from_db)} templates from DB after REFINED filters (type, lang, client, category, visibility).")
+        for template in global_templates:
+            # Only add global if a client-specific version (by original_template_id or name+type+lang) isn't already there
+            # This simple check by ID might not be enough if copies don't share ID.
+            # A more robust check might involve name, type, and language.
+            # For now, if ID is different, it's considered a different template entry.
+            if template.get('template_id') not in displayed_template_ids:
+                item_text = f"{template.get('template_name')} ({template.get('language_code')}) - Global"
+                list_item = QListWidgetItem(item_text)
+                list_item.setData(Qt.UserRole, template.get('template_id'))
+                self.template_list_widget.addItem(list_item)
+                if self.pre_selected_template_id and template.get('template_id') == self.pre_selected_template_id:
+                    list_item.setSelected(True)
 
-            # Apply UI's extension filter locally
-            if selected_ext_display != self.tr("All"):
-                target_template_type_for_gui_filter = type_map_from_ext.get(ext_map.get(selected_ext_display))
-                if target_template_type_for_gui_filter:
-                    templates_from_db = [
-                        t for t in templates_from_db
-                        if t.get('template_type') == target_template_type_for_gui_filter
-                    ]
-            logging.info(f"Templates after local extension filter '{selected_ext_display}': {len(templates_from_db)}")
+        if self.template_list_widget.count() == 0:
+            self.template_list_widget.addItem(self.tr("Aucun modèle ne correspond aux filtres."))
 
-
-            # Apply search text filter locally first
-            if search_text:
-                templates_from_db = [
-                    t for t in templates_from_db
-                    if search_text in t.get('template_name', '').lower()
-                ]
-            logging.info(f"Templates after local search filter '{search_text}': {len(templates_from_db)}")
-
-            # Refine default status based on client-specificity
-            # Key: (template_type, language_code)
-            # Value: template_dict (prioritizing client-specific default)
-            effective_defaults_map = {}
-            client_specific_defaults_found = {} # Stores client-specific defaults: key=(type,lang), value=template_dict
-
-            # First, identify all client-specific defaults from the filtered list
-            for t_dict in templates_from_db:
-                if t_dict.get('client_id') and t_dict.get('is_default_for_type_lang'):
-                    key = (t_dict.get('template_type'), t_dict.get('language_code'))
-                    # If multiple client-specific defaults for same type/lang (should ideally not happen if set_default is used)
-                    # we prefer the first one encountered or based on some criteria, here just overwriting.
-                    client_specific_defaults_found[key] = t_dict
-
-            effective_defaults_map.update(client_specific_defaults_found)
-
-            # Second, add global defaults only if no client-specific default exists for that type/lang
-            for t_dict in templates_from_db:
-                if not t_dict.get('client_id') and t_dict.get('is_default_for_type_lang'):
-                    key = (t_dict.get('template_type'), t_dict.get('language_code'))
-                    if key not in effective_defaults_map: # No client-specific default for this type/lang
-                        effective_defaults_map[key] = t_dict
-
-            processed_templates_display_list = []
-            for t_dict in templates_from_db:
-                display_dict = t_dict.copy()
-                key = (t_dict.get('template_type'), t_dict.get('language_code'))
-
-                # Is this template the one chosen as the "effective" default for its type/lang?
-                # We compare using object identity (id()) in case of identical dicts from different sources (unlikely here but safe)
-                # or more simply, if the template_id matches (assuming template_id is unique and present)
-                effective_default_for_key = effective_defaults_map.get(key)
-                if effective_default_for_key and effective_default_for_key.get('template_id') == t_dict.get('template_id'):
-                    display_dict['is_display_default'] = True
-                else:
-                    display_dict['is_display_default'] = False
-                processed_templates_display_list.append(display_dict)
-
-            # Sort: display_defaults first, then by name/lang
-            # Global templates (client_id is None) should generally come after client-specific ones if names are similar etc.
-            # The primary sort is by the new 'is_display_default' flag.
-            processed_templates_display_list.sort(key=lambda t: (
-                not t['is_display_default'], # False (is_display_default=True) comes before True (is_display_default=False)
-                bool(t.get('client_id')),    # Client-specific (True) before global (False) for non-defaults or secondary sort
-                t.get('template_name', '').lower(),
-                t.get('language_code', '').lower()
-            ))
-
-            for template_dict_display_item in processed_templates_display_list:
-                name = template_dict_display_item.get('template_name', 'N/A')
-                lang = template_dict_display_item.get('language_code', 'N/A')
-                base_file_name = template_dict_display_item.get('base_file_name', 'N/A')
-                # Use 'is_display_default' for the UI indication
-                is_default_for_display = template_dict_display_item.get('is_display_default', False)
-
-                item_text = f"{name} ({lang}) - {base_file_name}"
-                if is_default_for_display:
-                    item_text = f"[D] {item_text}"
-
-                item = QListWidgetItem(item_text)
-                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-                item.setCheckState(Qt.Unchecked)
-                # Store the original template_dict (or its copy if modification is an issue) in UserRole
-                # Here, template_dict_display_item contains the original data + 'is_display_default'
-                item.setData(Qt.UserRole, template_dict_display_item)
-
-                if is_default_for_display:
-                    font = item.font()
-                    font.setBold(True)
-                    item.setFont(font)
-                    # item.setBackground(QColor("#E0F0E0")) # Optional: QColor needs import
-                self.templates_list.addItem(item)
-
-            if self.template_data and self.template_data.get('template_id'):
-                target_template_id = self.template_data.get('template_id')
-                for i in range(self.templates_list.count()):
-                    item = self.templates_list.item(i)
-                    item_template_data = item.data(Qt.UserRole)
-                    if isinstance(item_template_data, dict) and item_template_data.get('template_id') == target_template_id:
-                        logging.info(f"Pre-selecting template item based on template_id: {target_template_id} (Name: {item_template_data.get('template_name')})")
-                        # item.setSelected(True) # Selection driven by check state
-                        item.setCheckState(Qt.Checked) # Ensure it's checked
-                        from PyQt5.QtWidgets import QAbstractItemView # Import for PositionAtCenter
-                        self.templates_list.scrollToItem(item, QAbstractItemView.PositionAtCenter)
-                        break
-        except Exception as e:
-            logging.error("Error loading templates in dialog", exc_info=True)
-            QMessageBox.warning(self, self.tr("Erreur DB"), self.tr("Erreur de chargement des modèles:\n{0}").format(str(e)))
-
-    def create_documents(self):
-        selected_items_data = []
-        for i in range(self.templates_list.count()):
-            item = self.templates_list.item(i)
-            if item.checkState() == Qt.Checked:
-                selected_items_data.append(item.data(Qt.UserRole))
-
-        if not selected_items_data:
-            QMessageBox.warning(self, self.tr("Aucun document sélectionné"), self.tr("Veuillez cocher au moins un document à créer."))
+    def _select_and_load_pre_selected_template(self):
+        # This method tries to set filters to match the pre_selected_template_id
+        # and then calls _filter_and_load_templates_for_selection to highlight it.
+        if not self.pre_selected_template_id:
             return
-        created_files_count = 0
 
+        template_details = db_manager.get_template_by_id(self.pre_selected_template_id)
+        if not template_details:
+            return
+
+        # Set language combo
+        lang_code_to_select = template_details.get('language_code')
+        if lang_code_to_select:
+            for i in range(self.language_combo.count()):
+                if self.language_combo.itemData(i) == lang_code_to_select:
+                    self.language_combo.setCurrentIndex(i)
+                    break
+
+        # Set document type combo
+        # This is trickier as DOCUMENT_TYPE_MAPPING maps display names to template_type_filters.
+        # We need to find which DOCUMENT_TYPE_MAPPING entry's template_type_filter matches the template's type.
+        template_actual_type = template_details.get('template_type') # e.g., PROFORMA_INVOICE_HTML
+        if template_actual_type:
+            for i in range(self.doc_type_combo.count()):
+                combo_data_type_filter = self.doc_type_combo.itemData(i) # This is the template_type_filter
+                if combo_data_type_filter == template_actual_type:
+                    self.doc_type_combo.setCurrentIndex(i)
+                    break
+
+        # Filters are now set, reload the list which should select the item
+        self._filter_and_load_templates_for_selection()
+
+
+    def _get_selected_template_ids_and_lang(self):
+        selected_items = self.template_list_widget.selectedItems()
+        if not selected_items:
+            QMessageBox.warning(self, self.tr("Sélection Requise"), self.tr("Veuillez sélectionner au moins un modèle à générer."))
+            return None, None
+
+        template_ids = [item.data(Qt.UserRole) for item in selected_items]
+
+        # For language, we'll use the language_combo if a specific one is selected.
+        # If "All Languages" is selected in combo, each template will use its own language.
+        # This part of the logic might need refinement based on desired behavior when multiple templates are chosen.
+        # For now, let's assume a single language context if specified, otherwise template's own.
+        language_code_from_combo = self.language_combo.currentData()
+        if language_code_from_combo == "ALL":
+            language_code_from_combo = None # Indicates template should use its own language
+
+        return template_ids, language_code_from_combo
+
+    def _handle_generate_selected_and_open(self):
+        selected_template_ids, language_context = self._get_selected_template_ids_and_lang()
+        if not selected_template_ids:
+            return
+
+        generated_paths = []
+        for template_id in selected_template_ids:
+            # If language_context is None, _generate_document_from_template_id should use template's own lang.
+            # If language_context is set, it overrides the template's language (e.g. for generating a French template in English).
+            # This needs to be handled carefully in _generate_document_from_template_id.
+            # For now, let's assume _generate_document_from_template_id will primarily use the template's own language
+            # and language_context is more for filtering or a future "translate on the fly" feature.
+            # So, we'll pass the template's own language for generation.
+
+            template_details = db_manager.get_template_by_id(template_id)
+            if not template_details:
+                logging.warning(f"Template ID {template_id} not found when generating. Skipping.")
+                continue
+
+            actual_generation_language = language_context if language_context else template_details.get('language_code')
+            if not actual_generation_language:
+                logging.warning(f"Language code for template ID {template_id} could not be determined. Skipping.")
+                QMessageBox.warning(self, self.tr("Erreur Langue"), self.tr(f"Impossible de déterminer la langue pour le modèle {template_details.get('template_name')}. Document ignoré."))
+                continue
+
+            generated_file_path = self._generate_document_from_template_id(template_id, actual_generation_language)
+            if generated_file_path and os.path.exists(generated_file_path):
+                generated_paths.append(generated_file_path)
+            elif generated_file_path:
+                 QMessageBox.warning(self, self.tr("Erreur Fichier Partiel"), self.tr("Le fichier pour le modèle '{0}' semble avoir été généré mais est introuvable : {1}").format(template_details.get('template_name'),generated_file_path))
+
+
+        if generated_paths:
+            if len(generated_paths) == 1:
+                try:
+                    QDesktopServices.openUrl(QUrl.fromLocalFile(generated_paths[0]))
+                except Exception as e:
+                    logging.error(f"Error opening file {generated_paths[0]}: {e}", exc_info=True)
+                    QMessageBox.warning(self, self.tr("Erreur Ouverture"), self.tr("Impossible d'ouvrir le document généré : {0}").format(str(e)))
+            else:
+                QMessageBox.information(self, self.tr("Documents Générés"),
+                                        self.tr("{0} documents ont été générés. Vous pouvez les trouver dans le dossier client.").format(len(generated_paths)))
+                # Optionally open the client folder
+                self._handle_view_client_folder()
+            self.accept()
+        elif selected_template_ids and not generated_paths: # Attempted but all failed
+            QMessageBox.warning(self, self.tr("Échec Génération"), self.tr("Aucun document n'a pu être généré avec succès."))
+
+
+    def _handle_view_client_folder(self):
+        client_base_folder = self.client_info.get("base_folder_path")
+        if not client_base_folder:
+             client_base_folder = self.client_info.get("default_base_folder_path")
+
+        if client_base_folder and os.path.isdir(client_base_folder):
+            try:
+                QDesktopServices.openUrl(QUrl.fromLocalFile(client_base_folder))
+            except Exception as e:
+                logging.error(f"Error opening client folder {client_base_folder}: {e}", exc_info=True)
+                QMessageBox.warning(self, self.tr("Erreur Ouverture Dossier"), self.tr("Impossible d'ouvrir le dossier client : {0}").format(str(e)))
+        else:
+            QMessageBox.warning(self, self.tr("Dossier Introuvable"), self.tr("Le dossier de base du client n'est pas configuré ou est invalide."))
+
+    def _generate_document_from_template_id(self, template_id, language_code_for_generation):
+        """
+        Generates a document using a specific template_id.
+        language_code_for_generation specifies the language context for data fetching and notes.
+        The template itself has an inherent language.
+        """
+        logging.info(f"Attempting to generate document from template_id='{template_id}', lang_context='{language_code_for_generation}' for client_id='{self.client_info.get('client_id')}'")
+
+        chosen_template = db_manager.get_template_by_id(template_id)
+        if not chosen_template:
+            QMessageBox.critical(self, self.tr("Erreur Modèle"), self.tr("Modèle avec ID '{0}' introuvable.").format(template_id))
+            return None
+
+        template_base_filename = chosen_template.get('base_file_name')
+        # The template's own language is important for finding its file.
+        template_inherent_language = chosen_template.get('language_code')
+        template_actual_type = chosen_template.get('template_type') # e.g., 'PROFORMA_INVOICE_HTML', 'document_excel'
+        template_display_name_for_output = chosen_template.get('template_name', 'Document')
+
+
+        template_file_on_disk_abs = os.path.join(self.config.get("templates_dir", "templates"), template_inherent_language, template_base_filename)
+        if not os.path.exists(template_file_on_disk_abs):
+             QMessageBox.warning(self, self.tr("Fichier Modèle Introuvable"), self.tr("Le fichier modèle '{0}' (lang: {1}) est introuvable.").format(template_base_filename, template_inherent_language))
+             return None
+
+        # Prepare Context Data
         default_company_obj = db_manager.get_default_company()
         default_company_id = default_company_obj['company_id'] if default_company_obj else None
-        if default_company_id is None:
-            QMessageBox.warning(self, self.tr("Avertissement"), self.tr("Aucune société par défaut n'est définie. Les détails du vendeur peuvent être manquants."))
+        if not default_company_id:
+            QMessageBox.warning(self, self.tr("Config Erreur"), self.tr("Société par défaut non définie. Certaines informations pourraient manquer."))
 
         client_id_for_context = self.client_info.get('client_id')
-        project_id_for_context_arg = self.client_info.get('project_id', self.client_info.get('project_identifier'))
+        project_id_for_context_arg = self.client_info.get('project_id')
 
-        for template_data in selected_items_data: # Iterate over collected data
-            # template_data is already the dictionary from item.data(Qt.UserRole)
-            if not isinstance(template_data, dict): # Should not happen if data integrity is maintained
-                QMessageBox.warning(self, self.tr("Erreur Modèle"), self.tr("Données de modèle invalides pour l'élément sélectionné."))
-                continue
+        # Determine the document_type_for_notes (e.g., 'PROFORMA_INVOICE_HTML') from the template's type
+        # This ensures correct notes are fetched based on the actual template type being generated.
+        document_type_for_notes_fetch = template_actual_type
 
-            db_template_name = template_data.get('template_name', 'N/A')
-            db_template_lang = template_data.get('language_code', 'N/A')
-            actual_template_filename = template_data.get('base_file_name', None)
-            template_type = template_data.get('template_type', 'UNKNOWN')
-            template_id_for_db = template_data.get('template_id')
+        additional_context_for_gen = {
+            'document_type': template_actual_type,
+            'current_document_type_for_notes': document_type_for_notes_fetch,
+        }
+        # Add specific context if needed, e.g., for DELIVERY_NOTE as before
+        # This needs to map template_actual_type to specific context keys if they differ from the general mapping.
+        # Example: if template_actual_type == "PACKING_LIST_HTML" or template_actual_type == "PACKING_LIST_EXCEL":
+        #    ... add packing_details context ...
 
-            if not actual_template_filename:
-                QMessageBox.warning(self, self.tr("Erreur Modèle"), self.tr("Nom de fichier manquant pour le modèle '{0}'. Impossible de créer.").format(db_template_name)); continue
+        document_context = db_manager.get_document_context_data(
+            client_id=client_id_for_context,
+            company_id=default_company_id,
+            target_language_code=language_code_for_generation, # Use the context language here
+            project_id=project_id_for_context_arg,
+            additional_context=additional_context_for_gen
+        )
+        if not document_context:
+            logging.warning(f"Failed to get full document context for template_id {template_id}. Document might be incomplete.")
+            document_context = {}
 
-            # Path construction modification: include template_type as a subdirectory
-            template_type_folder = template_type if template_type and template_type.strip() else "unknown_type"
+        # Determine Output Filename and Path
+        client_base_folder_relative = self.client_info.get("base_folder_path") or self.client_info.get("default_base_folder_path")
+        client_base_folder_absolute = None
 
-            template_file_on_disk_abs = os.path.join(self.config["templates_dir"], db_template_lang, actual_template_filename)
-            logging.info(f"Constructed template path for existence check: {template_file_on_disk_abs} (Lang: {db_template_lang}, File: {actual_template_filename})")
+        if client_base_folder_relative:
+            if not self.app_root_dir or not os.path.isdir(self.app_root_dir):
+                logging.error(f"CreateDocumentDialog: self.app_root_dir '{self.app_root_dir}' is invalid. Cannot form absolute path for client documents.")
+                QMessageBox.critical(self, self.tr("Erreur Configuration"), self.tr("Le dossier racine de l'application n'est pas correctement configuré."))
+                return None
 
-            if not os.path.exists(template_file_on_disk_abs):
-                logging.warning(f"Template file not found on disk: {template_file_on_disk_abs} for template name '{db_template_name}'. Skipping this template.")
-                QMessageBox.warning(self, self.tr("Fichier Modèle Introuvable"),
-                                    self.tr("Le fichier pour le modèle '{0}' ({1}) de type '{2}' est introuvable à l'emplacement attendu:\n{3}\n\nCe modèle sera ignoré.").format(db_template_name, db_template_lang, template_type, template_file_on_disk_abs))
-                continue
-            # No need for '=== Added Existence Check ===' comments, the logic is integrated.
+            client_base_folder_absolute = os.path.join(self.app_root_dir, client_base_folder_relative)
+            client_base_folder_absolute = os.path.normpath(client_base_folder_absolute)
+        else:
+            logging.warning("CreateDocumentDialog: No base_folder_path or default_base_folder_path found in client_info.")
 
-            # The original if os.path.exists(template_file_on_disk_abs) is now redundant due to the check above,
-            # but the logic inside it should proceed if the file exists (i.e., if the `continue` above wasn't hit).
-            # So, we don't need to indent the following block further, it's correctly placed.
-            # if os.path.exists(template_file_on_disk_abs): # This line can be effectively removed or commented out if the above check is comprehensive.
-            # For clarity, let's assume the code below this point only runs if the file exists.
+        if not client_base_folder_absolute or not os.path.isdir(client_base_folder_absolute):
+            # This error log is important, so we keep it or a version of it.
+            logging.error(f"CreateDocumentDialog: Client base folder '{client_base_folder_absolute}' (from relative: '{client_base_folder_relative}') is invalid or not a directory.")
+            QMessageBox.critical(self, self.tr("Erreur Dossier Client"),
+            self.tr("Dossier client '{0}' non configuré, invalide, ou inaccessible.").format(client_base_folder_absolute or client_base_folder_relative or self.tr('Non spécifié')))
+            return None
+        
+        # Ensure client_base_folder used later is the absolute one
+        client_base_folder = client_base_folder_absolute
 
-            selected_order_identifier = None
-            if self.order_select_combo and self.order_select_combo.isVisible():
-                selected_order_identifier_data = self.order_select_combo.currentData()
-                if selected_order_identifier_data != "NONE":
-                    selected_order_identifier = selected_order_identifier_data
+        # Ensure client_base_folder used later is the absolute one
+        client_base_folder = client_base_folder_absolute
 
-                client_base_folder = self.client_info.get("base_folder_path")
-                if not client_base_folder:
-                    logging.error(f"Client base folder not found for client_id: {client_id_for_context}")
-                    QMessageBox.warning(self, self.tr("Erreur Configuration Client"), self.tr("Dossier de base du client non configuré pour {0}.").format(self.client_info.get("client_name", "ce client")))
-                    continue
+        # Use a subfolder based on template's display name for organization
+        doc_type_name_for_folder = template_display_name_for_output.replace(" ", "_").replace("/", "_")
+        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        original_ext = os.path.splitext(template_base_filename)[1]
 
-                safe_order_subfolder = ""
-                if selected_order_identifier:
-                    safe_order_subfolder = selected_order_identifier.replace(':', '_').replace(' ', '_')
-                    # Path for file system
-                    target_path_for_file = os.path.join(client_base_folder, safe_order_subfolder, db_template_lang, actual_template_filename)
-                    # Path for DB (relative to client_base_folder)
-                    file_path_relative_for_db = os.path.join(safe_order_subfolder, db_template_lang, actual_template_filename)
+        output_filename_base = f"{self.client_info.get('client_name', 'Client').replace(' ', '_')}_{doc_type_name_for_folder}_{language_code_for_generation}_{timestamp_str}"
+        output_filename = f"{output_filename_base}{original_ext}"
+
+        # Output path uses the language_code_for_generation for the subfolder, not template_inherent_language
+        target_doc_folder = os.path.join(client_base_folder, language_code_for_generation, doc_type_name_for_folder)
+        os.makedirs(target_doc_folder, exist_ok=True)
+        output_file_path = os.path.join(target_doc_folder, output_filename)
+
+        # Generation Logic
+        generation_success = False
+        final_generated_file_path = output_file_path # Default to original copied/populated path
+        final_output_filename = output_filename       # Default to original copied/populated name
+        final_document_type_for_db = template_actual_type # Default to original template type
+
+        try:
+            shutil.copy(template_file_on_disk_abs, output_file_path)
+
+            if template_actual_type.endswith('_HTML') or original_ext.lower() == '.html':
+                with open(output_file_path, 'r', encoding='utf-8') as f: html_content = f.read()
+                populated_html = HtmlEditor.populate_html_content(html_content, document_context)
+                with open(output_file_path, 'w', encoding='utf-8') as f: f.write(populated_html)
+
+
+                # Convert HTML to PDF
+                from html_to_pdf_util import convert_html_to_pdf # Local import
+                pdf_output_filename = f"{output_filename_base}.pdf"
+                pdf_output_path = os.path.join(target_doc_folder, pdf_output_filename)
+                base_url_for_pdf = QUrl.fromLocalFile(os.path.dirname(template_file_on_disk_abs)).toString() # Base URL from original template location for relative assets
+
+                pdf_bytes = convert_html_to_pdf(populated_html, base_url=base_url_for_pdf)
+                if pdf_bytes:
+                    with open(pdf_output_path, 'wb') as f_pdf:
+                        f_pdf.write(pdf_bytes)
+                    logging.info(f"Successfully converted HTML to PDF: {pdf_output_path}")
+                    # Update output_file_path and output_filename to reflect the PDF
+                    # output_file_path = pdf_output_path # This will be returned
+                    # output_filename = pdf_output_filename # This will be used for DB record
+                    # Store the generated PDF path to be returned and recorded
+                    final_generated_file_path = pdf_output_path
+                    final_output_filename = pdf_output_filename
+                    final_document_type_for_db = template_actual_type.replace("_HTML", "_PDF") if "_HTML" in template_actual_type else f"{template_actual_type}_PDF"
+                    generation_success = True
                 else:
-                    # Path for file system
-                    target_path_for_file = os.path.join(client_base_folder, db_template_lang, actual_template_filename)
-                    # Path for DB (relative to client_base_folder)
-                    file_path_relative_for_db = os.path.join(db_template_lang, actual_template_filename)
+                    logging.error(f"Failed to convert populated HTML to PDF for: {output_filename}")
+                    QMessageBox.warning(self, self.tr("Erreur Conversion PDF"), self.tr("La conversion du HTML en PDF a échoué pour '{0}'. Le fichier HTML peuplé a été sauvegardé.").format(output_filename))
+                    # Fallback to returning the HTML path if PDF fails
+                    final_generated_file_path = output_file_path
+                    final_output_filename = output_filename
+                    final_document_type_for_db = template_actual_type # Record as HTML
+                    generation_success = True # Still true because HTML was generated
 
-                logging.info(f"Target path for file: {target_path_for_file}")
-                os.makedirs(os.path.dirname(target_path_for_file), exist_ok=True)
+            # Initialize final paths and types with non-PDF defaults
+            final_generated_file_path = output_file_path
+            final_output_filename = output_filename
+            final_document_type_for_db = template_actual_type
 
-                try:
-                    logging.info(f"Copying template '{template_file_on_disk_abs}' to '{target_path_for_file}'")
-                    shutil.copy(template_file_on_disk_abs, target_path_for_file)
-                    logging.info(f"Successfully copied template to target path.")
+            if template_actual_type.endswith('_HTML'): # Assuming convention like PROFORMA_INVOICE_HTML
+                with open(output_file_path, 'r', encoding='utf-8') as f: html_content = f.read()
+                populated_html = HtmlEditor.populate_html_content(html_content, document_context)
+                with open(output_file_path, 'w', encoding='utf-8') as f: f.write(populated_html)
+                generation_success = True # HTML generation was successful
 
-                    additional_context = {}
-                    if 'project_id' in self.client_info: additional_context['project_id'] = self.client_info['project_id']
-                    # invoice_id seems to be set later contextually for packing lists, not from client_info directly here.
-                    # if 'invoice_id' in self.client_info: additional_context['invoice_id'] = self.client_info['invoice_id']
-                    additional_context['order_identifier'] = selected_order_identifier
+                # Attempt to Convert HTML to PDF
+                from html_to_pdf_util import convert_html_to_pdf # Local import
+                pdf_output_filename_base = f"{output_filename_base}.pdf"
+                pdf_output_path = os.path.join(target_doc_folder, pdf_output_filename_base)
 
-                    if template_type == 'HTML_PACKING_LIST':
-                        additional_context['document_type'] = 'packing_list'
-                        additional_context['current_document_type_for_notes'] = 'HTML_PACKING_LIST'
-                        # ... (rest of packing list logic from original) ...
-                        packing_details_payload = {}
-                        linked_products = db_manager.get_products_for_client_or_project(
-                            client_id_for_context,
-                            project_id=project_id_for_context_arg
-                        )
-                        linked_products = linked_products if linked_products else []
-                        packing_items_data = []
-                        total_net_w = 0.0; total_gross_w = 0.0; total_pkg_count = 0
-                        for idx, prod_data in enumerate(linked_products):
-                            net_w = float(prod_data.get('weight', 0.0) or 0.0)
-                            quantity = float(prod_data.get('quantity', 1.0) or 1.0)
-                            gross_w = net_w * 1.05
-                            dims = prod_data.get('dimensions', 'N/A')
-                            num_pkgs = 1; pkg_type = 'Carton'
-                            packing_items_data.append({
-                                'marks_nos': f'BOX {total_pkg_count + 1}', 'product_id': prod_data.get('product_id'),
-                                'product_name_override': None, 'quantity_description': f"{quantity} {prod_data.get('unit_of_measure', 'unit(s)')}",
-                                'num_packages': num_pkgs, 'package_type': pkg_type,
-                                'net_weight_kg_item': net_w * quantity, 'gross_weight_kg_item': gross_w * quantity,
-                                'dimensions_cm_item': dims
-                            })
-                            total_net_w += net_w * quantity; total_gross_w += gross_w * quantity; total_pkg_count += num_pkgs
-                        if not linked_products:
-                             packing_items_data.append({
-                                'marks_nos': 'N/A', 'product_id': None, 'product_name_override': 'No products linked to client/project.',
-                                'quantity_description': '', 'num_packages': 0, 'package_type': '',
-                                'net_weight_kg_item': 0, 'gross_weight_kg_item': 0, 'dimensions_cm_item': ''
-                            })
-                        packing_details_payload['items'] = packing_items_data
-                        packing_details_payload['total_packages'] = total_pkg_count
-                        packing_details_payload['total_net_weight_kg'] = round(total_net_w, 2)
-                        packing_details_payload['total_gross_weight_kg'] = round(total_gross_w, 2)
-                        packing_details_payload['total_volume_cbm'] = 'N/A'
-                        client_project_identifier = self.client_info.get('project_identifier', self.client_info.get('client_id', 'NOID'))
-                        timestamp_str = datetime.now().strftime('%Y%m%d')
-                        additional_context['packing_list_id'] = f"PL-{client_project_identifier}-{timestamp_str}"
-                        additional_context['invoice_id'] = f"INVREF-{client_project_identifier}-{timestamp_str}"
-                        additional_context['project_id'] = self.client_info.get('project_identifier', 'N/A')
-                        additional_context['packing_details'] = packing_details_payload
-                    else:
-                        additional_context.update(self.client_info.copy())
-                        additional_context['document_type'] = template_type
-                        additional_context['order_identifier'] = selected_order_identifier
-                        if template_type.startswith("HTML_"):
-                             additional_context['current_document_type_for_notes'] = template_type
+                base_url_for_pdf = QUrl.fromLocalFile(os.path.dirname(template_file_on_disk_abs)).toString()
 
-                    doc_db_data = {
-                        'client_id': client_id_for_context,
-                        'project_id': project_id_for_context_arg, # This can be None if not applicable
-                        'order_identifier': selected_order_identifier, # This can be None
-                        'document_name': actual_template_filename, # Name of the doc, usually same as file
-                        'file_name_on_disk': actual_template_filename, # Actual file name
-                        'file_path_relative': file_path_relative_for_db, # Corrected relative path
-                        'document_type_generated': template_type,
-                        'source_template_id': template_id_for_db,
-                        'user_id': self.current_user_id # Use stored current_user_id
-                    }
-                    logging.info(f"Attempting to add document to DB with data: {doc_db_data}")
-                    new_document_id_from_db = db_manager.add_client_document(doc_db_data)
+                pdf_bytes = convert_html_to_pdf(populated_html, base_url=base_url_for_pdf)
+                if pdf_bytes:
+                    with open(pdf_output_path, 'wb') as f_pdf:
+                        f_pdf.write(pdf_bytes)
+                    logging.info(f"Successfully converted HTML to PDF: {pdf_output_path}")
+                    final_generated_file_path = pdf_output_path
+                    final_output_filename = pdf_output_filename_base # Use PDF filename
+                    # Adjust document type for DB to reflect PDF
+                    if template_actual_type.endswith('_HTML'):
+                        final_document_type_for_db = template_actual_type.replace("_HTML", "_PDF")
+                    elif original_ext.lower() == '.html': # Generic HTML template
+                        final_document_type_for_db = f"{template_actual_type}_PDF" # Or a more generic "GENERATED_PDF"
+                    else: # Fallback if naming convention is mixed
+                        final_document_type_for_db = f"{template_actual_type}_PDF"
 
-                    if new_document_id_from_db:
-                        logging.info(f"Document record added to DB with ID: {new_document_id_from_db}")
-                        additional_context['document_id'] = new_document_id_from_db
-                    else:
-                        logging.error(f"Failed to add document record to DB for: {actual_template_filename}. Data: {doc_db_data}")
-                        QMessageBox.warning(self, self.tr("Erreur DB"), self.tr("Impossible d'enregistrer l'entrée du document dans la base de données pour {0}.").format(actual_template_filename))
-                        # Consider cleanup of copied file if DB entry fails: os.remove(target_path_for_file)
-                        continue # Skip to next template
+                    final_output_filename = pdf_output_filename_base
+                    final_document_type_for_db = template_actual_type.replace("_HTML", "_PDF") if "_HTML" in template_actual_type else f"{template_actual_type}_PDF"
+                    try: # Optionally remove the intermediate HTML file
+                        os.remove(output_file_path)
+                        logging.info(f"Removed intermediate HTML file: {output_file_path}")
+                    except OSError as e_remove_html:
+                        logging.warning(f"Could not remove intermediate HTML file {output_file_path}: {e_remove_html}")
+                else:
+                    logging.error(f"Failed to convert populated HTML to PDF for: {output_filename}")
+                    QMessageBox.warning(self, self.tr("Erreur Conversion PDF"), self.tr("La conversion du HTML en PDF a échoué pour '{0}'. Le fichier HTML peuplé a été sauvegardé.").format(output_filename))
 
-                    if target_path_for_file.lower().endswith(".docx"):
-                        logging.info(f"Populating DOCX template: {target_path_for_file}")
-                        populate_docx_template(target_path_for_file, self.client_info) # self.client_info is used as context here
-                    elif target_path_for_file.lower().endswith(".html"):
-                        logging.info(f"Populating HTML template: {target_path_for_file}")
-                        with open(target_path_for_file, 'r', encoding='utf-8') as f: template_content = f.read()
+                    # Fallback: HTML was generated, so we use its details (already set before this block)
 
-                        document_context = db_manager.get_document_context_data(
-                            client_id=client_id_for_context, company_id=default_company_id,
-                            target_language_code=db_template_lang, project_id=project_id_for_context_arg,
-                            additional_context=additional_context
-                        )
-                        if not document_context:
-                             logging.warning(f"Failed to get document context for {actual_template_filename}. HTML might be incomplete.")
+            elif template_actual_type.endswith('_EXCEL'):
+                QMessageBox.information(self, "Info", f"La génération Excel pour '{template_display_name_for_output}' n'est pas encore entièrement implémentée. Le modèle a été copié.")
+                generation_success = True
+            elif template_actual_type.endswith('_WORD') or template_actual_type.endswith('_DOCX'):
+                populate_docx_template(output_file_path, document_context)
+                generation_success = True
+            else: # Other types, or if type is just 'document_excel', 'document_word' without _HTML suffix
+                if original_ext == '.html': # Generic HTML template
+                     with open(output_file_path, 'r', encoding='utf-8') as f: html_content = f.read()
+                     populated_html = HtmlEditor.populate_html_content(html_content, document_context)
+                     with open(output_file_path, 'w', encoding='utf-8') as f: f.write(populated_html)
+                     generation_success = True
 
-                        try:
-                            populated_content = HtmlEditor.populate_html_content(template_content, document_context if document_context else {})
-                            with open(target_path_for_file, 'w', encoding='utf-8') as f: f.write(populated_content)
-                            logging.info(f"Successfully populated and saved HTML: {target_path_for_file}")
-                        except Exception as e_html_pop:
-                            logging.error(f"Error populating HTML content for {target_path_for_file}: {e_html_pop}", exc_info=True)
-                            QMessageBox.warning(self, self.tr("Erreur HTML"), self.tr("Erreur lors de la population du contenu HTML pour {0}:\n{1}").format(actual_template_filename, str(e_html_pop)))
-                            # Continue, as file is copied, DB entry made, but content might be unpopulated/default.
-                    created_files_count += 1
-                except (IOError, shutil.Error) as e_copy:
-                    logging.error(f"Error copying template '{template_file_on_disk_abs}' to '{target_path_for_file}': {e_copy}", exc_info=True)
-                    QMessageBox.warning(self, self.tr("Erreur Copie Fichier"), self.tr("Impossible de copier le fichier modèle '{0}' vers la destination:\n{1}").format(actual_template_filename, str(e_copy)))
-                except Exception as e_create:
-                    logging.error(f"General error creating document '{actual_template_filename}': {e_create}", exc_info=True)
-                    QMessageBox.warning(self, self.tr("Erreur Création Document"), self.tr("Impossible de créer ou populer le document '{0}':\n{1}").format(actual_template_filename, str(e_create)))
-            # The 'else' for the original 'if os.path.exists' is no longer needed here as the check is done above.
-            # else:
-            #     logging.warning(f"Template file not found on disk: {template_file_on_disk_abs} for template name '{db_template_name}'")
-            #     QMessageBox.warning(self, self.tr("Erreur Modèle"), self.tr("Fichier modèle '{0}' introuvable pour '{1}'.").format(actual_template_filename, db_template_name))
+                     from html_to_pdf_util import convert_html_to_pdf
+                     pdf_output_filename_base = f"{output_filename_base}.pdf"
+                     pdf_output_path = os.path.join(target_doc_folder, pdf_output_filename_base)
+                     base_url_for_pdf = QUrl.fromLocalFile(os.path.dirname(template_file_on_disk_abs)).toString()
+                     pdf_bytes = convert_html_to_pdf(populated_html, base_url=base_url_for_pdf)
+                     if pdf_bytes:
+                         with open(pdf_output_path, 'wb') as f_pdf: f_pdf.write(pdf_bytes)
+                         final_generated_file_path = pdf_output_path
+                         final_output_filename = pdf_output_filename_base
+                         final_document_type_for_db = template_actual_type.replace(".html", "_PDF", 1) if template_actual_type.endswith(".html") else f"{template_actual_type}_PDF"
+                         try: os.remove(output_file_path)
+                         except OSError: logging.warning(f"Could not remove intermediate generic HTML file {output_file_path}")
+                     else:
+                         logging.error(f"Failed to convert generic HTML to PDF for: {output_filename}")
+                elif original_ext == '.docx':
+                     populate_docx_template(output_file_path, document_context)
+                     generation_success = True
+                else:
+                    logging.info(f"Template type '{template_actual_type}' or extension '{original_ext}' not specifically handled for population. File copied only.")
+                    generation_success = True # Copied
 
-        if created_files_count > 0:
-            QMessageBox.information(self, self.tr("Documents créés"), self.tr("{0} documents ont été créés avec succès.").format(created_files_count))
-            self.accept()
-        elif not selected_items_data: # Check against selected_items_data
-            # This case is handled by the check at the beginning of the method.
-            pass
-        else: # Some items were selected (checked), but none were created
-            QMessageBox.warning(self, self.tr("Erreur"), self.tr("Aucun document n'a pu être créé. Vérifiez les messages d'erreur précédents ou les logs pour plus de détails."))
+        except Exception as e_gen:
+            logging.error(f"Error during document generation for {final_output_filename} from template_id {template_id}: {e_gen}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur Génération"), self.tr("Erreur lors de la génération de '{0}':\n{1}").format(final_output_filename, str(e_gen)))
+            return None
+
+        if not generation_success: # If any step failed and didn't set it true
+            return None
+
+        # Add to ClientDocuments Table using the final determined file path, name, and type
+        relative_path_for_db = os.path.relpath(final_generated_file_path, client_base_folder)
+        doc_db_data = {
+            'client_id': client_id_for_context,
+            'project_id': project_id_for_context_arg,
+            'order_identifier': document_context.get('order_identifier'),
+
+            'document_name': final_output_filename,
+            'file_name_on_disk': final_output_filename,
+            'file_path_relative': relative_path_for_db,
+            'document_type_generated': final_document_type_for_db,
+            'source_template_id': template_id,
+            'user_id': self.current_user_id,
+            'language_code': language_code_for_generation
+
+        }
+
+        # Decide whether to add as new or create new version
+        new_doc_id = None
+        try:
+            if hasattr(self, 'old_document_id_to_version') and self.old_document_id_to_version:
+                logging.info(f"Creating new version for old_document_id: {self.old_document_id_to_version}")
+                # create_new_document_version expects new_document_data to be complete for add_client_document
+                # It will internally set parent_id, version_tag, is_latest
+                new_doc_id = db_manager.create_new_document_version(
+                    old_document_id=self.old_document_id_to_version,
+                    new_document_data=doc_db_data # Pass the full data for the new entry
+                )
+            else:
+                logging.info("Adding as a new document (not a version of an existing one).")
+                new_doc_id = db_manager.add_client_document(doc_db_data)
+
+            if new_doc_id:
+                logging.info(f"Document '{final_output_filename}' (DB ID: {new_doc_id}) processed for client {client_id_for_context}")
+                return final_generated_file_path
+            else:
+                QMessageBox.warning(self, self.tr("Erreur DB"), self.tr("Document généré mais échec de l'enregistrement en base de données."))
+
+                if os.path.exists(final_generated_file_path):
+                    try: os.remove(final_generated_file_path)
+                    except OSError: logging.warning(f"Failed to cleanup {final_generated_file_path} after DB error.")
+                return None
+        except Exception as e_db_add:
+            logging.error(f"Error adding/versioning document in DB {final_output_filename}: {e_db_add}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur DB"), self.tr("Erreur lors de l'enregistrement du document en DB:\n{0}").format(str(e_db_add)))
+            if os.path.exists(final_generated_file_path):
+
+                try: os.remove(final_generated_file_path)
+                except OSError: logging.warning(f"Failed to cleanup {final_generated_file_path} after DB error.")
+            return None
+
+    # Remove old methods related to template list display
+    def has_multiple_purchase_events(self): return False
+    def load_templates(self): pass
+    def create_documents(self): pass
+    # _generate_document is removed as its logic is now in _generate_document_from_template_id
+    # _get_selected_generation_params is removed as selection is now from list widget
+    # _handle_generate_and_copy_path is removed as we only have one generate button now

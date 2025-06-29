@@ -1,0 +1,31 @@
+[tool.black]
+line-length = 88
+target-version = ['py310'] # Assumant Python 3.10+ basé sur les dépendances récentes comme FastAPI. Ajuster si nécessaire.
+# include = '\.pyi?$'
+# exclude = '''
+# /(
+#     \.eggs
+#   | \.git
+#   | \.hg
+#   | \.mypy_cache
+#   | \.tox
+#   | \.venv
+#   | _build
+#   | buck-out
+#   | build
+#   | dist
+# )/
+# '''
+
+[tool.isort]
+profile = "black"
+line_length = 88
+# known_first_party = # Si on adopte une structure src/, on listera les modules de premier niveau ici
+# default_section = "THIRDPARTY"
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+# skip_glob = # Peut être utilisé pour exclure des dossiers spécifiques si nécessaire, comme .venv
+# skip = ["icons_rc.py"] # Exclure les fichiers générés

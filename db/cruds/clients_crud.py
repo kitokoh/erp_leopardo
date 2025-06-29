@@ -2,7 +2,7 @@ import sqlite3
 import uuid
 from datetime import datetime
 import logging
-from .generic_crud import GenericCRUD, _manage_conn, get_db_connection # Updated import
+from .generic_crud import GenericCRUD, _manage_conn # get_db_connection is not used directly
 
 # --- Clients CRUD ---
 class ClientsCRUD(GenericCRUD):
@@ -18,6 +18,7 @@ class ClientsCRUD(GenericCRUD):
         """
         self.table_name = "Clients"
         self.id_column = "client_id"
+        self.logger = logging.getLogger(__name__) # Add logger instance
 
     @_manage_conn
     def add_client(self, data: dict, conn: sqlite3.Connection = None) -> dict:
@@ -40,15 +41,17 @@ class ClientsCRUD(GenericCRUD):
             dict: A dictionary with {'success': True, 'client_id': new_id} on success,
                   or {'success': False, 'error': 'error message'} on failure.
         """
+        self.logger.info(f"Attempting to add client with data: {data}") # Log incoming data
+
         # Input Validation
         required_fields = ['client_name', 'created_by_user_id']
         for field in required_fields:
             if not data.get(field):
-                logging.error(f"Missing required field: {field} in add_client")
+                self.logger.error(f"Missing required field: {field} in add_client data: {data}")
                 return {'success': False, 'error': f"Missing required field: {field}"}
 
-        if 'price' in data and not isinstance(data['price'], (int, float)):
-            logging.error("Invalid data type for price in add_client")
+        if 'price' in data and data['price'] is not None and not isinstance(data['price'], (int, float)):
+            self.logger.error(f"Invalid data type for price in add_client data: {data}")
             return {'success': False, 'error': "Invalid data type for price. Must be a number."}
 
         cursor = conn.cursor()

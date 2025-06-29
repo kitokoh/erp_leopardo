@@ -6,10 +6,15 @@ from PyQt5.QtWidgets import (
     QGroupBox, QFormLayout, QTableWidget, QHeaderView, QTabWidget, QProgressBar,
     QTableWidgetItem, QStackedWidget
 )
-from PyQt5.QtCore import Qt, QObject, pyqtSignal, pyqtSlot
+from PyQt5.QtCore import Qt, QObject, pyqtSignal, pyqtSlot, QTimer # Added QTimer
 from PyQt5.QtWebChannel import QWebChannel
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWebEngineWidgets import QWebEngineView
+
+# Matplotlib imports
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
 
 
 from datetime import datetime # Added for client acquisition stats
@@ -84,18 +89,19 @@ class StatisticsDashboard(QWidget):
 
         # Left widget for Map
         self.left_widget_for_map = QWidget()
-        left_map_layout = QVBoxLayout(self.left_widget_for_map)
-        left_map_layout.setContentsMargins(0,0,0,0)
-        self.map_view = QWebEngineView(self)
-        left_map_layout.addWidget(self.map_view)
-        self.left_widget_for_map.setLayout(left_map_layout)
+        # Create layout, set it as the layout for self.left_widget_for_map, AND store it
+        self._left_map_actual_layout = QVBoxLayout(self.left_widget_for_map)
+        self._left_map_actual_layout.setContentsMargins(0,0,0,0)
+        # self.left_widget_for_map.setLayout(self._left_map_actual_layout) # Redundant if QVBoxLayout constructor has parent
+
+
+        self.map_view = None # Initialize as None
         main_splitter.addWidget(self.left_widget_for_map)
 
         # Right widget for Stats
         self.right_widget_for_stats = QWidget()
         right_stats_layout = QVBoxLayout(self.right_widget_for_stats)
         right_stats_layout.setContentsMargins(5,5,5,5)
-        # self._setup_stats_display_ui(right_stats_layout) # This will be called later
         self.right_widget_for_stats.setLayout(right_stats_layout)
         main_splitter.addWidget(self.right_widget_for_stats)
 
@@ -103,21 +109,82 @@ class StatisticsDashboard(QWidget):
         main_layout.addWidget(main_splitter)
         self.setLayout(main_layout)
 
-        # Setup for interactive map
-        self.map_interaction_handler = MapInteractionHandler(self)
-        self.map_interaction_handler.country_clicked_signal.connect(self._on_map_country_clicked)
-        # Connect client_clicked_on_map_signal to the new panel display method
-        self.map_interaction_handler.client_clicked_on_map_signal.connect(self._display_client_details_in_panel)
+        self.map_interaction_handler = None # Initialize as None
 
-        web_channel = QWebChannel(self.map_view.page())
-        self.map_view.page().setWebChannel(web_channel)
-        web_channel.registerObject("pyMapConnector", self.map_interaction_handler)
+        self._setup_stats_display_ui(right_stats_layout)
 
-        # Placeholder for ported stats UI setup and initial data load
-        self._setup_stats_display_ui(right_stats_layout) # Now call it
+        # Defer map component initialization and initial data load that depends on map
+        QTimer.singleShot(0, self._initialize_map_and_load_data)
+
+        logging.info("StatisticsDashboard initialized. Map components will be loaded via QTimer.")
+
+    def _initialize_map_and_load_data(self):
+        """Deferred initialization of map components and initial data load."""
+        logging.info("StatisticsDashboard: _initialize_map_and_load_data called by QTimer.")
+
+        # Ensure the container widget for the map exists
+        if self.left_widget_for_map is None:
+            logging.critical("StatisticsDashboard: self.left_widget_for_map is None at the start of _initialize_map_and_load_data. Cannot initialize map.")
+            # This indicates a severe problem with the widget's construction or state.
+            return
+
+        # self._left_map_actual_layout should have been initialized in __init__
+        # and is the correct layout for self.left_widget_for_map.
+        # We verify if self.left_widget_for_map.layout() still reports it,
+        # or if it somehow became None.
+
+        current_layout_on_widget = self.left_widget_for_map.layout()
+
+        if current_layout_on_widget is None:
+            logging.warning("StatisticsDashboard: self.left_widget_for_map.layout() is None. "
+                            "This is unexpected as it should have been set in __init__ via self._left_map_actual_layout. "
+                            "Attempting to re-apply self._left_map_actual_layout if it exists, or recreate.")
+            if self._left_map_actual_layout is not None:
+                # Re-apply the layout instance we stored in __init__
+                self.left_widget_for_map.setLayout(self._left_map_actual_layout)
+            else:
+                # This is a more critical state: self._left_map_actual_layout itself was not set in __init__
+                logging.error("StatisticsDashboard: self._left_map_actual_layout is also None. This indicates an issue in __init__. Recreating layout.")
+                self._left_map_actual_layout = QVBoxLayout(self.left_widget_for_map)
+                self._left_map_actual_layout.setContentsMargins(0,0,0,0)
+                # self.left_widget_for_map.setLayout() is implicitly called by QVBoxLayout constructor with parent
+        elif current_layout_on_widget is not self._left_map_actual_layout:
+            logging.warning("StatisticsDashboard: self.left_widget_for_map.layout() (is %s) is different from self._left_map_actual_layout (is %s). "
+                            "This is highly unexpected. Trusting the instance variable self._left_map_actual_layout.",
+                            id(current_layout_on_widget), id(self._left_map_actual_layout) )
+            # If the widget has a *different* layout, and we are sure _left_map_actual_layout is the one we want,
+            # we might need to re-set it. However, this situation implies external modification or a deep bug.
+            # For now, we assume self._left_map_actual_layout is the intended one.
+            # If self.left_widget_for_map.layout() returned a *different, valid* layout,
+            # and self._left_map_actual_layout was also valid but different,
+            # the original code would have updated self._left_map_actual_layout to match the widget.
+            # The current CRITICAL error implies self._left_map_actual_layout becomes None.
+            pass # We will proceed using self._left_map_actual_layout as defined in __init__
+
+        # Final check on self._left_map_actual_layout, which should be the one from __init__
+        if not self._left_map_actual_layout:
+            logging.critical("StatisticsDashboard: self._left_map_actual_layout is None after checks. Cannot proceed with map initialization.")
+            return
+
+        if self.map_view is None:
+            # Parent QWebEngineView to self.left_widget_for_map, which is its container
+            self.map_view = QWebEngineView(self.left_widget_for_map) # Parent to the widget
+            # Add the map_view to self._left_map_actual_layout, which is confirmed or restored/recreated.
+            self._left_map_actual_layout.addWidget(self.map_view)
+            logging.info("StatisticsDashboard: QWebEngineView (self.map_view) created and added to _left_map_actual_layout.")
+
+            self.map_interaction_handler = MapInteractionHandler(self)
+            self.map_interaction_handler.country_clicked_signal.connect(self._on_map_country_clicked)
+            self.map_interaction_handler.client_clicked_on_map_signal.connect(self._display_client_details_in_panel)
+
+            web_channel = QWebChannel(self.map_view.page())
+            self.map_view.page().setWebChannel(web_channel)
+            web_channel.registerObject("pyMapConnector", self.map_interaction_handler)
+            logging.info("StatisticsDashboard: MapInteractionHandler and QWebChannel set up.")
+
         self.refresh_all_dashboard_content()
+        # Removed diagnostic logging from the end of this method
 
-        logging.info("StatisticsDashboard initialized with new interactive structure.")
 
     @pyqtSlot(str)
     def _on_map_country_clicked(self, country_name):
@@ -137,9 +204,12 @@ class StatisticsDashboard(QWidget):
 
     def refresh_all_dashboard_content(self):
         logging.info("Refreshing all dashboard content...")
-        self.refresh_statistics_data()
-        self.update_map()
-        logging.info("All dashboard content refresh complete.")
+        self.refresh_statistics_data() # This updates non-map stats
+        if self.map_view: # Only update map if it has been initialized
+            self.update_map()
+        else:
+            logging.info("StatisticsDashboard: Map view not yet initialized, skipping map update in refresh_all_dashboard_content.")
+        logging.info("All dashboard content refresh process initiated.")
 
     # Placeholder for _setup_stats_display_ui - to be filled in Phase 2
     def _setup_stats_display_ui(self, layout_to_populate):
@@ -316,199 +386,92 @@ class StatisticsDashboard(QWidget):
     def update_map(self):
         logging.info("Updating interactive map...")
         try:
-            # Fetch data for choropleth
-            clients_by_country_counts = get_client_counts_by_country()
-
-            data_for_map = {"country_name": [], "client_count": []}
-            if clients_by_country_counts:
-                for entry in clients_by_country_counts:
-                    data_for_map["country_name"].append(entry["country_name"])
-                    data_for_map["client_count"].append(entry["client_count"])
-
             geojson_path = os.path.join(APP_ROOT_DIR, "assets", "world_countries.geojson")
 
             if not os.path.exists(geojson_path):
                 logging.error(f"GeoJSON file not found at: {geojson_path}")
-                m = folium.Map(location=[20,0], zoom_start=2)
-                folium.Marker([0,0], popup="Error: GeoJSON file for map not found.").add_to(m)
-                self.map_view.setHtml(m.get_root().render())
-                return
+                error_message = self.tr("Les données géographiques de la carte (GeoJSON) sont introuvables. La carte ne peut pas être affichée. Veuillez vérifier l'installation de l'application ou contacter le support.")
+                self._set_map_error_html(error_message)
+                return # This return exits the update_map method if geojson is not found.
 
             m = folium.Map(location=[20, 0], zoom_start=2, tiles="CartoDB positron")
+            
+            # Moved the database call for clients_by_country_counts here,
+            # as it's needed regardless of the geojson file existing (if the path check passes).
+            # This also simplifies the try-except structure.
+            try:
+                clients_by_country_counts = get_client_counts_by_country()
+            except Exception as db_exc:
+                logging.error(f"Database error while fetching client counts for map: {db_exc}", exc_info=True)
+                error_message = self.tr("Erreur de récupération des données statistiques pour la carte : {error_details}. L'affichage de la carte est indisponible.").format(error_details=str(db_exc))
+                self._set_map_error_html(error_message)
+                return
 
-            if clients_by_country_counts: # Check if there's any data
+            # The rest of the map generation logic follows...
+            if clients_by_country_counts:
                 counts_dict = {item['country_name']: item['client_count'] for item in clients_by_country_counts}
                 max_observed_clients = max(item['client_count'] for item in clients_by_country_counts) if clients_by_country_counts else 0
-
-                category_colors = ['#f7f7f7', '#c6dbef', '#6baed6', '#08519c'] # Light Grey, Light Blue, Medium Blue, Dark Blue
-                color_index = [0, 1, 2, 4] # Min value for each color category (0, 1, 2-3, 4+)
-
-                client_colormap = StepColormap(
-                    colors=category_colors,
-                    index=color_index,
-                    vmin=0,
-                    vmax=max(4, max_observed_clients),
-                    caption=self.tr("Nombre de Clients par Pays (Catégories)")
-                )
-
-                def style_function(feature):
-                    count = counts_dict.get(feature['properties']['name'], 0) # Default to 0 if country not in data
-                    return {
-                        'fillColor': client_colormap(count),
-                        'color': '#555555', # Border color for countries
-                        'weight': 0.5,
-                        'fillOpacity': 0.7
-                    }
-
-                if os.path.exists(geojson_path):
-                    folium.GeoJson(
-                        geojson_path,
-                        name=self.tr("Distribution des Clients par Pays"),
-                        style_function=style_function,
-                        tooltip=folium.features.GeoJsonTooltip(
-                            fields=['name'], # Show country name on hover
-                            aliases=[self.tr('Pays:')], # Use self.tr for alias
-                            localize=True
-                        )
-                    ).add_to(m)
-                    client_colormap.add_to(m) # Add legend to map
-                else:
-                    logging.warning(f"GeoJSON file not found at {geojson_path}, choropleth layer skipped.")
-            else:
-                logging.info("No client count data to display on map for choropleth/GeoJson coloring.")
-
-
-            if data_for_map["country_name"] and data_for_map["client_count"]:
-                df = pd.DataFrame(data_for_map)
-
-                # Define color categories and thresholds
-                category_colors = ['#f0f0f0', '#c6dbef', '#6baed6', '#08519c'] # Grey, Light Blue, Medium Blue, Dark Blue
-                # Index: Start of each category. [0, 1, 2, 4] means:
-                #   color[0] for values in [0, 1) (i.e., 0 clients)
-                #   color[1] for values in [1, 2) (i.e., 1 client)
-                #   color[2] for values in [2, 4) (i.e., 2, 3 clients)
-                #   color[3] for values >= 4 (i.e., 4+ clients)
+                category_colors = ['#f7f7f7', '#c6dbef', '#6baed6', '#08519c']
                 color_index = [0, 1, 2, 4]
-
-                max_observed_clients = df["client_count"].max() if not df.empty else 0
-
-                client_colormap = StepColormap(
-                    colors=category_colors,
-                    index=color_index,
-                    vmin=0,
-                    vmax=max(4, max_observed_clients), # Ensure colormap covers at least up to 4, or max observed
-                    caption=self.tr("Client Count by Country (Categories)")
-                )
-
-                folium.Choropleth(
-                    geo_data=geojson_path, name="choropleth", data=df,
-                    columns=["country_name", "client_count"], key_on="feature.properties.name",
-                    # fill_color is handled by client_colormap.add_to(m)
-                    fill_opacity=0.7, # Slightly more opaque for better color visibility
-                    line_opacity=0.3,
-                    highlight=True,
-                    # legend_name removed to use the StepColormap's legend
-                ).add_to(m)
-
-                # Add the colormap itself to the map to generate the legend and apply color
+                client_colormap = StepColormap(colors=category_colors, index=color_index, vmin=0, vmax=max(4, max_observed_clients), caption=self.tr("Nombre de Clients par Pays (Catégories)"))
+                def style_function(feature):
+                    count = counts_dict.get(feature['properties']['name'], 0)
+                    return {'fillColor': client_colormap(count), 'color': '#555555', 'weight': 0.5, 'fillOpacity': 0.7}
+                folium.GeoJson(geojson_path, name=self.tr("Distribution des Clients par Pays"), style_function=style_function, tooltip=folium.features.GeoJsonTooltip(fields=['name'], aliases=[self.tr('Pays:')], localize=True)).add_to(m)
                 client_colormap.add_to(m)
+            else:
+                folium.GeoJson(geojson_path, name=self.tr("Pays (Base)"), tooltip=folium.features.GeoJsonTooltip(fields=['name'], aliases=[self.tr('Pays:')])).add_to(m)
+                logging.info("StatisticsDashboard: No client count data. Added basic GeoJSON layer for choropleth.")
 
-
-            # Fetch active client data for interactive markers/popups
-            # This is a simplified version; in DocumentManager it's get_active_clients_per_country
-            # For StatisticsDashboard, we might just use the same get_client_counts_by_country data
-            # or fetch more detailed client data if we want to plot individual clients (can be slow).
-            # For now, the popups will focus on country interaction.
-
-            # Interactive popups for countries
             popup_layer = folium.GeoJson(
                 geojson_path,
                 name=self.tr("Informations Pays"),
                 style_function=lambda x: {'fillColor':'transparent', 'color':'transparent', 'weight':0},
-                tooltip=None # Disable default tooltip for this layer if choropleth provides enough
+                tooltip=None
             )
 
-            js_script_content = ""
             for feature in popup_layer.data.get('features', []):
                 country_name = feature.get('properties', {}).get('name', 'N/A')
                 if country_name == 'N/A': continue
-
                 country_client_count = next((item['client_count'] for item in clients_by_country_counts if item['country_name'] == country_name), 0)
-
                 popup_html = f"<b>{country_name}</b><br>"
                 popup_html += f"{self.tr('Clients (Total)')}: {country_client_count}<br><hr>"
-
-                # Fetch and list clients by city for this country
                 country_obj = get_country_by_name(country_name)
                 city_client_map = {}
                 if country_obj:
                     country_id = country_obj.get('country_id')
-                    clients_in_country = clients_crud_instance.get_all_clients_with_details(
-                        filters={'country_id': country_id},
-                        include_deleted=False # Only show active clients in this list
-                    )
+                    clients_in_country = clients_crud_instance.get_all_clients_with_details(filters={'country_id': country_id}, include_deleted=False)
                     if clients_in_country:
                         for client in clients_in_country:
                             city_name = client.get('city', self.tr('Ville Inconnue'))
                             client_detail_name = client.get('client_name', self.tr('Client Inconnu'))
                             client_id = client.get('client_id')
-
-                            city_name = client.get('city', self.tr('Ville Inconnue'))
-                            client_detail_name = client.get('client_name', self.tr('Client Inconnu'))
-                            client_id = client.get('client_id')
-
-                            if city_name not in city_client_map:
-                                city_client_map[city_name] = []
-
-                            if len(city_client_map[city_name]) < 3: # Limit to 3 clients per city for popup
-                                city_client_map[city_name].append({
-                                    'id': client_id,
-                                    'name': client_detail_name
-                                })
-
+                            if city_name not in city_client_map: city_client_map[city_name] = []
+                            if len(city_client_map[city_name]) < 3: city_client_map[city_name].append({'id': client_id, 'name': client_detail_name})
                 if city_client_map:
                     for city_name_iter, clients_in_city_list in city_client_map.items():
                         popup_html += f"<b>{self.tr('Ville')}: {city_name_iter}</b> ({len(clients_in_city_list)} {self.tr('client(s) affiché(s)')})<br>"
                         popup_html += "<ul>"
                         for client_data_item in clients_in_city_list:
-                            # Use json.dumps directly on the raw data for JS arguments
                             js_client_id_arg = json.dumps(client_data_item['id'])
                             js_client_name_arg = json.dumps(client_data_item['name'])
-
                             onclick_js = f"pyMapConnector.clientClickedOnMap({js_client_id_arg}, {js_client_name_arg}); return false;"
                             popup_html += f"<li><a href='#' onclick='{onclick_js}'>{client_data_item['name']}</a></li>"
                         popup_html += "</ul>"
                 else:
                     popup_html += f"{self.tr('Aucun client détaillé à afficher pour les villes.')}<br>"
 
-                # "Ajouter Client Ici" button
                 js_country_name_arg = json.dumps(country_name)
                 button_text = self.tr('Ajouter Client Ici')
-
                 onclick_country_js = f"pyMapConnector.countryClicked({js_country_name_arg}); return false;"
                 popup_html += f"<br><button onclick='{onclick_country_js}'>{button_text}</button>"
-
                 feature['properties']['popup_content'] = popup_html
 
             popup_layer.add_child(folium.features.GeoJsonPopup(fields=['popup_content'], localize=True))
             popup_layer.add_to(m)
-
-            if data_for_map["country_name"]: # Only add LayerControl if there's data
-                # Check if popup_layer is defined before adding LayerControl.
-                # Only add LayerControl if there's more than just the base map and choropleth.
-                # The popup_layer adds interactivity, so it's a good condition.
-                if 'popup_layer' in locals() and popup_layer is not None:
-                    folium.LayerControl().add_to(m)
-
-            # The JavaScript for pyMapConnector to exist.
-            # Note: folium's get_root().render() wraps the map in an IFrame.
-            # Direct JS injection like this might be tricky if the context is wrong.
-            # QWebChannel works by injecting objects into the page's main window.
-            # The onclick handlers in popups should correctly call `window.pyMapConnector.method()`.
-
+            folium.LayerControl().add_to(m)
             map_html_content = m.get_root().render()
 
-            # Define the QWebChannel setup JavaScript
             webchannel_setup_js = """
             <script type="text/javascript" src="qrc:///qtwebchannel/qwebchannel.js"></script>
             <script type="text/javascript">
@@ -528,25 +491,68 @@ class StatisticsDashboard(QWidget):
                 });
             </script>
             """
-
-            # Inject the QWebChannel setup script into the map HTML
             if "</body>" in map_html_content:
                 map_html_content = map_html_content.replace("</body>", webchannel_setup_js + "</body>", 1)
-            elif "</html>" in map_html_content: # Fallback if no body tag
+            elif "</html>" in map_html_content:
                 map_html_content = map_html_content.replace("</html>", webchannel_setup_js + "</html>", 1)
-            else: # Fallback if no body or html tag
+            else:
                 map_html_content += webchannel_setup_js
 
-            # Removed the debug_map.html saving functionality
-            # The console.log messages in webchannel_setup_js will remain for advanced debugging.
+            if self.map_view:
+                self.map_view.setHtml(map_html_content)
+                logging.info("Interactive map updated successfully with QWebChannel JS.")
+            else:
+                logging.error("StatisticsDashboard: self.map_view is None. Cannot set HTML for the map.")
 
-            self.map_view.setHtml(map_html_content)
-            logging.info("Interactive map updated successfully with QWebChannel JS.")
         except Exception as e:
-            logging.error(f"Error updating interactive map: {e}", exc_info=True)
-            error_map = folium.Map(location=[0,0], zoom_start=1)
-            folium.Marker([0,0], popup=f"Error generating map: {e}").add_to(error_map)
-            self.map_view.setHtml(error_map.get_root().render())
+            logging.error(f"General error updating interactive map: {e}", exc_info=True) # Changed log message slightly for clarity
+            error_message = self.tr("Une erreur inattendue est survenue lors de la génération de la carte : {error_details}. L'affichage de la carte est indisponible. Veuillez réessayer ou contacter le support si le problème persiste.").format(error_details=str(e))
+            self._set_map_error_html(error_message)
+
+    def _set_map_error_html(self, message: str):
+        """Helper function to set an error message HTML in the map_view."""
+        if self.map_view:
+            # Basic styling for the error message
+            # The button's onclick attempts to call a new method on pyMapConnector.
+            # This 'requestMapRefresh' signal/slot needs to be added to MapInteractionHandler and StatisticsDashboard.
+            # For this step, the JS call might not work fully yet, but the HTML structure is set.
+            error_html = f"""
+            <html>
+            <head>
+                <style>
+                    body {{ font-family: Arial, sans-serif; margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f8f9fa; }}
+                    .error-container {{ text-align: center; padding: 30px; border: 1px solid #dc3545; background-color: #f8d7da; color: #721c24; border-radius: 8px; max-width: 80%; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }}
+                    .error-icon {{ font-size: 32px; margin-bottom: 15px; color: #dc3545; }}
+                    h3 {{ margin-top: 0; color: #721c24; font-size: 1.5em; }}
+                    p {{ font-size: 1em; margin-bottom: 20px; }}
+                    button {{
+                        padding: 10px 20px;
+                        font-size: 1em;
+                        color: white;
+                        background-color: #007bff;
+                        border: none;
+                        border-radius: 5px;
+                        cursor: pointer;
+                        transition: background-color 0.3s ease;
+                    }}
+                    button:hover {{ background-color: #0056b3; }}
+                </style>
+            </head>
+            <body>
+                <div class="error-container">
+                    <div class="error-icon">⚠️</div>
+                    <h3>{self.tr("Erreur d'Affichage de la Carte")}</h3>
+                    <p>{message}</p>
+                    <button onclick="if(window.pyMapConnector && typeof window.pyMapConnector.requestMapRefresh === 'function') {{ window.pyMapConnector.requestMapRefresh(); }} else {{ alert('{self.tr("Le mécanisme de rafraîchissement n\\'est pas encore pleinement disponible.")}'); }}">{self.tr("Réessayer")}</button>
+                </div>
+            </body>
+            </html>
+            """
+            self.map_view.setHtml(error_html)
+            logging.info(f"Displayed error HTML in map_view: {message}")
+        else:
+            logging.error("StatisticsDashboard: self.map_view is None. Cannot display error message in map_view.")
+
 
     # --- Methods to be ported from CollapsibleStatisticsWidget ---
     def update_global_stats(self):
@@ -809,28 +815,39 @@ class StatisticsDashboard(QWidget):
             self.health_score_progress_bar.setValue(0)
 
     def _setup_segmentation_tab_ui_internal(self):
-        self.segmentation_tables = {} # Ensure this is initialized before use
+        self.segmentation_tables = {}
+        self.segmentation_canvases = {} # For Matplotlib canvases
+
         tab_configs = [
-            ("country", self.tr("Par Pays"), ["Pays", "Nombre de Clients"]),
-            ("city", self.tr("Par Ville"), ["Pays", "Ville", "Nombre de Clients"]),
-            ("status", self.tr("Par Statut"), ["Statut", "Nombre de Clients"]),
-            ("category", self.tr("Par Catégorie"), ["Catégorie", "Nombre de Clients"]),
-            ("product_popularity", self.tr("Par Popularité Produit"), [self.tr("Nom Produit"), self.tr("Nombre d'Utilisations")]) # Added
+            ("country", self.tr("Par Pays"), ["Pays", "Nombre de Clients"], "table"),
+            ("city", self.tr("Par Ville"), ["Pays", "Ville", "Nombre de Clients"], "table"),
+            ("status", self.tr("Par Statut"), [], "chart"), # No headers for chart tab directly
+            ("category", self.tr("Par Catégorie"), ["Catégorie", "Nombre de Clients"], "table"),
+            ("product_popularity", self.tr("Par Popularité Produit"), [self.tr("Nom Produit"), self.tr("Nombre d'Utilisations")], "table")
         ]
 
-        for key, title, headers in tab_configs:
+        for key, title, headers, tab_type in tab_configs:
             tab_widget = QWidget()
             tab_layout = QVBoxLayout(tab_widget)
-            table_widget = QTableWidget()
-            table_widget.setColumnCount(len(headers))
-            table_widget.setHorizontalHeaderLabels(headers)
-            table_widget.setEditTriggers(QTableWidget.NoEditTriggers)
-            table_widget.setSelectionBehavior(QTableWidget.SelectRows)
-            table_widget.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-            table_widget.setSortingEnabled(True)
-            tab_layout.addWidget(table_widget)
+
+            if tab_type == "table":
+                table_widget = QTableWidget()
+                table_widget.setColumnCount(len(headers))
+                table_widget.setHorizontalHeaderLabels(headers)
+                table_widget.setEditTriggers(QTableWidget.NoEditTriggers)
+                table_widget.setSelectionBehavior(QTableWidget.SelectRows)
+                table_widget.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+                table_widget.setSortingEnabled(True)
+                tab_layout.addWidget(table_widget)
+                self.segmentation_tables[key] = table_widget
+            elif tab_type == "chart":
+                # For chart tabs, we'll create a FigureCanvas later when data is available
+                # We can store the layout or a placeholder widget if needed.
+                # For simplicity, we'll store the layout and add the canvas to it in the update method.
+                self.segmentation_canvases[key] = tab_layout # Store the layout for the canvas
+
             self.segmentation_tabs.addTab(tab_widget, title)
-            self.segmentation_tables[key] = table_widget
+
 
     def _populate_table(self, table_key, data_fetch_func, column_keys):
         table = self.segmentation_tables.get(table_key)
@@ -844,19 +861,99 @@ class StatisticsDashboard(QWidget):
                 table.insertRow(row_idx)
                 for col_idx, col_key in enumerate(column_keys):
                     item_value = row_data.get(col_key, "")
-                    # Ensure QTableWidgetItem is used
                     table.setItem(row_idx, col_idx, QTableWidgetItem(str(item_value)))
         except Exception as e:
             logging.error(f"Error populating table {table_key}: {e}", exc_info=True)
         finally:
             table.setSortingEnabled(True)
 
+    def _update_status_segmentation_chart(self):
+        logging.info("Updating status segmentation chart...")
+        chart_layout = self.segmentation_canvases.get("status")
+        if not chart_layout:
+            logging.error("Chart layout for 'status' not found.")
+            return
+
+        # Clear previous canvas if any
+        while chart_layout.count():
+            item = chart_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
+        try:
+            status_data = get_client_segmentation_by_status()
+            if not status_data:
+                logging.info("No data for status segmentation chart.")
+                no_data_label = QLabel(self.tr("Aucune donnée de statut client disponible pour afficher le graphique."))
+                no_data_label.setAlignment(Qt.AlignCenter)
+                chart_layout.addWidget(no_data_label)
+                return
+
+            labels = [item.get('status_name', 'N/A') for item in status_data]
+            sizes = [item.get('client_count', 0) for item in status_data]
+
+            # Filter out zero sizes to prevent display issues with pie chart
+            filtered_labels = []
+            filtered_sizes = []
+            for label, size in zip(labels, sizes):
+                if size > 0:
+                    filtered_labels.append(label)
+                    filtered_sizes.append(size)
+
+            if not filtered_sizes: # All statuses have 0 clients
+                logging.info("All statuses have 0 clients for status segmentation chart.")
+                no_data_label = QLabel(self.tr("Aucun client trouvé pour les statuts existants."))
+                no_data_label.setAlignment(Qt.AlignCenter)
+                chart_layout.addWidget(no_data_label)
+                return
+
+            labels = filtered_labels
+            sizes = filtered_sizes
+
+            # Using a more Qt-friendly way to create the figure and canvas
+            # plt.style.use('seaborn-v0_8-whitegrid') # Optional: for styling
+
+            # Create a new figure and canvas each time to avoid issues with redrawing on the same canvas
+            # It's generally safer for dynamic updates in Qt.
+            fig = Figure(figsize=(5, 4), dpi=100) # Adjust figsize and dpi as needed
+            ax = fig.add_subplot(111)
+
+            # Generate distinct colors if many segments, or use default
+            # colors = plt.cm.get_cmap('viridis', len(labels)).colors # Example: 'viridis' colormap
+
+            wedges, texts, autotexts = ax.pie(
+                sizes,
+                autopct=lambda p: '{:.1f}% ({:.0f})'.format(p, p * sum(sizes) / 100), # Show percentage and absolute count
+                startangle=90,
+                # colors=colors # Optional: apply custom colors
+            )
+            ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+
+            # Add a legend
+            # Place legend outside the pie chart to avoid overlap, adjust bbox_to_anchor as needed
+            ax.legend(wedges, labels, title=self.tr("Statuts"), loc="center left", bbox_to_anchor=(1, 0, 0.5, 1))
+            fig.tight_layout() # Adjust layout to make room for legend if it's outside
+
+            canvas = FigureCanvas(fig)
+            chart_layout.addWidget(canvas)
+            canvas.draw()
+            logging.info("Status segmentation chart updated successfully.")
+
+        except Exception as e:
+            logging.error(f"Error updating status segmentation chart: {e}", exc_info=True)
+            error_label = QLabel(self.tr("Erreur lors de la génération du graphique des statuts."))
+            error_label.setAlignment(Qt.AlignCenter)
+            chart_layout.addWidget(error_label)
+
+
     def update_customer_segmentation_views(self):
         self._populate_table("country", get_client_counts_by_country, ["country_name", "client_count"])
         self._populate_table("city", get_client_segmentation_by_city, ["country_name", "city_name", "client_count"])
-        self._populate_table("status", get_client_segmentation_by_status, ["status_name", "client_count"])
+        # self._populate_table("status", get_client_segmentation_by_status, ["status_name", "client_count"]) # Replaced by chart
+        self._update_status_segmentation_chart() # New method for chart
         self._populate_table("category", get_client_segmentation_by_category, ["category", "client_count"])
-        self._populate_table("product_popularity", get_product_usage_counts, ["product_name", "usage_count"]) # Added
+        self._populate_table("product_popularity", get_product_usage_counts, ["product_name", "usage_count"])
 
     # --- End of Ported Methods ---
         # The old update_statistics_map method (which was the display-only map) is now removed.

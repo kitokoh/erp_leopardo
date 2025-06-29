@@ -45,3 +45,34 @@ class PermissionRequired:
 # async def create_item(item: Item, current_user: UserInDB = Depends(PermissionRequired("manage_items"))):
 #     # current_user is already validated for role and permission by this point
 #     pass
+
+from sqlalchemy.orm import Session # Required for type hinting get_db
+
+# Attempt to import the real SessionLocal, but provide a mock if it fails
+try:
+    from db.database import SessionLocal # This is the ideal location
+except ImportError:
+    # This mock allows tests to import 'get_db' without db.database existing yet.
+    # It won't provide a functional database session.
+    class MockSessionLocalForDeps:
+        def __call__(self):
+            class MockDBSession:
+                def close(self): pass
+                def query(self, *args): return self # Chainable
+                def add(self, *args): pass
+                def commit(self): pass
+                def rollback(self): pass
+                def refresh(self, *args): pass
+                # Add other SQLAlchemy session methods if needed by type hints or basic usage
+            return MockDBSession()
+    SessionLocal = MockSessionLocalForDeps()
+
+
+async def get_db() -> Session: # FastAPI expects a generator or async generator
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        # Ensure db has a close method, especially important for real sessions
+        if hasattr(db, 'close') and callable(db.close):
+            db.close()

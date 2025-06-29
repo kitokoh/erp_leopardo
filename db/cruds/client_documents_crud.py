@@ -1,7 +1,7 @@
 import sqlite3 # Keep for type hinting if conn is directly manipulated, though _manage_conn handles it.
 import logging
 import uuid # For generating document_id
-from .generic_crud import _manage_conn, get_db_connection # get_db_connection might not be needed if _manage_conn is sufficient
+from .generic_crud import _manage_conn # get_db_connection is not used directly
 
 # Configure logging
 # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -33,123 +33,223 @@ def add_client_document(data: dict, conn: sqlite3.Connection = None) -> str | No
         str | None: The newly generated document_id if successful, otherwise None.
     """
     new_document_id = str(uuid.uuid4())
+    # Ensure is_deleted and deleted_at are not part of initial add data, or set to defaults
+    data.pop('is_deleted', None)
+    data.pop('deleted_at', None)
     cursor = conn.cursor()
 
+    # Note: is_deleted and deleted_at columns are added to the table schema.
+    # They will take their DEFAULT values (0 and NULL respectively) on INSERT.
     sql = """
         INSERT INTO ClientDocuments (
             document_id, client_id, project_id, order_identifier,
             document_name, file_name_on_disk, file_path_relative,
             document_type_generated, source_template_id,
-            version_tag, notes, created_by_user_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            version_tag, notes, created_by_user_id,
+            parent_document_id, is_latest_version
+            -- is_deleted, deleted_at will use defaults from schema (0 and NULL)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
     params = (
         new_document_id,
         data.get('client_id'),
-        data.get('project_id'), # Optional
-        data.get('order_identifier'), # Optional
+        data.get('project_id'),
+        data.get('order_identifier'),
         data.get('document_name'),
         data.get('file_name_on_disk'),
         data.get('file_path_relative'),
         data.get('document_type_generated'),
         data.get('source_template_id'),
-        data.get('version_tag'), # Optional
-        data.get('notes'), # Optional
-        data.get('user_id') # This is from doc_metadata and maps to created_by_user_id
+        data.get('version_tag', "1.0"), # Default version_tag
+        data.get('notes'),
+        data.get('user_id'),
+        data.get('parent_document_id'), # New field for versioning
+        data.get('is_latest_version', 1) # Default to True (1) for new/latest version
     )
 
     try:
+        logging.debug(f"Attempting to add client document. SQL: {sql}, Params: {params}")
         cursor.execute(sql, params)
-        # conn.commit() # Handled by _manage_conn decorator if it's configured to do so
         logging.info(f"Successfully added client document with ID: {new_document_id} for client: {data.get('client_id')}")
         return new_document_id
     except sqlite3.Error as e:
-        logging.error(f"Error adding client document for client {data.get('client_id')}: {e} - SQL: {sql} - Params: {params}")
-        # conn.rollback() # Handled by _manage_conn decorator if it's configured to do so
+        logging.error(f"SQLite error adding client document for client {data.get('client_id')}: {e} - SQL: {sql} - Params: {params}", exc_info=True)
         return None
+
+@_manage_conn
+def create_new_document_version(old_document_id: str, new_document_data: dict, conn: sqlite3.Connection = None) -> str | None:
+    """
+    Creates a new version of a document.
+    1. Marks the old document as not the latest.
+    2. Adds the new document data as a new record, linking it to the old one.
+    """
+    from datetime import datetime # Local import
+
+    cursor = conn.cursor()
+    now_utc_iso = datetime.utcnow().isoformat()
+
+    # 1. Mark old document as not latest
+    try:
+        logging.info(f"Marking old document {old_document_id} as not latest.")
+        sql_update_old = "UPDATE ClientDocuments SET is_latest_version = 0, updated_at = ? WHERE document_id = ?"
+        cursor.execute(sql_update_old, (now_utc_iso, old_document_id))
+        if cursor.rowcount == 0:
+            logging.warning(f"Old document {old_document_id} not found or no change made while marking not latest.")
+            # Depending on desired strictness, could return None here or proceed.
+            # For now, proceed to allow creating the new version anyway if old one vanished.
+    except sqlite3.Error as e:
+        logging.error(f"Error marking old document {old_document_id} as not latest: {e}", exc_info=True)
+        return None # Fail if we can't update the old version status
+
+    # 2. Prepare and add the new document version
+    # Fetch old version_tag to increment it
+    old_doc_details = get_document_by_id(old_document_id, conn=conn, include_deleted=True) # Get even if it was marked deleted
+    current_version_tag = "1.0" # Default if old doc not found or has no tag
+    if old_doc_details and old_doc_details.get('version_tag'):
+        current_version_tag = old_doc_details.get('version_tag')
+
+    # Simple version increment: "1.0" -> "1.1", "1.9" -> "2.0", "2" -> "2.1"
+    try:
+        parts = current_version_tag.split('.')
+        if len(parts) == 1 and parts[0].isdigit(): # e.g. "2"
+            major = int(parts[0])
+            new_version_tag = f"{major}.1"
+        elif len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit(): # e.g. "1.0" or "1.9"
+            major = int(parts[0])
+            minor = int(parts[1])
+            if minor >= 9: # Or some other threshold for major bump
+                major += 1
+                minor = 0
+            else:
+                minor += 1
+            new_version_tag = f"{major}.{minor}"
+        else: # Non-standard, append ".vX"
+            existing_versions_count = 1 # Simplified: count how many children parent_document_id has
+            # A more robust way would be to query count of versions for this parent.
+            # For now, just append a generic increment.
+            new_version_tag = f"{current_version_tag}.new"
+            # This part needs more robust version increment logic if complex versions are used.
+            # Fallback: append timestamp or simple counter if parsing fails.
+            # For now, let's assume version_tag is like "1.0", "1.1", etc.
+            logging.warning(f"Could not parse version_tag '{current_version_tag}', using simple append for new version.")
+            # A simpler strategy for now:
+            new_version_tag = f"{current_version_tag}+{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+
+    except ValueError:
+        logging.warning(f"Could not parse version_tag '{current_version_tag}' for incrementing. Appending '.next'.")
+        new_version_tag = current_version_tag + ".next"
+
+
+    versioned_data = new_document_data.copy()
+    versioned_data['parent_document_id'] = old_document_id
+    versioned_data['version_tag'] = new_version_tag
+    versioned_data['is_latest_version'] = 1 # This new version is the latest
+
+    logging.info(f"Adding new version for document {old_document_id}. New version tag: {new_version_tag}. Data: {versioned_data}")
+    return add_client_document(versioned_data, conn=conn)
+
 
 @_manage_conn
 def delete_client_document(document_id: str, conn: sqlite3.Connection = None) -> bool:
     """
-    Deletes a client document by its document_id.
-    STUB FUNCTION - Full implementation pending.
+    Soft deletes a client document by its document_id.
+    Sets is_deleted = 1 and deleted_at = current UTC time.
     """
-    # Changed document_id type hint to str to match new_document_id type
-    logging.warning(f"Called stub function delete_client_document for document_id: {document_id}. Full implementation is missing.")
-    # Example:
-    # cursor = conn.cursor()
-    # try:
-    #     cursor.execute("DELETE FROM ClientDocuments WHERE document_id = ?", (document_id,))
-    #     return cursor.rowcount > 0 # Returns True if a row was deleted
-    # except sqlite3.Error as e:
-    #     logging.error(f"Stub delete_client_document error for {document_id}: {e}")
-    #     return False
-    return False
+    from datetime import datetime # Local import for current time
+
+    cursor = conn.cursor()
+    now_utc_iso = datetime.utcnow().isoformat()
+    try:
+        logging.info(f"Attempting to soft delete client document with ID: {document_id}")
+        sql = "UPDATE ClientDocuments SET is_deleted = 1, deleted_at = ? WHERE document_id = ?"
+        cursor.execute(sql, (now_utc_iso, document_id))
+
+        if cursor.rowcount > 0:
+            logging.info(f"Successfully soft-deleted client document with ID: {document_id}")
+            return True
+        else:
+            logging.warning(f"No client document found with ID: {document_id} to soft delete, or it was already marked.")
+            return False # No row was updated
+    except sqlite3.Error as e:
+        logging.error(f"SQLite error soft-deleting client document {document_id}: {e}", exc_info=True)
+        return False
 
 @_manage_conn
-def get_document_by_id(document_id: str, conn: sqlite3.Connection = None) -> dict | None:
+def get_document_by_id(document_id: str, conn: sqlite3.Connection = None, include_deleted: bool = False, fetch_only_latest_version: bool = False) -> dict | None:
     """
     Retrieves a client document by its document_id.
-    STUB FUNCTION - Full implementation pending.
+    Optionally includes soft-deleted documents.
+    Optionally fetches only the latest version if the given document_id is part of a version history
+    (this part is simplified, true latest version finding might need traversal or a conceptual ID).
+    For now, it respects is_latest_version if fetch_only_latest_version is True.
     """
-    # Changed document_id type hint to str
-    logging.warning(f"Called stub function get_document_by_id for ID: {document_id}. Full implementation is missing.")
-    # Example:
-    # cursor = conn.cursor()
-    # cursor.execute("SELECT * FROM ClientDocuments WHERE document_id = ?", (document_id,))
-    # row = cursor.fetchone()
-    # if row:
-    #     # Convert row to dict if conn.row_factory is not set to sqlite3.Row
-    #     # Assuming it is for now, or that dict conversion is handled
-    #     return dict(row)
-    # return None
-    return {'document_id': document_id, 'client_id': 'dummy_client_id', 'file_path_relative': 'dummy/path.pdf', 'file_name_on_disk': 'dummy.pdf'} # Placeholder for API to work
+    cursor = conn.cursor()
+    sql = "SELECT * FROM ClientDocuments WHERE document_id = ?"
+    params = [document_id]
+
+    if not include_deleted:
+        sql += " AND (is_deleted = 0 OR is_deleted IS NULL)"
+
+    if fetch_only_latest_version: # This flag might be redundant if get_document_by_id is always for a specific version.
+                                  # Keeping it for now if there's a use case.
+                                  # A better approach for "latest" might be a different function that resolves the latest.
+        sql += " AND (is_latest_version = 1 OR is_latest_version IS NULL)" # Assuming 1 is true, NULL might mean older system data
+
+    try:
+        cursor.execute(sql, tuple(params))
+        row = cursor.fetchone()
+        if row:
+            return dict(row)
+        return None
+    except sqlite3.Error as e:
+        logging.error(f"SQLite error getting document by ID {document_id}: {e}", exc_info=True)
+        return None
+
 
 @_manage_conn
-def get_documents_for_client(client_id: str, filters: dict = None, conn: sqlite3.Connection = None) -> list[dict]:
+def get_documents_for_client(client_id: str, filters: dict = None, include_deleted: bool = False, fetch_only_latest_versions: bool = True, conn: sqlite3.Connection = None) -> list[dict]:
     """
-    Retrieves all documents for a specific client, with optional filtering.
+    Retrieves documents for a specific client, with optional filtering, soft delete handling,
+    and option to fetch only latest versions.
 
     Args:
-        client_id (str): The ID of the client whose documents are to be retrieved.
-        filters (dict, optional): A dictionary for filtering results.
-            Supported filters:
-            - 'order_identifier':
-                - 'NONE': Retrieves documents where order_identifier IS NULL.
-                - 'ALL': Retrieves all documents regardless of order_identifier (or if key is missing).
-                - Any other string: Retrieves documents matching that specific order_identifier.
-        conn (sqlite3.Connection, optional): SQLite connection object. Provided by _manage_conn.
+        client_id (str): The ID of the client.
+        filters (dict, optional): Filtering dictionary.
+        include_deleted (bool, optional): If True, includes soft-deleted documents. Defaults to False.
+        fetch_only_latest_versions (bool, optional): If True, only fetches documents marked as the latest version.
+                                                    Defaults to True.
+        conn (sqlite3.Connection, optional): SQLite connection object.
 
     Returns:
-        list[dict]: A list of dictionaries, where each dictionary represents a document.
-                    Returns an empty list if no documents are found or in case of an error.
+        list[dict]: List of document dictionaries.
     """
     if not client_id:
         logging.error("get_documents_for_client: client_id cannot be empty.")
         return []
 
     try:
-        # Assuming conn.row_factory = sqlite3.Row is set by _manage_conn or globally
-        # If not, dict conversion would be more manual:
-        # e.g., columns = [col[0] for col in cursor.description]
-        # then for row in rows: result.append(dict(zip(columns, row)))
-
-        sql = "SELECT * FROM ClientDocuments WHERE client_id = ?"
+        conditions = ["client_id = ?"]
         params = [client_id]
+
+        if not include_deleted:
+            conditions.append("(is_deleted = 0 OR is_deleted IS NULL)")
+
+        if fetch_only_latest_versions:
+            conditions.append("(is_latest_version = 1 OR is_latest_version IS NULL)") # is NULL for older data before field existed
 
         if filters:
             order_identifier_filter = filters.get('order_identifier')
             if order_identifier_filter == 'NONE':
-                sql += " AND order_identifier IS NULL"
+                conditions.append("order_identifier IS NULL")
             elif order_identifier_filter and order_identifier_filter != 'ALL':
-                sql += " AND order_identifier = ?"
+                conditions.append("order_identifier = ?")
                 params.append(order_identifier_filter)
-            # If 'ALL' or not provided, no additional order_identifier filter is applied
 
-        sql += " ORDER BY created_at DESC"
+        sql = f"SELECT * FROM ClientDocuments WHERE {' AND '.join(conditions)} ORDER BY created_at DESC"
 
         cursor = conn.cursor()
-        cursor.execute(sql, params)
+        cursor.execute(sql, tuple(params))
         rows = cursor.fetchall()
 
         # Convert rows to dicts (assuming conn.row_factory = sqlite3.Row)

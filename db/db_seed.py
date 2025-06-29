@@ -14,10 +14,12 @@ from app_setup import CONFIG
 
 
 # Import necessary functions directly from their new CRUD module locations
-from db.cruds.generic_crud import get_db_connection, GenericCRUD
+from db.connection import get_db_connection # Corrected import
+from db.cruds.generic_crud import GenericCRUD
 
 # Import CRUD instances for refactored modules
-from db.cruds.users_crud import users_crud_instance
+# from db.cruds.users_crud import users_crud_instance # Replaced with direct module import
+from db.cruds import users_crud # Import the module itself
 from db.cruds.clients_crud import clients_crud_instance
 from db.cruds.products_crud import products_crud_instance
 
@@ -73,18 +75,75 @@ def _seed_default_partner_categories(cursor: sqlite3.Cursor, conn: sqlite3.Conne
 
 def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
     logger = logger_passed
+
+    # Import here to avoid circular dependencies if roles_crud uses get_db_connection
+    from db.cruds.roles_crud import add_role as crud_add_role, get_role_by_name as crud_get_role_by_name
+    from db.cruds.users_crud import add_user as crud_add_user, get_user_by_username as crud_get_user_by_username
+    from auth.permissions import ADMINISTRATOR, TEAM_LEAD, OPERATOR # Role names
+
     try:
-        # 1. Users
-        logger.info(f"Attempting to retrieve admin user ID for '{DEFAULT_ADMIN_USERNAME}' for seeding purposes.")
-        admin_user_dict = users_crud_instance.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn)
-        admin_user_id = admin_user_dict['user_id'] if admin_user_dict else None
+        # Seed Roles
+        logger.info("Seeding default roles...")
+        roles_to_seed = {
+            ADMINISTRATOR: "Full application access and user management.",
+            TEAM_LEAD: "Manages projects and teams, advanced client/product operations.",
+            OPERATOR: "Standard user for daily operations, data entry, document generation."
+        }
+        role_ids = {}
+        for role_name, desc in roles_to_seed.items():
+            existing_role = crud_get_role_by_name(role_name, conn=conn)
+            if existing_role:
+                role_ids[role_name] = existing_role['role_id']
+                logger.info(f"Role '{role_name}' already exists with ID {role_ids[role_name]}.")
+            else:
+                new_role_id = crud_add_role(role_name, desc, conn=conn)
+                if new_role_id:
+                    role_ids[role_name] = new_role_id
+                    logger.info(f"Role '{role_name}' added with ID {new_role_id}.")
+                else:
+                    logger.error(f"Failed to add role '{role_name}'.")
 
-        if admin_user_id:
-            logger.info(f"Found admin user '{DEFAULT_ADMIN_USERNAME}' with ID: {admin_user_id}.")
-        else:
-            logger.warning(f"Admin user '{DEFAULT_ADMIN_USERNAME}' not found.")
+        # Ensure Administrator role ID was obtained
+        admin_role_id = role_ids.get(ADMINISTRATOR)
+        if not admin_role_id:
+            logger.critical(f"Administrator role ('{ADMINISTRATOR}') could not be seeded or found. Cannot create default admin user.")
+            # Depending on policy, might raise an error or try to proceed if other roles are vital.
+            # For now, log critical and proceed, other parts of seeding might still be useful.
 
-        # 2. Companies
+        # 1. Users - Seed initial Admin User
+        admin_user_id = None # Initialize
+        if admin_role_id: # Only proceed if Admin role exists
+            logger.info(f"Checking for default admin user '{DEFAULT_ADMIN_USERNAME}'...")
+            admin_user_dict = crud_get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn)
+            if admin_user_dict:
+                admin_user_id = admin_user_dict['user_id']
+                logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' already exists with ID {admin_user_id}.")
+            else:
+                logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' not found. Creating...")
+                # Use a secure, but known temporary password for initial setup.
+                # IMPORTANT: This password MUST be changed immediately by the administrator.
+                # For a real deployment, this password should be very strong or generated
+                # and displayed once, or set via a secure first-time setup process.
+                temp_admin_password = "admin" # Changed to user's request
+
+                new_admin_id = crud_add_user(
+                    username=DEFAULT_ADMIN_USERNAME, # This is "admin" from config.py
+                    password=temp_admin_password,
+                    role_id=admin_role_id,
+                    full_name="Default Administrator",
+                    email="admin@example.local", # Placeholder email
+                    conn=conn
+                )
+                if new_admin_id:
+                    admin_user_id = new_admin_id
+                    logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' created with ID {admin_user_id}. PLEASE CHANGE THE DEFAULT PASSWORD IMMEDIATELY.")
+                else:
+                    logger.error(f"Failed to create default admin user '{DEFAULT_ADMIN_USERNAME}'.")
+        else: # admin_role_id was not found/created
+            logger.warning(f"Cannot seed default admin user because Administrator role ID is missing.")
+
+
+        # 2. Companies (uses admin_user_id if available for created_by or similar in future)
         default_company_id = None
         cursor.execute("SELECT COUNT(*) FROM Companies")
         if cursor.fetchone()[0] == 0:
@@ -107,31 +166,53 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
 
         # 4. TeamMembers
         if admin_user_id:
-            admin_user_for_tm_dict = users_crud_instance.get_user_by_id(admin_user_id, conn=conn)
+            admin_user_for_tm_dict = users_crud.get_user_by_id(admin_user_id, conn=conn)
             if admin_user_for_tm_dict:
                 cursor.execute("SELECT COUNT(*) FROM TeamMembers WHERE user_id = ?", (admin_user_id,))
                 if cursor.fetchone()[0] == 0:
+                    # Use 'role_name' as fetched from get_user_by_id, and map to 'role_or_title' column in TeamMembers
                     cursor.execute("INSERT OR IGNORE INTO TeamMembers (user_id, full_name, email, role_or_title) VALUES (?, ?, ?, ?)",
-                                   (admin_user_id, admin_user_for_tm_dict['full_name'], admin_user_for_tm_dict['email'], admin_user_for_tm_dict['role']))
+                                   (admin_user_id, admin_user_for_tm_dict['full_name'], admin_user_for_tm_dict['email'], admin_user_for_tm_dict.get('role_name')))
                     logger.info("Seeded admin team member.")
             else:
-                logger.warning(f"Could not retrieve admin user details for ID {admin_user_id}.")
+                logger.warning(f"Could not retrieve admin user details for ID {admin_user_id} to seed into TeamMembers.")
         else:
             logger.warning("Admin user ID not available for TeamMember seeding.")
 
         # Default Operational User
         DEFAULT_OPERATIONAL_USERNAME = "default_operational_user"
-        DEFAULT_OPERATIONAL_USER_ROLE = "User"
+        DEFAULT_OPERATIONAL_USER_ROLE = "User" # This should be a role_id or fetched dynamically
         logger.info(f"Checking for default operational user '{DEFAULT_OPERATIONAL_USERNAME}'...")
-        existing_operational_user = users_crud_instance.get_user_by_username(DEFAULT_OPERATIONAL_USERNAME, conn=conn)
+        existing_operational_user = users_crud.get_user_by_username(DEFAULT_OPERATIONAL_USERNAME, conn=conn)
         if existing_operational_user is None:
             logger.info(f"Creating default operational user '{DEFAULT_OPERATIONAL_USERNAME}'...")
-            op_user_data = {'username': DEFAULT_OPERATIONAL_USERNAME, 'password': uuid.uuid4().hex, 
-                            'email': f"{DEFAULT_OPERATIONAL_USERNAME}@example.local", 'role': DEFAULT_OPERATIONAL_USER_ROLE,
-                            'full_name': "Default Operational User", 'is_active': True}
-            op_user_result = users_crud_instance.add_user(op_user_data, conn=conn)
-            if op_user_result['success']: logger.info(f"Created default operational user ID: {op_user_result['id']}.")
-            else: logger.error(f"Failed to create default operational user: {op_user_result.get('error')}")
+            # Fetch OPERATOR role_id
+            operator_role_id = role_ids.get(OPERATOR) # Get OPERATOR role_id from seeded roles
+            if operator_role_id:
+                op_user_data = {
+                    'username': DEFAULT_OPERATIONAL_USERNAME,
+                    'password': uuid.uuid4().hex, # Generate a random password
+                    'role_id': operator_role_id,
+                    'full_name': "Default Operational User",
+                    'email': f"{DEFAULT_OPERATIONAL_USERNAME}@example.local",
+                    'is_active': True # This is not directly passed to users_crud.add_user; it's defaulted there
+                }
+                # users_crud.add_user expects: username, password, role_id, full_name=None, email=None, conn=None
+                # It returns user_id (str) or None
+                op_user_id = users_crud.add_user(
+                    username=op_user_data['username'],
+                    password=op_user_data['password'],
+                    role_id=op_user_data['role_id'],
+                    full_name=op_user_data['full_name'],
+                    email=op_user_data['email'],
+                    conn=conn
+                )
+                if op_user_id:
+                    logger.info(f"Created default operational user ID: {op_user_id}.")
+                else:
+                    logger.error(f"Failed to create default operational user: {DEFAULT_OPERATIONAL_USERNAME}")
+            else:
+                logger.error(f"Could not find role_id for '{OPERATOR}'. Cannot create default operational user.")
         else:
             logger.info(f"Default operational user '{DEFAULT_OPERATIONAL_USERNAME}' already exists.")
 
@@ -139,24 +220,41 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         logger.info("Seeding default countries and cities...")
         countries_cities = {'France': 'Paris', 'USA': 'New York', 'Algeria': 'Algiers'}
         for country_name, city_name in countries_cities.items():
-            country_id = get_or_add_country(country_name, conn=conn) 
-            if country_id: get_or_add_city(city_name, country_id, conn=conn) 
+            country_dict = get_or_add_country(country_name, conn=conn)
+            if country_dict and 'country_id' in country_dict:
+                get_or_add_city(city_name, country_dict['country_id'], conn=conn)
+            elif country_dict:
+                logger.error(f"Country '{country_name}' processed by get_or_add_country but 'country_id' key is missing in returned dict: {country_dict}")
+            else:
+                 logger.error(f"Failed to get or add country '{country_name}', cannot add city '{city_name}'.")
         logger.info(f"Seeded {len(countries_cities)} countries/cities.")
         
         # 7. Clients & 8. Projects (Simplified)
         logger.info("Seeding sample client and project...")
         cursor.execute("SELECT COUNT(*) FROM Clients")
         if cursor.fetchone()[0] == 0:
-            france_id_dict = get_country_by_name("France", conn=conn)
-            paris_id_dict = get_city_by_name_and_country_id("Paris", france_id_dict['country_id'] if france_id_dict else None, conn=conn) if france_id_dict else None
+            # Fetch IDs specifically for client seeding
+            france_country_dict = get_country_by_name("France", conn=conn)
+            actual_france_country_id = france_country_dict['country_id'] if france_country_dict else None
+
+            paris_city_dict = None
+            if actual_france_country_id:
+                paris_city_dict = get_city_by_name_and_country_id("Paris", actual_france_country_id, conn=conn)
+            actual_paris_city_id = paris_city_dict['city_id'] if paris_city_dict else None
+
             actif_status_dict = get_status_setting_by_name("Actif", "Client", conn=conn)
+            actual_actif_status_id = actif_status_dict['status_id'] if actif_status_dict else None
 
-            france_id = france_id_dict['country_id'] if france_id_dict else None
-            paris_id = paris_id_dict['city_id'] if paris_id_dict else None
-            actif_status_id = actif_status_dict['status_id'] if actif_status_dict else None
-
-            if admin_user_id and france_id and paris_id and actif_status_id:
-                client_data = {'client_name': "Sample Client SARL", 'country_id': france_id, 'city_id': paris_id, 'status_id': actif_status_id, 'created_by_user_id': admin_user_id, 'default_base_folder_path': f"clients/{uuid.uuid4()}", 'project_identifier': "SC-PROJ-001"}
+            if admin_user_id and actual_france_country_id and actual_paris_city_id and actual_actif_status_id:
+                client_data = {
+                    'client_name': "Sample Client SARL",
+                    'country_id': actual_france_country_id,
+                    'city_id': actual_paris_city_id,
+                    'status_id': actual_actif_status_id,
+                    'created_by_user_id': admin_user_id,
+                    'default_base_folder_path': f"clients/{uuid.uuid4()}",
+                    'project_identifier': "SC-PROJ-001"
+                }
                 add_client_res = clients_crud_instance.add_client(client_data, conn=conn)
                 if add_client_res['success']:
                     logger.info(f"Seeded sample client ID: {add_client_res['client_id']}")
@@ -167,6 +265,10 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                         cursor.execute("INSERT INTO Projects (project_id, client_id, project_name, status_id, manager_team_member_id) VALUES (?,?,?,?,?)",
                                        (project_data['project_id'], project_data['client_id'], project_data['project_name'], project_data['status_id'], project_data['manager_team_member_id']))
                         logger.info("Seeded sample project.")
+                else:
+                    logger.error(f"Failed to seed sample client. Add client response: {add_client_res}")
+            else:
+                logger.warning(f"One or more required IDs for sample client not found or invalid. Admin: {admin_user_id}, France: {actual_france_country_id}, Paris: {actual_paris_city_id}, ActifStatus: {actual_actif_status_id}. Skipping sample client seeding.")
         else:
             logger.info("Clients table not empty, skipping sample client/project seeding.")
 
@@ -362,31 +464,96 @@ def seed_initial_data_master(cursor: sqlite3.Cursor):
     _seed_main_document_templates(cursor, conn, logger_passed=logger)
     _seed_default_utility_templates(cursor, conn, logger_passed=logger)
     _seed_motivational_messages(cursor, conn, logger_passed=logger)
+    _seed_user_motivational_messages(cursor, conn, logger_passed=logger)
+
+
+def _seed_user_motivational_messages(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
+    logger = logger_passed
+    logger.info("Attempting to seed example user motivational messages...")
+
+    user_messages_crud = GenericCRUD(table_name='user_motivational_messages', primary_key='id')
+
+    example_user_messages = [
+        {"message": "Keep pushing your limits!", "language_code": "en"},
+        {"message": "Aujourd'hui est un cadeau.", "language_code": "fr"},
+        {"message": "Make today amazing.", "language_code": None}, # Example of a language-neutral user message
+    ]
+
+    added_count = 0
+    skipped_count = 0
+
+    for msg_data in example_user_messages:
+        try:
+            # Check for existing message to avoid IntegrityError on UNIQUE constraint
+            query = "SELECT id FROM user_motivational_messages WHERE message = ?"
+            cursor.execute(query, (msg_data["message"],))
+            existing = cursor.fetchone()
+
+            if existing:
+                logger.debug(f"User motivational message '{msg_data['message'][:30]}...' already exists. Skipping.")
+                skipped_count += 1
+                continue
+
+            data_to_insert = {
+                "message": msg_data["message"],
+                "language_code": msg_data.get("language_code"), # Handles if language_code is not present
+                "is_active": True
+            }
+            user_messages_crud.create(data_to_insert, conn=conn)
+            added_count += 1
+            logger.debug(f"Added user motivational message: {msg_data['message'][:30]}...")
+        except sqlite3.IntegrityError as e:
+            logger.warning(f"Skipping user motivational message due to integrity error: {msg_data['message'][:30]}.... Error: {e}")
+            skipped_count += 1
+        except Exception as e:
+            logger.error(f"Error adding user motivational message '{msg_data['message'][:30]}...': {e}", exc_info=True)
+            skipped_count += 1
+
+    logger.info(f"User motivational messages seeding complete. Added: {added_count}, Skipped/Existing: {skipped_count}")
+
 
 
 def _seed_motivational_messages(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
     logger = logger_passed
     logger.info("Attempting to seed motivational messages...")
 
-    messages_crud = GenericCRUD(conn, 'motivational_messages', 'id')
+    messages_crud = GenericCRUD(table_name='motivational_messages', primary_key='id')
 
     default_messages = [
-        # French
+        # French - Generic
+        {"language_code": "fr", "message": "Chaque effort compte, continuez d'avancer !", "day_of_year": None},
+        {"language_code": "fr", "message": "Votre potentiel est illimité, explorez-le.", "day_of_year": None},
+        {"language_code": "fr", "message": "Les défis sont des opportunités déguisées.", "day_of_year": None},
+        # French - Daily Specific (examples)
+        {"language_code": "fr", "message": "Bonne année ! Que cette nouvelle année vous apporte succès et bonheur.", "day_of_year": 1}, # Jan 1st
+        {"language_code": "fr", "message": "Joyeux Noël ! Paix et joie à vous et vos proches.", "day_of_year": 359}, # Dec 25th (approx for non-leap)
+        {"language_code": "fr", "message": "C'est le printemps, un temps de renouveau et de croissance !", "day_of_year": 80}, # Approx March 21st
+
+        # English - Generic
+        {"language_code": "en", "message": "Every effort counts, keep moving forward!", "day_of_year": None},
+        {"language_code": "en", "message": "Your potential is limitless, explore it.", "day_of_year": None},
+        {"language_code": "en", "message": "Challenges are disguised opportunities.", "day_of_year": None},
+        # English - Daily Specific (examples)
+        {"language_code": "en", "message": "Happy New Year! May this year bring you success and happiness.", "day_of_year": 1},
+        {"language_code": "en", "message": "Merry Christmas! Peace and joy to you and yours.", "day_of_year": 359},
+        {"language_code": "en", "message": "It's springtime, a time for renewal and growth!", "day_of_year": 80},
+
+        # Arabic - Generic
+        {"language_code": "ar", "message": "كل مجهود مهم، استمر في التقدم!", "day_of_year": None},
+        {"language_code": "ar", "message": "إمكانياتك لا حدود لها، استكشفها.", "day_of_year": None},
+        # Arabic - Daily Specific (example)
+        {"language_code": "ar", "message": "سنة جديدة سعيدة! أتمنى لك التوفيق والسعادة.", "day_of_year": 1},
+    ]
+    # Keep some of the original messages as generic fallbacks
+    original_generic_messages = [
         {"language_code": "fr", "message": "Chaque jour est une nouvelle opportunité.", "day_of_year": None},
         {"language_code": "fr", "message": "Croyez en vous et tout deviendra possible.", "day_of_year": None},
-        {"language_code": "fr", "message": "Le succès commence par un état d'esprit.", "day_of_year": None},
-        {"language_code": "fr", "message": "Soyez le changement que vous voulez voir dans le monde.", "day_of_year": None},
-        {"language_code": "fr", "message": "La persévérance est la clé de la réussite.", "day_of_year": None},
-        # English
         {"language_code": "en", "message": "Every day is a new opportunity.", "day_of_year": None},
         {"language_code": "en", "message": "Believe in yourself and anything is possible.", "day_of_year": None},
-        {"language_code": "en", "message": "Success begins with a state of mind.", "day_of_year": None},
-        {"language_code": "en", "message": "Be the change you wish to see in the world.", "day_of_year": None},
-        {"language_code": "en", "message": "Perseverance is the key to success.", "day_of_year": None},
-        # Arabic (Example - ensure your DB/system handles UTF-8 correctly)
         {"language_code": "ar", "message": "كل يوم هو فرصة جديدة.", "day_of_year": None},
-        {"language_code": "ar", "message": "آمن بنفسك وكل شيء سيصبح ممكنًا.", "day_of_year": None},
     ]
+    default_messages.extend(original_generic_messages)
+
 
     added_count = 0
     skipped_count = 0
@@ -406,14 +573,24 @@ def _seed_motivational_messages(cursor: sqlite3.Cursor, conn: sqlite3.Connection
 
             # Let's ensure we don't insert duplicates for generic messages (day_of_year is None)
             existing = None
+            # Check for existing message based on UNIQUE constraints
             if msg_data["day_of_year"] is None:
-                # Query for existing message with same language and text where day_of_year IS NULL
+                # Generic message: check language_code and message content (as per existing schema's UNIQUE(language_code, message))
+                # This also implicitly handles the case where multiple generic messages might exist for the same language
+                # if the schema didn't have UNIQUE(language_code, message) but relied on day_of_year IS NULL.
+                # Given UNIQUE(language_code, message), this check is somewhat redundant if we let IntegrityError handle it,
+                # but explicit check can be clearer.
                 query = "SELECT id FROM motivational_messages WHERE language_code = ? AND message = ? AND day_of_year IS NULL"
                 cursor.execute(query, (msg_data["language_code"], msg_data["message"]))
                 existing = cursor.fetchone()
+            else:
+                # Day-specific message: check language_code and day_of_year (as per UNIQUE(language_code, day_of_year))
+                query = "SELECT id FROM motivational_messages WHERE language_code = ? AND day_of_year = ?"
+                cursor.execute(query, (msg_data["language_code"], msg_data["day_of_year"]))
+                existing = cursor.fetchone()
 
             if existing:
-                logger.debug(f"Motivational message '{msg_data['message'][:30]}...' for lang '{msg_data['language_code']}' already exists. Skipping.")
+                logger.debug(f"Motivational message (lang: {msg_data['language_code']}, day: {msg_data['day_of_year']}, text: '{msg_data['message'][:30]}...') already exists. Skipping.")
                 skipped_count += 1
                 continue
 
@@ -422,9 +599,10 @@ def _seed_motivational_messages(cursor: sqlite3.Cursor, conn: sqlite3.Connection
             data_to_insert = {
                 "language_code": msg_data["language_code"],
                 "message": msg_data["message"],
-                "day_of_year": msg_data["day_of_year"] # Can be None
+                "day_of_year": msg_data["day_of_year"], # Can be None
+                "is_active": True
             }
-            messages_crud.create(data_to_insert)
+            messages_crud.create(data_to_insert, conn=conn)
             added_count += 1
             logger.debug(f"Added motivational message: {msg_data['message'][:30]}... for lang {msg_data['language_code']}")
         except sqlite3.IntegrityError as e: # Handles UNIQUE constraint violations

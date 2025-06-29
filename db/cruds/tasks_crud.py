@@ -1,7 +1,7 @@
 import sqlite3
 from datetime import datetime, timezone
 import logging
-from .generic_crud import _manage_conn, get_db_connection
+from .generic_crud import _manage_conn # get_db_connection is not used directly
 
 logger = logging.getLogger(__name__)
 
@@ -220,5 +220,19 @@ __all__ = [
     "add_task_dependency",
     "get_predecessor_tasks",
     "remove_task_dependency",
-
+    # Added placeholder for get_tasks_by_status
+    "get_tasks_by_status",
 ]
+
+# Placeholder for missing function
+@_manage_conn
+def get_tasks_by_status(status_id: int, conn: sqlite3.Connection = None) -> list[dict]:
+    """
+    (Placeholder) Retrieves tasks filtered by a specific status_id.
+    """
+    logger.warning("Placeholder function `get_tasks_by_status` called. Not yet implemented.")
+    # Example basic query if implemented:
+    # cursor = conn.cursor()
+    # cursor.execute("SELECT * FROM Tasks WHERE status_id = ? ORDER BY due_date ASC, priority DESC", (status_id,))
+    # return [dict(row) for row in cursor.fetchall()]
+    return []

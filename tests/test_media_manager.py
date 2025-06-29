@@ -11,6 +11,7 @@ import cv2
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from typing import List, Dict, Any # Added import
 from media_manager import operations, models
 import db
 from config import MEDIA_FILES_BASE_PATH, DEFAULT_DOWNLOAD_PATH, DATABASE_PATH, APP_ROOT_DIR

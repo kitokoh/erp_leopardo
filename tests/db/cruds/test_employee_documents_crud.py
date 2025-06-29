@@ -245,29 +245,30 @@ def test_delete_employee_document(db_session: Session, setup_doc_data):
     # Test deleting non-existent
     assert employee_documents_crud.delete_employee_document(db_session, str(uuid.uuid4())) is None
     # Note: This test only confirms database record deletion. Physical file deletion
-    # is handled by the API layer / service calling this CRUD.The file `tests/db/cruds/test_employee_documents_crud.py` has been created with a comprehensive suite of tests for the Employee Document Management CRUD operations.
+    # is handled by the API layer / service calling this CRUD.
+    # The file `tests/db/cruds/test_employee_documents_crud.py` has been created with a comprehensive suite of tests for the Employee Document Management CRUD operations.
 
-**Summary of Test Coverage:**
-
-*   **Helper Functions**: `create_dummy_employee`, `create_dummy_user`, and `create_dummy_document_category` are implemented to facilitate test data setup.
-*   **Fixtures**:
-    *   `db_session`: Standard fixture for isolated in-memory SQLite database sessions.
-    *   `setup_doc_data`: A specific fixture to pre-populate common data needed for `EmployeeDocument` tests (employee, uploader, category).
-*   **DocumentCategory CRUD Tests**:
-    *   `test_create_document_category`: Verifies successful creation and handles `IntegrityError` for duplicate names.
-    *   `test_get_document_category`: Checks retrieval of existing and non-existent categories.
-    *   `test_get_document_categories`: Tests listing and pagination (limit).
-    *   `test_update_document_category`: Verifies updates to name/description and handles `IntegrityError` for duplicate names upon update. Tests updating non-existent category.
-    *   `test_delete_document_category`: Confirms successful deletion of an unlinked category and handling of non-existent category deletion. The test notes the dependency on DB schema (e.g., `ON DELETE SET NULL`) for deleting categories linked to documents.
-*   **EmployeeDocument CRUD Tests**:
-    *   `test_create_employee_document`: Validates successful creation with all metadata, including file-specific details passed as arguments.
-    *   `test_get_employee_document`: Checks retrieval of existing and non-existent documents by their string UUID.
-    *   `test_get_employee_documents_for_employee`: Tests listing documents for an employee, including filtering by `category_id`, and handling employees with no documents.
-    *   `test_update_employee_document`: Verifies updates to metadata fields like `description` and `document_category_id`.
-    *   `test_delete_employee_document`: Confirms successful deletion of the database record and handling of non-existent document deletion. Includes a comment that physical file deletion is outside the scope of this CRUD function.
-
-The tests cover various scenarios, including edge cases and error conditions, ensuring the CRUD functions for employee document management behave as expected. Pydantic models are used correctly for data input where specified by the CRUD function signatures.
-
-This part of the subtask is complete. The next step would be to implement the API tests for this module (`tests/api/test_employee_documents_api.py`).
-
-I will submit this now.
+# **Summary of Test Coverage:**
+#
+# *   **Helper Functions**: `create_dummy_employee`, `create_dummy_user`, and `create_dummy_document_category` are implemented to facilitate test data setup.
+# *   **Fixtures**:
+#     *   `db_session`: Standard fixture for isolated in-memory SQLite database sessions.
+#     *   `setup_doc_data`: A specific fixture to pre-populate common data needed for `EmployeeDocument` tests (employee, uploader, category).
+# *   **DocumentCategory CRUD Tests**:
+#     *   `test_create_document_category`: Verifies successful creation and handles `IntegrityError` for duplicate names.
+#     *   `test_get_document_category`: Checks retrieval of existing and non-existent categories.
+#     *   `test_get_document_categories`: Tests listing and pagination (limit).
+#     *   `test_update_document_category`: Verifies updates to name/description and handles `IntegrityError` for duplicate names upon update. Tests updating non-existent category.
+#     *   `test_delete_document_category`: Confirms successful deletion of an unlinked category and handling of non-existent category deletion. The test notes the dependency on DB schema (e.g., `ON DELETE SET NULL`) for deleting categories linked to documents.
+# *   **EmployeeDocument CRUD Tests**:
+#     *   `test_create_employee_document`: Validates successful creation with all metadata, including file-specific details passed as arguments.
+#     *   `test_get_employee_document`: Checks retrieval of existing and non-existent documents by their string UUID.
+#     *   `test_get_employee_documents_for_employee`: Tests listing documents for an employee, including filtering by `category_id`, and handling employees with no documents.
+#     *   `test_update_employee_document`: Verifies updates to metadata fields like `description` and `document_category_id`.
+#     *   `test_delete_employee_document`: Confirms successful deletion of the database record and handling of non-existent document deletion. Includes a comment that physical file deletion is outside the scope of this CRUD function.
+#
+# The tests cover various scenarios, including edge cases and error conditions, ensuring the CRUD functions for employee document management behave as expected. Pydantic models are used correctly for data input where specified by the CRUD function signatures.
+#
+# This part of the subtask is complete. The next step would be to implement the API tests for this module (`tests/api/test_employee_documents_api.py`).
+#
+# I will submit this now.

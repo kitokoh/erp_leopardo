@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import QMessageBox, QDialog, QInputDialog # QInputDialog wa
 # from PyQt5.QtCore import QStandardPaths # Removed as not used by these functions
 
 # Import necessary functions directly from their new CRUD module locations
-from controllers.client_controller import ClientController # Added
+from client_management.client_controller import ClientController # Added
 from controllers.contact_controller import ContactController # Added
 from db.cruds.locations_crud import get_country_by_id, get_city_by_id # These are fine as locations_crud is not refactored to class yet
 from db.cruds.status_settings_crud import get_status_setting_by_name, get_status_setting_by_id # Fine
@@ -23,8 +23,17 @@ from db.cruds.clients_crud import clients_crud_instance # Import the instance
 from db.cruds.projects_crud import add_project, get_project_by_id, delete_project # Fine
 from db.cruds.tasks_crud import add_task # Fine
 from db.cruds.contacts_crud import get_contact_by_email, add_contact, update_contact, link_contact_to_client, get_contacts_for_client, update_client_contact_link # Fine
-from db.cruds.products_crud import get_product_by_name, add_product
+from db.cruds.products_crud import get_product_by_name, add_product, products_crud_instance
+
 from db.cruds.client_project_products_crud import add_product_to_client_or_project, get_products_for_client_or_project
+
+import logging # For logging errors or info
+# Confirm import of products_crud_instance at module load time
+if 'products_crud_instance' in globals():
+    logging.info(f"DM_LOGIC: products_crud_instance successfully imported at module level: {products_crud_instance}")
+else:
+    logging.error("DM_LOGIC: products_crud_instance is NOT DEFINED at module level after import line!")
+
 
 # Import dialogs that are used within the moved logic
 # Assuming these dialogs are in a 'dialogs.py' or similar accessible location.
@@ -230,13 +239,149 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
             doc_manager.add_client_to_list_widget(ui_map_data)
 
         if ui_map_data:
-            contact_controller = ContactController() # Instantiate controller
+            # --- BEGIN AUTO PROFORMA GENERATION ---
+            try:
+                logging.info(f"Starting automatic Proforma generation for new client ID: {actual_new_client_id}")
+
+                # 1. Determine Proforma Language
+                selected_langs_str = created_client_info.get("languages", "fr")
+                proforma_language_codes = [lang.strip() for lang in selected_langs_str.split(',') if lang.strip()]
+
+                if not proforma_language_codes:
+                    default_lang_from_config = doc_manager.config.get("default_document_language", "fr")
+                    proforma_language_codes = [default_lang_from_config]
+                    logging.info(f"No specific languages selected for client {actual_new_client_id}, defaulting Proforma to: {proforma_language_codes[0]}")
+
+                target_proforma_lang = proforma_language_codes[0]
+                logging.info(f"Target language for automatic Proforma: {target_proforma_lang}")
+
+                # 2. Fetch Default Proforma Template
+                from db.cruds import templates_crud
+                default_proforma_template = templates_crud.get_template_by_type_lang_default(
+                    template_type="HTML_PROFORMA",
+                    language_code=target_proforma_lang,
+                    client_id=None
+                )
+
+                if not default_proforma_template:
+                    logging.error(f"No default Proforma template found for language '{target_proforma_lang}'. Skipping auto-generation.")
+                    doc_manager.notify(title=doc_manager.tr("Modèle Proforma Manquant"),
+                                       message=doc_manager.tr("Aucun modèle Proforma par défaut trouvé pour la langue '{0}'. La génération automatique est annulée.").format(target_proforma_lang),
+                                       type='WARNING')
+                    raise Exception(f"Default Proforma template not found for {target_proforma_lang}")
+
+                template_base_filename = default_proforma_template.get('base_file_name')
+                template_inherent_language = default_proforma_template.get('language_code')
+
+                template_file_on_disk_abs = os.path.join(
+                    doc_manager.config.get("templates_dir", "templates"),
+                    template_inherent_language,
+                    template_base_filename
+                )
+
+                if not os.path.exists(template_file_on_disk_abs):
+                    logging.error(f"Default Proforma template file not found on disk: {template_file_on_disk_abs}")
+                    doc_manager.notify(title=doc_manager.tr("Fichier Modèle Introuvable"),
+                                       message=doc_manager.tr("Fichier modèle Proforma '{0}' introuvable pour la langue '{1}'. Génération auto annulée.").format(template_base_filename, target_proforma_lang),
+                                       type='ERROR')
+                    raise Exception(f"Default Proforma template file not found: {template_file_on_disk_abs}")
+
+                # 3. Determine Company ID (Default Company)
+                from db.cruds import companies_crud
+                default_company = companies_crud.get_default_company()
+                if not default_company or not default_company.get("company_id"):
+                    logging.error("No default company configured. Cannot generate Proforma.")
+                    doc_manager.notify(title=doc_manager.tr("Erreur Configuration Société"),
+                                       message=doc_manager.tr("Aucune société par défaut n'est configurée. La génération automatique de Proforma est annulée."),
+                                       type='ERROR')
+                    raise Exception("Default company not configured.")
+
+                auto_proforma_company_id = default_company.get("company_id")
+
+                # 4. Generate Proforma PDF
+                client_info_for_pdf_gen = created_client_info.copy()
+                client_info_for_pdf_gen['base_folder_path'] = base_folder_full_path
+
+                from utils import generate_pdf_for_document
+
+                proforma_doc_title_base = default_proforma_template.get('template_name', 'Facture_Proforma')
+                proforma_specific_additional_context = {
+                    'document_title': f"{proforma_doc_title_base} - {client_info_for_pdf_gen.get('client_name', 'Client')}",
+                    'proforma_id': f"PF-AUTO-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                }
+
+                generated_pdf_path = generate_pdf_for_document(
+                    source_file_path=template_file_on_disk_abs,
+                    client_info=client_info_for_pdf_gen,
+                    app_root_dir=doc_manager.app_root_dir,
+                    parent_widget=doc_manager,
+                    target_language_code=target_proforma_lang,
+                    project_id=new_project_id_central_db,
+                    additional_context=proforma_specific_additional_context,
+                document_type_for_context=default_proforma_template.get('template_type'),
+                allow_empty_products=True # Allow empty products for auto-generated Proforma
+                )
+            logging.info(f"Called generate_pdf_for_document for AUTO PROFORMA. File: {template_base_filename}, Lang: {target_proforma_lang}, allow_empty_products=True. Result path: {generated_pdf_path}") # NEW LOG
+
+
+                if not generated_pdf_path or not os.path.exists(generated_pdf_path):
+                    logging.error(f"Automatic Proforma PDF generation failed for client {actual_new_client_id}.")
+                    raise Exception("Automatic Proforma PDF generation failed.")
+
+                logging.info(f"Automatic Proforma PDF generated successfully: {generated_pdf_path}")
+
+                # 5. Save Document Record to ClientDocuments
+                from db.cruds import client_documents_crud
+                relative_pdf_path_for_db = os.path.relpath(generated_pdf_path, base_folder_full_path)
+
+                auto_proforma_doc_data = {
+                    'client_id': actual_new_client_id,
+                    'project_id': new_project_id_central_db,
+                    'order_identifier': proforma_specific_additional_context.get('proforma_id'),
+                    'document_name': os.path.basename(generated_pdf_path),
+                    'file_name_on_disk': os.path.basename(generated_pdf_path),
+                    'file_path_relative': relative_pdf_path_for_db,
+                    'document_type_generated': "PROFORMA_PDF",
+                    'source_template_id': default_proforma_template.get('template_id'),
+                    'user_id': doc_manager.current_user_id,
+                    'language_code': target_proforma_lang,
+                    'version_tag': "1.0"
+                }
+
+                new_client_doc_db_id = client_documents_crud.add_client_document(auto_proforma_doc_data)
+
+                if not new_client_doc_db_id:
+                    logging.error(f"Failed to save auto-generated Proforma to ClientDocuments for client {actual_new_client_id}.")
+                    if os.path.exists(generated_pdf_path):
+                        try: os.remove(generated_pdf_path)
+                        except OSError: logging.error(f"Failed to cleanup generated PDF: {generated_pdf_path}")
+                    doc_manager.notify(title=doc_manager.tr("Erreur DB Document"),
+                                       message=doc_manager.tr("Proforma PDF généré mais échec de l'enregistrement en base de données."),
+                                       type='ERROR')
+                    raise Exception("Failed to save auto-generated Proforma to ClientDocuments.")
+
+                logging.info(f"Auto-generated Proforma (Doc ID: {new_client_doc_db_id}) saved to ClientDocuments for client {actual_new_client_id}.")
+                doc_manager.notify(title=doc_manager.tr("Proforma Automatique Créée"),
+                                   message=doc_manager.tr("Une facture Proforma a été automatiquement générée et ajoutée pour le client en langue '{0}'.").format(target_proforma_lang),
+                                   type='SUCCESS')
+
+            except Exception as e_auto_proforma:
+                logging.error(f"Error during automatic Proforma generation for client {actual_new_client_id}: {e_auto_proforma}", exc_info=True)
+                doc_manager.notify(title=doc_manager.tr("Échec Proforma Auto"),
+                                   message=doc_manager.tr("La génération automatique de la Proforma a échoué. Raison: {0}").format(str(e_auto_proforma)),
+                                   type='WARNING')
+            # --- END AUTO PROFORMA GENERATION ---
+
+            contact_controller = ContactController(current_user_id=doc_manager.current_user_id) # Pass user_id
 
             # Check if this is the first contact for the client
             existing_contacts = get_contacts_for_client(actual_new_client_id, limit=1)
             is_first_contact = not existing_contacts
 
-            contact_dialog = ContactDialog(client_id=actual_new_client_id, parent=doc_manager, is_first_contact=is_first_contact)
+            contact_dialog = ContactDialog(client_id=actual_new_client_id,
+                                           parent=doc_manager,
+                                           is_first_contact=is_first_contact,
+                                           current_user_id=doc_manager.current_user_id) # Pass current_user_id
             if contact_dialog.exec_() == QDialog.Accepted:
                 contact_form_data = contact_dialog.get_data()
 
@@ -265,114 +410,152 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
             product_dialog = ProductDialog(client_id=actual_new_client_id, app_root_dir=doc_manager.app_root_dir, parent=doc_manager)
             if product_dialog.exec_() == QDialog.Accepted:
                 products_list_data = product_dialog.get_data()
+
+                # Check if products_crud_instance is defined before using it in the loop
+                if 'products_crud_instance' not in globals() or globals()['products_crud_instance'] is None:
+                    logging.error("DM_LOGIC: products_crud_instance is NOT available in handle_create_client_execution before product loop. This should have been caught at module load.")
+                    QMessageBox.critical(doc_manager, "Erreur Critique Module Produit", "Le module de gestion des produits n'est pas correctement initialisé.")
+                    # Optionally, return or raise an exception to prevent further processing
+                    # For now, we'll let it proceed and potentially hit NameErrors if it's truly not defined,
+                    # but the module-level log should have caught this.
+                else:
+                    logging.info(f"DM_LOGIC: products_crud_instance IS available in handle_create_client_execution: {globals()['products_crud_instance']}")
+
+
                 for product_item_data in products_list_data:
                     logging.info(f"Processing product item from dialog: {product_item_data}")
+                    global_product_id_to_link = None
+                    current_base_unit_price = None # Used to determine if override is needed
+
                     try:
-                        logging.info(f"Attempting to get global product by name: '{product_item_data.get('name')}'")
-                        global_product = get_product_by_name(product_item_data['name'])
-                        global_product_id = None; current_base_unit_price = None
-                        if global_product:
-                            global_product_id = global_product['product_id']; current_base_unit_price = global_product.get('base_unit_price')
+                        # products_crud_instance is now checked before the loop.
+                        # If it was None, an error message was shown.
+                        # If execution reaches here and it's still None (e.g. due to some very complex issue),
+                        # the NameError will occur as before, but the logs should give clues.
+
+
+                        # Step 1: Determine the global_product_id
+                        dialog_provided_global_product_id = product_item_data.get('product_id') # From selected existing product
+                        product_code_from_dialog = product_item_data.get('product_code', "").strip()
+
+                        if dialog_provided_global_product_id is not None:
+                            logging.info(f"Using existing global product_id from dialog: {dialog_provided_global_product_id}")
+                            global_product_id_to_link = dialog_provided_global_product_id
+                            existing_global_product_details = products_crud_instance.get_product_by_id(global_product_id_to_link)
+                            if existing_global_product_details:
+                                current_base_unit_price = existing_global_product_details.get('base_unit_price')
                         else:
-                            # New global product: product_code is now expected from product_item_data
-                            product_code_from_dialog = product_item_data.get('product_code')
                             if not product_code_from_dialog:
-                                logging.error(f"Product code (SKU) missing for new global product '{product_item_data.get('name')}'. Skipping.")
-                                QMessageBox.critical(doc_manager, doc_manager.tr("Erreur Données Produit"), 
-                                                     doc_manager.tr("Le code produit (SKU) est manquant pour le nouveau produit '{0}'. Ce produit n'a pas été ajouté.").format(product_item_data['name']))
+                                logging.warning(f"Product code (SKU) missing for product '{product_item_data.get('name')}'.")
+                                QMessageBox.warning(doc_manager, doc_manager.tr("Code Produit Requis"),
+                                                     doc_manager.tr("Le code produit (SKU) est requis pour le produit '{0}'. Ce produit ne sera pas ajouté.").format(product_item_data.get('name')))
                                 continue
-
-                            new_global_product_data = {
-                                'product_name': product_item_data['name'],
-                                'product_code': product_code_from_dialog, # Use product_code from dialog
-                                'description': product_item_data['description'],
-                                'base_unit_price': product_item_data['unit_price'],
-                                'language_code': product_item_data.get('language_code', 'fr'),
-                                'category': product_item_data.get('category', ''), # Assuming ProductDialog might provide category
-                                'unit_of_measure': product_item_data.get('unit_of_measure', 'unit'), # Assuming
-                                'weight': product_item_data.get('weight'), # Assuming
-                                'dimensions': product_item_data.get('dimensions'), # Assuming
-                                'is_active': True
-                            }
-                            logging.info(f"Global product '{product_item_data.get('name')}' not found. Attempting to add new global product with data: {new_global_product_data}")
-                            
-                            # Assuming products_crud_instance is available (e.g., imported or passed to this context)
-                            # from db.cruds.products_crud import products_crud_instance # Ensure this is imported
-                            add_result = products_crud_instance.add_product(new_global_product_data)
-
-                            if add_result and add_result.get('success'):
-                                new_global_product_id = add_result.get('id')
-                                if new_global_product_id:
-                                    global_product_id = new_global_product_id
-                                    current_base_unit_price = product_item_data['unit_price']
-                                else: # Should not happen if success is True and id is part of success payload
-                                    logging.error(f"Failed to get ID for newly added global product '{product_item_data.get('name')}' despite success response. Skipping linking.")
-                                    QMessageBox.critical(doc_manager, doc_manager.tr("Erreur DB"), doc_manager.tr("Erreur lors de la récupération de l'ID du nouveau produit global '{0}'.").format(product_item_data['name']))
-                                    continue
+                            existing_product_by_code = products_crud_instance.get_product_by_code(product_code_from_dialog)
+                            if existing_product_by_code:
+                                global_product_id_to_link = existing_product_by_code['product_id']
+                                current_base_unit_price = existing_product_by_code.get('base_unit_price')
+                                logging.debug(f"Helper: Found existing global product by code. ID: {global_product_id_to_link}")
                             else:
-                                error_detail = add_result.get('error', 'Unknown error') if add_result else 'Unknown error'
-                                logging.error(f"Failed to add global product '{product_item_data.get('name')}' with data {new_global_product_data}. Error: {error_detail}. Skipping linking for this item.")
-                                QMessageBox.critical(doc_manager, doc_manager.tr("Erreur DB"), doc_manager.tr("Impossible de créer le produit global '{0}' (lang: {1}). Erreur: {2}").format(product_item_data['name'], product_item_data.get('language_code', 'fr'), error_detail))
-                                continue
+                                logging.info(f"Helper: Product with code '{product_code_from_dialog}' not found. Creating new global product.")
+                                new_global_product_data = {
+                                    'product_name': product_item_data['name'], 'product_code': product_code_from_dialog,
+                                    'description': product_item_data['description'], 'base_unit_price': product_item_data['unit_price'],
+                                    'language_code': product_item_data.get('language_code', 'fr'), 'category': product_item_data.get('category', ''),
+                                    'unit_of_measure': product_item_data.get('unit_of_measure', 'unit'), 'weight': product_item_data.get('weight'),
+                                    'dimensions': product_item_data.get('dimensions'), 'is_active': True,
+                                    'created_by_user_id': doc_manager.current_user_id
+                                }
+                                add_result = products_crud_instance.add_product(new_global_product_data)
+                                if add_result and add_result.get('success'):
+                                    global_product_id_to_link = add_result.get('id')
+                                    current_base_unit_price = new_global_product_data['base_unit_price']
+                                    logging.info(f"DM_LOGIC: New global product '{new_global_product_data['product_name']}' created with ID: {global_product_id_to_link}") # Enhanced log
+                                else:
+                                    error_detail = add_result.get('error', 'Unknown error') if add_result else 'Unknown error'
+                                    logging.error(f"DM_LOGIC: Failed to add new global product '{product_item_data.get('name')}' (Code: {product_code_from_dialog}). Error: {error_detail}")
+                                    QMessageBox.critical(doc_manager, doc_manager.tr("Erreur Création Produit Global"),
+                                                         doc_manager.tr("Impossible de créer le produit global '{0}' (Code: {1}). Erreur: {2}").format(product_item_data['name'], product_code_from_dialog, error_detail))
+                                    return False # Indicate failure for this item
 
-                        if global_product_id and isinstance(global_product_id, (str, int)): # Ensure global_product_id is a valid ID type
-                            unit_price_override_val = product_item_data['unit_price'] if current_base_unit_price is None or product_item_data['unit_price'] != current_base_unit_price else None
+                        if global_product_id_to_link:
+                            unit_price_from_dialog = product_item_data['unit_price']
+                            unit_price_override_val = None
+                            if current_base_unit_price is None or unit_price_from_dialog != current_base_unit_price:
+                                unit_price_override_val = unit_price_from_dialog
                             link_data = {
-                                'client_id': actual_new_client_id, 
-                                'project_id': None, 
-                                'product_id': global_product_id, 
-                                'quantity': product_item_data['quantity'], 
+                                'client_id': actual_new_client_id, 'project_id': None,
+                                'product_id': global_product_id_to_link, 'quantity': product_item_data['quantity'],
                                 'unit_price_override': unit_price_override_val,
-                                'weight_override': product_item_data.get('weight'), # Pass from dialog
-                                'dimensions_override': product_item_data.get('dimensions') # Pass from dialog
+                                'added_by_user_id': doc_manager.current_user_id
                             }
-                            logging.info(f"Attempting to link product_id {global_product_id} to client {actual_new_client_id} (project: None) with link data: {link_data}")
+                            logging.debug(f"Helper: Attempting to link product_id {global_product_id_to_link} to client {actual_new_client_id} with data: {link_data}")
                             cpp_id = add_product_to_client_or_project(link_data)
-                            if not cpp_id:
-                                logging.error(f"Failed to link product_id {global_product_id} to client {actual_new_client_id} with link data {link_data}.")
-                                QMessageBox.warning(doc_manager, doc_manager.tr("Erreur DB"), doc_manager.tr("Impossible de lier le produit '{0}' au client.").format(product_item_data['name']))
+                            if cpp_id:
+                                logging.info(f"Helper: Successfully linked product '{product_item_data.get('name')}' to client. Link ID: {cpp_id}")
+                                return True # Indicate success for this item
+                            else:
+                                logging.error(f"Helper: Failed to link product '{product_item_data.get('name')}' (Global ID: {global_product_id_to_link}) to client {actual_new_client_id}.")
+                                QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Liaison Produit"),
+                                                    doc_manager.tr("Impossible de lier le produit '{0}' au client.").format(product_item_data['name']))
+                                return False # Indicate failure for this item
                         else:
-                            logging.error(f"Invalid global_product_id '{global_product_id}' for product '{product_item_data.get('name')}'. Cannot link to client.")
-                            QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Produit"), doc_manager.tr("ID de produit global invalide pour '{0}'. Liaison annulée.").format(product_item_data.get('name')))
-                            
-                    except Exception as e_product_save:
+                            logging.error(f"Helper: Global product ID to link is None for item '{product_item_data.get('name')}'. Cannot link.")
+                            QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Interne Produit"),
+                                                doc_manager.tr("ID de produit global non déterminé pour '{0}'. Liaison annulée.").format(product_item_data.get('name')))
+                            return False # Indicate failure for this item
+                    except Exception as e_product_save: # This broad exception catch should ideally be within the helper
                         logging.error(f"Unexpected error processing product '{product_item_data.get('name', 'Inconnu')}': {type(e_product_save).__name__} - {e_product_save}", exc_info=True)
-                        QMessageBox.critical(doc_manager, doc_manager.tr("Erreur Sauvegarde Produit"), doc_manager.tr("Une erreur est survenue lors de la sauvegarde du produit '{0}': {1}").format(product_item_data.get('name', 'Inconnu'), str(e_product_save)))
+                        QMessageBox.critical(doc_manager, doc_manager.tr("Erreur Sauvegarde Produit"),
+                                             doc_manager.tr("Une erreur est survenue lors de la sauvegarde du produit '{0}': {1}").format(product_item_data.get('name', 'Inconnu'), str(e_product_save)))
+                        return False # Indicate failure for this item
 
-            # Recalculate price after product dialog (whether accepted or cancelled)
-            linked_products = get_products_for_client_or_project(client_id=actual_new_client_id, project_id=None)
-            if linked_products is None: linked_products = []
-            calculated_total_sum = sum(p.get('total_price_calculated', 0.0) for p in linked_products if p.get('total_price_calculated') is not None)
-            logging.info(f"Recalculated total price for client {actual_new_client_id} after product changes: {calculated_total_sum}")
-            logging.info(f"Attempting to update client {actual_new_client_id} with new price: {calculated_total_sum}")
-            update_price_result = clients_crud_instance.update_client(actual_new_client_id, {'price': calculated_total_sum})
-
-            if update_price_result and update_price_result.get('success') and update_price_result.get('updated_count', 0) > 0:
-                logging.info(f"Successfully updated price for client {actual_new_client_id} to {calculated_total_sum}")
-                # Update local data maps (existing logic)
-                ui_map_data['price'] = calculated_total_sum
+                # Update client's total price based on successfully saved products
+                linked_products_after_save = get_products_for_client_or_project(client_id=actual_new_client_id, project_id=None)
+                calculated_total_sum_after_save = sum(p.get('total_price_calculated', 0.0) for p in linked_products_after_save if p.get('total_price_calculated') is not None)
+                logging.info(f"Updating client {actual_new_client_id} price to {calculated_total_sum_after_save} after ProductDialog acceptance.")
+                clients_crud_instance.update_client(actual_new_client_id, {'price': calculated_total_sum_after_save})
                 if actual_new_client_id in doc_manager.clients_data_map:
-                    doc_manager.clients_data_map[actual_new_client_id]['price'] = calculated_total_sum
-            else:
-                error_msg = update_price_result.get('error', 'Unknown error') if update_price_result else 'Unknown error'
-                logging.error(f"Failed to update price for client {actual_new_client_id} to {calculated_total_sum}. DB Result: {update_price_result}")
-                QMessageBox.warning(doc_manager,
-                                    doc_manager.tr("Erreur Mise à Jour Prix"),
-                                    doc_manager.tr("Le prix calculé ({0}) pour le client n'a pas pu être sauvegardé en base de données. Erreur: {1}").format(calculated_total_sum, error_msg))
+                    doc_manager.clients_data_map[actual_new_client_id]['price'] = calculated_total_sum_after_save
+                if ui_map_data: ui_map_data['price'] = calculated_total_sum_after_save # Ensure ui_map_data for CreateDocumentDialog is fresh
 
-            # CreateDocumentDialog call
-            logging.info(f"Attempting to show CreateDocumentDialog for client ID {actual_new_client_id}. Client info (ui_map_data) being passed: {ui_map_data}")
-            create_document_dialog = CreateDocumentDialog(
-                client_info=ui_map_data,
-                config=doc_manager.config,
-                current_user_id=doc_manager.current_user_id, # Pass current_user_id
-                parent=doc_manager
-            )
-            if create_document_dialog.exec_() == QDialog.Accepted: logging.info("CreateDocumentDialog accepted.")
-            else: logging.info("CreateDocumentDialog cancelled.")
+                # Proceed to CreateDocumentDialog
+                logging.info(f"Attempting to show CreateDocumentDialog for client ID {actual_new_client_id}.")
+                create_document_dialog = CreateDocumentDialog(
+                    client_info=ui_map_data, config=doc_manager.config,
+                    current_user_id=doc_manager.current_user_id, parent=doc_manager
+                )
+                if create_document_dialog.exec_() == QDialog.Accepted:
+                    logging.info("CreateDocumentDialog accepted.")
+                else:
+                    logging.info("CreateDocumentDialog cancelled.")
+            else: # ProductDialog was cancelled
+                logging.info("ProductDialog cancelled by user.")
+                # Update client's total price based on any products linked PRIOR to this cancelled dialog
+                linked_products_after_cancel = get_products_for_client_or_project(client_id=actual_new_client_id, project_id=None)
+                calculated_total_sum_after_cancel = sum(p.get('total_price_calculated', 0.0) for p in linked_products_after_cancel if p.get('total_price_calculated') is not None)
+                logging.info(f"Updating client {actual_new_client_id} price to {calculated_total_sum_after_cancel} after ProductDialog cancellation.")
+                clients_crud_instance.update_client(actual_new_client_id, {'price': calculated_total_sum_after_cancel})
+                if actual_new_client_id in doc_manager.clients_data_map:
+                    doc_manager.clients_data_map[actual_new_client_id]['price'] = calculated_total_sum_after_cancel
+                # CreateDocumentDialog is SKIPPED as per Test Case 3
 
-        else: # ui_map_data was not populated (should not happen if controller succeeded)
-             QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Données Client"), doc_manager.tr("Les données du client (ui_map_data) ne sont pas disponibles pour la séquence de dialogue."))
+
+
+
+#         else: # ui_map_data was not populated (should not happen if controller succeeded)
+#              QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Données Client"), doc_manager.tr("Les données du client (ui_map_data) ne sont pas disponibles pour la séquence de dialogue."))
+# # --- After contact_dialog.exec_() block ---
+        else: # ContactDialog was cancelled
+            logging.info("ContactDialog cancelled by user.")
+            # Ensure client's price is initialized/updated even if workflow is exited early
+            # (e.g., to 0 if no products were ever associated with this new client)
+            clients_crud_instance.update_client(actual_new_client_id, {'price': 0.0})
+            if actual_new_client_id in doc_manager.clients_data_map:
+                doc_manager.clients_data_map[actual_new_client_id]['price'] = 0.0
+            if ui_map_data: ui_map_data['price'] = 0.0
+
+
+# --- Final notifications and UI updates (outside the main if ui_map_data block, but relies on its outcomes) ---
 
         doc_manager.notify(title=doc_manager.tr("Client Créé"),
                            message=doc_manager.tr("Le client '{0}' (ID: {1}) a été créé avec succès.").format(created_client_info.get('client_name', client_name_val), actual_new_client_id),

@@ -38,151 +38,123 @@ def get_value_from_context(key: str, context_dict: dict, current_item: dict = No
     Returns:
         The value found, or an empty string if not found or path is invalid.
     """
-    if key.startswith("this.") and current_item is not None:
-        # Resolve against current_item
-        actual_key = key[5:] # Remove "this."
-        if isinstance(current_item, dict):
-            return current_item.get(actual_key, "")
-        # If current_item is not a dict, "this" access might not be meaningful in this simple form
-        # For direct access to item if it's not a dict (e.g. list of strings), key could be "this"
-        elif actual_key == "": # refers to the item itself if it's a simple type like string
-             return current_item
-        return "" # "this" used but current_item is not a dict or key is complex for non-dict item
+    logger = logging.getLogger(__name__) # Use the same logger
+    logger.debug(f"get_value_from_context: Attempting to get key='{key}'")
 
-    # Resolve against main context_dict
+    if key.startswith("this.") and current_item is not None:
+        actual_key = key[5:]
+        logger.debug(f"get_value_from_context: 'this.' context. actual_key='{actual_key}', current_item type: {type(current_item)}")
+        if isinstance(current_item, dict):
+            value = current_item.get(actual_key, "")
+            logger.debug(f"get_value_from_context: 'this.' dict access. Value for '{actual_key}': '{str(value)[:100]}'")
+            return value
+        elif actual_key == "":
+             logger.debug(f"get_value_from_context: 'this.' direct item access. Value: '{str(current_item)[:100]}'")
+             return current_item
+        logger.debug(f"get_value_from_context: 'this.' context but not dict or direct access. Returning empty string.")
+        return ""
+
     parts = key.split('.')
     value = context_dict
+    logger.debug(f"get_value_from_context: Main context. Parts: {parts}")
     try:
-        for part in parts:
+        for i, part in enumerate(parts):
             if isinstance(value, dict):
                 value = value[part]
-            # Handle list index access if needed, e.g. "products.0.name" - not implemented for simplicity
-            # elif isinstance(value, list) and part.isdigit():
-            #     value = value[int(part)]
-            else: # Path is invalid (trying to access subkey on a non-dict)
+                logger.debug(f"get_value_from_context: Part {i+1} ('{part}') resolved. Current value type: {type(value)}, value snippet: '{str(value)[:100]}'")
+            else:
+                logger.debug(f"get_value_from_context: Path invalid at part '{part}'. Current value is not a dict (type: {type(value)}). Returning empty string.")
                 return ""
-        return value if value is not None else ""
-    except (KeyError, TypeError, IndexError):
-        return "" # Key not found or invalid access
+        final_value = value if value is not None else ""
+        logger.debug(f"get_value_from_context: Successfully resolved key '{key}'. Final value snippet: '{str(final_value)[:100]}'")
+        return final_value
+    except (KeyError, TypeError, IndexError) as e_resolve:
+        logger.debug(f"get_value_from_context: Failed to resolve key '{key}' at part '{part}'. Error: {e_resolve}. Returning empty string.")
+        return ""
 
 def render_html_template(template_string: str, context: dict) -> str:
     """
     Renders an HTML template string with data from a context dictionary,
     supporting simple placeholders, conditional blocks, and loops.
     """
-    processed_template = template_string
+    import logging
+    # Ensure logger is configured if not already done globally
+    # logging.basicConfig(level=logging.DEBUG) # Basic config if needed
+    logger = logging.getLogger(__name__) # Use a named logger
 
-    # 1. Process loops {{#each array_key}}...{{/each}}
-    def process_loop(match_obj):
-        array_key = match_obj.group(1).strip()
-        loop_content_template = match_obj.group(2)
+    logger.debug(f"render_html_template: START. Context keys: {list(context.keys()) if isinstance(context, dict) else 'Non-dict context'}")
+    # For very detailed debugging, print small parts of context:
+    # if isinstance(context, dict):
+    #     logger.debug(f"Context[doc] sample: {str(context.get('doc', {}))[:200]}")
+    #     logger.debug(f"Context[client] sample: {str(context.get('client', {}))[:200]}")
+    #     logger.debug(f"Context[seller] sample: {str(context.get('seller', {}))[:200]}")
+    # logger.debug(f"render_html_template: Template content (first 200 chars): {template_string[:200]}")
 
-        array_data = get_value_from_context(array_key, context)
-        rendered_loop_items = []
+    try:
+        processed_template = template_string
 
-        if isinstance(array_data, list):
-            for item in array_data:
-                # For each item, we need a way to make its properties accessible.
-                # We can pass the item itself to a recursive call of render_html_template,
-                # potentially merging it into a temporary context or passing it as 'current_item'.
-                # Here, get_value_from_context is designed to check current_item for "this.*" keys.
-                # So, we pass the 'item' as current_item to the recursive render call implicitly
-                # through the get_value_from_context calls that will happen inside.
+        # 1. Process loops {{#each array_key}}...{{/each}}
+        def process_loop(match_obj):
+            array_key = match_obj.group(1).strip()
+            loop_content_template = match_obj.group(2)
+            logging.debug(f"render_html_template: Processing #each loop for key: '{array_key}'")
 
-                # Create a temporary context for the item, making its direct keys available
-                # AND keeping the main context for global lookups.
-                # This is a simplified approach; a full templating engine might have richer context stacking.
+            array_data = get_value_from_context(array_key, context)
+            rendered_loop_items = []
 
-                # The recursive call to render_html_template for the loop_content_template
-                # will use the main 'context', and get_value_from_context will use 'item'
-                # when it encounters {{this.property}}.
+            if isinstance(array_data, list):
+                logging.debug(f"render_html_template: Loop key '{array_key}' resolved to list with {len(array_data)} items.")
+                for i, item in enumerate(array_data):
+                    logging.debug(f"render_html_template: Loop item {i} for key '{array_key}'. Item data (first 100 chars): {str(item)[:100]}")
+                    item_specific_content = re.sub(r'\{\{([^}]+?)\}\}',
+                                                   lambda m: str(get_value_from_context(m.group(1).strip(), context, item)),
+                                                   loop_content_template)
+                    rendered_loop_items.append(render_html_template(item_specific_content, context)) # Recursive call
+            else:
+                logging.warning(f"render_html_template: Loop key '{array_key}' did not resolve to a list. Resolved to type: {type(array_data)}. Loop will be empty.")
+            return "".join(rendered_loop_items)
 
-                # To allow direct access to item properties like {{property}} within the loop,
-                # we can create a temporary context that overlays item properties on the main context.
-                # However, this can be tricky with deep recursion and context management.
-                # The "this." prefix is a clearer way for this implementation.
+        processed_template = re.sub(r'\{\{#each ([^}]+?)\}\}(.*?)\{\{/each\}\}', process_loop, processed_template, flags=re.DOTALL)
 
-                # Simpler: just pass the item to be used by get_value_from_context when "this." is used.
-                # The `render_html_template` itself doesn't need `current_item` directly,
-                # but `get_value_from_context` (which it uses) does.
-                # The lambda for simple placeholders within this recursive call needs access to 'item'.
+        # 2. Process conditionals {{#if key}}...{{/if}}
+        def process_conditional(match_obj):
+            condition_key = match_obj.group(1).strip()
+            content_if_true = match_obj.group(2)
+            logging.debug(f"render_html_template: Processing #if conditional for key: '{condition_key}'")
 
-                # To handle {{item_property}} directly within loop:
-                # item_context = {**context, **item} if isinstance(item, dict) else context
-                # rendered_item_content = render_html_template(loop_content_template, item_context)
+            value = get_value_from_context(condition_key, context)
+            logging.debug(f"render_html_template: Conditional key '{condition_key}' resolved to value: '{str(value)[:100]}' (type: {type(value)})")
 
-                # Using the "this" convention with current_item argument for get_value_from_context:
-                # The lambda for simple replacements needs to be aware of 'item'.
-                # This is tricky because re.sub's lambda doesn't easily take extra args from the outer scope's loop.
-                # So, the recursive call to render_html_template should handle the item context for simple replacements.
+            is_truthy = False
+            if isinstance(value, bool): is_truthy = value
+            elif isinstance(value, (int, float)): is_truthy = value != 0
+            elif isinstance(value, (str, list, dict)): is_truthy = len(value) > 0
 
-                # Let's make the recursive call handle the item context for its simple replacements.
-                # We pass the item to a modified simple replacement part of the recursive call.
+            logging.debug(f"render_html_template: Conditional key '{condition_key}' truthiness: {is_truthy}")
+            if is_truthy:
+                return render_html_template(content_if_true, context) # Recursive call
+            else:
+                return ""
 
-                # Modified approach for recursion within loop processing:
-                # The render_html_template needs to be aware of the current_item for the {{this...}}
-                # This requires passing current_item down through recursive calls to render_html_template.
+        processed_template = re.sub(r'\{\{#if ([^}]+?)\}\}(.*?)\{\{/if\}\}', process_conditional, processed_template, flags=re.DOTALL)
 
-                # For now, let's assume render_html_template is called for the inner block,
-                # and its get_value_from_context calls will correctly use `item` via a
-                # mechanism not shown here (e.g. if render_html_template took current_item)
-                # OR, we pre-render simple {{this.prop}} within the loop_content_template for this item.
+        # 3. Process simple placeholders {{key.subkey}}
+        def replace_placeholder(match):
+            key = match.group(1).strip()
+            logger.debug(f"render_html_template (replace_placeholder): Matched placeholder key='{key}'")
+            val = get_value_from_context(key, context) # get_value_from_context now has its own detailed logging
+            logger.debug(f"render_html_template (replace_placeholder): Value for key='{key}': '{str(val)[:100]}'")
+            return str(val)
 
-                # Pre-render simple {{this.prop}} for the current item before full recursive call
-                # This is a bit of a shortcut to avoid complex context passing in render_html_template itself.
-                item_specific_content = re.sub(r'\{\{([^}]+?)\}\}',
-                                               lambda m: str(get_value_from_context(m.group(1).strip(), context, item)),
-                                               loop_content_template)
-                # Now, recursively render this item-specific content for further structures (nested loops/ifs)
-                # This recursive call will operate on content already processed for 'this.x' specific to 'item'.
-                rendered_loop_items.append(render_html_template(item_specific_content, context))
-        return "".join(rendered_loop_items)
+        processed_template = re.sub(r'\{\{([^}]+?)\}\}', replace_placeholder, processed_template)
 
-    processed_template = re.sub(r'\{\{#each ([^}]+?)\}\}(.*?)\{\{/each\}\}', process_loop, processed_template, flags=re.DOTALL)
-
-    # 2. Process conditionals {{#if key}}...{{/if}}
-    # This needs to be done iteratively or recursively until no more conditionals are found,
-    # as conditionals can be nested or appear after loops.
-    # A single pass might not be enough for nested structures if processed sequentially.
-    # For simplicity, we'll do one pass. For true nesting, the recursive calls in process_loop/process_conditional handle it.
-
-    def process_conditional(match_obj):
-        condition_key = match_obj.group(1).strip()
-        content_if_true = match_obj.group(2)
-
-        # Evaluate condition_key
-        value = get_value_from_context(condition_key, context)
-
-        # Truthiness check: non-empty string, non-zero number, non-empty list/dict, True boolean
-        is_truthy = False
-        if isinstance(value, bool):
-            is_truthy = value
-        elif isinstance(value, (int, float)):
-            is_truthy = value != 0
-        elif isinstance(value, (str, list, dict)):
-            is_truthy = len(value) > 0
-
-        if is_truthy:
-            # Recursively render the content_if_true
-            return render_html_template(content_if_true, context)
-        else:
-            return ""
-
-    processed_template = re.sub(r'\{\{#if ([^}]+?)\}\}(.*?)\{\{/if\}\}', process_conditional, processed_template, flags=re.DOTALL)
-
-    # 3. Process simple placeholders {{key.subkey}}
-    # This should ideally be the last step, or happen recursively within loops/conditionals
-    # The current structure of recursive calls in process_loop and process_conditional
-    # means simple placeholders in their content are handled by those recursive calls.
-    # This final pass handles placeholders outside of any loops/conditionals or in already-processed blocks.
-
-    # The lambda for this re.sub does not have access to `current_item` directly.
-    # `get_value_from_context`'s `current_item` is only used when called from within `process_loop`.
-    processed_template = re.sub(r'\{\{([^}]+?)\}\}',
-                                lambda match: str(get_value_from_context(match.group(1).strip(), context)),
-                                processed_template)
-
-    return processed_template
+        logger.debug("render_html_template: FINISHED processing template successfully.")
+        return processed_template
+    except Exception as e_render:
+        logging.error(f"render_html_template: Unhandled exception during rendering: {e_render}", exc_info=True)
+        # It's crucial that this exception is caught by the caller, HtmlEditor.populate_html_content,
+        # which then returns the original template string. Re-raising is correct here.
+        raise
 
 
 def convert_html_to_pdf(html_string: str, base_url: str = None) -> bytes | None:
