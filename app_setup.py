@@ -6,7 +6,8 @@ import logging
 import logging.handlers
 import shutil
 import pandas as pd
-from PyQt5.QtCore import QFile, QTextStream # QStandardPaths, QLocale, QLibraryInfo removed
+# PyQt5.QtCore imports moved into functions that use them
+# from PyQt5.QtCore import QFile, QTextStream
 # from PyQt5.QtGui import QFont # Removed as QFont is not used here
 # Assuming db_manager and other necessary utils will be imported if functions using them are moved.
 from config import DATABASE_NAME as CENTRAL_DATABASE_NAME # For DATABASE_NAME
@@ -74,11 +75,7 @@ def get_app_config():
 
 def load_stylesheet_global(app):
     """Loads the global stylesheet."""
-    # Assuming APP_ROOT_DIR is defined in this module (app_setup.py)
-    # If style.qss is at the same level as main.py/app_setup.py, APP_ROOT_DIR is correct.
-    # If app_setup.py is in a subdirectory, APP_ROOT_DIR might need adjustment for this function
-    # or style.qss path needs to be relative to the project root.
-    # For now, assuming app_setup.py is at the root.
+    from PyQt5.QtCore import QFile, QTextStream # Moved import here
     qss_file_path = os.path.join(APP_ROOT_DIR, "style.qss")
 
     if not os.path.exists(qss_file_path):
