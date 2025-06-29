@@ -4000,9 +4000,48 @@ class ClientWidget(QWidget):
                 return # Early return for invalid base_client_path
             logging.info("PT_DEBUG: populate_doc_table - base_client_path is valid.")
 
+            # Fetch and filter documents
+            try:
+                all_client_documents = db_manager.get_documents_for_client(client_id)
+                if all_client_documents is None:
+                    all_client_documents = []
+                logging.info(f"PT_DEBUG: populate_doc_table - Fetched {len(all_client_documents)} documents for client_id: {client_id}")
+
+                # Apply filters
+                selected_order_id = self.doc_order_filter_combo.currentData()
+                selected_lang = self.doc_language_filter_combo.currentData()
+                selected_type = self.doc_type_filter_combo.currentData()
+                logging.info(f"PT_DEBUG: populate_doc_table - Filters: OrderID='{selected_order_id}', Lang='{selected_lang}', Type='{selected_type}'")
+
+                filtered_list = []
+                for doc in all_client_documents:
+                    match_order = (selected_order_id == "ALL" or
+                                   (selected_order_id == "NONE" and not doc.get('order_identifier')) or
+                                   (doc.get('order_identifier') == selected_order_id))
+
+                    match_lang = (selected_lang == "ALL" or
+                                  doc.get('language_code') == selected_lang)
+
+                    match_type = (selected_type == "ALL" or
+                                  doc.get('document_type_generated', '').upper() == selected_type or
+                                  (selected_type == "OTHER" and doc.get('document_type_generated', '').upper() not in ["HTML", "PDF", "XLSX", "DOCX"]))
+
+                    if match_order and match_lang and match_type:
+                        filtered_list.append(doc)
+                logging.info(f"PT_DEBUG: populate_doc_table - After filtering, {len(filtered_list)} documents remain.")
+
+            except Exception as e_fetch_docs:
+                logging.error(f"PT_DEBUG: populate_doc_table - Error fetching/filtering documents: {e_fetch_docs}", exc_info=True)
+                if hasattr(self, 'documents_empty_label'):
+                    self.documents_empty_label.setText(self.tr("Erreur lors du chargement des documents."))
+                    self.documents_empty_label.setVisible(True)
+                self.doc_table.setVisible(False)
+                self._is_populating_docs = False # Reset guard
+                return # Early return on error
+
             if not filtered_list:
                 if hasattr(self, 'documents_empty_label'):
-                     self.documents_empty_label.setText(self.tr("Aucun document pour les filtres."))
+                     self.documents_empty_label.setText(self.tr("Aucun document pour les filtres sélectionnés."))
                      self.documents_empty_label.setVisible(True)
                 self.doc_table.setVisible(False)
                 logging.info("PT_DEBUG: populate_doc_table - END (no documents after filtering)")
@@ -4035,9 +4074,9 @@ class ClientWidget(QWidget):
                 if file_path_relative_from_db:
                     if order_identifier_for_doc:
                         safe_order_subfolder = str(order_identifier_for_doc).replace(':', '_').replace(' ', '_')
-                        full_file_path = os.path.join(base_client_path, safe_order_subfolder, file_path_relative_from_db)
+                        full_file_path = os.path.join(base_client_path_abs, safe_order_subfolder, file_path_relative_from_db)
                     else:
-                        full_file_path = os.path.join(base_client_path, file_path_relative_from_db)
+                        full_file_path = os.path.join(base_client_path_abs, file_path_relative_from_db)
                     if not os.path.exists(full_file_path):
                         logging.warning(f"PT_DEBUG: populate_doc_table - File not found: {full_file_path} for doc_id {document_id}")
                 else:

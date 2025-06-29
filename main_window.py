@@ -1644,6 +1644,35 @@ class DocumentManager(QMainWindow):
         client_data_to_show = clients_crud_instance.get_client_by_id(client_id_to_open, include_deleted=False)
         logging.info(f"open_client_tab_by_id: client_data_to_show after fetching from DB: {client_data_to_show}")
 
+        if client_data_to_show:
+            # Ensure default_base_folder_path exists and is valid, then alias to base_folder_path
+            current_default_path = client_data_to_show.get("default_base_folder_path")
+            if not current_default_path or not current_default_path.strip():
+                client_name_for_folder = client_data_to_show.get("client_name", "unknown_client")
+                client_id_for_folder = client_data_to_show.get("client_id", "no_id")
+                sane_client_name = "".join(c if c.isalnum() else "_" for c in client_name_for_folder)
+
+                # Ensure clients_dir itself is a valid part of the path construction
+                # CONFIG.get('clients_dir', 'clients') gives the relative path like 'clients'
+                clients_base_subdir = CONFIG.get('clients_dir', 'clients') # e.g., "clients"
+
+                relative_folder = os.path.join(clients_base_subdir, f"{sane_client_name}_{client_id_for_folder[:8]}")
+                client_data_to_show["default_base_folder_path"] = relative_folder
+
+                abs_folder_path = os.path.join(self.app_root_dir, relative_folder)
+                try:
+                    os.makedirs(abs_folder_path, exist_ok=True)
+                    logging.info(f"Ensured client folder exists at: {abs_folder_path}")
+                    # Update the database so this path is persistent
+                    clients_crud_instance.update_client(client_id_to_open, {"default_base_folder_path": relative_folder})
+                    logging.info(f"Client {client_id_to_open} was missing default_base_folder_path. Constructed, assigned, and DB updated: {relative_folder}.")
+                except OSError as e_mkdir:
+                    logging.error(f"Failed to create directory {abs_folder_path}: {e_mkdir}")
+                    # Proceeding without this could still lead to issues, but client_data_to_show will have the path
+
+            # Ensure base_folder_path is an alias to default_base_folder_path for ClientWidget
+            client_data_to_show["base_folder_path"] = client_data_to_show.get("default_base_folder_path")
+
         if client_data_to_show and 'created_at' in client_data_to_show and client_data_to_show['created_at']:
             try:
                 created_at_str = client_data_to_show['created_at']
