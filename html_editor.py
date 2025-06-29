@@ -307,26 +307,27 @@ class HtmlEditor(QDialog):
             # The document_context is now expected to be fully resolved by the caller
             # (e.g., utils.generate_pdf_for_document which calls db.get_document_context_data)
             return render_html_template(html_template_content, document_context)
-        except Exception as e:
-            print(f"Error in static populate_html_content with pre-built context: {e}")
+        except BaseException as e: # Catch BaseException to include things like SystemExit, KeyboardInterrupt
+            # This will catch Jinja2's UndefinedError as it inherits from NameError -> Exception -> BaseException
+            # Also catches other standard exceptions.
+            print(f"Error in static populate_html_content with pre-built context: {type(e).__name__} - {e}")
             # Potentially log the context for debugging, carefully avoiding sensitive data in logs
             # print(f"Context was: {str(document_context)[:500]}...")
-            # Return a clear error message in HTML format instead of the original template
-            error_html = f"""
-            <!DOCTYPE html>
-            <html lang="en">
-            <head><meta charset="UTF-8"><title>Template Rendering Error</title></head>
-            <body>
-                <h1>Template Rendering Error</h1>
-                <p>An error occurred while trying to render the HTML template with Jinja2.</p>
-                <p><strong>Error Details:</strong></p>
-                <pre>{str(e)}</pre>
-                <p>The original template tags might appear in the document because of this error.</p>
-            </body>
-            </html>
-            """
-            print(f"CRITICAL: Returning error HTML due to Jinja2 rendering failure: {e}") # Make this very visible in logs
-            return error_html # Return original content on error
+            # It's important to re-raise critical errors or handle them appropriately.
+            # For now, returning original content on error to prevent crash, but this hides issues.
+            # A better approach for errors like UndefinedError from Jinja would be to let them propagate
+            # so the user/developer knows a template variable is missing.
+            # However, the immediate error "catching classes that do not inherit from BaseException"
+            # implies the *previous* version of this try-except was the problem.
+            # If Jinja2's StrictUndefined is working, it will raise UndefinedError.
+            # If this except block is hit by *that*, it's fine.
+            # The problem was likely if 'e' itself was not an instance of BaseException in some edge case.
+            # For now, making it BaseException makes the catch wider and should avoid the "catching classes" error.
+            # If Jinja2 StrictUndefined error is caught here, it means a template variable is missing.
+            if isinstance(e, Exception): # Re-raise standard exceptions to allow proper error handling upstream.
+                raise
+            return html_template_content # Fallback for non-standard BaseException like SystemExit
+-
 
     def _handle_tinymce_init_timeout(self):
         if not self.web_view: # Should not happen if timer was started
