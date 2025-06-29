@@ -4,7 +4,7 @@ import logging
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QSplitter, QHBoxLayout,
     QGroupBox, QFormLayout, QTableWidget, QHeaderView, QTabWidget, QProgressBar,
-    QTableWidgetItem, QStackedWidget
+    QTableWidgetItem, QStackedWidget, QDateEdit, QComboBox, QFileDialog
 )
 from PyQt5.QtCore import Qt, QObject, pyqtSignal, pyqtSlot, QTimer # Added QTimer
 from PyQt5.QtWebChannel import QWebChannel
@@ -317,8 +317,25 @@ class StatisticsDashboard(QWidget):
 
         self.stats_stack.setCurrentWidget(self.global_stats_widget) # Show global stats by default
 
+        # --- Advanced Reporting Tool ---
+        self.advanced_reporting_tool_widget = AdvancedReportingTool(self) # Create instance
+        self.stats_stack.addWidget(self.advanced_reporting_tool_widget)
+
+        # Button to access Advanced Reporting Tool
+        self.show_advanced_reporting_button = QPushButton(self.tr("Outil de Reporting Avancé"))
+        # self.show_advanced_reporting_button.setIcon(QIcon(":/icons/bar-chart-2.svg")) # Example icon
+        self.show_advanced_reporting_button.clicked.connect(self._show_advanced_reporting_view)
+
+        # Add this button to the global stats page or another suitable place in the dashboard UI
+        # For example, adding it below the segmentation_tabs on the global_stats_page_layout
+        global_stats_page_layout.addWidget(self.show_advanced_reporting_button)
+
+
     def _show_global_stats_view(self):
         self.stats_stack.setCurrentWidget(self.global_stats_widget)
+
+    def _show_advanced_reporting_view(self):
+        self.stats_stack.setCurrentWidget(self.advanced_reporting_tool_widget)
 
     @pyqtSlot(str, str)
     def _display_client_details_in_panel(self, client_id_str, client_name_str):
@@ -958,3 +975,300 @@ class StatisticsDashboard(QWidget):
     # --- End of Ported Methods ---
         # The old update_statistics_map method (which was the display-only map) is now removed.
         # self.update_map() is the current method for the interactive map.
+
+class AdvancedReportingTool(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(self.tr("Outil de Reporting Avancé"))
+        self.layout = QVBoxLayout(self)
+
+        # Controls
+        controls_group = QGroupBox(self.tr("Options de Rapport"))
+        controls_layout = QFormLayout(controls_group)
+
+        self.date_range_start_edit = QDateEdit(datetime.now().date().replace(day=1))
+        self.date_range_start_edit.setCalendarPopup(True)
+        self.date_range_end_edit = QDateEdit(datetime.now().date())
+        self.date_range_end_edit.setCalendarPopup(True)
+        controls_layout.addRow(self.tr("Plage de dates:"), self._create_date_range_layout())
+
+        self.data_type_combo = QComboBox()
+        self.data_type_combo.addItems([self.tr("Ventes"), self.tr("Clients"), self.tr("Produits")])
+        controls_layout.addRow(self.tr("Type de données:"), self.data_type_combo)
+
+        self.group_by_combo = QComboBox()
+        # Options de regroupement seront mises à jour en fonction du type de données
+        controls_layout.addRow(self.tr("Regrouper par:"), self.group_by_combo)
+        self.data_type_combo.currentTextChanged.connect(self._update_group_by_options)
+
+        self.generate_report_button = QPushButton(self.tr("Générer Rapport"))
+        self.generate_report_button.clicked.connect(self._generate_report)
+        controls_layout.addRow(self.generate_report_button)
+
+        self.layout.addWidget(controls_group)
+
+        # Results Table
+        self.results_table = QTableWidget()
+        self.layout.addWidget(self.results_table)
+
+        # Chart Type and Display
+        chart_group = QGroupBox(self.tr("Visualisation Graphique"))
+        chart_layout = QVBoxLayout(chart_group)
+
+        self.chart_type_combo = QComboBox()
+        self.chart_type_combo.addItems([self.tr("Barres"), self.tr("Lignes"), self.tr("Secteurs")])
+        chart_layout.addWidget(self.chart_type_combo)
+
+        self.figure_canvas = FigureCanvas(Figure()) # Placeholder
+        chart_layout.addWidget(self.figure_canvas)
+
+        self.layout.addWidget(chart_group)
+
+        # Export Buttons
+        export_layout = QHBoxLayout()
+        self.export_csv_button = QPushButton(self.tr("Exporter CSV"))
+        self.export_csv_button.clicked.connect(self._export_csv)
+        self.export_excel_button = QPushButton(self.tr("Exporter Excel"))
+        self.export_excel_button.clicked.connect(self._export_excel)
+        self.export_chart_button = QPushButton(self.tr("Exporter Graphique"))
+        self.export_chart_button.clicked.connect(self._export_chart)
+        export_layout.addWidget(self.export_csv_button)
+        export_layout.addWidget(self.export_excel_button)
+        export_layout.addWidget(self.export_chart_button)
+        self.layout.addLayout(export_layout)
+
+        self._update_group_by_options(self.data_type_combo.currentText()) # Initial setup
+
+    def _create_date_range_layout(self):
+        layout = QHBoxLayout()
+        layout.addWidget(self.date_range_start_edit)
+        layout.addWidget(QLabel(self.tr("à")))
+        layout.addWidget(self.date_range_end_edit)
+        return layout
+
+    def _update_group_by_options(self, data_type_text):
+        self.group_by_combo.clear()
+        if data_type_text == self.tr("Ventes"):
+            self.group_by_combo.addItems([self.tr("Jour"), self.tr("Mois"), self.tr("Année"), self.tr("Produit"), self.tr("Client")])
+        elif data_type_text == self.tr("Clients"):
+            self.group_by_combo.addItems([self.tr("Pays"), self.tr("Ville"), self.tr("Statut"), self.tr("Date de création (Mois)"), self.tr("Date de création (Année)")])
+        elif data_type_text == self.tr("Produits"):
+            self.group_by_combo.addItems([self.tr("Catégorie"), self.tr("Nombre de ventes"), self.tr("Chiffre d'affaires")])
+        # Add more specific grouping options as needed
+
+    def _generate_report(self):
+        # Placeholder for report generation logic
+        # This will involve:
+        # 1. Getting selected parameters (date range, data type, group by)
+        # 2. Calling appropriate CRUD functions (to be developed in step 3)
+        # 3. Populating self.results_table
+        # 4. Generating and displaying the chart in self.figure_canvas
+        start_date = self.date_range_start_edit.date().toPyDate()
+        end_date = self.date_range_end_edit.date().toPyDate()
+        data_type = self.data_type_combo.currentText()
+        group_by = self.group_by_combo.currentText()
+        chart_type = self.chart_type_combo.currentText()
+
+        logging.info(f"Génération du rapport: Dates: {start_date} à {end_date}, Type: {data_type}, Regroupement: {group_by}, Graphique: {chart_type}")
+
+        # Dummy data for now
+        self.results_table.setRowCount(0)
+        self.results_table.setColumnCount(0)
+
+        if data_type == self.tr("Ventes") and group_by == self.tr("Mois"):
+            self.results_table.setColumnCount(2)
+            self.results_table.setHorizontalHeaderLabels([self.tr("Mois"), self.tr("Total Ventes (€)")])
+            sample_data = [("Jan 2023", 1200.50), ("Fev 2023", 1500.75), ("Mar 2023", 1100.00)]
+            for i, (month, sales) in enumerate(sample_data):
+                self.results_table.insertRow(i)
+                self.results_table.setItem(i, 0, QTableWidgetItem(month))
+                self.results_table.setItem(i, 1, QTableWidgetItem(str(sales)))
+            self._update_chart(sample_data, chart_type, self.tr("Ventes par Mois"), self.tr("Mois"), self.tr("Total Ventes (€)"))
+
+        # Clear previous chart
+        # self.figure_canvas.figure.clear() # Clearing is now part of _update_chart
+
+        # Actual data fetching and chart generation
+        db_session = None # Placeholder for actual session management
+        data_for_chart = []
+
+        try:
+            # This is where you would get a real database session
+            # For now, we'll simulate calling the CRUD functions
+            # db_session = get_db_connection_somehow() # Replace with actual session logic
+
+            if data_type == self.tr("Ventes"):
+                # data_for_chart = proforma_invoices_crud.get_sales_data_for_period(db_session, start_date, end_date, group_by)
+                # Using dummy data as direct CRUD call isn't set up here
+                if group_by == self.tr("Mois"):
+                    self.results_table.setColumnCount(2)
+                    self.results_table.setHorizontalHeaderLabels([self.tr("Mois"), self.tr("Total Ventes (€)")])
+                    sample_data = [("Jan 2023", 1200.50), ("Fev 2023", 1500.75), ("Mar 2023", 1100.00), ("Avr 2023", 1800.20)]
+                    data_for_chart = sample_data
+                    title_chart, x_label_chart, y_label_chart = self.tr("Ventes par Mois"), self.tr("Mois"), self.tr("Total Ventes (€)")
+                elif group_by == self.tr("Client"):
+                    self.results_table.setColumnCount(2)
+                    self.results_table.setHorizontalHeaderLabels([self.tr("Client"), self.tr("Total Ventes (€)")])
+                    sample_data = [("Client A", 2500.00), ("Client B", 1800.50), ("Client C", 3200.75)]
+                    data_for_chart = sample_data
+                    title_chart, x_label_chart, y_label_chart = self.tr("Ventes par Client"), self.tr("Client"), self.tr("Total Ventes (€)")
+                # Add other sales groupings
+                else: # Fallback for other sales groupings
+                    title_chart, x_label_chart, y_label_chart = self.tr("Données de Ventes"), self.tr("Groupe"), self.tr("Valeur")
+
+
+            elif data_type == self.tr("Clients"):
+                # data_for_chart = clients_crud_instance.get_client_acquisition_data(start_date, end_date, group_by, conn=db_session_sqlite_conn_if_needed)
+                if group_by == self.tr("Pays"):
+                    self.results_table.setColumnCount(2)
+                    self.results_table.setHorizontalHeaderLabels([self.tr("Pays"), self.tr("Nombre de Clients")])
+                    sample_data = [("France", 15), ("USA", 25), ("Allemagne", 10)]
+                    data_for_chart = sample_data
+                    title_chart, x_label_chart, y_label_chart = self.tr("Clients par Pays"), self.tr("Pays"), self.tr("Nombre de Clients")
+                # Add other client groupings
+                else: # Fallback for other client groupings
+                    title_chart, x_label_chart, y_label_chart = self.tr("Données Clients"), self.tr("Groupe"), self.tr("Nombre")
+
+
+            elif data_type == self.tr("Produits"):
+                # data_for_chart = products_crud_instance.get_product_data_for_reporting(start_date, end_date, group_by, conn=db_session_sqlite_conn_if_needed)
+                if group_by == self.tr("Catégorie"):
+                    self.results_table.setColumnCount(2)
+                    self.results_table.setHorizontalHeaderLabels([self.tr("Catégorie"), self.tr("Nombre de Produits")])
+                    sample_data = [("Électronique", 50), ("Logiciel", 30), ("Services", 20)]
+                    data_for_chart = sample_data
+                    title_chart, x_label_chart, y_label_chart = self.tr("Produits par Catégorie"), self.tr("Catégorie"), self.tr("Nombre de Produits")
+                # Add other product groupings
+                else: # Fallback for other product groupings
+                    title_chart, x_label_chart, y_label_chart = self.tr("Données Produits"), self.tr("Groupe"), self.tr("Valeur")
+
+            # Populate table with data_for_chart
+            self.results_table.setRowCount(len(data_for_chart))
+            for i, row_data in enumerate(data_for_chart):
+                for j, cell_data in enumerate(row_data):
+                    self.results_table.setItem(i, j, QTableWidgetItem(str(cell_data)))
+
+            self.results_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+
+            if data_for_chart:
+                 self._update_chart(data_for_chart, chart_type, title_chart, x_label_chart, y_label_chart)
+            else:
+                 self.figure_canvas.figure.clear() # Clear if no data
+                 self.figure_canvas.draw()
+                 # Optionally display a "No data" message on the canvas
+                 ax = self.figure_canvas.figure.subplots()
+                 ax.text(0.5, 0.5, self.tr("Aucune donnée à afficher pour les sélections actuelles."),
+                        horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+                 ax.set_xticks([])
+                 ax.set_yticks([])
+                 self.figure_canvas.draw()
+
+
+        except Exception as e:
+            logging.error(f"Erreur lors de la génération du rapport avancé: {e}", exc_info=True)
+            # Display error to user, e.g., in a message box or on the chart/table area
+            self.results_table.setRowCount(0)
+            self.results_table.setColumnCount(1)
+            self.results_table.setHorizontalHeaderLabels([self.tr("Erreur")])
+            self.results_table.insertRow(0)
+            self.results_table.setItem(0, 0, QTableWidgetItem(self.tr("Erreur lors de la génération du rapport.")))
+            self.figure_canvas.figure.clear()
+            ax = self.figure_canvas.figure.subplots()
+            ax.text(0.5, 0.5, self.tr("Erreur de génération de rapport."), color='red',
+                    horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+            self.figure_canvas.draw()
+        # finally:
+            # Close db_session if it was opened here and needs explicit closing
+
+
+    def _update_chart(self, data, chart_type_text, title, xlabel, ylabel):
+        self.figure_canvas.figure.clear() # Clear the figure before redrawing
+
+        if not data:
+            # self.figure_canvas.figure.clear() # Already cleared
+            self.figure_canvas.draw()
+            return
+
+        ax = self.figure_canvas.figure.subplots() # Clears and adds new subplot
+
+        labels = [row[0] for row in data]
+        values = [row[1] for row in data]
+
+        if chart_type_text == self.tr("Barres"):
+            ax.bar(labels, values)
+        elif chart_type_text == self.tr("Lignes"):
+            ax.plot(labels, values, marker='o')
+        elif chart_type_text == self.tr("Secteurs"):
+            if sum(values) > 0 : # Pie chart requires positive values
+                ax.pie(values, labels=labels, autopct='%1.1f%%', startangle=90)
+                ax.axis('equal') # Equal aspect ratio ensures that pie is drawn as a circle.
+            else:
+                ax.text(0.5, 0.5, self.tr("Données insuffisantes pour le graphique secteur"),
+                        horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+
+        ax.set_title(title)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        self.figure_canvas.figure.tight_layout()
+        self.figure_canvas.draw()
+
+    def _export_csv(self):
+        # Placeholder for CSV export
+        file_path, _ = QFileDialog.getSaveFileName(self, self.tr("Exporter en CSV"), "", self.tr("Fichiers CSV (*.csv);;Tous les fichiers (*)"))
+        if file_path:
+            try:
+                # Using pandas for robust CSV export
+                data_to_export = []
+                headers = [self.results_table.horizontalHeaderItem(i).text() for i in range(self.results_table.columnCount())]
+                for row in range(self.results_table.rowCount()):
+                    row_data = []
+                    for col in range(self.results_table.columnCount()):
+                        item = self.results_table.item(row, col)
+                        row_data.append(item.text() if item else "")
+                    data_to_export.append(row_data)
+
+                df = pd.DataFrame(data_to_export, columns=headers)
+                df.to_csv(file_path, index=False, encoding='utf-8-sig') # utf-8-sig for Excel compatibility with accents
+                logging.info(f"Exportation CSV réussie vers: {file_path}")
+                # Optionally, show a success message to the user
+            except Exception as e:
+                logging.error(f"Erreur lors de l'exportation CSV: {e}", exc_info=True)
+                # Optionally, show an error message to the user (e.g., QMessageBox)
+
+    def _export_excel(self):
+        # Placeholder for Excel export
+        file_path, _ = QFileDialog.getSaveFileName(self, self.tr("Exporter en Excel"), "", self.tr("Fichiers Excel (*.xlsx);;Tous les fichiers (*)"))
+        if file_path:
+            try:
+                data_to_export = []
+                headers = [self.results_table.horizontalHeaderItem(i).text() for i in range(self.results_table.columnCount())]
+                for row in range(self.results_table.rowCount()):
+                    row_data = []
+                    for col in range(self.results_table.columnCount()):
+                        item = self.results_table.item(row, col)
+                        row_data.append(item.text() if item else "")
+                    data_to_export.append(row_data)
+
+                df = pd.DataFrame(data_to_export, columns=headers)
+                df.to_excel(file_path, index=False, engine='openpyxl')
+                logging.info(f"Exportation Excel réussie vers: {file_path}")
+            except Exception as e:
+                logging.error(f"Erreur lors de l'exportation Excel: {e}", exc_info=True)
+
+
+    def _export_chart(self):
+        # Placeholder for chart export
+        file_path, _ = QFileDialog.getSaveFileName(self, self.tr("Exporter le Graphique"), "", self.tr("Images PNG (*.png);;Images JPG (*.jpg);;Fichiers SVG (*.svg);;Tous les fichiers (*)"))
+        if file_path:
+            try:
+                self.figure_canvas.figure.savefig(file_path)
+                logging.info(f"Exportation du graphique réussie vers: {file_path}")
+            except Exception as e:
+                logging.error(f"Erreur lors de l'exportation du graphique: {e}", exc_info=True)
+            self.figure_canvas.figure.savefig(file_path)
+
+# Need to import QDateEdit, QComboBox, QFileDialog from PyQt5.QtWidgets
+# and update the import list at the top of statistics_module.py
+# Also, FigureCanvas and Figure from matplotlib
+# datetime from datetime
