@@ -122,81 +122,71 @@ class StatisticsDashboard(QWidget):
         """Deferred initialization of map components and initial data load."""
         logging.info("StatisticsDashboard: _initialize_map_and_load_data called by QTimer.")
 
-        # Ensure the container widget for the map exists and is valid
-        if self.left_widget_for_map is None :
-            logging.critical("StatisticsDashboard: self.left_widget_for_map is None at the start of _initialize_map_and_load_data. Cannot initialize map.")
+        if self.left_widget_for_map is None:
+            logging.critical("StatisticsDashboard: self.left_widget_for_map is None at the start. Cannot initialize map.")
             return
 
-        # Check if the widget is still valid (not deleted)
-        # This requires importing sip if not already available, or handling potential RuntimeError
         try:
-            # A simple check, more robust checks might involve checking internal Qt flags if accessible
-            # or just proceeding and catching exceptions if operations on it fail.
-            # For now, we assume if it's not None, we try to use it.
-            # A common pattern is to check `sip.isdeleted(self.left_widget_for_map)` but sip might not be directly used/available.
-            # Qt objects when deleted often cause RuntimeError on access.
-             pass # Proceeding with assumption it's not None means it's somewhat valid
-        except RuntimeError as e:
-            logging.critical(f"StatisticsDashboard: self.left_widget_for_map seems to be deleted or invalid: {e}")
+            # Simple check to see if the widget is still minimally valid
+            # A more robust check like sip.isdeleted() would be better if available
+            # but this can catch some cases of a deleted underlying C++ object.
+            _ = self.left_widget_for_map.isActiveWindow() # Or any simple property access
+        except RuntimeError:
+            logging.critical("StatisticsDashboard: self.left_widget_for_map appears to be deleted (RuntimeError). Cannot initialize map.")
             return
 
+        # Ensure self._left_map_actual_layout is valid and set on left_widget_for_map
+        current_layout = self.left_widget_for_map.layout()
 
-        # self._left_map_actual_layout should have been initialized in __init__
-        # and is the correct layout for self.left_widget_for_map.
-        # We verify if self.left_widget_for_map.layout() still reports it,
-        # or if it somehow became None.
+        if self._left_map_actual_layout is None:
+            # This should ideally not happen if __init__ was successful and _left_map_actual_layout wasn't tampered with.
+            logging.error("StatisticsDashboard: self._left_map_actual_layout found to be None. Recreating.")
+            self._left_map_actual_layout = QVBoxLayout(self.left_widget_for_map) # This will also set it on the widget
+            self._left_map_actual_layout.setContentsMargins(0,0,0,0)
+            current_layout = self.left_widget_for_map.layout() # Update current_layout
+            if current_layout is None or current_layout is not self._left_map_actual_layout :
+                 logging.critical("StatisticsDashboard: Failed to create and set _left_map_actual_layout. Map init aborted.")
+                 return
+            logging.info("StatisticsDashboard: _left_map_actual_layout recreated and set.")
 
-        current_layout_on_widget = self.left_widget_for_map.layout()
+        if current_layout is None:
+            logging.warning("StatisticsDashboard: Layout for left_widget_for_map is None. Setting _left_map_actual_layout.")
+            self.left_widget_for_map.setLayout(self._left_map_actual_layout)
+            if self.left_widget_for_map.layout() is None:
+                 logging.critical("StatisticsDashboard: Failed to set _left_map_actual_layout on left_widget_for_map. Map init aborted.")
+                 return
+            logging.info("StatisticsDashboard: _left_map_actual_layout applied to left_widget_for_map.")
+        elif current_layout is not self._left_map_actual_layout:
+            logging.warning("StatisticsDashboard: left_widget_for_map has a DIFFERENT layout. This is unexpected. Overwriting with _left_map_actual_layout.")
+            # Clean up the old layout properly before setting a new one.
+            # Create a temporary QWidget to take ownership of the old layout and its items.
+            # This allows the old layout to be properly deleted when the temporary widget is deleted.
+            temp_widget_for_old_layout = QWidget()
+            temp_widget_for_old_layout.setLayout(current_layout)
+            # Now set the new layout.
+            self.left_widget_for_map.setLayout(self._left_map_actual_layout)
+            if self.left_widget_for_map.layout() is not self._left_map_actual_layout:
+                 logging.critical("StatisticsDashboard: Failed to overwrite different layout with _left_map_actual_layout. Map init aborted.")
+                 return
+            logging.info("StatisticsDashboard: Different layout overwritten with _left_map_actual_layout.")
 
-        if current_layout_on_widget is None:
-            logging.warning("StatisticsDashboard: self.left_widget_for_map.layout() is None. "
-                            "This is unexpected as it should have been set in __init__ via self._left_map_actual_layout. "
-                            "Attempting to re-apply self._left_map_actual_layout if it exists, or recreate.")
-            if self._left_map_actual_layout is not None:
-                # Re-apply the layout instance we stored in __init__
-                self.left_widget_for_map.setLayout(self._left_map_actual_layout)
-            else:
-                # This is a more critical state: self._left_map_actual_layout itself was not set in __init__
-                logging.error("StatisticsDashboard: self._left_map_actual_layout is also None. This indicates an issue in __init__. Recreating layout.")
-                self._left_map_actual_layout = QVBoxLayout(self.left_widget_for_map)
-                self._left_map_actual_layout.setContentsMargins(0,0,0,0)
-                # self.left_widget_for_map.setLayout() is implicitly called by QVBoxLayout constructor with parent
-        elif current_layout_on_widget is not self._left_map_actual_layout:
-            logging.warning("StatisticsDashboard: self.left_widget_for_map.layout() (is %s) is different from self._left_map_actual_layout (is %s). "
-                            "This is highly unexpected. Trusting the instance variable self._left_map_actual_layout.",
-                            id(current_layout_on_widget), id(self._left_map_actual_layout) )
-            # If the widget has a *different* layout, and we are sure _left_map_actual_layout is the one we want,
-            # we might need to re-set it. However, this situation implies external modification or a deep bug.
-            # For now, we assume self._left_map_actual_layout is the intended one.
-            # If self.left_widget_for_map.layout() returned a *different, valid* layout,
-            # and self._left_map_actual_layout was also valid but different,
-            # the original code would have updated self._left_map_actual_layout to match the widget.
-            # The current CRITICAL error implies self._left_map_actual_layout becomes None.
-            pass # We will proceed using self._left_map_actual_layout as defined in __init__
 
-        # Final check on self._left_map_actual_layout, which should be the one from __init__
-        if not self._left_map_actual_layout:
-            logging.critical("StatisticsDashboard: self._left_map_actual_layout is None after checks. Cannot proceed with map initialization.")
-            return
-
+        # At this point, self._left_map_actual_layout should be valid and set on self.left_widget_for_map
         if self.map_view is None:
-            # Parent QWebEngineView to self.left_widget_for_map, which is its container
-            self.map_view = QWebEngineView(self.left_widget_for_map) # Parent to the widget
-            # Add the map_view to self._left_map_actual_layout, which is confirmed or restored/recreated.
+            self.map_view = QWebEngineView(self.left_widget_for_map)
             self._left_map_actual_layout.addWidget(self.map_view)
             logging.info("StatisticsDashboard: QWebEngineView (self.map_view) created and added to _left_map_actual_layout.")
 
             self.map_interaction_handler = MapInteractionHandler(self)
+            self.web_channel = QWebChannel(self.map_view.page()) # Store as instance attribute
+            self.map_view.page().setWebChannel(self.web_channel)
+            self.web_channel.registerObject("pyMapConnector", self.map_interaction_handler)
+
             self.map_interaction_handler.country_clicked_signal.connect(self._on_map_country_clicked)
             self.map_interaction_handler.client_clicked_on_map_signal.connect(self._display_client_details_in_panel)
-
-            web_channel = QWebChannel(self.map_view.page())
-            self.map_view.page().setWebChannel(web_channel)
-            web_channel.registerObject("pyMapConnector", self.map_interaction_handler)
             logging.info("StatisticsDashboard: MapInteractionHandler and QWebChannel set up.")
 
         self.refresh_all_dashboard_content()
-        # Removed diagnostic logging from the end of this method
 
 
     @pyqtSlot(str)
