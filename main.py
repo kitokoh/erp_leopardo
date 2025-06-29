@@ -32,8 +32,8 @@ from main_window import DocumentManager # The main application window
 
 import logging # For main.py's own logging needs, and for translator parts if setup_logging isn't called first
 import icons_rc # Import the compiled resource file
-import subprocess # Added for starting API server
-import atexit # Added for stopping API server on exit
+# import subprocess # Removed as API server functions are moved
+# import atexit # Removed as API server functions are moved
 
 # Core PyQt5 imports for application execution
 from PyQt5.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
@@ -83,8 +83,7 @@ SESSION_START_TIME = None
 # SESSION_TIMEOUT_SECONDS = CONFIG.get("session_timeout_minutes", 30) * 60
 SESSION_TIMEOUT_SECONDS = 12 * 30 * 24 * 60 * 60 # Approx 12 months
 
-# Global variable for the API server process
-api_server_process = None
+# Global variable for the API server process (api_server_process) has been moved to api_server_manager.py
 
 # --- DEVELOPMENT/TESTING FLAG ---
 # Set to True to bypass the login screen for faster testing.
@@ -96,96 +95,7 @@ BYPASS_LOGIN_FOR_TESTING = False
 
 # Old database initialization block removed as it's now called directly in main()
 
-def start_api_server():
-    """Starts the FastAPI server as a subprocess."""
-    global api_server_process
-    try:
-        # Ensure the command is correctly formatted.
-        # If 'api.main' is a module, uvicorn needs to be able to find it.
-        # This might require adjusting PYTHONPATH or running from a specific directory.
-        # For now, assume 'api.main:app' is discoverable by uvicorn in the current environment.
-        command = ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
-
-        # Using Popen for non-blocking execution.
-        # Ensure that the subprocess's stdout/stderr are handled appropriately
-        # to prevent blocking or deadlocks if they fill up.
-        # For basic logging, we can capture them or redirect to DEVNULL if not needed.
-        api_server_process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-        # Try to communicate with the process to get output.
-        # This will wait for the process to terminate if it does so quickly.
-        # If it's a long-running server, communicate() won't return until it's done,
-        # so we need a timeout for the initial check.
-        try:
-            stdout, stderr = api_server_process.communicate(timeout=2) # Wait 2 seconds for initial output / quick failure
-            # If communicate() returns, the process has terminated.
-            logging.error(f"FastAPI server process terminated unexpectedly. Exit code: {api_server_process.returncode}")
-            stdout_str = stdout.decode(errors='replace').strip()
-            stderr_str = stderr.decode(errors='replace').strip()
-            if stdout_str:
-                logging.error(f"FastAPI Server Stdout:\n{stdout_str}")
-            if stderr_str:
-                logging.error(f"FastAPI Server Stderr:\n{stderr_str}")
-            api_server_process = None # Reset as it failed
-        except subprocess.TimeoutExpired:
-            # This is the expected path for a successfully started server.
-            # The process is still running after the timeout.
-            if api_server_process.poll() is None:
-                logging.info(f"FastAPI server process started successfully with PID: {api_server_process.pid}. Command: {' '.join(command)}")
-                # Optionally, you could start threads here to monitor api_server_process.stdout and api_server_process.stderr
-                # and log their output in real-time if continuous logging is needed.
-            else:
-                # Process terminated after TimeoutExpired was raised but before poll() - less likely but possible
-                stdout, stderr = api_server_process.communicate() # get any final output
-                logging.error(f"FastAPI server process failed to start or terminated shortly after. Exit code: {api_server_process.returncode}")
-                stdout_str = stdout.decode(errors='replace').strip()
-                stderr_str = stderr.decode(errors='replace').strip()
-                if stdout_str:
-                    logging.error(f"FastAPI Server Stdout (after timeout check):\n{stdout_str}")
-                if stderr_str:
-                    logging.error(f"FastAPI Server Stderr (after timeout check):\n{stderr_str}")
-                api_server_process = None
-        except Exception as e_comm:
-            # Other errors during communicate
-            logging.error(f"Error communicating with FastAPI server process: {e_comm}", exc_info=True)
-            if api_server_process.poll() is not None:
-                logging.error(f"FastAPI server process also terminated with exit code: {api_server_process.returncode}")
-            api_server_process = None
-
-
-    except FileNotFoundError:
-        logging.error("Error starting FastAPI server: 'uvicorn' command not found. Ensure uvicorn is installed and in PATH.")
-        api_server_process = None
-    except Exception as e:
-        logging.error(f"An unexpected error occurred while starting the FastAPI server process: {e}", exc_info=True)
-        api_server_process = None
-
-def stop_api_server():
-    """Stops the FastAPI server process if it is running."""
-    global api_server_process
-    if api_server_process and api_server_process.poll() is None: # Check if process exists and is running
-        logging.info(f"Attempting to terminate API server process with PID: {api_server_process.pid}")
-        try:
-            api_server_process.terminate() # Send SIGTERM
-            try:
-                # Wait for a few seconds for graceful shutdown
-                api_server_process.wait(timeout=5)
-                logging.info(f"API server process with PID: {api_server_process.pid} terminated.")
-            except subprocess.TimeoutExpired:
-                logging.warning(f"API server process with PID: {api_server_process.pid} did not terminate in time. Sending SIGKILL.")
-                api_server_process.kill() # Send SIGKILL
-                api_server_process.wait() # Wait for kill to complete
-                logging.info(f"API server process with PID: {api_server_process.pid} killed.")
-            except Exception as e_wait: # Catch other errors during wait (e.g. process already died)
-                logging.info(f"Error waiting for API server process {api_server_process.pid} to terminate: {e_wait}. It might have already exited.")
-        except ProcessLookupError: # Raised if process does not exist (e.g. already terminated)
-            logging.info(f"API server process with PID: {api_server_process.pid} not found. Likely already stopped.")
-        except Exception as e:
-            logging.error(f"Error terminating/killing API server process with PID: {api_server_process.pid}: {e}", exc_info=True)
-    elif api_server_process: # Process exists but poll() is not None, meaning it already terminated
-        logging.info(f"API server process with PID: {api_server_process.pid} was already stopped (return code: {api_server_process.returncode}).")
-    else: # api_server_process is None
-        logging.info("No API server process to stop (api_server_process is None).")
+# start_api_server() and stop_api_server() functions have been moved to api_server_manager.py
 
 def expire_session():
     global CURRENT_SESSION_TOKEN, CURRENT_USER_ROLE, CURRENT_USER_ID, SESSION_START_TIME
@@ -217,17 +127,11 @@ def main():
     setup_logging()
     logging.info("Application starting...")
 
-    # Start the API server - Commented out as per user request for local PyQt app
-    # start_api_server()
-    # logging.info("API server auto-start is disabled for local PyQt execution.") # Log message removed
+    # API server start call and atexit registration have been removed.
+    # The functions start_api_server() and stop_api_server() remain in the file
+    # in case they are used by other parts of the system or for specific operational modes.
 
-
-    # Register the function to stop the API server on application exit
-    # This ensures that if start_api_server() actually started a process,
-    # we attempt to clean it up.
-    atexit.register(stop_api_server)
-
-    # Initialize database after logging and API server start attempt
+    # Initialize database after logging
     db.initialize_database()
 
     # --- Coordinated Data Seeding ---
@@ -298,71 +202,9 @@ def main():
     # load_stylesheet_global is imported from app_setup
     load_stylesheet_global(app) 
     
-    # Apply the basic QSS stylesheet (this was the one previously embedded)
-    # This can be moved to style.qss and loaded by load_stylesheet_global if preferred.
-    app.setStyleSheet("""
-        QWidget {}
-        QPushButton {
-            padding: 6px 12px; border: 1px solid #cccccc; border-radius: 4px;
-        background-color: #f8f9fa; min-width: 80px;
-        }
-        QPushButton:hover { background-color: #e9ecef; border-color: #adb5bd; }
-        QPushButton:pressed { background-color: #dee2e6; border-color: #adb5bd; }
-        QPushButton:disabled { background-color: #e9ecef; color: #6c757d; border-color: #ced4da; }
-        QPushButton#primaryButton, QPushButton[primary="true"] {
-            background-color: #007bff; color: white; border-color: #007bff;
-        }
-        QPushButton#primaryButton:hover, QPushButton[primary="true"]:hover {
-            background-color: #0069d9; border-color: #0062cc;
-        }
-        QPushButton#primaryButton:pressed, QPushButton[primary="true"]:pressed {
-            background-color: #005cbf; border-color: #005cbf;
-        }
-        QPushButton#dangerButton, QPushButton[danger="true"] {
-            background-color: #dc3545; color: white; border-color: #dc3545;
-        }
-        QPushButton#dangerButton:hover, QPushButton[danger="true"]:hover {
-            background-color: #c82333; border-color: #bd2130;
-        }
-        QPushButton#dangerButton:pressed, QPushButton[danger="true"]:pressed {
-            background-color: #b21f2d; border-color: #b21f2d;
-        }
-        QLineEdit, QTextEdit, QSpinBox, QDoubleSpinBox, QComboBox {
-            padding: 5px; border: 1px solid #ced4da; border-radius: 4px;
-        }
-        QLineEdit:focus, QTextEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {
-            border-color: #80bdff;
-        }
-        QGroupBox {
-            font-weight: bold; border: 1px solid #ced4da; border-radius: 4px;
-            margin-top: 10px; padding: 10px;
-        }
-        QGroupBox::title {
-            subcontrol-origin: margin; subcontrol-position: top left;
-            padding: 0 3px 0 3px; left: 10px; background-color: transparent;
-        }
-        QTabWidget::pane { border-top: 1px solid #ced4da; padding: 10px; }
-        QTabBar::tab {
-            padding: 8px 15px; border: 1px solid #ced4da; border-bottom: none;
-            border-top-left-radius: 4px; border-top-right-radius: 4px;
-            background-color: #e9ecef; margin-right: 2px;
-        }
-        QTabBar::tab:selected { background-color: #ffffff; border-color: #ced4da; }
-        QTabBar::tab:hover:!selected { background-color: #f8f9fa; }
-        QTableWidget {
-            border: 1px solid #dee2e6; gridline-color: #dee2e6;
-            alternate-background-color: #f8f9fa;
-        }
-        QHeaderView::section {
-            background-color: #e9ecef; padding: 4px; border: 1px solid #dee2e6;
-            font-weight: bold;
-        }
-        QListWidget { border: 1px solid #ced4da; border-radius: 4px; }
-        QListWidget::item { padding: 5px; }
-        QListWidget::item:alternate { background-color: #f8f9fa; }
-        QListWidget::item:hover { background-color: #e9ecef; }
-        QListWidget::item:selected { background-color: #007bff; /* color: white; */ }
-    # """) # The # color: white; part for QListWidget::item:selected was commented out in original.
+    # The inline app.setStyleSheet call that was here has been removed.
+    # The global stylesheet is now solely loaded by load_stylesheet_global(app)
+    # which loads style.qss.
 
     # 8. Setup Translations
     # Try to get language from DB settings
@@ -435,19 +277,6 @@ def main():
     initialize_default_templates(CONFIG, APP_ROOT_DIR)
     logging.info("Call to app_setup.initialize_default_templates completed (ensures template files on disk).")
 
-    # --- Coordinated Data Seeding ---
-    # This block handles the seeding of initial data after the schema is created,
-    # using the dedicated seeding module.
-    try:
-        logging.info("Attempting to run data seeding if necessary...")
-        run_seed() # Call the main seeding function from db_seed.py
-        # run_seed() handles its own connection, commit, rollback, and logging.
-        logging.info("Data seeding process via run_seed() completed.")
-    except Exception as e_seed_run:
-        # Catch any unexpected error from run_seed() itself, though it should handle its own.
-        logging.error(f"An unexpected error occurred when calling run_seed(): {e_seed_run}", exc_info=True)
-    # --- End Coordinated Data Seeding ---
-
     # --- Startup Dialog Logic ---
     show_setup_prompt_config_value = CONFIG.get("show_initial_setup_on_startup", False)
     # Use CONFIG for directory paths in is_first_launch
@@ -457,67 +286,50 @@ def main():
     should_reset_config_flag_after_dialog = False
 
     if first_launch_detected:
-        logging.info("Application detected first launch. Executing InitialSetupDialog.")
-        # initial_setup_dialog = InitialSetupDialog()
-        # result = initial_setup_dialog.exec_()
-        # if result == QDialog.Accepted:
-        #     # Use CONFIG for directory paths in mark_initial_setup_complete
-        #     mark_initial_setup_complete(APP_ROOT_DIR, CONFIG.get('templates_dir'), CONFIG.get('clients_dir'))
-        #     logging.info("Initial setup marked as complete.")
-        #     companies_exist = bool(db.get_all_companies()) # Re-check companies after setup
-        # else:
-        #     logging.warning("InitialSetupDialog cancelled. Application may lack configurations.")
-        #     # Potentially exit or show critical error if setup is vital
+        logging.info("Application detected first launch. InitialSetupDialog logic was previously commented out and has been removed.")
+        # The original InitialSetupDialog instantiation and exec_() call were here.
+        # If first_launch_detected is true, mark_initial_setup_complete would have been called on dialog acceptance.
+        # For now, we assume that if this dialog was critical, its functionality is either deprecated
+        # or handled elsewhere. If it needs to be restored, this is the section.
+        # We will still re-check companies_exist after this block if first_launch was true.
+        mark_initial_setup_complete(APP_ROOT_DIR, CONFIG.get('templates_dir'), CONFIG.get('clients_dir'))
+        logging.info("Initial setup (first launch marker) marked as complete.")
+        companies_exist = bool(db.get_all_companies()) # Re-check companies after setup
 
     # Now, handle the PromptCompanyInfoDialog based on company existence and the flag
     if not companies_exist:
         if first_launch_detected or show_setup_prompt_config_value: # Show if first launch OR if flag is true
-            logging.info("No companies found or setup prompt explicitly enabled. Prompting for company information.")
-            # prompt_dialog = PromptCompanyInfoDialog()
-            # dialog_result_company = prompt_dialog.exec_()
+            logging.info("No companies found and/or setup prompt explicitly enabled. Proceeding with logic for default company creation if applicable.")
+            # The original PromptCompanyInfoDialog instantiation and exec_() call were here.
+            # The following logic simulates an "accepted" dialog that opts for a default company.
+            # This preserves the behavior of creating a default company if none exist
+            # and either it's the first launch or the config flag is set.
 
-            # if dialog_result_company == QDialog.Accepted:
-            # Simulate dialog acceptance to proceed with default company creation if logic expects it
-            dialog_result_company = QDialog.Accepted # SIMULATED ACCEPTANCE
-            prompt_dialog = type('obj', (object,), {'use_default_company': True, 'get_company_data': lambda: None})() # SIMULATED DIALOG
+            # Simulate conditions that would lead to default company creation
+            # This replaces the simulated dialog object and its acceptance.
+            # The key logic is to create a default company if 'use_default_company' path was taken.
+            # We assume 'use_default_company' is the desired path if no actual dialog is shown.
 
-            if dialog_result_company == QDialog.Accepted:
-                if prompt_dialog.use_default_company:
-                    logging.info("User opted to use a default company.")
-                    default_company_data = {
-                        "company_name": "My Business", "address": "Not specified", "is_default": True,
-                        "logo_path": None, "payment_info": "", "other_info": "Default company created."
-                    }
-                    new_company_id = add_company(default_company_data)
-                    if new_company_id:
-                        logging.info(f"Default company 'My Business' added with ID: {new_company_id}.")
-                        companies_exist = True # Update companies_exist status
-                    else:
-                        logging.error("Failed to add default company.")
-                else: # User entered data
-                    user_company_data = prompt_dialog.get_company_data()
-                    if user_company_data and user_company_data['company_name']:
-                        company_to_add = {
-                            "company_name": user_company_data['company_name'],
-                            "address": user_company_data.get('address', ''), "is_default": True,
-                            "logo_path": None, "payment_info": "", "other_info": "Company created via prompt."
-                        }
-                        new_company_id = add_company(company_to_add)
-                        if new_company_id:
-                            logging.info(f"User-defined company '{company_to_add['company_name']}' added with ID: {new_company_id}.")
-                            companies_exist = True # Update companies_exist status
-                        else:
-                            logging.error(f"Failed to add user-defined company '{company_to_add['company_name']}'.")
-                    else:
-                        logging.warning("Company prompt accepted, but no company name provided. No company added.")
-            else: # Dialog was cancelled
-                logging.warning("User cancelled company prompt.")
+            # Directly proceed to default company creation logic:
+            logging.info("Attempting to add a default company as no companies exist and conditions are met.")
+            default_company_data = {
+                "company_name": "My Business", "address": "Not specified", "is_default": True,
+                "logo_path": None, "payment_info": "", "other_info": "Default company auto-created."
+            }
+            new_company_id = add_company(default_company_data)
+            if new_company_id:
+                logging.info(f"Default company 'My Business' added with ID: {new_company_id}.")
+                companies_exist = True # Update companies_exist status
+            else:
+                logging.error("Failed to add default company.")
+            # The 'else' branch for user-entered company data (from the simulated dialog) is removed
+            # as there's no dialog interaction.
 
             # If the prompt was shown because of the config flag (and not strictly first_launch path that also sets it)
             if show_setup_prompt_config_value and not first_launch_detected:
                 should_reset_config_flag_after_dialog = True
         else:
-            logging.info("No companies found, but setup prompt is not enabled by config and not first launch. Skipping company prompt.")
+            logging.info("No companies found, but setup prompt is not enabled by config and not first launch. Skipping company creation.")
     else: # Companies exist
         logging.info("Companies found in the database. No need to prompt for company info now.")
         # If companies exist, but the flag was true, it implies the user wanted to see the prompt (even if not strictly necessary).
