@@ -76,7 +76,8 @@ from document_manager_logic import (
     perform_old_clients_check,
     handle_open_edit_client_dialog,
     archive_client_status,
-    permanently_delete_client
+    permanently_delete_client,
+    ensure_client_folder_path # Import the new helper
 )
 from dialogs import (
     TemplateDialog, AddNewClientDialog, ManageProductMasterDialog
@@ -1644,6 +1645,9 @@ class DocumentManager(QMainWindow):
         client_data_to_show = clients_crud_instance.get_client_by_id(client_id_to_open, include_deleted=False)
         logging.info(f"open_client_tab_by_id: client_data_to_show after fetching from DB: {client_data_to_show}")
 
+        if client_data_to_show:
+            client_data_to_show = ensure_client_folder_path(client_data_to_show, self.app_root_dir) # Use helper
+
         if client_data_to_show and 'created_at' in client_data_to_show and client_data_to_show['created_at']:
             try:
                 created_at_str = client_data_to_show['created_at']
@@ -1875,6 +1879,9 @@ class DocumentManager(QMainWindow):
                     fresh_client_data = clients_crud_instance.get_client_by_id(client_id, include_deleted=False) # Assuming active clients in tabs
 
                     if fresh_client_data:
+                        # Ensure folder path is handled consistently
+                        fresh_client_data = ensure_client_folder_path(fresh_client_data, self.app_root_dir) # Use helper
+
                         # Augment data with related names (country, city, status text)
                         # This ensures that if a status name was changed, it's reflected.
                         if 'country' not in fresh_client_data and fresh_client_data.get('country_id'):
@@ -1892,12 +1899,15 @@ class DocumentManager(QMainWindow):
                         selected_languages_str = fresh_client_data.get('selected_languages')
                         if isinstance(selected_languages_str, str) and selected_languages_str.strip():
                             fresh_client_data['selected_languages'] = [lang.strip() for lang in selected_languages_str.split(',') if lang.strip()]
-                        elif not isinstance(fresh_client_data.get('selected_languages'), list):
+                        elif not isinstance(fresh_client_data.get('selected_languages'), list): # If it's already a list, use it
+                            pass # No change needed if it's already a list (even if empty)
+                        else: # None or other non-string, non-list types
                             fresh_client_data['selected_languages'] = []
+
 
                         # Call refresh_display on the ClientWidget with the fresh, augmented data
                         if hasattr(client_widget, 'refresh_display'):
-                            logging.debug(f"Calling refresh_display() for ClientWidget of client ID: {client_id}")
+                            logging.debug(f"Calling refresh_display() for ClientWidget of client ID: {client_id} with data: {fresh_client_data}")
                             client_widget.refresh_display(fresh_client_data)
                             logging.info(f"Refreshed client tab display for client ID: {client_id}")
                         else:
