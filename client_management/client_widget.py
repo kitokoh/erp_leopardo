@@ -3520,11 +3520,72 @@ class ClientWidget(QWidget):
                  QMessageBox.warning(self, self.tr("Erreur Génération PDF"), self.tr("Le fichier PDF semble avoir été généré mais est introuvable : {0}").format(generated_pdf_path_final))
             # else: self.generate_pdf_for_document would have shown an error.
 
+            # After successful generation and opening, add to DB and refresh table
+            if generated_pdf_path_final and os.path.exists(generated_pdf_path_final):
+                # Add to ClientDocuments Table
+                # file_name_on_disk_for_pdf = os.path.basename(generated_pdf_path_final)
+                # base_client_path_abs = os.path.normpath(os.path.join(self.app_root_dir, client_base_folder_relative))
+                # relative_path_for_db = os.path.relpath(generated_pdf_path_final, base_client_path_abs)
+
+                # Simplified relative path construction assuming PDF is saved in the same directory as source HTML
+                source_dir_relative = os.path.dirname(document_data.get('file_path_relative'))
+                pdf_file_name_on_disk = os.path.basename(generated_pdf_path_final)
+                relative_path_for_db_pdf = os.path.join(source_dir_relative, pdf_file_name_on_disk)
+
+
+                doc_db_data_pdf = {
+                    'client_id': self.client_info.get("client_id"),
+                    'project_id': document_data.get('project_id'),
+                    'order_identifier': document_data.get('order_identifier'),
+                    'document_name': pdf_file_name_on_disk, # Or a more descriptive name
+                    'file_name_on_disk': pdf_file_name_on_disk,
+                    'file_path_relative': relative_path_for_db_pdf,
+                    'document_type_generated': "PDF",
+                    'source_template_id': document_data.get('source_template_id'),
+                    'user_id': self.current_user_id,
+                    'language_code': document_data.get('language_code'),
+                    'notes': f"PDF généré à partir de {document_data.get('file_name_on_disk')}"
+                }
+                try:
+                    new_pdf_doc_id = db_manager.add_client_document(doc_db_data_pdf)
+                    if new_pdf_doc_id:
+                        logging.info(f"Generated PDF document '{pdf_file_name_on_disk}' (ID: {new_pdf_doc_id}) added to DB.")
+                        self.populate_doc_table() # Refresh to show the new PDF
+                        if self.notification_manager:
+                            self.notification_manager.show(
+                                title=self.tr("PDF Enregistré"),
+                                message=self.tr("Le PDF généré a été enregistré et ajouté à la liste des documents."),
+                                type='SUCCESS'
+                            )
+                    else:
+                        logging.error(f"Failed to add generated PDF {pdf_file_name_on_disk} to database.")
+                        if self.notification_manager:
+                            self.notification_manager.show(
+                                title=self.tr("Erreur DB"),
+                                message=self.tr("Le PDF a été généré mais son enregistrement en base de données a échoué."),
+                                type='ERROR'
+                            )
+                except Exception as e_db_add_pdf:
+                    logging.error(f"Error adding generated PDF {pdf_file_name_on_disk} to DB: {e_db_add_pdf}", exc_info=True)
+                    if self.notification_manager:
+                        self.notification_manager.show(
+                            title=self.tr("Erreur DB Critique"),
+                            message=self.tr("Erreur critique lors de l'enregistrement du PDF en DB:\n{0}").format(str(e_db_add_pdf)),
+                            type='CRITICAL'
+                        )
+
         except Exception as e:
             logging.error(f"Error in _handle_generate_and_open_pdf_action: {e}", exc_info=True)
             QMessageBox.critical(self, self.tr("Erreur Inattendue"), self.tr("Une erreur inattendue est survenue lors de la génération du PDF:\n{0}").format(str(e)))
+            if self.notification_manager:
+                 self.notification_manager.show(
+                    title=self.tr("Erreur PDF Inattendue"),
+                    message=self.tr("Erreur: {0}").format(str(e)),
+                    type='ERROR'
+                )
         finally:
             QApplication.restoreOverrideCursor()
+
 
     def populate_details_layout(self):
         # Clear existing rows from the layout
