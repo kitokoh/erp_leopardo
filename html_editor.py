@@ -311,7 +311,22 @@ class HtmlEditor(QDialog):
             print(f"Error in static populate_html_content with pre-built context: {e}")
             # Potentially log the context for debugging, carefully avoiding sensitive data in logs
             # print(f"Context was: {str(document_context)[:500]}...")
-            return html_template_content # Return original content on error
+            # Return a clear error message in HTML format instead of the original template
+            error_html = f"""
+            <!DOCTYPE html>
+            <html lang="en">
+            <head><meta charset="UTF-8"><title>Template Rendering Error</title></head>
+            <body>
+                <h1>Template Rendering Error</h1>
+                <p>An error occurred while trying to render the HTML template with Jinja2.</p>
+                <p><strong>Error Details:</strong></p>
+                <pre>{str(e)}</pre>
+                <p>The original template tags might appear in the document because of this error.</p>
+            </body>
+            </html>
+            """
+            print(f"CRITICAL: Returning error HTML due to Jinja2 rendering failure: {e}") # Make this very visible in logs
+            return error_html # Return original content on error
 
     def _handle_tinymce_init_timeout(self):
         if not self.web_view: # Should not happen if timer was started

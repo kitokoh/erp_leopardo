@@ -128,6 +128,10 @@ def get_document_context(
         context["doc"]["currency_symbol"] = additional_data.get("currency_symbol", "€")
         context["doc"]["vat_rate"] = Decimal(additional_data.get("vat_rate", "0.20"))
         context["doc"]["discount_rate"] = Decimal(additional_data.get("discount_rate", "0.00"))
+        # Proactively add payment_terms and delivery_terms to doc context
+        context["doc"]["payment_terms"] = additional_data.get("payment_terms", "Due on receipt") # Default or from additional_data
+        context["doc"]["delivery_terms"] = additional_data.get("delivery_terms", "FOB Origin") # Default or from additional_data
+
 
         # 2. Language Info (lang section) & Localized Labels
         context["lang"]["code"] = language_code
@@ -560,10 +564,27 @@ def get_document_context(
         context["placeholders"]["SELLER_LOGO"] = context["seller"].get("logo_path")
         context["placeholders"]["PROJECT_NAME"] = context["project"].get("name")
         context["placeholders"]["PROJECT_IDENTIFIER"] = context["project"].get("identifier")
-        context["placeholders"]["CURRENT_DATE"] = context["doc"]["current_date"]
+        context["placeholders"]["CURRENT_DATE"] = context["doc"]["current_date_formatted"] # Use formatted date for placeholder
         context["placeholders"]["GRAND_TOTAL_AMOUNT"] = context["doc"]["grand_total_amount"]
         context["placeholders"]["SUBTOTAL_AMOUNT"] = context["doc"]["subtotal_amount"]
         context["placeholders"]["CURRENCY_SYMBOL"] = context["doc"]["currency_symbol"]
+        # Populate placeholders for rates as expected by template
+        context["placeholders"]["DISCOUNT_RATE"] = f"{context['doc']['discount_rate'] * Decimal('100'):.0f}" # Format as percentage string
+        context["placeholders"]["VAT_RATE"] = f"{context['doc']['vat_rate'] * Decimal('100'):.0f}" # Format as percentage string
+        context["placeholders"]["DISCOUNT_AMOUNT"] = context["doc"]["discount_amount"]
+        context["placeholders"]["VAT_AMOUNT"] = context["doc"]["vat_amount"]
+
+        # Populate order details if available in additional_data
+        context["order"] = {
+            "client_order_number": additional_data.get("client_order_number", "N/A"),
+            "client_order_date": additional_data.get("client_order_date", "N/A")
+        }
+        # Also add to placeholders for direct use if template expects them there
+        context["placeholders"]["CLIENT_ORDER_NUMBER"] = context["order"]["client_order_number"]
+        context["placeholders"]["CLIENT_ORDER_DATE"] = context["order"]["client_order_date"]
+        context["placeholders"]["PAYMENT_TERMS"] = context["doc"]["payment_terms"]
+        context["placeholders"]["DELIVERY_TERMS"] = context["doc"]["delivery_terms"]
+
 
     except Exception as e:
         logger.error(f"Error building document context: {e}", exc_info=True)
