@@ -28,6 +28,8 @@ else:
 
 from main_window import DocumentManager # The main application window
 
+from main_window import DocumentManager # The main application window
+
 import logging # For main.py's own logging needs, and for translator parts if setup_logging isn't called first
 import icons_rc # Import the compiled resource file
 import subprocess # Added for starting API server
@@ -215,17 +217,11 @@ def main():
     setup_logging()
     logging.info("Application starting...")
 
-    # Start the API server - Commented out as per user request for local PyQt app
-    # start_api_server()
-    # logging.info("API server auto-start is disabled for local PyQt execution.") # Log message removed
+    # API server start call and atexit registration have been removed.
+    # The functions start_api_server() and stop_api_server() remain in the file
+    # in case they are used by other parts of the system or for specific operational modes.
 
-
-    # Register the function to stop the API server on application exit
-    # This ensures that if start_api_server() actually started a process,
-    # we attempt to clean it up.
-    atexit.register(stop_api_server)
-
-    # Initialize database after logging and API server start attempt
+    # Initialize database after logging
     db.initialize_database()
 
     # --- Coordinated Data Seeding ---
@@ -296,71 +292,9 @@ def main():
     # load_stylesheet_global is imported from app_setup
     load_stylesheet_global(app) 
     
-    # Apply the basic QSS stylesheet (this was the one previously embedded)
-    # This can be moved to style.qss and loaded by load_stylesheet_global if preferred.
-    app.setStyleSheet("""
-        QWidget {}
-        QPushButton {
-            padding: 6px 12px; border: 1px solid #cccccc; border-radius: 4px;
-        background-color: #f8f9fa; min-width: 80px;
-        }
-        QPushButton:hover { background-color: #e9ecef; border-color: #adb5bd; }
-        QPushButton:pressed { background-color: #dee2e6; border-color: #adb5bd; }
-        QPushButton:disabled { background-color: #e9ecef; color: #6c757d; border-color: #ced4da; }
-        QPushButton#primaryButton, QPushButton[primary="true"] {
-            background-color: #007bff; color: white; border-color: #007bff;
-        }
-        QPushButton#primaryButton:hover, QPushButton[primary="true"]:hover {
-            background-color: #0069d9; border-color: #0062cc;
-        }
-        QPushButton#primaryButton:pressed, QPushButton[primary="true"]:pressed {
-            background-color: #005cbf; border-color: #005cbf;
-        }
-        QPushButton#dangerButton, QPushButton[danger="true"] {
-            background-color: #dc3545; color: white; border-color: #dc3545;
-        }
-        QPushButton#dangerButton:hover, QPushButton[danger="true"]:hover {
-            background-color: #c82333; border-color: #bd2130;
-        }
-        QPushButton#dangerButton:pressed, QPushButton[danger="true"]:pressed {
-            background-color: #b21f2d; border-color: #b21f2d;
-        }
-        QLineEdit, QTextEdit, QSpinBox, QDoubleSpinBox, QComboBox {
-            padding: 5px; border: 1px solid #ced4da; border-radius: 4px;
-        }
-        QLineEdit:focus, QTextEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {
-            border-color: #80bdff;
-        }
-        QGroupBox {
-            font-weight: bold; border: 1px solid #ced4da; border-radius: 4px;
-            margin-top: 10px; padding: 10px;
-        }
-        QGroupBox::title {
-            subcontrol-origin: margin; subcontrol-position: top left;
-            padding: 0 3px 0 3px; left: 10px; background-color: transparent;
-        }
-        QTabWidget::pane { border-top: 1px solid #ced4da; padding: 10px; }
-        QTabBar::tab {
-            padding: 8px 15px; border: 1px solid #ced4da; border-bottom: none;
-            border-top-left-radius: 4px; border-top-right-radius: 4px;
-            background-color: #e9ecef; margin-right: 2px;
-        }
-        QTabBar::tab:selected { background-color: #ffffff; border-color: #ced4da; }
-        QTabBar::tab:hover:!selected { background-color: #f8f9fa; }
-        QTableWidget {
-            border: 1px solid #dee2e6; gridline-color: #dee2e6;
-            alternate-background-color: #f8f9fa;
-        }
-        QHeaderView::section {
-            background-color: #e9ecef; padding: 4px; border: 1px solid #dee2e6;
-            font-weight: bold;
-        }
-        QListWidget { border: 1px solid #ced4da; border-radius: 4px; }
-        QListWidget::item { padding: 5px; }
-        QListWidget::item:alternate { background-color: #f8f9fa; }
-        QListWidget::item:hover { background-color: #e9ecef; }
-        QListWidget::item:selected { background-color: #007bff; /* color: white; */ }
-    # """) # The # color: white; part for QListWidget::item:selected was commented out in original.
+    # The inline app.setStyleSheet call that was here has been removed.
+    # The global stylesheet is now solely loaded by load_stylesheet_global(app)
+    # which loads style.qss.
 
     # 8. Setup Translations
     # Try to get language from DB settings
@@ -433,19 +367,6 @@ def main():
     initialize_default_templates(CONFIG, APP_ROOT_DIR)
     logging.info("Call to app_setup.initialize_default_templates completed (ensures template files on disk).")
 
-    # --- Coordinated Data Seeding ---
-    # This block handles the seeding of initial data after the schema is created,
-    # using the dedicated seeding module.
-    try:
-        logging.info("Attempting to run data seeding if necessary...")
-        run_seed() # Call the main seeding function from db_seed.py
-        # run_seed() handles its own connection, commit, rollback, and logging.
-        logging.info("Data seeding process via run_seed() completed.")
-    except Exception as e_seed_run:
-        # Catch any unexpected error from run_seed() itself, though it should handle its own.
-        logging.error(f"An unexpected error occurred when calling run_seed(): {e_seed_run}", exc_info=True)
-    # --- End Coordinated Data Seeding ---
-
     # --- Startup Dialog Logic ---
     show_setup_prompt_config_value = CONFIG.get("show_initial_setup_on_startup", False)
     # Use CONFIG for directory paths in is_first_launch
@@ -455,33 +376,64 @@ def main():
     should_reset_config_flag_after_dialog = False
 
     if first_launch_detected:
-        logging.info("Application detected first launch. Executing InitialSetupDialog.")
-        # initial_setup_dialog = InitialSetupDialog()
-        # result = initial_setup_dialog.exec_()
-        # if result == QDialog.Accepted:
-        #     # Use CONFIG for directory paths in mark_initial_setup_complete
-        #     mark_initial_setup_complete(APP_ROOT_DIR, CONFIG.get('templates_dir'), CONFIG.get('clients_dir'))
-        #     logging.info("Initial setup marked as complete.")
-        #     companies_exist = bool(db.get_all_companies()) # Re-check companies after setup
-        # else:
-        #     logging.warning("InitialSetupDialog cancelled. Application may lack configurations.")
-        #     # Potentially exit or show critical error if setup is vital
+        logging.info("Application detected first launch. InitialSetupDialog logic was previously commented out and has been removed.")
+        # The original InitialSetupDialog instantiation and exec_() call were here.
+        # If first_launch_detected is true, mark_initial_setup_complete would have been called on dialog acceptance.
+        # For now, we assume that if this dialog was critical, its functionality is either deprecated
+        # or handled elsewhere. If it needs to be restored, this is the section.
+        # We will still re-check companies_exist after this block if first_launch was true.
+        mark_initial_setup_complete(APP_ROOT_DIR, CONFIG.get('templates_dir'), CONFIG.get('clients_dir'))
+        logging.info("Initial setup (first launch marker) marked as complete.")
+        companies_exist = bool(db.get_all_companies()) # Re-check companies after setup
 
     # Now, handle the PromptCompanyInfoDialog based on company existence and the flag
     if not companies_exist:
         if first_launch_detected or show_setup_prompt_config_value: # Show if first launch OR if flag is true
-            logging.info("No companies found or setup prompt explicitly enabled. Prompting for company information.")
-            # prompt_dialog = PromptCompanyInfoDialog()
-            # dialog_result_company = prompt_dialog.exec_()
+            logging.info("No companies found and/or setup prompt explicitly enabled. Proceeding with logic for default company creation if applicable.")
+            # The original PromptCompanyInfoDialog instantiation and exec_() call were here.
+            # The following logic simulates an "accepted" dialog that opts for a default company.
+            # This preserves the behavior of creating a default company if none exist
+            # and either it's the first launch or the config flag is set.
 
-            # if dialog_result_company == QDialog.Accepted:
-            # Simulate dialog acceptance to proceed with default company creation if logic expects it
-            dialog_result_company = QDialog.Accepted # SIMULATED ACCEPTANCE
-            prompt_dialog = type('obj', (object,), {'use_default_company': True, 'get_company_data': lambda: None})() # SIMULATED DIALOG
+            # Simulate conditions that would lead to default company creation
+            # This replaces the simulated dialog object and its acceptance.
+            # The key logic is to create a default company if 'use_default_company' path was taken.
+            # We assume 'use_default_company' is the desired path if no actual dialog is shown.
 
-            if dialog_result_company == QDialog.Accepted:
-                if prompt_dialog.use_default_company:
-                    logging.info("User opted to use a default company.")
+            # Directly proceed to default company creation logic:
+            logging.info("Attempting to add a default company as no companies exist and conditions are met.")
+            default_company_data = {
+                "company_name": "My Business", "address": "Not specified", "is_default": True,
+                "logo_path": None, "payment_info": "", "other_info": "Default company auto-created."
+            }
+            new_company_id = add_company(default_company_data)
+            if new_company_id:
+                logging.info(f"Default company 'My Business' added with ID: {new_company_id}.")
+                companies_exist = True # Update companies_exist status
+            else:
+                logging.error("Failed to add default company.")
+            # The 'else' branch for user-entered company data (from the simulated dialog) is removed
+            # as there's no dialog interaction.
+
+            # If the prompt was shown because of the config flag (and not strictly first_launch path that also sets it)
+            if show_setup_prompt_config_value and not first_launch_detected:
+                should_reset_config_flag_after_dialog = True
+        else:
+            logging.info("No companies found, but setup prompt is not enabled by config and not first launch. Skipping company creation.")
+    else: # Companies exist
+        logging.info("Companies found in the database. No need to prompt for company info now.")
+        # If companies exist, but the flag was true, it implies the user wanted to see the prompt (even if not strictly necessary).
+        # Reset it as the condition (no companies) for the prompt to be useful wasn't met, or it was already met.
+        if show_setup_prompt_config_value:
+             should_reset_config_flag_after_dialog = True
+
+
+    if should_reset_config_flag_after_dialog:
+        logging.info("Resetting 'show_initial_setup_on_startup' flag to False.")
+        CONFIG["show_initial_setup_on_startup"] = False
+        save_config(CONFIG)
+
+    proceed_to_main_app = False # Initialize before bypass and remember me
                     default_company_data = {
                         "company_name": "My Business", "address": "Not specified", "is_default": True,
                         "logo_path": None, "payment_info": "", "other_info": "Default company created."

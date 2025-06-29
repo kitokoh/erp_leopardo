@@ -1648,6 +1648,7 @@ class DocumentManager(QMainWindow):
         if client_data_to_show:
             client_data_to_show = ensure_client_folder_path(client_data_to_show, self.app_root_dir) # Use helper
 
+
         if client_data_to_show and 'created_at' in client_data_to_show and client_data_to_show['created_at']:
             try:
                 created_at_str = client_data_to_show['created_at']

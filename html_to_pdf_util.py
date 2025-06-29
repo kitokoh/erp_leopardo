@@ -1,6 +1,15 @@
 import os
 import logging
 from jinja2 import Environment, BaseLoader, select_autoescape, StrictUndefined
+import re # Added re import
+import logging
+
+# Basic logging configuration to ensure it's initialized
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__) # Create logger instance at module level
+
+from jinja2 import Environment, select_autoescape, FileSystemLoader, BaseLoader, StrictUndefined
+
 from weasyprint import HTML
 from weasyprint.urls import URLFetchingError
 
@@ -11,6 +20,51 @@ logger = logging.getLogger(__name__)
 class WeasyPrintError(Exception):
     """Custom exception for WeasyPrint conversion errors."""
     pass
+
+
+# def populate_html(template_content: str, data: dict) -> str:
+#     """
+#     Populates an HTML template string with data from a dictionary.
+#
+#     Args:
+#         template_content: The HTML content as a string with placeholders.
+#         data: A dictionary where keys are placeholder names (e.g., "TITLE")
+#               and values are the data to insert.
+#
+#     Returns:
+#         The populated HTML string.
+#     """
+#     populated_html_string = template_content
+#     for key, value in data.items():
+#         placeholder = f"{{{{{key}}}}}" # e.g. {{TITLE}}
+#         populated_html_string = populated_html_string.replace(placeholder, str(value))
+#     return populated_html_string
+
+def get_value_from_context(key: str, context_dict: dict, current_item: dict = None) -> any:
+    """
+    Retrieves a value from a context dictionary using a dot-separated key.
+    If the key is not found, it returns None.
+
+    Args:
+        key: The dot-separated key to retrieve (e.g., "doc.title").
+        context_dict: The dictionary containing the context data.
+        current_item: An optional current item dictionary for nested lookups.
+
+    Returns:
+        The value from the context dictionary or None if not found.
+    """
+    keys = key.split('.')
+    value = context_dict
+
+    for k in keys:
+        if isinstance(value, dict) and k in value:
+            value = value[k]
+        elif isinstance(value, list) and k.isdigit() and int(k) < len(value):
+            value = value[int(k)]
+        else:
+            return None  # Key not found
+
+    return value    
 
 def render_html_template(template_string: str, context: dict) -> str:
     """
@@ -31,6 +85,7 @@ def render_html_template(template_string: str, context: dict) -> str:
         template = env.from_string(template_string)
         rendered_html = template.render(context)
 
+
         logger.debug("render_html_template (Jinja2): FINISHED processing template successfully.")
         return rendered_html
     except StrictUndefined as e_strict:
@@ -38,6 +93,7 @@ def render_html_template(template_string: str, context: dict) -> str:
         raise
     except Exception as e_render:
         logger.error(f"render_html_template (Jinja2): Unhandled exception during rendering: {e_render}", exc_info=True)
+
         raise
 
 def convert_html_to_pdf(html_string: str, base_url: str = None) -> bytes | None:
