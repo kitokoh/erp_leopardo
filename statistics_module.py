@@ -11,6 +11,11 @@ from PyQt5.QtWebChannel import QWebChannel
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 
+# Matplotlib imports
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
+
 
 from datetime import datetime # Added for client acquisition stats
 from dateutil.relativedelta import relativedelta # Added for client acquisition stats
@@ -823,28 +828,39 @@ class StatisticsDashboard(QWidget):
             self.health_score_progress_bar.setValue(0)
 
     def _setup_segmentation_tab_ui_internal(self):
-        self.segmentation_tables = {} # Ensure this is initialized before use
+        self.segmentation_tables = {}
+        self.segmentation_canvases = {} # For Matplotlib canvases
+
         tab_configs = [
-            ("country", self.tr("Par Pays"), ["Pays", "Nombre de Clients"]),
-            ("city", self.tr("Par Ville"), ["Pays", "Ville", "Nombre de Clients"]),
-            ("status", self.tr("Par Statut"), ["Statut", "Nombre de Clients"]),
-            ("category", self.tr("Par Catégorie"), ["Catégorie", "Nombre de Clients"]),
-            ("product_popularity", self.tr("Par Popularité Produit"), [self.tr("Nom Produit"), self.tr("Nombre d'Utilisations")]) # Added
+            ("country", self.tr("Par Pays"), ["Pays", "Nombre de Clients"], "table"),
+            ("city", self.tr("Par Ville"), ["Pays", "Ville", "Nombre de Clients"], "table"),
+            ("status", self.tr("Par Statut"), [], "chart"), # No headers for chart tab directly
+            ("category", self.tr("Par Catégorie"), ["Catégorie", "Nombre de Clients"], "table"),
+            ("product_popularity", self.tr("Par Popularité Produit"), [self.tr("Nom Produit"), self.tr("Nombre d'Utilisations")], "table")
         ]
 
-        for key, title, headers in tab_configs:
+        for key, title, headers, tab_type in tab_configs:
             tab_widget = QWidget()
             tab_layout = QVBoxLayout(tab_widget)
-            table_widget = QTableWidget()
-            table_widget.setColumnCount(len(headers))
-            table_widget.setHorizontalHeaderLabels(headers)
-            table_widget.setEditTriggers(QTableWidget.NoEditTriggers)
-            table_widget.setSelectionBehavior(QTableWidget.SelectRows)
-            table_widget.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-            table_widget.setSortingEnabled(True)
-            tab_layout.addWidget(table_widget)
+
+            if tab_type == "table":
+                table_widget = QTableWidget()
+                table_widget.setColumnCount(len(headers))
+                table_widget.setHorizontalHeaderLabels(headers)
+                table_widget.setEditTriggers(QTableWidget.NoEditTriggers)
+                table_widget.setSelectionBehavior(QTableWidget.SelectRows)
+                table_widget.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+                table_widget.setSortingEnabled(True)
+                tab_layout.addWidget(table_widget)
+                self.segmentation_tables[key] = table_widget
+            elif tab_type == "chart":
+                # For chart tabs, we'll create a FigureCanvas later when data is available
+                # We can store the layout or a placeholder widget if needed.
+                # For simplicity, we'll store the layout and add the canvas to it in the update method.
+                self.segmentation_canvases[key] = tab_layout # Store the layout for the canvas
+
             self.segmentation_tabs.addTab(tab_widget, title)
-            self.segmentation_tables[key] = table_widget
+
 
     def _populate_table(self, table_key, data_fetch_func, column_keys):
         table = self.segmentation_tables.get(table_key)
@@ -858,19 +874,99 @@ class StatisticsDashboard(QWidget):
                 table.insertRow(row_idx)
                 for col_idx, col_key in enumerate(column_keys):
                     item_value = row_data.get(col_key, "")
-                    # Ensure QTableWidgetItem is used
                     table.setItem(row_idx, col_idx, QTableWidgetItem(str(item_value)))
         except Exception as e:
             logging.error(f"Error populating table {table_key}: {e}", exc_info=True)
         finally:
             table.setSortingEnabled(True)
 
+    def _update_status_segmentation_chart(self):
+        logging.info("Updating status segmentation chart...")
+        chart_layout = self.segmentation_canvases.get("status")
+        if not chart_layout:
+            logging.error("Chart layout for 'status' not found.")
+            return
+
+        # Clear previous canvas if any
+        while chart_layout.count():
+            item = chart_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
+        try:
+            status_data = get_client_segmentation_by_status()
+            if not status_data:
+                logging.info("No data for status segmentation chart.")
+                no_data_label = QLabel(self.tr("Aucune donnée de statut client disponible pour afficher le graphique."))
+                no_data_label.setAlignment(Qt.AlignCenter)
+                chart_layout.addWidget(no_data_label)
+                return
+
+            labels = [item.get('status_name', 'N/A') for item in status_data]
+            sizes = [item.get('client_count', 0) for item in status_data]
+
+            # Filter out zero sizes to prevent display issues with pie chart
+            filtered_labels = []
+            filtered_sizes = []
+            for label, size in zip(labels, sizes):
+                if size > 0:
+                    filtered_labels.append(label)
+                    filtered_sizes.append(size)
+
+            if not filtered_sizes: # All statuses have 0 clients
+                logging.info("All statuses have 0 clients for status segmentation chart.")
+                no_data_label = QLabel(self.tr("Aucun client trouvé pour les statuts existants."))
+                no_data_label.setAlignment(Qt.AlignCenter)
+                chart_layout.addWidget(no_data_label)
+                return
+
+            labels = filtered_labels
+            sizes = filtered_sizes
+
+            # Using a more Qt-friendly way to create the figure and canvas
+            # plt.style.use('seaborn-v0_8-whitegrid') # Optional: for styling
+
+            # Create a new figure and canvas each time to avoid issues with redrawing on the same canvas
+            # It's generally safer for dynamic updates in Qt.
+            fig = Figure(figsize=(5, 4), dpi=100) # Adjust figsize and dpi as needed
+            ax = fig.add_subplot(111)
+
+            # Generate distinct colors if many segments, or use default
+            # colors = plt.cm.get_cmap('viridis', len(labels)).colors # Example: 'viridis' colormap
+
+            wedges, texts, autotexts = ax.pie(
+                sizes,
+                autopct=lambda p: '{:.1f}% ({:.0f})'.format(p, p * sum(sizes) / 100), # Show percentage and absolute count
+                startangle=90,
+                # colors=colors # Optional: apply custom colors
+            )
+            ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+
+            # Add a legend
+            # Place legend outside the pie chart to avoid overlap, adjust bbox_to_anchor as needed
+            ax.legend(wedges, labels, title=self.tr("Statuts"), loc="center left", bbox_to_anchor=(1, 0, 0.5, 1))
+            fig.tight_layout() # Adjust layout to make room for legend if it's outside
+
+            canvas = FigureCanvas(fig)
+            chart_layout.addWidget(canvas)
+            canvas.draw()
+            logging.info("Status segmentation chart updated successfully.")
+
+        except Exception as e:
+            logging.error(f"Error updating status segmentation chart: {e}", exc_info=True)
+            error_label = QLabel(self.tr("Erreur lors de la génération du graphique des statuts."))
+            error_label.setAlignment(Qt.AlignCenter)
+            chart_layout.addWidget(error_label)
+
+
     def update_customer_segmentation_views(self):
         self._populate_table("country", get_client_counts_by_country, ["country_name", "client_count"])
         self._populate_table("city", get_client_segmentation_by_city, ["country_name", "city_name", "client_count"])
-        self._populate_table("status", get_client_segmentation_by_status, ["status_name", "client_count"])
+        # self._populate_table("status", get_client_segmentation_by_status, ["status_name", "client_count"]) # Replaced by chart
+        self._update_status_segmentation_chart() # New method for chart
         self._populate_table("category", get_client_segmentation_by_category, ["category", "client_count"])
-        self._populate_table("product_popularity", get_product_usage_counts, ["product_name", "usage_count"]) # Added
+        self._populate_table("product_popularity", get_product_usage_counts, ["product_name", "usage_count"])
 
     # --- End of Ported Methods ---
         # The old update_statistics_map method (which was the display-only map) is now removed.
