@@ -327,7 +327,6 @@ class HtmlEditor(QDialog):
             if isinstance(e, Exception): # Re-raise standard exceptions to allow proper error handling upstream.
                 raise
             return html_template_content # Fallback for non-standard BaseException like SystemExit
--
 
     def _handle_tinymce_init_timeout(self):
         if not self.web_view: # Should not happen if timer was started
