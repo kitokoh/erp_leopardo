@@ -1,0 +1,553 @@
+# -*- coding: utf-8 -*-
+import logging
+from PyQt5.QtWidgets import (
+    QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QTextEdit,
+    QComboBox, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
+    QAbstractItemView, QMessageBox, QDateEdit, QDialogButtonBox, QLabel,
+    QDoubleSpinBox, QSpinBox
+)
+from PyQt5.QtGui import QIcon
+from PyQt5.QtCore import Qt, QDate
+
+import db # Assuming db.__init__ exposes necessary cruds
+from db.cruds import commandes_crud, products_crud, projects_crud, status_settings_crud
+from dialogs.product_dialog import ProductDialog # Import ProductDialog
+
+class CommandeDialog(QDialog):
+    def __init__(self, client_id, current_user_id, commande_id_to_edit=None, parent=None):
+        super().__init__(parent)
+        self.client_id = client_id
+        self.current_user_id = current_user_id
+        self.commande_id_to_edit = commande_id_to_edit
+        self.commande_data = None # To store fetched data if editing
+        self.commande_items_data = [] # To store line items
+
+        self.logger = logging.getLogger(__name__)
+
+        self.setWindowTitle("Nouvelle Commande" if not commande_id_to_edit else "Modifier Commande")
+        self.setMinimumSize(700, 500)
+
+        self.setup_ui()
+
+        if not self.commande_id_to_edit: # New Commande
+            self.commande_reference_edit.setText(commandes_crud.get_next_commande_reference())
+            # self.commande_reference_edit.setReadOnly(True) # Optional: make it read-only
+
+        self.populate_combos()
+
+        if self.commande_id_to_edit:
+            self.load_commande_data_for_edit()
+
+    def setup_ui(self):
+        main_layout = QVBoxLayout(self)
+
+        # Form for Commande Details
+        form_layout = QFormLayout()
+
+        self.commande_reference_edit = QLineEdit()
+        self.commande_reference_edit.setPlaceholderText("Ex: CMD-2023-0001")
+        form_layout.addRow("Référence Commande:", self.commande_reference_edit)
+
+        self.commande_date_edit = QDateEdit(QDate.currentDate())
+        self.commande_date_edit.setCalendarPopup(True)
+        self.commande_date_edit.setDisplayFormat("yyyy-MM-dd")
+        form_layout.addRow("Date Commande:", self.commande_date_edit)
+
+        self.status_commande_combo = QComboBox()
+        form_layout.addRow("Statut Commande:", self.status_commande_combo)
+
+        self.description_commande_edit = QTextEdit()
+        self.description_commande_edit.setFixedHeight(60)
+        form_layout.addRow("Description:", self.description_commande_edit)
+
+        # Project linking (optional or for later)
+        self.project_combo = QComboBox()
+        self.project_combo.addItem("Aucun Projet Lié", None)
+        # TODO: Populate with projects for this client, or allow creating new
+        form_layout.addRow("Projet Associé:", self.project_combo)
+
+        main_layout.addLayout(form_layout)
+
+        # Line Items Section
+        main_layout.addWidget(QLabel("Articles de la Commande:"))
+        self.items_table = QTableWidget()
+        self.items_table.setColumnCount(7) # Product, Desc, Qty, Unit Price HT, VAT Rate, Total HT, Total TTC
+        self.items_table.setHorizontalHeaderLabels([
+            "Produit", "Description", "Qté", "Prix Unitaire HT", "TVA (%)", "Total HT", "Total TTC"
+        ])
+        self.items_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch) # Description
+        self.items_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        # self.items_table.setEditTriggers(QAbstractItemView.DoubleClicked) # For inline editing if desired
+        main_layout.addWidget(self.items_table)
+
+        items_actions_layout = QHBoxLayout()
+        self.add_item_btn = QPushButton(QIcon.fromTheme("list-add"), "Ajouter Article")
+        self.add_item_btn.clicked.connect(self.add_item_to_table)
+        items_actions_layout.addWidget(self.add_item_btn)
+        self.remove_item_btn = QPushButton(QIcon.fromTheme("list-remove"), "Supprimer Article")
+        self.remove_item_btn.clicked.connect(self.remove_selected_item)
+        items_actions_layout.addWidget(self.remove_item_btn)
+        items_actions_layout.addStretch()
+        main_layout.addLayout(items_actions_layout)
+
+        # Totals (Display Only)
+        totals_layout = QFormLayout()
+        self.total_ht_label = QLabel("0.00 EUR")
+        self.total_ttc_label = QLabel("0.00 EUR")
+        totals_layout.addRow("Total HT:", self.total_ht_label)
+        totals_layout.addRow("Total TTC:", self.total_ttc_label)
+        main_layout.addLayout(totals_layout)
+
+        # Dialog Buttons
+        self.button_box = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        self.button_box.accepted.connect(self.accept_dialog)
+        self.button_box.rejected.connect(self.reject)
+        main_layout.addWidget(self.button_box)
+
+    def populate_combos(self):
+        # Statuses
+        self.status_commande_combo.clear()
+        try:
+            statuses = status_settings_crud.get_all_status_settings(type_filter='Commande')
+            if statuses:
+                for status in sorted(statuses, key=lambda x: x.get('sort_order', 0)):
+                    self.status_commande_combo.addItem(status.get('status_name'), status.get('status_id'))
+            else:
+                self.status_commande_combo.addItem("Aucun Statut Défini", None)
+        except Exception as e:
+            self.logger.error(f"Error loading 'Commande' statuses: {e}", exc_info=True)
+            QMessageBox.warning(self, "Erreur", "Impossible de charger les statuts de commande.")
+
+        # Projects (for linking)
+        self.project_combo.clear()
+        self.project_combo.addItem("Aucun Projet Lié", None)
+        self.project_combo.addItem("Créer un Nouveau Projet...", "CREATE_NEW") # Special value
+        try:
+            client_projects = projects_crud.get_projects_by_client_id(self.client_id)
+            if client_projects:
+                for proj in client_projects:
+                    self.project_combo.addItem(f"{proj.get('project_name')} (ID: {proj.get('project_id')[:8]}...)", proj.get('project_id'))
+        except Exception as e:
+            self.logger.error(f"Error loading projects for client {self.client_id}: {e}", exc_info=True)
+            # Non-critical, user can still create new
+
+    def load_commande_data_for_edit(self):
+        self.commande_data = commandes_crud.get_commande_by_id(self.commande_id_to_edit)
+        if not self.commande_data:
+            QMessageBox.critical(self, "Erreur", f"Impossible de charger les données de la commande ID: {self.commande_id_to_edit}")
+            self.reject() # Close dialog if data load fails
+            return
+
+        self.commande_reference_edit.setText(self.commande_data.get("commande_reference", ""))
+
+        commande_date_str = self.commande_data.get("commande_date")
+        if commande_date_str:
+            try:
+                # Assuming ISO format from DB
+                q_date = QDate.fromString(datetime.fromisoformat(commande_date_str.replace('Z', '')).strftime('%Y-%m-%d'), "yyyy-MM-dd")
+                if q_date.isValid():
+                    self.commande_date_edit.setDate(q_date)
+            except ValueError:
+                self.logger.warning(f"Invalid date format for commande_date: {commande_date_str}")
+
+        status_id = self.commande_data.get("status_commande_id")
+        if status_id:
+            index = self.status_commande_combo.findData(status_id)
+            if index != -1:
+                self.status_commande_combo.setCurrentIndex(index)
+
+        self.description_commande_edit.setPlainText(self.commande_data.get("description_commande", ""))
+
+        project_id = self.commande_data.get("project_id")
+        if project_id:
+            index = self.project_combo.findData(project_id)
+            if index != -1:
+                self.project_combo.setCurrentIndex(index)
+            else: # Project might not be in list if it was deleted, or from another context
+                self.project_combo.addItem(f"Projet Lié (ID: {project_id[:8]}...)", project_id)
+                self.project_combo.setCurrentIndex(self.project_combo.findData(project_id))
+
+        # Load items
+        self.commande_items_data = commandes_crud.get_items_for_commande(self.commande_id_to_edit)
+        self.items_table.setRowCount(0) # Clear table
+        for item_data in self.commande_items_data:
+            self.add_item_to_table(item_data_to_load=item_data, is_loading=True)
+
+        self.update_totals_display()
+
+
+    def add_item_to_table(self, item_data_to_load=None, is_loading=False):
+        if not is_loading:
+            # Use ProductDialog for selecting/defining products
+            # The ProductDialog needs client_id and app_root_dir.
+            # Assuming self.parent() is DocumentManager or similar that has app_root_dir
+            app_root_dir_for_product_dialog = ""
+            if hasattr(self.parent(), 'app_root_dir'):
+                app_root_dir_for_product_dialog = self.parent().app_root_dir
+            elif hasattr(self.parent(), 'parent') and hasattr(self.parent().parent(), 'app_root_dir'): # Check grandparent if parent is ClientWidget
+                app_root_dir_for_product_dialog = self.parent().parent().app_root_dir
+
+
+            if not app_root_dir_for_product_dialog:
+                self.logger.error("app_root_dir not found for ProductDialog instantiation.")
+                QMessageBox.critical(self, "Erreur Configuration", "Chemin racine de l'application non trouvé.")
+                return
+
+            product_dialog = ProductDialog(client_id=self.client_id,
+                                           app_root_dir=app_root_dir_for_product_dialog,
+                                           parent=self)
+
+            if product_dialog.exec_() == QDialog.Accepted:
+                products_from_dialog = product_dialog.get_data()
+                if not products_from_dialog:
+                    return # No products were added/selected in ProductDialog
+
+                for product_data in products_from_dialog:
+                    # This product_data already contains name, desc, qty, price, product_id (if existing global), product_code
+                    # We need to adapt this to fit CommandeItem structure for our table
+
+                    # If product_id is None, it means a new global product was defined in ProductDialog.
+                    # We need to ensure this global product is created in the DB first.
+                    # This logic will be handled in `accept_dialog` when the commande is saved.
+                    # For now, we store all info from ProductDialog in the UserRole of the first cell.
+                    # The `_get_payload_from_table_row` will use this stored data.
+
+                    row_pos = self.items_table.rowCount()
+                    self.items_table.insertRow(row_pos)
+
+                    # Store the raw product_data from ProductDialog. It contains global product_id if existing, or None if new.
+                    # It also contains product_code, name, description, quantity, unit_price from ProductDialog's form.
+                    name_cell_item = QTableWidgetItem(product_data.get("name", "N/A"))
+                    name_cell_item.setData(Qt.UserRole, product_data)
+                    self.items_table.setItem(row_pos, 0, name_cell_item) # Product Name (from ProductDialog)
+
+                    self.items_table.setItem(row_pos, 1, QTableWidgetItem(product_data.get("description", "")))
+
+                    qty_item = QTableWidgetItem(str(product_data.get("quantity", 1.0))) # Default to 1 if not specified
+                    qty_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    self.items_table.setItem(row_pos, 2, qty_item)
+
+                    unit_price_ht_item = QTableWidgetItem(f"{float(product_data.get('unit_price', 0.0)):.2f}")
+                    unit_price_ht_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    self.items_table.setItem(row_pos, 3, unit_price_ht_item)
+
+                    # VAT Rate - default to 0 for now, user can edit this cell if made editable
+                    vat_item = QTableWidgetItem("0") # Default 0% VAT
+                    vat_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    self.items_table.setItem(row_pos, 4, vat_item)
+
+                    # Calculate totals for display - this part will be refined
+                    current_qty = float(product_data.get("quantity", 1.0))
+                    current_price_ht = float(product_data.get('unit_price', 0.0))
+                    current_vat_rate = 0.0 # as per default above
+
+                    total_ht = current_qty * current_price_ht
+                    total_ttc = total_ht * (1 + current_vat_rate)
+
+                    self.items_table.setItem(row_pos, 5, QTableWidgetItem(f"{total_ht:.2f}"))
+                    self.items_table.setItem(row_pos, 6, QTableWidgetItem(f"{total_ttc:.2f}"))
+
+                self.update_totals_display()
+            return # Return after handling ProductDialog
+
+        # If item_data_to_load is provided (e.g., when editing an existing commande)
+        if item_data_to_load:
+            row_pos = self.items_table.rowCount()
+            self.items_table.insertRow(row_pos)
+
+            # Store full item_data in the first cell's UserRole for later retrieval/update
+            product_name_item = QTableWidgetItem(item_data_to_load.get("product_name", "N/A"))
+            product_name_item.setData(Qt.UserRole, item_data_to_load) # Store full dict
+            self.items_table.setItem(row_pos, 0, product_name_item)
+
+            self.items_table.setItem(row_pos, 1, QTableWidgetItem(item_data_to_load.get("description_item", "")))
+            self.items_table.setItem(row_pos, 2, QTableWidgetItem(str(item_data_to_load.get("quantity", 0))))
+            self.items_table.setItem(row_pos, 3, QTableWidgetItem(f"{item_data_to_load.get('unit_price_ht', 0.0):.2f}"))
+            self.items_table.setItem(row_pos, 4, QTableWidgetItem(f"{item_data_to_load.get('vat_rate', 0.0)*100:.0f}")) # Display as %
+            self.items_table.setItem(row_pos, 5, QTableWidgetItem(f"{item_data_to_load.get('total_item_ht', 0.0):.2f}"))
+            self.items_table.setItem(row_pos, 6, QTableWidgetItem(f"{item_data_to_load.get('total_item_ttc', 0.0):.2f}"))
+            self.update_totals_display() # Update after adding an item
+
+    def remove_selected_item(self):
+        current_row = self.items_table.currentRow()
+        if current_row >= 0:
+            item_widget = self.items_table.item(current_row, 0)
+            if item_widget:
+                item_data = item_widget.data(Qt.UserRole)
+                item_id_to_delete = item_data.get('item_id') if item_data else None
+
+                if self.commande_id_to_edit and item_id_to_delete: # Item exists in DB
+                    # No direct DB delete here, will be handled during save_commande
+                    pass
+
+            self.items_table.removeRow(current_row)
+            self.update_totals_display()
+        else:
+            QMessageBox.warning(self, "Sélection Requise", "Veuillez sélectionner un article à supprimer.")
+
+    def update_totals_display(self):
+        total_ht = 0.0
+        total_ttc = 0.0
+        for row in range(self.items_table.rowCount()):
+            try:
+                # Assuming data is stored or can be read from table cells
+                # For simplicity, let's assume we re-fetch from stored item_data if available (complex for new items)
+                # Or, if cells are directly editable widgets, get values from them.
+                # This is a placeholder for robust calculation based on table content.
+
+                # If loading existing items, their totals are already calculated.
+                # If adding new items, their totals need to be calculated upon input.
+                # This function should sum up total_item_ht and total_item_ttc from all rows.
+
+                # Example: Read from cell text (simplistic, assumes plain text)
+                ht_cell = self.items_table.item(row, 5)
+                ttc_cell = self.items_table.item(row, 6)
+                if ht_cell and ht_cell.text():
+                    total_ht += float(ht_cell.text())
+                if ttc_cell and ttc_cell.text():
+                    total_ttc += float(ttc_cell.text())
+
+            except ValueError:
+                self.logger.warning(f"Could not parse total from row {row} for calculation.")
+                pass # Skip row if parsing fails
+
+        currency = self.commande_data.get("currency", "EUR") if self.commande_data else "EUR"
+        self.total_ht_label.setText(f"{total_ht:.2f} {currency}")
+        self.total_ttc_label.setText(f"{total_ttc:.2f} {currency}")
+
+
+    def accept_dialog(self):
+        # Data Validation
+        commande_ref = self.commande_reference_edit.text().strip()
+        if not commande_ref:
+            QMessageBox.warning(self, "Validation", "La référence de la commande est obligatoire.")
+            return
+
+        status_id = self.status_commande_combo.currentData()
+        if status_id is None:
+            QMessageBox.warning(self, "Validation", "Le statut de la commande est obligatoire.")
+            return
+
+        commande_data_payload = {
+            "client_id": self.client_id,
+            "commande_reference": commande_ref,
+            "commande_date": self.commande_date_edit.date().toString("yyyy-MM-dd") + "T00:00:00Z", # Store as ISO string
+            "status_commande_id": status_id,
+            "description_commande": self.description_commande_edit.toPlainText().strip(),
+            "project_id": self.project_combo.currentData() if self.project_combo.currentData() != "CREATE_NEW" else None,
+            "created_by_user_id": self.current_user_id,
+            # Totals will be calculated based on items or handled by a separate update later
+            "total_ht": None, # Placeholder
+            "total_ttc": None, # Placeholder
+            "currency": "EUR" # Placeholder, could be configurable
+        }
+
+        if self.project_combo.currentData() == "CREATE_NEW":
+            # Logic to create a new project
+            project_name, ok = QInputDialog.getText(self, "Nouveau Projet", f"Nom du projet pour la commande {commande_ref}:")
+            if ok and project_name.strip():
+                # Default status for new project (e.g., 'Planning')
+                planning_status = status_settings_crud.get_status_setting_by_name("Planning", "Project")
+                if not planning_status:
+                    QMessageBox.critical(self, "Erreur", "Statut 'Planning' par défaut introuvable pour les projets.")
+                    return # Or handle differently
+
+                new_project_data = {
+                    "client_id": self.client_id,
+                    "project_name": project_name.strip(),
+                    "status_id": planning_status.get('status_id'),
+                    "manager_team_member_id": self.current_user_id # Or prompt for manager
+                }
+                new_project_id = projects_crud.add_project(new_project_data)
+                if new_project_id:
+                    commande_data_payload["project_id"] = new_project_id
+                else:
+                    QMessageBox.warning(self, "Échec Création Projet", "Impossible de créer le projet associé. La commande sera sauvegardée sans projet lié pour le moment.")
+            else: # User cancelled or entered empty project name
+                QMessageBox.information(self, "Info", "Création de projet annulée. La commande sera sauvegardée sans projet lié pour le moment.")
+
+
+        # Save/Update Commande
+        if self.commande_id_to_edit:
+            success = commandes_crud.update_commande(self.commande_id_to_edit, commande_data_payload)
+            if success:
+                self.logger.info(f"Commande {self.commande_id_to_edit} updated.")
+                self._last_processed_project_id = commande_data_payload.get("project_id") # Store project_id
+                self._sync_commande_items(self.commande_id_to_edit)
+                super().accept()
+            else:
+                QMessageBox.critical(self, "Erreur", "Impossible de mettre à jour la commande.")
+        else: # New Commande
+            new_cmd_id = commandes_crud.add_commande(commande_data_payload)
+            if new_cmd_id:
+                self.logger.info(f"New commande {new_cmd_id} created.")
+                self.commande_id_to_edit = new_cmd_id # So items can be linked
+                self._last_processed_project_id = commande_data_payload.get("project_id") # Store project_id
+                self._created_commande_id = new_cmd_id
+                self._created_commande_ref = commande_data_payload.get("commande_reference")
+                self._sync_commande_items(new_cmd_id)
+                super().accept()
+            else:
+                QMessageBox.critical(self, "Erreur", "Impossible de créer la commande.")
+
+    def _sync_commande_items(self, commande_id):
+        """
+        Synchronizes items in the table with the database for the given commande_id.
+        - Deletes items from DB that are not in the table anymore.
+        - Updates items in DB that have changed.
+        - Adds new items from table to DB.
+        """
+        db_items_list = commandes_crud.get_items_for_commande(commande_id)
+        db_item_ids = {item['item_id'] for item in db_items_list}
+
+        table_item_ids_processed = set()
+
+        # Update existing or add new items
+        for row in range(self.items_table.rowCount()):
+            table_item_widget = self.items_table.item(row, 0)
+            if not table_item_widget: continue
+
+            table_item_data_stored = table_item_widget.data(Qt.UserRole) # This is the full dict if loaded
+            item_id_in_table = table_item_data_stored.get('item_id') if table_item_data_stored else None
+
+            # Prepare payload from table row (this needs to be more robust if cells are widgets)
+            # This example assumes data can be read from table cells if not in UserRole
+            # or that UserRole is always populated correctly for new/edited items.
+            # For simplicity, let's assume a helper method prepares this payload correctly.
+            current_row_payload = self._get_payload_from_table_row(row, commande_id)
+            if not current_row_payload: continue # Skip if row data is invalid
+
+            if item_id_in_table and item_id_in_table in db_item_ids: # Item exists in DB, update it
+                commandes_crud.update_commande_item(item_id_in_table, current_row_payload)
+                table_item_ids_processed.add(item_id_in_table)
+            elif not item_id_in_table: # New item, add it
+                # current_row_payload should already have commande_id
+                new_added_item_id = commandes_crud.add_commande_item(current_row_payload)
+                if new_added_item_id:
+                    table_item_ids_processed.add(new_added_item_id) # Should ideally match a generated UUID if not returned
+            # Else: item_id_in_table is present but not in db_item_ids - this case shouldn't happen if logic is correct.
+
+        # Delete items from DB that are no longer in the table
+        for db_item_id_to_check in db_item_ids:
+            if db_item_id_to_check not in table_item_ids_processed:
+                commandes_crud.delete_commande_item(db_item_id_to_check)
+
+        self._recalculate_and_save_commande_totals(commande_id)
+
+
+    def _get_payload_from_table_row(self, row_index, commande_id_for_new_items):
+        """
+        Helper to extract item data from a table row to a dictionary suitable for CRUD.
+        This needs to be robust based on how items are added/edited in the table.
+        """
+        try:
+            # This is highly dependent on how items are added/edited.
+            # If cells are QTableWidgetItems with text:
+            product_item = self.items_table.item(row_index, 0)
+            # Assuming product_id is stored in product_item.data(Qt.UserRole + 1) or similar
+            # For now, we can't get product_id reliably from a simple text cell.
+            # This part needs a proper ProductSelectionDialog integration.
+            # Let's assume product_item.data(Qt.UserRole) contains the full original item_data
+            # or a product_id if it's a simple selection.
+
+            original_item_data = product_item.data(Qt.UserRole) if product_item else {}
+            if not isinstance(original_item_data, dict): original_item_data = {}
+
+            payload = {
+                "commande_id": original_item_data.get('commande_id', commande_id_for_new_items),
+                "product_id": original_item_data.get('product_id'), # CRITICAL: This needs to be set correctly
+                "description_item": self.items_table.item(row_index, 1).text(),
+                "quantity": float(self.items_table.item(row_index, 2).text()),
+                "unit_price_ht": float(self.items_table.item(row_index, 3).text()),
+                "vat_rate": float(self.items_table.item(row_index, 4).text()) / 100.0,
+            }
+            if not payload["product_id"]:
+                self.logger.error(f"Missing product_id for item in row {row_index}. Cannot save.")
+                # This should be caught by validation before trying to save.
+                # For now, returning None to indicate an issue.
+                return None
+            return payload
+        except Exception as e:
+            self.logger.error(f"Error extracting payload from table row {row_index}: {e}", exc_info=True)
+            return None
+
+    def _recalculate_and_save_commande_totals(self, commande_id):
+        """Recalculates total_ht and total_ttc for the commande based on its items and updates the DB."""
+        items = commandes_crud.get_items_for_commande(commande_id)
+        if items is None: # Error fetching items
+            self.logger.error(f"Could not fetch items for commande {commande_id} to recalculate totals.")
+            return
+
+        current_total_ht = sum(item.get('total_item_ht', 0.0) for item in items)
+        current_total_ttc = sum(item.get('total_item_ttc', 0.0) for item in items)
+
+        update_payload = {
+            "total_ht": current_total_ht,
+            "total_ttc": current_total_ttc
+        }
+        if not commandes_crud.update_commande(commande_id, update_payload):
+            self.logger.error(f"Failed to update commande {commande_id} with recalculated totals.")
+        else:
+            self.logger.info(f"Commande {commande_id} totals updated: HT={current_total_ht}, TTC={current_total_ttc}")
+
+    def get_created_project_id(self):
+        """
+        Returns the project_id that was created or linked during the dialog's execution.
+        This should be called after accept_dialog() has successfully processed/saved the commande.
+        """
+        # self.commande_data might be populated if editing, or could be the payload if new
+        # A more robust way is to store the determined project_id in an instance variable during accept_dialog
+        if hasattr(self, '_last_processed_project_id'):
+            return self._last_processed_project_id
+
+        # Fallback: if editing, get it from the reloaded commande_data
+        if self.commande_id_to_edit and self.commande_data:
+            return self.commande_data.get("project_id")
+
+        # Fallback: if new, it might be in the payload that was built (less ideal as payload is local to accept_dialog)
+        # This indicates a need to store the project_id more reliably if created/selected.
+        # For now, this method will primarily work if _last_processed_project_id is set in accept_dialog.
+        self.logger.warning("get_created_project_id called but _last_processed_project_id not set and not editing.")
+        return None
+
+    def get_created_commande_id(self):
+        """Returns the ID of the commande created or edited by this dialog instance."""
+        return getattr(self, '_created_commande_id', None)
+
+    def get_created_commande_reference(self):
+        """Returns the reference of the commande created or edited by this dialog instance."""
+        return getattr(self, '_created_commande_ref', None)
+
+
+# Example usage (for testing, if run directly)
+if __name__ == '__main__':
+    from PyQt5.QtWidgets import QApplication
+    import sys
+    import os
+
+    # Mock data for testing
+    mock_client_id = "test_client_for_commande_dialog"
+    mock_user_id = "test_user_for_commande_dialog"
+
+    # Ensure DB is initialized (adjust path as needed)
+    try:
+        sys.path.append(os.path.join(os.path.dirname(__file__), '..')) # To find db package
+        from db import initialize_database
+        initialize_database()
+        # You might want to add a mock client here for testing
+        # db.add_client({'client_id': mock_client_id, 'client_name': 'Test Client Dialog', 'created_by_user_id': mock_user_id, 'project_identifier': 'P-DIALOG'})
+    except Exception as e:
+        print(f"DB init error for CommandeDialog test: {e}")
+
+    app = QApplication(sys.argv)
+    dialog = CommandeDialog(client_id=mock_client_id, current_user_id=mock_user_id)
+    # To test editing:
+    # Create a dummy commande first via CRUD, then pass its ID
+    # example_cmd_id = commandes_crud.add_commande({ ... })
+    # dialog = CommandeDialog(client_id=mock_client_id, current_user_id=mock_user_id, commande_id_to_edit=example_cmd_id)
+
+    if dialog.exec_() == QDialog.Accepted:
+        print("Commande Dialog Accepted/Saved.")
+    else:
+        print("Commande Dialog Cancelled.")
+    sys.exit(app.exec_())

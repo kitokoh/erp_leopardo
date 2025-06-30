@@ -65,7 +65,10 @@ Le module de Gestion des Clients est une composante essentielle de ClientDocMana
 5.  La logique dans `AddNewClientDialog` (ou déléguée au `client_controller.py`) récupère les données saisies.
 6.  Les données sont validées.
 7.  `clients_crud.add_client()` est appelé pour insérer le nouveau client dans la base de données. Les contacts associés, adresses, etc., sont également créés via leurs CRUDs respectifs.
-8.  Le `client_widget.py` est notifié et rafraîchit sa liste pour afficher le nouveau client.
+8.  L'utilisateur est ensuite invité à créer une **Commande** pour ce nouveau client.
+    *   Si l'utilisateur accepte, le dialogue de création de commande s'ouvre (`commande_management/commande_dialog.py`).
+    *   La création de la commande peut entraîner la création automatique ou la liaison à un **Projet** (pour le suivi administratif et des tâches).
+9.  Le `client_widget.py` est notifié et rafraîchit sa liste pour afficher le nouveau client. Un nouvel onglet "Commandes" est disponible dans la fiche client pour gérer les commandes associées.
 
 ### 3.2. Consultation et Modification d'un Client
 
@@ -79,11 +82,12 @@ Le module de Gestion des Clients est une composante essentielle de ClientDocMana
 
 ## 4. Interactions avec d'Autres Modules
 
-*   **Gestion des Documents**: Essentiel pour lier les documents (devis, factures, contrats) aux clients. La création de documents est souvent initiée à partir d'un client sélectionné.
-*   **Facturation et Paiements**: Les factures sont émises pour des clients spécifiques.
-*   **Gestion de Projet**: Les projets sont souvent réalisés pour des clients.
+*   **Gestion des Documents**: Essentiel pour lier les documents (devis, factures, contrats) aux clients et potentiellement à leurs commandes spécifiques.
+*   **Gestion des Commandes**: Le module de gestion des clients est le point d'entrée pour créer et visualiser les commandes associées à un client. Chaque client peut avoir plusieurs commandes.
+*   **Facturation et Paiements**: Les factures sont émises pour des clients spécifiques, souvent en lien avec une commande.
+*   **Gestion de Projet**: Chaque commande est associée à un projet pour le suivi administratif et des tâches. Le module de gestion de projet interagit donc étroitement.
 *   **Gestion des Contacts**: Les contacts individuels sont généralement associés à des entreprises clientes.
-*   **Rapports et Statistiques**: Les données clients sont une source majeure pour les rapports de vente, d'activité commerciale, etc.
+*   **Rapports et Statistiques**: Les données clients et commandes sont une source majeure pour les rapports de vente, d'activité commerciale, etc.
 *   **Authentification et Gestion des Utilisateurs**: Le commercial ou l'agent assigné à un client est un utilisateur de l'application. Des permissions peuvent exister pour limiter qui peut voir ou modifier quels clients.
 *   **Base de Données**: Toutes les informations des clients sont stockées et gérées via la couche d'accès aux données.
 
