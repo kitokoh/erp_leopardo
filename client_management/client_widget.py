@@ -419,6 +419,7 @@ class ClientWidget(QWidget):
         self._setup_notes_section(layout)
         # self._setup_contacts_section(layout) # Call removed, contacts group box will be integrated differently
         self._setup_main_tabs_section(layout) # Tabs like Documents, Products will remain here
+
         self._setup_commandes_tab() # Add the new Commandes tab
 
         # Initial data loading calls
@@ -507,6 +508,7 @@ class ClientWidget(QWidget):
             # self.contacts_group_box.toggled.connect(self._handle_contacts_section_toggled)
 
 
+
         # Apply permissions
         self._apply_permissions()
 
@@ -550,6 +552,7 @@ class ClientWidget(QWidget):
     # def _setup_contacts_section(self, main_layout): # Method removed as contacts are now an internal tab
     #     """Sets up the collapsible contacts section directly in the main layout."""
     #     pass # Content moved to an internal tab
+
 
     def _apply_permissions(self):
         """Applies role-based permissions to UI elements within ClientWidget."""
@@ -690,7 +693,7 @@ class ClientWidget(QWidget):
             main_layout.addWidget(self.tabs_group_box)
 
             self._setup_documents_tab()
-            # self._setup_contacts_tab() # Call removed, contacts are now an internal tab
+
             self._setup_products_tab()
             self._setup_document_notes_tab()
             self._setup_product_dimensions_tab()
@@ -714,7 +717,7 @@ class ClientWidget(QWidget):
 
     # _setup_available_templates_tab and load_available_templates removed.
     # handle_generate_template_button_clicked was only called by load_available_templates, so it can also be removed.
-    # _setup_assignments_tab method itself is removed.
+
 
     def _setup_documents_tab(self):
         try:

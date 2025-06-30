@@ -1457,11 +1457,22 @@ class DocumentManager(QMainWindow):
             QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Partner Management est désactivé."))
 
     def show_statistics_view(self):
+        logging.info(f"Attempting to show Statistics View. Instance: {self.statistics_dashboard_instance}")
         if self.statistics_dashboard_instance:
-            self.main_area_stack.setCurrentWidget(self.statistics_dashboard_instance)
+            # Diagnostic: Log widgets currently in the stack
+            stacked_widgets = [self.main_area_stack.widget(i) for i in range(self.main_area_stack.count())]
+            logging.info(f"Widgets in main_area_stack: {stacked_widgets}")
+            if self.statistics_dashboard_instance in stacked_widgets:
+                logging.info("StatisticsDashboard instance IS in main_area_stack. Calling setCurrentWidget.")
+                self.main_area_stack.setCurrentWidget(self.statistics_dashboard_instance)
+                logging.info("setCurrentWidget called for StatisticsDashboard.")
+            else:
+                logging.error("StatisticsDashboard instance is NOT in main_area_stack. This is the cause of the QStackedWidget error.")
+                QMessageBox.critical(self, self.tr("Erreur Module"),
+                                     self.tr("Le module Statistiques n'a pas été correctement chargé dans l'interface principale."))
         else:
-            logging.warning("Statistics Dashboard instance is None. Cannot show view.")
-            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Statistiques est désactivé."))
+            logging.warning("Statistics Dashboard instance is None. Cannot show view (module likely disabled or failed to init).")
+            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Statistiques est désactivé ou n'a pas pu être initialisé."))
 
     def show_inventory_browser_view(self):
         print("DocumentManager: show_inventory_browser_view called.")
