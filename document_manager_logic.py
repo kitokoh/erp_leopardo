@@ -307,6 +307,10 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                 QMessageBox.warning(doc_manager, doc_manager.tr("Erreur DB Projet"),
                                     doc_manager.tr("La création du projet administratif général a échoué."))
 
+        # Ensure a clean transition to the next block of code.
+        # All lines between the above 'else' and the below 'if' must be either comments or truly blank.
+        # Any hidden 'try:' statement would be removed by this re-application of the structure.
+
         # Now, if project_id_for_tasks is set (either from commande or default creation), create tasks for it.
         if project_id_for_tasks:
             task_status_todo_obj = get_status_setting_by_name("To Do", "Task")
