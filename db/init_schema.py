@@ -1073,6 +1073,50 @@ CREATE TABLE IF NOT EXISTS Templates (
     )
     """)
 
+    # --- Commandes Module Tables (Moved Before ClientDocuments) ---
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Commandes (
+        commande_id TEXT PRIMARY KEY,
+        client_id TEXT NOT NULL,
+        project_id TEXT,
+        commande_reference TEXT UNIQUE NOT NULL,
+        commande_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        status_commande_id INTEGER NOT NULL,
+        description_commande TEXT,
+        total_ht REAL,
+        total_ttc REAL,
+        currency TEXT NOT NULL DEFAULT 'EUR',
+        shipping_address TEXT,
+        billing_address TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_by_user_id TEXT,
+        FOREIGN KEY (client_id) REFERENCES Clients (client_id) ON DELETE CASCADE,
+        FOREIGN KEY (project_id) REFERENCES Projects (project_id) ON DELETE SET NULL,
+        FOREIGN KEY (status_commande_id) REFERENCES StatusSettings (status_id),
+        FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL
+    )
+    """)
+    print("DEBUG_INIT_DB: Table Commandes created or exists.")
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS CommandeItems (
+        item_id TEXT PRIMARY KEY,
+        commande_id TEXT NOT NULL,
+        product_id INTEGER NOT NULL,
+        description_item TEXT NOT NULL,
+        quantity REAL NOT NULL,
+        unit_price_ht REAL NOT NULL,
+        vat_rate REAL DEFAULT 0.0,
+        total_item_ht REAL NOT NULL,
+        total_item_ttc REAL NOT NULL,
+        FOREIGN KEY (commande_id) REFERENCES Commandes (commande_id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES Products (product_id)
+    )
+    """)
+    print("DEBUG_INIT_DB: Table CommandeItems created or exists.")
+    # --- End Commandes Module Tables ---
+
     # Create ClientDocuments table (logic from ca.py to add order_identifier if missing)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS ClientDocuments (
@@ -2120,7 +2164,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_exp_tags_tag_id ON ExperienceTags(tag_id)")
     # --- End Experience Module Indexes ---
 
-    # --- Commandes Module Indexes ---
+
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandes_client_id ON Commandes(client_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandes_project_id ON Commandes(project_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandes_commande_reference ON Commandes(commande_reference)")
@@ -2130,49 +2174,6 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandeitems_product_id ON CommandeItems(product_id)")
     # --- End Commandes Module Indexes ---
 
-    # --- Commandes Module Tables ---
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS Commandes (
-        commande_id TEXT PRIMARY KEY,
-        client_id TEXT NOT NULL,
-        project_id TEXT,
-        commande_reference TEXT UNIQUE NOT NULL,
-        commande_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        status_commande_id INTEGER NOT NULL,
-        description_commande TEXT,
-        total_ht REAL,
-        total_ttc REAL,
-        currency TEXT NOT NULL DEFAULT 'EUR',
-        shipping_address TEXT,
-        billing_address TEXT,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        created_by_user_id TEXT,
-        FOREIGN KEY (client_id) REFERENCES Clients (client_id) ON DELETE CASCADE,
-        FOREIGN KEY (project_id) REFERENCES Projects (project_id) ON DELETE SET NULL,
-        FOREIGN KEY (status_commande_id) REFERENCES StatusSettings (status_id),
-        FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL
-    )
-    """)
-    print("DEBUG_INIT_DB: Table Commandes created or exists.")
-
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS CommandeItems (
-        item_id TEXT PRIMARY KEY,
-        commande_id TEXT NOT NULL,
-        product_id INTEGER NOT NULL,
-        description_item TEXT NOT NULL,
-        quantity REAL NOT NULL,
-        unit_price_ht REAL NOT NULL,
-        vat_rate REAL DEFAULT 0.0,
-        total_item_ht REAL NOT NULL,
-        total_item_ttc REAL NOT NULL,
-        FOREIGN KEY (commande_id) REFERENCES Commandes (commande_id) ON DELETE CASCADE,
-        FOREIGN KEY (product_id) REFERENCES Products (product_id)
-    )
-    """)
-    print("DEBUG_INIT_DB: Table CommandeItems created or exists.")
-    # --- End Commandes Module Tables ---
 
     # --- Company Expense Module Tables ---
     cursor.execute("""
