@@ -226,10 +226,19 @@ class ClientWidget(QWidget):
             self.category_label = QLabel(self.tr("Catégorie:")) # Initialized here, used in populate_details_layout
             self.category_value_label = QLabel() # Initialized here, used in populate_details_layout
 
-            details_tab_layout.addLayout(self.details_layout)
+            # self.status_combo must be created here ONCE and added to details_tab_layout
+            # Then populate_details_layout will only update its contents and enabled state.
+            if not hasattr(self, 'status_combo') or self.status_combo is None: # Should only happen once
+                self.status_combo = QComboBox()
+                 # The actual load_statuses and setting current text will be done in populate_details_layout
+                # and when switching to edit mode.
+            # Add it to a layout that will be part of details_tab_layout (e.g., within the QFormLayout handled by populate_details_layout)
+
+            details_tab_layout.addLayout(self.details_layout) # details_layout will contain status_combo via populate_details_layout
             self.internal_client_info_tabs.addTab(self.client_details_tab, self.client_info.get('client_name', self.tr("Détails Client")))
 
-            self.populate_details_layout() # Populate the details in the first tab
+            self.populate_details_layout() # Populate the details in the first tab, this will add status_combo to details_layout
+
 
             # --- Tab 2: Contacts ---
             contacts_tab_widget = QWidget()
@@ -3890,20 +3899,29 @@ class ClientWidget(QWidget):
         self.detail_value_labels = {} # Re-initialize
         logging.info(f"Populating details layout for: {self.client_info.get('client_name')}")
 
-        # Ensure status_combo is created if it doesn't exist (should be in setup_ui)
+        # Ensure status_combo is created (should be done in setup_ui, but as a fallback)
         if not hasattr(self, 'status_combo') or self.status_combo is None:
+            logging.warning("status_combo was None in populate_details_layout, re-creating. This should ideally be created in setup_ui.")
             self.status_combo = QComboBox()
-            self.load_statuses() # Load statuses if creating combo for the first time here
-        else:
-            self.load_statuses() # Ensure statuses are fresh and selection is updated
+            # self.load_statuses() # load_statuses will be called below anyway
 
-        self.status_combo.setEnabled(False) # Default to non-editable in display mode
-        self.status_combo.setCurrentText(self.client_info.get("status", self.tr("En cours")))
-        # Reconnect signal AFTER setting current text to avoid premature trigger during population
+        # Always reload statuses to ensure items are up-to-date
+        self.load_statuses()
+
+        # Set current status and enabled state
+        self.status_combo.setEnabled(False) # Non-editable in display mode
+        current_status_text = self.client_info.get("status", self.tr("En cours"))
+        status_idx = self.status_combo.findText(current_status_text)
+        if status_idx != -1:
+            self.status_combo.setCurrentIndex(status_idx)
+        elif self.status_combo.count() > 0:
+            self.status_combo.setCurrentIndex(0) # Default to first if not found
+
+        # Manage signal connection
         try:
-            self.status_combo.currentTextChanged.disconnect(self.update_client_status) # Ensure no multiple connections
+            self.status_combo.currentTextChanged.disconnect(self.update_client_status)
         except TypeError:
-            pass
+            pass # Not connected
         self.status_combo.currentTextChanged.connect(self.update_client_status)
 
 
@@ -5540,15 +5558,20 @@ class ClientWidget(QWidget):
             self.status_combo.currentTextChanged.disconnect(self.update_client_status)
         except TypeError: # Was not connected or already disconnected
             pass
-        # No longer doing self.status_combo.setParent(None)
-        # if self.status_combo and self.status_combo.parent():
-        #     self.status_combo.setParent(None) # Keep status_combo in its layout
+        try:
+            self.status_combo.currentTextChanged.disconnect(self.update_client_status)
+        except TypeError: # Was not connected or already disconnected
+            pass
 
-        # Detach other labels that are part of details_layout before clearing rows
-        if hasattr(self, 'category_label') and self.category_label.layout() == self.details_layout :
-             self.category_label.setParent(None)
-        if hasattr(self, 'category_value_label') and self.category_value_label.layout() == self.details_layout:
-             self.category_value_label.setParent(None)
+        # We are not removing status_combo from its parent layout here.
+        # Instead, we will ensure it's correctly placed and managed in the details_layout (QFormLayout).
+
+        # Detach other labels that were part of details_layout before clearing rows,
+        # but ensure they are not the status_combo itself if it was directly added to a row.
+        # The QFormLayout manages its rows, so removing rows will detach widgets.
+        # We need to be careful if status_combo was added directly to a row in details_layout.
+        # For now, assume populate_details_layout correctly adds it, and here we just clear.
+
 
         # Clear previous edit widgets if any, and rows from details_layout
         for widget in self.edit_widgets.values():
