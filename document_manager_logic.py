@@ -209,11 +209,9 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
             # Fetch names for IDs obtained from controller
             country_obj = get_country_by_id(client_dict_from_controller.get('country_id')) if client_dict_from_controller.get('country_id') else None
             city_obj = get_city_by_id(client_dict_from_controller.get('city_id')) if client_dict_from_controller.get('city_id') else None
-            # Status should be part of created_client_info if controller sets it, or fetch if controller returns status_id
-            status_id_from_controller = client_dict_from_controller.get('client_status_id') # Key used in controller
+            status_id_from_controller = client_dict_from_controller.get('client_status_id')
             status_obj = get_status_setting_by_id(status_id_from_controller) if status_id_from_controller else None
-
-            sel_langs_str_ui = client_dict_from_controller.get('languages', 'fr') # Key used in controller
+            sel_langs_str_ui = client_dict_from_controller.get('languages', 'fr')
             sel_langs_list_ui = sel_langs_str_ui.split(',') if isinstance(sel_langs_str_ui, str) else ['fr']
 
             ui_map_data = {
@@ -221,24 +219,125 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                 "client_name": client_dict_from_controller.get('client_name'),
                 "company_name": client_dict_from_controller.get('company_name'),
                 "need": client_dict_from_controller.get('primary_need_description'),
-                "country": country_obj['country_name'] if country_obj else client_data_dict.get("country_name", "N/A"), # Fallback to original input if needed
+                "country": country_obj['country_name'] if country_obj else client_data_dict.get("country_name", "N/A"),
                 "country_id": client_dict_from_controller.get('country_id'),
-                "city": city_obj['city_name'] if city_obj else client_data_dict.get("city_name", "N/A"), # Fallback to original input if needed
+                "city": city_obj['city_name'] if city_obj else client_data_dict.get("city_name", "N/A"),
                 "city_id": client_dict_from_controller.get('city_id'),
-                "project_identifier": client_dict_from_controller.get('project_identifier'),
-                "base_folder_path": client_dict_from_controller.get('default_base_folder_path'), # Updated earlier
+                "project_identifier": client_dict_from_controller.get('project_identifier'), # This is the client's main project ID
+                "default_base_folder_path": client_dict_from_controller.get('default_base_folder_path'),
+                "base_folder_path": client_dict_from_controller.get('default_base_folder_path'), # Alias for ClientWidget
                 "selected_languages": sel_langs_list_ui,
-                "price": client_dict_from_controller.get('price', 0), # Price from controller
-                "notes": client_dict_from_controller.get('notes', ''), # Notes from controller
+                "price": client_dict_from_controller.get('price', 0),
+                "notes": client_dict_from_controller.get('notes', ''),
                 "status": status_obj['status_name'] if status_obj else "N/A",
                 "status_id": status_id_from_controller,
                 "creation_date": client_dict_from_controller.get('created_at','').split("T")[0] if client_dict_from_controller.get('created_at') else datetime.now().strftime("%Y-%m-%d"),
-                "category": client_dict_from_controller.get('category', 'Standard') # Category from controller
+                "category": client_dict_from_controller.get('category', 'Standard')
             }
             doc_manager.clients_data_map[actual_new_client_id] = ui_map_data
-            doc_manager.add_client_to_list_widget(ui_map_data)
+            doc_manager.add_client_to_list_widget(ui_map_data) # Add to the list widget in DocumentManager UI
 
-        if ui_map_data:
+        # --- Prompt for Commande Creation ---
+        commande_created_project_id = None
+        if actual_new_client_id: # Ensure client was successfully created
+            reply = QMessageBox.question(doc_manager, doc_manager.tr("Nouvelle Commande"),
+                                         doc_manager.tr("Voulez-vous créer une nouvelle commande pour ce client ({0}) ?").format(client_name_val),
+                                         QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+            if reply == QMessageBox.Yes:
+                from commande_management.commande_dialog import CommandeDialog # Local import
+                commande_dialog = CommandeDialog(client_id=actual_new_client_id,
+                                                 current_user_id=doc_manager.current_user_id,
+                                                 parent=doc_manager)
+                if commande_dialog.exec_() == QDialog.Accepted:
+                    # CommandeDialog is expected to handle its own saving and project creation/linking.
+                    # We need to get the project_id if a new project was created via the commande dialog.
+                    # This assumes CommandeDialog might have a method like get_associated_project_id()
+                    # or that the project_id is stored on the commande_data it might return.
+                    # For now, let's assume the CommandeDialog updates the Commande record with project_id.
+                    # We might need to fetch the latest commande for this client to get that project_id.
+
+                    # A simpler way: CommandeDialog could create the project and return its ID.
+                    # Let's assume CommandeDialog has a method `get_created_project_id()`
+                    if hasattr(commande_dialog, 'get_created_project_id'):
+                        commande_created_project_id = commande_dialog.get_created_project_id()
+                        if commande_created_project_id:
+                             logging.info(f"Commande dialog created/linked project ID: {commande_created_project_id}")
+
+                    doc_manager.notify(title=doc_manager.tr("Commande Traitée"),
+                                       message=doc_manager.tr("La commande a été initialisée."), type='INFO')
+                    # Refresh ClientWidget's Commande tab if it's open
+                    for i in range(doc_manager.client_tabs_widget.count()):
+                        tab_widget = doc_manager.client_tabs_widget.widget(i)
+                        if hasattr(tab_widget, 'client_info') and tab_widget.client_info.get("client_id") == actual_new_client_id:
+                            if hasattr(tab_widget, 'commande_widget_instance') and tab_widget.commande_widget_instance: # Assuming ClientWidget holds CommandeWidget
+                                tab_widget.commande_widget_instance.refresh_commandes()
+                            break
+                else:
+                    logging.info("Commande creation cancelled by user.")
+
+        # --- Project and Task Creation (Adapting to use commande_created_project_id if available) ---
+        project_id_for_tasks = commande_created_project_id if commande_created_project_id else new_project_id_central_db
+
+        if not project_id_for_tasks and not commande_created_project_id : # If no commande led to a project, and no default project was planned
+            # This means user said NO to commande, and we decided not to create a default project.
+            # The original logic for new_project_id_central_db would not have run.
+            # If a project is always desired, the logic for new_project_id_central_db should run if commande_created_project_id is None.
+            # Let's adjust: if no commande_created_project_id, then try to create the default project.
+            if not commande_created_project_id:
+                # Re-run the original project creation logic if no project came from commande
+                project_status_planning_obj = get_status_setting_by_name("Planning", "Project")
+                project_status_id_for_pm = project_status_planning_obj['status_id'] if project_status_planning_obj else None
+                if not project_status_id_for_pm:
+                     QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Configuration Projet"),
+                                         doc_manager.tr("Statut de projet par défaut 'Planning' non trouvé."))
+                project_data_for_db_default = {
+                    'client_id': actual_new_client_id,
+                    'project_name': f"Projet Administratif pour {created_client_info.get('client_name', client_name_val)}",
+                    'description': f"Suivi administratif pour client: {created_client_info.get('client_name', client_name_val)}.",
+                    'start_date': datetime.now().strftime("%Y-%m-%d"),
+                    'status_id': project_status_id_for_pm,
+                    'priority': 0 # Lower priority for general admin project
+                }
+                new_project_id_central_db = add_project(project_data_for_db_default)
+                if new_project_id_central_db:
+                    project_id_for_tasks = new_project_id_central_db
+                    QMessageBox.information(doc_manager, doc_manager.tr("Projet Administratif Créé"),
+                                            doc_manager.tr("Un projet administratif général a été créé pour {0}.").format(created_client_info.get('client_name', client_name_val)))
+                else:
+                    QMessageBox.warning(doc_manager, doc_manager.tr("Erreur DB Projet"),
+                                        doc_manager.tr("La création du projet administratif général a échoué."))
+
+        # Now, if project_id_for_tasks is set (either from commande or default creation), create tasks for it.
+        if project_id_for_tasks:
+            task_status_todo_obj = get_status_setting_by_name("To Do", "Task")
+            task_status_id_for_todo = task_status_todo_obj['status_id'] if task_status_todo_obj else None
+            if not task_status_id_for_todo:
+                QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Configuration Tâche"),
+                                    doc_manager.tr("Statut de tâche par défaut 'To Do' non trouvé."))
+
+            standard_tasks = [
+                {"name": "Initial Client Consultation & Needs Assessment", "description": "Understand client requirements, objectives, target markets, and budget.", "priority_val": 2, "deadline_days": 3},
+                {"name": "Market Research & Analysis", "description": "Research target international markets, including competition, regulations, and cultural nuances.", "priority_val": 1, "deadline_days": 7},
+                {"name": "Post-Sales Follow-up & Support", "description": "Follow up with the client after delivery.", "priority_val": 1, "deadline_days": 60}
+            ]
+            for task_item in standard_tasks:
+                task_deadline = (datetime.now() + timedelta(days=task_item["deadline_days"])).strftime("%Y-%m-%d")
+                task_data_for_db = {
+                    'project_id': project_id_for_tasks, # Use the determined project_id
+                    'task_name': task_item["name"],
+                    'description': task_item["description"],
+                    'status_id': task_status_id_for_todo,
+                    'priority': task_item["priority_val"],
+                    'due_date': task_deadline
+                }
+                add_task(task_data_for_db)
+            QMessageBox.information(doc_manager, doc_manager.tr("Tâches Créées"),
+                                    doc_manager.tr("Des tâches standard ont été ajoutées au projet associé."))
+        else:
+            logging.warning(f"No project ID available (commande or default) for client {actual_new_client_id}. No tasks created.")
+
+
+        if ui_map_data: # This block should run regardless of commande creation, to ensure Proforma/Contact/Product dialogs sequence
             # --- BEGIN AUTO PROFORMA GENERATION ---
             try:
                 logging.info(f"Starting automatic Proforma generation for new client ID: {actual_new_client_id}")

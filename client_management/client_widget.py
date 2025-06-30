@@ -87,6 +87,10 @@ from auth.permissions import has_permission, \
     P_LINK_PRODUCTS_TO_CLIENT, P_MANAGE_CLIENT_DOCUMENTS, P_ARCHIVE_CLIENT, \
     P_MANAGE_CLIENT_ASSIGNMENTS, P_MANAGE_CLIENT_BILLING # Define more as needed
 
+# Import CommandeWidget
+from commande_management.commande_widget import CommandeWidget
+
+
 class ClientWidget(QWidget):
     CONTACT_PAGE_LIMIT = 15 # Class attribute for page limit
 
@@ -218,6 +222,7 @@ class ClientWidget(QWidget):
 
         self._setup_notes_section(layout)
         self._setup_main_tabs_section(layout) # This will call sub-methods for each tab
+        self._setup_commandes_tab() # Add the new Commandes tab
 
         # Initial data loading calls
         logging.info("ClientWidget.setup_ui: Starting initial data loading for tabs...")
@@ -1162,6 +1167,39 @@ class ClientWidget(QWidget):
         # Initial state for MTA buttons
         self.add_assigned_mta_btn.setEnabled(False)
         self.remove_assigned_mta_btn.setEnabled(False)
+
+    def _setup_commandes_tab(self):
+        """Sets up the Commandes tab."""
+        try:
+            logging.info("ClientWidget.setup_ui: Starting setup for Commandes Tab...")
+            self.commandes_tab_widget = CommandeWidget(
+                client_info=self.client_info,
+                current_user_info=self.current_user_info,
+                parent=self
+            )
+            # Add this as a top-level tab in self.tab_widget (main tab container)
+            # Or, if Commandes should be part of the "Autres Informations" group box, then add to self.tab_widget
+            # For now, let's add it to the main self.tab_widget
+            if hasattr(self, 'tab_widget'):
+                 # Insert it before "Available Templates" or as the second tab for prominence
+                docs_tab_index = -1
+                for i in range(self.tab_widget.count()):
+                    if self.tab_widget.tabText(i) == self.tr("Documents"):
+                        docs_tab_index = i
+                        break
+
+                if docs_tab_index != -1:
+                    self.tab_widget.insertTab(docs_tab_index + 1, self.commandes_tab_widget, self.tr("Commandes"))
+                else: # Fallback if Documents tab isn't found by that exact name
+                    self.tab_widget.addTab(self.commandes_tab_widget, self.tr("Commandes"))
+
+                logging.info("ClientWidget._setup_commandes_tab: Commandes tab added.")
+            else:
+                logging.error("ClientWidget._setup_commandes_tab: self.tab_widget not found. Cannot add Commandes tab.")
+
+        except Exception as e:
+            logging.error(f"Error in _setup_commandes_tab: {e}", exc_info=True)
+            QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation onglet Commandes:\n{0}").format(str(e)))
 
 
     def _setup_billing_tab(self):
@@ -3772,6 +3810,16 @@ class ClientWidget(QWidget):
         # Also ensure SAV tickets table is loaded if tab is visible
         if hasattr(self, 'sav_tab_index') and self.tab_widget.isTabEnabled(self.sav_tab_index): # Check sav_tab_index exists
             self.load_sav_tickets_table()
+
+        # Refresh CommandesWidget if it exists
+        if hasattr(self, 'commandes_tab_widget') and self.commandes_tab_widget:
+            self.commandes_tab_widget.client_info = new_client_info # Update its client_info
+            self.commandes_tab_widget.client_id = new_client_info.get("client_id")
+            if hasattr(self.commandes_tab_widget, 'load_commandes'):
+                self.commandes_tab_widget.load_commandes()
+            if hasattr(self.commandes_tab_widget, 'populate_status_filters'): # If it has filters
+                self.commandes_tab_widget.populate_status_filters()
+
 
     def load_statuses(self):
         current_client_status_id = self.client_info.get("status_id")
