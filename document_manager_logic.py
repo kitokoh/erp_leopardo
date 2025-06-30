@@ -337,6 +337,7 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
             logging.warning(f"No project ID available (commande or default) for client {actual_new_client_id}. No tasks created.")
 
 
+
         if ui_map_data: # This block should run regardless of commande creation, to ensure Proforma/Contact/Product dialogs sequence
             # --- BEGIN AUTO PROFORMA GENERATION ---
             try:

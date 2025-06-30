@@ -13,6 +13,7 @@ import db # Assuming db.__init__ exposes necessary cruds
 from db.cruds import commandes_crud, products_crud, projects_crud, status_settings_crud
 from dialogs.product_dialog import ProductDialog # Import ProductDialog
 
+
 class CommandeDialog(QDialog):
     def __init__(self, client_id, current_user_id, commande_id_to_edit=None, parent=None):
         super().__init__(parent)
@@ -32,6 +33,7 @@ class CommandeDialog(QDialog):
         if not self.commande_id_to_edit: # New Commande
             self.commande_reference_edit.setText(commandes_crud.get_next_commande_reference())
             # self.commande_reference_edit.setReadOnly(True) # Optional: make it read-only
+
 
         self.populate_combos()
 
@@ -251,6 +253,7 @@ class CommandeDialog(QDialog):
             return # Return after handling ProductDialog
 
         # If item_data_to_load is provided (e.g., when editing an existing commande)
+
         if item_data_to_load:
             row_pos = self.items_table.rowCount()
             self.items_table.insertRow(row_pos)
@@ -373,6 +376,7 @@ class CommandeDialog(QDialog):
             if success:
                 self.logger.info(f"Commande {self.commande_id_to_edit} updated.")
                 self._last_processed_project_id = commande_data_payload.get("project_id") # Store project_id
+
                 self._sync_commande_items(self.commande_id_to_edit)
                 super().accept()
             else:
@@ -385,6 +389,7 @@ class CommandeDialog(QDialog):
                 self._last_processed_project_id = commande_data_payload.get("project_id") # Store project_id
                 self._created_commande_id = new_cmd_id
                 self._created_commande_ref = commande_data_payload.get("commande_reference")
+
                 self._sync_commande_items(new_cmd_id)
                 super().accept()
             else:
@@ -517,6 +522,7 @@ class CommandeDialog(QDialog):
     def get_created_commande_reference(self):
         """Returns the reference of the commande created or edited by this dialog instance."""
         return getattr(self, '_created_commande_ref', None)
+
 
 
 # Example usage (for testing, if run directly)
