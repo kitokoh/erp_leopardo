@@ -13,6 +13,7 @@ import db # Assuming db.__init__ exposes necessary cruds
 from db.cruds import commandes_crud, products_crud, projects_crud, status_settings_crud
 from dialogs.product_dialog import ProductDialog # Import ProductDialog
 
+
 class CommandeDialog(QDialog):
     def __init__(self, client_id, current_user_id, commande_id_to_edit=None, parent=None):
         super().__init__(parent)
@@ -251,6 +252,7 @@ class CommandeDialog(QDialog):
             return # Return after handling ProductDialog
 
         # If item_data_to_load is provided (e.g., when editing an existing commande)
+
         if item_data_to_load:
             row_pos = self.items_table.rowCount()
             self.items_table.insertRow(row_pos)
@@ -373,6 +375,7 @@ class CommandeDialog(QDialog):
             if success:
                 self.logger.info(f"Commande {self.commande_id_to_edit} updated.")
                 self._last_processed_project_id = commande_data_payload.get("project_id") # Store project_id
+
                 self._sync_commande_items(self.commande_id_to_edit)
                 super().accept()
             else:
@@ -385,6 +388,7 @@ class CommandeDialog(QDialog):
                 self._last_processed_project_id = commande_data_payload.get("project_id") # Store project_id
                 self._created_commande_id = new_cmd_id
                 self._created_commande_ref = commande_data_payload.get("commande_reference")
+
                 self._sync_commande_items(new_cmd_id)
                 super().accept()
             else:
@@ -547,6 +551,7 @@ class CommandeDialog(QDialog):
         for db_item_id_to_check in db_item_ids:
             if db_item_id_to_check not in table_item_ids_processed:
                 self.logger.info(f"Deleting CommandeItem {db_item_id_to_check} as it's no longer in the table.")
+
                 commandes_crud.delete_commande_item(db_item_id_to_check)
 
         self._recalculate_and_save_commande_totals(commande_id)
@@ -612,6 +617,7 @@ class CommandeDialog(QDialog):
         except Exception as e:
             self.logger.error(f"Error extracting payload from table row {row_index}: {e}", exc_info=True)
             QMessageBox.critical(self, "Erreur Interne", f"Erreur lors de la lecture des données de la ligne d'article {row_index + 1}.")
+
             return None
 
     def _recalculate_and_save_commande_totals(self, commande_id):
@@ -660,6 +666,7 @@ class CommandeDialog(QDialog):
     def get_created_commande_reference(self):
         """Returns the reference of the commande created or edited by this dialog instance."""
         return getattr(self, '_created_commande_ref', None)
+
 
 
 # Example usage (for testing, if run directly)

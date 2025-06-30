@@ -337,8 +337,12 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
             logging.warning(f"No project ID available (commande or default) for client {actual_new_client_id}. No tasks created.")
 
 
+
         if ui_map_data: # This block should run regardless of commande creation, to ensure Proforma/Contact/Product dialogs sequence
             # --- BEGIN AUTO PROFORMA GENERATION ---
+            # This section is now executed AFTER the Commande and its items are established (if any)
+            # and after the ContactDialog.
+            # The project_id used for Proforma should be project_id_for_tasks.
             try:
                 logging.info(f"Starting automatic Proforma generation for new client ID: {actual_new_client_id}")
                 project_status_id_for_pm = project_status_planning_obj['status_id'] if project_status_planning_obj else None
@@ -398,6 +402,7 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
             # and after the ContactDialog.
             # The project_id used for Proforma should be project_id_for_tasks.
             try:
+
                 logging.info(f"Starting automatic Proforma generation for new client ID: {actual_new_client_id}, using project ID: {project_id_for_tasks}")
 
                 # 1. Determine Proforma Language

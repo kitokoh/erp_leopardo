@@ -265,12 +265,14 @@ def create_proforma_api(
             db_proforma.linked_document_id = generated_doc_id # Update the instance for the response
             db_session.refresh(db_proforma) # Refresh to get the updated state if update_proforma_invoice doesn't
     except WeasyPrintError as wpe:
-        # print(f"WeasyPrintError during PDF generation for proforma {db_proforma.id}: {wpe}")
-        pass
+        logging.error(f"WeasyPrintError during PDF generation for proforma {db_proforma.id if db_proforma else 'N/A'}: {wpe}")
+        # Decide if this should raise an HTTPException or if creating proforma without PDF is acceptable
+        # For now, it proceeds, and the absence of proforma_pdf_url will indicate the issue.
     except HTTPException: # Re-raise HTTPExceptions
         raise
     except Exception as pdf_exc:
-        # print(f"Generic error during PDF generation for proforma {db_proforma.id}: {pdf_exc}")
+        logging.error(f"Generic error during PDF generation for proforma {db_proforma.id if db_proforma else 'N/A'}: {pdf_exc}", exc_info=True)
+        # Similar to WeasyPrintError, decide on error handling strategy.
         pass
 
     response = ProformaInvoiceResponse.from_orm(db_proforma)
@@ -397,25 +399,42 @@ def generate_final_invoice_api(
     #     if hasattr(db_proforma, 'target_language_code') and db_proforma.target_language_code:
     #         target_lang = db_proforma.target_language_code
 
-    # Simplified way to get vat/discount if not stored on proforma model
-    # This would ideally be part of the ProformaInvoice model or settings
-    temp_proforma_create_obj_for_rates = ProformaInvoiceCreate( # Dummy create obj just to access defaults
-        client_id=db_proforma.client_id, company_id=db_proforma.company_id, items=[]
-    )
-    vat_rate_to_use = temp_proforma_create_obj_for_rates.vat_rate_percentage
-    # discount_rate_to_use = temp_proforma_create_obj_for_rates.discount_rate_percentage
-    # Or, calculate from proforma amounts if possible:
-    discount_rate_to_use = (db_proforma.discount_amount / db_proforma.subtotal_amount * 100
-                            if db_proforma.subtotal_amount and db_proforma.discount_amount else 0.0)
+    # Calculate discount rate from proforma amounts for accuracy
+    discount_rate_to_use = 0.0
+    if db_proforma.subtotal_amount and db_proforma.subtotal_amount > 0 and db_proforma.discount_amount is not None:
+        discount_rate_to_use = (db_proforma.discount_amount / db_proforma.subtotal_amount) * 100
+
+    # Calculate VAT rate from proforma amounts for accuracy
+    vat_rate_to_use = 0.0
+    amount_for_vat_calculation = db_proforma.subtotal_amount - (db_proforma.discount_amount or 0.0)
+    if amount_for_vat_calculation > 0 and db_proforma.vat_amount is not None:
+        vat_rate_to_use = (db_proforma.vat_amount / amount_for_vat_calculation) * 100
+    else:
+        # Fallback to default from a dummy ProformaInvoiceCreate object if calculation is not possible
+        # This case should ideally not happen if proforma has valid financial data
+        temp_proforma_create_obj_for_rates = ProformaInvoiceCreate(
+            client_id=db_proforma.client_id, company_id=db_proforma.company_id, items=[]
+        )
+        vat_rate_to_use = temp_proforma_create_obj_for_rates.vat_rate_percentage
+        # If discount_rate_to_use is still 0.0 because subtotal was 0, use default too
+        if discount_rate_to_use == 0.0 and db_proforma.subtotal_amount == 0:
+             discount_rate_to_use = temp_proforma_create_obj_for_rates.discount_rate_percentage
 
 
     additional_context_for_invoice_pdf = {
-        "invoice_id": invoice_number_final, "proforma_id": db_proforma.proforma_invoice_number,
-        "current_date": invoice_date_final, "document_title": "INVOICE",
+        "invoice_id": invoice_number_final,
+        "proforma_id": db_proforma.proforma_invoice_number,
+        "current_date": invoice_date_final,
+        "document_title": "INVOICE", # This might be better handled by get_proforma_invoice_context_data or template
         "vat_rate_percentage": vat_rate_to_use,
         "discount_rate_percentage": discount_rate_to_use,
-        "lite_selected_products": [{
-            "product_id": item.product_id, "name": item.description, "description": item.description,
+        # Pass the raw amounts from proforma to context so it can decide to use them or recalculate
+        "subtotal_amount_raw": db_proforma.subtotal_amount,
+        "discount_amount_raw": db_proforma.discount_amount,
+        "vat_amount_raw": db_proforma.vat_amount,
+        "grand_total_amount_raw": db_proforma.grand_total_amount,
+        "lite_selected_products": [{ # These are the items from the original proforma
+            "product_id": item.product_id, "name": item.description, "description": item.description, # Name/desc might be overridden by context anyway
             "quantity": item.quantity, "unit_price_override": item.unit_price
         } for item in db_proforma.items],
         # "db_session": db_session, # Removed for sqlite context
