@@ -1073,7 +1073,7 @@ CREATE TABLE IF NOT EXISTS Templates (
     )
     """)
 
-    # --- Commandes Module Tables ---
+
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS Commandes (
         commande_id TEXT PRIMARY KEY,
@@ -1145,6 +1145,7 @@ CREATE TABLE IF NOT EXISTS Templates (
         FOREIGN KEY (commande_id) REFERENCES Commandes (commande_id) ON DELETE SET NULL, -- Correct FK
         FOREIGN KEY (source_template_id) REFERENCES Templates (template_id),
         FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id),
+        FOREIGN KEY (commande_id) REFERENCES Commandes (commande_id) ON DELETE SET NULL,
         FOREIGN KEY (parent_document_id) REFERENCES ClientDocuments (document_id) ON DELETE SET NULL
     )""")
 
@@ -2176,8 +2177,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_exp_tags_tag_id ON ExperienceTags(tag_id)")
     # --- End Experience Module Indexes ---
 
-    # --- Commandes Module Tables (definition moved before ClientDocuments) ---
-    # --- Indexes for Commandes Module (defined after table creation) ---
+
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandes_client_id ON Commandes(client_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandes_project_id ON Commandes(project_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandes_commande_reference ON Commandes(commande_reference)")
@@ -2186,6 +2186,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandeitems_commande_id ON CommandeItems(commande_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandeitems_product_id ON CommandeItems(product_id)")
     # --- End Commandes Module Indexes ---
+
 
     # --- Company Expense Module Tables ---
     cursor.execute("""
