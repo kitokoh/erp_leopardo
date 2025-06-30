@@ -2164,8 +2164,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_exp_tags_tag_id ON ExperienceTags(tag_id)")
     # --- End Experience Module Indexes ---
 
-    # --- Commandes Module Tables (definition moved before ClientDocuments) ---
-    # --- Indexes for Commandes Module (defined after table creation) ---
+
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandes_client_id ON Commandes(client_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandes_project_id ON Commandes(project_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandes_commande_reference ON Commandes(commande_reference)")
@@ -2174,6 +2173,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandeitems_commande_id ON CommandeItems(commande_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandeitems_product_id ON CommandeItems(product_id)")
     # --- End Commandes Module Indexes ---
+
 
     # --- Company Expense Module Tables ---
     cursor.execute("""
