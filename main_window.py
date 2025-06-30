@@ -294,7 +294,19 @@ class DocumentManager(QMainWindow):
             logging.info("DocumentManager: StatisticsDashboard instance created.") # Kept for diagnostics
             self.statistics_dashboard_instance.request_add_client_for_country.connect(self.handle_add_client_from_stats_map)
             self.statistics_dashboard_instance.request_view_client_details.connect(self.handle_view_client_from_stats_map)
+
+            logging.info(f"DocumentManager: BEFORE addWidget for StatisticsDashboard. Current stack count: {self.main_area_stack.count()}. Instance: {self.statistics_dashboard_instance}")
             self.main_area_stack.addWidget(self.statistics_dashboard_instance)
+            logging.info(f"DocumentManager: AFTER addWidget for StatisticsDashboard. New stack count: {self.main_area_stack.count()}. Widget added: {self.main_area_stack.widget(self.main_area_stack.count() -1) == self.statistics_dashboard_instance}")
+            # Verify if it's really in the stack
+            found_in_stack_after_add = False
+            for i in range(self.main_area_stack.count()):
+                if self.main_area_stack.widget(i) == self.statistics_dashboard_instance:
+                    found_in_stack_after_add = True
+                    logging.info(f"DocumentManager: StatisticsDashboard IS found in stack at index {i} immediately after addWidget.")
+                    break
+            if not found_in_stack_after_add:
+                logging.error("DocumentManager: CRITICAL - StatisticsDashboard was NOT found in stack immediately after addWidget call!")
         else:
             self.statistics_dashboard_instance = None
 
