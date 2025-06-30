@@ -427,7 +427,7 @@ def _seed_main_document_templates(cursor: sqlite3.Cursor, conn: sqlite3.Connecti
         {'template_name': 'Facture Proforma (Excel)', 'base_file_name': 'proforma_template.xlsx', 'template_type': 'EXCEL_PROFORMA_INVOICE', 'description': 'Modèle Excel pour les factures proforma.'},
         {'template_name': 'Contrat de Vente (Excel)', 'base_file_name': 'contrat_vente_template.xlsx', 'template_type': 'EXCEL_SALES_CONTRACT', 'description': 'Modèle Excel pour les contrats de vente.'},
         {'template_name': 'Liste de Colisage (Excel)', 'base_file_name': 'packing_liste_template.xlsx', 'template_type': 'EXCEL_PACKING_LIST', 'description': 'Modèle Excel pour les listes de colisage.'},
-        {'template_name': 'Facture Proforma (HTML)', 'base_file_name': 'proforma_invoice_template.html', 'template_type': 'PROFORMA_INVOICE_HTML', 'description': 'Modèle HTML pour les factures proforma.'},
+        {'template_name': 'Facture Proforma (HTML)', 'base_file_name': 'proforma_invoice_template.html', 'template_type': 'HTML_PROFORMA', 'description': 'Modèle HTML pour les factures proforma.'}, # Corrected template_type
         {'template_name': 'Liste de Colisage (HTML)', 'base_file_name': 'packing_list_template.html', 'template_type': 'PACKING_LIST_HTML', 'description': 'Modèle HTML pour les listes de colisage.'},
         {'template_name': 'Contrat de Vente (HTML)', 'base_file_name': 'sales_contract_template.html', 'template_type': 'SALES_CONTRACT_HTML', 'description': 'Modèle HTML pour les contrats de vente.'},
     ]
@@ -436,11 +436,21 @@ def _seed_main_document_templates(cursor: sqlite3.Cursor, conn: sqlite3.Connecti
     for lang_code in all_supported_template_langs:
         for doc_def in main_document_templates_definitions:
             full_template_name = f"{doc_def['template_name']} ({lang_code.upper()})"
+
+            # Determine if this template should be default
+            is_default = False
+            if doc_def['template_type'] == 'HTML_PROFORMA' and lang_code == 'fr':
+                is_default = True
+            # Add other conditions for other default templates if needed
+            # Example:
+            # elif doc_def['template_type'] == 'SOME_OTHER_TYPE' and lang_code == 'en':
+            #     is_default = True
+
             template_data_for_db = {
                 'template_name': full_template_name, 'template_type': doc_def['template_type'],
                 'language_code': lang_code, 'base_file_name': doc_def['base_file_name'],
                 'description': doc_def['description'], 'category_id': category_id,
-                'client_id': None, 'is_default_for_type_lang': False,
+                'client_id': None, 'is_default_for_type_lang': is_default, # Set dynamically
             }
             template_id = add_default_template_if_not_exists(template_data_for_db, conn=conn) 
             
