@@ -146,6 +146,7 @@ from calculator.main_calculator_widget import MainCalculatorWidget # Import Calc
 # from db.connection import SessionLocal as AppSessionLocal_MW # Import SessionLocal for calculator
 from user_management.user_menu_button import UserMenuButton # Import UserMenuButton
 from dialogs.edit_user_dialog import EditUserDialog # For handling edit/add user requests
+from commande_management.commandes_dashboard_widget import CommandesDashboardWidget # Import CommandesDashboardWidget
 
 # Definition of configurable modules
 CONFIGURABLE_MODULES = [
@@ -390,6 +391,15 @@ class DocumentManager(QMainWindow):
         else:
             self.calculator_module_widget_instance = None
             logging.info("DocumentManager: Calculator module disabled, widget not created.")
+
+        # Commandes Dashboard Widget (always create, visibility of menu action controlled by RBAC)
+        self.commandes_dashboard_widget_instance = CommandesDashboardWidget(
+            parent=self,
+            current_user_info=self.current_user_info,
+            app_root_dir=self.app_root_dir # Pass app_root_dir
+        )
+        self.main_area_stack.addWidget(self.commandes_dashboard_widget_instance)
+        logging.info("DocumentManager: CommandesDashboardWidget instance created and added to stack.")
 
 
         self.main_area_stack.setCurrentWidget(self.home_page_widget_instance) # Set Home Page as default view
@@ -1066,6 +1076,10 @@ class DocumentManager(QMainWindow):
         self.calculator_module_action = QAction(QIcon(":/icons/bar-chart.svg"), self.tr("Calculatrices"), self) # Placeholder icon
         self.calculator_module_action.triggered.connect(self.show_calculator_module_view)
 
+        # Action for Commande Management (Global View)
+        self.commande_management_action = QAction(QIcon(":/icons/shopping-cart.svg"), self.tr("Gestion des Commandes"), self) # Assumes shopping-cart.svg will be added
+        self.commande_management_action.triggered.connect(self.show_commande_management_view)
+
 
         # Populate searchable_actions_map
         self.searchable_actions_map[self.tr("Accueil")] = self.home_action
@@ -1087,6 +1101,7 @@ class DocumentManager(QMainWindow):
         self.searchable_actions_map[self.tr("Gestion des Connaissances")] = self.experience_management_action
         self.searchable_actions_map[self.tr("Calendrier")] = self.calendar_module_action
         self.searchable_actions_map[self.tr("Gérer les Utilisateurs")] = self.manage_users_action
+        self.searchable_actions_map[self.tr("Gestion des Commandes")] = self.commande_management_action
 
     def _placeholder_manage_users(self):
         # This is a placeholder. Actual user management UI would be complex.
@@ -1117,7 +1132,8 @@ class DocumentManager(QMainWindow):
         modules_menu = menu_bar.addMenu(self.tr("Modules"))
         modules_menu.addAction(self.home_action) # Added Home action to Modules menu
         modules_menu.addAction(self.documents_view_action) # Documents view is core, always added
-        modules_menu.addSeparator() # Separator after Home and Documents
+        modules_menu.addAction(self.commande_management_action) # Add Commande Management action
+        modules_menu.addSeparator() # Separator after Home, Documents, and Commandes
 
         for module_info in CONFIGURABLE_MODULES:
             action_name = module_info['action_attr']
@@ -1281,6 +1297,11 @@ class DocumentManager(QMainWindow):
             else: # Fallback if P_ACCESS_CALCULATOR_MODULE is not defined: make visible if module is on
                 logging.warning("P_ACCESS_CALCULATOR_MODULE permission constant not found. Calculator module visibility based on module_states only.")
                 self.calculator_module_action.setVisible(self.module_states.get('calculator', False))
+
+        # Commande Management Action Visibility (assuming a general permission for now like P_ACCESS_PROJECT_MODULE)
+        # TODO: Define a specific P_ACCESS_COMMANDE_MODULE permission
+        if hasattr(self, 'commande_management_action'):
+            self.commande_management_action.setVisible(has_permission(role_name, P_ACCESS_PROJECT_MODULE)) # Placeholder permission
 
 
         # Main Buttons on Document View
@@ -2058,6 +2079,45 @@ class DocumentManager(QMainWindow):
         else:
             logging.warning("Calculator module widget instance is None. Cannot show view.")
             QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Calculatrices est désactivé ou non initialisé."))
+
+    def show_commande_management_view(self):
+        """Switches to the main Commandes management view (e.g., dashboard)."""
+        if self.commandes_dashboard_widget_instance:
+            # Refresh data when view is shown
+            if hasattr(self.commandes_dashboard_widget_instance, '_load_initial_data'):
+                self.logger.info("Calling _load_initial_data on CommandesDashboardWidget.")
+                self.commandes_dashboard_widget_instance._load_initial_data()
+            self.main_area_stack.setCurrentWidget(self.commandes_dashboard_widget_instance)
+            self.logger.info("Switched to CommandesDashboardWidget.")
+        else:
+            logging.error("CommandesDashboardWidget instance is None. Cannot show view.")
+            QMessageBox.critical(self, self.tr("Erreur Module Commande"),
+                                 self.tr("Le module de gestion des commandes n'a pas pu être chargé."))
+
+    def focus_on_project(self, project_id: str):
+        """
+        Switches to the Project Management dashboard and attempts to focus on/display
+        the specified project.
+        """
+        if not project_id:
+            self.notify(self.tr("Erreur"), self.tr("Aucun ID de projet fourni pour la navigation."), type='ERROR')
+            return
+
+        if self.project_management_widget_instance:
+            self.main_area_stack.setCurrentWidget(self.project_management_widget_instance)
+            if hasattr(self.project_management_widget_instance, 'find_and_display_project'):
+                # This method needs to be implemented in ProjectManagementDashboard
+                self.project_management_widget_instance.find_and_display_project(project_id)
+                logging.info(f"Attempted to focus on project ID: {project_id} in Project Management Dashboard.")
+            else:
+                logging.warning(f"ProjectManagementDashboard does not have 'find_and_display_project' method. Cannot focus on project {project_id}.")
+                self.notify(self.tr("Fonctionnalité Manquante"),
+                            self.tr("Impossible de focaliser sur le projet spécifique dans le tableau de bord des projets."),
+                            type='WARNING')
+        else:
+            self.notify(self.tr("Module Désactivé"), self.tr("Le module de gestion de projet est désactivé."), type='WARNING')
+            logging.warning(f"Cannot focus on project {project_id}, Project Management module is not loaded/enabled.")
+
     # --- Saved Filters Methods ---
     def populate_saved_filters_combo(self):
         """Populates the combo box with filters saved by the current user."""

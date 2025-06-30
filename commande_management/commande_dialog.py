@@ -14,6 +14,7 @@ from db.cruds import commandes_crud, products_crud, projects_crud, status_settin
 from dialogs.product_dialog import ProductDialog # Import ProductDialog
 
 
+
 class CommandeDialog(QDialog):
     def __init__(self, client_id, current_user_id, commande_id_to_edit=None, parent=None):
         super().__init__(parent)
