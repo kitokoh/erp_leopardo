@@ -21,6 +21,7 @@ from db.cruds.templates_crud import get_distinct_template_languages, get_distinc
 import icons_rc # Import for Qt resource file
 
 # Local import for get_notification_manager will be kept inside methods as per plan.
+from .html_template_creator_dialog import HtmlTemplateCreatorDialog # Import the new dialog
 
 class TemplateDialog(QDialog):
     def __init__(self, config, parent=None):
@@ -69,10 +70,18 @@ class TemplateDialog(QDialog):
         self.template_list.setAlternatingRowColors(True); font = self.template_list.font(); font.setPointSize(font.pointSize() + 1); self.template_list.setFont(font)
         left_vbox_layout.addWidget(self.template_list)
         btn_layout = QHBoxLayout(); btn_layout.setSpacing(8)
-        self.add_btn = QPushButton(self.tr("Ajouter")); self.add_btn.setIcon(QIcon(":/icons/plus.svg")); self.add_btn.setToolTip(self.tr("Ajouter un nouveau modèle")); self.add_btn.setObjectName("primaryButton"); self.add_btn.clicked.connect(self.add_template); btn_layout.addWidget(self.add_btn)
-        self.edit_btn = QPushButton(self.tr("Modifier")); self.edit_btn.setIcon(QIcon(":/icons/pencil.svg")); self.edit_btn.setToolTip(self.tr("Modifier le modèle sélectionné (ouvre le fichier externe)")); self.edit_btn.clicked.connect(self.edit_template); self.edit_btn.setEnabled(False); btn_layout.addWidget(self.edit_btn)
+        self.add_btn = QPushButton(self.tr("Ajouter Fichier")); self.add_btn.setIcon(QIcon(":/icons/plus.svg")); self.add_btn.setToolTip(self.tr("Ajouter un nouveau modèle à partir d'un fichier existant (.docx, .xlsx, .html)")); self.add_btn.setObjectName("primaryButton"); self.add_btn.clicked.connect(self.add_template_from_file); btn_layout.addWidget(self.add_btn)
+
+        self.create_html_btn = QPushButton(self.tr("Créer Modèle HTML")); self.create_html_btn.setIcon(QIcon(":/icons/file-plus.svg")); # Assuming you have a file-plus.svg or similar
+        self.create_html_btn.setToolTip(self.tr("Créer un nouveau modèle HTML à partir de zéro avec l'éditeur intégré")); self.create_html_btn.clicked.connect(self.create_html_template_dialog); btn_layout.addWidget(self.create_html_btn)
+
+        btn_layout.addStretch(1) # Add some space before other buttons
+
+        self.edit_btn = QPushButton(self.tr("Modifier")); self.edit_btn.setIcon(QIcon(":/icons/pencil.svg")); self.edit_btn.setToolTip(self.tr("Modifier le modèle sélectionné (ouvre le fichier externe ou l'éditeur HTML)")); self.edit_btn.clicked.connect(self.edit_template); self.edit_btn.setEnabled(False); btn_layout.addWidget(self.edit_btn)
         self.delete_btn = QPushButton(self.tr("Supprimer")); self.delete_btn.setIcon(QIcon(":/icons/trash.svg")); self.delete_btn.setToolTip(self.tr("Supprimer le modèle sélectionné")); self.delete_btn.setObjectName("dangerButton"); self.delete_btn.clicked.connect(self.delete_template); self.delete_btn.setEnabled(False); btn_layout.addWidget(self.delete_btn)
-        self.default_btn = QPushButton(self.tr("Par Défaut")); self.default_btn.setIcon(QIcon.fromTheme("emblem-default")); self.default_btn.setToolTip(self.tr("Définir le modèle sélectionné comme modèle par défaut pour sa catégorie et langue")); self.default_btn.clicked.connect(self.set_default_template); self.default_btn.setEnabled(False); btn_layout.addWidget(self.default_btn) # emblem-default not in list yet
+        self.default_btn = QPushButton(self.tr("Par Défaut")); self.default_btn.setIcon(QIcon.fromTheme("emblem-default", QIcon(":/icons/check-square.svg"))); # Fallback icon
+        self.default_btn.setToolTip(self.tr("Définir le modèle sélectionné comme modèle par défaut pour sa catégorie et langue")); self.default_btn.clicked.connect(self.set_default_template); self.default_btn.setEnabled(False); btn_layout.addWidget(self.default_btn)
+
         left_vbox_layout.addLayout(btn_layout); main_hbox_layout.addLayout(left_vbox_layout, 1)
         self.preview_area = QTextEdit(); self.preview_area.setReadOnly(True); self.preview_area.setPlaceholderText(self.tr("Sélectionnez un modèle pour afficher un aperçu."))
         self.preview_area.setObjectName("templatePreviewArea")
@@ -90,6 +99,21 @@ class TemplateDialog(QDialog):
         # self.client_filter_combo.currentIndexChanged.connect(self.handle_filter_changed) # Removed
 
         self.load_templates(); self.template_list.currentItemChanged.connect(self.handle_tree_item_selection)
+
+    def create_html_template_dialog(self):
+        """Opens the dialog to create a new HTML template."""
+        creator_dialog = HtmlTemplateCreatorDialog(self)
+        # Connect the signal from HtmlTemplateCreatorDialog to refresh the list
+        creator_dialog.template_created_signal.connect(self._handle_new_template_creation)
+        creator_dialog.exec_() # Show modally
+
+    def _handle_new_template_creation(self):
+        """Slot to refresh template list and notify user."""
+        self.load_templates() # Refresh the list
+        # Optionally, notify user, though HtmlTemplateCreatorDialog already does.
+        # from main import get_notification_manager
+        # get_notification_manager().show(title=self.tr("Modèle Créé"), message=self.tr("Nouveau modèle HTML ajouté avec succès."), type='SUCCESS')
+        # Select the category of the newly added template, if possible, or just refresh.
 
     def handle_filter_changed(self):
         category_id = self.category_filter_combo.currentData()
@@ -274,10 +298,16 @@ class TemplateDialog(QDialog):
         self.delete_btn.setEnabled(False)
         self.default_btn.setEnabled(False)
 
-    def add_template(self):
-        file_path,_=QFileDialog.getOpenFileName(self,self.tr("Sélectionner un modèle"),self.config["templates_dir"],self.tr("Fichiers Modèles (*.xlsx *.docx *.html);;Tous les fichiers (*)"))
+    def add_template_from_file(self): # Renamed from add_template
+        file_path,_=QFileDialog.getOpenFileName(self,self.tr("Sélectionner un modèle existant"),self.config["templates_dir"],self.tr("Fichiers Modèles (*.docx *.xlsx *.html);;Tous les fichiers (*)"))
         if not file_path:return
-        name,ok=QInputDialog.getText(self,self.tr("Nom du Modèle"),self.tr("Entrez un nom pour ce modèle:"))
+
+        # Propose a default name based on the filename without extension
+        base_file_name_no_ext = os.path.splitext(os.path.basename(file_path))[0]
+        # Capitalize first letter and replace underscores/hyphens with spaces for a nicer default name
+        proposed_name = base_file_name_no_ext.replace('_', ' ').replace('-', ' ').capitalize()
+
+        name,ok=QInputDialog.getText(self,self.tr("Nom du Modèle"),self.tr("Entrez un nom pour ce modèle:"), QLineEdit.Normal, proposed_name)
         if not ok or not name.strip():return
         existing_categories=db_manager.get_all_template_categories(); existing_categories=existing_categories if existing_categories else []
         category_display_list=[cat['category_name'] for cat in existing_categories]; create_new_option=self.tr("[Create New Category...]"); category_display_list.append(create_new_option)
@@ -369,14 +399,56 @@ class TemplateDialog(QDialog):
 
     def edit_template(self):
         current_item=self.template_list.currentItem()
-        if not current_item or not current_item.parent():QMessageBox.warning(self,self.tr("Sélection Requise"),self.tr("Veuillez sélectionner un modèle à modifier."));return
-        template_id=current_item.data(0,Qt.UserRole);
-        if template_id is None:return
+        if not current_item or not current_item.parent():
+            QMessageBox.warning(self,self.tr("Sélection Requise"),self.tr("Veuillez sélectionner un modèle à modifier."))
+            return
+
+        template_id=current_item.data(0,Qt.UserRole)
+        if template_id is None: return
+
         try:
-            path_info=db_manager.get_template_path_info(template_id)
-            if path_info:template_file_path=os.path.join(self.config["templates_dir"],path_info['language'],path_info['file_name']); QDesktopServices.openUrl(QUrl.fromLocalFile(template_file_path))
-            else:QMessageBox.warning(self,self.tr("Erreur"),self.tr("Impossible de récupérer les informations du modèle."))
-        except Exception as e:QMessageBox.warning(self,self.tr("Erreur"),self.tr("Erreur lors de l'ouverture du modèle:\n{0}").format(str(e)))
+            template_details = db_manager.get_template_by_id(template_id) # Fetch full details
+            if not template_details:
+                QMessageBox.warning(self,self.tr("Erreur"),self.tr("Impossible de récupérer les détails du modèle."))
+                return
+
+            file_name = template_details.get('base_file_name')
+            language = template_details.get('language_code')
+            template_type = template_details.get('template_type')
+
+            if not file_name or not language:
+                QMessageBox.warning(self,self.tr("Erreur"),self.tr("Informations de chemin du modèle incomplètes."))
+                return
+
+            template_file_path=os.path.join(self.config["templates_dir"],language,file_name)
+
+            if template_type == 'document_html' and os.path.exists(template_file_path):
+                # For HTML templates, open with our HtmlEditor
+                # We need client_data for the editor's preview.
+                # Since this is editing an existing template, specific client_data might not be directly available
+                # or relevant unless templates are strictly client-specific.
+                # For now, use generic or dummy client_data for previewing context.
+                # In a more advanced system, we might link templates to example client contexts.
+                dummy_client_data_for_edit_preview = {
+                    "client_id": template_details.get("client_id", "GLOBAL_PREVIEW_ID"),
+                    "Nom du client": f"Preview for {template_details.get('template_name','Template')}",
+                }
+
+                editor = HtmlEditor(file_path=template_file_path, client_data=dummy_client_data_for_edit_preview, parent=self)
+                # The title is already set by HtmlEditor if file_path is provided
+                if editor.exec_() == QDialog.Accepted:
+                    # Content is saved by HtmlEditor's own save mechanism directly to file_path
+                    self.show_template_preview(current_item) # Refresh preview
+                    from main import get_notification_manager
+                    get_notification_manager().show(title=self.tr("Modèle HTML Modifié"), message=self.tr("Modèle '{0}' sauvegardé.").format(template_details.get('template_name')), type='SUCCESS')
+            elif os.path.exists(template_file_path):
+                # For other file types (DOCX, XLSX), open with default desktop application
+                QDesktopServices.openUrl(QUrl.fromLocalFile(template_file_path))
+            else:
+                QMessageBox.warning(self,self.tr("Fichier Introuvable"),self.tr("Le fichier modèle '{0}' n'a pas été trouvé à l'emplacement attendu:\n{1}").format(file_name, template_file_path))
+
+        except Exception as e:
+            QMessageBox.warning(self,self.tr("Erreur"),self.tr("Erreur lors de l'ouverture ou la modification du modèle:\n{0}").format(str(e)))
 
     def delete_template(self):
         current_item=self.template_list.currentItem()
