@@ -449,3 +449,4 @@ def get_all_commandes_count(filters: dict = None, conn: sqlite3.Connection = Non
     except sqlite3.Error as e:
         logger.error(f"Failed to count commandes. Filters: {filters}. SQL: {full_sql} Params: {q_params} Error: {e}", exc_info=True)
         return 0
+

@@ -147,68 +147,73 @@
 <body>
     <div class="container">
         <div class="header">
-            {% if seller.logo_url %}
-            <img src="{{ seller.logo_url }}" alt="Company Logo" class="logo" />
+            {% if seller.logo_path %}
+            <img src="{{ seller.logo_path }}" alt="Company Logo" class="logo" />
+            {% else %}
+            <!-- Optionally, display company name if no logo -->
+            <!-- <p class="no-logo-placeholder">{{ seller.name }}</p> -->
             {% endif %}
-            <h1>FACTURE PROFORMA</h1> {# Kept French static text, assuming template per lang #}
+            <h1>FACTURE PROFORMA</h1>
         </div>
 
         <div class="details-section">
             <div class="company-details">
-                <h3>De :</h3> {# Kept French static text #}
-                <p><strong>{{ seller.name }}</strong></p>
-                <p>{{ seller.address_full }}</p>
-                {# seller.city_zip_country might be less useful if address_full is comprehensive #}
-                {# <p>{{ seller.city_zip_country }}</p> #}
-                <p>Téléphone : {{ seller.phone }}</p>
-                <p>Email : {{ seller.email }}</p>
-                <p>N° TVA : {{ seller.vat_id }}</p>
-                <p>N° de registre : {{ seller.registration_number }}</p>
+                <h3>De :</h3>
+                <p><strong>{{ seller.name | default('N/A') }}</strong></p>
+                <p>{{ seller.address | default('N/A') }}</p>
+                <p>Téléphone : {{ seller.phone | default('N/A') }}</p>
+                <p>Email : {{ seller.email | default('N/A') }}</p>
+                <p>N° TVA : {{ seller.vat_id | default('N/A') }}</p>
+                <p>N° de registre : {{ seller.registration_number | default('N/A') }}</p>
             </div>
 
             <div class="client-details">
-                <h3>À :</h3> {# Kept French static text #}
-                <p><strong>{{ client.display_name }}</strong></p>
-                <p>{{ client.address_full }}</p>
-                {# <p>{{ client.city_zip_country }}</p> #}
-                <p>Contact : {{ client.contact_name }}</p>
-                <p>Email : {{ client.contact_email }}</p>
-                <p>N° TVA : {{ client.vat_id }}</p>
+                <h3>À :</h3>
+                <p><strong>{{ client.company_name | default(client.representative_name) | default('N/A') }}</strong></p>
+                <p>{{ client.address | default('N/A') }}</p>
+                <p>Contact : {{ client.representative_name | default('N/A') }}</p>
+                <p>Email : {{ client.email | default('N/A') }}</p>
+                <p>N° TVA : {{ client.vat_id | default('N/A') }}</p>
             </div>
         </div>
 
         <div class="invoice-meta">
-            <p><strong>Facture Proforma N° :</strong> {{ doc.proforma_id | default(placeholders.PROFORMA_ID) }}</p>
-            <p><strong>Date :</strong> {{ doc.current_date | default(placeholders.DATE) }}</p>
-            <p><strong>ID Projet :</strong> {{ project.identifier | default(placeholders.PROJECT_IDENTIFIER) }}</p>
-            <p><strong>Conditions de Paiement :</strong> {{ doc.payment_terms | default(placeholders.PAYMENT_TERMS) }}</p>
-            <p><strong>Conditions de Livraison :</strong> {{ doc.delivery_terms | default(placeholders.DELIVERY_TERMS) }}</p>
+            <p><strong>Facture Proforma N° :</strong> {{ doc.proforma_id | default('N/A') }}</p>
+            <p><strong>Date :</strong> {{ doc.current_date | default('N/A') }}</p>
+            <p><strong>ID Projet :</strong> {{ project.identifier | default(project.name) | default('N/A') }}</p>
+            <p><strong>Conditions de Paiement :</strong> {{ doc.payment_terms | default('N/A') }}</p>
+            <p><strong>Conditions de Livraison :</strong> {{ doc.delivery_terms | default('N/A') }}</p>
+            {% if doc.incoterms and doc.incoterms != 'N/A' %}
+            <p><strong>Incoterms :</strong> {{ doc.incoterms }}{% if doc.named_place_of_delivery and doc.named_place_of_delivery != 'N/A' %} - {{ doc.named_place_of_delivery }}{% endif %}</p>
+            {% endif %}
         </div>
 
         <table>
             <thead>
                 <tr>
-                    <th style="width:5%;">{{ labels.item_ref | default('#') }}</th>
-                    <th style="width:45%;">{{ labels.item_description | default('Description') }}</th>
-                    <th style="width:15%;" class="number">{{ labels.quantity | default('Quantity') }}</th>
-                    <th style="width:15%;" class="number">{{ labels.unit_price | default('Unit Price') }}</th>
-                    <th style="width:20%;" class="number">{{ labels.total_price | default('Total Price') }}</th>
+                    <th style="width:10%;">{{ labels.item_ref | default('Réf.') }}</th>
+                    <th style="width:40%;">{{ labels.item_description | default('Description') }}</th>
+                    <th style="width:10%;" class="number">{{ labels.quantity | default('Qté') }}</th>
+                    <th style="width:15%;" class="number">{{ labels.unit_price | default('Prix Unit.') }}</th>
+                    <th style="width:15%;" class="number">{{ labels.total_price | default('Total') }}</th>
                 </tr>
             </thead>
             <tbody>
                 {% for product in products %}
                 <tr>
-                    <td class="number">{{ loop.index }}</td>
+                    <td>{{ product.product_code | default(loop.index) }}</td>
                     <td>
-                        <strong>{{ product.name }}</strong>
-                        {% if product.sku and product.sku != 'N/A' %}<br><small>SKU: {{ product.sku }}</small>{% endif %}
-                        {% if product.description and product.description != product.name and product.description != product.sku %}
+                        <strong>{{ product.name | default('N/A') }}</strong>
+                        {% if product.description and product.description != product.name %}
                         <br><small>{{ product.description }}</small>
                         {% endif %}
+                         {% if product.original_name and product.original_name != product.name and product.original_name != product.description %}
+                        <br><small><em>Nom original: {{ product.original_name }}</em></small>
+                        {% endif %}
                     </td>
-                    <td class="number">{{ product.quantity }}</td>
-                    <td class="number">{{ product.unit_price }}</td> {# Already formatted string from context #}
-                    <td class="number">{{ product.total_price }}</td> {# Already formatted string from context #}
+                    <td class="number">{{ product.quantity | default(0) }}</td>
+                    <td class="number">{{ product.unit_price_formatted | default('N/A') }}</td>
+                    <td class="number">{{ product.total_price_formatted | default('N/A') }}</td>
                 </tr>
                 {% else %}
                 <tr>
@@ -218,20 +223,35 @@
             </tbody>
         </table>
 
-        <div class="invoice-meta" style="margin-top: 20px;">
-            <p><strong>Référence Commande Client:</strong> {{ order.client_order_number }}</p>
-            <p><strong>Date Commande Client:</strong> {{ order.client_order_date }}</p>
+        {% if order.client_order_number and order.client_order_number != 'N/A' %}
+        <div class="invoice-meta" style="margin-top: 10px; margin-bottom: 20px;">
+            <p><strong>Référence Commande Client :</strong> {{ order.client_order_number }}</p>
+            {% if order.client_order_date and order.client_order_date != 'N/A' %}
+            <p><strong>Date Commande Client :</strong> {{ order.client_order_date }}</p>
+            {% endif %}
         </div>
+        {% endif %}
 
         <div class="total-section">
-            <p>Sous-total: {{placeholders.SUBTOTAL_AMOUNT}}</p>
-            <p>Remise ({{placeholders.DISCOUNT_RATE}}%): {{placeholders.DISCOUNT_AMOUNT}}</p>
-            <p>TVA ({{placeholders.VAT_RATE}}%): {{placeholders.VAT_AMOUNT}}</p>
-            <h3><strong>Montant Total: {{placeholders.GRAND_TOTAL_AMOUNT}}</strong></h3>
-            <!-- <p>({{placeholders.GRAND_TOTAL_AMOUNT_WORDS}})</p> -->
+            <p>Sous-total : {{ doc.subtotal_amount_formatted | default('N/A') }}</p>
+            {% if doc.discount_amount_raw and doc.discount_amount_raw > 0 %}
+            <p>Remise ({{ doc.discount_rate_percentage | default(0) }}%) : -{{ doc.discount_amount_formatted | default('N/A') }}</p>
+            {% endif %}
+            <p>{{ doc.vat_label | default('TVA') }} ({{ doc.vat_rate_percentage | default(0) }}%) : {{ doc.vat_amount_formatted | default('N/A') }}</p>
+            <h3><strong>Montant Total : {{ doc.grand_total_amount_formatted | default('N/A') }}</strong></h3>
+            {% if doc.grand_total_amount_words and doc.grand_total_amount_words != 'N/A' %}
+            <!-- <p>({{ doc.grand_total_amount_words }})</p> -->
+            {% endif %}
         </div>
 
-        <div class="footer" style="margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px;">
+        {% if doc.proforma_notes and doc.proforma_notes != 'N/A' %}
+        <div class="notes-section" style="margin-top:20px; margin-bottom:20px; padding:10px; background-color:#f9f9f9; border-radius:5px;">
+            <h4>Notes :</h4>
+            <p>{{ doc.proforma_notes | replace('\n', '<br>') | safe }}</p>
+        </div>
+        {% endif %}
+
+        <div class="footer" style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 15px;">
             <p><strong>Nos coordonnées bancaires :</strong></p>
             <p>Banque: {{ seller.bank_name }}</p>
             <p>Titulaire du compte: {{ seller.bank_account_holder_name }}</p>

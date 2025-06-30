@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
 import logging
+
+
+import datetime
+
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QTableWidget,
     QTableWidgetItem, QHeaderView, QAbstractItemView, QMessageBox, QComboBox
@@ -7,6 +11,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QUrl
 from PyQt5.QtGui import QDesktopServices
+
 
 
 import db
@@ -141,6 +146,7 @@ class CommandeWidget(QWidget):
                 proforma_btn.setToolTip("Générer Facture Proforma")
                 proforma_btn.clicked.connect(lambda ch, cmd_id=commande_data.get("commande_id"): self.handle_generate_proforma_for_commande(cmd_id))
                 actions_layout.addWidget(proforma_btn)
+
 
                 delete_btn = QPushButton(QIcon.fromTheme("edit-delete"), "")
                 delete_btn.setToolTip("Supprimer Commande")
@@ -567,6 +573,7 @@ class CommandeWidget(QWidget):
         # Implementation will involve:
         # 9. Notifying the user and potentially opening the PDF.
         # 10. Refreshing document lists.
+
 
     def populate_status_filters(self):
         """Populates the status filter combobox for Commandes."""

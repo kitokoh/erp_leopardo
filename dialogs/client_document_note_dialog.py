@@ -48,7 +48,11 @@ class ClientDocumentNoteDialog(QDialog):
 
         self.is_active_checkbox = QCheckBox(self.tr("Active"))
         self.is_active_checkbox.setChecked(True)
-        form_layout.addRow(self.is_active_checkbox)
+        form_layout.addRow(self.is_active_checkbox) # Keep this for activation status
+
+        self.is_standard_checkbox = QCheckBox(self.tr("Note Standard (globale pour ce type/langue)"))
+        self.is_standard_checkbox.setToolTip(self.tr("Si cochée, cette note sera considérée comme un standard pour le type de document et la langue sélectionnés, et potentiellement utilisée par défaut."))
+        form_layout.addRow(self.is_standard_checkbox) # Add the new checkbox
 
         main_layout.addLayout(form_layout)
 
@@ -68,21 +72,28 @@ class ClientDocumentNoteDialog(QDialog):
         self.language_code_combo.setCurrentText(note_data.get("language_code", "fr"))
         self.note_content_edit.setPlainText(note_data.get("note_content", ""))
         self.is_active_checkbox.setChecked(note_data.get("is_active", True))
+        self.is_standard_checkbox.setChecked(note_data.get("is_standard", False)) # Populate new checkbox
 
     def get_data(self) -> dict:
         data = {
-            "client_id": self.client_id,
+            "client_id": self.client_id, # Will be set to None if is_standard is True
             "document_type": self.document_type_combo.currentText(),
             "language_code": self.language_code_combo.currentText(),
             "note_content": self.note_content_edit.toPlainText().strip(),
-            "is_active": self.is_active_checkbox.isChecked()
+            "is_active": self.is_active_checkbox.isChecked(),
+            "is_standard": self.is_standard_checkbox.isChecked() # Get value of new checkbox
         }
         if self.note_data and 'note_id' in self.note_data:
             data['note_id'] = self.note_data['note_id']
+
+        # If it's a standard note, client_id should be None
+        if data["is_standard"]:
+            data["client_id"] = None
+
         return data
 
     def accept(self):
-        data = self.get_data()
+        data = self.get_data() # get_data now handles setting client_id to None if is_standard
 
         if not data["document_type"]:
             QMessageBox.warning(self, self.tr("Champ Requis"), self.tr("Le type de document est requis."))
