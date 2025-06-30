@@ -1,12 +1,17 @@
 # -*- coding: utf-8 -*-
 import logging
+
 import datetime
+
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QTableWidget,
     QTableWidgetItem, QHeaderView, QAbstractItemView, QMessageBox, QComboBox
 )
 from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QUrl
+from PyQt5.QtGui import QDesktopServices
+
+
 
 import db
 from db.cruds import commandes_crud # Assuming this will be created with necessary functions
@@ -136,6 +141,12 @@ class CommandeWidget(QWidget):
                 view_btn.clicked.connect(lambda ch, cmd_id=commande_data.get("commande_id"): self.view_edit_commande(cmd_id=cmd_id))
                 actions_layout.addWidget(view_btn)
 
+                proforma_btn = QPushButton(QIcon.fromTheme("document-export"), "") # Placeholder icon
+                proforma_btn.setToolTip("Générer Facture Proforma")
+                proforma_btn.clicked.connect(lambda ch, cmd_id=commande_data.get("commande_id"): self.handle_generate_proforma_for_commande(cmd_id))
+                actions_layout.addWidget(proforma_btn)
+
+
                 delete_btn = QPushButton(QIcon.fromTheme("edit-delete"), "")
                 delete_btn.setToolTip("Supprimer Commande")
                 delete_btn.clicked.connect(lambda ch, cmd_id=commande_data.get("commande_id"): self.delete_selected_commande(cmd_id))
@@ -211,6 +222,357 @@ class CommandeWidget(QWidget):
             except Exception as e:
                 self.logger.error(f"Error deleting commande {cmd_id}: {e}", exc_info=True)
                 QMessageBox.critical(self, "Erreur", f"Une erreur est survenue lors de la suppression : {e}")
+
+    def handle_generate_proforma_for_commande(self, commande_id):
+        """
+        Handles the request to generate a proforma invoice for the given commande_id.
+        This is a placeholder and will be implemented in the next steps.
+        """
+        self.logger.info(f"Génération de proforma demandée pour la commande ID: {commande_id}")
+
+        try:
+            # 1. Fetching commande details (header, items).
+            commande_details = commandes_crud.get_commande_by_id(commande_id)
+            if not commande_details:
+                QMessageBox.warning(self, "Erreur", f"Impossible de trouver les détails pour la commande ID: {commande_id}")
+                return
+
+            commande_items = commandes_crud.get_items_for_commande(commande_id)
+            if commande_items is None: # Check for None specifically, as empty list is valid
+                QMessageBox.warning(self, "Erreur", f"Impossible de charger les articles pour la commande ID: {commande_id}")
+                return
+
+            # 2. Fetching client details. (client_id is in commande_details)
+            client_id = commande_details.get("client_id")
+            if not client_id: # Should not happen if DB is consistent
+                QMessageBox.warning(self, "Erreur Données Commande", f"L'ID client est manquant pour la commande {commande_id}.")
+                return
+
+            # client_info for proforma generation should be fetched fresh
+            # It's available in self.client_info if this widget is for a single client,
+            # but it's better to fetch to ensure it's the most up-to-date for the document.
+            client_info_for_doc = db.clients_crud_instance.get_client_by_id(client_id)
+            if not client_info_for_doc:
+                QMessageBox.warning(self, "Erreur", f"Impossible de trouver les détails du client ID: {client_id}")
+                return
+
+            # Ensure base_folder_path is set for document saving logic later
+            if not client_info_for_doc.get("default_base_folder_path"):
+                 # This logic should ideally be centralized or handled more robustly
+                client_name_for_folder = client_info_for_doc.get("client_name", "unknown_client")
+                client_id_for_folder = client_info_for_doc.get("client_id", "no_id")
+                sane_client_name = "".join(c if c.isalnum() else "_" for c in client_name_for_folder)
+                # Assuming self.parent() or self.parent().parent() can give app_root_dir
+                # This is a bit fragile. ClientWidget has self.app_root_dir
+                app_root_dir = ""
+                if hasattr(self, 'app_root_dir'): # If CommandeWidget itself has it
+                    app_root_dir = self.app_root_dir
+                elif hasattr(self.parent(), 'app_root_dir'): # If parent (ClientWidget) has it
+                    app_root_dir = self.parent().app_root_dir
+
+                if not app_root_dir:
+                    self.logger.error("Could not determine app_root_dir for proforma generation path.")
+                    QMessageBox.critical(self, "Erreur Configuration", "Chemin racine de l'application non défini.")
+                    return
+
+                clients_base_subdir = db_manager.CONFIG.get('clients_dir', 'clients')
+                relative_folder = os.path.join(clients_base_subdir, f"{sane_client_name}_{client_id_for_folder[:8]}")
+                client_info_for_doc["default_base_folder_path"] = os.path.join(app_root_dir, relative_folder)
+                # We also need the relative path for DB storage later
+                client_info_for_doc["db_relative_base_folder_path"] = relative_folder
+            else:
+                # Ensure default_base_folder_path is absolute for saving, and store relative for DB
+                app_root_dir = ""
+                if hasattr(self, 'app_root_dir'): app_root_dir = self.app_root_dir
+                elif hasattr(self.parent(), 'app_root_dir'): app_root_dir = self.parent().app_root_dir
+
+                if not app_root_dir:
+                    self.logger.error("Could not determine app_root_dir for proforma generation path (existing folder).")
+                    QMessageBox.critical(self, "Erreur Configuration", "Chemin racine de l'application non défini (dossier existant).")
+                    return
+
+                client_info_for_doc["db_relative_base_folder_path"] = client_info_for_doc["default_base_folder_path"]
+                client_info_for_doc["default_base_folder_path"] = os.path.join(app_root_dir, client_info_for_doc["default_base_folder_path"])
+
+
+            # 3. Fetching company details.
+            default_company = db.companies_crud.get_default_company()
+            if not default_company:
+                QMessageBox.warning(self, "Erreur Configuration", "Aucune société par défaut n'est configurée.")
+                return
+
+            self.logger.info(f"Données récupérées pour la proforma de la commande {commande_id}:")
+            self.logger.info(f"  Commande: {commande_details}")
+            self.logger.info(f"  Articles: {commande_items}")
+            self.logger.info(f"  Client: {client_info_for_doc}")
+            self.logger.info(f"  Société: {default_company}")
+
+            # 4. Preparing context for the proforma template.
+            # This needs to align with what `document_generator.context_builder.get_document_context` expects
+            # or what `utils.generate_pdf_for_document` can work with.
+
+            # Basic company context
+            company_context = {
+                'name': default_company.get('company_name'),
+                'address': default_company.get('address'),
+                'payment_info': default_company.get('payment_info'),
+                # Add other company fields as needed by the template (e.g., VAT number, phone, email)
+            }
+
+            # Basic client context
+            client_context = {
+                'name': client_info_for_doc.get('client_name'),
+                'company_name': client_info_for_doc.get('company_name'),
+                'address': client_info_for_doc.get('address'), # Assuming client_info_for_doc has a primary address field
+                'country': client_info_for_doc.get('country'), # Assuming country name is already resolved
+                'city': client_info_for_doc.get('city'),     # Assuming city name is already resolved
+                'project_identifier': client_info_for_doc.get('project_identifier'),
+                # Add other client fields (e.g., contact person, client VAT number)
+            }
+
+            # Commande items context
+            items_context = []
+            for item in commande_items:
+                items_context.append({
+                    'product_name': item.get('product_name'),
+                    'description': item.get('description_item'),
+                    'quantity': item.get('quantity'),
+                    'unit_price_ht': item.get('unit_price_ht'),
+                    'vat_rate_percentage': item.get('vat_rate', 0.0) * 100,
+                    'total_item_ht': item.get('total_item_ht'),
+                    'total_item_ttc': item.get('total_item_ttc'),
+                    'product_code': item.get('product_code')
+                })
+
+            # Main document context (for proforma)
+            # The structure here should be what your Proforma HTML template expects.
+            # This often includes a 'doc' object and an 'items' list.
+            document_context = {
+                'doc': {
+                    'type': 'Facture Proforma', # Or get from template type later
+                    'title': f"Facture Proforma - {commande_details.get('commande_reference')}",
+                    'date': datetime.fromisoformat(commande_details.get('commande_date').replace('Z', '')).strftime('%d/%m/%Y') if commande_details.get('commande_date') else 'N/A',
+                    'reference': commande_details.get('commande_reference'),
+                    'project_name': commande_details.get('project_name', ''), # Name of linked project
+                    'notes': commande_details.get('description_commande', ''),
+                    'currency_symbol': commande_details.get('currency', 'EUR'), # Or get from company/client settings
+                    # Totals (these might be calculated or from DB)
+                    'total_ht': commande_details.get('total_ht', 0.0),
+                    'total_ttc': commande_details.get('total_ttc', 0.0),
+                    'total_vat': (commande_details.get('total_ttc', 0.0) or 0.0) - (commande_details.get('total_ht', 0.0) or 0.0),
+                    # Add other fields like payment_terms, delivery_terms if stored on Commande
+                },
+                'client': client_context,
+                'company': company_context,
+                'items': items_context,
+                'current_date': datetime.now().strftime('%d/%m/%Y'),
+                # You might need other global variables like logo paths, etc.
+            }
+
+            # Ensure totals in document_context['doc'] are up-to-date if not directly from DB
+            # or if there's a chance they are stale.
+            calculated_ht = sum(it['total_item_ht'] for it in items_context)
+            calculated_ttc = sum(it['total_item_ttc'] for it in items_context)
+            document_context['doc']['total_ht'] = calculated_ht
+            document_context['doc']['total_ttc'] = calculated_ttc
+            document_context['doc']['total_vat'] = calculated_ttc - calculated_ht
+
+
+            self.logger.info(f"Context préparé pour la proforma : {document_context}")
+
+            # 5. Selecting the appropriate proforma template.
+            # Determine target language (e.g., first selected language of the client, or default)
+            target_lang_code = 'fr' # Default
+            if client_info_for_doc.get('selected_languages'):
+                try:
+                    # Assuming selected_languages is a comma-separated string or a list
+                    langs = client_info_for_doc['selected_languages']
+                    if isinstance(langs, str):
+                        langs = [lang.strip() for lang in langs.split(',') if lang.strip()]
+                    if langs:
+                        target_lang_code = langs[0]
+                except Exception as lang_ex:
+                    self.logger.warning(f"Could not determine client's preferred language, defaulting to 'fr'. Error: {lang_ex}")
+
+            self.logger.info(f"Target language for Proforma template: {target_lang_code}")
+
+            from db.cruds import templates_crud # Local import for clarity
+            # Assuming "HTML_PROFORMA" is the template_type for proforma invoices. This might need adjustment.
+            proforma_template_type = "HTML_PROFORMA"
+            default_proforma_template = templates_crud.get_template_by_type_lang_default(
+                template_type=proforma_template_type,
+                language_code=target_lang_code,
+                client_id=None # Global default template
+            )
+
+            if not default_proforma_template:
+                self.logger.error(f"No default Proforma template found for type '{proforma_template_type}' and language '{target_lang_code}'.")
+                QMessageBox.warning(self, "Modèle Manquant",
+                                    f"Aucun modèle de facture proforma par défaut trouvé pour la langue '{target_lang_code}'.")
+                return
+
+            template_base_filename = default_proforma_template.get('base_file_name')
+            template_inherent_language = default_proforma_template.get('language_code', target_lang_code) # Use template's lang if specified
+
+            # Construct path to the template file
+            # Need app_root_dir for this. ClientWidget should have it.
+            app_root_dir_for_template = ""
+            if hasattr(self, 'app_root_dir'): app_root_dir_for_template = self.app_root_dir
+            elif hasattr(self.parent(), 'app_root_dir'): app_root_dir_for_template = self.parent().app_root_dir
+
+            if not app_root_dir_for_template:
+                self.logger.error("app_root_dir not found for template path construction.")
+                QMessageBox.critical(self, "Erreur Configuration", "Chemin racine de l'application non défini pour les modèles.")
+                return
+
+            template_file_on_disk_abs = os.path.join(
+                app_root_dir_for_template, # This needs to be the actual root where "templates" folder is
+                db_manager.CONFIG.get("templates_dir", "templates"), # e.g., "templates"
+                template_inherent_language,
+                template_base_filename
+            )
+
+            self.logger.info(f"Attempting to use proforma template: {template_file_on_disk_abs}")
+
+            if not os.path.exists(template_file_on_disk_abs):
+                self.logger.error(f"Default Proforma template file not found on disk: {template_file_on_disk_abs}")
+                QMessageBox.warning(self, "Fichier Modèle Introuvable",
+                                    f"Le fichier modèle Proforma '{template_base_filename}' est introuvable pour la langue '{template_inherent_language}'.")
+                return
+
+            # Store for next step
+            self._current_proforma_generation_data = {
+                "commande_id": commande_id,
+                "commande_details": commande_details,
+                "commande_items": commande_items,
+                "client_info_for_doc": client_info_for_doc, # Has absolute default_base_folder_path and relative db_relative_base_folder_path
+                "default_company": default_company,
+                "document_context": document_context,
+                "template_file_path": template_file_on_disk_abs,
+                "target_language_code": target_lang_code, # Language used for selecting template and for PDF content
+                "source_template_id": default_proforma_template.get('template_id')
+            }
+
+            self.logger.info(f"Modèle proforma '{template_base_filename}' sélectionné. Prêt pour la génération PDF.")
+
+            # 6. Calling a utility function to create the PDF.
+            from utils import generate_pdf_for_document # Ensure this is imported
+
+            # app_root_dir is needed by generate_pdf_for_document for resolving paths (e.g. fonts, images in templates)
+            # It was determined when constructing template_file_on_disk_abs
+            app_root_dir = ""
+            if hasattr(self, 'app_root_dir'): app_root_dir = self.app_root_dir
+            elif hasattr(self.parent(), 'app_root_dir'): app_root_dir = self.parent().app_root_dir
+            else: # Should have been caught earlier
+                self.logger.critical("app_root_dir is still not available before PDF generation.")
+                QMessageBox.critical(self, "Erreur Critique", "Configuration de l'application manquante pour la génération PDF.")
+                return
+
+            # The client_info passed to generate_pdf_for_document needs 'default_base_folder_path' to be absolute for saving
+            # and 'db_relative_base_folder_path' for ClientDocuments entry.
+            # self._current_proforma_generation_data['client_info_for_doc'] already has these correctly set.
+
+            generated_pdf_path = generate_pdf_for_document(
+                source_file_path=self._current_proforma_generation_data["template_file_path"],
+                client_info=self._current_proforma_generation_data["client_info_for_doc"], # Contains absolute path for saving
+                app_root_dir=app_root_dir,
+                parent_widget=self, # For any UI interactions from the util
+                target_language_code=self._current_proforma_generation_data["target_language_code"],
+                project_id=self._current_proforma_generation_data["commande_details"].get("project_id"), # Project linked to commande
+                additional_context=self._current_proforma_generation_data["document_context"], # The full context we built
+                document_type_for_context="HTML_PROFORMA", # The type of the source template
+                output_subfolder_name="Proformas" # Specific subfolder for proformas
+            )
+
+            if generated_pdf_path and os.path.exists(generated_pdf_path):
+                self.logger.info(f"Facture Proforma PDF générée avec succès : {generated_pdf_path}")
+                # Store for next steps (saving to DB, opening)
+                self._current_proforma_generation_data["generated_pdf_path"] = generated_pdf_path
+
+                # 7. Saving the PDF to the client's folder (already done by generate_pdf_for_document)
+                # 8. Creating a ClientDocuments entry, linking it to the commande_id.
+                try:
+                    gen_data = self._current_proforma_generation_data
+                    client_info = gen_data["client_info_for_doc"]
+
+                    # Construct relative path for DB
+                    # client_info["db_relative_base_folder_path"] should be like "clients/ClientName_ID"
+                    # generated_pdf_path is absolute like ".../app_root/clients/ClientName_ID/Proformas/PF_123.pdf"
+                    # We need the path relative to the "app_root" effectively, but stored as relative to client's base dir for ClientDocuments table.
+
+                    # client_info["default_base_folder_path"] is the ABSOLUTE path to client's base dir (e.g. .../app_root/clients/ClientName_ID)
+                    # client_info["db_relative_base_folder_path"] is the RELATIVE path from app_root (e.g. clients/ClientName_ID)
+
+                    # The path stored in ClientDocuments.file_path_relative is relative TO the client's base folder path.
+                    # So, if generated_pdf_path is /abs/path/to/clients_dir/ClientFolder/Proformas/doc.pdf
+                    # and client_info["default_base_folder_path"] is /abs/path/to/clients_dir/ClientFolder
+                    # then relative_pdf_path_for_db should be Proformas/doc.pdf
+
+                    relative_pdf_path_for_db = os.path.relpath(generated_pdf_path, client_info["default_base_folder_path"])
+
+                    proforma_doc_data = {
+                        'document_id': str(uuid.uuid4()), # Generate new UUID for this document
+                        'client_id': client_info.get("client_id"),
+                        'project_id': gen_data["commande_details"].get("project_id"),
+                        'commande_id': gen_data["commande_id"], # Link to the commande
+                        'order_identifier': gen_data["commande_details"].get("commande_reference"), # Use commande_reference
+                        'document_name': os.path.basename(generated_pdf_path),
+                        'file_name_on_disk': os.path.basename(generated_pdf_path),
+                        'file_path_relative': relative_pdf_path_for_db,
+                        'document_type_generated': "PROFORMA_PDF",
+                        'source_template_id': gen_data.get('source_template_id'),
+                        'user_id': self.current_user_id, # User who initiated the action
+                        'language_code': gen_data["target_language_code"],
+                        'version_tag': "1.0"
+                    }
+
+                    from db.cruds import client_documents_crud # Local import
+                    new_doc_db_id = client_documents_crud.add_client_document(proforma_doc_data)
+
+                    if new_doc_db_id:
+                        self.logger.info(f"Proforma PDF document record created in DB with ID: {new_doc_db_id} (generated UUID was {proforma_doc_data['document_id']})")
+
+                        # 9. Notifying the user and potentially opening the PDF.
+                        QDesktopServices.openUrl(QUrl.fromLocalFile(generated_pdf_path))
+                        self.parent().notification_manager.show( # Assuming parent is ClientWidget which has notification_manager
+                            self.tr("Proforma Générée et Enregistrée"),
+                            self.tr(f"La facture proforma '{proforma_doc_data['document_name']}' a été créée et est prête."),
+                            type='SUCCESS'
+                        )
+
+                        # 10. Refreshing document lists in the parent ClientWidget.
+                        if hasattr(self.parent(), 'populate_doc_table'):
+                            self.logger.info("Refreshing document table in parent ClientWidget.")
+                            self.parent().populate_doc_table()
+                        else:
+                            self.logger.warning("Could not find 'populate_doc_table' on parent widget to refresh document list.")
+
+                    else:
+                        self.logger.error(f"Échec de la création de l'enregistrement ClientDocument pour la proforma {proforma_doc_data['document_name']}.")
+                        QMessageBox.critical(self, "Erreur Base de Données", "Impossible d'enregistrer le document proforma dans la base de données.")
+                        # Consider cleanup of the generated PDF file if DB entry fails
+                        if os.path.exists(generated_pdf_path):
+                            try: os.remove(generated_pdf_path)
+                            except OSError: self.logger.error(f"Échec de la suppression du PDF généré après échec DB: {generated_pdf_path}")
+                        return
+
+                except Exception as e_db_save:
+                    self.logger.error(f"Erreur lors de la sauvegarde du document proforma en DB pour la commande {commande_id}: {e_db_save}", exc_info=True)
+                    QMessageBox.critical(self, "Erreur Sauvegarde DB", f"Une erreur est survenue lors de la sauvegarde du document proforma: {e_db_save}")
+                    return
+            else:
+                self.logger.error(f"Échec de la génération du PDF pour la proforma de la commande {commande_id}.")
+                QMessageBox.critical(self, "Échec Génération PDF", "La génération du fichier PDF pour la facture proforma a échoué.")
+                return # Stop processing
+
+        except Exception as e:
+            self.logger.error(f"Erreur lors de la préparation ou génération de proforma pour la commande {commande_id}: {e}", exc_info=True)
+            QMessageBox.critical(self, "Erreur Inattendue", f"Une erreur inattendue est survenue: {e}")
+
+        # Implementation will involve:
+        # 9. Notifying the user and potentially opening the PDF.
+        # 10. Refreshing document lists.
+
 
     def populate_status_filters(self):
         """Populates the status filter combobox for Commandes."""
