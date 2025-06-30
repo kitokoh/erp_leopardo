@@ -11,6 +11,8 @@ from PyQt5.QtCore import Qt, QDate
 
 import db # Assuming db.__init__ exposes necessary cruds
 from db.cruds import commandes_crud, products_crud, projects_crud, status_settings_crud
+from dialogs.product_dialog import ProductDialog # Import ProductDialog
+
 
 class CommandeDialog(QDialog):
     def __init__(self, client_id, current_user_id, commande_id_to_edit=None, parent=None):
@@ -27,6 +29,12 @@ class CommandeDialog(QDialog):
         self.setMinimumSize(700, 500)
 
         self.setup_ui()
+
+        if not self.commande_id_to_edit: # New Commande
+            self.commande_reference_edit.setText(commandes_crud.get_next_commande_reference())
+            # self.commande_reference_edit.setReadOnly(True) # Optional: make it read-only
+
+
         self.populate_combos()
 
         if self.commande_id_to_edit:
@@ -171,20 +179,81 @@ class CommandeDialog(QDialog):
 
 
     def add_item_to_table(self, item_data_to_load=None, is_loading=False):
-        # This method would typically open another dialog to select a product
-        # and enter quantity, price, etc. For simplicity in this skeleton:
-        if not is_loading: # Show dialog to add new item
-            # TODO: Implement a ProductSelectionDialog or similar
-            # For now, let's add a placeholder item or require manual input in table
-            QMessageBox.information(self, "Info", "La sélection de produit pour l'article sera implémentée.")
-            # Example: Manually add a new empty row for user to fill, or use a more complex item dialog
-            row_pos = self.items_table.rowCount()
-            self.items_table.insertRow(row_pos)
-            # Add QComboBox for product selection, QLineEdit for description, QSpinBox for Qty, etc.
-            # This requires making table cells widgets.
-            return
+        if not is_loading:
+            # Use ProductDialog for selecting/defining products
+            # The ProductDialog needs client_id and app_root_dir.
+            # Assuming self.parent() is DocumentManager or similar that has app_root_dir
+            app_root_dir_for_product_dialog = ""
+            if hasattr(self.parent(), 'app_root_dir'):
+                app_root_dir_for_product_dialog = self.parent().app_root_dir
+            elif hasattr(self.parent(), 'parent') and hasattr(self.parent().parent(), 'app_root_dir'): # Check grandparent if parent is ClientWidget
+                app_root_dir_for_product_dialog = self.parent().parent().app_root_dir
 
-        # If item_data_to_load is provided (e.g., when editing)
+
+            if not app_root_dir_for_product_dialog:
+                self.logger.error("app_root_dir not found for ProductDialog instantiation.")
+                QMessageBox.critical(self, "Erreur Configuration", "Chemin racine de l'application non trouvé.")
+                return
+
+            product_dialog = ProductDialog(client_id=self.client_id,
+                                           app_root_dir=app_root_dir_for_product_dialog,
+                                           parent=self)
+
+            if product_dialog.exec_() == QDialog.Accepted:
+                products_from_dialog = product_dialog.get_data()
+                if not products_from_dialog:
+                    return # No products were added/selected in ProductDialog
+
+                for product_data in products_from_dialog:
+                    # This product_data already contains name, desc, qty, price, product_id (if existing global), product_code
+                    # We need to adapt this to fit CommandeItem structure for our table
+
+                    # If product_id is None, it means a new global product was defined in ProductDialog.
+                    # We need to ensure this global product is created in the DB first.
+                    # This logic will be handled in `accept_dialog` when the commande is saved.
+                    # For now, we store all info from ProductDialog in the UserRole of the first cell.
+                    # The `_get_payload_from_table_row` will use this stored data.
+
+                    row_pos = self.items_table.rowCount()
+                    self.items_table.insertRow(row_pos)
+
+                    # Store the raw product_data from ProductDialog. It contains global product_id if existing, or None if new.
+                    # It also contains product_code, name, description, quantity, unit_price from ProductDialog's form.
+                    name_cell_item = QTableWidgetItem(product_data.get("name", "N/A"))
+                    name_cell_item.setData(Qt.UserRole, product_data)
+                    self.items_table.setItem(row_pos, 0, name_cell_item) # Product Name (from ProductDialog)
+
+                    self.items_table.setItem(row_pos, 1, QTableWidgetItem(product_data.get("description", "")))
+
+                    qty_item = QTableWidgetItem(str(product_data.get("quantity", 1.0))) # Default to 1 if not specified
+                    qty_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    self.items_table.setItem(row_pos, 2, qty_item)
+
+                    unit_price_ht_item = QTableWidgetItem(f"{float(product_data.get('unit_price', 0.0)):.2f}")
+                    unit_price_ht_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    self.items_table.setItem(row_pos, 3, unit_price_ht_item)
+
+                    # VAT Rate - default to 0 for now, user can edit this cell if made editable
+                    vat_item = QTableWidgetItem("0") # Default 0% VAT
+                    vat_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    self.items_table.setItem(row_pos, 4, vat_item)
+
+                    # Calculate totals for display - this part will be refined
+                    current_qty = float(product_data.get("quantity", 1.0))
+                    current_price_ht = float(product_data.get('unit_price', 0.0))
+                    current_vat_rate = 0.0 # as per default above
+
+                    total_ht = current_qty * current_price_ht
+                    total_ttc = total_ht * (1 + current_vat_rate)
+
+                    self.items_table.setItem(row_pos, 5, QTableWidgetItem(f"{total_ht:.2f}"))
+                    self.items_table.setItem(row_pos, 6, QTableWidgetItem(f"{total_ttc:.2f}"))
+
+                self.update_totals_display()
+            return # Return after handling ProductDialog
+
+        # If item_data_to_load is provided (e.g., when editing an existing commande)
+
         if item_data_to_load:
             row_pos = self.items_table.rowCount()
             self.items_table.insertRow(row_pos)
@@ -306,7 +375,8 @@ class CommandeDialog(QDialog):
             success = commandes_crud.update_commande(self.commande_id_to_edit, commande_data_payload)
             if success:
                 self.logger.info(f"Commande {self.commande_id_to_edit} updated.")
-                # Update items (delete removed, update existing, add new)
+                self._last_processed_project_id = commande_data_payload.get("project_id") # Store project_id
+
                 self._sync_commande_items(self.commande_id_to_edit)
                 super().accept()
             else:
@@ -316,6 +386,10 @@ class CommandeDialog(QDialog):
             if new_cmd_id:
                 self.logger.info(f"New commande {new_cmd_id} created.")
                 self.commande_id_to_edit = new_cmd_id # So items can be linked
+                self._last_processed_project_id = commande_data_payload.get("project_id") # Store project_id
+                self._created_commande_id = new_cmd_id
+                self._created_commande_ref = commande_data_payload.get("commande_reference")
+
                 self._sync_commande_items(new_cmd_id)
                 super().accept()
             else:
@@ -420,6 +494,36 @@ class CommandeDialog(QDialog):
             self.logger.error(f"Failed to update commande {commande_id} with recalculated totals.")
         else:
             self.logger.info(f"Commande {commande_id} totals updated: HT={current_total_ht}, TTC={current_total_ttc}")
+
+    def get_created_project_id(self):
+        """
+        Returns the project_id that was created or linked during the dialog's execution.
+        This should be called after accept_dialog() has successfully processed/saved the commande.
+        """
+        # self.commande_data might be populated if editing, or could be the payload if new
+        # A more robust way is to store the determined project_id in an instance variable during accept_dialog
+        if hasattr(self, '_last_processed_project_id'):
+            return self._last_processed_project_id
+
+        # Fallback: if editing, get it from the reloaded commande_data
+        if self.commande_id_to_edit and self.commande_data:
+            return self.commande_data.get("project_id")
+
+        # Fallback: if new, it might be in the payload that was built (less ideal as payload is local to accept_dialog)
+        # This indicates a need to store the project_id more reliably if created/selected.
+        # For now, this method will primarily work if _last_processed_project_id is set in accept_dialog.
+        self.logger.warning("get_created_project_id called but _last_processed_project_id not set and not editing.")
+        return None
+
+    def get_created_commande_id(self):
+        """Returns the ID of the commande created or edited by this dialog instance."""
+        return getattr(self, '_created_commande_id', None)
+
+    def get_created_commande_reference(self):
+        """Returns the reference of the commande created or edited by this dialog instance."""
+        return getattr(self, '_created_commande_ref', None)
+
+
 
 # Example usage (for testing, if run directly)
 if __name__ == '__main__':

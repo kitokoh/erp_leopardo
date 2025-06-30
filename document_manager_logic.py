@@ -237,55 +237,111 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
             doc_manager.clients_data_map[actual_new_client_id] = ui_map_data
             doc_manager.add_client_to_list_widget(ui_map_data) # Add to the list widget in DocumentManager UI
 
-        # --- Prompt for Commande Creation ---
+        # --- Automatic Commande Creation ---
         commande_created_project_id = None
         if actual_new_client_id: # Ensure client was successfully created
-            reply = QMessageBox.question(doc_manager, doc_manager.tr("Nouvelle Commande"),
-                                         doc_manager.tr("Voulez-vous créer une nouvelle commande pour ce client ({0}) ?").format(client_name_val),
-                                         QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
-            if reply == QMessageBox.Yes:
-                from commande_management.commande_dialog import CommandeDialog # Local import
-                commande_dialog = CommandeDialog(client_id=actual_new_client_id,
-                                                 current_user_id=doc_manager.current_user_id,
-                                                 parent=doc_manager)
-                if commande_dialog.exec_() == QDialog.Accepted:
-                    # CommandeDialog is expected to handle its own saving and project creation/linking.
-                    # We need to get the project_id if a new project was created via the commande dialog.
-                    # This assumes CommandeDialog might have a method like get_associated_project_id()
-                    # or that the project_id is stored on the commande_data it might return.
-                    # For now, let's assume the CommandeDialog updates the Commande record with project_id.
-                    # We might need to fetch the latest commande for this client to get that project_id.
+            logging.info(f"Attempting to automatically create first commande for new client {actual_new_client_id}")
+            from commande_management.commande_dialog import CommandeDialog # Local import
 
-                    # A simpler way: CommandeDialog could create the project and return its ID.
-                    # Let's assume CommandeDialog has a method `get_created_project_id()`
-                    if hasattr(commande_dialog, 'get_created_project_id'):
-                        commande_created_project_id = commande_dialog.get_created_project_id()
-                        if commande_created_project_id:
-                             logging.info(f"Commande dialog created/linked project ID: {commande_created_project_id}")
+            # Instantiate CommandeDialog. It should handle fetching next commande_reference internally.
+            # It will also handle creation of its associated project.
+            commande_dialog = CommandeDialog(client_id=actual_new_client_id,
+                                             current_user_id=doc_manager.current_user_id,
+                                             # No commande_id_to_edit, so it's a new commande
+                                             parent=doc_manager)
 
-                    doc_manager.notify(title=doc_manager.tr("Commande Traitée"),
-                                       message=doc_manager.tr("La commande a été initialisée."), type='INFO')
-                    # Refresh ClientWidget's Commande tab if it's open
-                    for i in range(doc_manager.client_tabs_widget.count()):
-                        tab_widget = doc_manager.client_tabs_widget.widget(i)
-                        if hasattr(tab_widget, 'client_info') and tab_widget.client_info.get("client_id") == actual_new_client_id:
-                            if hasattr(tab_widget, 'commande_widget_instance') and tab_widget.commande_widget_instance: # Assuming ClientWidget holds CommandeWidget
-                                tab_widget.commande_widget_instance.refresh_commandes()
-                            break
+            # Open the dialog for the user to fill in details and products
+            if commande_dialog.exec_() == QDialog.Accepted:
+                # CommandeDialog's accept_dialog method handles saving the commande and its items.
+                # It also handles creating/linking the project.
+                # We need to get the project_id that was created or linked by the CommandeDialog.
+                if hasattr(commande_dialog, 'get_created_project_id'):
+                    commande_created_project_id = commande_dialog.get_created_project_id()
+                    if commande_created_project_id:
+                         logging.info(f"Commande dialog created/linked project ID: {commande_created_project_id} for the new commande.")
                 else:
-                    logging.info("Commande creation cancelled by user.")
+                    logging.warning("CommandeDialog does not have get_created_project_id() method. Cannot retrieve project_id for tasks.")
 
-        # --- Project and Task Creation (Adapting to use commande_created_project_id if available) ---
-        project_id_for_tasks = commande_created_project_id if commande_created_project_id else new_project_id_central_db
+                doc_manager.notify(title=doc_manager.tr("Première Commande Créée"),
+                                   message=doc_manager.tr("La première commande a été créée et initialisée."), type='SUCCESS')
+                # Refresh ClientWidget's Commande tab if it's open
+                for i in range(doc_manager.client_tabs_widget.count()):
+                    tab_widget = doc_manager.client_tabs_widget.widget(i)
+                    if hasattr(tab_widget, 'client_info') and tab_widget.client_info.get("client_id") == actual_new_client_id:
+                        if hasattr(tab_widget, 'commandes_tab_widget') and hasattr(tab_widget.commandes_tab_widget, 'refresh_commandes'):
+                             tab_widget.commandes_tab_widget.refresh_commandes()
+                        break
+            else:
+                logging.info(f"User cancelled the initial CommandeDialog for client {actual_new_client_id}.")
+                # If the user cancels the first commande, we might still want a default project.
+                # Or, we might decide that no project is created if the first commande is cancelled.
+                # For now, let's proceed with creating a default project if no commande-linked project exists.
+                doc_manager.notify(title=doc_manager.tr("Création de Commande Annulée"),
+                                   message=doc_manager.tr("La création de la première commande a été annulée. Un projet administratif général sera créé."), type='INFO')
 
-        if not project_id_for_tasks and not commande_created_project_id : # If no commande led to a project, and no default project was planned
-            # This means user said NO to commande, and we decided not to create a default project.
-            # The original logic for new_project_id_central_db would not have run.
-            # If a project is always desired, the logic for new_project_id_central_db should run if commande_created_project_id is None.
-            # Let's adjust: if no commande_created_project_id, then try to create the default project.
-            if not commande_created_project_id:
-                # Re-run the original project creation logic if no project came from commande
-                project_status_planning_obj = get_status_setting_by_name("Planning", "Project")
+        # --- Project and Task Creation ---
+        # Use project_id from commande if available, otherwise create a default project.
+        project_id_for_tasks = commande_created_project_id
+
+        if not project_id_for_tasks:
+            logging.info(f"No project linked from commande for client {actual_new_client_id}. Creating default administrative project.")
+            project_status_planning_obj = get_status_setting_by_name("Planning", "Project")
+            project_status_id_for_pm = project_status_planning_obj['status_id'] if project_status_planning_obj else None
+            if not project_status_id_for_pm:
+                 QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Configuration Projet"),
+                                     doc_manager.tr("Statut de projet par défaut 'Planning' non trouvé."))
+            project_data_for_db_default = {
+                'client_id': actual_new_client_id,
+                'project_name': f"Projet Administratif pour {created_client_info.get('client_name', client_name_val)}",
+                'description': f"Suivi administratif général pour client: {created_client_info.get('client_name', client_name_val)}.",
+                'start_date': datetime.now().strftime("%Y-%m-%d"),
+                'status_id': project_status_id_for_pm,
+                'priority': 0
+            }
+            new_default_project_id = add_project(project_data_for_db_default)
+            if new_default_project_id:
+                project_id_for_tasks = new_default_project_id
+                QMessageBox.information(doc_manager, doc_manager.tr("Projet Administratif Créé"),
+                                        doc_manager.tr("Un projet administratif général a été créé pour {0}.").format(created_client_info.get('client_name', client_name_val)))
+            else:
+                QMessageBox.warning(doc_manager, doc_manager.tr("Erreur DB Projet"),
+                                    doc_manager.tr("La création du projet administratif général a échoué."))
+
+        # Now, if project_id_for_tasks is set (either from commande or default creation), create tasks for it.
+        if project_id_for_tasks:
+            task_status_todo_obj = get_status_setting_by_name("To Do", "Task")
+            task_status_id_for_todo = task_status_todo_obj['status_id'] if task_status_todo_obj else None
+            if not task_status_id_for_todo:
+                QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Configuration Tâche"),
+                                    doc_manager.tr("Statut de tâche par défaut 'To Do' non trouvé."))
+
+            standard_tasks = [
+                {"name": "Initial Client Consultation & Needs Assessment", "description": "Understand client requirements, objectives, target markets, and budget.", "priority_val": 2, "deadline_days": 3},
+                {"name": "Market Research & Analysis", "description": "Research target international markets, including competition, regulations, and cultural nuances.", "priority_val": 1, "deadline_days": 7},
+                {"name": "Post-Sales Follow-up & Support", "description": "Follow up with the client after delivery.", "priority_val": 1, "deadline_days": 60}
+            ]
+            for task_item in standard_tasks:
+                task_deadline = (datetime.now() + timedelta(days=task_item["deadline_days"])).strftime("%Y-%m-%d")
+                task_data_for_db = {
+                    'project_id': project_id_for_tasks,
+                    'task_name': task_item["name"],
+                    'description': task_item["description"],
+                    'status_id': task_status_id_for_todo,
+                    'priority': task_item["priority_val"],
+                    'due_date': task_deadline
+                }
+                add_task(task_data_for_db)
+            QMessageBox.information(doc_manager, doc_manager.tr("Tâches Créées"),
+                                    doc_manager.tr("Des tâches standard ont été ajoutées au projet associé."))
+        else:
+            logging.warning(f"No project ID available (commande or default) for client {actual_new_client_id}. No tasks created.")
+
+
+
+        if ui_map_data: # This block should run regardless of commande creation, to ensure Proforma/Contact/Product dialogs sequence
+            # --- BEGIN AUTO PROFORMA GENERATION ---
+            try:
+                logging.info(f"Starting automatic Proforma generation for new client ID: {actual_new_client_id}")
                 project_status_id_for_pm = project_status_planning_obj['status_id'] if project_status_planning_obj else None
                 if not project_status_id_for_pm:
                      QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Configuration Projet"),
@@ -339,8 +395,11 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
 
         if ui_map_data: # This block should run regardless of commande creation, to ensure Proforma/Contact/Product dialogs sequence
             # --- BEGIN AUTO PROFORMA GENERATION ---
+            # This section is now executed AFTER the Commande and its items are established (if any)
+            # and after the ContactDialog.
+            # The project_id used for Proforma should be project_id_for_tasks.
             try:
-                logging.info(f"Starting automatic Proforma generation for new client ID: {actual_new_client_id}")
+                logging.info(f"Starting automatic Proforma generation for new client ID: {actual_new_client_id}, using project ID: {project_id_for_tasks}")
 
                 # 1. Determine Proforma Language
                 selected_langs_str = created_client_info.get("languages", "fr")
@@ -398,15 +457,24 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                 auto_proforma_company_id = default_company.get("company_id")
 
                 # 4. Generate Proforma PDF
-                client_info_for_pdf_gen = created_client_info.copy()
-                client_info_for_pdf_gen['base_folder_path'] = base_folder_full_path
+                client_info_for_pdf_gen = created_client_info.copy() # This is the main client info
+                client_info_for_pdf_gen['base_folder_path'] = base_folder_full_path # Ensure this is the correct, created path
 
                 from utils import generate_pdf_for_document
 
                 proforma_doc_title_base = default_proforma_template.get('template_name', 'Facture_Proforma')
+
+                # Try to get commande reference if a commande was created
+                # This is a bit indirect; ideally CommandeDialog would pass back the commande_reference if created.
+                # For now, try to fetch the latest commande if one was made.
+                commande_ref_for_proforma = f"PF-AUTO-{datetime.now().strftime('%Y%m%d%H%M%S')}" # Default
+                if hasattr(commande_dialog, 'get_created_commande_reference'): # Check if CommandeDialog can provide this
+                    _ref = commande_dialog.get_created_commande_reference()
+                    if _ref: commande_ref_for_proforma = _ref
+
                 proforma_specific_additional_context = {
                     'document_title': f"{proforma_doc_title_base} - {client_info_for_pdf_gen.get('client_name', 'Client')}",
-                    'proforma_id': f"PF-AUTO-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                    'proforma_id': commande_ref_for_proforma # Use commande_reference if available
                 }
 
                 generated_pdf_path = generate_pdf_for_document(
@@ -415,12 +483,12 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                     app_root_dir=doc_manager.app_root_dir,
                     parent_widget=doc_manager,
                     target_language_code=target_proforma_lang,
-                    project_id=new_project_id_central_db,
+                    project_id=project_id_for_tasks, # Use the determined project_id
                     additional_context=proforma_specific_additional_context,
-                document_type_for_context=default_proforma_template.get('template_type'),
-                allow_empty_products=True # Allow empty products for auto-generated Proforma
+                    document_type_for_context=default_proforma_template.get('template_type'),
+                    allow_empty_products=True
                 )
-                logging.info(f"Called generate_pdf_for_document for AUTO PROFORMA. File: {template_base_filename}, Lang: {target_proforma_lang}, allow_empty_products=True. Result path: {generated_pdf_path}") # NEW LOG
+                logging.info(f"Called generate_pdf_for_document for AUTO PROFORMA. File: {template_base_filename}, Lang: {target_proforma_lang}, allow_empty_products=True. Result path: {generated_pdf_path}")
 
 
                 if not generated_pdf_path or not os.path.exists(generated_pdf_path):
@@ -433,14 +501,20 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                 from db.cruds import client_documents_crud
                 relative_pdf_path_for_db = os.path.relpath(generated_pdf_path, base_folder_full_path)
 
+                # Link to commande_id if available
+                linked_commande_id = None
+                if hasattr(commande_dialog, 'get_created_commande_id'): # CommandeDialog should expose this
+                    linked_commande_id = commande_dialog.get_created_commande_id()
+
                 auto_proforma_doc_data = {
                     'client_id': actual_new_client_id,
-                    'project_id': new_project_id_central_db,
-                    'order_identifier': proforma_specific_additional_context.get('proforma_id'),
+                    'project_id': project_id_for_tasks, # Use the determined project_id
+                    'commande_id': linked_commande_id, # Link to the commande if one was created
+                    'order_identifier': commande_ref_for_proforma, # Use commande_reference or generated proforma_id
                     'document_name': os.path.basename(generated_pdf_path),
                     'file_name_on_disk': os.path.basename(generated_pdf_path),
                     'file_path_relative': relative_pdf_path_for_db,
-                    'document_type_generated': "PROFORMA_PDF",
+                    'document_type_generated': "PROFORMA_PDF", # Or more specific if template type says so
                     'source_template_id': default_proforma_template.get('template_id'),
                     'user_id': doc_manager.current_user_id,
                     'language_code': target_proforma_lang,
@@ -471,187 +545,37 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                                    type='WARNING')
             # --- END AUTO PROFORMA GENERATION ---
 
-            contact_controller = ContactController(current_user_id=doc_manager.current_user_id) # Pass user_id
-
-            # Check if this is the first contact for the client
+            # Call ContactDialog after Commande and Project/Tasks logic
+            contact_controller = ContactController(current_user_id=doc_manager.current_user_id)
             existing_contacts = get_contacts_for_client(actual_new_client_id, limit=1)
             is_first_contact = not existing_contacts
-
             contact_dialog = ContactDialog(client_id=actual_new_client_id,
                                            parent=doc_manager,
                                            is_first_contact=is_first_contact,
-                                           current_user_id=doc_manager.current_user_id) # Pass current_user_id
+                                           current_user_id=doc_manager.current_user_id)
             if contact_dialog.exec_() == QDialog.Accepted:
                 contact_form_data = contact_dialog.get_data()
-
-                logging.info(f"Attempting to process contact for client {actual_new_client_id} using ContactController. Form data: {contact_form_data}")
-
-                # Use the ContactController here
                 contact_id_linked, link_id = contact_controller.get_or_create_contact_and_link(
                     client_id=actual_new_client_id,
                     contact_form_data=contact_form_data
                 )
-
                 if contact_id_linked:
                     logging.info(f"Contact processed successfully for client {actual_new_client_id}. Contact ID: {contact_id_linked}, Link ID: {link_id}")
-                    # Optionally, notify user of contact success, though ContactDialog itself might do this.
-                    # For consistency, a simple log here is fine, or a notification via doc_manager.notify if desired.
-                    # Example: doc_manager.notify(title=doc_manager.tr("Contact Traité"), message=doc_manager.tr("Le contact a été traité avec succès pour le nouveau client."), type='SUCCESS')
                 else:
                     logging.error(f"Failed to process contact for client {actual_new_client_id} using ContactController.")
                     QMessageBox.warning(doc_manager,
                                         doc_manager.tr("Erreur Contact"),
-                                        doc_manager.tr("Le traitement du contact a échoué. Veuillez vérifier les informations du contact ou consulter les logs pour plus de détails."))
+                                        doc_manager.tr("Le traitement du contact a échoué."))
             else:
                 logging.info(f"ContactDialog was cancelled for client {actual_new_client_id}.")
 
-            # ProductDialog and subsequent price calculation
-            product_dialog = ProductDialog(client_id=actual_new_client_id, app_root_dir=doc_manager.app_root_dir, parent=doc_manager)
-            if product_dialog.exec_() == QDialog.Accepted:
-                products_list_data = product_dialog.get_data()
+            # The ProductDialog call that was here is removed, as products are now part of CommandeDialog.
+            # The CreateDocumentDialog call that was here is also removed, as Proforma is auto-generated.
+            # Further document creation can be done from ClientWidget.
 
-                # Check if products_crud_instance is defined before using it in the loop
-                if 'products_crud_instance' not in globals() or globals()['products_crud_instance'] is None:
-                    logging.error("DM_LOGIC: products_crud_instance is NOT available in handle_create_client_execution before product loop. This should have been caught at module load.")
-                    QMessageBox.critical(doc_manager, "Erreur Critique Module Produit", "Le module de gestion des produits n'est pas correctement initialisé.")
-                    # Optionally, return or raise an exception to prevent further processing
-                    # For now, we'll let it proceed and potentially hit NameErrors if it's truly not defined,
-                    # but the module-level log should have caught this.
-                else:
-                    logging.info(f"DM_LOGIC: products_crud_instance IS available in handle_create_client_execution: {globals()['products_crud_instance']}")
-
-
-                for product_item_data in products_list_data:
-                    logging.info(f"Processing product item from dialog: {product_item_data}")
-                    global_product_id_to_link = None
-                    current_base_unit_price = None # Used to determine if override is needed
-
-                    try:
-                        # products_crud_instance is now checked before the loop.
-                        # If it was None, an error message was shown.
-                        # If execution reaches here and it's still None (e.g. due to some very complex issue),
-                        # the NameError will occur as before, but the logs should give clues.
-
-
-                        # Step 1: Determine the global_product_id
-                        dialog_provided_global_product_id = product_item_data.get('product_id') # From selected existing product
-                        product_code_from_dialog = product_item_data.get('product_code', "").strip()
-
-                        if dialog_provided_global_product_id is not None:
-                            logging.info(f"Using existing global product_id from dialog: {dialog_provided_global_product_id}")
-                            global_product_id_to_link = dialog_provided_global_product_id
-                            existing_global_product_details = products_crud_instance.get_product_by_id(global_product_id_to_link)
-                            if existing_global_product_details:
-                                current_base_unit_price = existing_global_product_details.get('base_unit_price')
-                        else:
-                            if not product_code_from_dialog:
-                                logging.warning(f"Product code (SKU) missing for product '{product_item_data.get('name')}'.")
-                                QMessageBox.warning(doc_manager, doc_manager.tr("Code Produit Requis"),
-                                                     doc_manager.tr("Le code produit (SKU) est requis pour le produit '{0}'. Ce produit ne sera pas ajouté.").format(product_item_data.get('name')))
-                                continue
-                            existing_product_by_code = products_crud_instance.get_product_by_code(product_code_from_dialog)
-                            if existing_product_by_code:
-                                global_product_id_to_link = existing_product_by_code['product_id']
-                                current_base_unit_price = existing_product_by_code.get('base_unit_price')
-                                logging.debug(f"Helper: Found existing global product by code. ID: {global_product_id_to_link}")
-                            else:
-                                logging.info(f"Helper: Product with code '{product_code_from_dialog}' not found. Creating new global product.")
-                                new_global_product_data = {
-                                    'product_name': product_item_data['name'], 'product_code': product_code_from_dialog,
-                                    'description': product_item_data['description'], 'base_unit_price': product_item_data['unit_price'],
-                                    'language_code': product_item_data.get('language_code', 'fr'), 'category': product_item_data.get('category', ''),
-                                    'unit_of_measure': product_item_data.get('unit_of_measure', 'unit'), 'weight': product_item_data.get('weight'),
-                                    'dimensions': product_item_data.get('dimensions'), 'is_active': True,
-                                    'created_by_user_id': doc_manager.current_user_id
-                                }
-                                add_result = products_crud_instance.add_product(new_global_product_data)
-                                if add_result and add_result.get('success'):
-                                    global_product_id_to_link = add_result.get('id')
-                                    current_base_unit_price = new_global_product_data['base_unit_price']
-                                    logging.info(f"DM_LOGIC: New global product '{new_global_product_data['product_name']}' created with ID: {global_product_id_to_link}") # Enhanced log
-                                else:
-                                    error_detail = add_result.get('error', 'Unknown error') if add_result else 'Unknown error'
-                                    logging.error(f"DM_LOGIC: Failed to add new global product '{product_item_data.get('name')}' (Code: {product_code_from_dialog}). Error: {error_detail}")
-                                    QMessageBox.critical(doc_manager, doc_manager.tr("Erreur Création Produit Global"),
-                                                         doc_manager.tr("Impossible de créer le produit global '{0}' (Code: {1}). Erreur: {2}").format(product_item_data['name'], product_code_from_dialog, error_detail))
-                                    return False # Indicate failure for this item
-
-                        if global_product_id_to_link:
-                            unit_price_from_dialog = product_item_data['unit_price']
-                            unit_price_override_val = None
-                            if current_base_unit_price is None or unit_price_from_dialog != current_base_unit_price:
-                                unit_price_override_val = unit_price_from_dialog
-                            link_data = {
-                                'client_id': actual_new_client_id, 'project_id': None,
-                                'product_id': global_product_id_to_link, 'quantity': product_item_data['quantity'],
-                                'unit_price_override': unit_price_override_val,
-                                'added_by_user_id': doc_manager.current_user_id
-                            }
-                            logging.debug(f"Helper: Attempting to link product_id {global_product_id_to_link} to client {actual_new_client_id} with data: {link_data}")
-                            cpp_id = add_product_to_client_or_project(link_data)
-                            if cpp_id:
-                                logging.info(f"Helper: Successfully linked product '{product_item_data.get('name')}' to client. Link ID: {cpp_id}")
-                                return True # Indicate success for this item
-                            else:
-                                logging.error(f"Helper: Failed to link product '{product_item_data.get('name')}' (Global ID: {global_product_id_to_link}) to client {actual_new_client_id}.")
-                                QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Liaison Produit"),
-                                                    doc_manager.tr("Impossible de lier le produit '{0}' au client.").format(product_item_data['name']))
-                                return False # Indicate failure for this item
-                        else:
-                            logging.error(f"Helper: Global product ID to link is None for item '{product_item_data.get('name')}'. Cannot link.")
-                            QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Interne Produit"),
-                                                doc_manager.tr("ID de produit global non déterminé pour '{0}'. Liaison annulée.").format(product_item_data.get('name')))
-                            return False # Indicate failure for this item
-                    except Exception as e_product_save: # This broad exception catch should ideally be within the helper
-                        logging.error(f"Unexpected error processing product '{product_item_data.get('name', 'Inconnu')}': {type(e_product_save).__name__} - {e_product_save}", exc_info=True)
-                        QMessageBox.critical(doc_manager, doc_manager.tr("Erreur Sauvegarde Produit"),
-                                             doc_manager.tr("Une erreur est survenue lors de la sauvegarde du produit '{0}': {1}").format(product_item_data.get('name', 'Inconnu'), str(e_product_save)))
-                        return False # Indicate failure for this item
-
-                # Update client's total price based on successfully saved products
-                linked_products_after_save = get_products_for_client_or_project(client_id=actual_new_client_id, project_id=None)
-                calculated_total_sum_after_save = sum(p.get('total_price_calculated', 0.0) for p in linked_products_after_save if p.get('total_price_calculated') is not None)
-                logging.info(f"Updating client {actual_new_client_id} price to {calculated_total_sum_after_save} after ProductDialog acceptance.")
-                clients_crud_instance.update_client(actual_new_client_id, {'price': calculated_total_sum_after_save})
-                if actual_new_client_id in doc_manager.clients_data_map:
-                    doc_manager.clients_data_map[actual_new_client_id]['price'] = calculated_total_sum_after_save
-                if ui_map_data: ui_map_data['price'] = calculated_total_sum_after_save # Ensure ui_map_data for CreateDocumentDialog is fresh
-
-                # Proceed to CreateDocumentDialog
-                logging.info(f"Attempting to show CreateDocumentDialog for client ID {actual_new_client_id}.")
-                create_document_dialog = CreateDocumentDialog(
-                    client_info=ui_map_data, config=doc_manager.config,
-                    current_user_id=doc_manager.current_user_id, parent=doc_manager
-                )
-                if create_document_dialog.exec_() == QDialog.Accepted:
-                    logging.info("CreateDocumentDialog accepted.")
-                else:
-                    logging.info("CreateDocumentDialog cancelled.")
-            else: # ProductDialog was cancelled
-                logging.info("ProductDialog cancelled by user.")
-                # Update client's total price based on any products linked PRIOR to this cancelled dialog
-                linked_products_after_cancel = get_products_for_client_or_project(client_id=actual_new_client_id, project_id=None)
-                calculated_total_sum_after_cancel = sum(p.get('total_price_calculated', 0.0) for p in linked_products_after_cancel if p.get('total_price_calculated') is not None)
-                logging.info(f"Updating client {actual_new_client_id} price to {calculated_total_sum_after_cancel} after ProductDialog cancellation.")
-                clients_crud_instance.update_client(actual_new_client_id, {'price': calculated_total_sum_after_cancel})
-                if actual_new_client_id in doc_manager.clients_data_map:
-                    doc_manager.clients_data_map[actual_new_client_id]['price'] = calculated_total_sum_after_cancel
-                # CreateDocumentDialog is SKIPPED as per Test Case 3
-
-
-
-
-#         else: # ui_map_data was not populated (should not happen if controller succeeded)
-#              QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Données Client"), doc_manager.tr("Les données du client (ui_map_data) ne sont pas disponibles pour la séquence de dialogue."))
+        else: # ui_map_data was not populated (should not happen if controller succeeded)
+             QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Données Client"), doc_manager.tr("Les données du client (ui_map_data) ne sont pas disponibles pour la séquence de dialogue."))
 # # --- After contact_dialog.exec_() block ---
-        else: # ContactDialog was cancelled
-            logging.info("ContactDialog cancelled by user.")
-            # Ensure client's price is initialized/updated even if workflow is exited early
-            # (e.g., to 0 if no products were ever associated with this new client)
-            clients_crud_instance.update_client(actual_new_client_id, {'price': 0.0})
-            if actual_new_client_id in doc_manager.clients_data_map:
-                doc_manager.clients_data_map[actual_new_client_id]['price'] = 0.0
-            if ui_map_data: ui_map_data['price'] = 0.0
 
 
 # --- Final notifications and UI updates (outside the main if ui_map_data block, but relies on its outcomes) ---
