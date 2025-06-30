@@ -239,6 +239,7 @@ class ClientWidget(QWidget):
 
             self.populate_details_layout() # Populate the details in the first tab, this will add status_combo to details_layout
 
+
             # --- Tab 2: Contacts ---
             contacts_tab_widget = QWidget()
             contacts_tab_layout = QVBoxLayout(contacts_tab_widget)
@@ -427,6 +428,7 @@ class ClientWidget(QWidget):
         self._setup_notes_section(layout)
         # self._setup_contacts_section(layout) # Call removed, contacts group box will be integrated differently
         self._setup_main_tabs_section(layout) # Tabs like Documents, Products will remain here
+
         self._setup_commandes_tab() # Add the new Commandes tab
 
         # Initial data loading calls
@@ -513,6 +515,7 @@ class ClientWidget(QWidget):
              self.tabs_group_box.toggled.connect(self._handle_tabs_section_toggled)
         # if hasattr(self, 'contacts_group_box'): # Connection removed as the group box is being removed
             # self.contacts_group_box.toggled.connect(self._handle_contacts_section_toggled)
+
 
 
         # Apply permissions
@@ -698,7 +701,7 @@ class ClientWidget(QWidget):
             main_layout.addWidget(self.tabs_group_box)
 
             self._setup_documents_tab()
-            # self._setup_contacts_tab() # Call removed, contacts are now an internal tab
+
             self._setup_products_tab()
             self._setup_document_notes_tab()
             self._setup_product_dimensions_tab()
@@ -722,7 +725,7 @@ class ClientWidget(QWidget):
 
     # _setup_available_templates_tab and load_available_templates removed.
     # handle_generate_template_button_clicked was only called by load_available_templates, so it can also be removed.
-    # _setup_assignments_tab method itself is removed.
+
 
     def _setup_documents_tab(self):
         try:
@@ -1328,6 +1331,7 @@ class ClientWidget(QWidget):
 
     # def _setup_assignments_tab(self): # Method completely removed
     #     pass
+
 
     def _setup_commandes_tab(self):
         """Sets up the Commandes tab."""
@@ -3920,6 +3924,7 @@ class ClientWidget(QWidget):
             pass # Not connected
         self.status_combo.currentTextChanged.connect(self.update_client_status)
 
+
         # Project ID
         project_id_label = QLabel(self.tr("ID Projet:"))
         project_identifier_value = self.client_info.get("project_identifier", self.tr("N/A"))
@@ -5566,6 +5571,7 @@ class ClientWidget(QWidget):
         # The QFormLayout manages its rows, so removing rows will detach widgets.
         # We need to be careful if status_combo was added directly to a row in details_layout.
         # For now, assume populate_details_layout correctly adds it, and here we just clear.
+
 
         # Clear previous edit widgets if any, and rows from details_layout
         for widget in self.edit_widgets.values():

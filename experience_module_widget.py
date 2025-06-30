@@ -357,7 +357,8 @@ class AddEditExperienceDialog(QDialog):
 
     def _load_all_tags_for_completer(self):
         try:
-            all_tags_data = tags_crud.get_all_tags() # Assumes this returns list of dicts like [{'tag_id': 1, 'tag_name': 'urgent'}, ...]
+            # Assuming get_tags() with default arguments returns all tags
+            all_tags_data = tags_crud.get_tags() # Assumes this returns list of dicts like [{'tag_id': 1, 'tag_name': 'urgent'}, ...]
             if all_tags_data:
                 tag_names_list = [tag['tag_name'] for tag in all_tags_data if 'tag_name' in tag]
                 self.all_tags_model.setStringList(tag_names_list)
