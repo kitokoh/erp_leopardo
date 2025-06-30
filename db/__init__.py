@@ -84,6 +84,11 @@ from .cruds.clients_crud import ( # Modified
     get_total_clients_count, # Added
     update_client, # Added
 )
+from .cruds.commandes_crud import (
+    add_commande, get_commande_by_id, get_commandes_for_client, update_commande, delete_commande,
+    add_commande_item, get_items_for_commande, update_commande_item, delete_commande_item,
+    get_next_commande_reference
+)
 from .cruds.contacts_crud import (
     get_contacts_for_client,
     add_contact,
@@ -393,6 +398,17 @@ __all__ = [
     "initialize_database",
     "get_setting",
     "set_setting",
+    # Commandes CRUD
+    "add_commande",
+    "get_commande_by_id",
+    "get_commandes_for_client",
+    "update_commande",
+    "delete_commande",
+    "add_commande_item",
+    "get_items_for_commande",
+    "update_commande_item",
+    "delete_commande_item",
+    "get_next_commande_reference",
     "get_all_transporters",
     "add_transporter",
     "get_transporter_by_id",
