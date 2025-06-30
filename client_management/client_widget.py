@@ -417,8 +417,7 @@ class ClientWidget(QWidget):
             QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation section infos client:\n{0}").format(str(e)))
 
         self._setup_notes_section(layout)
-        # self._setup_contacts_section(layout) # Call removed, contacts group box will be integrated differently
-        self._setup_main_tabs_section(layout) # Tabs like Documents, Products will remain here
+        self._setup_main_tabs_section(layout) # This will call sub-methods for each tab
 
         self._setup_commandes_tab() # Add the new Commandes tab
 
@@ -1323,6 +1322,39 @@ class ClientWidget(QWidget):
 
     # def _setup_assignments_tab(self): # Method completely removed
     #     pass
+
+    def _setup_commandes_tab(self):
+        """Sets up the Commandes tab."""
+        try:
+            logging.info("ClientWidget.setup_ui: Starting setup for Commandes Tab...")
+            self.commandes_tab_widget = CommandeWidget(
+                client_info=self.client_info,
+                current_user_info=self.current_user_info,
+                parent=self
+            )
+            # Add this as a top-level tab in self.tab_widget (main tab container)
+            # Or, if Commandes should be part of the "Autres Informations" group box, then add to self.tab_widget
+            # For now, let's add it to the main self.tab_widget
+            if hasattr(self, 'tab_widget'):
+                 # Insert it before "Available Templates" or as the second tab for prominence
+                docs_tab_index = -1
+                for i in range(self.tab_widget.count()):
+                    if self.tab_widget.tabText(i) == self.tr("Documents"):
+                        docs_tab_index = i
+                        break
+
+                if docs_tab_index != -1:
+                    self.tab_widget.insertTab(docs_tab_index + 1, self.commandes_tab_widget, self.tr("Commandes"))
+                else: # Fallback if Documents tab isn't found by that exact name
+                    self.tab_widget.addTab(self.commandes_tab_widget, self.tr("Commandes"))
+
+                logging.info("ClientWidget._setup_commandes_tab: Commandes tab added.")
+            else:
+                logging.error("ClientWidget._setup_commandes_tab: self.tab_widget not found. Cannot add Commandes tab.")
+
+        except Exception as e:
+            logging.error(f"Error in _setup_commandes_tab: {e}", exc_info=True)
+            QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation onglet Commandes:\n{0}").format(str(e)))
 
     def _setup_commandes_tab(self):
         """Sets up the Commandes tab."""
