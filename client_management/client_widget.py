@@ -185,7 +185,7 @@ class ClientWidget(QWidget):
             self.compile_pdf_btn.setIcon(QIcon.fromTheme("document-export"))
             self.compile_pdf_btn.setProperty("primary", True)
             self.compile_pdf_btn.clicked.connect(self.open_compile_pdf_dialog)
-            action_layout.addWidget(self.compile_pdf_btn)
+            # action_layout.addWidget(self.compile_pdf_btn) # Moved to documents tab filters
 
             self.edit_save_client_btn = QPushButton(self.tr("Modifier Client"))
             self.edit_save_client_btn.setIcon(QIcon.fromTheme("document-edit", QIcon(":/icons/pencil.svg")))
@@ -197,32 +197,229 @@ class ClientWidget(QWidget):
             self.send_whatsapp_btn.setIcon(QIcon.fromTheme("contact-new", QIcon(":/icons/user.svg")))
             self.send_whatsapp_btn.setToolTip(self.tr("Send a WhatsApp message to the client"))
             self.send_whatsapp_btn.clicked.connect(self.open_send_whatsapp_dialog)
-            action_layout.addWidget(self.send_whatsapp_btn)
+            # action_layout.addWidget(self.send_whatsapp_btn) # Moved to an internal tab
+
+            self.archive_client_btn = QPushButton(self.tr("Archiver Client"))
+            self.archive_client_btn.setIcon(QIcon(":/icons/archive.svg"))
+            self.archive_client_btn.setToolTip(self.tr("Archiver ce client (soft delete)"))
+            self.archive_client_btn.clicked.connect(self.handle_archive_client) # Connect to the new handler
+            action_layout.addWidget(self.archive_client_btn)
+
             info_container_layout.addLayout(action_layout)
 
-            self.status_combo = QComboBox()
-            self.load_statuses()
-            self.status_combo.setCurrentText(self.client_info.get("status", self.tr("En cours")))
-            self.status_combo.currentTextChanged.connect(self.update_client_status)
+            # Create the internal QTabWidget
+            self.internal_client_info_tabs = QTabWidget()
+            info_container_layout.addWidget(self.internal_client_info_tabs)
 
-            self.details_layout = QFormLayout()
+            # --- Tab 1: Client Details (populated by populate_details_layout) ---
+            self.client_details_tab = QWidget()
+            details_tab_layout = QVBoxLayout(self.client_details_tab)
+
+            self.status_combo = QComboBox() # Status combo will be part of the details tab
+            # self.load_statuses() # load_statuses will be called by populate_details_layout or refresh_display
+            # self.status_combo.setCurrentText(self.client_info.get("status", self.tr("En cours")))
+            # self.status_combo.currentTextChanged.connect(self.update_client_status)
+
+            self.details_layout = QFormLayout() # This is the layout for client fields
             self.details_layout.setLabelAlignment(Qt.AlignLeft)
             self.details_layout.setSpacing(10)
-            self.category_label = QLabel(self.tr("Catégorie:"))
-            self.category_value_label = QLabel()
-            self.populate_details_layout()
-            info_container_layout.addLayout(self.details_layout)
+            self.category_label = QLabel(self.tr("Catégorie:")) # Initialized here, used in populate_details_layout
+            self.category_value_label = QLabel() # Initialized here, used in populate_details_layout
+
+            details_tab_layout.addLayout(self.details_layout)
+            self.internal_client_info_tabs.addTab(self.client_details_tab, self.client_info.get('client_name', self.tr("Détails Client")))
+
+            self.populate_details_layout() # Populate the details in the first tab
+
+            # --- Tab 2: Contacts ---
+            contacts_tab_widget = QWidget()
+            contacts_tab_layout = QVBoxLayout(contacts_tab_widget)
+
+            # Re-create contacts UI (table, buttons, pagination)
+            self.contacts_table = QTableWidget()
+            self.contacts_table.setColumnCount(5)
+            self.contacts_table.setHorizontalHeaderLabels([
+                self.tr("Nom"), self.tr("Email"), self.tr("Téléphone"),
+                self.tr("Position"), self.tr("Principal")
+            ])
+            self.contacts_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+            self.contacts_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            self.contacts_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            self.contacts_table.setAlternatingRowColors(True)
+            self.contacts_table.cellDoubleClicked.connect(self.edit_contact)
+
+            self.contacts_empty_label = QLabel(self.tr("Aucun contact ajouté pour ce client.\nCliquez sur '➕ Ajouter' pour commencer."))
+            self.contacts_empty_label.setAlignment(Qt.AlignCenter)
+            font_contacts_empty = self.contacts_empty_label.font(); font_contacts_empty.setPointSize(10)
+            self.contacts_empty_label.setFont(font_contacts_empty)
+            contacts_tab_layout.addWidget(self.contacts_empty_label)
+            contacts_tab_layout.addWidget(self.contacts_table)
+
+            contacts_pagination_layout = QHBoxLayout()
+            self.prev_contact_button = QPushButton("<< Précédent")
+            self.prev_contact_button.setObjectName("paginationButton")
+            self.prev_contact_button.clicked.connect(self.prev_contact_page)
+            self.contact_page_info_label = QLabel("Page 1 / 1")
+            self.contact_page_info_label.setObjectName("paginationLabel")
+            self.next_contact_button = QPushButton("Suivant >>")
+            self.next_contact_button.setObjectName("paginationButton")
+            self.next_contact_button.clicked.connect(self.next_contact_page)
+            contacts_pagination_layout.addStretch()
+            contacts_pagination_layout.addWidget(self.prev_contact_button)
+            contacts_pagination_layout.addWidget(self.contact_page_info_label)
+            contacts_pagination_layout.addWidget(self.next_contact_button)
+            contacts_pagination_layout.addStretch()
+            contacts_tab_layout.addLayout(contacts_pagination_layout)
+
+            contacts_btn_layout = QHBoxLayout()
+            self.add_contact_btn = QPushButton(self.tr("Ajouter")); self.add_contact_btn.setIcon(QIcon(":/icons/user-plus.svg"))
+            self.add_contact_btn.setToolTip(self.tr("Ajouter un nouveau contact pour ce client")); self.add_contact_btn.clicked.connect(self.add_contact); contacts_btn_layout.addWidget(self.add_contact_btn)
+            self.edit_contact_btn = QPushButton(self.tr("Modifier")); self.edit_contact_btn.setIcon(QIcon(":/icons/pencil.svg"))
+            self.edit_contact_btn.setToolTip(self.tr("Modifier le contact sélectionné")); self.edit_contact_btn.clicked.connect(self.edit_contact); contacts_btn_layout.addWidget(self.edit_contact_btn)
+            self.remove_contact_btn = QPushButton(self.tr("Supprimer")); self.remove_contact_btn.setIcon(QIcon(":/icons/trash.svg"))
+            self.remove_contact_btn.setToolTip(self.tr("Supprimer le lien vers le contact sélectionné pour ce client")); self.remove_contact_btn.setObjectName("dangerButton"); self.remove_contact_btn.clicked.connect(self.remove_contact); contacts_btn_layout.addWidget(self.remove_contact_btn)
+            contacts_tab_layout.addLayout(contacts_btn_layout)
+
+            self.internal_client_info_tabs.addTab(contacts_tab_widget, self.tr("Contacts"))
+            # self.load_contacts() # Will be called in the main setup_ui after all tabs are defined
+
+
+            # --- Tab 3: Assignments (Affectations) ---
+            self.assignments_internal_tab = QWidget() # Using a more specific name for the tab widget itself
+            assignments_internal_tab_layout = QVBoxLayout(self.assignments_internal_tab)
+            self.assignments_sub_tabs = QTabWidget() # This is the QTabWidget for sub-assignments
+            assignments_internal_tab_layout.addWidget(self.assignments_sub_tabs)
+
+            # Sub-Tab: Assigned Vendors/Sellers (CompanyPersonnel)
+            assigned_vendors_widget = QWidget()
+            assigned_vendors_layout = QVBoxLayout(assigned_vendors_widget)
+            self.assigned_vendors_table = QTableWidget(); self.assigned_vendors_table.setColumnCount(4)
+            self.assigned_vendors_table.setHorizontalHeaderLabels([self.tr("Nom"), self.tr("Rôle Projet"), self.tr("Email"), self.tr("Téléphone")])
+            self.assigned_vendors_table.setSelectionBehavior(QAbstractItemView.SelectRows); self.assigned_vendors_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            self.assigned_vendors_table.horizontalHeader().setStretchLastSection(True)
+            assigned_vendors_layout.addWidget(self.assigned_vendors_table)
+            vendor_buttons_layout = QHBoxLayout()
+            self.add_assigned_vendor_btn = QPushButton(self.tr("Ajouter Vendeur/Personnel")); self.add_assigned_vendor_btn.clicked.connect(self.handle_add_assigned_vendor)
+            self.remove_assigned_vendor_btn = QPushButton(self.tr("Retirer Vendeur/Personnel")); self.remove_assigned_vendor_btn.clicked.connect(self.handle_remove_assigned_vendor)
+            vendor_buttons_layout.addWidget(self.add_assigned_vendor_btn); vendor_buttons_layout.addWidget(self.remove_assigned_vendor_btn)
+            assigned_vendors_layout.addLayout(vendor_buttons_layout)
+            self.assignments_sub_tabs.addTab(assigned_vendors_widget, self.tr("Vendeurs & Personnel"))
+
+            # Sub-Tab: Assigned Technicians
+            assigned_technicians_widget = QWidget()
+            assigned_technicians_layout = QVBoxLayout(assigned_technicians_widget)
+            self.assigned_technicians_table = QTableWidget(); self.assigned_technicians_table.setColumnCount(4)
+            self.assigned_technicians_table.setHorizontalHeaderLabels([self.tr("Nom"), self.tr("Rôle Projet"), self.tr("Email"), self.tr("Téléphone")])
+            self.assigned_technicians_table.setSelectionBehavior(QAbstractItemView.SelectRows); self.assigned_technicians_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            self.assigned_technicians_table.horizontalHeader().setStretchLastSection(True)
+            assigned_technicians_layout.addWidget(self.assigned_technicians_table)
+            technician_buttons_layout = QHBoxLayout()
+            self.add_assigned_technician_btn = QPushButton(self.tr("Ajouter Technicien")); self.add_assigned_technician_btn.clicked.connect(self.handle_add_assigned_technician)
+            self.remove_assigned_technician_btn = QPushButton(self.tr("Retirer Technicien")); self.remove_assigned_technician_btn.clicked.connect(self.handle_remove_assigned_technician)
+            technician_buttons_layout.addWidget(self.add_assigned_technician_btn); technician_buttons_layout.addWidget(self.remove_assigned_technician_btn)
+            assigned_technicians_layout.addLayout(technician_buttons_layout)
+            self.assignments_sub_tabs.addTab(assigned_technicians_widget, self.tr("Techniciens"))
+
+            # Sub-Tab: Assigned Transporters
+            assigned_transporters_widget = QWidget()
+            assigned_transporters_layout = QVBoxLayout(assigned_transporters_widget)
+            self.assigned_transporters_table = QTableWidget(); self.assigned_transporters_table.setColumnCount(6)
+            self.assigned_transporters_table.setHorizontalHeaderLabels([self.tr("Nom Transporteur"), self.tr("Contact"), self.tr("Téléphone"), self.tr("Détails Transport"), self.tr("Coût Estimé"), self.tr("Actions")])
+            self.assigned_transporters_table.setSelectionBehavior(QAbstractItemView.SelectRows); self.assigned_transporters_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            self.assigned_transporters_table.horizontalHeader().setStretchLastSection(True)
+            assigned_transporters_layout.addWidget(self.assigned_transporters_table)
+            transporter_buttons_layout = QHBoxLayout()
+            self.add_assigned_transporter_btn = QPushButton(self.tr("Ajouter Transporteur")); self.add_assigned_transporter_btn.clicked.connect(self.handle_add_assigned_transporter)
+            self.remove_assigned_transporter_btn = QPushButton(self.tr("Retirer Transporteur")); self.remove_assigned_transporter_btn.clicked.connect(self.handle_remove_assigned_transporter)
+            transporter_buttons_layout.addWidget(self.add_assigned_transporter_btn); transporter_buttons_layout.addWidget(self.remove_assigned_transporter_btn)
+            assigned_transporters_layout.addLayout(transporter_buttons_layout)
+            self.assignments_sub_tabs.addTab(assigned_transporters_widget, self.tr("Transporteurs"))
+
+            # Sub-Tab: Assigned Freight Forwarders
+            assigned_forwarders_widget = QWidget()
+            assigned_forwarders_layout = QVBoxLayout(assigned_forwarders_widget)
+            self.assigned_forwarders_table = QTableWidget(); self.assigned_forwarders_table.setColumnCount(5)
+            self.assigned_forwarders_table.setHorizontalHeaderLabels([self.tr("Nom Transitaire"), self.tr("Contact"), self.tr("Téléphone"), self.tr("Description Tâche"), self.tr("Coût Estimé")])
+            self.assigned_forwarders_table.setSelectionBehavior(QAbstractItemView.SelectRows); self.assigned_forwarders_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            self.assigned_forwarders_table.horizontalHeader().setStretchLastSection(True)
+            assigned_forwarders_layout.addWidget(self.assigned_forwarders_table)
+            forwarder_buttons_layout = QHBoxLayout()
+            self.add_assigned_forwarder_btn = QPushButton(self.tr("Ajouter Transitaire")); self.add_assigned_forwarder_btn.clicked.connect(self.handle_add_assigned_forwarder)
+            self.remove_assigned_forwarder_btn = QPushButton(self.tr("Retirer Transitaire")); self.remove_assigned_forwarder_btn.clicked.connect(self.handle_remove_assigned_forwarder)
+            forwarder_buttons_layout.addWidget(self.add_assigned_forwarder_btn); forwarder_buttons_layout.addWidget(self.remove_assigned_forwarder_btn)
+            assigned_forwarders_layout.addLayout(forwarder_buttons_layout)
+            self.assignments_sub_tabs.addTab(assigned_forwarders_widget, self.tr("Transitaires"))
+
+            # Sub-Tab: Money Transfer Agents
+            mta_widget = QWidget()
+            mta_layout = QVBoxLayout(mta_widget)
+            mta_project_selector_layout = QHBoxLayout()
+            mta_project_selector_layout.addWidget(QLabel(self.tr("Sélectionner Commande/Projet:")))
+            self.mta_project_selector_combo = QComboBox()
+            mta_project_selector_layout.addWidget(self.mta_project_selector_combo)
+            mta_layout.addLayout(mta_project_selector_layout)
+            self.assigned_mta_table = QTableWidget()
+            self.assigned_mta_table.setColumnCount(8)
+            self.assigned_mta_table.setHorizontalHeaderLabels([
+                self.tr("Nom Agent"), self.tr("Type"), self.tr("Email"), self.tr("Téléphone"),
+                self.tr("Détails Affectation"), self.tr("Frais Estimés"), self.tr("Statut Email"), self.tr("Actions")])
+            self.assigned_mta_table.setSelectionBehavior(QAbstractItemView.SelectRows); self.assigned_mta_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            self.assigned_mta_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            self.assigned_mta_table.setMinimumHeight(150)
+            mta_layout.addWidget(self.assigned_mta_table)
+            mta_buttons_layout = QHBoxLayout()
+            self.add_assigned_mta_btn = QPushButton(self.tr("Assigner Agent de Transfert")); self.add_assigned_mta_btn.clicked.connect(self.handle_add_assigned_mta)
+            self.remove_assigned_mta_btn = QPushButton(self.tr("Retirer Agent de Transfert")); self.remove_assigned_mta_btn.clicked.connect(self.handle_remove_assigned_mta)
+            mta_buttons_layout.addWidget(self.add_assigned_mta_btn); mta_buttons_layout.addWidget(self.remove_assigned_mta_btn)
+            mta_layout.addLayout(mta_buttons_layout)
+            self.assignments_sub_tabs.addTab(mta_widget, self.tr("Agents de Transfert d'Argent"))
+
+            self.internal_client_info_tabs.addTab(self.assignments_internal_tab, self.tr("Affectations"))
+            # Connect signals for assignment tables (moved from old _setup_assignments_tab)
+            self.assigned_vendors_table.itemSelectionChanged.connect(self.update_assigned_vendors_buttons_state)
+            self.assigned_technicians_table.itemSelectionChanged.connect(self.update_assigned_technicians_buttons_state)
+            self.assigned_transporters_table.itemSelectionChanged.connect(self.update_assigned_transporters_buttons_state)
+            self.assigned_forwarders_table.itemSelectionChanged.connect(self.update_assigned_forwarders_buttons_state)
+            self.mta_project_selector_combo.currentIndexChanged.connect(self.handle_mta_project_selection_changed)
+            self.assigned_mta_table.itemSelectionChanged.connect(self.update_mta_buttons_state)
+            # Initial load for MTA project selector and button states
+            self.load_projects_for_mta_combo()
+            self.add_assigned_mta_btn.setEnabled(False)
+            self.remove_assigned_mta_btn.setEnabled(False)
+
+
+            # --- Tab 4: Send Email ---
+            send_email_tab_widget = QWidget()
+            send_email_tab_layout = QVBoxLayout(send_email_tab_widget)
+            self.open_email_dialog_btn = QPushButton(self.tr("Composer un Email..."))
+            self.open_email_dialog_btn.setIcon(QIcon.fromTheme("mail-send", QIcon(":/icons/bell.svg")))
+            self.open_email_dialog_btn.clicked.connect(self.open_send_email_dialog)
+            send_email_tab_layout.addWidget(self.open_email_dialog_btn)
+            send_email_tab_layout.addStretch()
+            self.internal_client_info_tabs.addTab(send_email_tab_widget, self.tr("Envoyer Mail"))
+
+            # --- Tab 5: Send WhatsApp ---
+            send_whatsapp_tab_widget = QWidget()
+            send_whatsapp_tab_layout = QVBoxLayout(send_whatsapp_tab_widget)
+            self.open_whatsapp_dialog_btn = QPushButton(self.tr("Envoyer message WhatsApp..."))
+            self.open_whatsapp_dialog_btn.setIcon(QIcon.fromTheme("contact-new", QIcon(":/icons/user.svg"))) # Placeholder
+            self.open_whatsapp_dialog_btn.clicked.connect(self.open_send_whatsapp_dialog)
+            send_whatsapp_tab_layout.addWidget(self.open_whatsapp_dialog_btn)
+            send_whatsapp_tab_layout.addStretch()
+            self.internal_client_info_tabs.addTab(send_whatsapp_tab_widget, self.tr("Send WhatsApp"))
+
 
             client_info_group_layout.addWidget(self.info_container_widget)
-            self.client_info_group_box.setChecked(True)
+            self.client_info_group_box.setChecked(True) # Ensure the main group is expanded by default
             layout.addWidget(self.client_info_group_box)
         except Exception as e:
             logging.error(f"Error in _setup_client_info_section: {e}", exc_info=True)
             QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation section infos client:\n{0}").format(str(e)))
 
         self._setup_notes_section(layout)
-        self._setup_contacts_section(layout) # Call to setup the new contacts group box
-        self._setup_main_tabs_section(layout) # This will call sub-methods for each tab (Contacts tab will be removed from here)
+        # self._setup_contacts_section(layout) # Call removed, contacts group box will be integrated differently
+        self._setup_main_tabs_section(layout) # Tabs like Documents, Products will remain here
+
         self._setup_commandes_tab() # Add the new Commandes tab
 
         # Initial data loading calls
@@ -307,8 +504,9 @@ class ClientWidget(QWidget):
              self.notes_group_box.toggled.connect(self._handle_notes_section_toggled)
         if hasattr(self, 'tabs_group_box'):
              self.tabs_group_box.toggled.connect(self._handle_tabs_section_toggled)
-        if hasattr(self, 'contacts_group_box'): # Connect the new contacts group box
-            self.contacts_group_box.toggled.connect(self._handle_contacts_section_toggled)
+        # if hasattr(self, 'contacts_group_box'): # Connection removed as the group box is being removed
+            # self.contacts_group_box.toggled.connect(self._handle_contacts_section_toggled)
+
 
 
         # Apply permissions
@@ -319,74 +517,42 @@ class ClientWidget(QWidget):
             self.notes_edit.installEventFilter(self)
         logging.info(f"ClientWidget.setup_ui: FULL UI SETUP COMPLETED for client_id={self.client_info.get('client_id')}")
 
-    def _setup_contacts_section(self, main_layout):
-        """Sets up the collapsible contacts section directly in the main layout."""
-        try:
-            logging.info("ClientWidget.setup_ui: Starting setup for Contacts Section (GroupBox)...")
-            self.contacts_group_box = QGroupBox(self.tr("Contacts"))
-            self.contacts_group_box.setCheckable(True)
-            contacts_group_main_layout = QVBoxLayout(self.contacts_group_box)
+    def handle_archive_client(self):
+        client_id = self.client_info.get("client_id")
+        if not client_id:
+            QMessageBox.warning(self, self.tr("Erreur Client"), self.tr("ID Client non disponible."))
+            return
 
-            # Container for the actual contacts UI (table, buttons, pagination)
-            self.contacts_container_widget = QWidget()
-            contacts_container_layout = QVBoxLayout(self.contacts_container_widget)
-            contacts_container_layout.setContentsMargins(0, 5, 0, 0) # Similar to other collapsible sections
+        reply = QMessageBox.question(self, self.tr("Archiver Client"),
+                                     self.tr("Êtes-vous sûr de vouloir archiver ce client ({0})?\nLe client sera marqué comme archivé et pourra être masqué des listes par défaut.").format(self.client_info.get("client_name", client_id)),
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
 
-            # Re-use the UI elements from the old _setup_contacts_tab method
-            self.contacts_table = QTableWidget()
-            self.contacts_table.setColumnCount(5)
-            self.contacts_table.setHorizontalHeaderLabels([
-                self.tr("Nom"), self.tr("Email"), self.tr("Téléphone"),
-                self.tr("Position"), self.tr("Principal")
-            ])
-            self.contacts_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-            self.contacts_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            self.contacts_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-            self.contacts_table.setAlternatingRowColors(True)
-            self.contacts_table.cellDoubleClicked.connect(self.edit_contact)
+        if reply == QMessageBox.Yes:
+            parent_window = self # Start with self, then try parent
+            doc_manager_instance = None
+            for _ in range(5): # Max 5 levels up
+                if hasattr(parent_window, 'set_client_status_archived_slot'):
+                    doc_manager_instance = parent_window
+                    break
+                if hasattr(parent_window, 'parent') and callable(parent_window.parent):
+                    parent_window = parent_window.parent()
+                    if parent_window is None or not isinstance(parent_window, QWidget): # Stop if no more QWidget parents
+                        break
+                else:
+                    break
 
-            self.contacts_empty_label = QLabel(self.tr("Aucun contact ajouté pour ce client.\nCliquez sur '➕ Ajouter' pour commencer."))
-            self.contacts_empty_label.setAlignment(Qt.AlignCenter)
-            font = self.contacts_empty_label.font(); font.setPointSize(10)
-            self.contacts_empty_label.setFont(font)
-            contacts_container_layout.addWidget(self.contacts_empty_label)
-            contacts_container_layout.addWidget(self.contacts_table)
+            if doc_manager_instance:
+                logging.info(f"ClientWidget: Demande d'archivage pour client ID {client_id} via parent.")
+                doc_manager_instance.set_client_status_archived_slot(client_id)
+            else:
+                QMessageBox.warning(self, self.tr("Erreur Action"), self.tr("Impossible de trouver la fonction d'archivage. L'action n'a pas pu être complétée."))
+                logging.error("ClientWidget: La méthode set_client_status_archived_slot n'a pas été trouvée dans la hiérarchie parente.")
 
-            contacts_pagination_layout = QHBoxLayout()
-            self.prev_contact_button = QPushButton("<< Précédent")
-            self.prev_contact_button.setObjectName("paginationButton")
-            self.prev_contact_button.clicked.connect(self.prev_contact_page)
-            self.contact_page_info_label = QLabel("Page 1 / 1")
-            self.contact_page_info_label.setObjectName("paginationLabel")
-            self.next_contact_button = QPushButton("Suivant >>")
-            self.next_contact_button.setObjectName("paginationButton")
-            self.next_contact_button.clicked.connect(self.next_contact_page)
-            contacts_pagination_layout.addStretch()
-            contacts_pagination_layout.addWidget(self.prev_contact_button)
-            contacts_pagination_layout.addWidget(self.contact_page_info_label)
-            contacts_pagination_layout.addWidget(self.next_contact_button)
-            contacts_pagination_layout.addStretch()
-            contacts_container_layout.addLayout(contacts_pagination_layout)
 
-            contacts_btn_layout = QHBoxLayout()
-            self.add_contact_btn = QPushButton(self.tr("Ajouter")); self.add_contact_btn.setIcon(QIcon(":/icons/user-plus.svg"))
-            self.add_contact_btn.setToolTip(self.tr("Ajouter un nouveau contact pour ce client")); self.add_contact_btn.clicked.connect(self.add_contact); contacts_btn_layout.addWidget(self.add_contact_btn)
-            self.edit_contact_btn = QPushButton(self.tr("Modifier")); self.edit_contact_btn.setIcon(QIcon(":/icons/pencil.svg"))
-            self.edit_contact_btn.setToolTip(self.tr("Modifier le contact sélectionné")); self.edit_contact_btn.clicked.connect(self.edit_contact); contacts_btn_layout.addWidget(self.edit_contact_btn)
-            self.remove_contact_btn = QPushButton(self.tr("Supprimer")); self.remove_contact_btn.setIcon(QIcon(":/icons/trash.svg"))
-            self.remove_contact_btn.setToolTip(self.tr("Supprimer le lien vers le contact sélectionné pour ce client")); self.remove_contact_btn.setObjectName("dangerButton"); self.remove_contact_btn.clicked.connect(self.remove_contact); contacts_btn_layout.addWidget(self.remove_contact_btn)
-            contacts_container_layout.addLayout(contacts_btn_layout)
+    # def _setup_contacts_section(self, main_layout): # Method removed as contacts are now an internal tab
+    #     """Sets up the collapsible contacts section directly in the main layout."""
+    #     pass # Content moved to an internal tab
 
-            contacts_group_main_layout.addWidget(self.contacts_container_widget)
-            self.contacts_group_box.setChecked(False) # Collapsed by default
-            main_layout.addWidget(self.contacts_group_box) # Add to the main vertical layout of ClientWidget
-
-            # Initial load of contacts
-            self.load_contacts()
-
-        except Exception as e:
-            logging.error(f"Error in _setup_contacts_section: {e}", exc_info=True)
-            QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation section Contacts:\n{0}").format(str(e)))
 
     def _apply_permissions(self):
         """Applies role-based permissions to UI elements within ClientWidget."""
@@ -527,7 +693,7 @@ class ClientWidget(QWidget):
             main_layout.addWidget(self.tabs_group_box)
 
             self._setup_documents_tab()
-            # self._setup_contacts_tab() # Call removed, contacts are now in a group box
+
             self._setup_products_tab()
             self._setup_document_notes_tab()
             self._setup_product_dimensions_tab()
@@ -542,8 +708,8 @@ class ClientWidget(QWidget):
                 logging.error("ClientWidget._setup_main_tabs_section: CRITICAL ERROR DURING OR IMMEDIATELY AFTER CALL TO self._setup_sav_tab()", exc_info=True)
                 QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("Une erreur critique est survenue lors de l'initialisation de l'onglet SAV."))
             
-            logging.info("ClientWidget._setup_main_tabs_section: PRE-CALL self._setup_assignments_tab()")
-            self._setup_assignments_tab()
+            # logging.info("ClientWidget._setup_main_tabs_section: PRE-CALL self._setup_assignments_tab()") # Call removed, assignments are now an internal tab
+            # self._setup_assignments_tab() # Logic will be moved
             self._setup_billing_tab()
         except Exception as e:
             logging.error(f"Error in _setup_main_tabs_section: {e}", exc_info=True)
@@ -551,6 +717,7 @@ class ClientWidget(QWidget):
 
     # _setup_available_templates_tab and load_available_templates removed.
     # handle_generate_template_button_clicked was only called by load_available_templates, so it can also be removed.
+
 
     def _setup_documents_tab(self):
         try:
@@ -1149,10 +1316,13 @@ class ClientWidget(QWidget):
         self.assigned_mta_table.itemSelectionChanged.connect(self.update_mta_buttons_state)
 
         # Initial load for MTA project selector
-        self.load_projects_for_mta_combo()
+        # self.load_projects_for_mta_combo() # This will be called when the assignments tab is created
         # Initial state for MTA buttons
-        self.add_assigned_mta_btn.setEnabled(False)
-        self.remove_assigned_mta_btn.setEnabled(False)
+        # self.add_assigned_mta_btn.setEnabled(False) # These buttons will be part of the new internal assignments tab
+        # self.remove_assigned_mta_btn.setEnabled(False)
+
+    # def _setup_assignments_tab(self): # Method completely removed
+    #     pass
 
     def _setup_commandes_tab(self):
         """Sets up the Commandes tab."""
@@ -1397,6 +1567,11 @@ class ClientWidget(QWidget):
             self.doc_type_filter_combo.addItem(self.tr("Autre"), "OTHER")
             self.doc_type_filter_combo.currentIndexChanged.connect(self.populate_doc_table)
             doc_filter_layout.addWidget(self.doc_type_filter_combo)
+
+            doc_filter_layout.addStretch(1) # Add stretch before the button
+            if hasattr(self, 'compile_pdf_btn'): # Ensure button was created
+                doc_filter_layout.addWidget(self.compile_pdf_btn) # Add compile PDF button here
+
             docs_layout.addWidget(self.doc_filter_layout_widget)
             self.doc_filter_layout_widget.setVisible(True)
             self.documents_empty_label = QLabel(self.tr("Aucun document trouvé pour ce client.\nUtilisez les boutons ci-dessous pour ajouter ou générer des documents."))
