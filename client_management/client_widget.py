@@ -417,7 +417,8 @@ class ClientWidget(QWidget):
             QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation section infos client:\n{0}").format(str(e)))
 
         self._setup_notes_section(layout)
-        self._setup_main_tabs_section(layout) # This will call sub-methods for each tab
+        # self._setup_contacts_section(layout) # Call removed, contacts group box will be integrated differently
+        self._setup_main_tabs_section(layout) # Tabs like Documents, Products will remain here
 
         self._setup_commandes_tab() # Add the new Commandes tab
 
@@ -551,7 +552,6 @@ class ClientWidget(QWidget):
     # def _setup_contacts_section(self, main_layout): # Method removed as contacts are now an internal tab
     #     """Sets up the collapsible contacts section directly in the main layout."""
     #     pass # Content moved to an internal tab
-
 
     def _apply_permissions(self):
         """Applies role-based permissions to UI elements within ClientWidget."""
@@ -1322,6 +1322,7 @@ class ClientWidget(QWidget):
 
     # def _setup_assignments_tab(self): # Method completely removed
     #     pass
+
 
     def _setup_commandes_tab(self):
         """Sets up the Commandes tab."""
@@ -3899,18 +3900,45 @@ class ClientWidget(QWidget):
 
 
     def populate_details_layout(self):
-        # Clear existing rows from the layout
-        if self.status_combo and self.status_combo.parent():
-            self.status_combo.setParent(None)
-        if hasattr(self, 'category_label') and self.category_label and self.category_label.parent():
+        # Clear existing rows from the layout, EXCEPT for the status_combo's row if managed differently
+        # For simplicity, we'll clear and re-add, ensuring status_combo is handled carefully.
+
+        # Disconnect signals first to prevent issues during repopulation
+        if hasattr(self, 'status_combo'):
+            try:
+                self.status_combo.currentTextChanged.disconnect(self.update_client_status)
+            except TypeError:
+                pass # Not connected
+
+        # Detach category labels if they exist and are parented to details_layout
+        if hasattr(self, 'category_label') and self.category_label and self.category_label.layout() == self.details_layout:
             self.category_label.setParent(None)
-        if hasattr(self, 'category_value_label') and self.category_value_label and self.category_value_label.parent():
+        if hasattr(self, 'category_value_label') and self.category_value_label and self.category_value_label.layout() == self.details_layout:
             self.category_value_label.setParent(None)
+
+        # Clear all rows from details_layout
         while self.details_layout.rowCount() > 0:
             self.details_layout.removeRow(0)
 
         self.detail_value_labels = {} # Re-initialize
         logging.info(f"Populating details layout for: {self.client_info.get('client_name')}")
+
+        # Ensure status_combo is created if it doesn't exist (should be in setup_ui)
+        if not hasattr(self, 'status_combo') or self.status_combo is None:
+            self.status_combo = QComboBox()
+            self.load_statuses() # Load statuses if creating combo for the first time here
+        else:
+            self.load_statuses() # Ensure statuses are fresh and selection is updated
+
+        self.status_combo.setEnabled(False) # Default to non-editable in display mode
+        self.status_combo.setCurrentText(self.client_info.get("status", self.tr("En cours")))
+        # Reconnect signal AFTER setting current text to avoid premature trigger during population
+        try:
+            self.status_combo.currentTextChanged.disconnect(self.update_client_status) # Ensure no multiple connections
+        except TypeError:
+            pass
+        self.status_combo.currentTextChanged.connect(self.update_client_status)
+
 
         # Project ID
         project_id_label = QLabel(self.tr("ID Projet:"))
@@ -5543,17 +5571,31 @@ class ClientWidget(QWidget):
             pass
         try:
             self.status_combo.currentTextChanged.disconnect(self.update_client_status)
-        except TypeError:
+        except TypeError: # Was not connected or already disconnected
             pass
-        if self.status_combo and self.status_combo.parent():
-            self.status_combo.setParent(None)
-        if hasattr(self, 'category_label') and self.category_label and self.category_label.parent():
-            self.category_label.setParent(None)
-        if hasattr(self, 'category_value_label') and self.category_value_label and self.category_value_label.parent():
-            self.category_value_label.setParent(None)
+        # No longer doing self.status_combo.setParent(None)
+        # if self.status_combo and self.status_combo.parent():
+        #     self.status_combo.setParent(None) # Keep status_combo in its layout
+
+        # Detach other labels that are part of details_layout before clearing rows
+        if hasattr(self, 'category_label') and self.category_label.layout() == self.details_layout :
+             self.category_label.setParent(None)
+        if hasattr(self, 'category_value_label') and self.category_value_label.layout() == self.details_layout:
+             self.category_value_label.setParent(None)
+
+        # Clear previous edit widgets if any, and rows from details_layout
+        for widget in self.edit_widgets.values():
+            if isinstance(widget, QWidget) and widget.parent(): # Check if it's a widget and has a parent
+                widget.setParent(None)
+                widget.deleteLater() # Schedule for deletion
+            elif isinstance(widget, QLayout): # If a layout was stored (less likely but possible)
+                # Clearing items from a layout is more complex, assuming only widgets for now
+                pass
+        self.edit_widgets.clear()
+
         while self.details_layout.rowCount() > 0:
             self.details_layout.removeRow(0)
-        self.edit_widgets = {}
+        # self.edit_widgets = {} # Moved clear and deletion logic above
 
         # Client Name
         self.edit_widgets['client_name'] = QLineEdit(self.client_info.get("client_name", ""))
