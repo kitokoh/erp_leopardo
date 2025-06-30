@@ -1073,7 +1073,7 @@ CREATE TABLE IF NOT EXISTS Templates (
     )
     """)
 
-    # --- Commandes Module Tables (Moved Before ClientDocuments) ---
+
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS Commandes (
         commande_id TEXT PRIMARY KEY,
@@ -1118,18 +1118,31 @@ CREATE TABLE IF NOT EXISTS Templates (
     # --- End Commandes Module Tables ---
 
     # Create ClientDocuments table (logic from ca.py to add order_identifier if missing)
+    # Note: commande_id column is added here, and its FOREIGN KEY constraint properly references Commandes table.
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS ClientDocuments (
-        document_id TEXT PRIMARY KEY, client_id TEXT NOT NULL, project_id TEXT,
-        order_identifier TEXT, document_name TEXT NOT NULL, file_name_on_disk TEXT NOT NULL,
-        file_path_relative TEXT NOT NULL, document_type_generated TEXT,
-        source_template_id INTEGER, version_tag TEXT, notes TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        document_id TEXT PRIMARY KEY,
+        client_id TEXT NOT NULL,
+        project_id TEXT,
+        commande_id TEXT, -- Added column for linking to a Commande
+        order_identifier TEXT, -- Existing field, might be used for Commande reference or Project identifier
+        document_name TEXT NOT NULL,
+        file_name_on_disk TEXT NOT NULL,
+        file_path_relative TEXT NOT NULL,
+        document_type_generated TEXT,
+        source_template_id INTEGER,
+        version_tag TEXT,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         created_by_user_id TEXT,
         is_deleted INTEGER DEFAULT 0,
         deleted_at TEXT,
+        parent_document_id TEXT, -- For versioning
+        is_latest_version INTEGER DEFAULT 1, -- For versioning
         FOREIGN KEY (client_id) REFERENCES Clients (client_id),
         FOREIGN KEY (project_id) REFERENCES Projects (project_id),
+        FOREIGN KEY (commande_id) REFERENCES Commandes (commande_id) ON DELETE SET NULL, -- Correct FK
         FOREIGN KEY (source_template_id) REFERENCES Templates (template_id),
         FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id),
         FOREIGN KEY (commande_id) REFERENCES Commandes (commande_id) ON DELETE SET NULL,
