@@ -1,5 +1,11 @@
 import os
 import re # Added re import
+import logging
+
+# Basic logging configuration to ensure it's initialized
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__) # Create logger instance at module level
+
 from weasyprint import HTML
 from weasyprint.urls import URLFetchingError # Corrected import
 
@@ -38,41 +44,59 @@ def get_value_from_context(key: str, context_dict: dict, current_item: dict = No
     Returns:
         The value found, or an empty string if not found or path is invalid.
     """
-    if key.startswith("this.") and current_item is not None:
-        # Resolve against current_item
-        actual_key = key[5:] # Remove "this."
-        if isinstance(current_item, dict):
-            return current_item.get(actual_key, "")
-        # If current_item is not a dict, "this" access might not be meaningful in this simple form
-        # For direct access to item if it's not a dict (e.g. list of strings), key could be "this"
-        elif actual_key == "": # refers to the item itself if it's a simple type like string
-             return current_item
-        return "" # "this" used but current_item is not a dict or key is complex for non-dict item
+    # Ensure the module-level logger is used. This line should already be commented out or removed.
+    # logger = logging.getLogger(__name__)
+    logger.debug(f"get_value_from_context: Attempting to get key='{key}'")
 
-    # Resolve against main context_dict
+    if key.startswith("this.") and current_item is not None:
+        actual_key = key[5:]
+        logger.debug(f"get_value_from_context: 'this.' context. actual_key='{actual_key}', current_item type: {type(current_item)}")
+        if isinstance(current_item, dict):
+            value = current_item.get(actual_key, "")
+            logger.debug(f"get_value_from_context: 'this.' dict access. Value for '{actual_key}': '{str(value)[:100]}'")
+            return value
+        elif actual_key == "":
+             logger.debug(f"get_value_from_context: 'this.' direct item access. Value: '{str(current_item)[:100]}'")
+             return current_item
+        logger.debug(f"get_value_from_context: 'this.' context but not dict or direct access. Returning empty string.")
+        return ""
+
     parts = key.split('.')
     value = context_dict
+    logger.debug(f"get_value_from_context: Main context. Parts: {parts}")
     try:
-        for part in parts:
+        for i, part in enumerate(parts):
             if isinstance(value, dict):
                 value = value[part]
-            # Handle list index access if needed, e.g. "products.0.name" - not implemented for simplicity
-            # elif isinstance(value, list) and part.isdigit():
-            #     value = value[int(part)]
-            else: # Path is invalid (trying to access subkey on a non-dict)
+                logger.debug(f"get_value_from_context: Part {i+1} ('{part}') resolved. Current value type: {type(value)}, value snippet: '{str(value)[:100]}'")
+            else:
+                logger.debug(f"get_value_from_context: Path invalid at part '{part}'. Current value is not a dict (type: {type(value)}). Returning empty string.")
                 return ""
-        return value if value is not None else ""
-    except (KeyError, TypeError, IndexError):
-        return "" # Key not found or invalid access
+        final_value = value if value is not None else ""
+        logger.debug(f"get_value_from_context: Successfully resolved key '{key}'. Final value snippet: '{str(final_value)[:100]}'")
+        return final_value
+    except (KeyError, TypeError, IndexError) as e_resolve:
+        logger.debug(f"get_value_from_context: Failed to resolve key '{key}' at part '{part}'. Error: {e_resolve}. Returning empty string.")
+        return ""
 
 def render_html_template(template_string: str, context: dict) -> str:
     """
     Renders an HTML template string with data from a context dictionary,
     supporting simple placeholders, conditional blocks, and loops.
     """
-    import logging # Added for logging
-    logging.debug(f"render_html_template: Called with context keys: {list(context.keys()) if isinstance(context, dict) else 'Non-dict context'}")
-    # logging.debug(f"render_html_template: Template content (first 100 chars): {template_string[:100]}")
+    # Ensure logger is configured if not already done globally
+    # logging.basicConfig(level=logging.DEBUG) # Basic config if needed
+    # Ensure the module-level logger is used. This line should already be commented out or removed.
+    # logger = logging.getLogger(__name__)
+
+    logger.debug(f"render_html_template: START. Context keys: {list(context.keys()) if isinstance(context, dict) else 'Non-dict context'}")
+    # For very detailed debugging, print small parts of context:
+    # if isinstance(context, dict):
+    #     logger.debug(f"Context[doc] sample: {str(context.get('doc', {}))[:200]}")
+    #     logger.debug(f"Context[client] sample: {str(context.get('client', {}))[:200]}")
+    #     logger.debug(f"Context[seller] sample: {str(context.get('seller', {}))[:200]}")
+    # logger.debug(f"render_html_template: Template content (first 200 chars): {template_string[:200]}")
+
     try:
         processed_template = template_string
 
@@ -124,16 +148,32 @@ def render_html_template(template_string: str, context: dict) -> str:
         # 3. Process simple placeholders {{key.subkey}}
         def replace_placeholder(match):
             key = match.group(1).strip()
-            # Log the key being accessed
-            # logging.debug(f"render_html_template: Attempting to replace placeholder for key: '{key}'")
+            # More verbose logging for specific keys of interest
+            if key in ["main_image_path", "seller.logo_url", "doc.logo_path"]:
+                logger.info(f"render_html_template (replace_placeholder): SPECIAL KEY MATCHED key='{key}'")
+            else:
+                logger.debug(f"render_html_template (replace_placeholder): Matched placeholder key='{key}'")
+
             val = get_value_from_context(key, context)
-            # Log the value found (or empty string if not found)
-            # logging.debug(f"render_html_template: Key '{key}' resolved to value (first 50 chars): '{str(val)[:50]}'")
+
+            if key in ["main_image_path", "seller.logo_url", "doc.logo_path"]:
+                logger.info(f"render_html_template (replace_placeholder): SPECIAL KEY VALUE for key='{key}': '{str(val)[:200]}'")
+            else:
+                logger.debug(f"render_html_template (replace_placeholder): Value for key='{key}': '{str(val)[:100]}'")
             return str(val)
 
+        # Log template before and after main placeholder substitution
+        # logger.debug(f"render_html_template: Template BEFORE simple placeholder substitution:\n{processed_template[:1000]}")
         processed_template = re.sub(r'\{\{([^}]+?)\}\}', replace_placeholder, processed_template)
+        # logger.debug(f"render_html_template: Template AFTER simple placeholder substitution:\n{processed_template[:1000]}")
 
-        logging.debug("render_html_template: Finished processing template successfully.")
+        if "{{ main_image_path }}" in processed_template or "{{ seller.logo_url }}" in processed_template:
+            logger.warning("render_html_template: Placeholders for main_image_path or seller.logo_url still exist in processed_template before returning!")
+            logger.debug(f"Problematic template snippet (around main_image_path): {processed_template[max(0, processed_template.find('main_image_path')-20):processed_template.find('main_image_path')+40]}")
+            logger.debug(f"Problematic template snippet (around seller.logo_url): {processed_template[max(0, processed_template.find('seller.logo_url')-20):processed_template.find('seller.logo_url')+40]}")
+
+
+        logger.debug("render_html_template: FINISHED processing template successfully.")
         return processed_template
     except Exception as e_render:
         logging.error(f"render_html_template: Unhandled exception during rendering: {e_render}", exc_info=True)

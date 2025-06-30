@@ -1,11 +1,11 @@
-from .add_new_client_dialog import AddNewClientDialog
-from .template_dialog import TemplateDialog
+from client_management.add_new_client_dialog import AddNewClientDialog
+from client_management.edit_client_dialog import EditClientDialog
+from .template_dialog import TemplateDialog # Added back
 from .contact_dialog import ContactDialog
 from .product_dialog import ProductDialog
 from .edit_product_line_dialog import EditProductLineDialog
 from .create_document_dialog import CreateDocumentDialog
 from .compile_pdf_dialog import CompilePdfDialog
-from .edit_client_dialog import EditClientDialog
 from .send_email_dialog import SendEmailDialog
 from .product_equivalency_dialog import ProductEquivalencyDialog
 from .select_contacts_dialog import SelectContactsDialog

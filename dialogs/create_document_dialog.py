@@ -54,15 +54,18 @@ class CreateDocumentDialog(QDialog):
         "TECHNICAL_SPECIFICATIONS_EXCEL": {"name": "Spécifications Techniques (Excel)", "template_type_filter": "TECHNICAL_SPECIFICATIONS_EXCEL"},
     }
 
-    def __init__(self, client_info, config, current_user_id, parent=None, template_data=None):
+    def __init__(self, client_info, config, current_user_id, parent=None, template_data=None, old_document_id_to_version=None):
         super().__init__(parent)
         self.client_info = client_info
         self.config = config
         self.app_root_dir = config.get("app_root_dir", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         self.current_user_id = current_user_id
         self.pre_selected_template_id = template_data.get('template_id') if template_data else None
+        self.old_document_id_to_version = old_document_id_to_version # Store for versioning
 
         self.setWindowTitle(self.tr("Générer Document(s) Client via Modèle"))
+        if self.old_document_id_to_version:
+            self.setWindowTitle(self.tr("Créer une Nouvelle Version du Document"))
         self.setMinimumSize(600, 400) # Adjusted size
         self._init_ui()
         if self.pre_selected_template_id:
@@ -142,7 +145,7 @@ class CreateDocumentDialog(QDialog):
             client_languages = [lang.strip() for lang in client_languages.split(',') if lang.strip()]
 
         # Use all known system languages if client has none or for broader selection
-        system_languages = ["fr", "en", "ar", "tr", "pt"] # Define or get from config
+        system_languages = ["fr", "en", "ar", "tr", "pt", "ru"] # Define or get from config
 
         effective_langs_for_combo = sorted(list(set(client_languages + system_languages)))
 
@@ -374,10 +377,11 @@ class CreateDocumentDialog(QDialog):
             company_id=default_company_id,
             target_language_code=language_code_for_generation, # Use the context language here
             project_id=project_id_for_context_arg,
-            additional_context=additional_context_for_gen
+            additional_context=additional_context_for_gen,
+            app_root_dir=self.app_root_dir # Passer app_root_dir ici
         )
         if not document_context:
-            logging.warning(f"Failed to get full document context for template_id {template_id}. Document might be incomplete.")
+            logging.warning(f"Failed to get full document context for template_id {template_id} using app_root_dir '{self.app_root_dir}'. Document might be incomplete.")
             document_context = {}
 
         # Determine Output Filename and Path
@@ -423,27 +427,120 @@ class CreateDocumentDialog(QDialog):
 
         # Generation Logic
         generation_success = False
+        final_generated_file_path = output_file_path # Default to original copied/populated path
+        final_output_filename = output_filename       # Default to original copied/populated name
+        final_document_type_for_db = template_actual_type # Default to original template type
+
         try:
             shutil.copy(template_file_on_disk_abs, output_file_path)
+
+            if template_actual_type.endswith('_HTML') or original_ext.lower() == '.html':
+                with open(output_file_path, 'r', encoding='utf-8') as f: html_content = f.read()
+                populated_html = HtmlEditor.populate_html_content(html_content, document_context)
+                with open(output_file_path, 'w', encoding='utf-8') as f: f.write(populated_html)
+
+
+                # Convert HTML to PDF
+                from html_to_pdf_util import convert_html_to_pdf # Local import
+                pdf_output_filename = f"{output_filename_base}.pdf"
+                pdf_output_path = os.path.join(target_doc_folder, pdf_output_filename)
+                base_url_for_pdf = QUrl.fromLocalFile(os.path.dirname(template_file_on_disk_abs)).toString() # Base URL from original template location for relative assets
+
+                pdf_bytes = convert_html_to_pdf(populated_html, base_url=base_url_for_pdf)
+                if pdf_bytes:
+                    with open(pdf_output_path, 'wb') as f_pdf:
+                        f_pdf.write(pdf_bytes)
+                    logging.info(f"Successfully converted HTML to PDF: {pdf_output_path}")
+                    # Update output_file_path and output_filename to reflect the PDF
+                    # output_file_path = pdf_output_path # This will be returned
+                    # output_filename = pdf_output_filename # This will be used for DB record
+                    # Store the generated PDF path to be returned and recorded
+                    final_generated_file_path = pdf_output_path
+                    final_output_filename = pdf_output_filename
+                    final_document_type_for_db = template_actual_type.replace("_HTML", "_PDF") if "_HTML" in template_actual_type else f"{template_actual_type}_PDF"
+                    generation_success = True
+                else:
+                    logging.error(f"Failed to convert populated HTML to PDF for: {output_filename}")
+                    QMessageBox.warning(self, self.tr("Erreur Conversion PDF"), self.tr("La conversion du HTML en PDF a échoué pour '{0}'. Le fichier HTML peuplé a été sauvegardé.").format(output_filename))
+                    # Fallback to returning the HTML path if PDF fails
+                    final_generated_file_path = output_file_path
+                    final_output_filename = output_filename
+                    final_document_type_for_db = template_actual_type # Record as HTML
+                    generation_success = True # Still true because HTML was generated
+
+            # Initialize final paths and types with non-PDF defaults
+            final_generated_file_path = output_file_path
+            final_output_filename = output_filename
+            final_document_type_for_db = template_actual_type
 
             if template_actual_type.endswith('_HTML'): # Assuming convention like PROFORMA_INVOICE_HTML
                 with open(output_file_path, 'r', encoding='utf-8') as f: html_content = f.read()
                 populated_html = HtmlEditor.populate_html_content(html_content, document_context)
                 with open(output_file_path, 'w', encoding='utf-8') as f: f.write(populated_html)
-                generation_success = True
-            elif template_actual_type.endswith('_EXCEL'): # e.g., PROFORMA_EXCEL
-                # Placeholder for Excel processing
+                generation_success = True # HTML generation was successful
+
+                # Attempt to Convert HTML to PDF
+                from html_to_pdf_util import convert_html_to_pdf # Local import
+                pdf_output_filename_base = f"{output_filename_base}.pdf"
+                pdf_output_path = os.path.join(target_doc_folder, pdf_output_filename_base)
+
+                base_url_for_pdf = QUrl.fromLocalFile(os.path.dirname(template_file_on_disk_abs)).toString()
+
+                pdf_bytes = convert_html_to_pdf(populated_html, base_url=base_url_for_pdf)
+                if pdf_bytes:
+                    with open(pdf_output_path, 'wb') as f_pdf:
+                        f_pdf.write(pdf_bytes)
+                    logging.info(f"Successfully converted HTML to PDF: {pdf_output_path}")
+                    final_generated_file_path = pdf_output_path
+                    final_output_filename = pdf_output_filename_base # Use PDF filename
+                    # Adjust document type for DB to reflect PDF
+                    if template_actual_type.endswith('_HTML'):
+                        final_document_type_for_db = template_actual_type.replace("_HTML", "_PDF")
+                    elif original_ext.lower() == '.html': # Generic HTML template
+                        final_document_type_for_db = f"{template_actual_type}_PDF" # Or a more generic "GENERATED_PDF"
+                    else: # Fallback if naming convention is mixed
+                        final_document_type_for_db = f"{template_actual_type}_PDF"
+
+                    final_output_filename = pdf_output_filename_base
+                    final_document_type_for_db = template_actual_type.replace("_HTML", "_PDF") if "_HTML" in template_actual_type else f"{template_actual_type}_PDF"
+                    try: # Optionally remove the intermediate HTML file
+                        os.remove(output_file_path)
+                        logging.info(f"Removed intermediate HTML file: {output_file_path}")
+                    except OSError as e_remove_html:
+                        logging.warning(f"Could not remove intermediate HTML file {output_file_path}: {e_remove_html}")
+                else:
+                    logging.error(f"Failed to convert populated HTML to PDF for: {output_filename}")
+                    QMessageBox.warning(self, self.tr("Erreur Conversion PDF"), self.tr("La conversion du HTML en PDF a échoué pour '{0}'. Le fichier HTML peuplé a été sauvegardé.").format(output_filename))
+
+                    # Fallback: HTML was generated, so we use its details (already set before this block)
+
+            elif template_actual_type.endswith('_EXCEL'):
                 QMessageBox.information(self, "Info", f"La génération Excel pour '{template_display_name_for_output}' n'est pas encore entièrement implémentée. Le modèle a été copié.")
                 generation_success = True
-            elif template_actual_type.endswith('_WORD') or template_actual_type.endswith('_DOCX'): # e.g., SALES_CONTRACT_DOCX
+            elif template_actual_type.endswith('_WORD') or template_actual_type.endswith('_DOCX'):
                 populate_docx_template(output_file_path, document_context)
                 generation_success = True
             else: # Other types, or if type is just 'document_excel', 'document_word' without _HTML suffix
-                if original_ext == '.html':
+                if original_ext == '.html': # Generic HTML template
                      with open(output_file_path, 'r', encoding='utf-8') as f: html_content = f.read()
                      populated_html = HtmlEditor.populate_html_content(html_content, document_context)
                      with open(output_file_path, 'w', encoding='utf-8') as f: f.write(populated_html)
                      generation_success = True
+
+                     from html_to_pdf_util import convert_html_to_pdf
+                     pdf_output_filename_base = f"{output_filename_base}.pdf"
+                     pdf_output_path = os.path.join(target_doc_folder, pdf_output_filename_base)
+                     base_url_for_pdf = QUrl.fromLocalFile(os.path.dirname(template_file_on_disk_abs)).toString()
+                     pdf_bytes = convert_html_to_pdf(populated_html, base_url=base_url_for_pdf)
+                     if pdf_bytes:
+                         with open(pdf_output_path, 'wb') as f_pdf: f_pdf.write(pdf_bytes)
+                         final_generated_file_path = pdf_output_path
+                         final_output_filename = pdf_output_filename_base
+                         final_document_type_for_db = template_actual_type.replace(".html", "_PDF", 1) if template_actual_type.endswith(".html") else f"{template_actual_type}_PDF"
+                         try: os.remove(output_file_path)
+                         except OSError: logging.warning(f"Could not remove intermediate generic HTML file {output_file_path}")
+                     else:
+                         logging.error(f"Failed to convert generic HTML to PDF for: {output_filename}")
                 elif original_ext == '.docx':
                      populate_docx_template(output_file_path, document_context)
                      generation_success = True
@@ -452,38 +549,62 @@ class CreateDocumentDialog(QDialog):
                     generation_success = True # Copied
 
         except Exception as e_gen:
-            logging.error(f"Error during document generation for {output_filename} from template_id {template_id}: {e_gen}", exc_info=True)
-            QMessageBox.critical(self, self.tr("Erreur Génération"), self.tr("Erreur lors de la génération de '{0}':\n{1}").format(output_filename, str(e_gen)))
+            logging.error(f"Error during document generation for {final_output_filename} from template_id {template_id}: {e_gen}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur Génération"), self.tr("Erreur lors de la génération de '{0}':\n{1}").format(final_output_filename, str(e_gen)))
             return None
 
-        if not generation_success:
+        if not generation_success: # If any step failed and didn't set it true
             return None
 
-        # Add to ClientDocuments Table
-        relative_path_for_db = os.path.relpath(output_file_path, client_base_folder)
+        # Add to ClientDocuments Table using the final determined file path, name, and type
+        relative_path_for_db = os.path.relpath(final_generated_file_path, client_base_folder)
         doc_db_data = {
             'client_id': client_id_for_context,
             'project_id': project_id_for_context_arg,
             'order_identifier': document_context.get('order_identifier'),
-            'document_name': output_filename,
-            'file_name_on_disk': output_filename,
+
+            'document_name': final_output_filename,
+            'file_name_on_disk': final_output_filename,
             'file_path_relative': relative_path_for_db,
-            'document_type_generated': template_actual_type, # Store the template's specific type
+            'document_type_generated': final_document_type_for_db,
             'source_template_id': template_id,
             'user_id': self.current_user_id,
-            'language_code': language_code_for_generation # Language of the generated document content
+            'language_code': language_code_for_generation
+
         }
+
+        # Decide whether to add as new or create new version
+        new_doc_id = None
         try:
-            new_doc_id = db_manager.add_client_document(doc_db_data)
+            if hasattr(self, 'old_document_id_to_version') and self.old_document_id_to_version:
+                logging.info(f"Creating new version for old_document_id: {self.old_document_id_to_version}")
+                # create_new_document_version expects new_document_data to be complete for add_client_document
+                # It will internally set parent_id, version_tag, is_latest
+                new_doc_id = db_manager.create_new_document_version(
+                    old_document_id=self.old_document_id_to_version,
+                    new_document_data=doc_db_data # Pass the full data for the new entry
+                )
+            else:
+                logging.info("Adding as a new document (not a version of an existing one).")
+                new_doc_id = db_manager.add_client_document(doc_db_data)
+
             if new_doc_id:
-                logging.info(f"Document '{output_filename}' (ID: {new_doc_id}) added to DB for client {client_id_for_context}")
-                return output_file_path
+                logging.info(f"Document '{final_output_filename}' (DB ID: {new_doc_id}) processed for client {client_id_for_context}")
+                return final_generated_file_path
             else:
                 QMessageBox.warning(self, self.tr("Erreur DB"), self.tr("Document généré mais échec de l'enregistrement en base de données."))
+
+                if os.path.exists(final_generated_file_path):
+                    try: os.remove(final_generated_file_path)
+                    except OSError: logging.warning(f"Failed to cleanup {final_generated_file_path} after DB error.")
                 return None
         except Exception as e_db_add:
-            logging.error(f"Error adding document to DB {output_filename}: {e_db_add}", exc_info=True)
+            logging.error(f"Error adding/versioning document in DB {final_output_filename}: {e_db_add}", exc_info=True)
             QMessageBox.critical(self, self.tr("Erreur DB"), self.tr("Erreur lors de l'enregistrement du document en DB:\n{0}").format(str(e_db_add)))
+            if os.path.exists(final_generated_file_path):
+
+                try: os.remove(final_generated_file_path)
+                except OSError: logging.warning(f"Failed to cleanup {final_generated_file_path} after DB error.")
             return None
 
     # Remove old methods related to template list display
