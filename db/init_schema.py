@@ -410,7 +410,18 @@ def initialize_database():
         {'status_name': 'Completed', 'status_type': 'InterviewStatus', 'color_hex': '#2ecc71', 'icon_name': 'calendar-check', 'is_completion_status': True, 'is_archival_status': False, 'sort_order': 1},
         {'status_name': 'Cancelled', 'status_type': 'InterviewStatus', 'color_hex': '#e74c3c', 'icon_name': 'calendar-times', 'is_completion_status': True, 'is_archival_status': True, 'sort_order': 2},
         {'status_name': 'Rescheduled', 'status_type': 'InterviewStatus', 'color_hex': '#f39c12', 'icon_name': 'calendar-edit', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 3},
-        {'status_name': 'No Show', 'status_type': 'InterviewStatus', 'color_hex': '#c0392b', 'icon_name': 'calendar-question', 'is_completion_status': True, 'is_archival_status': True, 'sort_order': 4}
+        {'status_name': 'No Show', 'status_type': 'InterviewStatus', 'color_hex': '#c0392b', 'icon_name': 'calendar-question', 'is_completion_status': True, 'is_archival_status': True, 'sort_order': 4},
+
+        # Commande Statuses
+        {'status_name': 'Brouillon', 'status_type': 'Commande', 'color_hex': '#7f8c8d', 'icon_name': 'document-edit', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 0},
+        {'status_name': 'Devis Envoyé', 'status_type': 'Commande', 'color_hex': '#1abc9c', 'icon_name': 'document-send', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 1},
+        {'status_name': 'Confirmée', 'status_type': 'Commande', 'color_hex': '#2ecc71', 'icon_name': 'document-check', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 2},
+        {'status_name': 'En Préparation', 'status_type': 'Commande', 'color_hex': '#3498db', 'icon_name': 'box-archive', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 3},
+        {'status_name': 'Expédiée', 'status_type': 'Commande', 'color_hex': '#9b59b6', 'icon_name': 'truck', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 4},
+        {'status_name': 'Facturée', 'status_type': 'Commande', 'color_hex': '#f1c40f', 'icon_name': 'file-invoice-dollar', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 5},
+        {'status_name': 'Payée', 'status_type': 'Commande', 'color_hex': '#27ae60', 'icon_name': 'hand-holding-usd', 'is_completion_status': True, 'is_archival_status': False, 'sort_order': 6},
+        {'status_name': 'Annulée', 'status_type': 'Commande', 'color_hex': '#e74c3c', 'icon_name': 'document-cancel', 'is_completion_status': True, 'is_archival_status': True, 'sort_order': 7},
+        {'status_name': 'Archivée', 'status_type': 'Commande', 'color_hex': '#95a5a6', 'icon_name': 'archive', 'is_completion_status': True, 'is_archival_status': True, 'sort_order': 8},
     ]
     for status in default_statuses:
         cursor.execute("""
@@ -1062,6 +1073,50 @@ CREATE TABLE IF NOT EXISTS Templates (
     )
     """)
 
+    # --- Commandes Module Tables (Moved Before ClientDocuments) ---
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Commandes (
+        commande_id TEXT PRIMARY KEY,
+        client_id TEXT NOT NULL,
+        project_id TEXT,
+        commande_reference TEXT UNIQUE NOT NULL,
+        commande_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        status_commande_id INTEGER NOT NULL,
+        description_commande TEXT,
+        total_ht REAL,
+        total_ttc REAL,
+        currency TEXT NOT NULL DEFAULT 'EUR',
+        shipping_address TEXT,
+        billing_address TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_by_user_id TEXT,
+        FOREIGN KEY (client_id) REFERENCES Clients (client_id) ON DELETE CASCADE,
+        FOREIGN KEY (project_id) REFERENCES Projects (project_id) ON DELETE SET NULL,
+        FOREIGN KEY (status_commande_id) REFERENCES StatusSettings (status_id),
+        FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL
+    )
+    """)
+    print("DEBUG_INIT_DB: Table Commandes created or exists.")
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS CommandeItems (
+        item_id TEXT PRIMARY KEY,
+        commande_id TEXT NOT NULL,
+        product_id INTEGER NOT NULL,
+        description_item TEXT NOT NULL,
+        quantity REAL NOT NULL,
+        unit_price_ht REAL NOT NULL,
+        vat_rate REAL DEFAULT 0.0,
+        total_item_ht REAL NOT NULL,
+        total_item_ttc REAL NOT NULL,
+        FOREIGN KEY (commande_id) REFERENCES Commandes (commande_id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES Products (product_id)
+    )
+    """)
+    print("DEBUG_INIT_DB: Table CommandeItems created or exists.")
+    # --- End Commandes Module Tables ---
+
     # Create ClientDocuments table (logic from ca.py to add order_identifier if missing)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS ClientDocuments (
@@ -1077,10 +1132,11 @@ CREATE TABLE IF NOT EXISTS Templates (
         FOREIGN KEY (project_id) REFERENCES Projects (project_id),
         FOREIGN KEY (source_template_id) REFERENCES Templates (template_id),
         FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id),
+        FOREIGN KEY (commande_id) REFERENCES Commandes (commande_id) ON DELETE SET NULL,
         FOREIGN KEY (parent_document_id) REFERENCES ClientDocuments (document_id) ON DELETE SET NULL
     )""")
 
-    # Ensure is_deleted, deleted_at, order_identifier, parent_document_id, is_latest_version columns exist
+    # Ensure is_deleted, deleted_at, order_identifier, parent_document_id, is_latest_version, commande_id columns exist
     cursor.execute("PRAGMA table_info(ClientDocuments)")
     cd_columns_info = cursor.fetchall()
     cd_column_names = [info['name'] for info in cd_columns_info]
@@ -1122,6 +1178,13 @@ CREATE TABLE IF NOT EXISTS Templates (
             print("Added 'is_latest_version' column to ClientDocuments table.")
         except sqlite3.Error as e_alter_cd_is_latest:
             print(f"Error adding 'is_latest_version' column to ClientDocuments table: {e_alter_cd_is_latest}")
+
+    if 'commande_id' not in cd_column_names:
+        try:
+            cursor.execute("ALTER TABLE ClientDocuments ADD COLUMN commande_id TEXT REFERENCES Commandes(commande_id) ON DELETE SET NULL")
+            print("Added 'commande_id' column to ClientDocuments table.")
+        except sqlite3.Error as e_alter_cd_commande_id:
+            print(f"Error adding 'commande_id' column to ClientDocuments table: {e_alter_cd_commande_id}")
 
     # Create ClientDocumentNotes table (from ca.py)
     cursor.execute("""
@@ -1927,9 +1990,10 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     # ClientDocuments
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientdocuments_client_id ON ClientDocuments(client_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientdocuments_project_id ON ClientDocuments(project_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientdocuments_commande_id ON ClientDocuments(commande_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientdocuments_document_type_generated ON ClientDocuments(document_type_generated)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientdocuments_source_template_id ON ClientDocuments(source_template_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientdocuments_order_identifier ON ClientDocuments(order_identifier)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientdocuments_order_identifier ON ClientDocuments(order_identifier)") # This might become commande_reference
     # Invoices
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_invoices_client_id ON Invoices(client_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_invoices_project_id ON Invoices(project_id)")
@@ -2099,6 +2163,17 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_exp_tags_experience_id ON ExperienceTags(experience_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_exp_tags_tag_id ON ExperienceTags(tag_id)")
     # --- End Experience Module Indexes ---
+
+    # --- Commandes Module Tables (definition moved before ClientDocuments) ---
+    # --- Indexes for Commandes Module (defined after table creation) ---
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandes_client_id ON Commandes(client_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandes_project_id ON Commandes(project_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandes_commande_reference ON Commandes(commande_reference)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandes_status_commande_id ON Commandes(status_commande_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandes_commande_date ON Commandes(commande_date)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandeitems_commande_id ON CommandeItems(commande_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandeitems_product_id ON CommandeItems(product_id)")
+    # --- End Commandes Module Indexes ---
 
     # --- Company Expense Module Tables ---
     cursor.execute("""
