@@ -11,6 +11,8 @@ from PyQt5.QtCore import Qt, QDate
 
 import db # Assuming db.__init__ exposes necessary cruds
 from db.cruds import commandes_crud, products_crud, projects_crud, status_settings_crud
+from dialogs.product_dialog import ProductDialog # Import ProductDialog
+
 
 class CommandeDialog(QDialog):
     def __init__(self, client_id, current_user_id, commande_id_to_edit=None, parent=None):
@@ -27,6 +29,11 @@ class CommandeDialog(QDialog):
         self.setMinimumSize(700, 500)
 
         self.setup_ui()
+
+        if not self.commande_id_to_edit: # New Commande
+            self.commande_reference_edit.setText(commandes_crud.get_next_commande_reference())
+            # self.commande_reference_edit.setReadOnly(True) # Optional: make it read-only
+
         self.populate_combos()
 
         if self.commande_id_to_edit:
@@ -171,20 +178,81 @@ class CommandeDialog(QDialog):
 
 
     def add_item_to_table(self, item_data_to_load=None, is_loading=False):
-        # This method would typically open another dialog to select a product
-        # and enter quantity, price, etc. For simplicity in this skeleton:
-        if not is_loading: # Show dialog to add new item
-            # TODO: Implement a ProductSelectionDialog or similar
-            # For now, let's add a placeholder item or require manual input in table
-            QMessageBox.information(self, "Info", "La sélection de produit pour l'article sera implémentée.")
-            # Example: Manually add a new empty row for user to fill, or use a more complex item dialog
-            row_pos = self.items_table.rowCount()
-            self.items_table.insertRow(row_pos)
-            # Add QComboBox for product selection, QLineEdit for description, QSpinBox for Qty, etc.
-            # This requires making table cells widgets.
-            return
+        if not is_loading:
+            # Use ProductDialog for selecting/defining products
+            # The ProductDialog needs client_id and app_root_dir.
+            # Assuming self.parent() is DocumentManager or similar that has app_root_dir
+            app_root_dir_for_product_dialog = ""
+            if hasattr(self.parent(), 'app_root_dir'):
+                app_root_dir_for_product_dialog = self.parent().app_root_dir
+            elif hasattr(self.parent(), 'parent') and hasattr(self.parent().parent(), 'app_root_dir'): # Check grandparent if parent is ClientWidget
+                app_root_dir_for_product_dialog = self.parent().parent().app_root_dir
 
-        # If item_data_to_load is provided (e.g., when editing)
+
+            if not app_root_dir_for_product_dialog:
+                self.logger.error("app_root_dir not found for ProductDialog instantiation.")
+                QMessageBox.critical(self, "Erreur Configuration", "Chemin racine de l'application non trouvé.")
+                return
+
+            product_dialog = ProductDialog(client_id=self.client_id,
+                                           app_root_dir=app_root_dir_for_product_dialog,
+                                           parent=self)
+
+            if product_dialog.exec_() == QDialog.Accepted:
+                products_from_dialog = product_dialog.get_data()
+                if not products_from_dialog:
+                    return # No products were added/selected in ProductDialog
+
+                for product_data in products_from_dialog:
+                    # This product_data already contains name, desc, qty, price, product_id (if existing global), product_code
+                    # We need to adapt this to fit CommandeItem structure for our table
+
+                    # If product_id is None, it means a new global product was defined in ProductDialog.
+                    # We need to ensure this global product is created in the DB first.
+                    # This logic will be handled in `accept_dialog` when the commande is saved.
+                    # For now, we store all info from ProductDialog in the UserRole of the first cell.
+                    # The `_get_payload_from_table_row` will use this stored data.
+
+                    row_pos = self.items_table.rowCount()
+                    self.items_table.insertRow(row_pos)
+
+                    # Store the raw product_data from ProductDialog. It contains global product_id if existing, or None if new.
+                    # It also contains product_code, name, description, quantity, unit_price from ProductDialog's form.
+                    name_cell_item = QTableWidgetItem(product_data.get("name", "N/A"))
+                    name_cell_item.setData(Qt.UserRole, product_data)
+                    self.items_table.setItem(row_pos, 0, name_cell_item) # Product Name (from ProductDialog)
+
+                    self.items_table.setItem(row_pos, 1, QTableWidgetItem(product_data.get("description", "")))
+
+                    qty_item = QTableWidgetItem(str(product_data.get("quantity", 1.0))) # Default to 1 if not specified
+                    qty_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    self.items_table.setItem(row_pos, 2, qty_item)
+
+                    unit_price_ht_item = QTableWidgetItem(f"{float(product_data.get('unit_price', 0.0)):.2f}")
+                    unit_price_ht_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    self.items_table.setItem(row_pos, 3, unit_price_ht_item)
+
+                    # VAT Rate - default to 0 for now, user can edit this cell if made editable
+                    vat_item = QTableWidgetItem("0") # Default 0% VAT
+                    vat_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    self.items_table.setItem(row_pos, 4, vat_item)
+
+                    # Calculate totals for display - this part will be refined
+                    current_qty = float(product_data.get("quantity", 1.0))
+                    current_price_ht = float(product_data.get('unit_price', 0.0))
+                    current_vat_rate = 0.0 # as per default above
+
+                    total_ht = current_qty * current_price_ht
+                    total_ttc = total_ht * (1 + current_vat_rate)
+
+                    self.items_table.setItem(row_pos, 5, QTableWidgetItem(f"{total_ht:.2f}"))
+                    self.items_table.setItem(row_pos, 6, QTableWidgetItem(f"{total_ttc:.2f}"))
+
+                self.update_totals_display()
+            return # Return after handling ProductDialog
+
+        # If item_data_to_load is provided (e.g., when editing an existing commande)
+
         if item_data_to_load:
             row_pos = self.items_table.rowCount()
             self.items_table.insertRow(row_pos)
@@ -306,7 +374,8 @@ class CommandeDialog(QDialog):
             success = commandes_crud.update_commande(self.commande_id_to_edit, commande_data_payload)
             if success:
                 self.logger.info(f"Commande {self.commande_id_to_edit} updated.")
-                # Update items (delete removed, update existing, add new)
+                self._last_processed_project_id = commande_data_payload.get("project_id") # Store project_id
+
                 self._sync_commande_items(self.commande_id_to_edit)
                 super().accept()
             else:
@@ -316,6 +385,10 @@ class CommandeDialog(QDialog):
             if new_cmd_id:
                 self.logger.info(f"New commande {new_cmd_id} created.")
                 self.commande_id_to_edit = new_cmd_id # So items can be linked
+                self._last_processed_project_id = commande_data_payload.get("project_id") # Store project_id
+                self._created_commande_id = new_cmd_id
+                self._created_commande_ref = commande_data_payload.get("commande_reference")
+
                 self._sync_commande_items(new_cmd_id)
                 super().accept()
             else:
@@ -361,6 +434,124 @@ class CommandeDialog(QDialog):
         # Delete items from DB that are no longer in the table
         for db_item_id_to_check in db_item_ids:
             if db_item_id_to_check not in table_item_ids_processed:
+                self.logger.info(f"Deleting CommandeItem {db_item_id_to_check} as it's no longer in the table.")
+                commandes_crud.delete_commande_item(db_item_id_to_check)
+
+        self._recalculate_and_save_commande_totals(commande_id)
+
+    def _create_global_product_if_needed(self, item_payload_from_row):
+        """
+        Checks if a global product needs to be created based on item_payload_from_row.
+        If so, creates it and updates item_payload_from_row with the new product_id.
+        Returns True if successful or not needed, False if creation failed.
+        """
+        if item_payload_from_row.get("product_id"): # Already an existing global product
+            return True
+
+        product_code = item_payload_from_row.get("product_code")
+        original_name = item_payload_from_row.get("original_product_name")
+        original_price = item_payload_from_row.get("original_base_unit_price")
+        original_description = item_payload_from_row.get("original_product_description")
+
+        if not (product_code and original_name):
+            self.logger.error("Cannot create global product: product_code or original_name is missing.")
+            QMessageBox.critical(self, "Erreur Création Produit", "Code ou nom manquant pour la création d'un nouveau produit global.")
+            return False
+
+        # Check if product with this code already exists (e.g., created by another line item in this same dialog session)
+        existing_global_product = products_crud.get_product_by_code(product_code)
+        if existing_global_product:
+            item_payload_from_row["product_id"] = existing_global_product.get('product_id')
+            self.logger.info(f"Found existing global product by code '{product_code}' with ID {item_payload_from_row['product_id']} during sync.")
+            return True
+
+        self.logger.info(f"Creating new global product: Code='{product_code}', Name='{original_name}'")
+        new_global_product_data = {
+            'product_name': original_name,
+            'product_code': product_code,
+            'description': original_description,
+            'base_unit_price': original_price if original_price is not None else 0.0,
+            # 'language_code': ??? # ProductDialog's get_data includes language_code, ensure it's passed here
+            # 'category': ???
+            # 'created_by_user_id': self.current_user_id # Important for tracking
+            'is_active': True
+        }
+        # Add language_code if available from product_data_from_dialog (UserRole)
+        # This assumes _get_payload_from_table_row stores it
+        if item_payload_from_row.get("language_code"): # Check if this key exists from UserRole
+            new_global_product_data['language_code'] = item_payload_from_row.get("language_code")
+        else: # Fallback or default
+            new_global_product_data['language_code'] = 'fr'
+
+        if self.current_user_id:
+             new_global_product_data['created_by_user_id'] = self.current_user_id
+
+
+        add_result = products_crud.add_product(product_data=new_global_product_data)
+        if add_result and add_result.get('success'):
+            new_global_id = add_result.get('id')
+            item_payload_from_row["product_id"] = new_global_id
+            self.logger.info(f"New global product '{original_name}' created with ID: {new_global_id}.")
+            return True
+        else:
+            error_msg = add_result.get('error', 'Unknown error') if add_result else 'Unknown error'
+            self.logger.error(f"Failed to add new global product '{original_name}'. Error: {error_msg}")
+            QMessageBox.critical(self, "Erreur Création Produit Global", f"Impossible de créer le produit global '{original_name}': {error_msg}")
+            return False
+
+    def _sync_commande_items(self, commande_id):
+        """
+        Synchronizes items in the table with the database for the given commande_id.
+        - Deletes items from DB that are not in the table anymore.
+        - Updates items in DB that have changed.
+        - Adds new items from table to DB (creating global products if needed).
+        """
+        db_items_list = commandes_crud.get_items_for_commande(commande_id)
+        db_item_ids = {item['item_id'] for item in db_items_list if item and 'item_id' in item} # Ensure item and item_id exist
+
+        table_item_ids_processed = set()
+
+        for row in range(self.items_table.rowCount()):
+            item_payload = self._get_payload_from_table_row(row, commande_id)
+            if not item_payload:
+                self.logger.warning(f"Skipping row {row} in _sync_commande_items due to invalid payload.")
+                continue
+
+            # Ensure global product exists or is created
+            if not self._create_global_product_if_needed(item_payload):
+                # If global product creation fails, we might want to stop the whole sync or skip this item.
+                # For now, let's skip this item to prevent further errors.
+                self.logger.error(f"Skipping item sync for row {row} due to global product creation/retrieval failure.")
+                continue
+
+            # product_id should now be populated in item_payload
+            if not item_payload.get("product_id"):
+                self.logger.error(f"Critical: product_id still missing for item in row {row} after _create_global_product_if_needed. Payload: {item_payload}")
+                QMessageBox.critical(self, "Erreur Interne", f"Erreur interne : ID produit manquant pour l'article à la ligne {row + 1} après tentative de création/récupération.")
+                continue # Skip this item
+
+            commande_item_id = item_payload.get('item_id') # This is CommandeItem.item_id if editing
+
+            if commande_item_id and commande_item_id in db_item_ids: # Existing CommandeItem, update it
+                success = commandes_crud.update_commande_item(commande_item_id, item_payload)
+                if success:
+                    table_item_ids_processed.add(commande_item_id)
+                else:
+                    self.logger.error(f"Failed to update CommandeItem {commande_item_id}.")
+            else: # New CommandeItem, add it
+                # Remove 'item_id' if it was part of payload but not for a DB existing item (should not happen here)
+                item_payload.pop('item_id', None)
+                new_added_item_id = commandes_crud.add_commande_item(item_payload)
+                if new_added_item_id:
+                    table_item_ids_processed.add(new_added_item_id)
+                else:
+                    self.logger.error(f"Failed to add new CommandeItem for product {item_payload.get('product_id')}.")
+
+        # Delete items from DB that are no longer in the table
+        for db_item_id_to_check in db_item_ids:
+            if db_item_id_to_check not in table_item_ids_processed:
+                self.logger.info(f"Deleting CommandeItem {db_item_id_to_check} as it's no longer in the table.")
+
                 commandes_crud.delete_commande_item(db_item_id_to_check)
 
         self._recalculate_and_save_commande_totals(commande_id)
@@ -369,37 +560,64 @@ class CommandeDialog(QDialog):
     def _get_payload_from_table_row(self, row_index, commande_id_for_new_items):
         """
         Helper to extract item data from a table row to a dictionary suitable for CRUD.
-        This needs to be robust based on how items are added/edited in the table.
+        It prioritizes data from `UserRole` (set by `ProductDialog`) and then current cell values.
         """
+        payload = {}
         try:
-            # This is highly dependent on how items are added/edited.
-            # If cells are QTableWidgetItems with text:
-            product_item = self.items_table.item(row_index, 0)
-            # Assuming product_id is stored in product_item.data(Qt.UserRole + 1) or similar
-            # For now, we can't get product_id reliably from a simple text cell.
-            # This part needs a proper ProductSelectionDialog integration.
-            # Let's assume product_item.data(Qt.UserRole) contains the full original item_data
-            # or a product_id if it's a simple selection.
+            name_cell_item = self.items_table.item(row_index, 0)
+            # product_data_from_dialog contains product_id, product_code, original name, desc, price from ProductDialog
+            product_data_from_dialog = name_cell_item.data(Qt.UserRole) if name_cell_item else {}
+            if not isinstance(product_data_from_dialog, dict):
+                product_data_from_dialog = {}
 
-            original_item_data = product_item.data(Qt.UserRole) if product_item else {}
-            if not isinstance(original_item_data, dict): original_item_data = {}
+            payload["commande_id"] = commande_id_for_new_items # This will be overridden if item already has an ID
 
-            payload = {
-                "commande_id": original_item_data.get('commande_id', commande_id_for_new_items),
-                "product_id": original_item_data.get('product_id'), # CRITICAL: This needs to be set correctly
-                "description_item": self.items_table.item(row_index, 1).text(),
-                "quantity": float(self.items_table.item(row_index, 2).text()),
-                "unit_price_ht": float(self.items_table.item(row_index, 3).text()),
-                "vat_rate": float(self.items_table.item(row_index, 4).text()) / 100.0,
-            }
-            if not payload["product_id"]:
-                self.logger.error(f"Missing product_id for item in row {row_index}. Cannot save.")
-                # This should be caught by validation before trying to save.
-                # For now, returning None to indicate an issue.
-                return None
+            # These are critical for identifying/creating the global product
+            payload["product_id"] = product_data_from_dialog.get('product_id') # Might be None if new global product
+            payload["product_code"] = product_data_from_dialog.get('product_code')
+            payload["original_product_name"] = product_data_from_dialog.get('name') # Name as defined in ProductDialog
+            payload["original_product_description"] = product_data_from_dialog.get('description')
+            payload["original_base_unit_price"] = product_data_from_dialog.get('unit_price') # Price as defined in ProductDialog
+            payload["language_code"] = product_data_from_dialog.get('language_code', 'fr') # Language for new global product
+
+            # These are values for the CommandeItem, potentially edited in the table
+            payload["description_item"] = self.items_table.item(row_index, 1).text().strip()
+
+            try:
+                payload["quantity"] = float(self.items_table.item(row_index, 2).text().replace(",", "."))
+            except ValueError:
+                self.logger.error(f"Invalid quantity in row {row_index}. Defaulting to 0.")
+                payload["quantity"] = 0.0
+
+            try:
+                payload["unit_price_ht"] = float(self.items_table.item(row_index, 3).text().replace("€", "").replace(",", ".").strip())
+            except ValueError:
+                self.logger.error(f"Invalid unit_price_ht in row {row_index}. Defaulting to 0.0.")
+                payload["unit_price_ht"] = 0.0
+
+            try:
+                vat_text = self.items_table.item(row_index, 4).text().replace("%", "").strip()
+                payload["vat_rate"] = float(vat_text.replace(",", ".")) / 100.0
+            except ValueError:
+                self.logger.error(f"Invalid vat_rate in row {row_index}. Defaulting to 0.0.")
+                payload["vat_rate"] = 0.0
+
+            # Include item_id if it's an existing item being updated
+            if product_data_from_dialog and product_data_from_dialog.get('item_id'): # 'item_id' here refers to CommandeItem.item_id if loaded for edit
+                payload['item_id'] = product_data_from_dialog.get('item_id')
+
+            # If product_id is None, we need product_code and name to try and create it
+            if payload["product_id"] is None and not (payload.get("product_code") and payload.get("original_product_name")):
+                self.logger.error(f"Row {row_index}: New global product indicated (no product_id) but missing product_code or original_product_name from ProductDialog data.")
+                QMessageBox.warning(self, "Données Produit Manquantes", f"Les informations pour créer un nouveau produit global (code/nom) sont manquantes pour l'article à la ligne {row_index + 1}.")
+                return None # Critical error for this row
+
             return payload
+
         except Exception as e:
             self.logger.error(f"Error extracting payload from table row {row_index}: {e}", exc_info=True)
+            QMessageBox.critical(self, "Erreur Interne", f"Erreur lors de la lecture des données de la ligne d'article {row_index + 1}.")
+
             return None
 
     def _recalculate_and_save_commande_totals(self, commande_id):
@@ -420,6 +638,36 @@ class CommandeDialog(QDialog):
             self.logger.error(f"Failed to update commande {commande_id} with recalculated totals.")
         else:
             self.logger.info(f"Commande {commande_id} totals updated: HT={current_total_ht}, TTC={current_total_ttc}")
+
+    def get_created_project_id(self):
+        """
+        Returns the project_id that was created or linked during the dialog's execution.
+        This should be called after accept_dialog() has successfully processed/saved the commande.
+        """
+        # self.commande_data might be populated if editing, or could be the payload if new
+        # A more robust way is to store the determined project_id in an instance variable during accept_dialog
+        if hasattr(self, '_last_processed_project_id'):
+            return self._last_processed_project_id
+
+        # Fallback: if editing, get it from the reloaded commande_data
+        if self.commande_id_to_edit and self.commande_data:
+            return self.commande_data.get("project_id")
+
+        # Fallback: if new, it might be in the payload that was built (less ideal as payload is local to accept_dialog)
+        # This indicates a need to store the project_id more reliably if created/selected.
+        # For now, this method will primarily work if _last_processed_project_id is set in accept_dialog.
+        self.logger.warning("get_created_project_id called but _last_processed_project_id not set and not editing.")
+        return None
+
+    def get_created_commande_id(self):
+        """Returns the ID of the commande created or edited by this dialog instance."""
+        return getattr(self, '_created_commande_id', None)
+
+    def get_created_commande_reference(self):
+        """Returns the reference of the commande created or edited by this dialog instance."""
+        return getattr(self, '_created_commande_ref', None)
+
+
 
 # Example usage (for testing, if run directly)
 if __name__ == '__main__':
