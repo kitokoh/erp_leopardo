@@ -90,9 +90,9 @@ class StatisticsDashboard(QWidget):
         # Left widget for Map
         self.left_widget_for_map = QWidget()
         # Create layout, set it as the layout for self.left_widget_for_map, AND store it
-        self._left_map_actual_layout = QVBoxLayout(self.left_widget_for_map)
+        self._left_map_actual_layout = QVBoxLayout() # Create layout without parent first
         self._left_map_actual_layout.setContentsMargins(0,0,0,0)
-        # self.left_widget_for_map.setLayout(self._left_map_actual_layout) # Redundant if QVBoxLayout constructor has parent
+        self.left_widget_for_map.setLayout(self._left_map_actual_layout) # Explicitly set the layout
 
 
         self.map_view = None # Initialize as None
