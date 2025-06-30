@@ -700,15 +700,16 @@ class DocumentManager(QMainWindow):
         self.more_filters_button.setCheckable(True)
         self.more_filters_button.toggled.connect(self.toggle_more_filters_visibility)
         self.more_filters_button.setToolTip(self.tr("Afficher/Masquer plus de filtres"))
+        # self.more_filters_button.setText("🔽") # Using setIcon instead
         top_filter_line_layout.addWidget(self.more_filters_button)
 
-        # "Réinitialiser Filtres" Button (Icon Only, moved to top line)
-        self.reset_filters_button = QPushButton("") # No text
-        self.reset_filters_button.setObjectName("resetFiltersButton")
-        self.reset_filters_button.setIcon(QIcon(":/icons/refresh-cw.svg"))
-        self.reset_filters_button.clicked.connect(self.reset_all_filters_slot)
-        self.reset_filters_button.setToolTip(self.tr("Réinitialiser tous les filtres"))
-        top_filter_line_layout.addWidget(self.reset_filters_button)
+        # "Réinitialiser Filtres" Button is now moved to the collapsible section
+        # self.reset_filters_button = QPushButton("")
+        # self.reset_filters_button.setObjectName("resetFiltersButton")
+        # self.reset_filters_button.setIcon(QIcon(":/icons/refresh-cw.svg"))
+        # self.reset_filters_button.clicked.connect(self.reset_all_filters_slot)
+        # self.reset_filters_button.setToolTip(self.tr("Réinitialiser tous les filtres"))
+        # top_filter_line_layout.addWidget(self.reset_filters_button) # Removed from here
 
         filter_search_main_layout.addLayout(top_filter_line_layout) # This is the single visible line of filters
 
@@ -716,8 +717,8 @@ class DocumentManager(QMainWindow):
         # --- Collapsible Filter Widget ---
         self.collapsible_filter_widget = QWidget()
         collapsible_layout = QVBoxLayout(self.collapsible_filter_widget)
-        # Remove top margin if it creates unwanted space when hidden, or ensure widget is fully hidden
-        collapsible_layout.setContentsMargins(0, 2, 0, 0) # Minimal top margin when visible
+        collapsible_layout.setContentsMargins(0, 5, 0, 5) # Adjusted margins for better spacing
+        collapsible_layout.setSpacing(10)
 
 
         # Archive Filter (moved into collapsible area)
@@ -809,8 +810,19 @@ class DocumentManager(QMainWindow):
         save_filter_layout.addWidget(self.save_filter_button)
         saved_filters_main_layout.addLayout(save_filter_layout)
 
-        filter_search_main_layout.addWidget(saved_filters_group) # Add the group to the main filter layout
+        # filter_search_main_layout.addWidget(saved_filters_group) # Removed from main filter layout
+        collapsible_layout.addWidget(saved_filters_group) # Added to collapsible layout
         # --- End Saved Filters UI ---
+
+        # --- "Réinitialiser Filtres" Button (now in collapsible area) ---
+        self.reset_filters_button = QPushButton(self.tr("Réinitialiser Tous les Filtres")) # Added text back for clarity in collapsible
+        self.reset_filters_button.setObjectName("resetFiltersButton") # Keep object name for styling if any
+        self.reset_filters_button.setIcon(QIcon(":/icons/refresh-cw.svg"))
+        self.reset_filters_button.clicked.connect(self.reset_all_filters_slot)
+        self.reset_filters_button.setToolTip(self.tr("Réinitialiser tous les filtres et masquer cette section"))
+        collapsible_layout.addWidget(self.reset_filters_button) # Add to collapsible layout
+        # --- End Réinitialiser Filtres Button ---
+
 
         # Remove the previous layout for reset_button_layout as it's now on the top line
         # filter_search_main_layout.addLayout(reset_button_layout) # This line is removed
@@ -1445,11 +1457,22 @@ class DocumentManager(QMainWindow):
             QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Partner Management est désactivé."))
 
     def show_statistics_view(self):
+        logging.info(f"Attempting to show Statistics View. Instance: {self.statistics_dashboard_instance}")
         if self.statistics_dashboard_instance:
-            self.main_area_stack.setCurrentWidget(self.statistics_dashboard_instance)
+            # Diagnostic: Log widgets currently in the stack
+            stacked_widgets = [self.main_area_stack.widget(i) for i in range(self.main_area_stack.count())]
+            logging.info(f"Widgets in main_area_stack: {stacked_widgets}")
+            if self.statistics_dashboard_instance in stacked_widgets:
+                logging.info("StatisticsDashboard instance IS in main_area_stack. Calling setCurrentWidget.")
+                self.main_area_stack.setCurrentWidget(self.statistics_dashboard_instance)
+                logging.info("setCurrentWidget called for StatisticsDashboard.")
+            else:
+                logging.error("StatisticsDashboard instance is NOT in main_area_stack. This is the cause of the QStackedWidget error.")
+                QMessageBox.critical(self, self.tr("Erreur Module"),
+                                     self.tr("Le module Statistiques n'a pas été correctement chargé dans l'interface principale."))
         else:
-            logging.warning("Statistics Dashboard instance is None. Cannot show view.")
-            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Statistiques est désactivé."))
+            logging.warning("Statistics Dashboard instance is None. Cannot show view (module likely disabled or failed to init).")
+            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Statistiques est désactivé ou n'a pas pu être initialisé."))
 
     def show_inventory_browser_view(self):
         print("DocumentManager: show_inventory_browser_view called.")
