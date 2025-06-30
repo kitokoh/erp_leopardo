@@ -228,6 +228,13 @@ def get_proforma_invoice_context_data(
     doc_ctx["vat_rate_percentage"] = float(additional_context.get("vat_rate_percentage", 20.0))
     doc_ctx["discount_rate_percentage"] = float(additional_context.get("discount_rate_percentage", 0.0))
     doc_ctx["current_year"] = str(datetime.now(timezone.utc).year)
+    # Add vat_label based on language
+    if target_language_code == "fr":
+        doc_ctx["vat_label"] = additional_context.get("vat_label", "TVA")
+    elif target_language_code == "en":
+        doc_ctx["vat_label"] = additional_context.get("vat_label", "VAT")
+    else: # Default or other languages
+        doc_ctx["vat_label"] = additional_context.get("vat_label", "Tax")
 
 
     db_conn = None # This will be an SQLite connection
@@ -458,37 +465,61 @@ def get_proforma_invoice_context_data(
 
             # Description priority: ProformaInvoiceItem.description -> item_data_ac.description -> Product.name
             description_for_render = item_data_to_render.get("description") # From ProformaInvoiceItem
-            if not description_for_render or description_for_render == "N/A": # If not set on item or is placeholder
-                description_for_render = item_data_to_render.get("description_override") # From additional_context
-                if not description_for_render and original_product_details: # Fallback to product name
-                    description_for_render = original_product_details.get("original_name", "Custom Item")
-                elif not description_for_render: # Ultimate fallback
-                    description_for_render = "Custom Item"
+            # Determine product name
+            product_name_for_display = "N/A"
+            if original_product_details:
+                if target_language_code != original_product_details.get("original_language_code") and original_product_details.get("equivalent_name"):
+                    product_name_for_display = original_product_details["equivalent_name"]
+                else:
+                    product_name_for_display = original_product_details.get("original_name", "N/A")
+            elif item_data_to_render.get("description"): # Use item's description if no product details
+                 product_name_for_display = item_data_to_render.get("description")
+            elif item_data_to_render.get("description_override"):
+                 product_name_for_display = item_data_to_render.get("description_override")
+            else:
+                 product_name_for_display = "Custom Item"
+
+
+            # Determine product_description (secondary, potentially longer description)
+            product_description_for_display = ""
+            # Priority: item_data_to_render.description (from ProformaInvoiceItem) -> item_data_to_render.description_override -> original_product_details.description (translated or original)
+            if item_data_to_render.get("description") and item_data_to_render.get("description") != product_name_for_display :
+                product_description_for_display = item_data_to_render.get("description")
+            elif item_data_to_render.get("description_override") and item_data_to_render.get("description_override") != product_name_for_display:
+                product_description_for_display = item_data_to_render.get("description_override")
+            elif original_product_details:
+                temp_desc = ""
+                if target_language_code != original_product_details.get("original_language_code") and original_product_details.get("equivalent_description"):
+                    temp_desc = original_product_details["equivalent_description"]
+                else:
+                    temp_desc = original_product_details.get("original_description", "")
+
+                if temp_desc != product_name_for_display: # Only use if different from the main name
+                    product_description_for_display = temp_desc
 
 
             quantity_render = item_data_to_render.get("quantity", 0.0)
             total_price_render = item_data_to_render.get("total_price")
-            if total_price_render is None:
+            if total_price_render is None: # Calculate if not provided (e.g. from proforma_instance.items)
                 total_price_render = quantity_render * effective_unit_price
 
-            if not proforma_instance:
+            if not proforma_instance: # If creating new, calculate subtotal iteratively
                 subtotal_amount_calculated_from_items += total_price_render
 
-            product_name_display = description_for_render
-            product_code_display = "N/A"
-            if original_product_details:
-                product_code_display = original_product_details.get("product_code", "N/A")
-                # If the description used is the generic product name, and a translation exists, use it.
-                if description_for_render == original_product_details.get("original_name") and \
-                   target_language_code != original_product_details.get("original_language_code") and \
-                   original_product_details.get("equivalent_name"):
-                    product_name_display = original_product_details["equivalent_name"]
+            product_code_display = original_product_details.get("product_code", "N/A") if original_product_details else "N/A"
+            original_name_if_translated = ""
+            if original_product_details and \
+               target_language_code != original_product_details.get("original_language_code") and \
+               product_name_for_display != original_product_details.get("original_name"):
+                original_name_if_translated = original_product_details.get("original_name","")
+
 
             product_entry = {
                 "id": str(p_id_render) if p_id_render else uuid.uuid4().hex[:8],
-                "product_code": product_code_display, # Added product code
-                "name": product_name_display, # This is the primary description field now
-                "description": "", # Secondary description, can be populated if needed
+                "product_code": product_code_display,
+                "name": product_name_for_display,
+                "description": product_description_for_display, # Secondary description
+                "original_name": original_name_if_translated, # Original name if translated name is used
                 "quantity": quantity_render,
                 "unit_price_raw": float(effective_unit_price),
                 "unit_price_formatted": format_currency(float(effective_unit_price), doc_ctx["currency_symbol"]),
