@@ -221,7 +221,8 @@ class ClientWidget(QWidget):
             QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation section infos client:\n{0}").format(str(e)))
 
         self._setup_notes_section(layout)
-        self._setup_main_tabs_section(layout) # This will call sub-methods for each tab
+        self._setup_contacts_section(layout) # Call to setup the new contacts group box
+        self._setup_main_tabs_section(layout) # This will call sub-methods for each tab (Contacts tab will be removed from here)
         self._setup_commandes_tab() # Add the new Commandes tab
 
         # Initial data loading calls
@@ -306,6 +307,9 @@ class ClientWidget(QWidget):
              self.notes_group_box.toggled.connect(self._handle_notes_section_toggled)
         if hasattr(self, 'tabs_group_box'):
              self.tabs_group_box.toggled.connect(self._handle_tabs_section_toggled)
+        if hasattr(self, 'contacts_group_box'): # Connect the new contacts group box
+            self.contacts_group_box.toggled.connect(self._handle_contacts_section_toggled)
+
 
         # Apply permissions
         self._apply_permissions()
@@ -314,6 +318,75 @@ class ClientWidget(QWidget):
         if hasattr(self, 'notes_edit'):
             self.notes_edit.installEventFilter(self)
         logging.info(f"ClientWidget.setup_ui: FULL UI SETUP COMPLETED for client_id={self.client_info.get('client_id')}")
+
+    def _setup_contacts_section(self, main_layout):
+        """Sets up the collapsible contacts section directly in the main layout."""
+        try:
+            logging.info("ClientWidget.setup_ui: Starting setup for Contacts Section (GroupBox)...")
+            self.contacts_group_box = QGroupBox(self.tr("Contacts"))
+            self.contacts_group_box.setCheckable(True)
+            contacts_group_main_layout = QVBoxLayout(self.contacts_group_box)
+
+            # Container for the actual contacts UI (table, buttons, pagination)
+            self.contacts_container_widget = QWidget()
+            contacts_container_layout = QVBoxLayout(self.contacts_container_widget)
+            contacts_container_layout.setContentsMargins(0, 5, 0, 0) # Similar to other collapsible sections
+
+            # Re-use the UI elements from the old _setup_contacts_tab method
+            self.contacts_table = QTableWidget()
+            self.contacts_table.setColumnCount(5)
+            self.contacts_table.setHorizontalHeaderLabels([
+                self.tr("Nom"), self.tr("Email"), self.tr("Téléphone"),
+                self.tr("Position"), self.tr("Principal")
+            ])
+            self.contacts_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+            self.contacts_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            self.contacts_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            self.contacts_table.setAlternatingRowColors(True)
+            self.contacts_table.cellDoubleClicked.connect(self.edit_contact)
+
+            self.contacts_empty_label = QLabel(self.tr("Aucun contact ajouté pour ce client.\nCliquez sur '➕ Ajouter' pour commencer."))
+            self.contacts_empty_label.setAlignment(Qt.AlignCenter)
+            font = self.contacts_empty_label.font(); font.setPointSize(10)
+            self.contacts_empty_label.setFont(font)
+            contacts_container_layout.addWidget(self.contacts_empty_label)
+            contacts_container_layout.addWidget(self.contacts_table)
+
+            contacts_pagination_layout = QHBoxLayout()
+            self.prev_contact_button = QPushButton("<< Précédent")
+            self.prev_contact_button.setObjectName("paginationButton")
+            self.prev_contact_button.clicked.connect(self.prev_contact_page)
+            self.contact_page_info_label = QLabel("Page 1 / 1")
+            self.contact_page_info_label.setObjectName("paginationLabel")
+            self.next_contact_button = QPushButton("Suivant >>")
+            self.next_contact_button.setObjectName("paginationButton")
+            self.next_contact_button.clicked.connect(self.next_contact_page)
+            contacts_pagination_layout.addStretch()
+            contacts_pagination_layout.addWidget(self.prev_contact_button)
+            contacts_pagination_layout.addWidget(self.contact_page_info_label)
+            contacts_pagination_layout.addWidget(self.next_contact_button)
+            contacts_pagination_layout.addStretch()
+            contacts_container_layout.addLayout(contacts_pagination_layout)
+
+            contacts_btn_layout = QHBoxLayout()
+            self.add_contact_btn = QPushButton(self.tr("Ajouter")); self.add_contact_btn.setIcon(QIcon(":/icons/user-plus.svg"))
+            self.add_contact_btn.setToolTip(self.tr("Ajouter un nouveau contact pour ce client")); self.add_contact_btn.clicked.connect(self.add_contact); contacts_btn_layout.addWidget(self.add_contact_btn)
+            self.edit_contact_btn = QPushButton(self.tr("Modifier")); self.edit_contact_btn.setIcon(QIcon(":/icons/pencil.svg"))
+            self.edit_contact_btn.setToolTip(self.tr("Modifier le contact sélectionné")); self.edit_contact_btn.clicked.connect(self.edit_contact); contacts_btn_layout.addWidget(self.edit_contact_btn)
+            self.remove_contact_btn = QPushButton(self.tr("Supprimer")); self.remove_contact_btn.setIcon(QIcon(":/icons/trash.svg"))
+            self.remove_contact_btn.setToolTip(self.tr("Supprimer le lien vers le contact sélectionné pour ce client")); self.remove_contact_btn.setObjectName("dangerButton"); self.remove_contact_btn.clicked.connect(self.remove_contact); contacts_btn_layout.addWidget(self.remove_contact_btn)
+            contacts_container_layout.addLayout(contacts_btn_layout)
+
+            contacts_group_main_layout.addWidget(self.contacts_container_widget)
+            self.contacts_group_box.setChecked(False) # Collapsed by default
+            main_layout.addWidget(self.contacts_group_box) # Add to the main vertical layout of ClientWidget
+
+            # Initial load of contacts
+            self.load_contacts()
+
+        except Exception as e:
+            logging.error(f"Error in _setup_contacts_section: {e}", exc_info=True)
+            QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation section Contacts:\n{0}").format(str(e)))
 
     def _apply_permissions(self):
         """Applies role-based permissions to UI elements within ClientWidget."""
@@ -454,11 +527,11 @@ class ClientWidget(QWidget):
             main_layout.addWidget(self.tabs_group_box)
 
             self._setup_documents_tab()
-            self._setup_contacts_tab()
+            # self._setup_contacts_tab() # Call removed, contacts are now in a group box
             self._setup_products_tab()
             self._setup_document_notes_tab()
             self._setup_product_dimensions_tab()
-            self._setup_available_templates_tab()
+            # self._setup_available_templates_tab() # Call removed
 
             logging.info("ClientWidget._setup_main_tabs_section: PRE-CALL self._setup_sav_tab()")
             try:
@@ -476,98 +549,8 @@ class ClientWidget(QWidget):
             logging.error(f"Error in _setup_main_tabs_section: {e}", exc_info=True)
             QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation conteneur onglets principaux:\n{0}").format(str(e)))
 
-    def _setup_available_templates_tab(self):
-        try:
-            logging.info("ClientWidget.setup_ui: Starting setup for Available Templates Tab Structure...")
-            self.available_templates_tab = QWidget()
-            available_templates_layout = QVBoxLayout(self.available_templates_tab)
-
-            self.available_templates_table = QTableWidget()
-            self.available_templates_table.setColumnCount(5) # Name, Description, Language, Type, Actions
-            self.available_templates_table.setHorizontalHeaderLabels([
-                self.tr("Name"), self.tr("Description"), self.tr("Language"),
-                self.tr("Type"), self.tr("Actions")
-            ])
-            self.available_templates_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-            self.available_templates_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-            self.available_templates_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
-            self.available_templates_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
-            self.available_templates_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
-            self.available_templates_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            self.available_templates_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-
-            available_templates_layout.addWidget(self.available_templates_table)
-
-            self.tab_widget.addTab(self.available_templates_tab, self.tr("Available Templates"))
-            self.load_available_templates() # Load data
-            logging.info("ClientWidget._setup_available_templates_tab: SUCCESSFULLY COMPLETED")
-        except Exception as e:
-            logging.error(f"Error in _setup_available_templates_tab: {e}", exc_info=True)
-            QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation onglet Modèles Disponibles:\n{0}").format(str(e)))
-
-    def load_available_templates(self):
-        self.available_templates_table.setRowCount(0)
-        try:
-            templates = db_manager.get_all_templates()
-            if templates is None:
-                templates = []
-
-            self.available_templates_table.setRowCount(len(templates))
-            for row_idx, template_data in enumerate(templates):
-                template_id = template_data.get('template_id')
-
-                name_item = QTableWidgetItem(template_data.get('template_name', self.tr("N/A")))
-                name_item.setData(Qt.UserRole, template_id) # Store template_id with the name item
-                self.available_templates_table.setItem(row_idx, 0, name_item)
-
-                self.available_templates_table.setItem(row_idx, 1, QTableWidgetItem(template_data.get('description', '')))
-                self.available_templates_table.setItem(row_idx, 2, QTableWidgetItem(template_data.get('language_code', '')))
-                self.available_templates_table.setItem(row_idx, 3, QTableWidgetItem(template_data.get('template_type', '')))
-
-                generate_button = QPushButton(self.tr("Generate"))
-                # Use a lambda to pass template_id to the handler
-                generate_button.clicked.connect(lambda checked, t_id=template_id: self.handle_generate_template_button_clicked(t_id))
-
-                action_widget = QWidget()
-                action_layout = QHBoxLayout(action_widget)
-                action_layout.addWidget(generate_button)
-                action_layout.setContentsMargins(5, 0, 5, 0)
-                action_layout.setAlignment(Qt.AlignCenter)
-                action_widget.setLayout(action_layout)
-                self.available_templates_table.setCellWidget(row_idx, 4, action_widget)
-
-        except Exception as e:
-            logging.error(f"Error loading available templates: {e}", exc_info=True)
-            QMessageBox.critical(self, self.tr("Erreur Chargement Modèles"),
-                                 self.tr("Impossible de charger la liste des modèles disponibles:\n{0}").format(str(e)))
-
-    def handle_generate_template_button_clicked(self, template_id):
-        try:
-            template_data = db_manager.get_template_by_id(template_id)
-            if template_data:
-                # Ensure CreateDocumentDialog is available (it should be via _import_main_elements)
-                if not hasattr(self, 'CreateDocumentDialog') or self.CreateDocumentDialog is None:
-                    logging.error("CreateDocumentDialog is not available in ClientWidget.")
-                    QMessageBox.critical(self, self.tr("Erreur Composant"),
-                                         self.tr("Le composant de création de document n'est pas chargé."))
-                    return
-
-                dialog = self.CreateDocumentDialog(
-                    client_info=self.client_info,
-                    config=self.config,
-                    parent=self,
-                    template_data=template_data  # Pass the fetched template data
-                )
-                # logging.info(f"ClientWidget.handle_generate_template_button_clicked: About to open CreateDocumentDialog. Client Info: {self.client_info}, Config available: {bool(self.config)}") # DEBUG LOG REMOVED
-                if dialog.exec_() == QDialog.Accepted:
-                    self.populate_doc_table()  # Refresh documents tab
-            else:
-                QMessageBox.warning(self, self.tr("Modèle Introuvable"),
-                                    self.tr("Le modèle avec l'ID {0} n'a pas été trouvé.").format(template_id))
-        except Exception as e:
-            logging.error(f"Error in handle_generate_template_button_clicked: {e}", exc_info=True)
-            QMessageBox.critical(self, self.tr("Erreur"),
-                                 self.tr("Une erreur est survenue lors de la tentative de génération du document à partir du modèle:\n{0}").format(str(e)))
+    # _setup_available_templates_tab and load_available_templates removed.
+    # handle_generate_template_button_clicked was only called by load_available_templates, so it can also be removed.
 
     def _setup_documents_tab(self):
         try:
@@ -779,17 +762,20 @@ class ClientWidget(QWidget):
             doc_notes_filters_layout.addStretch()
             doc_notes_layout.addLayout(doc_notes_filters_layout)
             self.document_notes_table = QTableWidget()
-            self.document_notes_table.setColumnCount(5)
+            self.document_notes_table.setColumnCount(6) # Added "Standard" column
             self.document_notes_table.setHorizontalHeaderLabels([
                 self.tr("Type Document"), self.tr("Langue"),
-                self.tr("Aperçu Note"), self.tr("Actif"), self.tr("Actions")
+                self.tr("Contenu de la Note"), self.tr("Standard"), self.tr("Actif"), self.tr("Actions")
             ])
-            self.document_notes_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+            self.document_notes_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch) # Contenu
+            self.document_notes_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents) # Standard
+            self.document_notes_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents) # Actif
+            self.document_notes_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents) # Actions
             self.document_notes_table.setSelectionBehavior(QAbstractItemView.SelectRows)
             self.document_notes_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
             doc_notes_layout.addWidget(self.document_notes_table)
             doc_notes_buttons_layout = QHBoxLayout()
-            self.add_doc_note_button = QPushButton(self.tr("Ajouter Note de Document"))
+            self.add_doc_note_button = QPushButton(self.tr("Ajouter Note")) # Renamed button
             self.add_doc_note_button.setIcon(QIcon.fromTheme("document-new"))
             doc_notes_buttons_layout.addWidget(self.add_doc_note_button)
             self.refresh_doc_notes_button = QPushButton(self.tr("Actualiser Liste"))
@@ -1026,7 +1012,7 @@ class ClientWidget(QWidget):
             self.assignments_sub_tabs = QTabWidget()
             assignments_main_layout.addWidget(self.assignments_sub_tabs)
             self.tab_widget.addTab(self.assignments_tab, self.tr("Affectations"))
-            # Vendors/Sellers
+            # Vendors/Sellers (CompanyPersonnel)
             assigned_vendors_widget = QWidget()
             assigned_vendors_layout = QVBoxLayout(assigned_vendors_widget)
             self.assigned_vendors_table = QTableWidget(); self.assigned_vendors_table.setColumnCount(4)
@@ -2576,25 +2562,67 @@ class ClientWidget(QWidget):
         self.tab_widget.setVisible(checked)
 
         if checked:
+            # Collapse Client Info
             if hasattr(self, 'client_info_group_box'):
                 self.client_info_group_box.blockSignals(True)
                 self.client_info_group_box.setChecked(False)
-                if hasattr(self, 'info_container_widget'): # Ensure info_container_widget also exists
-                     self.info_container_widget.setVisible(False) # Explicitly hide content
+                if hasattr(self, 'info_container_widget'): self.info_container_widget.setVisible(False)
                 self.client_info_group_box.blockSignals(False)
-
+            # Collapse Notes
             if hasattr(self, 'notes_group_box'):
                 self.notes_group_box.blockSignals(True)
                 self.notes_group_box.setChecked(False)
-                if hasattr(self, 'notes_container_widget'): # Ensure notes_container_widget also exists
-                     self.notes_container_widget.setVisible(False) # Explicitly hide content
+                if hasattr(self, 'notes_container_widget'): self.notes_container_widget.setVisible(False)
                 self.notes_group_box.blockSignals(False)
-        elif not self.client_info_group_box.isChecked() and not self.notes_group_box.isChecked():
+            # Collapse Contacts
+            if hasattr(self, 'contacts_group_box'):
+                self.contacts_group_box.blockSignals(True)
+                self.contacts_group_box.setChecked(False)
+                if hasattr(self, 'contacts_container_widget'): self.contacts_container_widget.setVisible(False)
+                self.contacts_group_box.blockSignals(False)
+
+        elif not self.client_info_group_box.isChecked() and \
+             not self.notes_group_box.isChecked() and \
+             (not hasattr(self, 'contacts_group_box') or not self.contacts_group_box.isChecked()): # Check if contacts_group_box exists
             # If this is the only one checked, and user tried to uncheck it, re-check it.
             self.tabs_group_box.blockSignals(True)
             self.tabs_group_box.setChecked(True)
             self.tab_widget.setVisible(True) # Ensure content visibility matches state
             self.tabs_group_box.blockSignals(False)
+
+    def _handle_contacts_section_toggled(self, checked):
+        if not hasattr(self, 'contacts_container_widget'):
+            return
+        self.contacts_container_widget.setVisible(checked)
+
+        if checked:
+            # Collapse Client Info
+            if hasattr(self, 'client_info_group_box'):
+                self.client_info_group_box.blockSignals(True)
+                self.client_info_group_box.setChecked(False)
+                if hasattr(self, 'info_container_widget'): self.info_container_widget.setVisible(False)
+                self.client_info_group_box.blockSignals(False)
+            # Collapse Notes
+            if hasattr(self, 'notes_group_box'):
+                self.notes_group_box.blockSignals(True)
+                self.notes_group_box.setChecked(False)
+                if hasattr(self, 'notes_container_widget'): self.notes_container_widget.setVisible(False)
+                self.notes_group_box.blockSignals(False)
+            # Collapse Tabs Group
+            if hasattr(self, 'tabs_group_box'):
+                self.tabs_group_box.blockSignals(True)
+                self.tabs_group_box.setChecked(False)
+                if hasattr(self, 'tab_widget'): self.tab_widget.setVisible(False)
+                self.tabs_group_box.blockSignals(False)
+
+        elif not self.client_info_group_box.isChecked() and \
+             not self.notes_group_box.isChecked() and \
+             (not hasattr(self, 'tabs_group_box') or not self.tabs_group_box.isChecked()):
+            self.contacts_group_box.blockSignals(True)
+            self.contacts_group_box.setChecked(True)
+            self.contacts_container_widget.setVisible(True)
+            self.contacts_group_box.blockSignals(False)
+
 
     def load_sav_tickets_table(self):
         # Ensure sav_tickets_table is initialized before use
@@ -3181,7 +3209,7 @@ class ClientWidget(QWidget):
 
                 content_preview = note.get("note_content", "")
                 if len(content_preview) > 70: content_preview = content_preview[:67] + "..."
-                self.document_notes_table.setItem(row_idx, 2, QTableWidgetItem(content_preview))
+                # self.document_notes_table.setItem(row_idx, 2, QTableWidgetItem(content_preview)) # Replaced by HTML label
 
                 note_content = note.get("note_content", "")
                 lines = [line.strip() for line in note_content.split('\n') if line.strip()]
