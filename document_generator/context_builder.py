@@ -96,6 +96,7 @@ def get_document_context(
     company_id: int,
     language_code: str,
     project_id: int = None,
+    order_id: str = None, # Added order_id parameter
     document_type: str = None, # e.g., 'proforma_invoice', 'technical_sheet'
     additional_data: dict = None,
     db_conn=None, # This parameter is now effectively ignored by internal calls if they are all decorated
@@ -105,7 +106,7 @@ def get_document_context(
     Fetches and structures data for document generation.
     Connections to DB for CRUD operations are managed by @_manage_conn decorator on CRUD functions.
     """
-    logger.info(f"get_document_context called with app_root_dir: {app_root_dir}") # LOG app_root_dir
+    logger.info(f"get_document_context called with app_root_dir: {app_root_dir}, client_id: {client_id}, order_id: {order_id}, lang: {language_code}")
     if additional_data is None:
         additional_data = {}
 
@@ -123,147 +124,64 @@ def get_document_context(
     # conn = db_conn if db_conn else get_db_connection() # Connection now managed by @_manage_conn on each CRUD call
 
     try:
+        # Determine translations base path (assuming it's relative to this file's location or project root)
+        # For robustness, it's better if app_root_dir is used to construct this path.
+        # If context_builder.py is in document_generator/, and translations/ is at project root:
+        current_script_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root_for_translations = os.path.dirname(current_script_dir) # Moves up one level from document_generator/
+
+        # If app_root_dir is provided and reliable for finding 'translations' folder:
+        if app_root_dir and os.path.isdir(os.path.join(app_root_dir, "translations", "doc_labels")):
+            translations_base_path = os.path.join(app_root_dir, "translations", "doc_labels")
+        else: # Fallback to path relative to this script
+            translations_base_path = os.path.join(project_root_for_translations, "translations", "doc_labels")
+
+        logger.info(f"Using translations base path: {translations_base_path}")
+
         # 1. Document Info (doc section)
         context["doc"]["current_date"] = datetime.date.today().strftime("%Y-%m-%d")
         context["doc"]["current_year"] = datetime.date.today().year
         context["doc"]["currency_symbol"] = additional_data.get("currency_symbol", "€")
-        context["doc"]["vat_rate"] = Decimal(additional_data.get("vat_rate", "0.20"))
-        context["doc"]["discount_rate"] = Decimal(additional_data.get("discount_rate", "0.00"))
+        # Ensure rates are Decimal for precision
+        context["doc"]["vat_rate"] = Decimal(str(additional_data.get("vat_rate", "0.20")))
+        context["doc"]["discount_rate"] = Decimal(str(additional_data.get("discount_rate", "0.00")))
+
 
         # 2. Language Info (lang section) & Localized Labels
         context["lang"]["code"] = language_code
         context["lang"]["text_direction"] = "rtl" if language_code == "ar" else "ltr"
 
-        _labels = {
-            "fr": {
-            "proforma_invoice_title": "FACTURE PROFORMA",
-            "from_seller": "De :",
-            "to_client": "À :",
-            "proforma_no": "Facture Proforma N° :",
-            "date_label": "Date :",
-            "project_id_label": "ID Projet :",
-            "payment_terms_label": "Conditions de Paiement :",
-            "delivery_terms_label": "Conditions de Livraison :",
-            "item_ref": "Réf.",
-            "item_description": "Description",
-            "quantity": "Quantité",
-            "unit_price": "Prix Unitaire",
-            "total_price": "Prix Total",
-            "client_order_ref_label": "Référence Commande Client :",
-            "client_order_date_label": "Date Commande Client :",
-            "sub_total": "Sous-total :",
-            "discount": "Remise",
-            "vat": "TVA",
-            "grand_total": "Montant Total :",
-            "bank_details_title": "Nos coordonnées bancaires :",
-            "bank_name": "Banque :",
-            "account_holder": "Titulaire du compte :",
-            "iban": "IBAN :",
-            "swift_bic": "SWIFT/BIC :",
-            "bank_address": "Adresse de la banque :",
-            "proforma_notice": "Ceci est une facture proforma et ne constitue pas une demande de paiement.",
-            "thank_you_message": "Merci de votre confiance !",
-            "no_products_listed": "Aucun produit listé."
-        },
-        "en": {
-            "proforma_invoice_title": "PROFORMA INVOICE",
-            "from_seller": "From:",
-            "to_client": "To:",
-            "proforma_no": "Proforma Invoice No:",
-            "date_label": "Date:",
-            "project_id_label": "Project ID:",
-            "payment_terms_label": "Payment Terms:",
-            "delivery_terms_label": "Delivery Terms:",
-            "item_ref": "Ref.",
-            "item_description": "Item Description",
-            "quantity": "Quantity",
-            "unit_price": "Unit Price",
-            "total_price": "Total Price",
-            "client_order_ref_label": "Client Order Reference:",
-            "client_order_date_label": "Client Order Date:",
-            "sub_total": "Subtotal:",
-            "discount": "Discount",
-            "vat": "VAT",
-            "grand_total": "Grand Total:",
-            "bank_details_title": "Our Bank Details:",
-            "bank_name": "Bank:",
-            "account_holder": "Account Holder:",
-            "iban": "IBAN:",
-            "swift_bic": "SWIFT/BIC:",
-            "bank_address": "Bank Address:",
-            "proforma_notice": "This is a proforma invoice and not a demand for payment.",
-            "thank_you_message": "Thank you for your business!"
-        },
-        "ar": {
-            "proforma_invoice_title": "فاتورة أولية",
-            "from_seller": "من:",
-            "to_client": "إلى:",
-            "proforma_no": "رقم الفاتورة الأولية:",
-            "date_label": "التاريخ:",
-            "project_id_label": "معرف المشروع:",
-            "payment_terms_label": "شروط الدفع:",
-            "delivery_terms_label": "شروط التسليم:",
-            "item_ref": "المرجع",
-            "item_description": "وصف السلعة",
-            "quantity": "الكمية",
-            "unit_price": "سعر الوحدة",
-            "total_price": "السعر الإجمالي",
-            "client_order_ref_label": "مرجع طلب العميل:",
-            "client_order_date_label": "تاريخ طلب العميل:",
-            "sub_total": "المجموع الفرعي:",
-            "discount": "خصم",
-            "vat": "ضريبة القيمة المضافة",
-            "grand_total": "المبلغ الإجمالي:",
-            "bank_details_title": "تفاصيل حسابنا المصرفي:",
-            "bank_name": "البنك:",
-            "account_holder": "صاحب الحساب:",
-            "iban": "رقم الحساب المصرفي الدولي:",
-            "swift_bic": "رمز سويفت/BIC:",
-            "bank_address": "عنوان البنك:",
-            "proforma_notice": "هذه فاتورة أولية وليست مطالبة بالدفع.",
-            "thank_you_message": "شكرا لتعاملكم معنا!",
-            "no_products_listed": "لا توجد منتجات مدرجة."
-        },
-        "ru": {
-            "proforma_invoice_title": "ПРОФОРМА-ИНВОЙС",
-            "from_seller": "От:",
-            "to_client": "Кому:",
-            "proforma_no": "Проформа-инвойс №:",
-            "date_label": "Дата:",
-            "project_id_label": "ID Проекта:",
-            "payment_terms_label": "Условия оплаты:",
-            "delivery_terms_label": "Условия поставки:",
-            "item_ref": "Арт.",
-            "item_description": "Описание товара",
-            "quantity": "Кол-во",
-            "unit_price": "Цена за ед.",
-            "total_price": "Сумма",
-            "client_order_ref_label": "Номер заказа клиента:",
-            "client_order_date_label": "Дата заказа клиента:",
-            "sub_total": "Подытог:",
-            "discount": "Скидка",
-            "vat": "НДС",
-            "grand_total": "Итого:",
-            "bank_details_title": "Наши банковские реквизиты:",
-            "bank_name": "Банк:",
-            "account_holder": "Получатель:",
-            "iban": "IBAN:",
-            "swift_bic": "SWIFT/BIC:",
-            "bank_address": "Адрес банка:",
-            "proforma_notice": "Это проформа-инвойс и не является требованием к оплате.",
-            "thank_you_message": "Спасибо за ваш бизнес!",
-            "no_products_listed": "Товары отсутствуют.",
-            "company_logo_alt": "Логотип компании",
-            "phone_label": "Телефон:",
-            "email_label": "Email:",
-            "vat_id_label": "ИНН:",
-            "reg_no_label": "Рег. номер:",
-            "contact_label": "Контакт:"
-            }
-        }
-        context["labels"] = _labels.get(language_code, _labels.get("en", {}))
+        # Load labels from JSON files
+        default_lang_for_labels = "en" # Fallback language
+        labels_path = os.path.join(translations_base_path, f"{language_code}.json")
 
-        context["doc"]["current_date_iso"] = context["doc"]["current_date"] 
+        loaded_labels = {}
+        if os.path.exists(labels_path):
+            try:
+                with open(labels_path, 'r', encoding='utf-8') as f:
+                    loaded_labels = json.load(f)
+                logger.info(f"Successfully loaded labels for language: {language_code} from {labels_path}")
+            except Exception as e:
+                logger.error(f"Error loading labels for language {language_code} from {labels_path}: {e}")
+        else:
+            logger.warning(f"Labels file not found for language: {language_code} at {labels_path}. Attempting fallback.")
+
+        # Fallback labels if specific language file not found or loading failed
+        if not loaded_labels and language_code != default_lang_for_labels:
+            fallback_labels_path = os.path.join(translations_base_path, f"{default_lang_for_labels}.json")
+            if os.path.exists(fallback_labels_path):
+                try:
+                    with open(fallback_labels_path, 'r', encoding='utf-8') as f:
+                        loaded_labels = json.load(f)
+                    logger.info(f"Using fallback labels from: {default_lang_for_labels}.json")
+                except Exception as e:
+                    logger.error(f"Error loading fallback labels for language {default_lang_for_labels}: {e}")
+            else:
+                logger.error(f"Fallback labels file '{default_lang_for_labels}.json' also not found at {fallback_labels_path}.")
+
+        context["labels"] = loaded_labels
+
+        context["doc"]["current_date_iso"] = context["doc"]["current_date"]
         try:
             current_date_obj = datetime.datetime.strptime(context["doc"]["current_date"], "%Y-%m-%d").date()
             if language_code == "fr":
@@ -430,103 +348,148 @@ def get_document_context(
              context["project"]["identifier"] = client_data.get("default_project_identifier")
              context["project"]["name"] = client_data.get("default_project_name")
 
-        # 6. Product Information (products section)
-        linked_products_data = get_products_for_client_or_project(client_id=client_id, project_id=project_id) # Removed conn
-        linked_products_data = linked_products_data if linked_products_data else []
+        # 6. Order and Product/Item Information
+        # This section will now primarily focus on order_id if provided.
+        # The old logic for `get_products_for_client_or_project` might be a fallback
+        # or used for documents not directly tied to a specific order.
 
-        processed_products_for_context = []
-        total_items_price = Decimal("0.0")
+        raw_items_data = []
+        if order_id and commandes_crud:
+            order_details = commandes_crud.get_commande_by_id(order_id)
+            if order_details:
+                context["order"] = {
+                    "id": order_details.get("commande_id"),
+                    "reference": order_details.get("commande_reference"),
+                    "date": order_details.get("commande_date"),
+                    "date_formatted": format_date(order_details.get("commande_date"), language_code),
+                    "description": order_details.get("description_commande"),
+                    "notes": order_details.get("notes"),
+                    "total_ht_raw": Decimal(str(order_details.get("total_ht", "0.0"))),
+                    "total_ttc_raw": Decimal(str(order_details.get("total_ttc", "0.0"))),
+                    "currency": order_details.get("currency", "EUR"),
+                    "project_id": order_details.get("project_id"),
+                    "project_name": order_details.get("project_name"), # From JOIN in get_commande_by_id
+                    "status_name": order_details.get("status_commande_name"),
+                    # Add more fields from order_details as needed by templates
+                }
+                # Override doc currency with order currency if available
+                context["doc"]["currency_symbol"] = context["order"]["currency"]
 
-        for linked_prod_info in linked_products_data:
-            global_product_id = linked_prod_info.get("product_id")
-            if not global_product_id:
-                logger.warning(f"Skipping linked product entry due to missing global_product_id: {linked_prod_info}")
-                continue
+                # Use order's project_id if not already set from arguments
+                if not project_id and context["order"].get("project_id"):
+                    project_id = context["order"]["project_id"] # Update project_id for project context loading
 
-            global_product_details = get_product_by_id(global_product_id) # Removed conn
-            if not global_product_details:
-                logger.warning(f"Global product details not found for product_id: {global_product_id} (linked via client_project_product_id: {linked_prod_info.get('client_project_product_id')}). Skipping.")
-                continue
-
-            display_name = None
-            display_description = None
-            product_matches_target_language = False
-
-            all_raw_equivalents = get_equivalent_products(global_product_id) # Removed conn
-
-            found_equivalent_in_lang = None
-            if all_raw_equivalents:
-                for eq_prod in all_raw_equivalents:
-                    if eq_prod.get("language_code") == language_code:
-                        found_equivalent_in_lang = eq_prod
-                        break
-
-            if found_equivalent_in_lang:
-                display_name = found_equivalent_in_lang.get("name", global_product_details.get("name"))
-                display_description = found_equivalent_in_lang.get("description", global_product_details.get("description"))
-
-                product_matches_target_language = True
-            elif global_product_details.get("language_code") == language_code:
-                display_name = global_product_details.get("name")
-                display_description = global_product_details.get("description")
-                product_matches_target_language = True
-            
-            if not product_matches_target_language:
-                logger.info(f"Product ID {global_product_id} (Name: {global_product_details.get('name')}) will be excluded. Original lang: {global_product_details.get('language_code')}, Target lang: {language_code}.")
-                continue
-
-            quantity = Decimal(str(linked_prod_info.get("quantity", 1)))
-            
-            unit_price_override = linked_prod_info.get("unit_price_override")
-            if unit_price_override is not None:
-                unit_price = Decimal(str(unit_price_override))
+                raw_items_data = commandes_crud.get_items_for_commande(order_id)
+                if raw_items_data is None: raw_items_data = []
+                logger.info(f"Loaded {len(raw_items_data)} items for order_id: {order_id}")
             else:
-                unit_price = Decimal(str(global_product_details.get("base_unit_price", "0.00")))
-            
-            item_total_price = quantity * unit_price
-            total_items_price += item_total_price
+                logger.warning(f"Order with ID {order_id} not found.")
 
-            media_links_raw = get_media_links_for_product(global_product_id) # Removed conn
+        # If no order_id, or if items are passed via additional_data (e.g. for non-order docs)
+        # This part needs careful consideration on how 'products' vs 'items' are handled.
+        # For now, if order_id, 'items' will be populated. If not, old 'products' logic could run.
+        # Let's prioritize `items` from order.
+
+        if not raw_items_data and not order_id: # Fallback to old product fetching if no order
+            logger.info("No order_id provided, attempting to fetch products via get_products_for_client_or_project.")
+            linked_products_data = get_products_for_client_or_project(client_id=client_id, project_id=project_id)
+            linked_products_data = linked_products_data if linked_products_data else []
+            # This `linked_products_data` needs to be transformed into a structure similar to `raw_items_data`
+            # if we want a unified processing loop. For now, this path will lead to empty context["items"].
+            # This section requires further refinement if non-order documents need product listings.
+            # For this iteration, we focus on order-based documents.
+            logger.warning("Non-order based product listing in context_builder needs review/implementation based on use-case.")
+
+
+        processed_items_for_context = []
+        calculated_subtotal_ht = Decimal("0.0")
+
+        for item_data in raw_items_data: # Iterating over CommandeItems
+            global_product_id = item_data.get("product_id")
+            item_specific_lang_code = item_data.get("product_language_code")
+            target_lang_for_this_item = item_specific_lang_code if item_specific_lang_code else language_code
+
+            display_name = item_data.get("description_item") # Default to item's own description
+            display_description = "" # CommandeItem might not have a separate long description field
+            
+            # Try to get product details in the target language for this item
+            # This part needs robust multilingual product fetching logic.
+            # For now, using placeholder logic:
+            product_details_in_target_lang = None
+            if global_product_id:
+                # Ideal: products_crud.get_product_translation(global_product_id, target_lang_for_this_item, fallback_lang='en')
+                # Simplified for now:
+                global_product_base_info = get_product_by_id(global_product_id) # Gets default lang
+                if global_product_base_info:
+                    if global_product_base_info.get("language_code") == target_lang_for_this_item:
+                        product_details_in_target_lang = global_product_base_info
+                    else: # Try equivalents (simplified)
+                        equivalents = get_equivalent_products(global_product_id)
+                        if equivalents:
+                            for eq in equivalents:
+                                if eq.get("language_code") == target_lang_for_this_item:
+                                    product_details_in_target_lang = eq
+                                    break
+                    if not product_details_in_target_lang: # Fallback to base if no translation found
+                         product_details_in_target_lang = global_product_base_info
+                         logger.warning(f"No translation for product {global_product_id} to lang {target_lang_for_this_item}. Using base: {global_product_base_info.get('name')}")
+
+                if product_details_in_target_lang:
+                    # Override item's description with product's name if item's description is empty or too generic
+                    if not display_name or display_name == product_details_in_target_lang.get("product_code"):
+                        display_name = product_details_in_target_lang.get("product_name", item_data.get("description_item"))
+                    display_description = product_details_in_target_lang.get("description", "")
+
+
+            quantity = Decimal(str(item_data.get("quantity", 1)))
+            unit_price_ht = Decimal(str(item_data.get("unit_price_ht", "0.00")))
+            total_item_ht = Decimal(str(item_data.get("total_item_ht", "0.00"))) # Use pre-calculated from DB
+            calculated_subtotal_ht += total_item_ht
+
+            # Media links (similar to previous product logic)
             media_links_processed = []
-            if media_links_raw:
-                for media_link in media_links_raw:
-                    file_path = media_link.get("file_path")
-                    if file_path and app_root_dir:
-                        media_root = AppGlobalConfig.get('media_files_path')
-                        if not media_root and app_root_dir: 
-                            media_root = os.path.join(app_root_dir, 'media_files')
-                        if media_root:
+            if global_product_id and app_root_dir:
+                media_links_raw = get_media_links_for_product(global_product_id)
+                if media_links_raw:
+                    for media_link in media_links_raw:
+                        file_path = media_link.get("file_path")
+                        if file_path:
+                            media_root = AppGlobalConfig.get('media_files_path', os.path.join(app_root_dir, 'media_files'))
                             abs_media_path = os.path.join(media_root, file_path.lstrip(os.sep))
                             if os.path.exists(abs_media_path):
                                  media_links_processed.append({
                                      "url": f"file:///{abs_media_path.replace(os.sep, '/')}",
-                                     "type": media_link.get("type", "image"),
-                                     "description": media_link.get("description")
+                                     "type": media_link.get("type", "image"), "description": media_link.get("description")
                                  })
-                            else:
-                                logger.warning(f"Media file not found: {abs_media_path} for product {global_product_id} (media_root: {media_root})")
-                        else:
-                             logger.warning(f"Media root path could not be determined. Cannot resolve media path for product {global_product_id}: {file_path}")
             
-            processed_products_for_context.append({
-                "id": global_product_id,
-                "original_name": global_product_details.get("name"),
-                "original_description": global_product_details.get("description"),
-                "sku": global_product_details.get("product_code"),
+            processed_items_for_context.append({
+                "product_code": item_data.get("product_code", global_product_id), # From JOIN in get_items_for_commande
                 "name": display_name,
                 "description": display_description,
                 "quantity": quantity,
-                "unit_price": format_currency(unit_price, context["doc"]["currency_symbol"]),
-                "total_price": format_currency(item_total_price, context["doc"]["currency_symbol"]),
-                "unit_price_decimal": unit_price,
-                "total_price_decimal": item_total_price,
+                "unit_price_formatted": format_currency(unit_price_ht, context["doc"]["currency_symbol"], language_code=language_code),
+                "total_price_formatted": format_currency(total_item_ht, context["doc"]["currency_symbol"], language_code=language_code),
+                "unit_price_decimal": unit_price_ht,
+                "total_price_decimal": total_item_ht,
+                "vat_rate_percentage": Decimal(str(item_data.get("vat_rate", "0.0"))) * Decimal("100"),
+                "total_ttc_formatted": format_currency(Decimal(str(item_data.get("total_item_ttc", "0.0"))), context["doc"]["currency_symbol"], language_code=language_code),
+                "weight": item_data.get("weight"), # From CommandeItems
+                "dimensions_text": item_data.get("dimensions_text"), # From CommandeItems
+                "item_language_code": item_data.get("product_language_code"), # From CommandeItems
                 "media_links": media_links_processed,
             })
         
-        context["products"] = processed_products_for_context
-        subtotal = total_items_price
-        discount_amount = subtotal * context["doc"]["discount_rate"]
-        subtotal_after_discount = subtotal - discount_amount
+        context["items"] = processed_items_for_context # Use "items" for generic line items
+
+        # Use calculated subtotal from items if order details are not authoritative or need override
+        subtotal_ht = calculated_subtotal_ht
+        if order_id and context["order"].get("total_ht_raw") is not None: # Prefer order's total if available
+            subtotal_ht = context["order"]["total_ht_raw"]
+
+        # Recalculate totals based on context["items"] or order totals
+        # Assuming discount_rate and vat_rate are for the whole order
+        discount_amount = subtotal_ht * context["doc"]["discount_rate"]
+        subtotal_after_discount = subtotal_ht - discount_amount
         vat_amount = subtotal_after_discount * context["doc"]["vat_rate"]
         grand_total = subtotal_after_discount + vat_amount
 

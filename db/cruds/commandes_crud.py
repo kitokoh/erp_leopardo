@@ -214,9 +214,10 @@ def add_commande_item(data: dict, conn: sqlite3.Connection = None) -> str | None
     sql = """
         INSERT INTO CommandeItems (
             item_id, commande_id, product_id, description_item, quantity,
-            unit_price_ht, vat_rate, total_item_ht, total_item_ttc
+            unit_price_ht, vat_rate, total_item_ht, total_item_ttc,
+            weight, dimensions_text, product_language_code
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
     params = (
         new_item_id,
@@ -227,7 +228,10 @@ def add_commande_item(data: dict, conn: sqlite3.Connection = None) -> str | None
         unit_price_ht,
         vat_rate,
         total_item_ht,
-        total_item_ttc
+        total_item_ttc,
+        data.get('weight'), # Nouveau champ
+        data.get('dimensions_text'), # Nouveau champ
+        data.get('product_language_code') # Nouveau champ
     )
     try:
         cursor.execute(sql, params)
@@ -242,7 +246,10 @@ def get_items_for_commande(commande_id: str, conn: sqlite3.Connection = None) ->
     """Retrieves all items for a given commande_id, joining with Products for product_name."""
     cursor = conn.cursor()
     sql = """
-        SELECT ci.*, p.product_name, p.product_code
+        SELECT ci.*, p.product_name, p.product_code,
+               p.language_code AS global_product_language_code,
+               p.weight AS global_product_weight,
+               p.dimensions AS global_product_dimensions
         FROM CommandeItems ci
         JOIN Products p ON ci.product_id = p.product_id
         WHERE ci.commande_id = ?
@@ -256,7 +263,7 @@ def update_commande_item(item_id: str, data: dict, conn: sqlite3.Connection = No
     """Updates an existing commande item."""
     cursor = conn.cursor()
 
-    valid_fields = ['product_id', 'description_item', 'quantity', 'unit_price_ht', 'vat_rate']
+    valid_fields = ['product_id', 'description_item', 'quantity', 'unit_price_ht', 'vat_rate', 'weight', 'dimensions_text', 'product_language_code']
     fields_to_update = {k: v for k, v in data.items() if k in valid_fields}
 
     if not fields_to_update:
