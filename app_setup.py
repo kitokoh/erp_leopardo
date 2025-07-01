@@ -74,7 +74,7 @@ def setup_logging():
 
     # Add the new file handler
     file_handler = logging.handlers.RotatingFileHandler(
-        log_file_path, maxBytes=1024*1024, backupCount=3, encoding='utf-8'
+        log_file_path, maxBytes=1024*1024, backupCount=3, encoding='utf-8', delay=True
     )
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(logging.Formatter(log_format))
