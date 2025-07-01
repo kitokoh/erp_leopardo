@@ -361,8 +361,12 @@ class CommandeDialog(QDialog):
             qty_item = self.items_table.item(row, 2)
             price_ht_item = self.items_table.item(row, 3)
             vat_rate_percent_item = self.items_table.item(row, 4)
-            total_ht_cell_item = self.items_table.item(row, 5)
-            total_ttc_cell_item = self.items_table.item(row, 6)
+            qty_item = self.items_table.item(row, 2)
+            price_ht_item = self.items_table.item(row, 3)
+            vat_rate_percent_item = self.items_table.item(row, 4)
+            # Les totaux de ligne sont dans les colonnes 8 (Total HT) et 9 (Total TTC)
+            total_ht_cell_item = self.items_table.item(row, 8)
+            total_ttc_cell_item = self.items_table.item(row, 9)
 
             if not all([qty_item, price_ht_item, vat_rate_percent_item, total_ht_cell_item, total_ttc_cell_item]):
                 self.logger.warning(f"handle_item_changed_in_table: Missing cell item in row {row}. Aborting calculation for this row.")
@@ -437,8 +441,8 @@ class CommandeDialog(QDialog):
                 # If loading existing items, their totals are already calculated.
                 # If adding new items, their totals need to be calculated upon input.
                 # This function should sum up total_item_ht and total_item_ttc from all rows.
-                ht_cell_item = self.items_table.item(row, 5) # Total HT column
-                ttc_cell_item = self.items_table.item(row, 6) # Total TTC column
+                ht_cell_item = self.items_table.item(row, 8) # Total HT column (index 8)
+                ttc_cell_item = self.items_table.item(row, 9) # Total TTC column (index 9)
 
                 if ht_cell_item and ht_cell_item.text():
                     try:
