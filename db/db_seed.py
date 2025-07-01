@@ -294,7 +294,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         logger.info("Finished seeding products.")
 
         # Seed default hydraulic presses
-        _seed_default_hydraulic_presses(cursor, conn, logger_passed=logger)
+        # _seed_default_hydraulic_presses(cursor, conn, logger_passed=logger) # Function definition not found
         
         # 11. SmtpConfigs
         logger.info("Seeding placeholder SMTP config...")
