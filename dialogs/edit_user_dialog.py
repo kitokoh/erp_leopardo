@@ -57,6 +57,11 @@ class EditUserDialog(QDialog):
             self.username_input = QLineEdit()
             self.form_layout.addRow(self.tr("Nom d'utilisateur:"), self.username_input)
         else:
+            # Display User ID (non-editable) in edit mode
+            self.user_id_label_display = QLabel(self.user_data_to_edit.get('user_id', self.tr("N/A")))
+            self.user_id_label_display.setTextInteractionFlags(Qt.TextSelectableByMouse) # Allow copying
+            self.form_layout.addRow(self.tr("ID Utilisateur:"), self.user_id_label_display)
+
             self.username_label = QLabel(self.user_data_to_edit.get('username', ''))
             self.form_layout.addRow(self.tr("Nom d'utilisateur:"), self.username_label)
 
