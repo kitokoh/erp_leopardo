@@ -79,7 +79,7 @@ class LoginDialog(QDialog):
         # Buttons
         self.button_box = QDialogButtonBox()
         self.login_button = self.button_box.addButton(self.tr("Connexion"), QDialogButtonBox.AcceptRole) # Store as instance member
-        self.login_button.setIcon(QIcon(":/icons/log-in.svg")) # Assuming log-in.svg exists
+        self.login_button.setIcon(QIcon(":/icons/log-out.svg")) # Corrected: log-out.svg exists and is suitable
         self.login_button.setObjectName("primaryButton") # For styling
 
         cancel_button = self.button_box.addButton(QDialogButtonBox.Cancel)
