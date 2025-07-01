@@ -24,6 +24,7 @@ from PyQt5.QtGui import QPixmap
 
 import db as db_manager
 from db.cruds import client_documents_crud, users_crud, activity_logs_crud # Added for document deletion and user fetching
+
 from db.cruds.clients_crud import clients_crud_instance
 from excel_editor import ExcelEditor
 from html_editor import HtmlEditor
