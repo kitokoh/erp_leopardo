@@ -1,10 +1,11 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>Proforma Invoice</title>
+    <title>فاتورة شكلية</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;700&display=swap');
+        body { font-family: 'Noto Sans Arabic', Arial, sans-serif; margin: 20px; color: #333; }
         .container { width: 90%; margin: auto; }
         .header, .footer { text-align: center; margin-bottom: 30px; }
         .header h1 { color: #444; }
@@ -24,78 +25,90 @@
 <body>
     <div class="container">
         <div class="header">
-            <img src="{{SELLER_LOGO_PATH}}" alt="Company Logo" class="logo" />
-            <h1>PROFORMA INVOICE</h1>
+            {{#if seller.logo_url}}
+            <img src="{{seller.logo_url}}" alt="{{labels.company_logo_alt | default('شعار الشركة')}}" class="logo" />
+            {{/if}}
+            <h1>{{labels.proforma_invoice_title | default('فاتورة شكلية')}}</h1>
         </div>
 
         <div class="details-section">
             <div class="company-details">
-                <h3>From:</h3>
-                <p><strong>{{SELLER_COMPANY_NAME}}</strong></p>
-                <p>{{SELLER_ADDRESS_LINE1}}</p>
-                <p>{{SELLER_CITY_ZIP_COUNTRY}}</p>
-                <p>Phone: {{SELLER_PHONE}}</p>
-                <p>Email: {{SELLER_EMAIL}}</p>
-                <p>VAT ID: {{SELLER_VAT_ID}}</p>
+                <h3>{{labels.from_seller | default('من:')}}</h3>
+                <p><strong>{{seller.name}}</strong></p>
+                <p>{{seller.address_line1}}</p>
+                <p>{{seller.city_zip_country}}</p>
+                <p>{{labels.phone | default('الهاتف:')}} {{seller.phone}}</p>
+                <p>{{labels.email | default('البريد الإلكتروني:')}} {{seller.email}}</p>
+                <p>{{labels.vat_id | default('الرقم الضريبي:')}} {{seller.vat_id}}</p>
             </div>
 
             <div class="client-details">
-                <h3>To:</h3>
-                <p><strong>{{CLIENT_NAME}}</strong></p>
-                <p>{{CLIENT_ADDRESS_LINE1}}</p>
-                <p>{{CLIENT_CITY_ZIP_COUNTRY}}</p>
-                <p>Contact: {{PRIMARY_CONTACT_NAME}}</p>
-                <p>Email: {{PRIMARY_CONTACT_EMAIL}}</p>
-                <p>VAT ID: {{CLIENT_VAT_ID}}</p>
+                <h3>{{labels.to_client | default('إلى:')}}</h3>
+                <p><strong>{{client.display_name}}</strong></p>
+                <p>{{client.address_line1}}</p>
+                <p>{{client.city_zip_country}}</p>
+                <p>{{labels.contact | default('جهة الاتصال:')}} {{client.contact_name}}</p>
+                <p>{{labels.email | default('البريد الإلكتروني:')}} {{client.contact_email}}</p>
+                <p>{{labels.vat_id | default('الرقم الضريبي:')}} {{client.vat_id}}</p>
             </div>
         </div>
 
         <div class="invoice-meta">
-            <p><strong>Proforma Invoice No:</strong> {{PROFORMA_ID}}</p>
-            <p><strong>Date:</strong> {{DATE}}</p>
-            <p><strong>Project ID:</strong> {{PROJECT_ID}}</p>
-            <p><strong>Payment Terms:</strong> {{PAYMENT_TERMS}}</p>
-            <p><strong>Delivery Terms:</strong> {{DELIVERY_TERMS}}</p>
+            <p><strong>{{labels.proforma_invoice_no | default('رقم الفاتورة الشكلية:')}}</strong> {{doc.document_reference}}</p>
+            <p><strong>{{labels.date | default('التاريخ:')}}</strong> {{doc.current_date_formatted}}</p>
+            <p><strong>{{labels.project_id | default('معرف المشروع:')}}</strong> {{project.identifier}}</p>
+            <!-- Payment/Delivery terms might come from seller.payment_info or doc.additional_notes depending on setup -->
+            <p><strong>{{labels.payment_terms | default('شروط الدفع:')}}</strong> {{doc.payment_terms}}</p>
+            <p><strong>{{labels.delivery_terms | default('شروط التسليم:')}}</strong> {{doc.delivery_terms}}</p>
         </div>
 
         <table>
             <thead>
                 <tr>
-                    <th>#</th>
-                    <th>Item Description</th>
-                    <th>Quantity</th>
-                    <th>Unit Price</th>
-                    <th>Total Price</th>
+                    <th>{{labels.item_ref_short | default('#')}}</th>
+                    <th>{{labels.item_description | default('وصف العنصر')}}</th>
+                    <th>{{labels.quantity | default('الكمية')}}</th>
+                    <th>{{labels.unit_price | default('سعر الوحدة')}}</th>
+                    <th>{{labels.total_price | default('السعر الإجمالي')}}</th>
                 </tr>
             </thead>
             <tbody>
-                {{doc.products_table_rows}} <!-- Populated by db.py -->
-                <!-- Example Row (to be replaced by HtmlEditor):
+                {{#each items}}
                 <tr>
-                    <td>1</td>
-                    <td>Product A</td>
-                    <td>2</td>
-                    <td>€100.00</td>
-                    <td>€200.00</td>
+                    <td>{{this.product_code}}</td>
+                    <td>
+                        <strong>{{this.name}}</strong>
+                        {{#if this.description}}
+                        <br><small>{{this.description}}</small>
+                        {{/if}}
+                    </td>
+                    <td style="text-align: center;">{{this.quantity}}</td>
+                    <td style="text-align: right;">{{this.unit_price_formatted}}</td>
+                    <td style="text-align: right;">{{this.total_price_formatted}}</td>
                 </tr>
-                -->
+                {{/each}}
             </tbody>
         </table>
 
         <div class="total-section">
-            <p>Subtotal: {{SUBTOTAL_AMOUNT}}</p>
-            <p>Discount ({{DISCOUNT_RATE}}%): {{DISCOUNT_AMOUNT}}</p>
-            <p>VAT ({{VAT_RATE}}%): {{VAT_AMOUNT}}</p>
-            <h3><strong>Total Amount Due: {{GRAND_TOTAL_AMOUNT}}</strong></h3>
+            <p>{{labels.subtotal | default('المجموع الفرعي:')}} {{doc.subtotal_amount}}</p>
+            {{#if doc.discount_amount_raw}}
+            <p>{{labels.discount | default('الخصم')}} ({{doc.discount_rate}}%): {{doc.discount_amount}}</p>
+            {{/if}}
+            <p>{{labels.vat_label | default('ضريبة القيمة المضافة')}} ({{doc.vat_rate}}%): {{doc.vat_amount}}</p>
+            <h3><strong>{{labels.total_amount_due | default('المبلغ الإجمالي المستحق:')}} {{doc.grand_total_amount}}</strong></h3>
         </div>
 
         <div class="footer">
-            <p>Bank Details: {{BANK_NAME}}, Account: {{BANK_ACCOUNT_NUMBER}}, Swift/BIC: {{BANK_SWIFT_BIC}}</p>
-            <p>This is a proforma invoice and is not a demand for payment.</p>
-            {% if doc.client_specific_footer_notes %}
-            <p style="margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px;">{{doc.client_specific_footer_notes}}</p>
-            {% endif %}
-            <p>Thank you for your business!</p>
+            <p>{{labels.bank_details | default('التفاصيل المصرفية:')}} {{seller.bank_name}}, {{labels.account | default('الحساب:')}} {{seller.bank_iban}}, {{labels.swift_bic | default('سويفت/BIC:')}} {{seller.bank_swift_bic}}</p>
+            <p>{{labels.proforma_not_a_demand | default('هذه فاتورة شكلية وليست مطالبة بالدفع.')}}</p>
+            {{#each doc.client_specific_notes}}
+            <p style="margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px;">{{this}}</p>
+            {{/each}}
+             {{#if doc.footer_notes}}
+            <p style="margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px;">{{doc.footer_notes}}</p>
+            {{/if}}
+            <p>{{labels.thank_you_message | default('شكرا لتعاملكم معنا!')}}</p>
         </div>
     </div>
 </body>

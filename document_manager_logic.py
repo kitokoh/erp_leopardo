@@ -795,8 +795,16 @@ def permanently_delete_client(doc_manager, client_id):
             # clients_crud_instance.delete_client now handles soft delete AND status update.
             delete_result = clients_crud_instance.delete_client(client_id)
 
-            if delete_result and delete_result.get('success'):
-                logging.info(f"Client {client_id} ({client_name_val}) soft deleted and status updated to 'Archivé'. Folder NOT removed.")
+            if delete_result['success']:
+                # Folder removal logic might be re-evaluated.
+                # For soft delete, typically data isn't removed from filesystem immediately.
+                # For now, keeping the rmtree logic but it's less common with soft delete.
+                # Consider making folder archival a separate process or based on a longer-term policy.
+                # logging.info(f"Client {client_id} soft-deleted. Folder {client_folder_path} was NOT removed as part of soft delete.")
+                # Le dossier n'est PAS supprimé lors d'un soft delete.
+                # La suppression de dossier pourrait être une action manuelle séparée ou lors d'un hard delete futur.
+                logging.info(f"Client {client_id} marqué comme supprimé (soft delete). Le dossier {client_folder_path} n'est PAS supprimé.")
+
 
                 # Update UI
                 if client_id in doc_manager.clients_data_map:
