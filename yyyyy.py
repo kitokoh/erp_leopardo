@@ -132,9 +132,9 @@ def get_generic_input_style():
             border-top-right-radius: 3px; border-bottom-right-radius: 3px;
         }
         QComboBox::down-arrow {
-            image: url(icons/arrow_down.png);
+        image: url(resources/icons/arrow_down.png);
         }
-    """ # Assuming icons/arrow_down.png exists or will be added
+""" # Assuming resources/icons/arrow_down.png exists or will be added
 
 def get_group_box_style():
     return """
