@@ -11,9 +11,7 @@ import logging # Added logging
 from PyQt5.QtCore import QCoreApplication # Retained for potential remaining Qt utilities, or if QMessageBox needs it implicitly
 from PyQt5.QtWidgets import QMessageBox # Retained for potential remaining Qt utilities
 
-# Document import was removed earlier.
-# import db as db_manager # Moved with generate_pdf_for_document
-# from html_to_pdf_util import convert_html_to_pdf # Moved with generate_pdf_for_document
+
 
 # MAIN_APP_ROOT_DIR related comments are now with the functions that used it.
 

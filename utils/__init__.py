@@ -22,3 +22,4 @@ __all__ = [
     'is_first_launch', 'mark_initial_setup_complete',
     'generate_pdf_for_document'
 ]
+
