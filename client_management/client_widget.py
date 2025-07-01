@@ -4023,10 +4023,70 @@ class ClientWidget(QWidget):
         # Clear existing rows from the layout, EXCEPT for the status_combo's row if managed differently
         # For simplicity, we'll clear and re-add, ensuring status_combo is handled carefully.
 
-        # This method now updates existing widgets rather than clearing and rebuilding the layout.
+        # Explicitly handle deletion and recreation of status_combo
+        if hasattr(self, 'status_combo') and self.status_combo is not None:
+            # Disconnect signals first
+            try:
+                self.status_combo.currentTextChanged.disconnect(self.update_client_status)
+            except TypeError:
+                pass # Not connected or already disconnected
+
+            # Remove from layout if it's part of one (QFormLayout handles this when row is removed)
+            # Then schedule for deletion and clear the reference
+            if self.status_combo.parent() is not None: # Check if it has a parent (might be in a layout)
+                 # If details_layout is its direct parent or part of its hierarchy, removing rows will handle it.
+                 # For safety, if it's not directly in details_layout but managed elsewhere, ensure it's handled.
+                 # However, given it's added to status_category_widget which goes into details_layout,
+                 # clearing details_layout should delete it.
+                 pass # Assuming layout clearing below handles parentage and deletion.
+
+            # More direct: just delete it and set to None so it's recreated.
+            self.status_combo.deleteLater()
+            self.status_combo = None
+            logging.debug("Old status_combo marked for deletion and reference cleared.")
+
+        # Detach category labels if they exist and are parented to details_layout
+        # This is important if they are not recreated each time.
+        if hasattr(self, 'category_label') and self.category_label and self.category_label.parentWidget() is not None:
+            self.category_label.setParent(None)
+        if hasattr(self, 'category_value_label') and self.category_value_label and self.category_value_label.parentWidget() is not None:
+            self.category_value_label.setParent(None)
+
+        # Clear all rows from details_layout. This will delete widgets previously in the layout.
+        while self.details_layout.rowCount() > 0:
+            self.details_layout.removeRow(0)
+
+        self.detail_value_labels = {} # Re-initialize
         logging.info(f"Populating details layout for: {self.client_info.get('client_name')}")
 
-        # Update Project ID
+        # Ensure status_combo is created (it will be None now due to the above logic)
+        if not hasattr(self, 'status_combo') or self.status_combo is None:
+            logging.debug("status_combo is None, creating new instance.")
+            self.status_combo = QComboBox()
+
+        # Always reload statuses into the (potentially new) combo box
+        self.load_statuses() # This should now operate on a valid, new QComboBox
+
+        # Set current status and enabled state
+        self.status_combo.setEnabled(False) # Non-editable in display mode
+        current_status_text = self.client_info.get("status", self.tr("En cours"))
+        status_idx = self.status_combo.findText(current_status_text)
+        if status_idx != -1:
+            self.status_combo.setCurrentIndex(status_idx)
+        elif self.status_combo.count() > 0:
+            self.status_combo.setCurrentIndex(0) # Default to first if not found
+
+        # Manage signal connection
+        try:
+            self.status_combo.currentTextChanged.disconnect(self.update_client_status)
+        except TypeError:
+            pass # Not connected
+        self.status_combo.currentTextChanged.connect(self.update_client_status)
+
+
+        # Project ID
+        project_id_label = QLabel(self.tr("ID Projet:"))
+
         project_identifier_value = self.client_info.get("project_identifier", self.tr("N/A"))
         self.project_id_value_label.setText(project_identifier_value)
         logging.info(f"Setting project_identifier: {project_identifier_value}")
