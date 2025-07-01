@@ -504,12 +504,19 @@ def get_document_context(
         context["doc"]["vat_amount"] = format_currency(vat_amount, cs)
         context["doc"]["grand_total_amount"] = format_currency(grand_total, cs)
 
-        doc_type_for_notes = additional_data.get("document_type_for_notes", document_type)
+        doc_type_for_notes = additional_data.get("current_document_type_for_notes", document_type) # Use the key passed from create_document_dialog
         if doc_type_for_notes and client_id and language_code:
-            notes = get_client_document_notes(client_id, doc_type_for_notes, language_code) # Removed conn
-            context["doc"]["client_specific_notes"] = notes
+            # Explicitly fetch only active notes. conn is handled by @_manage_conn in get_client_document_notes
+            client_notes_records = get_client_document_notes(client_id, doc_type_for_notes, language_code, is_active=True)
+            # Templates likely expect a list of note strings, not dicts.
+            context["doc"]["client_specific_notes"] = [note['note_content'] for note in client_notes_records] if client_notes_records else []
+            if client_notes_records:
+                logger.info(f"Fetched {len(client_notes_records)} active client-specific notes for doc type '{doc_type_for_notes}', lang '{language_code}'.")
+            else:
+                logger.info(f"No active client-specific notes found for doc type '{doc_type_for_notes}', lang '{language_code}'.")
         else:
             context["doc"]["client_specific_notes"] = []
+            logger.info(f"Skipping client-specific notes fetch due to missing: doc_type_for_notes='{doc_type_for_notes}', client_id='{client_id}', or language_code='{language_code}'.")
 
         context["placeholders"]["BUYER_COMPANY_NAME"] = context["client"].get("company_name", context["client"].get("name"))
         context["placeholders"]["BUYER_CONTACT_NAME"] = context["client"].get("contact_name")
