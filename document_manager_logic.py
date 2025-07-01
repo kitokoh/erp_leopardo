@@ -801,9 +801,10 @@ def permanently_delete_client(doc_manager, client_id):
                 # For soft delete, typically data isn't removed from filesystem immediately.
                 # For now, keeping the rmtree logic but it's less common with soft delete.
                 # Consider making folder archival a separate process or based on a longer-term policy.
-                if os.path.exists(client_folder_path):
-                    # shutil.rmtree(client_folder_path, ignore_errors=True) # Reconsider this line for soft delete
-                    logging.warning(f"Client {client_id} soft-deleted. Folder {client_folder_path} was NOT removed as part of soft delete.")
+                # logging.info(f"Client {client_id} soft-deleted. Folder {client_folder_path} was NOT removed as part of soft delete.")
+                # Le dossier n'est PAS supprimé lors d'un soft delete.
+                # La suppression de dossier pourrait être une action manuelle séparée ou lors d'un hard delete futur.
+                logging.info(f"Client {client_id} marqué comme supprimé (soft delete). Le dossier {client_folder_path} n'est PAS supprimé.")
 
                 # Update UI: remove from active list (if not showing deleted), update map
                 if client_id in doc_manager.clients_data_map:
