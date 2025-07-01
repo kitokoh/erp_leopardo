@@ -2086,10 +2086,10 @@ class DocumentManager(QMainWindow):
         if self.commandes_dashboard_widget_instance:
             # Refresh data when view is shown
             if hasattr(self.commandes_dashboard_widget_instance, '_load_initial_data'):
-                self.logger.info("Calling _load_initial_data on CommandesDashboardWidget.")
+                logging.info("Calling _load_initial_data on CommandesDashboardWidget.")
                 self.commandes_dashboard_widget_instance._load_initial_data()
             self.main_area_stack.setCurrentWidget(self.commandes_dashboard_widget_instance)
-            self.logger.info("Switched to CommandesDashboardWidget.")
+            logging.info("Switched to CommandesDashboardWidget.")
         else:
             logging.error("CommandesDashboardWidget instance is None. Cannot show view.")
             QMessageBox.critical(self, self.tr("Erreur Module Commande"),
