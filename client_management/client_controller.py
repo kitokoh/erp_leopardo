@@ -6,6 +6,8 @@ import logging
 # Setup basic logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+from db.cruds.activity_logs_crud import add_activity_log # Added import
+
 class ClientController:
     def __init__(self):
         # In the future, we might pass a specific DB connection or configuration
@@ -267,6 +269,21 @@ class ClientController:
                         created_client_details['product_creation_status'] = {'success': False, 'error': error_msg}
                 else:
                     logging.info(f"No product information provided for client ID {new_client_id}.")
+
+                # Log activity
+                try:
+                    log_data = {
+                        "user_id": db_client_data.get('created_by_user_id'),
+                        "action_type": "CLIENT_CREATED",
+                        "details": f"Client '{created_client_details.get('client_name')}' créé.",
+                        "related_entity_type": "Client",
+                        "related_entity_id": new_client_id,
+                        "related_client_id": new_client_id # Also set related_client_id for client-specific actions
+                    }
+                    add_activity_log(log_data)
+                    logging.info(f"Activity logged for CLIENT_CREATED: {new_client_id}")
+                except Exception as e_log:
+                    logging.error(f"Failed to log CLIENT_CREATED activity for client {new_client_id}: {e_log}", exc_info=True)
 
                 return created_client_details # Return the (potentially augmented) client details
             else: # Should not happen if success is True and client_id is missing from clients_crud.add_client result

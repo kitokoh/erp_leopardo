@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
     QComboBox, QPushButton, QMessageBox, QDialogButtonBox, QLabel
 )
 from PyQt5.QtGui import QIcon
-from db.cruds import users_crud, roles_crud
+from db.cruds import users_crud, roles_crud, activity_logs_crud
 from auth.permissions import P_MANAGE_USERS, has_permission
 from utils import hash_password # Import the hashing function
 
@@ -197,6 +197,19 @@ class EditUserDialog(QDialog):
             )
             if new_user_id:
                 QMessageBox.information(self, self.tr("Succès"), self.tr("Utilisateur '{0}' créé avec succès.").format(username))
+                # Log activity for user creation
+                try:
+                    log_data = {
+                        "user_id": self.current_admin_user_info.get('user_id'), # User performing the action
+                        "action_type": "USER_CREATED",
+                        "details": f"Utilisateur '{username}' (ID: {new_user_id}) créé avec le rôle ID: {new_role_id}.",
+                        "related_entity_type": "User",
+                        "related_entity_id": new_user_id
+                    }
+                    activity_logs_crud.add_activity_log(log_data)
+                    logger.info(f"Activity logged for USER_CREATED: {new_user_id} by {self.current_admin_user_info.get('user_id')}")
+                except Exception as e_log:
+                    logger.error(f"Failed to log USER_CREATED activity for new user {new_user_id}: {e_log}", exc_info=True)
                 self.accept()
             else:
                 QMessageBox.critical(self, self.tr("Erreur Création"), self.tr("Impossible de créer l'utilisateur."))
@@ -261,6 +274,29 @@ class EditUserDialog(QDialog):
 
             if user_update_success and role_update_success:
                 QMessageBox.information(self, self.tr("Succès"), self.tr("Utilisateur mis à jour avec succès."))
+
+                # Log activity for user update (details and/or role)
+                log_details_parts = []
+                if changed_details:
+                    log_details_parts.append(f"Détails mis à jour: {update_data_user}")
+                if changed_role:
+                    new_role_name = self.role_combo.currentText() # Get name for logging
+                    log_details_parts.append(f"Rôle changé en '{new_role_name}' (ID: {new_role_id})")
+
+                if log_details_parts: # Only log if something actually changed and was successful
+                    try:
+                        log_entry_details = "Modifications: " + "; ".join(log_details_parts)
+                        log_data = {
+                            "user_id": self.current_admin_user_info.get('user_id'), # User performing the action
+                            "action_type": "USER_UPDATED",
+                            "details": log_entry_details,
+                            "related_entity_type": "User",
+                            "related_entity_id": self.user_id_to_edit
+                        }
+                        activity_logs_crud.add_activity_log(log_data)
+                        logger.info(f"Activity logged for USER_UPDATED: {self.user_id_to_edit} by {self.current_admin_user_info.get('user_id')}")
+                    except Exception as e_log:
+                        logger.error(f"Failed to log USER_UPDATED activity for user {self.user_id_to_edit}: {e_log}", exc_info=True)
                 self.accept()
 
 if __name__ == '__main__':

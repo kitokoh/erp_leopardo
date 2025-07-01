@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import QAbstractItemView
 
 # Assuming users_crud and roles_crud are accessible for fetching data
 # and auth.permissions for permission checking if actions were added here.
-from db.cruds import users_crud # For list_users
+from db.cruds import users_crud, activity_logs_crud # For list_users and logging
 from auth.permissions import has_permission, P_MANAGE_USERS
 from db.cruds import roles_crud # For populating roles in edit dialog
 
@@ -299,6 +299,19 @@ class UserManagementPage(QWidget):
                 QMessageBox.information(self, self.tr("Succès"),
                                         self.tr("Statut de l'utilisateur '{0}' mis à jour.").format(username_to_display))
                 self.load_users_to_table()
+                # Log activity
+                try:
+                    log_data = {
+                        "user_id": self.current_user_info.get('user_id'), # User performing the action
+                        "action_type": "USER_STATUS_CHANGED",
+                        "details": f"Statut de l'utilisateur '{username_to_display}' (ID: {selected_user_id}) changé à {'Actif' if new_status else 'Inactif'}.",
+                        "related_entity_type": "User",
+                        "related_entity_id": selected_user_id
+                    }
+                    activity_logs_crud.add_activity_log(log_data)
+                    logging.info(f"Activity logged for USER_STATUS_CHANGED: {selected_user_id} by {self.current_user_info.get('user_id')}")
+                except Exception as e_log:
+                    logging.error(f"Failed to log USER_STATUS_CHANGED activity for user {selected_user_id}: {e_log}", exc_info=True)
             else:
                 QMessageBox.critical(self, self.tr("Erreur"),
                                      self.tr("Impossible de mettre à jour le statut de l'utilisateur '{0}'.").format(username_to_display))
@@ -332,6 +345,19 @@ class UserManagementPage(QWidget):
             if users_crud.update_user_password(selected_user_id, new_password):
                 QMessageBox.information(self, self.tr("Succès"),
                                         self.tr("Mot de passe pour '{0}' réinitialisé avec succès.").format(username_to_display))
+                # Log activity
+                try:
+                    log_data = {
+                        "user_id": self.current_user_info.get('user_id'), # User performing the action
+                        "action_type": "USER_PASSWORD_RESET",
+                        "details": f"Mot de passe réinitialisé pour l'utilisateur '{username_to_display}' (ID: {selected_user_id}).",
+                        "related_entity_type": "User",
+                        "related_entity_id": selected_user_id
+                    }
+                    activity_logs_crud.add_activity_log(log_data)
+                    logging.info(f"Activity logged for USER_PASSWORD_RESET: {selected_user_id} by {self.current_user_info.get('user_id')}")
+                except Exception as e_log:
+                    logging.error(f"Failed to log USER_PASSWORD_RESET activity for user {selected_user_id}: {e_log}", exc_info=True)
                 # No need to reload table as password change isn't visible in the user list
             else:
                 QMessageBox.critical(self, self.tr("Erreur"),

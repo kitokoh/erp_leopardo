@@ -46,6 +46,7 @@ from dialogs import (
 # from client_widget import ClientWidget # Not directly used in the functions being moved, but DocumentManager uses it.
 
 import logging # For logging errors or info
+from db.cruds import activity_logs_crud # Added for activity logging
 
 def handle_create_client_execution(doc_manager, client_data_dict=None):
     client_controller = ClientController() # Instantiate controller
@@ -779,6 +780,22 @@ def archive_client_status(doc_manager, client_id):
             doc_manager.notify(title=doc_manager.tr("Erreur Archivage"),
                                message=doc_manager.tr("Erreur d'archivage du client '{0}'.").format(client_name_for_notify),
                                type='ERROR')
+
+        # Log activity for client archival
+        try:
+            log_data = {
+                "user_id": doc_manager.current_user_id,
+                "action_type": "CLIENT_ARCHIVED", # Or CLIENT_STATUS_CHANGED
+                "details": f"Client '{client_name_for_notify}' (ID: {client_id}) archivé.",
+                "related_entity_type": "Client",
+                "related_entity_id": client_id,
+                "related_client_id": client_id
+            }
+            activity_logs_crud.add_activity_log(log_data)
+            logging.info(f"Activity logged for CLIENT_ARCHIVED: {client_id}")
+        except Exception as e_log:
+            logging.error(f"Failed to log CLIENT_ARCHIVED activity for client {client_id}: {e_log}", exc_info=True)
+
     except Exception as e:
         QMessageBox.critical(doc_manager, doc_manager.tr("Erreur DB"), doc_manager.tr("Erreur d'archivage du client:\n{0}").format(str(e)))
         doc_manager.notify(title=doc_manager.tr("Erreur Archivage Inattendue"),

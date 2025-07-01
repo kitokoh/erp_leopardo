@@ -23,7 +23,8 @@ from PyQt5.QtWidgets import QListWidgetItem
 from PyQt5.QtGui import QPixmap
 
 import db as db_manager
-from db.cruds import client_documents_crud, users_crud # Added for document deletion and user fetching
+from db.cruds import client_documents_crud, users_crud, activity_logs_crud # Added for document deletion and user fetching
+
 from db.cruds.clients_crud import clients_crud_instance
 from excel_editor import ExcelEditor
 from html_editor import HtmlEditor
@@ -5908,6 +5909,22 @@ class ClientWidget(QWidget):
             self.update_sav_tab_visibility() # Update SAV tab based on potentially changed status
 
             QMessageBox.information(self, self.tr("Succès"), self.tr("Informations client sauvegardées."))
+
+            # Log activity for client update
+            try:
+                log_data = {
+                    "user_id": self.current_user_id, # Assuming self.current_user_id holds the logged-in user's ID
+                    "action_type": "CLIENT_UPDATED",
+                    "details": f"Client '{self.client_info.get('client_name')}' (ID: {self.client_info['client_id']}) mis à jour. Changements: {data_to_save}",
+                    "related_entity_type": "Client",
+                    "related_entity_id": self.client_info['client_id'],
+                    "related_client_id": self.client_info['client_id']
+                }
+                activity_logs_crud.add_activity_log(log_data)
+                logging.info(f"Activity logged for CLIENT_UPDATED: {self.client_info['client_id']}")
+            except Exception as e_log:
+                logging.error(f"Failed to log CLIENT_UPDATED activity for client {self.client_info['client_id']}: {e_log}", exc_info=True)
+
             return True
         else:
             QMessageBox.warning(self, self.tr("Erreur DB"), self.tr("Échec de la sauvegarde des informations client."))
