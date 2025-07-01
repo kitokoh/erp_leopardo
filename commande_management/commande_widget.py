@@ -48,8 +48,8 @@ class CommandeWidget(QWidget):
         filter_layout = QHBoxLayout()
         filter_layout.addWidget(QLabel("Filtrer par Statut:"))
         self.status_filter_combo = QComboBox()
-        # TODO: Populate status_filter_combo with 'Commande' statuses from StatusSettings
-        # self.status_filter_combo.currentIndexChanged.connect(self.load_commandes)
+        self.populate_status_filters() # Populate statuses
+        self.status_filter_combo.currentIndexChanged.connect(self.load_commandes) # Connect filter
         filter_layout.addWidget(self.status_filter_combo)
         filter_layout.addStretch()
         main_layout.addLayout(filter_layout)
@@ -80,6 +80,8 @@ class CommandeWidget(QWidget):
         main_layout.addLayout(buttons_layout)
 
         self.setLayout(main_layout)
+        self.populate_status_filters() # Populate filters on init
+
 
     def load_commandes(self):
         self.commandes_table.setRowCount(0)
@@ -88,10 +90,12 @@ class CommandeWidget(QWidget):
             return
 
         try:
-            # TODO: Implement filter application
-            # status_filter_id = self.status_filter_combo.currentData()
-            # filters = {'status_commande_id': status_filter_id} if status_filter_id else None
-            commandes_list = commandes_crud.get_commandes_for_client(self.client_id) #, filters=filters)
+            filters = {}
+            status_filter_id = self.status_filter_combo.currentData()
+            if status_filter_id is not None: # Make sure None (for "All Statuses") is handled correctly
+                filters['status_commande_id'] = status_filter_id
+
+            commandes_list = commandes_crud.get_commandes_for_client(self.client_id, filters=filters if filters else None)
 
             if commandes_list is None:
                 self.logger.error(f"Failed to load commandes for client {self.client_id}. Received None.")
@@ -172,19 +176,39 @@ class CommandeWidget(QWidget):
 
     def add_new_commande(self):
         self.logger.info(f"Add new commande initiated for client: {self.client_id}")
-        # dialog = CommandeDialog(client_id=self.client_id, current_user_id=self.current_user_info.get('user_id'), parent=self)
-        # if dialog.exec_() == QDialog.Accepted:
-        #     self.load_commandes()
-        #     # Potentially trigger project creation/linking here or in CommandeDialog
-        QMessageBox.information(self, "Info", "La fonctionnalité d'ajout de commande sera implémentée avec CommandeDialog.")
+        try:
+            from .commande_dialog import CommandeDialog # Import here
+            dialog = CommandeDialog(client_id=self.client_id, current_user_id=self.current_user_info.get('user_id'), parent=self)
+            if dialog.exec_() == QDialog.Accepted:
+                self.load_commandes()
+                # Notify parent (ClientWidget) if it needs to refresh project lists or other client details
+                if hasattr(self.parent(), 'refresh_display_full'): # Example method name
+                    self.parent().refresh_display_full()
+        except ImportError:
+            self.logger.error("Failed to import CommandeDialog.")
+            QMessageBox.critical(self, "Erreur Importation", "Le module CommandeDialog n'a pas pu être chargé.")
+        except Exception as e:
+            self.logger.error(f"Error opening CommandeDialog for new commande: {e}", exc_info=True)
+            QMessageBox.critical(self, "Erreur Inattendue", f"Une erreur est survenue: {e}")
 
 
     def view_edit_commande(self, item=None, cmd_id=None):
         if cmd_id is None: # Called from double click
-            if item is None: return
-            row = item.row()
-            id_item = self.commandes_table.item(row, 0)
-            if not id_item: return
+            if item is None: # Should not happen if triggered by double click signal with item
+                # Try to get from current selection if item is None but was a context menu call or similar
+                selected_items = self.commandes_table.selectedItems()
+                if not selected_items:
+                    self.logger.warning("view_edit_commande called without cmd_id and no selection in table.")
+                    return
+                row = self.commandes_table.row(selected_items[0]) # Use row of first selected item
+                id_item = self.commandes_table.item(row, 0) # Assuming ID is in column 0
+            else: # Called with item from double click
+                row = item.row()
+                id_item = self.commandes_table.item(row, 0) # Assuming ID is in column 0
+
+            if not id_item:
+                self.logger.warning(f"view_edit_commande: Could not get ID item from row {row if 'row' in locals() else 'N/A'}.")
+                return
             cmd_id = id_item.data(Qt.UserRole)
 
         if not cmd_id:
@@ -192,10 +216,20 @@ class CommandeWidget(QWidget):
             return
 
         self.logger.info(f"View/Edit commande initiated for commande_id: {cmd_id}")
-        # dialog = CommandeDialog(client_id=self.client_id, commande_id_to_edit=cmd_id, current_user_id=self.current_user_info.get('user_id'), parent=self)
-        # if dialog.exec_() == QDialog.Accepted:
-        #     self.load_commandes()
-        QMessageBox.information(self, "Info", f"La fonctionnalité de modification de commande (ID: {cmd_id}) sera implémentée avec CommandeDialog.")
+        try:
+            from .commande_dialog import CommandeDialog # Import here
+            dialog = CommandeDialog(client_id=self.client_id, commande_id_to_edit=cmd_id, current_user_id=self.current_user_info.get('user_id'), parent=self)
+            if dialog.exec_() == QDialog.Accepted:
+                self.load_commandes()
+                # Notify parent (ClientWidget) if it needs to refresh project lists or other client details
+                if hasattr(self.parent(), 'refresh_display_full'): # Example method name
+                    self.parent().refresh_display_full()
+        except ImportError:
+            self.logger.error("Failed to import CommandeDialog.")
+            QMessageBox.critical(self, "Erreur Importation", "Le module CommandeDialog n'a pas pu être chargé.")
+        except Exception as e:
+            self.logger.error(f"Error opening CommandeDialog for editing commande {cmd_id}: {e}", exc_info=True)
+            QMessageBox.critical(self, "Erreur Inattendue", f"Une erreur est survenue: {e}")
 
 
     def delete_selected_commande(self, cmd_id=None):
@@ -584,9 +618,9 @@ class CommandeWidget(QWidget):
         # 9. Notifying the user and potentially opening the PDF.
         # 10. Refreshing document lists.
 
-
     def populate_status_filters(self):
         """Populates the status filter combobox for Commandes."""
+        self.logger.debug(f"Populating status filters for CommandeWidget (Client: {self.client_id})")
         self.status_filter_combo.blockSignals(True)
         self.status_filter_combo.clear()
         self.status_filter_combo.addItem("Tous les Statuts", None)

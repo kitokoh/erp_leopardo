@@ -1131,6 +1131,9 @@ CREATE TABLE IF NOT EXISTS Templates (
         vat_rate REAL DEFAULT 0.0,
         total_item_ht REAL NOT NULL,
         total_item_ttc REAL NOT NULL,
+            weight REAL,                        -- Poids spécifique pour cet article de commande
+            dimensions_text TEXT,               -- Dimensions spécifiques (ex: "100x50x30 cm")
+            product_language_code TEXT,         -- Langue du produit tel qu'ajouté à cette commande (ex: 'fr', 'en')
         FOREIGN KEY (commande_id) REFERENCES Commandes (commande_id) ON DELETE CASCADE,
         FOREIGN KEY (product_id) REFERENCES Products (product_id)
     )

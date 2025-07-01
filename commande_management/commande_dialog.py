@@ -78,13 +78,17 @@ class CommandeDialog(QDialog):
         # Line Items Section
         main_layout.addWidget(QLabel("Articles de la Commande:"))
         self.items_table = QTableWidget()
-        self.items_table.setColumnCount(7) # Product, Desc, Qty, Unit Price HT, VAT Rate, Total HT, Total TTC
+        # Product, Desc, Qty, Unit Price HT, VAT (%), Weight, Dimensions, Lang, Total HT, Total TTC
+        self.items_table.setColumnCount(10)
         self.items_table.setHorizontalHeaderLabels([
-            "Produit", "Description", "Qté", "Prix Unitaire HT", "TVA (%)", "Total HT", "Total TTC"
+            "Produit", "Description", "Qté", "Prix Unitaire HT", "TVA (%)",
+            "Poids", "Dimensions", "Langue Article", # Nouvelles colonnes
+            "Total HT", "Total TTC"
         ])
         self.items_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch) # Description
         self.items_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        # self.items_table.setEditTriggers(QAbstractItemView.DoubleClicked) # For inline editing if desired
+        self.items_table.setEditTriggers(QAbstractItemView.DoubleClicked | QAbstractItemView.SelectedClicked | QAbstractItemView.EditKeyPressed) # Enable editing
+        self.items_table.itemChanged.connect(self.handle_item_changed_in_table) # Connect signal for recalculation
         main_layout.addWidget(self.items_table)
 
         items_actions_layout = QHBoxLayout()
@@ -101,6 +105,8 @@ class CommandeDialog(QDialog):
         totals_layout = QFormLayout()
         self.total_ht_label = QLabel("0.00 EUR")
         self.total_ttc_label = QLabel("0.00 EUR")
+        self.total_ht_label.setStyleSheet("font-weight: bold;")
+        self.total_ttc_label.setStyleSheet("font-weight: bold;")
         totals_layout.addRow("Total HT:", self.total_ht_label)
         totals_layout.addRow("Total TTC:", self.total_ttc_label)
         main_layout.addLayout(totals_layout)
@@ -253,14 +259,26 @@ class CommandeDialog(QDialog):
                     total_ht = current_qty * current_price_ht
                     total_ttc = total_ht * (1 + current_vat_rate)
 
-                    self.items_table.setItem(row_pos, 5, QTableWidgetItem(f"{total_ht:.2f}"))
-                    self.items_table.setItem(row_pos, 6, QTableWidgetItem(f"{total_ttc:.2f}"))
+                    self.items_table.setItem(row_pos, 5, QTableWidgetItem(product_data.get("weight", ""))) # Poids
+                    self.items_table.setItem(row_pos, 6, QTableWidgetItem(product_data.get("dimensions", ""))) # Dimensions
+                    self.items_table.setItem(row_pos, 7, QTableWidgetItem(product_data.get("language_code", "fr"))) # Langue Article (default fr)
+
+                    self.items_table.setItem(row_pos, 8, QTableWidgetItem(f"{total_ht:.2f}")) # Total HT
+                    self.items_table.setItem(row_pos, 9, QTableWidgetItem(f"{total_ttc:.2f}")) # Total TTC
+
+                    # Make relevant cells editable
+                    self.items_table.item(row_pos, 2).setFlags(self.items_table.item(row_pos, 2).flags() | Qt.ItemIsEditable) # Qty
+                    self.items_table.item(row_pos, 3).setFlags(self.items_table.item(row_pos, 3).flags() | Qt.ItemIsEditable) # Price HT
+                    self.items_table.item(row_pos, 4).setFlags(self.items_table.item(row_pos, 4).flags() | Qt.ItemIsEditable) # TVA
+                    self.items_table.item(row_pos, 5).setFlags(self.items_table.item(row_pos, 5).flags() | Qt.ItemIsEditable) # Poids
+                    self.items_table.item(row_pos, 6).setFlags(self.items_table.item(row_pos, 6).flags() | Qt.ItemIsEditable) # Dimensions
+                    self.items_table.item(row_pos, 7).setFlags(self.items_table.item(row_pos, 7).flags() | Qt.ItemIsEditable) # Langue Article
+
 
                 self.update_totals_display()
             return # Return after handling ProductDialog
 
         # If item_data_to_load is provided (e.g., when editing an existing commande)
-
         if item_data_to_load:
             row_pos = self.items_table.rowCount()
             self.items_table.insertRow(row_pos)
@@ -268,15 +286,126 @@ class CommandeDialog(QDialog):
             # Store full item_data in the first cell's UserRole for later retrieval/update
             product_name_item = QTableWidgetItem(item_data_to_load.get("product_name", "N/A"))
             product_name_item.setData(Qt.UserRole, item_data_to_load) # Store full dict
+            product_name_item.setFlags(product_name_item.flags() & ~Qt.ItemIsEditable) # Product name not editable here
             self.items_table.setItem(row_pos, 0, product_name_item)
 
-            self.items_table.setItem(row_pos, 1, QTableWidgetItem(item_data_to_load.get("description_item", "")))
-            self.items_table.setItem(row_pos, 2, QTableWidgetItem(str(item_data_to_load.get("quantity", 0))))
-            self.items_table.setItem(row_pos, 3, QTableWidgetItem(f"{item_data_to_load.get('unit_price_ht', 0.0):.2f}"))
-            self.items_table.setItem(row_pos, 4, QTableWidgetItem(f"{item_data_to_load.get('vat_rate', 0.0)*100:.0f}")) # Display as %
-            self.items_table.setItem(row_pos, 5, QTableWidgetItem(f"{item_data_to_load.get('total_item_ht', 0.0):.2f}"))
-            self.items_table.setItem(row_pos, 6, QTableWidgetItem(f"{item_data_to_load.get('total_item_ttc', 0.0):.2f}"))
+            desc_item = QTableWidgetItem(item_data_to_load.get("description_item", ""))
+            desc_item.setFlags(desc_item.flags() & ~Qt.ItemIsEditable) # Description not editable here
+            self.items_table.setItem(row_pos, 1, desc_item)
+
+            qty_val = item_data_to_load.get("quantity", 0)
+            qty_item = QTableWidgetItem(str(qty_val))
+            qty_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            qty_item.setFlags(qty_item.flags() | Qt.ItemIsEditable)
+            self.items_table.setItem(row_pos, 2, qty_item)
+
+            price_val = item_data_to_load.get('unit_price_ht', 0.0)
+            price_item = QTableWidgetItem(f"{price_val:.2f}")
+            price_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            price_item.setFlags(price_item.flags() | Qt.ItemIsEditable)
+            self.items_table.setItem(row_pos, 3, price_item)
+
+            vat_val = item_data_to_load.get('vat_rate', 0.0) * 100
+            vat_item = QTableWidgetItem(f"{vat_val:.0f}") # Display as %
+            vat_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            vat_item.setFlags(vat_item.flags() | Qt.ItemIsEditable)
+            self.items_table.setItem(row_pos, 4, vat_item)
+
+            # Poids (col 5)
+            weight_val = item_data_to_load.get('weight', item_data_to_load.get('global_product_weight', '')) # Fallback to global product weight
+            weight_item = QTableWidgetItem(str(weight_val))
+            weight_item.setFlags(weight_item.flags() | Qt.ItemIsEditable)
+            self.items_table.setItem(row_pos, 5, weight_item)
+
+            # Dimensions (col 6)
+            dims_val = item_data_to_load.get('dimensions_text', item_data_to_load.get('global_product_dimensions', '')) # Fallback to global
+            dims_item = QTableWidgetItem(dims_val)
+            dims_item.setFlags(dims_item.flags() | Qt.ItemIsEditable)
+            self.items_table.setItem(row_pos, 6, dims_item)
+
+            # Langue Article (col 7)
+            lang_val = item_data_to_load.get('product_language_code', item_data_to_load.get('global_product_language_code', 'fr')) # Fallback to global then 'fr'
+            lang_item = QTableWidgetItem(lang_val)
+            lang_item.setFlags(lang_item.flags() | Qt.ItemIsEditable)
+            self.items_table.setItem(row_pos, 7, lang_item)
+
+            total_ht_val = item_data_to_load.get('total_item_ht', 0.0)
+            total_ht_item = QTableWidgetItem(f"{total_ht_val:.2f}")
+            total_ht_item.setFlags(total_ht_item.flags() & ~Qt.ItemIsEditable)
+            total_ht_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.items_table.setItem(row_pos, 8, total_ht_item) # Adjusted index
+
+            total_ttc_val = item_data_to_load.get('total_item_ttc', 0.0)
+            total_ttc_item = QTableWidgetItem(f"{total_ttc_val:.2f}")
+            total_ttc_item.setFlags(total_ttc_item.flags() & ~Qt.ItemIsEditable)
+            total_ttc_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.items_table.setItem(row_pos, 9, total_ttc_item) # Adjusted index
+
             self.update_totals_display() # Update after adding an item
+
+    def handle_item_changed_in_table(self, item):
+        if self.items_table.signalsBlocked():
+            return
+
+        row = item.row()
+        col = item.column()
+
+        # React to changes in Qty, Price HT, VAT Rate columns for totals
+        # Weight, Dimensions, Langue Article changes are saved but don't directly trigger total recalculation here.
+        if col not in [2, 3, 4]: # 2: Qty, 3: Price HT, 4: VAT
+            return
+
+        try:
+            self.items_table.blockSignals(True) # Prevent recursion
+
+            qty_item = self.items_table.item(row, 2)
+            price_ht_item = self.items_table.item(row, 3)
+            vat_rate_percent_item = self.items_table.item(row, 4)
+            total_ht_cell_item = self.items_table.item(row, 5)
+            total_ttc_cell_item = self.items_table.item(row, 6)
+
+            if not all([qty_item, price_ht_item, vat_rate_percent_item, total_ht_cell_item, total_ttc_cell_item]):
+                self.logger.warning(f"handle_item_changed_in_table: Missing cell item in row {row}. Aborting calculation for this row.")
+                return
+
+            try:
+                qty = float(qty_item.text().replace(",", "."))
+            except ValueError:
+                self.logger.warning(f"Invalid quantity in row {row}: '{qty_item.text()}'. Using 0 for calculation.")
+                qty = 0.0
+                # Optionally revert cell text or show error to user
+
+            try:
+                price_ht = float(price_ht_item.text().replace("€", "").replace(",", ".").strip())
+            except ValueError:
+                self.logger.warning(f"Invalid price_ht in row {row}: '{price_ht_item.text()}'. Using 0.0 for calculation.")
+                price_ht = 0.0
+
+            try:
+                vat_rate_percent_str = vat_rate_percent_item.text().replace("%", "").strip()
+                vat_rate = float(vat_rate_percent_str.replace(",", ".")) / 100.0
+            except ValueError:
+                self.logger.warning(f"Invalid vat_rate_percent in row {row}: '{vat_rate_percent_item.text()}'. Using 0.0 for calculation.")
+                vat_rate = 0.0
+
+
+            current_total_ht = qty * price_ht
+            current_total_ttc = current_total_ht * (1 + vat_rate)
+
+            total_ht_cell_item.setText(f"{current_total_ht:.2f}")
+            total_ttc_cell_item.setText(f"{current_total_ttc:.2f}")
+
+            # No specific action needed for weight, dimensions, product_language_code changes
+            # in this handler, as they don't directly affect line/order totals.
+            # Their values are simply edited in the table and will be saved during _sync_commande_items.
+
+            self.update_totals_display()
+
+        except Exception as e:
+            self.logger.error(f"Error in handle_item_changed_in_table for row {row}, col {col}: {e}", exc_info=True)
+        finally:
+            self.items_table.blockSignals(False)
+
 
     def remove_selected_item(self):
         current_row = self.items_table.currentRow()
@@ -308,17 +437,22 @@ class CommandeDialog(QDialog):
                 # If loading existing items, their totals are already calculated.
                 # If adding new items, their totals need to be calculated upon input.
                 # This function should sum up total_item_ht and total_item_ttc from all rows.
+                ht_cell_item = self.items_table.item(row, 5) # Total HT column
+                ttc_cell_item = self.items_table.item(row, 6) # Total TTC column
 
-                # Example: Read from cell text (simplistic, assumes plain text)
-                ht_cell = self.items_table.item(row, 5)
-                ttc_cell = self.items_table.item(row, 6)
-                if ht_cell and ht_cell.text():
-                    total_ht += float(ht_cell.text())
-                if ttc_cell and ttc_cell.text():
-                    total_ttc += float(ttc_cell.text())
+                if ht_cell_item and ht_cell_item.text():
+                    try:
+                        total_ht += float(ht_cell_item.text().replace("€", "").replace(",", ".").strip())
+                    except ValueError:
+                        self.logger.warning(f"Could not parse Total HT from row {row}: '{ht_cell_item.text()}'")
 
-            except ValueError:
-                self.logger.warning(f"Could not parse total from row {row} for calculation.")
+                if ttc_cell_item and ttc_cell_item.text():
+                    try:
+                        total_ttc += float(ttc_cell_item.text().replace("€", "").replace(",", ".").strip())
+                    except ValueError:
+                        self.logger.warning(f"Could not parse Total TTC from row {row}: '{ttc_cell_item.text()}'")
+            except Exception: # General exception to catch any other parsing error for the row
+                self.logger.warning(f"Could not parse totals from row {row} for calculation due to unexpected error.", exc_info=True)
                 pass # Skip row if parsing fails
 
         currency = self.commande_data.get("currency", "EUR") if self.commande_data else "EUR"
@@ -494,11 +628,15 @@ class CommandeDialog(QDialog):
 
         if self.current_user_id:
              new_global_product_data['created_by_user_id'] = self.current_user_id
+        else:
+            self.logger.warning("current_user_id is not set in CommandeDialog. Cannot set created_by_user_id for new global product.")
+            # Depending on DB constraints, this might fail if created_by_user_id is NOT NULL in Products.
+            # For now, proceed without it if not available. DB will raise error if required.
 
 
         add_result = products_crud.add_product(product_data=new_global_product_data)
         if add_result and add_result.get('success'):
-            new_global_id = add_result.get('id')
+            new_global_id = add_result.get('id') # products_crud.add_product returns {'success': True, 'id': new_id}
             item_payload_from_row["product_id"] = new_global_id
             self.logger.info(f"New global product '{original_name}' created with ID: {new_global_id}.")
             return True
@@ -610,6 +748,17 @@ class CommandeDialog(QDialog):
             except ValueError:
                 self.logger.error(f"Invalid vat_rate in row {row_index}. Defaulting to 0.0.")
                 payload["vat_rate"] = 0.0
+
+            # New fields: Poids, Dimensions, Langue Article
+            try:
+                payload["weight"] = float(self.items_table.item(row_index, 5).text().replace(",", ".")) if self.items_table.item(row_index, 5) and self.items_table.item(row_index, 5).text() else None
+            except ValueError:
+                self.logger.warning(f"Invalid weight in row {row_index}. Setting to None.")
+                payload["weight"] = None
+
+            payload["dimensions_text"] = self.items_table.item(row_index, 6).text().strip() if self.items_table.item(row_index, 6) and self.items_table.item(row_index, 6).text() else None
+            payload["product_language_code"] = self.items_table.item(row_index, 7).text().strip() if self.items_table.item(row_index, 7) and self.items_table.item(row_index, 7).text() else None
+
 
             # Include item_id if it's an existing item being updated
             if product_data_from_dialog and product_data_from_dialog.get('item_id'): # 'item_id' here refers to CommandeItem.item_id if loaded for edit
