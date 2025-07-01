@@ -2,6 +2,7 @@
 import sys
 import os
 from PyQt5.QtCore import QDate
+import logging
 
 # --- BEGIN WORKAROUND for ModuleNotFoundError ---
 # Ensure the project root is in sys.path when main_window.py is loaded.

@@ -307,6 +307,10 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                 QMessageBox.warning(doc_manager, doc_manager.tr("Erreur DB Projet"),
                                     doc_manager.tr("La création du projet administratif général a échoué."))
 
+        # Ensure a clean transition to the next block of code.
+        # All lines between the above 'else' and the below 'if' must be either comments or truly blank.
+        # Any hidden 'try:' statement would be removed by this re-application of the structure.
+
         # Now, if project_id_for_tasks is set (either from commande or default creation), create tasks for it.
         if project_id_for_tasks:
             task_status_todo_obj = get_status_setting_by_name("To Do", "Task")
@@ -338,62 +342,6 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
 
 
 
-        if ui_map_data: # This block should run regardless of commande creation, to ensure Proforma/Contact/Product dialogs sequence
-            # --- BEGIN AUTO PROFORMA GENERATION ---
-            # This section is now executed AFTER the Commande and its items are established (if any)
-            # and after the ContactDialog.
-            # The project_id used for Proforma should be project_id_for_tasks.
-            try:
-                logging.info(f"Starting automatic Proforma generation for new client ID: {actual_new_client_id}")
-                project_status_id_for_pm = project_status_planning_obj['status_id'] if project_status_planning_obj else None
-                if not project_status_id_for_pm:
-                     QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Configuration Projet"),
-                                         doc_manager.tr("Statut de projet par défaut 'Planning' non trouvé."))
-                project_data_for_db_default = {
-                    'client_id': actual_new_client_id,
-                    'project_name': f"Projet Administratif pour {created_client_info.get('client_name', client_name_val)}",
-                    'description': f"Suivi administratif pour client: {created_client_info.get('client_name', client_name_val)}.",
-                    'start_date': datetime.now().strftime("%Y-%m-%d"),
-                    'status_id': project_status_id_for_pm,
-                    'priority': 0 # Lower priority for general admin project
-                }
-                new_project_id_central_db = add_project(project_data_for_db_default)
-                if new_project_id_central_db:
-                    project_id_for_tasks = new_project_id_central_db
-                    QMessageBox.information(doc_manager, doc_manager.tr("Projet Administratif Créé"),
-                                            doc_manager.tr("Un projet administratif général a été créé pour {0}.").format(created_client_info.get('client_name', client_name_val)))
-                else:
-                    QMessageBox.warning(doc_manager, doc_manager.tr("Erreur DB Projet"),
-                                        doc_manager.tr("La création du projet administratif général a échoué."))
-
-        # Now, if project_id_for_tasks is set (either from commande or default creation), create tasks for it.
-        if project_id_for_tasks:
-            task_status_todo_obj = get_status_setting_by_name("To Do", "Task")
-            task_status_id_for_todo = task_status_todo_obj['status_id'] if task_status_todo_obj else None
-            if not task_status_id_for_todo:
-                QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Configuration Tâche"),
-                                    doc_manager.tr("Statut de tâche par défaut 'To Do' non trouvé."))
-
-            standard_tasks = [
-                {"name": "Initial Client Consultation & Needs Assessment", "description": "Understand client requirements, objectives, target markets, and budget.", "priority_val": 2, "deadline_days": 3},
-                {"name": "Market Research & Analysis", "description": "Research target international markets, including competition, regulations, and cultural nuances.", "priority_val": 1, "deadline_days": 7},
-                {"name": "Post-Sales Follow-up & Support", "description": "Follow up with the client after delivery.", "priority_val": 1, "deadline_days": 60}
-            ]
-            for task_item in standard_tasks:
-                task_deadline = (datetime.now() + timedelta(days=task_item["deadline_days"])).strftime("%Y-%m-%d")
-                task_data_for_db = {
-                    'project_id': project_id_for_tasks, # Use the determined project_id
-                    'task_name': task_item["name"],
-                    'description': task_item["description"],
-                    'status_id': task_status_id_for_todo,
-                    'priority': task_item["priority_val"],
-                    'due_date': task_deadline
-                }
-                add_task(task_data_for_db)
-            QMessageBox.information(doc_manager, doc_manager.tr("Tâches Créées"),
-                                    doc_manager.tr("Des tâches standard ont été ajoutées au projet associé."))
-        else:
-            logging.warning(f"No project ID available (commande or default) for client {actual_new_client_id}. No tasks created.")
 
 
         if ui_map_data: # This block should run regardless of commande creation, to ensure Proforma/Contact/Product dialogs sequence
