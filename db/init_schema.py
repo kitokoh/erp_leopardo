@@ -1083,6 +1083,8 @@ CREATE TABLE IF NOT EXISTS Templates (
         commande_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         status_commande_id INTEGER NOT NULL,
         description_commande TEXT,
+        notes TEXT, -- Added for order-specific notes
+        is_default BOOLEAN DEFAULT FALSE, -- Added to flag default orders
         total_ht REAL,
         total_ttc REAL,
         currency TEXT NOT NULL DEFAULT 'EUR',
@@ -1098,6 +1100,25 @@ CREATE TABLE IF NOT EXISTS Templates (
     )
     """)
     print("DEBUG_INIT_DB: Table Commandes created or exists.")
+
+    # Ensure notes and is_default columns exist in Commandes table for existing databases
+    cursor.execute("PRAGMA table_info(Commandes)")
+    commandes_columns_info = cursor.fetchall()
+    commandes_column_names = [info['name'] for info in commandes_columns_info]
+
+    if 'notes' not in commandes_column_names:
+        try:
+            cursor.execute("ALTER TABLE Commandes ADD COLUMN notes TEXT")
+            print("DEBUG_INIT_DB: Added 'notes' column to Commandes table.")
+        except sqlite3.Error as e_alter_commandes_notes:
+            print(f"DEBUG_INIT_DB: Error adding 'notes' column to Commandes table: {e_alter_commandes_notes}")
+
+    if 'is_default' not in commandes_column_names:
+        try:
+            cursor.execute("ALTER TABLE Commandes ADD COLUMN is_default BOOLEAN DEFAULT FALSE")
+            print("DEBUG_INIT_DB: Added 'is_default' column to Commandes table.")
+        except sqlite3.Error as e_alter_commandes_is_default:
+            print(f"DEBUG_INIT_DB: Error adding 'is_default' column to Commandes table: {e_alter_commandes_is_default}")
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS CommandeItems (
@@ -1133,6 +1154,7 @@ CREATE TABLE IF NOT EXISTS Templates (
         source_template_id INTEGER,
         version_tag TEXT,
         notes TEXT,
+        footer_notes TEXT, -- Added for document-specific footer notes
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         created_by_user_id TEXT,
@@ -1149,10 +1171,17 @@ CREATE TABLE IF NOT EXISTS Templates (
         FOREIGN KEY (parent_document_id) REFERENCES ClientDocuments (document_id) ON DELETE SET NULL
     )""")
 
-    # Ensure is_deleted, deleted_at, order_identifier, parent_document_id, is_latest_version, commande_id columns exist
+    # Ensure is_deleted, deleted_at, order_identifier, parent_document_id, is_latest_version, commande_id, footer_notes columns exist
     cursor.execute("PRAGMA table_info(ClientDocuments)")
     cd_columns_info = cursor.fetchall()
     cd_column_names = [info['name'] for info in cd_columns_info]
+
+    if 'footer_notes' not in cd_column_names:
+        try:
+            cursor.execute("ALTER TABLE ClientDocuments ADD COLUMN footer_notes TEXT")
+            print("DEBUG_INIT_DB: Added 'footer_notes' column to ClientDocuments table.")
+        except sqlite3.Error as e_alter_cd_footer_notes:
+            print(f"DEBUG_INIT_DB: Error adding 'footer_notes' column to ClientDocuments table: {e_alter_cd_footer_notes}")
 
     if 'order_identifier' not in cd_column_names:
         try:

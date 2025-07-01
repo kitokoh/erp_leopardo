@@ -475,6 +475,42 @@ def seed_initial_data_master(cursor: sqlite3.Cursor):
     _seed_default_utility_templates(cursor, conn, logger_passed=logger)
     _seed_motivational_messages(cursor, conn, logger_passed=logger)
     _seed_user_motivational_messages(cursor, conn, logger_passed=logger)
+    _seed_default_document_footers(cursor, conn, logger_passed=logger)
+
+
+def _seed_default_document_footers(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
+    logger = logger_passed
+    logger.info("Attempting to seed default document footer notes...")
+
+    default_footers = {
+        "default_document_footer_notes_fr": "Merci de votre confiance. N'hésitez pas à nous contacter pour toute question.",
+        "default_document_footer_notes_en": "Thank you for your business. Please contact us if you have any questions.",
+        "default_document_footer_notes_ar": "شكراً لثقتكم بنا. لا تترددوا في الاتصال بنا لأية استفسارات."
+        # Add other languages as needed
+    }
+
+    added_count = 0
+    skipped_count = 0
+
+    for key, value in default_footers.items():
+        try:
+            # Check if setting already exists (optional, set_setting is INSERT OR REPLACE)
+            existing_value = get_setting(key, conn=conn)
+            if existing_value is not None and existing_value == value:
+                logger.debug(f"Default footer note for '{key}' already exists and matches. Skipping.")
+                skipped_count += 1
+                continue
+            elif existing_value is not None:
+                logger.info(f"Default footer note for '{key}' exists but differs. Updating.")
+
+            set_setting(key, value, conn=conn)
+            added_count += 1
+            logger.debug(f"Seeded/Updated default footer note for: {key}")
+        except Exception as e:
+            logger.error(f"Error seeding default footer note for '{key}': {e}", exc_info=True)
+            skipped_count +=1
+
+    logger.info(f"Default document footer notes seeding complete. Added/Updated: {added_count}, Skipped/Existing: {skipped_count}")
 
 
 def _seed_user_motivational_messages(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):

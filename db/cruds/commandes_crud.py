@@ -29,11 +29,12 @@ def add_commande(data: dict, conn: sqlite3.Connection = None) -> str | None:
     sql = """
         INSERT INTO Commandes (
             commande_id, client_id, project_id, commande_reference, commande_date,
-            status_commande_id, description_commande, total_ht, total_ttc, currency,
+            status_commande_id, description_commande, notes, is_default,
+            total_ht, total_ttc, currency,
             shipping_address, billing_address,
             created_at, updated_at, created_by_user_id
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
     params = (
         new_commande_id,
@@ -43,6 +44,8 @@ def add_commande(data: dict, conn: sqlite3.Connection = None) -> str | None:
         commande_date,
         data['status_commande_id'],
         data.get('description_commande'),
+        data.get('notes'), # Added notes
+        data.get('is_default', False), # Added is_default
         data.get('total_ht'),
         data.get('total_ttc'),
         data.get('currency', 'EUR'),
@@ -135,7 +138,8 @@ def update_commande(commande_id: str, data: dict, conn: sqlite3.Connection = Non
 
     valid_fields = [
         'project_id', 'commande_reference', 'commande_date', 'status_commande_id',
-        'description_commande', 'total_ht', 'total_ttc', 'currency',
+        'description_commande', 'notes', 'is_default',
+        'total_ht', 'total_ttc', 'currency',
         'shipping_address', 'billing_address'
     ]
 
@@ -360,6 +364,7 @@ def get_all_commandes_with_details(filters: dict = None, limit: int = None, offs
     base_sql = """
         SELECT
             cmd.commande_id, cmd.commande_reference, cmd.commande_date, cmd.description_commande,
+            cmd.notes, cmd.is_default, -- Added notes and is_default
             cmd.total_ht, cmd.total_ttc, cmd.currency, cmd.created_at, cmd.project_id,
             c.client_id, c.client_name,
             p.project_name,

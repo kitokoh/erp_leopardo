@@ -24,6 +24,8 @@ class ClientsCRUD(GenericCRUD):
     def add_client(self, data: dict, conn: sqlite3.Connection = None) -> dict:
         """
         Adds a new client to the database.
+        After successfully adding the client, it automatically creates a default order
+        and a default project linked to that order for the new client.
 
         Performs input validation for required fields ('client_name', 'created_by_user_id')
         and data types (e.g., 'price'). Sets 'is_deleted' to 0 by default.
@@ -41,6 +43,10 @@ class ClientsCRUD(GenericCRUD):
             dict: A dictionary with {'success': True, 'client_id': new_id} on success,
                   or {'success': False, 'error': 'error message'} on failure.
         """
+        from . import commandes_crud # Local import to avoid circular dependency at module level
+        from . import projects_crud # Local import
+        from . import status_settings_crud # For fetching default status IDs
+
         self.logger.info(f"Attempting to add client with data: {data}") # Log incoming data
 
         # Input Validation
@@ -75,11 +81,88 @@ class ClientsCRUD(GenericCRUD):
                   data['is_deleted'], data['deleted_at'], data.get('default_template_id'))
         try:
             cursor.execute(sql, params)
-            # conn.commit() # Handled by _manage_conn
+            client_name_for_defaults = data.get('client_name', 'N/A')
+            user_id_for_defaults = data.get('created_by_user_id', None)
+
+            # --- Create Default Order and Project ---
+            # 1. Fetch default status for 'Commande' (e.g., 'Brouillon')
+            default_order_status_list = status_settings_crud.get_status_settings_by_type('Commande', conn=conn)
+            default_order_status_id = None
+            if default_order_status_list:
+                # Try to find 'Brouillon' or take the first one with lowest sort_order
+                brouillon_status = next((s['status_id'] for s in default_order_status_list if s['status_name'].lower() == 'brouillon'), None)
+                if brouillon_status:
+                    default_order_status_id = brouillon_status
+                else:
+                    # Sort by sort_order and pick the first if available
+                    sorted_statuses = sorted(default_order_status_list, key=lambda x: x.get('sort_order', 0))
+                    if sorted_statuses:
+                        default_order_status_id = sorted_statuses[0]['status_id']
+
+            if not default_order_status_id:
+                self.logger.warning(f"Could not determine a default status_id for Commande for client {new_id}. Default order/project creation might be incomplete.")
+                # Proceed with client creation, but log this issue.
+
+            if default_order_status_id:
+                default_order_data = {
+                    'client_id': new_id,
+                    'commande_reference': f"DEF-ORD-{new_id[:8]}", # Example reference
+                    'status_commande_id': default_order_status_id,
+                    'created_by_user_id': user_id_for_defaults,
+                    'notes': f"Default order automatically created for {client_name_for_defaults}.",
+                    'is_default': True,
+                    'description_commande': "Default Order"
+                }
+                default_commande_id = commandes_crud.add_commande(default_order_data, conn=conn)
+
+                if default_commande_id:
+                    self.logger.info(f"Successfully created default order {default_commande_id} for client {new_id}.")
+                    # 2. Fetch default status for 'Project' (e.g., 'Planning')
+                    default_project_status_list = status_settings_crud.get_status_settings_by_type('Project', conn=conn)
+                    default_project_status_id = None
+                    if default_project_status_list:
+                        planning_status = next((s['status_id'] for s in default_project_status_list if s['status_name'].lower() == 'planning'), None)
+                        if planning_status:
+                            default_project_status_id = planning_status
+                        else:
+                            sorted_project_statuses = sorted(default_project_status_list, key=lambda x: x.get('sort_order', 0))
+                            if sorted_project_statuses:
+                                default_project_status_id = sorted_project_statuses[0]['status_id']
+
+                    if not default_project_status_id:
+                        self.logger.warning(f"Could not determine a default status_id for Project for client {new_id}. Default project creation might be incomplete.")
+
+                    if default_project_status_id:
+                        default_project_data = {
+                            'client_id': new_id,
+                            'project_name': f"Default Project for {client_name_for_defaults}",
+                            'status_id': default_project_status_id,
+                            'description': f"Default project automatically created for order {default_order_data['commande_reference']}.",
+                            'manager_team_member_id': user_id_for_defaults # Or assign to a default project manager if applicable
+                        }
+                        default_project_id = projects_crud.add_project(default_project_data, conn=conn)
+
+                        if default_project_id:
+                            self.logger.info(f"Successfully created default project {default_project_id} for client {new_id}.")
+                            # Link project to the default order
+                            update_payload = {'project_id': default_project_id}
+                            if commandes_crud.update_commande(default_commande_id, update_payload, conn=conn):
+                                self.logger.info(f"Successfully linked default project {default_project_id} to default order {default_commande_id}.")
+                            else:
+                                self.logger.error(f"Failed to link default project {default_project_id} to default order {default_commande_id} for client {new_id}.")
+                        else:
+                            self.logger.error(f"Failed to create default project for client {new_id} after creating default order {default_commande_id}.")
+                    else: # No default project status
+                        self.logger.warning(f"Skipping default project creation for client {new_id} as no default project status ID could be determined.")
+                else:
+                    self.logger.error(f"Failed to create default order for client {new_id}.")
+            else: # No default order status
+                 self.logger.warning(f"Skipping default order and project creation for client {new_id} as no default order status ID could be determined.")
+            # --- End Default Order and Project ---
+
             return {'success': True, 'client_id': new_id}
         except sqlite3.Error as e:
             logging.error(f"Failed to add client '{data.get('client_name')}': {e}")
-            # conn.rollback() # Handled by _manage_conn
             return {'success': False, 'error': str(e)}
 
     @_manage_conn

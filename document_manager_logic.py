@@ -343,7 +343,6 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
 
 
 
-
         if ui_map_data: # This block should run regardless of commande creation, to ensure Proforma/Contact/Product dialogs sequence
             # --- BEGIN AUTO PROFORMA GENERATION ---
             # This section is now executed AFTER the Commande and its items are established (if any)

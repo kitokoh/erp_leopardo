@@ -100,6 +100,15 @@ class CreateDocumentDialog(QDialog):
         main_layout.addWidget(QLabel(self.tr("Modèles Disponibles (sélectionnez un ou plusieurs):")))
         main_layout.addWidget(self.template_list_widget, 1) # Give list widget stretch factor
 
+        # Footer Notes Input
+        footer_notes_group = QGroupBox(self.tr("Notes de Bas de Page (Optionnel)"))
+        footer_notes_layout = QVBoxLayout(footer_notes_group)
+        self.footer_notes_edit = QTextEdit()
+        self.footer_notes_edit.setPlaceholderText(self.tr("Entrez ici les notes de bas de page personnalisées. Laissez vide pour utiliser les notes par défaut de la langue."))
+        self.footer_notes_edit.setFixedHeight(80) # Adjust height as needed
+        footer_notes_layout.addWidget(self.footer_notes_edit)
+        main_layout.addWidget(footer_notes_group)
+
         self._load_document_types_and_languages() # Populates combos
 
         # Connect signals for filtering the template list
@@ -366,6 +375,7 @@ class CreateDocumentDialog(QDialog):
         additional_context_for_gen = {
             'document_type': template_actual_type,
             'current_document_type_for_notes': document_type_for_notes_fetch,
+            'footer_notes': self.footer_notes_edit.toPlainText().strip() # Add footer notes
         }
         # Add specific context if needed, e.g., for DELIVERY_NOTE as before
         # This needs to map template_actual_type to specific context keys if they differ from the general mapping.
