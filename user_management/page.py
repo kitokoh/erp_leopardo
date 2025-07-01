@@ -52,6 +52,31 @@ class UserManagementPage(QWidget):
         title_label.setStyleSheet("font-size: 16pt; font-weight: bold;")
         main_layout.addWidget(title_label, alignment=Qt.AlignCenter) # Center title
 
+        # Filters Layout
+        filters_layout = QHBoxLayout()
+        filters_layout.addWidget(QLabel(self.tr("Filtrer par Rôle:")))
+        self.role_filter_combo = QComboBox()
+        self.role_filter_combo.addItem(self.tr("Tous les rôles"), None) # Option pour afficher tous
+        filters_layout.addWidget(self.role_filter_combo)
+
+        filters_layout.addSpacing(20)
+
+        filters_layout.addWidget(QLabel(self.tr("Filtrer par Statut:")))
+        self.status_filter_combo = QComboBox()
+        self.status_filter_combo.addItem(self.tr("Tous les statuts"), "all")
+        self.status_filter_combo.addItem(self.tr("Actif"), "active")
+        self.status_filter_combo.addItem(self.tr("Inactif"), "inactive")
+        filters_layout.addWidget(self.status_filter_combo)
+        filters_layout.addStretch()
+        main_layout.addLayout(filters_layout)
+
+        # Populate role filter combo
+        self._populate_role_filter()
+
+        # Connect filter signals
+        self.role_filter_combo.currentIndexChanged.connect(self.load_users_to_table)
+        self.status_filter_combo.currentIndexChanged.connect(self.load_users_to_table)
+
         # Placeholder for action buttons (Add User, Edit User etc. - for later phases)
         action_layout = QHBoxLayout()
 
@@ -102,6 +127,18 @@ class UserManagementPage(QWidget):
         main_layout.addWidget(self.users_table)
         self.setLayout(main_layout)
 
+    def _populate_role_filter(self):
+        """Populates the role filter combo box with roles from the database."""
+        try:
+            roles = roles_crud.list_roles()
+            if roles:
+                for role in roles:
+                    self.role_filter_combo.addItem(role['role_name'], role['role_id'])
+        except Exception as e:
+            QMessageBox.critical(self, self.tr("Erreur Chargement Rôles"),
+                                 self.tr("Impossible de charger les rôles pour le filtre : {0}").format(str(e)))
+            print(f"Error populating role filter: {e}")
+
     def _handle_add_user(self):
         """Handles the Add User button click. Placeholder for now."""
         # QMessageBox.information(self, self.tr("Fonctionnalité à venir"), self.tr("L'ajout d'utilisateurs sera implémenté prochainement."))
@@ -135,8 +172,18 @@ class UserManagementPage(QWidget):
     def load_users_to_table(self):
         self.users_table.setRowCount(0) # Clear existing rows
         try:
-            # list_users() from users_crud already joins with Roles to get role_name
-            users_list = users_crud.list_users()
+            selected_role_id = self.role_filter_combo.currentData()
+            selected_status_filter = self.status_filter_combo.currentData() # 'all', 'active', 'inactive'
+
+            # If 'all' is selected for status, pass None to list_users for status_filter
+            status_arg = None
+            if selected_status_filter == "active":
+                status_arg = "active"
+            elif selected_status_filter == "inactive":
+                status_arg = "inactive"
+
+            users_list = users_crud.list_users(role_id_filter=selected_role_id, status_filter=status_arg)
+
             if users_list:
                 self.users_table.setRowCount(len(users_list))
                 for row, user_data in enumerate(users_list):
