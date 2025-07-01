@@ -86,7 +86,7 @@ class ClientsCRUD(GenericCRUD):
 
             # --- Create Default Order and Project ---
             # 1. Fetch default status for 'Commande' (e.g., 'Brouillon')
-            default_order_status_list = status_settings_crud.get_status_settings_by_type('Commande', conn=conn)
+            default_order_status_list = status_settings_crud.get_all_status_settings(type_filter='Commande', conn=conn)
             default_order_status_id = None
             if default_order_status_list:
                 # Try to find 'Brouillon' or take the first one with lowest sort_order
@@ -118,7 +118,7 @@ class ClientsCRUD(GenericCRUD):
                 if default_commande_id:
                     self.logger.info(f"Successfully created default order {default_commande_id} for client {new_id}.")
                     # 2. Fetch default status for 'Project' (e.g., 'Planning')
-                    default_project_status_list = status_settings_crud.get_status_settings_by_type('Project', conn=conn)
+                    default_project_status_list = status_settings_crud.get_all_status_settings(type_filter='Project', conn=conn)
                     default_project_status_id = None
                     if default_project_status_list:
                         planning_status = next((s['status_id'] for s in default_project_status_list if s['status_name'].lower() == 'planning'), None)
