@@ -147,6 +147,7 @@ from calculator.main_calculator_widget import MainCalculatorWidget # Import Calc
 # from db.connection import SessionLocal as AppSessionLocal_MW # Import SessionLocal for calculator
 from user_management.user_menu_button import UserMenuButton # Import UserMenuButton
 from dialogs.edit_user_dialog import EditUserDialog # For handling edit/add user requests
+from dialogs.role_management_dialog import RoleManagementDialog # Added for role management
 from commande_management.commandes_dashboard_widget import CommandesDashboardWidget # Import CommandesDashboardWidget
 
 # Definition of configurable modules
@@ -1073,6 +1074,9 @@ class DocumentManager(QMainWindow):
         self.manage_users_action = QAction(QIcon(":/icons/users.svg"), self.tr("Gérer les Utilisateurs"), self)
         self.manage_users_action.triggered.connect(self.show_user_management_page) # Connect to show page method
 
+        self.manage_roles_action = QAction(QIcon(":/icons/team.svg"), self.tr("Gérer les Rôles"), self) # Placeholder, consider specific icon
+        self.manage_roles_action.triggered.connect(self.show_role_management_dialog)
+
         # Action for Calculator Module
         self.calculator_module_action = QAction(QIcon(":/icons/bar-chart.svg"), self.tr("Calculatrices"), self) # Placeholder icon
         self.calculator_module_action.triggered.connect(self.show_calculator_module_view)
@@ -1102,6 +1106,7 @@ class DocumentManager(QMainWindow):
         self.searchable_actions_map[self.tr("Gestion des Connaissances")] = self.experience_management_action
         self.searchable_actions_map[self.tr("Calendrier")] = self.calendar_module_action
         self.searchable_actions_map[self.tr("Gérer les Utilisateurs")] = self.manage_users_action
+        self.searchable_actions_map[self.tr("Gérer les Rôles")] = self.manage_roles_action # Add to searchable map
         self.searchable_actions_map[self.tr("Gestion des Commandes")] = self.commande_management_action
 
     def _placeholder_manage_users(self):
@@ -1127,6 +1132,7 @@ class DocumentManager(QMainWindow):
         # Admin Menu (new menu for admin-specific tasks)
         self.admin_menu = menu_bar.addMenu(self.tr("Administration"))
         self.admin_menu.addAction(self.manage_users_action)
+        self.admin_menu.addAction(self.manage_roles_action) # Add to Admin menu
         # Add other admin-specific actions here if any (e.g., manage roles, system logs)
 
         # Modules Menu
@@ -1255,6 +1261,7 @@ class DocumentManager(QMainWindow):
         # Admin Menu visibility
         self.admin_menu.menuAction().setVisible(has_permission(role_name, P_MANAGE_USERS)) # Hide/show whole menu
         self.manage_users_action.setEnabled(has_permission(role_name, P_MANAGE_USERS)) # Also control action itself
+        self.manage_roles_action.setEnabled(has_permission(role_name, P_MANAGE_USERS)) # Using P_MANAGE_USERS for now for roles too
 
         # Module Menu Actions (Visibility based on module access permission)
         # Assuming specific P_ACCESS_MODULE_XYZ permissions or more granular ones.
@@ -2062,6 +2069,18 @@ class DocumentManager(QMainWindow):
             logging.error("UserManagementPage instance is None. Cannot show user management view.")
             QMessageBox.critical(self, self.tr("Erreur Critique"),
                                  self.tr("La page de gestion des utilisateurs n'a pas pu être chargée."))
+
+    def show_role_management_dialog(self):
+        """Opens the Role Management dialog."""
+        # Permission check already handled by menu action visibility/enabled state
+        dialog = RoleManagementDialog(current_user_info=self.current_user_info, parent=self)
+        dialog.exec_()
+        # After dialog closes, refresh relevant parts of the UI that might use roles
+        if hasattr(self, 'user_management_page_instance') and self.user_management_page_instance:
+            self.user_management_page_instance.refresh_view() # UserManagementPage needs a refresh_view to update its role filter
+
+        # If EditUserDialog could be open, it would also need a way to refresh its roles.
+        # For now, assume it's re-instantiated or refreshed if DocumentManager signals a global role change.
 
     def show_calculator_module_view(self):
         """Switches the main stacked widget to display the Calculator module."""
