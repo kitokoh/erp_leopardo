@@ -23,7 +23,7 @@ from PyQt5.QtWidgets import QListWidgetItem
 from PyQt5.QtGui import QPixmap
 
 import db as db_manager
-from db.cruds import client_documents_crud # Added for document deletion
+from db.cruds import client_documents_crud, users_crud, activity_logs_crud # Added for document deletion and user fetching
 from db.cruds.clients_crud import clients_crud_instance
 from excel_editor import ExcelEditor
 from html_editor import HtmlEditor
@@ -303,6 +303,11 @@ class ClientWidget(QWidget):
             self.folder_value_label.setOpenExternalLinks(True)
             self.folder_value_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
             self.details_layout.addRow(self.folder_label_static, self.folder_value_label)
+
+            # Created By
+            self.created_by_label_static = QLabel(self.tr("Créé par:"))
+            self.created_by_value_label = QLabel(self.tr("N/A"))
+            self.details_layout.addRow(self.created_by_label_static, self.created_by_value_label)
             # --- End of Persistent UI Elements for Client Details Tab ---
 
             details_tab_layout.addLayout(self.details_layout)
@@ -4096,6 +4101,19 @@ class ClientWidget(QWidget):
                 folder_display_text = self.tr("Chemin invalide: {0}").format(folder_path_value)
             self.folder_value_label.setText(folder_display_text)
 
+        # Update Created By
+        created_by_user_id = self.client_info.get("created_by_user_id")
+        created_by_user_name = self.tr("N/A")
+        if created_by_user_id:
+            user = users_crud.get_user_by_id(created_by_user_id)
+            if user:
+                created_by_user_name = user.get("full_name") or user.get("username", self.tr("Inconnu"))
+            else:
+                created_by_user_name = self.tr("Utilisateur Inconnu (ID: {0})").format(created_by_user_id)
+
+        self.created_by_value_label.setText(created_by_user_name)
+        logging.info(f"Setting created_by: {created_by_user_name} (ID: {created_by_user_id})")
+
         # The detail_value_labels dictionary is no longer needed for display mode updates
         # as we are directly updating instance member labels.
         # It might still be used by edit mode logic if that wasn't changed.
@@ -5752,6 +5770,21 @@ class ClientWidget(QWidget):
             self.edit_widgets['languages_list'].addItem(item)
         self.details_layout.addRow(self.tr("Langues Documents:"), self.edit_widgets['languages_list'])
 
+        # Display "Created By" (non-editable)
+        created_by_user_id = self.client_info.get("created_by_user_id")
+        created_by_user_name = self.tr("N/A")
+        if created_by_user_id:
+            user = users_crud.get_user_by_id(created_by_user_id) # users_crud should be imported
+            if user:
+                created_by_user_name = user.get("full_name") or user.get("username", self.tr("Inconnu"))
+            else:
+                created_by_user_name = self.tr("Utilisateur Inconnu (ID: {0})").format(created_by_user_id)
+
+        created_by_label_edit = QLabel(self.tr("Créé par:"))
+        created_by_value_edit = QLabel(created_by_user_name)
+        self.details_layout.addRow(created_by_label_edit, created_by_value_edit)
+
+
     def _populate_country_edit_combo(self, combo, current_country_id):
         combo.blockSignals(True)
         combo.clear()
@@ -5875,6 +5908,22 @@ class ClientWidget(QWidget):
             self.update_sav_tab_visibility() # Update SAV tab based on potentially changed status
 
             QMessageBox.information(self, self.tr("Succès"), self.tr("Informations client sauvegardées."))
+
+            # Log activity for client update
+            try:
+                log_data = {
+                    "user_id": self.current_user_id, # Assuming self.current_user_id holds the logged-in user's ID
+                    "action_type": "CLIENT_UPDATED",
+                    "details": f"Client '{self.client_info.get('client_name')}' (ID: {self.client_info['client_id']}) mis à jour. Changements: {data_to_save}",
+                    "related_entity_type": "Client",
+                    "related_entity_id": self.client_info['client_id'],
+                    "related_client_id": self.client_info['client_id']
+                }
+                activity_logs_crud.add_activity_log(log_data)
+                logging.info(f"Activity logged for CLIENT_UPDATED: {self.client_info['client_id']}")
+            except Exception as e_log:
+                logging.error(f"Failed to log CLIENT_UPDATED activity for client {self.client_info['client_id']}: {e_log}", exc_info=True)
+
             return True
         else:
             QMessageBox.warning(self, self.tr("Erreur DB"), self.tr("Échec de la sauvegarde des informations client."))
