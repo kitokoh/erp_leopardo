@@ -8,6 +8,7 @@ from PyQt5.QtCore import Qt
 # import db as db_manager # Removed
 from .client_controller import ClientController # Added
 # from db.cruds.templates_crud import get_all_templates # Removed
+from auth.authentication import get_current_user_id # Added import
 
 class AddNewClientDialog(QDialog):
     def __init__(self, parent=None, initial_country_name=None):
@@ -319,6 +320,7 @@ class AddNewClientDialog(QDialog):
 
         selected_lang_display_text = self.language_select_combo.currentText()
         selected_languages_list = self.language_options_map.get(selected_lang_display_text, ["fr"])
+        current_user_id = get_current_user_id() # Get current user ID
 
         return {
             "client_name": client_name,
@@ -327,7 +329,8 @@ class AddNewClientDialog(QDialog):
             "country_name": country_name, # Raw name
             "city_name": city_name,       # Raw name
             "project_identifier": project_id_text,
-            "selected_languages": ",".join(selected_languages_list)
+            "selected_languages": ",".join(selected_languages_list),
+            "created_by_user_id": current_user_id  # Added current user ID
             # "default_template_id": self.default_template_combo.currentData() # Removed
 
             # client_status_id can be defaulted by the controller or main window

@@ -77,22 +77,22 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
     new_project_id_central_db = None # Define for later use in error handling
 
     if not created_client_info or not created_client_info.get("client_id"):
-        QMessageBox.critical(doc_manager, doc_manager.tr("Erreur DB"),
-                             doc_manager.tr("Impossible de créer le client via le contrôleur."))
-        # Add None check for created_client_info before calling .get()
-        if created_client_info is None:
-            print("Error: Client creation failed, created_client_info is None.") # Or use actual logging
-            doc_manager.notify(title=doc_manager.tr("Erreur Création Client"),
-                               message=doc_manager.tr("Le contrôleur n'a pas pu créer le client. Réponse nulle."),
-                               type='ERROR')
-            return # Or handle appropriately otherwise
+        error_msg = doc_manager.tr("Le contrôleur n'a pas pu créer le client. Réponse nulle.")
+        if created_client_info and created_client_info.get("error"):
+            error_msg = created_client_info.get("error")
 
+        QMessageBox.critical(doc_manager, doc_manager.tr("Erreur DB"), error_msg)
         doc_manager.notify(title=doc_manager.tr("Erreur Création Client"),
-                           message=created_client_info.get("error", doc_manager.tr("Le contrôleur n'a pas pu créer le client.")),
+                           message=error_msg,
                            type='ERROR')
         return
 
     actual_new_client_id = created_client_info.get("client_id")
+    client_name_for_notification = created_client_info.get("client_name", client_name_val)
+    doc_manager.notify(title=doc_manager.tr("Client Créé (DB)"),
+                       message=doc_manager.tr("Client '{0}' (ID: {1}) créé avec succès dans la base de données.").format(client_name_for_notification, actual_new_client_id),
+                       type='SUCCESS')
+
     country_id_val = created_client_info.get("country_id") # Resolved by controller
     city_id_val = created_client_info.get("city_id")       # Resolved by controller
 
@@ -341,6 +341,11 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
             logging.warning(f"No project ID available (commande or default) for client {actual_new_client_id}. No tasks created.")
         # Assuming a phantom 'try' block was before the 'if project_id_for_tasks:' at line 374 (or before comments at L369)
 
+        # Notify about project and task creation if successful
+        if project_id_for_tasks:
+            doc_manager.notify(title=doc_manager.tr("Configuration Initiale Client Terminée"),
+                               message=doc_manager.tr("Projet et tâches initiales créés pour '{0}'.").format(created_client_info.get('client_name', client_name_val)),
+                               type='INFO')
 
 
         if ui_map_data: # This block should run regardless of commande creation, to ensure Proforma/Contact/Product dialogs sequence
