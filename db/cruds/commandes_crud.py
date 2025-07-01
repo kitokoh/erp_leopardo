@@ -29,11 +29,12 @@ def add_commande(data: dict, conn: sqlite3.Connection = None) -> str | None:
     sql = """
         INSERT INTO Commandes (
             commande_id, client_id, project_id, commande_reference, commande_date,
-            status_commande_id, description_commande, total_ht, total_ttc, currency,
+            status_commande_id, description_commande, notes, is_default,
+            total_ht, total_ttc, currency,
             shipping_address, billing_address,
             created_at, updated_at, created_by_user_id
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
     params = (
         new_commande_id,
@@ -43,6 +44,8 @@ def add_commande(data: dict, conn: sqlite3.Connection = None) -> str | None:
         commande_date,
         data['status_commande_id'],
         data.get('description_commande'),
+        data.get('notes'), # Added notes
+        data.get('is_default', False), # Added is_default
         data.get('total_ht'),
         data.get('total_ttc'),
         data.get('currency', 'EUR'),
@@ -135,7 +138,8 @@ def update_commande(commande_id: str, data: dict, conn: sqlite3.Connection = Non
 
     valid_fields = [
         'project_id', 'commande_reference', 'commande_date', 'status_commande_id',
-        'description_commande', 'total_ht', 'total_ttc', 'currency',
+        'description_commande', 'notes', 'is_default',
+        'total_ht', 'total_ttc', 'currency',
         'shipping_address', 'billing_address'
     ]
 
@@ -342,5 +346,112 @@ __all__ = [
     "get_items_for_commande",
     "update_commande_item",
     "delete_commande_item",
-    "get_next_commande_reference"
+    "get_next_commande_reference",
+    "get_all_commandes_with_details",
+    "get_all_commandes_count"
 ]
+
+@_manage_conn
+def get_all_commandes_with_details(filters: dict = None, limit: int = None, offset: int = 0, conn: sqlite3.Connection = None) -> list[dict]:
+    """
+    Retrieves all commandes with details from joined tables (Clients, Projects, StatusSettings, Users).
+    Supports filtering and pagination.
+    """
+    cursor = conn.cursor()
+    # Ensure row_factory is set for this cursor if not globally for the connection
+    # conn.row_factory = sqlite3.Row # Already set at connection level in _manage_conn likely
+
+    base_sql = """
+        SELECT
+            cmd.commande_id, cmd.commande_reference, cmd.commande_date, cmd.description_commande,
+            cmd.notes, cmd.is_default, -- Added notes and is_default
+            cmd.total_ht, cmd.total_ttc, cmd.currency, cmd.created_at, cmd.project_id,
+            c.client_id, c.client_name,
+            p.project_name,
+            s.status_name AS status_commande_name, s.color_hex AS status_commande_color,
+            u.username AS created_by_username
+        FROM Commandes cmd
+        JOIN Clients c ON cmd.client_id = c.client_id
+        LEFT JOIN Projects p ON cmd.project_id = p.project_id
+        JOIN StatusSettings s ON cmd.status_commande_id = s.status_id AND s.status_type = 'Commande'
+        LEFT JOIN Users u ON cmd.created_by_user_id = u.user_id
+    """
+    q_params = []
+    conditions = []
+
+    if filters:
+        if filters.get('status_commande_id'):
+            conditions.append("cmd.status_commande_id = ?")
+            q_params.append(filters['status_commande_id'])
+
+        if filters.get('search_term'):
+            term = f"%{filters['search_term']}%"
+            # Adjusted to search in commande_reference, client_name, or project_name
+            conditions.append("(cmd.commande_reference LIKE ? OR c.client_name LIKE ? OR IFNULL(p.project_name, '') LIKE ?)")
+            q_params.extend([term, term, term])
+
+        if filters.get('date_from'):
+            # Ensure date format matches 'YYYY-MM-DD' as stored or used by date() function
+            conditions.append("date(cmd.commande_date) >= date(?)")
+            q_params.append(filters['date_from']) # Should be 'YYYY-MM-DD'
+
+        if filters.get('date_to'):
+            conditions.append("date(cmd.commande_date) <= date(?)")
+            q_params.append(filters['date_to']) # Should be 'YYYY-MM-DD'
+
+    if conditions:
+        base_sql += " WHERE " + " AND ".join(conditions)
+
+    base_sql += " ORDER BY cmd.commande_date DESC"
+
+    if limit is not None: # Ensure offset is used with limit
+        base_sql += " LIMIT ? OFFSET ?"
+        q_params.extend([limit, offset if offset is not None else 0])
+
+    try:
+        cursor.execute(base_sql, tuple(q_params)) # Ensure q_params is a tuple
+        return [dict(row) for row in cursor.fetchall()]
+    except sqlite3.Error as e:
+        logger.error(f"Failed to get all commandes with details. Filters: {filters}. SQL: {base_sql} Params: {q_params} Error: {e}", exc_info=True)
+        return []
+
+@_manage_conn
+def get_all_commandes_count(filters: dict = None, conn: sqlite3.Connection = None) -> int:
+    """Counts all commandes based on filters."""
+    cursor = conn.cursor()
+    base_sql = "SELECT COUNT(DISTINCT cmd.commande_id) FROM Commandes cmd" # Use DISTINCT if joins might create duplicates
+    q_params = []
+    conditions = []
+
+    joins = " JOIN Clients c ON cmd.client_id = c.client_id LEFT JOIN Projects p ON cmd.project_id = p.project_id JOIN StatusSettings s ON cmd.status_commande_id = s.status_id AND s.status_type = 'Commande' LEFT JOIN Users u ON cmd.created_by_user_id = u.user_id"
+
+    if filters:
+        if filters.get('status_commande_id'):
+            conditions.append("cmd.status_commande_id = ?")
+            q_params.append(filters['status_commande_id'])
+
+        if filters.get('search_term'):
+            term = f"%{filters['search_term']}%"
+            conditions.append("(cmd.commande_reference LIKE ? OR c.client_name LIKE ? OR IFNULL(p.project_name, '') LIKE ?)")
+            q_params.extend([term, term, term])
+
+        if filters.get('date_from'):
+            conditions.append("date(cmd.commande_date) >= date(?)")
+            q_params.append(filters['date_from'])
+
+        if filters.get('date_to'):
+            conditions.append("date(cmd.commande_date) <= date(?)")
+            q_params.append(filters['date_to'])
+
+    full_sql = base_sql + joins
+    if conditions:
+        full_sql += " WHERE " + " AND ".join(conditions)
+
+    try:
+        cursor.execute(full_sql, tuple(q_params)) # Ensure q_params is a tuple
+        count_result = cursor.fetchone()
+        return count_result[0] if count_result is not None else 0
+    except sqlite3.Error as e:
+        logger.error(f"Failed to count commandes. Filters: {filters}. SQL: {full_sql} Params: {q_params} Error: {e}", exc_info=True)
+        return 0
+

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 
+
 import datetime
 
 from PyQt5.QtWidgets import (
@@ -102,6 +103,16 @@ class CommandeWidget(QWidget):
 
                 ref_item = QTableWidgetItem(commande_data.get("commande_reference", "N/A"))
                 ref_item.setData(Qt.UserRole, commande_data.get("commande_id")) # Store ID
+
+                # Add notes to tooltip
+                notes_text = commande_data.get("notes", "")
+                if notes_text:
+                    tooltip_text = f"Référence: {commande_data.get('commande_reference', 'N/A')}\n" \
+                                   f"Notes: {notes_text[:100]}{'...' if len(notes_text) > 100 else ''}"
+                    ref_item.setToolTip(tooltip_text)
+                else:
+                    ref_item.setToolTip(f"Référence: {commande_data.get('commande_reference', 'N/A')}\nPas de notes.")
+
                 self.commandes_table.setItem(row_idx, 0, ref_item)
 
                 date_str = commande_data.get("commande_date", "")

@@ -45,10 +45,10 @@ def add_client_document(data: dict, conn: sqlite3.Connection = None) -> str | No
             document_id, client_id, project_id, order_identifier,
             document_name, file_name_on_disk, file_path_relative,
             document_type_generated, source_template_id,
-            version_tag, notes, created_by_user_id,
+            version_tag, notes, footer_notes, created_by_user_id,
             parent_document_id, is_latest_version
             -- is_deleted, deleted_at will use defaults from schema (0 and NULL)
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
     params = (
         new_document_id,
@@ -62,6 +62,7 @@ def add_client_document(data: dict, conn: sqlite3.Connection = None) -> str | No
         data.get('source_template_id'),
         data.get('version_tag', "1.0"), # Default version_tag
         data.get('notes'),
+        data.get('footer_notes'), # Added footer_notes
         data.get('user_id'),
         data.get('parent_document_id'), # New field for versioning
         data.get('is_latest_version', 1) # Default to True (1) for new/latest version

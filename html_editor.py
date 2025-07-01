@@ -12,7 +12,7 @@ from PyQt5.QtWebChannel import QWebChannel
 
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtCore import QUrl, QStandardPaths, Qt, QCoreApplication, pyqtSlot, QObject, pyqtSignal, QFileInfo, QTimer
-import db as db_manager
+import db as db_manager # Assuming db_manager provides necessary CRUDs
 from db.utils import get_document_context_data
 # from db.cruds.companies_crud import get_default_company # Moved into __init__
 from html_to_pdf_util import render_html_template, convert_html_to_pdf
@@ -82,7 +82,15 @@ class HtmlEditor(QDialog):
         self.tinymce_init_timer.timeout.connect(self._handle_tinymce_init_timeout)
 
     def _setup_ui(self):
-        self.setWindowTitle(self.tr("HTML Editor (TinyMCE) - {0}").format(os.path.basename(self.file_path) if self.file_path else "New Document"))
+        # Window title is set by caller if file_path is None (e.g. HtmlTemplateCreatorDialog)
+        # or here if file_path is provided (editing existing)
+        if self.file_path:
+            self.setWindowTitle(self.tr("HTML Editor (TinyMCE) - {0}").format(os.path.basename(self.file_path)))
+        else:
+            # Title will be set by the calling dialog like HtmlTemplateCreatorDialog
+            # Or we can set a generic one here if preferred for direct instantiation without path.
+            self.setWindowTitle(self.tr("HTML Editor (TinyMCE) - New Document"))
+
         self.setGeometry(100, 100, 1200, 800)
 
         main_layout = QVBoxLayout(self)
@@ -169,42 +177,115 @@ class HtmlEditor(QDialog):
 
 
     def _get_default_skeleton_html(self):
+        # A more comprehensive default skeleton for new templates
         return """<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><title>Document</title></head>
-<body><h1>New Document</h1><p>Client: {{client.name}}</p></body>
+<html lang="{{ doc.language_code | default('en') }}">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ client.name | default('N/A') }} - {{ doc.type | default('Document') }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
+        .header { background-color: #f2f2f2; padding: 10px; text-align: center; }
+        .content { margin-top: 20px; }
+        .footer { margin-top: 30px; padding-top: 10px; border-top: 1px solid #ccc; font-size: 0.9em; text-align: center; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ seller.name | default('Your Company') }}</h1>
+        <p>{{ seller.address_raw | default('Your Company Address') }}</p>
+    </div>
+
+    <div class="content">
+        <h2>{{ doc.type | default('Document Title') }}</h2>
+        <p><strong>Date:</strong> {{ doc.current_date }}</p>
+        <p><strong>Client:</strong> {{ client.name | default('Client Name') }}</p>
+        <p><strong>Client Address:</strong> {{ client.full_address | default('Client Address') }}</p>
+
+        <p>Dear {{ client.contact_name | default('Client Contact') }},</p>
+        <p>This is a placeholder for your document content. You can use Jinja2 templating for dynamic data.</p>
+
+        {{#if products}}
+        <h3>Products/Services:</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Quantity</th>
+                    <th>Unit Price</th>
+                    <th>Total Price</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each products}}
+                <tr>
+                    <td>{{ this.name }}</td>
+                    <td>{{ this.description }}</td>
+                    <td>{{ this.quantity_formatted }}</td>
+                    <td>{{ this.price_formatted }}</td>
+                    <td>{{ this.total_price_formatted }}</td>
+                </tr>
+                {{/each}}
+            </tbody>
+        </table>
+        {{else}}
+        <p><em>No products listed for this document.</em></p>
+        {{/if}}
+
+        <p>Further details and terms can be added here.</p>
+    </div>
+
+    <div class="footer">
+        <p>&copy; {{ doc.current_year }} {{ seller.name | default('Your Company') }}. All rights reserved.</p>
+        <p>Thank you for your business!</p>
+    </div>
+</body>
 </html>"""
 
     def _replace_placeholders_html(self, html_content: str) -> str:
-        if not self.client_data or 'client_id' not in self.client_data:
-            QMessageBox.warning(self, self.tr("Data Error"), self.tr("Client ID is missing. Cannot populate template fully."))
-            return html_content
-        # self.default_company_id is used for seller info
+        # Ensure client_data is present, even if it's just dummy data for new templates
+        if not self.client_data: # Should typically be provided, even if dummy
+            print("HtmlEditor Warning: client_data is missing. Preview might be incomplete.")
+            # Create a minimal dummy client_data if it's absolutely missing, to avoid crashing get_document_context_data
+            temp_dummy_client_data = {'client_id': 'dummy_preview_id_if_missing'}
+        else:
+            temp_dummy_client_data = self.client_data
 
-        client_id = self.client_data.get('client_id')
-        # Use project_id if available in client_data (e.g. if document is project-specific)
-        project_id_for_context = self.client_data.get('project_id_db_uuid', self.client_data.get('project_identifier'))
+        # Ensure client_id is in the (potentially dummy) client_data for context fetching
+        if 'client_id' not in temp_dummy_client_data:
+            # This situation implies an issue with how client_data is passed or constructed.
+            # For robustness in preview, we'll add a placeholder.
+            print("HtmlEditor Warning: 'client_id' missing in client_data for preview. Using placeholder.")
+            temp_dummy_client_data['client_id'] = 'placeholder_client_id_for_preview'
 
+
+        client_id_for_context = temp_dummy_client_data.get('client_id')
+        project_id_for_context = temp_dummy_client_data.get('project_id_db_uuid', temp_dummy_client_data.get('project_identifier'))
 
         try:
-            # Use self.target_language_code for the live preview context
             context = get_document_context_data(
-                client_id=client_id,
+                client_id=client_id_for_context,
                 company_id=self.default_company_id,
                 target_language_code=self.target_language_code,
                 project_id=project_id_for_context if project_id_for_context else None,
-                # Pass client_data as additional_context for any specific overrides or extra fields
-                additional_context=self.client_data
+                additional_context=temp_dummy_client_data # Use the potentially augmented temp_dummy_client_data
             )
 
             # Optional: "No Products" check for preview (console warning only)
-            file_name_for_check = os.path.basename(self.file_path or "untitled.html").lower()
-            if "proforma" in file_name_for_check or "invoice" in file_name_for_check:
+            # Use self.file_path if available, otherwise a generic name for new documents
+            doc_name_for_check = os.path.basename(self.file_path) if self.file_path else "new_document.html"
+            doc_name_for_check = doc_name_for_check.lower()
+
+            if "proforma" in doc_name_for_check or "invoice" in doc_name_for_check:
                 products_in_target_lang = [p for p in context.get('products', []) if p.get('is_language_match')]
                 if not context.get('products'):
-                    print(f"HtmlEditor Preview Info: No products linked for Proforma/Invoice '{file_name_for_check}'.")
+                    print(f"HtmlEditor Preview Info: No products linked for document '{doc_name_for_check}'.")
                 elif not products_in_target_lang:
-                    print(f"HtmlEditor Preview Info: No products found in language '{self.target_language_code}' for Proforma/Invoice '{file_name_for_check}'.")
+                    print(f"HtmlEditor Preview Info: No products found in language '{self.target_language_code}' for document '{doc_name_for_check}'.")
 
             return render_html_template(html_content, context)
         except Exception as e:
@@ -222,19 +303,23 @@ class HtmlEditor(QDialog):
         if self._save_pending:
             self._save_pending = False
             if not self.file_path:
-                default_save_dir = QStandardPaths.writableLocation(QStandardPaths.DocumentsLocation)
-                file_dialog = QFileDialog(self, self.tr("Save HTML File"), default_save_dir, self.tr("HTML Files (*.html *.htm)"))
-                file_dialog.setAcceptMode(QFileDialog.AcceptSave)
-                if file_dialog.exec_():
-                    self.file_path = file_dialog.selectedFiles()[0]
-                else:
-                    return
+                # This is a new template being created.
+                # The HtmlTemplateCreatorDialog will handle the actual file and DB saving.
+                # Here, we just accept the dialog so HtmlTemplateCreatorDialog can get raw_html_content_from_editor.
+                # A check for empty content can be good.
+                if not self.raw_html_content_from_editor.strip():
+                    QMessageBox.warning(self, self.tr("Empty Content"), self.tr("Cannot save an empty template. Please add some content."))
+                    return # Stay in editor
+                self.accept() # Signal to calling dialog (HtmlTemplateCreatorDialog) that content is ready
+                return
+
+            # Existing file path, save normally
             try:
                 with open(self.file_path, 'w', encoding='utf-8') as f:
                     f.write(self.raw_html_content_from_editor)
                 QMessageBox.information(self, self.tr("Success"), self.tr("HTML content saved successfully to {0}.").format(self.file_path))
-                self.setWindowTitle(self.tr("HTML Editor (TinyMCE) - {0}").format(os.path.basename(self.file_path)))
-                self.accept()
+                # No need to change window title here if it was already set correctly
+                self.accept() # Close editor on successful save
             except IOError as e:
                 QMessageBox.critical(self, self.tr("Save Error"), self.tr("Could not save HTML file: {0}\n{1}").format(self.file_path, e))
 

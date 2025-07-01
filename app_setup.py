@@ -39,34 +39,204 @@ PROFORMA_TEMPLATE_NAME = "proforma_template.xlsx"
 CONTRAT_VENTE_TEMPLATE_NAME = "contrat_vente_template.xlsx"
 PACKING_LISTE_TEMPLATE_NAME = "packing_liste_template.xlsx"
 
+# --- Logging Monkey-Patch for Windows PermissionError ---
+# Ensure necessary imports for the patch are at the top level of the module
+import logging.handlers # Required for patching
+import os               # Required by the rotate method
+import sys              # For sys.exc_info() in error handling
+
+_original_rotate_method = None # To store the original method
+
+def _custom_windows_rotate_wrapper(self, source, dest):
+    """
+    Wrapper for the original rotate method to catch PermissionError on Windows.
+    This is a monkey-patch. 'self' here is the handler instance.
+    """
+    global _original_rotate_method
+    if not _original_rotate_method:
+        # This case should ideally not be reached if the patch is applied correctly,
+        # meaning _original_rotate_method should be populated before this wrapper is ever called.
+        # However, as a defensive measure, if it's None, we log an error and
+        # attempt a simple rename, which was the problematic operation.
+        try:
+            # Log that the original method was not found (this is an issue with the patching logic itself)
+            # Since logging might be in a weird state, a print might be more reliable here,
+            # or use self.handleError if 'self' is a valid handler instance.
+            # For now, assume self.handleError is available.
+            error_record_patch_issue = logging.LogRecord(
+                name=self.name if hasattr(self, 'name') else 'LogPatching',
+                level=logging.ERROR, pathname="", lineno=0,
+                msg="Critical: _custom_windows_rotate_wrapper called but _original_rotate_method is None. Patching failed.",
+                args=(), exc_info=None, func=""
+            )
+            if hasattr(self, 'handleError'):
+                self.handleError(error_record_patch_issue)
+            else: # Fallback if self isn't a full handler instance yet or handleError is missing
+                print(f"CRITICAL PATCHING ERROR: {error_record_patch_issue.getMessage()}", file=sys.stderr, flush=True)
+
+            # Attempt the basic rename operation as a last resort.
+            if os.path.exists(source):
+                os.rename(source, dest)
+        except PermissionError:
+            # Handle PermissionError during the fallback rename.
+            perm_error_record = logging.LogRecord(
+                name=self.name if hasattr(self, 'name') else 'LogRotationFallback',
+                level=logging.WARNING, pathname="", lineno=0,
+                msg=f"Log rotation (fallback rename) failed: Permission denied to rename {source} to {dest}.",
+                args=(), exc_info=None, func=""
+            )
+            if hasattr(self, 'handleError'):
+                self.handleError(perm_error_record)
+            else:
+                print(f"WARNING: {perm_error_record.getMessage()}", file=sys.stderr, flush=True)
+        except Exception as e_fallback: # Catch any other error during fallback
+            fallback_exc_record = logging.LogRecord(
+                name=self.name if hasattr(self, 'name') else 'LogRotationFallback',
+                level=logging.ERROR, pathname="", lineno=0,
+                msg=f"Unexpected error during fallback log rotation of {source} to {dest}: {e_fallback}",
+                args=(), exc_info=sys.exc_info(), func=""
+            )
+            if hasattr(self, 'handleError'):
+                self.handleError(fallback_exc_record)
+            else:
+                print(f"ERROR: {fallback_exc_record.getMessage()}", file=sys.stderr, flush=True)
+        return # Exit after attempting fallback
+
+    # Call the original rotate method (which is now stored in _original_rotate_method)
+    try:
+        # The original 'rotate' method is part of BaseRotatingHandler and expects 'self', 'source', 'dest'.
+        _original_rotate_method(self, source, dest)
+    except PermissionError:
+        # If PermissionError occurs during the original method's execution
+        perm_error_during_original_record = logging.LogRecord(
+            name=self.name, level=logging.WARNING, pathname="", lineno=0,
+            msg=f"Log rotation (via original method) failed: Permission denied during rotation of {source} to {dest}. "
+                "Logging will continue to the original file. Manual cleanup of logs might be required.",
+            args=(), exc_info=None, func="" # No exc_info for a handled warning
+        )
+        self.handleError(perm_error_during_original_record)
+    except Exception as e_original:
+        # Catch any other unexpected error from the original rotate method
+        unexpected_error_record = logging.LogRecord(
+            name=self.name, level=logging.ERROR, pathname="", lineno=0,
+            msg=f"Unexpected error during original log rotation call for {source} to {dest}: {e_original}",
+            args=(), exc_info=sys.exc_info(), func="" # Include exc_info for unexpected errors
+        )
+        self.handleError(unexpected_error_record)
+
+def _apply_windows_logging_patch():
+    """
+    Applies a monkey-patch to logging.handlers.BaseRotatingHandler.rotate
+    to handle PermissionError on Windows more gracefully.
+    This should be called once, early in the application startup.
+    """
+    global _original_rotate_method
+    if os.name == 'nt': # Apply only on Windows (nt means New Technology, i.e., Windows)
+        # Check if the patch has already been applied to avoid re-patching
+        if not _original_rotate_method and hasattr(logging.handlers.BaseRotatingHandler, 'rotate'):
+            _original_rotate_method = logging.handlers.BaseRotatingHandler.rotate
+            logging.handlers.BaseRotatingHandler.rotate = _custom_windows_rotate_wrapper
+            # Using print for initial feedback as logging itself is being configured.
+            print("Applied refined Windows logging patch to BaseRotatingHandler.rotate.", flush=True)
+        elif _original_rotate_method:
+            print("Windows logging patch already applied.", flush=True)
+        else:
+            # This case (os.name == 'nt' but BaseRotatingHandler.rotate doesn't exist) is highly unlikely.
+            print("Could not apply Windows logging patch: BaseRotatingHandler.rotate not found.", file=sys.stderr, flush=True)
+    else:
+        # Optional: print a message if not on Windows, for clarity.
+        # print("Windows logging patch not applied (not on Windows OS).", flush=True)
+        pass
+
+
 # --- Utility Functions ---
 def setup_logging():
-    """Configures logging for the application."""
+    """Configures logging for the application robustly."""
+    # Apply the patch before any handlers are created, if on Windows.
+    _apply_windows_logging_patch()
+
     log_file_name = "client_manager_app.log"
+    # Resolve to absolute path for robust comparison
+    log_file_path = os.path.abspath(log_file_name)
     log_format = "%(asctime)s - %(levelname)s - [%(module)s:%(lineno)d] - %(message)s"
 
-    logging.basicConfig(level=logging.DEBUG, format=log_format, stream=sys.stderr)
+    root_logger = logging.getLogger()
 
+    # 1. Configure basicConfig only if no handlers exist at all on the root logger.
+    if not root_logger.hasHandlers():
+        logging.basicConfig(level=logging.DEBUG, format=log_format, stream=sys.stderr)
+        # basicConfig adds a StreamHandler. We will manage it below.
+        logging.info("basicConfig applied as no handlers were present.")
+    else:
+        # If handlers exist, basicConfig does nothing. We might still want to set the root logger's level.
+        if root_logger.level == logging.NOTSET or root_logger.level > logging.DEBUG:
+            root_logger.setLevel(logging.DEBUG)
+            logging.info(f"Root logger level set to DEBUG as it was {logging.getLevelName(root_logger.level)}.")
+
+
+    # --- File Handler Setup ---
+    # Remove any existing RotatingFileHandler for the *same file* before adding a new one.
+    for handler in root_logger.handlers[:]: # Iterate over a copy
+        if isinstance(handler, logging.handlers.RotatingFileHandler):
+            # Ensure baseFilename is absolute for comparison if it's not already
+            handler_base_filename_abs = os.path.abspath(handler.baseFilename)
+            if handler_base_filename_abs == log_file_path:
+                logging.info(f"Removing existing RotatingFileHandler for {handler.baseFilename}")
+                handler.close()
+                root_logger.removeHandler(handler)
+
+    # Add the new file handler
     file_handler = logging.handlers.RotatingFileHandler(
-        log_file_name, maxBytes=1024*1024, backupCount=3, encoding='utf-8'
+        log_file_path, maxBytes=1024*1024, backupCount=3, encoding='utf-8', delay=True
     )
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(logging.Formatter(log_format))
+    root_logger.addHandler(file_handler)
+    logging.info(f"Added/Replaced RotatingFileHandler for {log_file_path}.")
 
-    console_handler = logging.StreamHandler(sys.stderr)
-    console_handler.setLevel(logging.ERROR)
-    console_handler.setFormatter(logging.Formatter(log_format))
-
-    root_logger = logging.getLogger()
-    if not any(isinstance(h, logging.handlers.RotatingFileHandler) and h.baseFilename.endswith(log_file_name) for h in root_logger.handlers):
-        root_logger.addHandler(file_handler)
-    if not any(isinstance(h, logging.StreamHandler) and h.stream == sys.stderr for h in root_logger.handlers):
-        for handler in root_logger.handlers[:]:
-            if isinstance(handler, logging.StreamHandler) and handler.stream in (sys.stdout, sys.stderr) and handler.formatter._fmt == logging.BASIC_FORMAT:
+    # --- Console Handler Setup ---
+    # Ensure only one custom console handler for stderr with the correct format exists.
+    # Remove basicConfig's default stream handler or any old custom ones.
+    custom_console_handler_found_and_kept = False
+    for handler in root_logger.handlers[:]:
+        if isinstance(handler, logging.StreamHandler) and handler.stream == sys.stderr:
+            if handler.formatter and handler.formatter._fmt == log_format and handler.level == logging.ERROR:
+                if not custom_console_handler_found_and_kept:
+                    logging.info("Found existing custom console handler. Keeping it.")
+                    custom_console_handler_found_and_kept = True
+                else:
+                    logging.info("Removing duplicate custom console handler.")
+                    handler.close() # Stream handlers for stderr don't strictly need close
+                    root_logger.removeHandler(handler)
+            elif getattr(handler.formatter, '_fmt', None) == logging.BASIC_FORMAT:
+                logging.info(f"Removing basicConfig default StreamHandler (formatter: {handler.formatter._fmt}).")
+                handler.close()
                 root_logger.removeHandler(handler)
-        root_logger.addHandler(console_handler)
+            elif handler.formatter and handler.formatter._fmt == log_format and handler.level != logging.ERROR:
+                # If it's our format but wrong level, remove and re-add
+                logging.info(f"Removing custom console handler with incorrect level ({logging.getLevelName(handler.level)}). Will re-add with ERROR level.")
+                handler.close()
+                root_logger.removeHandler(handler)
 
-    logging.info("Logging configured.")
+
+    if not custom_console_handler_found_and_kept:
+        console_handler = logging.StreamHandler(sys.stderr)
+        console_handler.setLevel(logging.ERROR) # Only ERROR and above to console
+        console_handler.setFormatter(logging.Formatter(log_format))
+        root_logger.addHandler(console_handler)
+        logging.info("Added new custom StreamHandler for console (ERROR level).")
+
+    # Ensure root logger level is appropriate if not set by basicConfig initially
+    # This is a bit redundant if basicConfig was called, but safe.
+    if root_logger.level == logging.NOTSET or root_logger.level > logging.DEBUG:
+        root_logger.setLevel(logging.DEBUG)
+        logging.info(f"Ensured root logger level is DEBUG (was {logging.getLevelName(root_logger.level)}).")
+
+    # Final log to confirm configuration.
+    # This message itself might be logged by the old handler if setup_logging is called multiple times
+    # before the old handlers are fully removed and new ones added in this same function call.
+    # However, the critical part is that by the *end* of this function, the handler state is clean.
+    logging.info("Logging configuration process complete.")
 
 def get_app_config():
     """Returns the global CONFIG object."""
