@@ -171,16 +171,7 @@ def list_users(role_id_filter: int = None, status_filter: str = None, conn: sqli
         logger.error(f"Database error listing users with filters (role_id: {role_id_filter}, status: {status_filter}): {e}", exc_info=True)
         return []
 
-def verify_password(hashed_password: str, provided_password: str) -> bool:
-    """
-    Verifies a provided password against a stored hash.
-    Internal helper, typically not called directly from outside for login.
-    Uses the verify_password function imported from utils.py (which uses passlib).
-    Now returns a tuple: (bool_verified, new_hash_if_updated_or_None)
-    """
-    # The function signature in utils.verify_password is (plain_password, hashed_password)
-    # So, the call should be utils.verify_password(provided_password, hashed_password)
-    return verify_password(provided_password, hashed_password) # Corrected argument order from previous step if it was wrong
+# Removed local verify_password function. Will use the one imported from utils directly.
 
 @_manage_conn
 def _update_user_password_hash_only(user_id: str, new_hashed_password: str, conn: sqlite3.Connection = None) -> bool:
@@ -223,8 +214,9 @@ def verify_user_password(username: str, password: str, conn: sqlite3.Connection 
             logger.error(f"User record for {username} is missing 'hashed_password'. Cannot verify.")
             return None
 
-        # verify_password (the internal one) now calls utils.verify_password which returns a tuple
-        verified, new_hash = verify_password(user['hashed_password'], password)
+        # Call the verify_password function imported from utils.
+        # The expected signature is verify_password(plain_password, hashed_password)
+        verified, new_hash = verify_password(password, user['hashed_password'])
 
         if verified:
             logger.info(f"Password verification successful for user: {username}")
