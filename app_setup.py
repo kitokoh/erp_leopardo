@@ -18,7 +18,8 @@ if getattr(sys, 'frozen', False):
 else:
     APP_ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-DEFAULT_TEMPLATES_DIR = os.path.join(APP_ROOT_DIR, "templates") # Standardized subdir name
+DEFAULT_TEMPLATES_DIR = os.path.join(APP_ROOT_DIR, "resources", "templates") # Updated path
+DEFAULT_ICONS_DIR = os.path.join(APP_ROOT_DIR, "resources", "icons") # Added for icons
 DEFAULT_CLIENTS_DIR = os.path.join(APP_ROOT_DIR, "clients")   # Standardized subdir name
 LOGO_SUBDIR = "company_logos"
 

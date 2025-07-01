@@ -60,7 +60,7 @@ STYLE_GENERIC_INPUT = """
         border-left-width: 1px; border-left-color: #ced4da; border-left-style: solid;
         border-top-right-radius: 3px; border-bottom-right-radius: 3px;
     }
-    QComboBox::down-arrow { image: url(icons/arrow_down.png); }
+    QComboBox::down-arrow { image: url(resources/icons/arrow_down.png); }
 """
 
 STYLE_PRIMARY_BUTTON = """

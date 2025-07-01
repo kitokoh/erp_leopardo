@@ -20,7 +20,7 @@ class SplashWindow(QWidget):
         super().__init__()
         self.app_root_dir = app_root_dir
         self.language_code = language_code or QLocale.system().name().split('_')[0] # e.g., 'en', 'fr'
-        self.default_static_pixmap = QPixmap(os.path.join(self.app_root_dir, "icons", "leopard_logo.svg"))
+        self.default_static_pixmap = QPixmap(os.path.join(self.app_root_dir, "resources", "icons", "leopard_logo.svg"))
 
         # Configure window properties for splash-like behavior
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool) # Qt.Tool helps it float like a splash

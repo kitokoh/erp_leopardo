@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <title>Facture Proforma</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300;400;700&display=swap');
         body {
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-family: 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
             margin: 0;
             padding: 0;
             background-color: #f4f4f4;
@@ -199,57 +200,58 @@
                 </tr>
             </thead>
             <tbody>
-                {% for product in products %}
+                {{#each items}}
                 <tr>
-                    <td>{{ product.product_code | default(loop.index) }}</td>
+                    <td>{{this.product_code}}</td>
                     <td>
-                        <strong>{{ product.name | default('N/A') }}</strong>
-                        {% if product.description and product.description != product.name %}
-                        <br><small>{{ product.description }}</small>
-                        {% endif %}
-                         {% if product.original_name and product.original_name != product.name and product.original_name != product.description %}
-                        <br><small><em>Nom original: {{ product.original_name }}</em></small>
-                        {% endif %}
+                        <strong>{{this.name}}</strong>
+                        {{#if this.description}}
+                        <br><small>{{this.description}}</small>
+                        {{/if}}
+                        {{#if this.item_language_code}}
+                        {{#if this.original_name}}
+                        <!-- This logic for original_name might need refinement based on context -->
+                        <!-- <br><small><em>Nom original ({{this.item_language_code}}): {{this.original_name}}</em></small> -->
+                        {{/if}}
+                        {{/if}}
                     </td>
-                    <td class="number">{{ product.quantity | default(0) }}</td>
-                    <td class="number">{{ product.unit_price_formatted | default('N/A') }}</td>
-                    <td class="number">{{ product.total_price_formatted | default('N/A') }}</td>
+                    <td class="number">{{this.quantity}}</td>
+                    <td class="number">{{this.unit_price_formatted}}</td>
+                    <td class="number">{{this.total_price_formatted}}</td>
                 </tr>
-                {% else %}
-                <tr>
-                    <td colspan="5" style="text-align: center;">{{ labels.no_products_listed | default("Aucun produit listé.") }}</td>
-                </tr>
-                {% endfor %}
+                {{/each}}
+                <!-- Fallback for no items - current regex engine doesn't have #else for #each -->
+                <!-- This would need to be handled by checking items length with an #if block before the table or #each -->
             </tbody>
         </table>
 
-        {% if order.client_order_number and order.client_order_number != 'N/A' %}
+        {{#if order.reference}} <!-- Assuming order details are in context.order -->
         <div class="invoice-meta" style="margin-top: 10px; margin-bottom: 20px;">
-            <p><strong>Référence Commande Client :</strong> {{ order.client_order_number }}</p>
-            {% if order.client_order_date and order.client_order_date != 'N/A' %}
-            <p><strong>Date Commande Client :</strong> {{ order.client_order_date }}</p>
-            {% endif %}
+            <p><strong>Référence Commande Client :</strong> {{ order.reference }}</p>
+            {{#if order.date_formatted}}
+            <p><strong>Date Commande Client :</strong> {{ order.date_formatted }}</p>
+            {{/if}}
         </div>
-        {% endif %}
+        {{/if}}
 
         <div class="total-section">
-            <p>Sous-total : {{ doc.subtotal_amount_formatted | default('N/A') }}</p>
-            {% if doc.discount_amount_raw and doc.discount_amount_raw > 0 %}
-            <p>Remise ({{ doc.discount_rate_percentage | default(0) }}%) : -{{ doc.discount_amount_formatted | default('N/A') }}</p>
-            {% endif %}
-            <p>{{ doc.vat_label | default('TVA') }} ({{ doc.vat_rate_percentage | default(0) }}%) : {{ doc.vat_amount_formatted | default('N/A') }}</p>
-            <h3><strong>Montant Total : {{ doc.grand_total_amount_formatted | default('N/A') }}</strong></h3>
-            {% if doc.grand_total_amount_words and doc.grand_total_amount_words != 'N/A' %}
-            <!-- <p>({{ doc.grand_total_amount_words }})</p> -->
-            {% endif %}
+            <p>Sous-total : {{ doc.subtotal_amount }}</p>
+            {{#if doc.discount_amount_raw}} <!-- Check raw value for existence/non-zero -->
+            <p>Remise ({{ doc.discount_rate }}%) : -{{ doc.discount_amount }}</p>
+            {{/if}}
+            <p>{{ labels.vat_label }} ({{ doc.vat_rate }}%) : {{ doc.vat_amount }}</p>
+            <h3><strong>Montant Total : {{ doc.grand_total_amount }}</strong></h3>
+            <!-- {{#if doc.grand_total_amount_words}}
+            <p>({{ doc.grand_total_amount_words }})</p>
+            {{/if}} -->
         </div>
 
-        {% if doc.proforma_notes and doc.proforma_notes != 'N/A' %}
+        {{#if doc.additional_notes}} <!-- Assuming proforma_notes might be in additional_notes or a specific key -->
         <div class="notes-section" style="margin-top:20px; margin-bottom:20px; padding:10px; background-color:#f9f9f9; border-radius:5px;">
             <h4>Notes :</h4>
-            <p>{{ doc.proforma_notes | replace('\n', '<br>') | safe }}</p>
+            <p>{{ doc.additional_notes }}</p> <!-- Basic display, no complex replace or safe filters -->
         </div>
-        {% endif %}
+        {{/if}}
 
         <div class="footer" style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 15px;">
             <p><strong>Nos coordonnées bancaires :</strong></p>
@@ -259,12 +261,12 @@
             <p>SWIFT/BIC: {{ seller.bank_swift_bic }}</p>
             <p>Adresse de la banque: {{ seller.bank_address }}</p>
             <hr>
-            {% if doc.client_specific_footer_notes %}
-            <p>{{doc.client_specific_footer_notes}}</p>
-            {% endif %}
+            {{#each doc.client_specific_notes}}
+            <p>{{this}}</p> <!-- Assuming client_specific_notes is a list of strings -->
+            {{/each}}
             <p style="margin-top: 10px;"><em>Ceci est une facture proforma et ne constitue pas une demande de paiement.</em></p>
             <p><em>Merci de votre confiance !</em></p>
-            <p style="font-size: 0.8em; color: #999; margin-top: 20px;">{{ seller.company_name }} - {{ seller.address }} - Numéro de TVA: {{ seller.vat_id }} - Numéro d'enregistrement: {{ seller.registration_number }}</p>
+            <p style="font-size: 0.8em; color: #999; margin-top: 20px;">{{ seller.name }} - {{ seller.address_full }} - Numéro de TVA: {{ seller.vat_id }} - Numéro d'enregistrement: {{ seller.registration_number }}</p>
         </div>
     </div>
 </body>
