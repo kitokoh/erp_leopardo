@@ -133,18 +133,42 @@ def record_login_time(user_id: str, conn: sqlite3.Connection = None) -> bool:
         return False
 
 @_manage_conn
-def list_users(conn: sqlite3.Connection = None) -> list[dict]:
-    """Lists all users with their role names."""
+def list_users(role_id_filter: int = None, status_filter: str = None, conn: sqlite3.Connection = None) -> list[dict]:
+    """
+    Lists all users with their role names, with optional filtering by role_id and active status.
+    Args:
+        role_id_filter (int, optional): Role ID to filter by. Defaults to None (no role filter).
+        status_filter (str, optional): Status to filter by ('active', 'inactive'). Defaults to None (all statuses).
+        conn (sqlite3.Connection, optional): Database connection.
+    Returns:
+        list[dict]: A list of user dictionaries.
+    """
+    params = []
     sql = """SELECT u.user_id, u.username, u.full_name, u.email, r.role_name, u.is_active, u.created_at, u.last_login_at
              FROM Users u
-             JOIN Roles r ON u.role_id = r.role_id
-             ORDER BY u.username"""
+             JOIN Roles r ON u.role_id = r.role_id"""
+
+    conditions = []
+    if role_id_filter is not None:
+        conditions.append("u.role_id = ?")
+        params.append(role_id_filter)
+
+    if status_filter == "active":
+        conditions.append("u.is_active = 1")
+    elif status_filter == "inactive":
+        conditions.append("u.is_active = 0")
+
+    if conditions:
+        sql += " WHERE " + " AND ".join(conditions)
+
+    sql += " ORDER BY u.username"
+
     try:
         cursor = conn.cursor()
-        cursor.execute(sql)
+        cursor.execute(sql, params)
         return [dict(row) for row in cursor.fetchall()]
     except sqlite3.Error as e:
-        logger.error(f"Database error listing users: {e}", exc_info=True)
+        logger.error(f"Database error listing users with filters (role_id: {role_id_filter}, status: {status_filter}): {e}", exc_info=True)
         return []
 
 def verify_password(hashed_password: str, provided_password: str) -> bool:

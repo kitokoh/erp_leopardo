@@ -6,6 +6,8 @@ import logging
 # Setup basic logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+from db.cruds.activity_logs_crud import add_activity_log # Added import
+
 class ClientController:
     def __init__(self):
         # In the future, we might pass a specific DB connection or configuration
@@ -160,23 +162,10 @@ class ClientController:
             # Ensure created_by_user_id
             final_created_by_user_id = client_data.get('created_by_user_id')
             if not final_created_by_user_id:
-                logging.warning("created_by_user_id not found in client_data. Attempting to fetch first user as fallback.")
-                try:
-                    # Use list_users from the imported users_crud module
-                    all_users = users_crud.list_users(limit=1) # Changed from users_crud_instance
-                    if all_users:
-                        final_created_by_user_id = all_users[0].get('user_id')
-                        logging.info(f"Using first user ID {final_created_by_user_id} as fallback for created_by_user_id.")
-                    else:
-                        logging.error("No users found in DB. Cannot set created_by_user_id for new client.")
-                        return {'success': False, 'error': "No users available to assign as client creator."}
-                except Exception as e_user:
-                    logging.error(f"Error fetching fallback user ID: {e_user}. Cannot set created_by_user_id.")
-                    return {'success': False, 'error': f"Error fetching fallback user: {e_user}"}
-
-            if not final_created_by_user_id: # Still no user ID
-                 logging.error("Critical: created_by_user_id could not be determined.")
-                 return {'success': False, 'error': "Client creator ID could not be determined."}
+                # This case should be less frequent now as AddNewClientDialog provides it.
+                # However, keeping a log for robustness.
+                logging.error("Critical: created_by_user_id was not provided to ClientController.create_client.")
+                return {'success': False, 'error': "Client creator ID was not provided."}
 
             db_client_data['created_by_user_id'] = final_created_by_user_id
 
@@ -195,9 +184,9 @@ class ClientController:
             # It also requires 'created_by_user_id'. This needs to be added to db_client_data
             # or passed explicitly if the controller has access to it.
             # For now, let's assume it's part of client_data or a default is used.
-            if 'created_by_user_id' not in db_client_data:
-                # Add a placeholder or fetch actual user ID if available in controller context
-                db_client_data['created_by_user_id'] = 'SYSTEM_USER' # Placeholder
+            # if 'created_by_user_id' not in db_client_data: # This check is now redundant due to changes above
+            #     # Add a placeholder or fetch actual user ID if available in controller context
+            #     db_client_data['created_by_user_id'] = 'SYSTEM_USER' # Placeholder
 
             result = clients_crud.add_client(db_client_data) # Call the CRUD function
 
@@ -280,6 +269,21 @@ class ClientController:
                         created_client_details['product_creation_status'] = {'success': False, 'error': error_msg}
                 else:
                     logging.info(f"No product information provided for client ID {new_client_id}.")
+
+                # Log activity
+                try:
+                    log_data = {
+                        "user_id": db_client_data.get('created_by_user_id'),
+                        "action_type": "CLIENT_CREATED",
+                        "details": f"Client '{created_client_details.get('client_name')}' créé.",
+                        "related_entity_type": "Client",
+                        "related_entity_id": new_client_id,
+                        "related_client_id": new_client_id # Also set related_client_id for client-specific actions
+                    }
+                    add_activity_log(log_data)
+                    logging.info(f"Activity logged for CLIENT_CREATED: {new_client_id}")
+                except Exception as e_log:
+                    logging.error(f"Failed to log CLIENT_CREATED activity for client {new_client_id}: {e_log}", exc_info=True)
 
                 return created_client_details # Return the (potentially augmented) client details
             else: # Should not happen if success is True and client_id is missing from clients_crud.add_client result

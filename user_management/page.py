@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import QAbstractItemView
 
 # Assuming users_crud and roles_crud are accessible for fetching data
 # and auth.permissions for permission checking if actions were added here.
-from db.cruds import users_crud # For list_users
+from db.cruds import users_crud, activity_logs_crud # For list_users and logging
 from auth.permissions import has_permission, P_MANAGE_USERS
 from db.cruds import roles_crud # For populating roles in edit dialog
 
@@ -51,6 +51,31 @@ class UserManagementPage(QWidget):
         title_label = QLabel(self.tr("Gestion des Utilisateurs"))
         title_label.setStyleSheet("font-size: 16pt; font-weight: bold;")
         main_layout.addWidget(title_label, alignment=Qt.AlignCenter) # Center title
+
+        # Filters Layout
+        filters_layout = QHBoxLayout()
+        filters_layout.addWidget(QLabel(self.tr("Filtrer par Rôle:")))
+        self.role_filter_combo = QComboBox()
+        self.role_filter_combo.addItem(self.tr("Tous les rôles"), None) # Option pour afficher tous
+        filters_layout.addWidget(self.role_filter_combo)
+
+        filters_layout.addSpacing(20)
+
+        filters_layout.addWidget(QLabel(self.tr("Filtrer par Statut:")))
+        self.status_filter_combo = QComboBox()
+        self.status_filter_combo.addItem(self.tr("Tous les statuts"), "all")
+        self.status_filter_combo.addItem(self.tr("Actif"), "active")
+        self.status_filter_combo.addItem(self.tr("Inactif"), "inactive")
+        filters_layout.addWidget(self.status_filter_combo)
+        filters_layout.addStretch()
+        main_layout.addLayout(filters_layout)
+
+        # Populate role filter combo
+        self._populate_role_filter()
+
+        # Connect filter signals
+        self.role_filter_combo.currentIndexChanged.connect(self.load_users_to_table)
+        self.status_filter_combo.currentIndexChanged.connect(self.load_users_to_table)
 
         # Placeholder for action buttons (Add User, Edit User etc. - for later phases)
         action_layout = QHBoxLayout()
@@ -102,6 +127,18 @@ class UserManagementPage(QWidget):
         main_layout.addWidget(self.users_table)
         self.setLayout(main_layout)
 
+    def _populate_role_filter(self):
+        """Populates the role filter combo box with roles from the database."""
+        try:
+            roles = roles_crud.list_roles()
+            if roles:
+                for role in roles:
+                    self.role_filter_combo.addItem(role['role_name'], role['role_id'])
+        except Exception as e:
+            QMessageBox.critical(self, self.tr("Erreur Chargement Rôles"),
+                                 self.tr("Impossible de charger les rôles pour le filtre : {0}").format(str(e)))
+            print(f"Error populating role filter: {e}")
+
     def _handle_add_user(self):
         """Handles the Add User button click. Placeholder for now."""
         # QMessageBox.information(self, self.tr("Fonctionnalité à venir"), self.tr("L'ajout d'utilisateurs sera implémenté prochainement."))
@@ -135,8 +172,18 @@ class UserManagementPage(QWidget):
     def load_users_to_table(self):
         self.users_table.setRowCount(0) # Clear existing rows
         try:
-            # list_users() from users_crud already joins with Roles to get role_name
-            users_list = users_crud.list_users()
+            selected_role_id = self.role_filter_combo.currentData()
+            selected_status_filter = self.status_filter_combo.currentData() # 'all', 'active', 'inactive'
+
+            # If 'all' is selected for status, pass None to list_users for status_filter
+            status_arg = None
+            if selected_status_filter == "active":
+                status_arg = "active"
+            elif selected_status_filter == "inactive":
+                status_arg = "inactive"
+
+            users_list = users_crud.list_users(role_id_filter=selected_role_id, status_filter=status_arg)
+
             if users_list:
                 self.users_table.setRowCount(len(users_list))
                 for row, user_data in enumerate(users_list):
@@ -252,6 +299,19 @@ class UserManagementPage(QWidget):
                 QMessageBox.information(self, self.tr("Succès"),
                                         self.tr("Statut de l'utilisateur '{0}' mis à jour.").format(username_to_display))
                 self.load_users_to_table()
+                # Log activity
+                try:
+                    log_data = {
+                        "user_id": self.current_user_info.get('user_id'), # User performing the action
+                        "action_type": "USER_STATUS_CHANGED",
+                        "details": f"Statut de l'utilisateur '{username_to_display}' (ID: {selected_user_id}) changé à {'Actif' if new_status else 'Inactif'}.",
+                        "related_entity_type": "User",
+                        "related_entity_id": selected_user_id
+                    }
+                    activity_logs_crud.add_activity_log(log_data)
+                    logging.info(f"Activity logged for USER_STATUS_CHANGED: {selected_user_id} by {self.current_user_info.get('user_id')}")
+                except Exception as e_log:
+                    logging.error(f"Failed to log USER_STATUS_CHANGED activity for user {selected_user_id}: {e_log}", exc_info=True)
             else:
                 QMessageBox.critical(self, self.tr("Erreur"),
                                      self.tr("Impossible de mettre à jour le statut de l'utilisateur '{0}'.").format(username_to_display))
@@ -285,6 +345,19 @@ class UserManagementPage(QWidget):
             if users_crud.update_user_password(selected_user_id, new_password):
                 QMessageBox.information(self, self.tr("Succès"),
                                         self.tr("Mot de passe pour '{0}' réinitialisé avec succès.").format(username_to_display))
+                # Log activity
+                try:
+                    log_data = {
+                        "user_id": self.current_user_info.get('user_id'), # User performing the action
+                        "action_type": "USER_PASSWORD_RESET",
+                        "details": f"Mot de passe réinitialisé pour l'utilisateur '{username_to_display}' (ID: {selected_user_id}).",
+                        "related_entity_type": "User",
+                        "related_entity_id": selected_user_id
+                    }
+                    activity_logs_crud.add_activity_log(log_data)
+                    logging.info(f"Activity logged for USER_PASSWORD_RESET: {selected_user_id} by {self.current_user_info.get('user_id')}")
+                except Exception as e_log:
+                    logging.error(f"Failed to log USER_PASSWORD_RESET activity for user {selected_user_id}: {e_log}", exc_info=True)
                 # No need to reload table as password change isn't visible in the user list
             else:
                 QMessageBox.critical(self, self.tr("Erreur"),
