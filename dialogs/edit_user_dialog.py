@@ -178,9 +178,18 @@ class EditUserDialog(QDialog):
             user_payload = {
                 "username": username, "hashed_password": hashed_pw, "full_name": new_full_name,
                 "email": new_email, "role_id": new_role_id, "is_active": True, # New users active by default
-                "created_by_user_id": created_by_id
+                "created_by_user_id": created_by_id # This field is not directly in Users table but might be for logging or other tables
             }
-            new_user_id = users_crud.create_user(user_payload)
+            # Call users_crud.add_user with individual arguments
+            new_user_id = users_crud.add_user(
+                username=username,
+                password=password, # add_user will hash it
+                role_id=new_role_id,
+                full_name=new_full_name,
+                email=new_email
+                # is_active is True by default in add_user
+                # created_by_user_id is not a direct param of add_user, it's for user_payload if create_user was used
+            )
             if new_user_id:
                 QMessageBox.information(self, self.tr("Succès"), self.tr("Utilisateur '{0}' créé avec succès.").format(username))
                 self.accept()
