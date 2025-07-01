@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>فاتورة شكلية</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;700&display=swap');
+        body { font-family: 'Noto Sans Arabic', Arial, sans-serif; margin: 20px; color: #333; }
+        .container { width: 90%; margin: auto; }
+        .header, .footer { text-align: center; margin-bottom: 30px; }
+        .header h1 { color: #444; }
+        .details-section { display: flex; justify-content: space-between; margin-bottom: 30px; }
+        .company-details, .client-details { width: 48%; padding: 10px; background-color: #f9f9f9; border: 1px solid #eee; }
+        .invoice-meta { clear: both; margin-bottom: 20px; background-color: #f9f9f9; padding: 15px; border: 1px solid #eee; }
+        .invoice-meta p { margin: 5px 0; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #e9e9e9; font-weight: bold; }
+        .total-section { text-align: right; margin-top: 20px; padding-right:10px;}
+        .total-section h3 { color: #555; }
+        .footer p { font-size: 0.9em; color: #777; }
+        .logo { max-width: 150px; max-height: 70px; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            {{#if seller.logo_url}}
+            <img src="{{seller.logo_url}}" alt="{{labels.company_logo_alt | default('شعار الشركة')}}" class="logo" />
+            {{/if}}
+            <h1>{{labels.proforma_invoice_title | default('فاتورة شكلية')}}</h1>
+        </div>
+
+        <div class="details-section">
+            <div class="company-details">
+                <h3>{{labels.from_seller | default('من:')}}</h3>
+                <p><strong>{{seller.name}}</strong></p>
+                <p>{{seller.address_line1}}</p>
+                <p>{{seller.city_zip_country}}</p>
+                <p>{{labels.phone | default('الهاتف:')}} {{seller.phone}}</p>
+                <p>{{labels.email | default('البريد الإلكتروني:')}} {{seller.email}}</p>
+                <p>{{labels.vat_id | default('الرقم الضريبي:')}} {{seller.vat_id}}</p>
+            </div>
+
+            <div class="client-details">
+                <h3>{{labels.to_client | default('إلى:')}}</h3>
+                <p><strong>{{client.display_name}}</strong></p>
+                <p>{{client.address_line1}}</p>
+                <p>{{client.city_zip_country}}</p>
+                <p>{{labels.contact | default('جهة الاتصال:')}} {{client.contact_name}}</p>
+                <p>{{labels.email | default('البريد الإلكتروني:')}} {{client.contact_email}}</p>
+                <p>{{labels.vat_id | default('الرقم الضريبي:')}} {{client.vat_id}}</p>
+            </div>
+        </div>
+
+        <div class="invoice-meta">
+            <p><strong>{{labels.proforma_invoice_no | default('رقم الفاتورة الشكلية:')}}</strong> {{doc.document_reference}}</p>
+            <p><strong>{{labels.date | default('التاريخ:')}}</strong> {{doc.current_date_formatted}}</p>
+            <p><strong>{{labels.project_id | default('معرف المشروع:')}}</strong> {{project.identifier}}</p>
+            <!-- Payment/Delivery terms might come from seller.payment_info or doc.additional_notes depending on setup -->
+            <p><strong>{{labels.payment_terms | default('شروط الدفع:')}}</strong> {{doc.payment_terms}}</p>
+            <p><strong>{{labels.delivery_terms | default('شروط التسليم:')}}</strong> {{doc.delivery_terms}}</p>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>{{labels.item_ref_short | default('#')}}</th>
+                    <th>{{labels.item_description | default('وصف العنصر')}}</th>
+                    <th>{{labels.quantity | default('الكمية')}}</th>
+                    <th>{{labels.unit_price | default('سعر الوحدة')}}</th>
+                    <th>{{labels.total_price | default('السعر الإجمالي')}}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each items}}
+                <tr>
+                    <td>{{this.product_code}}</td>
+                    <td>
+                        <strong>{{this.name}}</strong>
+                        {{#if this.description}}
+                        <br><small>{{this.description}}</small>
+                        {{/if}}
+                    </td>
+                    <td style="text-align: center;">{{this.quantity}}</td>
+                    <td style="text-align: right;">{{this.unit_price_formatted}}</td>
+                    <td style="text-align: right;">{{this.total_price_formatted}}</td>
+                </tr>
+                {{/each}}
+            </tbody>
+        </table>
+
+        <div class="total-section">
+            <p>{{labels.subtotal | default('المجموع الفرعي:')}} {{doc.subtotal_amount}}</p>
+            {{#if doc.discount_amount_raw}}
+            <p>{{labels.discount | default('الخصم')}} ({{doc.discount_rate}}%): {{doc.discount_amount}}</p>
+            {{/if}}
+            <p>{{labels.vat_label | default('ضريبة القيمة المضافة')}} ({{doc.vat_rate}}%): {{doc.vat_amount}}</p>
+            <h3><strong>{{labels.total_amount_due | default('المبلغ الإجمالي المستحق:')}} {{doc.grand_total_amount}}</strong></h3>
+        </div>
+
+        <div class="footer">
+            <p>{{labels.bank_details | default('التفاصيل المصرفية:')}} {{seller.bank_name}}, {{labels.account | default('الحساب:')}} {{seller.bank_iban}}, {{labels.swift_bic | default('سويفت/BIC:')}} {{seller.bank_swift_bic}}</p>
+            <p>{{labels.proforma_not_a_demand | default('هذه فاتورة شكلية وليست مطالبة بالدفع.')}}</p>
+            {{#each doc.client_specific_notes}}
+            <p style="margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px;">{{this}}</p>
+            {{/each}}
+             {{#if doc.footer_notes}}
+            <p style="margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px;">{{doc.footer_notes}}</p>
+            {{/if}}
+            <p>{{labels.thank_you_message | default('شكرا لتعاملكم معنا!')}}</p>
+        </div>
+    </div>
+</body>
+</html>

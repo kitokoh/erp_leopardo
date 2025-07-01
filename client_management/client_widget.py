@@ -987,7 +987,7 @@ class ClientWidget(QWidget):
             prod_dims_layout.addWidget(self.dim_product_selector_combo)
             logging.debug("ClientWidget._setup_product_dimensions_tab: Added dim_product_selector_combo to layout")
 
-            self.edit_client_product_dimensions_button = QPushButton(self.tr("Modifier Dimensions Produit"))
+            self.edit_client_product_dimensions_button = QPushButton(self.tr("Modifier Dimensions Produit (Global)"))
             logging.debug("ClientWidget._setup_product_dimensions_tab: Created edit_client_product_dimensions_button")
 
             self.edit_client_product_dimensions_button.setIcon(QIcon.fromTheme("document-edit", QIcon(":/icons/pencil.svg")))
@@ -1014,10 +1014,10 @@ class ClientWidget(QWidget):
             logging.debug(f"ClientWidget._setup_product_dimensions_tab: notes_doc_tab_index determined as {notes_doc_tab_index}")
 
             if notes_doc_tab_index != -1:
-                self.tab_widget.insertTab(notes_doc_tab_index + 1, self.product_dimensions_tab, self.tr("Dimensions Produit (Client)"))
+                self.tab_widget.insertTab(notes_doc_tab_index + 1, self.product_dimensions_tab, self.tr("Dimensions Produit (Global)"))
                 logging.debug(f"ClientWidget._setup_product_dimensions_tab: Inserted product_dimensions_tab at index {notes_doc_tab_index + 1}")
             else: # Fallback if "Notes de Document" not found
-                self.tab_widget.addTab(self.product_dimensions_tab, self.tr("Dimensions Produit (Client)"))
+                self.tab_widget.addTab(self.product_dimensions_tab, self.tr("Dimensions Produit (Global)"))
                 logging.debug("ClientWidget._setup_product_dimensions_tab: Added product_dimensions_tab as a new tab (fallback)")
 
             self.dim_product_selector_combo.currentIndexChanged.connect(self.on_dim_product_selected)
