@@ -80,10 +80,16 @@ QLineEdit, QTextEdit, QSpinBox, QDoubleSpinBox, QDateEdit {
     color: #263238;
     border: 1px solid #DDE2E6;
     border-radius: 4px;
-    padding: 5px 8px;
+    padding: 5px 8px; /* Default padding */
+    min-height: 1.8em; /* Default min height for consistency */
     selection-background-color: #007BFF;
     selection-color: #FFFFFF;
 }
+/* Make QLineEdit and QTextEdit slightly taller by default if desired */
+QLineEdit, QTextEdit {
+    padding: 6px 8px; /* Slightly more vertical padding */
+}
+
 
 QLineEdit:focus, QTextEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QDateEdit:focus {
     border-color: #007BFF;

@@ -46,6 +46,7 @@ from dialogs import (
 # from client_widget import ClientWidget # Not directly used in the functions being moved, but DocumentManager uses it.
 
 import logging # For logging errors or info
+from db.cruds import activity_logs_crud # Added for activity logging
 
 def handle_create_client_execution(doc_manager, client_data_dict=None):
     client_controller = ClientController() # Instantiate controller
@@ -77,22 +78,22 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
     new_project_id_central_db = None # Define for later use in error handling
 
     if not created_client_info or not created_client_info.get("client_id"):
-        QMessageBox.critical(doc_manager, doc_manager.tr("Erreur DB"),
-                             doc_manager.tr("Impossible de créer le client via le contrôleur."))
-        # Add None check for created_client_info before calling .get()
-        if created_client_info is None:
-            print("Error: Client creation failed, created_client_info is None.") # Or use actual logging
-            doc_manager.notify(title=doc_manager.tr("Erreur Création Client"),
-                               message=doc_manager.tr("Le contrôleur n'a pas pu créer le client. Réponse nulle."),
-                               type='ERROR')
-            return # Or handle appropriately otherwise
+        error_msg = doc_manager.tr("Le contrôleur n'a pas pu créer le client. Réponse nulle.")
+        if created_client_info and created_client_info.get("error"):
+            error_msg = created_client_info.get("error")
 
+        QMessageBox.critical(doc_manager, doc_manager.tr("Erreur DB"), error_msg)
         doc_manager.notify(title=doc_manager.tr("Erreur Création Client"),
-                           message=created_client_info.get("error", doc_manager.tr("Le contrôleur n'a pas pu créer le client.")),
+                           message=error_msg,
                            type='ERROR')
         return
 
     actual_new_client_id = created_client_info.get("client_id")
+    client_name_for_notification = created_client_info.get("client_name", client_name_val)
+    doc_manager.notify(title=doc_manager.tr("Client Créé (DB)"),
+                       message=doc_manager.tr("Client '{0}' (ID: {1}) créé avec succès dans la base de données.").format(client_name_for_notification, actual_new_client_id),
+                       type='SUCCESS')
+
     country_id_val = created_client_info.get("country_id") # Resolved by controller
     city_id_val = created_client_info.get("city_id")       # Resolved by controller
 
@@ -339,8 +340,13 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                                     doc_manager.tr("Des tâches standard ont été ajoutées au projet associé."))
         else:
             logging.warning(f"No project ID available (commande or default) for client {actual_new_client_id}. No tasks created.")
+        # Assuming a phantom 'try' block was before the 'if project_id_for_tasks:' at line 374 (or before comments at L369)
 
-
+        # Notify about project and task creation if successful
+        if project_id_for_tasks:
+            doc_manager.notify(title=doc_manager.tr("Configuration Initiale Client Terminée"),
+                               message=doc_manager.tr("Projet et tâches initiales créés pour '{0}'.").format(created_client_info.get('client_name', client_name_val)),
+                               type='INFO')
 
 
         if ui_map_data: # This block should run regardless of commande creation, to ensure Proforma/Contact/Product dialogs sequence
@@ -550,14 +556,7 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
         # If client was created by controller but project/task fails here, client still exists.
         # Consider if rollback is needed for controller-created client if subsequent steps fail.
         # For now, if controller created client, it remains.
-    except Exception as e_general:
-        QMessageBox.critical(doc_manager, doc_manager.tr("Erreur Inattendue"), doc_manager.tr("Une erreur s'est produite:\n{0}").format(str(e_general)))
-        doc_manager.notify(title=doc_manager.tr("Erreur Inattendue Création"), message=doc_manager.tr("Erreur inattendue."), type='ERROR')
-        # Rollback for project/tasks if created
-        if new_project_id_central_db and get_project_by_id(new_project_id_central_db):
-            delete_project(new_project_id_central_db)
-        # Client created by controller remains unless explicitly rolled back.
-        # This part needs careful consideration of transactional behavior.
+      # This part needs careful consideration of transactional behavior.
         # If client was created (actual_new_client_id is not None), but this later part fails,
         # the client exists in DB, but project/tasks might not.
         # The original code had some rollback logic for client if os.makedirs failed after client creation.
@@ -781,6 +780,22 @@ def archive_client_status(doc_manager, client_id):
             doc_manager.notify(title=doc_manager.tr("Erreur Archivage"),
                                message=doc_manager.tr("Erreur d'archivage du client '{0}'.").format(client_name_for_notify),
                                type='ERROR')
+
+        # Log activity for client archival
+        try:
+            log_data = {
+                "user_id": doc_manager.current_user_id,
+                "action_type": "CLIENT_ARCHIVED", # Or CLIENT_STATUS_CHANGED
+                "details": f"Client '{client_name_for_notify}' (ID: {client_id}) archivé.",
+                "related_entity_type": "Client",
+                "related_entity_id": client_id,
+                "related_client_id": client_id
+            }
+            activity_logs_crud.add_activity_log(log_data)
+            logging.info(f"Activity logged for CLIENT_ARCHIVED: {client_id}")
+        except Exception as e_log:
+            logging.error(f"Failed to log CLIENT_ARCHIVED activity for client {client_id}: {e_log}", exc_info=True)
+
     except Exception as e:
         QMessageBox.critical(doc_manager, doc_manager.tr("Erreur DB"), doc_manager.tr("Erreur d'archivage du client:\n{0}").format(str(e)))
         doc_manager.notify(title=doc_manager.tr("Erreur Archivage Inattendue"),
@@ -799,8 +814,7 @@ def permanently_delete_client(doc_manager, client_id):
     )
     if reply == QMessageBox.Yes:
         try:
-            # Use clients_crud_instance.delete_client for soft delete
-            logging.info("INFO: permanently_delete_client now performs a SOFT delete due to CRUD changes. For hard delete, a new CRUD method is needed.")
+            # clients_crud_instance.delete_client now handles soft delete AND status update.
             delete_result = clients_crud_instance.delete_client(client_id)
 
             if delete_result['success']:
@@ -808,57 +822,47 @@ def permanently_delete_client(doc_manager, client_id):
                 # For soft delete, typically data isn't removed from filesystem immediately.
                 # For now, keeping the rmtree logic but it's less common with soft delete.
                 # Consider making folder archival a separate process or based on a longer-term policy.
-                if os.path.exists(client_folder_path):
-                    # shutil.rmtree(client_folder_path, ignore_errors=True) # Reconsider this line for soft delete
-                    logging.warning(f"Client {client_id} soft-deleted. Folder {client_folder_path} was NOT removed as part of soft delete.")
+                # logging.info(f"Client {client_id} soft-deleted. Folder {client_folder_path} was NOT removed as part of soft delete.")
+                # Le dossier n'est PAS supprimé lors d'un soft delete.
+                # La suppression de dossier pourrait être une action manuelle séparée ou lors d'un hard delete futur.
+                logging.info(f"Client {client_id} marqué comme supprimé (soft delete). Le dossier {client_folder_path} n'est PAS supprimé.")
 
-                # Update UI: remove from active list (if not showing deleted), update map
+
+                # Update UI
                 if client_id in doc_manager.clients_data_map:
-                    # If not showing deleted items, remove from map. Otherwise, update its state.
-                    # A full refresh via load_and_display_clients with current filters is better.
-                    del doc_manager.clients_data_map[client_id] # Or mark as deleted if map handles it
+                    # Option 1: Remove from map if not showing archived (depends on filter logic)
+                    # Option 2: Update client_data_map entry to reflect new status and is_deleted, then let filter handle it.
+                    # For simplicity with current filter_client_list_display_slot, a full refresh via load_clients_from_db_slot is better.
+                    pass # Let load_clients_from_db_slot handle map refresh
 
-                # Refresh display considering current filters (especially include_deleted)
-                doc_manager.filter_client_list_display_slot() # Use the main_window slot
-                # load_and_display_clients(doc_manager)
+                doc_manager.load_clients_from_db_slot() # This will reload and re-filter the list
+
+                # Close the tab for the archived client if it's open
                 for i in range(doc_manager.client_tabs_widget.count()):
-                    if hasattr(doc_manager.client_tabs_widget.widget(i), 'client_info') and \
-                       doc_manager.client_tabs_widget.widget(i).client_info["client_id"] == client_id:
-                        doc_manager.close_client_tab(i); break # close_client_tab is a method of DocumentManager
-                doc_manager.stats_widget.update_stats()
-                # QMessageBox.information(doc_manager, doc_manager.tr("Client Supprimé"),
-                #                         doc_manager.tr("Client '{0}' supprimé avec succès.").format(client_name_val))
-                doc_manager.notify(title=doc_manager.tr("Client Supprimé"),
-                                   message=doc_manager.tr("Client '{0}' supprimé avec succès.").format(client_name_val),
-                                   type='SUCCESS')
+                    tab_widget = doc_manager.client_tabs_widget.widget(i)
+                    if hasattr(tab_widget, 'client_info') and tab_widget.client_info.get("client_id") == client_id:
+                        doc_manager.close_client_tab(i)
+                        logging.info(f"Closed tab for archived client {client_id}.")
+                        break
+
+                if hasattr(doc_manager, 'stats_widget') and doc_manager.stats_widget: # Check if stats_widget exists
+                    doc_manager.stats_widget.update_stats()
+
+                doc_manager.notify(title=doc_manager.tr("Client Archivé"),
+                                   message=doc_manager.tr("Le client '{0}' a été archivé avec succès.").format(client_name_val),
+                                   type='INFO') # Changed from SUCCESS to INFO as it's an archival
             else:
-                error_message = delete_result.get('error', doc_manager.tr("Erreur inconnue."))
-                QMessageBox.critical(doc_manager, doc_manager.tr("Erreur DB"),
-                                     doc_manager.tr("Erreur lors de la suppression (soft) du client: {0}").format(error_message))
-                doc_manager.notify(title=doc_manager.tr("Erreur Suppression (Soft)"),
-                                   message=doc_manager.tr("Erreur de suppression (soft) du client '{0}': {1}").format(client_name_val, error_message),
+                error_message = delete_result.get('error', doc_manager.tr("Erreur inconnue lors de l'archivage."))
+                QMessageBox.critical(doc_manager, doc_manager.tr("Erreur Archivage"),
+                                     doc_manager.tr("Erreur lors de l'archivage du client: {0}").format(error_message))
+                doc_manager.notify(title=doc_manager.tr("Erreur Archivage"),
+                                   message=doc_manager.tr("Erreur d'archivage du client '{0}': {1}").format(client_name_val, error_message),
                                    type='ERROR')
-        except OSError as e_os: # This error is now less likely if rmtree is removed for soft delete
-            QMessageBox.critical(doc_manager, doc_manager.tr("Erreur Dossier"),
-                                 doc_manager.tr("Le client a été marqué comme supprimé, mais une erreur est survenue lors d'une opération sur son dossier:\n{0}").format(str(e_os)))
-            doc_manager.notify(title=doc_manager.tr("Erreur Opération Dossier"),
-                               message=doc_manager.tr("Client '{0}' marqué supprimé, mais erreur d'opération sur dossier.").format(client_name_val),
-                               type='WARNING')
-            # Refresh client list even if folder operation had issues
-            if client_id in doc_manager.clients_data_map:
-                 del doc_manager.clients_data_map[client_id] # Or mark deleted
-            doc_manager.filter_client_list_display_slot()
-            # load_and_display_clients(doc_manager)
-            for i in range(doc_manager.client_tabs_widget.count()):
-                if hasattr(doc_manager.client_tabs_widget.widget(i), 'client_info') and \
-                   doc_manager.client_tabs_widget.widget(i).client_info["client_id"] == client_id:
-                    doc_manager.close_client_tab(i); break
-            doc_manager.stats_widget.update_stats()
-        except Exception as e_db:
-             QMessageBox.critical(doc_manager, doc_manager.tr("Erreur DB"),
-                                  doc_manager.tr("Erreur lors de la suppression du client:\n{0}").format(str(e_db)))
-             doc_manager.notify(title=doc_manager.tr("Erreur Suppression Inattendue"),
-                                message=doc_manager.tr("Erreur inattendue lors de la suppression du client '{0}'.").format(client_name_val),
+        except Exception as e_archive: # Catch any other unexpected error during the process
+             QMessageBox.critical(doc_manager, doc_manager.tr("Erreur Inattendue"),
+                                  doc_manager.tr("Une erreur inattendue est survenue lors de l'archivage du client:\n{0}").format(str(e_archive)))
+             doc_manager.notify(title=doc_manager.tr("Erreur Archivage Inattendue"),
+                                message=doc_manager.tr("Erreur inattendue lors de l'archivage du client '{0}'.").format(client_name_val),
                                 type='ERROR')
 
 # --- Invoice Generation and DB Update Logic ---

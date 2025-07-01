@@ -226,6 +226,14 @@ def main():
     # This ensures that if start_api_server() actually started a process,
     # we attempt to clean it up.
     atexit.register(stop_api_server)
+    
+    # Register logging.shutdown() to be called on exit to properly close handlers
+    atexit.register(logging.shutdown)
+    logging.info("logging.shutdown registered with atexit.")
+
+    # Register logging.shutdown() to be called on exit to properly close handlers
+    atexit.register(logging.shutdown)
+    logging.info("logging.shutdown registered with atexit.")
 
     # Register logging.shutdown() to be called on exit to properly close handlers
     atexit.register(logging.shutdown)

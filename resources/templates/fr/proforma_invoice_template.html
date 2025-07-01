@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Facture Proforma</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300;400;700&display=swap');
+        body {
+            font-family: 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            color: #333;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+        .container {
+            width: 800px; /* Fixed width for better PDF rendering consistency */
+            margin: 30px auto;
+            background-color: #fff;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #007bff; /* Accent color */
+        }
+        .header .logo-container {
+            flex-grow: 1;
+        }
+        .header .logo {
+            max-width: 200px;
+            max-height: 80px;
+        }
+        .header h1 {
+            color: #007bff;
+            font-size: 28px;
+            margin: 0;
+            text-align: right;
+            font-weight: 300;
+            white-space: nowrap;
+        }
+        .details-section {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+        }
+        .company-details, .client-details {
+            width: 48%;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            border: 1px solid #e7e7e7;
+        }
+        .company-details h3, .client-details h3 {
+            margin-top: 0;
+            color: #007bff;
+            font-size: 14px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+        .company-details p, .client-details p {
+            margin: 4px 0;
+            font-size: 11px;
+        }
+        .invoice-meta {
+            margin-bottom: 30px;
+            background-color: #f0f8ff; /* Light blue accent */
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .invoice-meta p {
+            margin: 6px 0;
+            font-size: 12px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px; /* Increased padding */
+            text-align: left;
+            font-size: 11px;
+        }
+        th {
+            background-color: #007bff; /* Primary accent color */
+            color: #fff;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 11px;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .number { /* Class for numerical cells */
+            text-align: right;
+        }
+        .total-section {
+            text-align: right;
+            margin-top: 30px;
+            padding-right: 10px;
+        }
+        .total-section p {
+            margin: 5px 0;
+            font-size: 12px;
+        }
+        .total-section h3 {
+            color: #007bff;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            font-size: 10px;
+            color: #666;
+        }
+        .footer p {
+            margin: 3px 0;
+        }
+        .bank-details {
+            margin-bottom:20px;
+            padding:15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            text-align:left;
+        }
+        .bank-details p {
+            margin: 4px 0;
+            font-size: 11px;
+        }
+        .bank-details strong {
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            {% if seller.logo_path %}
+            <img src="{{ seller.logo_path }}" alt="Company Logo" class="logo" />
+            {% else %}
+            <!-- Optionally, display company name if no logo -->
+            <!-- <p class="no-logo-placeholder">{{ seller.name }}</p> -->
+            {% endif %}
+            <h1>FACTURE PROFORMA</h1>
+        </div>
+
+        <div class="details-section">
+            <div class="company-details">
+                <h3>De :</h3>
+                <p><strong>{{ seller.name | default('N/A') }}</strong></p>
+                <p>{{ seller.address | default('N/A') }}</p>
+                <p>Téléphone : {{ seller.phone | default('N/A') }}</p>
+                <p>Email : {{ seller.email | default('N/A') }}</p>
+                <p>N° TVA : {{ seller.vat_id | default('N/A') }}</p>
+                <p>N° de registre : {{ seller.registration_number | default('N/A') }}</p>
+            </div>
+
+            <div class="client-details">
+                <h3>À :</h3>
+                <p><strong>{{ client.company_name | default(client.representative_name) | default('N/A') }}</strong></p>
+                <p>{{ client.address | default('N/A') }}</p>
+                <p>Contact : {{ client.representative_name | default('N/A') }}</p>
+                <p>Email : {{ client.email | default('N/A') }}</p>
+                <p>N° TVA : {{ client.vat_id | default('N/A') }}</p>
+            </div>
+        </div>
+
+        <div class="invoice-meta">
+            <p><strong>Facture Proforma N° :</strong> {{ doc.proforma_id | default('N/A') }}</p>
+            <p><strong>Date :</strong> {{ doc.current_date | default('N/A') }}</p>
+            <p><strong>ID Projet :</strong> {{ project.identifier | default(project.name) | default('N/A') }}</p>
+            <p><strong>Conditions de Paiement :</strong> {{ doc.payment_terms | default('N/A') }}</p>
+            <p><strong>Conditions de Livraison :</strong> {{ doc.delivery_terms | default('N/A') }}</p>
+            {% if doc.incoterms and doc.incoterms != 'N/A' %}
+            <p><strong>Incoterms :</strong> {{ doc.incoterms }}{% if doc.named_place_of_delivery and doc.named_place_of_delivery != 'N/A' %} - {{ doc.named_place_of_delivery }}{% endif %}</p>
+            {% endif %}
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:10%;">{{ labels.item_ref | default('Réf.') }}</th>
+                    <th style="width:40%;">{{ labels.item_description | default('Description') }}</th>
+                    <th style="width:10%;" class="number">{{ labels.quantity | default('Qté') }}</th>
+                    <th style="width:15%;" class="number">{{ labels.unit_price | default('Prix Unit.') }}</th>
+                    <th style="width:15%;" class="number">{{ labels.total_price | default('Total') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each items}}
+                <tr>
+                    <td>{{this.product_code}}</td>
+                    <td>
+                        <strong>{{this.name}}</strong>
+                        {{#if this.description}}
+                        <br><small>{{this.description}}</small>
+                        {{/if}}
+                        {{#if this.item_language_code}}
+                        {{#if this.original_name}}
+                        <!-- This logic for original_name might need refinement based on context -->
+                        <!-- <br><small><em>Nom original ({{this.item_language_code}}): {{this.original_name}}</em></small> -->
+                        {{/if}}
+                        {{/if}}
+                    </td>
+                    <td class="number">{{this.quantity}}</td>
+                    <td class="number">{{this.unit_price_formatted}}</td>
+                    <td class="number">{{this.total_price_formatted}}</td>
+                </tr>
+                {{/each}}
+                <!-- Fallback for no items - current regex engine doesn't have #else for #each -->
+                <!-- This would need to be handled by checking items length with an #if block before the table or #each -->
+            </tbody>
+        </table>
+
+        {{#if order.reference}} <!-- Assuming order details are in context.order -->
+        <div class="invoice-meta" style="margin-top: 10px; margin-bottom: 20px;">
+            <p><strong>Référence Commande Client :</strong> {{ order.reference }}</p>
+            {{#if order.date_formatted}}
+            <p><strong>Date Commande Client :</strong> {{ order.date_formatted }}</p>
+            {{/if}}
+        </div>
+        {{/if}}
+
+        <div class="total-section">
+            <p>Sous-total : {{ doc.subtotal_amount }}</p>
+            {{#if doc.discount_amount_raw}} <!-- Check raw value for existence/non-zero -->
+            <p>Remise ({{ doc.discount_rate }}%) : -{{ doc.discount_amount }}</p>
+            {{/if}}
+            <p>{{ labels.vat_label }} ({{ doc.vat_rate }}%) : {{ doc.vat_amount }}</p>
+            <h3><strong>Montant Total : {{ doc.grand_total_amount }}</strong></h3>
+            <!-- {{#if doc.grand_total_amount_words}}
+            <p>({{ doc.grand_total_amount_words }})</p>
+            {{/if}} -->
+        </div>
+
+        {{#if doc.additional_notes}} <!-- Assuming proforma_notes might be in additional_notes or a specific key -->
+        <div class="notes-section" style="margin-top:20px; margin-bottom:20px; padding:10px; background-color:#f9f9f9; border-radius:5px;">
+            <h4>Notes :</h4>
+            <p>{{ doc.additional_notes }}</p> <!-- Basic display, no complex replace or safe filters -->
+        </div>
+        {{/if}}
+
+        <div class="footer" style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 15px;">
+            <p><strong>Nos coordonnées bancaires :</strong></p>
+            <p>Banque: {{ seller.bank_name }}</p>
+            <p>Titulaire du compte: {{ seller.bank_account_holder_name }}</p>
+            <p>IBAN: {{ seller.bank_iban }}</p>
+            <p>SWIFT/BIC: {{ seller.bank_swift_bic }}</p>
+            <p>Adresse de la banque: {{ seller.bank_address }}</p>
+            <hr>
+            {{#each doc.client_specific_notes}}
+            <p>{{this}}</p> <!-- Assuming client_specific_notes is a list of strings -->
+            {{/each}}
+            <p style="margin-top: 10px;"><em>Ceci est une facture proforma et ne constitue pas une demande de paiement.</em></p>
+            <p><em>Merci de votre confiance !</em></p>
+            <p style="font-size: 0.8em; color: #999; margin-top: 20px;">{{ seller.name }} - {{ seller.address_full }} - Numéro de TVA: {{ seller.vat_id }} - Numéro d'enregistrement: {{ seller.registration_number }}</p>
+        </div>
+    </div>
+</body>
+</html>

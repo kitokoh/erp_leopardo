@@ -10,7 +10,7 @@ from PyQt5.QtCore import QFile, QTextStream # QStandardPaths, QLocale, QLibraryI
 # from PyQt5.QtGui import QFont # Removed as QFont is not used here
 # Assuming db_manager and other necessary utils will be imported if functions using them are moved.
 from config import DATABASE_NAME as CENTRAL_DATABASE_NAME # For DATABASE_NAME
-from utils import load_config # save_config removed as it's not used here
+from utils import load_config # Changed from app_utils
 
 # --- Global Constants and Configurations ---
 if getattr(sys, 'frozen', False):
@@ -18,7 +18,8 @@ if getattr(sys, 'frozen', False):
 else:
     APP_ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-DEFAULT_TEMPLATES_DIR = os.path.join(APP_ROOT_DIR, "templates") # Standardized subdir name
+DEFAULT_TEMPLATES_DIR = os.path.join(APP_ROOT_DIR, "resources", "templates") # Updated path
+DEFAULT_ICONS_DIR = os.path.join(APP_ROOT_DIR, "resources", "icons") # Added for icons
 DEFAULT_CLIENTS_DIR = os.path.join(APP_ROOT_DIR, "clients")   # Standardized subdir name
 LOGO_SUBDIR = "company_logos"
 

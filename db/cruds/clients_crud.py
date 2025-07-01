@@ -306,36 +306,67 @@ class ClientsCRUD(GenericCRUD):
     @_manage_conn
     def delete_client(self, client_id: str, conn: sqlite3.Connection = None) -> dict:
         """
-        Soft deletes a client by setting `is_deleted = 1` and `deleted_at` to the current UTC timestamp.
+        Soft deletes a client by setting `is_deleted = 1`, `deleted_at` to the current UTC timestamp,
+        and updating the client's status to 'Archivé'.
 
         Args:
             client_id (str): The UUID of the client to soft delete.
             conn (sqlite3.Connection, optional): Database connection.
 
         Returns:
-            dict: {'success': True, 'message': 'Client soft deleted.'} on success,
-                  {'success': False, 'error': 'Client not found or already deleted.'} if no record was updated,
-                  {'success': False, 'error': 'DB error message'} on database error.
+            dict: {'success': True, 'message': 'Client soft deleted and status updated.'} on success,
+                  {'success': False, 'error': 'Reason for failure.'} on failure.
         """
+        from . import status_settings_crud # Local import for status operations
+
         if not client_id:
+            self.logger.warning("delete_client called with no client_id.")
             return {'success': False, 'error': "Client ID is required for deletion."}
 
-        now = datetime.utcnow().isoformat() + "Z"
-        # Direct SQL for soft delete operation.
-        # Note: This operation marks the client as deleted.
-        # Associated entities (like notes) are not automatically soft-deleted by this method.
-        cursor = conn.cursor()
-        sql = f"UPDATE {self.table_name} SET is_deleted = ?, deleted_at = ? WHERE {self.id_column} = ?"
-        params = (1, now, client_id)
+        now_utc_iso = datetime.utcnow().isoformat() + "Z"
+
+        archived_status_id = None
+        try:
+            status_archived_obj = status_settings_crud.get_status_setting_by_name('Archivé', 'Client', conn=conn)
+            if status_archived_obj and 'status_id' in status_archived_obj:
+                archived_status_id = status_archived_obj['status_id']
+            else:
+                self.logger.error(f"Could not find 'Archivé' status for Client type. Cannot update status for client {client_id} during soft delete.")
+                # Proceed with soft delete flags, but status won't be changed to Archived.
+                # Consider if this should be a hard failure for the operation. For now, log and proceed.
+        except Exception as e_status:
+            self.logger.error(f"Error fetching 'Archivé' status_id for client {client_id}: {e_status}", exc_info=True)
+            # Similar to above, proceed with soft delete flags.
+
+        update_fields = {
+            'is_deleted': 1,
+            'deleted_at': now_utc_iso
+        }
+        if archived_status_id:
+            update_fields['status_id'] = archived_status_id
+
+        set_clauses = [f"{key} = ?" for key in update_fields.keys()]
+        params = list(update_fields.values())
+        params.append(client_id)
+
+        sql = f"UPDATE {self.table_name} SET {', '.join(set_clauses)} WHERE {self.id_column} = ?"
 
         try:
-            cursor.execute(sql, params)
+            cursor = conn.cursor()
+            cursor.execute(sql, tuple(params))
             if cursor.rowcount > 0:
-                return {'success': True, 'message': f"Client {client_id} soft deleted."}
+                message = f"Client {client_id} soft deleted."
+                if archived_status_id:
+                    message += " Status updated to 'Archivé'."
+                else:
+                    message += " Status NOT updated to 'Archivé' due to missing status configuration."
+                self.logger.info(message)
+                return {'success': True, 'message': message}
             else:
-                return {'success': False, 'error': f"Client {client_id} not found or already deleted."}
+                self.logger.warning(f"Client {client_id} not found or no changes made during soft delete.")
+                return {'success': False, 'error': f"Client {client_id} not found or no changes made."}
         except sqlite3.Error as e:
-            logging.error(f"Failed to soft delete client {client_id}: {e}")
+            self.logger.error(f"Failed to soft delete client {client_id}: {e}", exc_info=True)
             return {'success': False, 'error': str(e)}
 
     @_manage_conn

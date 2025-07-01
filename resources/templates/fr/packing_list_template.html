@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ labels.packing_list_title | default('Packing List') }}</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            color: #333;
+            font-size: 11px; /* Slightly smaller base font for packing lists */
+            line-height: 1.5;
+        }
+        .container {
+            width: 800px;
+            margin: 20px auto;
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #3498db; /* Different accent color */
+        }
+        .header .logo {
+            max-width: 180px;
+            max-height: 70px;
+        }
+        .header h1 {
+            color: #3498db;
+            font-size: 26px;
+            margin: 0;
+            text-align: right;
+            font-weight: normal;
+        }
+        .details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr; /* Three columns */
+            gap: 20px; /* Space between columns */
+            margin-bottom: 25px;
+        }
+        .details-column {
+            padding: 12px;
+            background-color: #fafdff;
+            border: 1px solid #e0eaf1;
+            border-radius: 4px;
+        }
+        .details-column h3 {
+            margin-top: 0;
+            color: #3498db;
+            font-size: 13px;
+            border-bottom: 1px solid #d6e4ee;
+            padding-bottom: 4px;
+            margin-bottom: 8px;
+        }
+        .details-column p {
+            margin: 3px 0;
+        }
+        .shipment-info {
+            margin-bottom: 25px;
+            background-color: #eef7ff;
+            padding: 12px;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+        .shipment-info p {
+            margin: 5px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 25px;
+        }
+        th, td {
+            border: 1px solid #cce0ed;
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #3498db;
+            color: #fff;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 10px;
+        }
+        tr:nth-child(even) {
+            background-color: #f6faff;
+        }
+        .number { text-align: right; }
+        .text-center { text-align: center; }
+        .totals-summary {
+            margin-top: 25px;
+            padding: 15px;
+            background-color: #f0faff;
+            border: 1px solid #cce0ed;
+            border-radius: 5px;
+        }
+        .totals-summary p { margin: 6px 0; font-weight: bold; }
+        .totals-summary span { font-weight: normal; }
+
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+            font-size: 10px;
+            color: #777;
+        }
+         .footer p { margin: 4px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            {% if seller.logo_path %}
+            <img src="{{ seller.logo_path }}" alt="{{ labels.logo_alt | default('Logo Entreprise') }}" class="logo" />
+            {% endif %}
+            <h1>{{ labels.packing_list_title | default('PACKING LIST') }}</h1>
+        </div>
+
+        <div class="details-grid">
+            <div class="details-column shipper-details">
+                <h3>{{ labels.shipper_exporter | default('Expéditeur/Exportateur:') }}</h3>
+                <p><strong>{{ seller.name | default('N/A') }}</strong></p>
+                <p>{{ seller.address | default('N/A') }}</p>
+                <p>{{ labels.phone | default('Téléphone:') }} {{ seller.phone | default('N/A') }}</p>
+                <p>{{ labels.email | default('Email:') }} {{ seller.email | default('N/A') }}</p>
+            </div>
+
+            <div class="details-column consignee-details">
+                <h3>{{ labels.consignee | default('Destinataire:') }}</h3>
+                <p><strong>{{ client.company_name | default(client.representative_name) | default('N/A') }}</strong></p>
+                <p>{{ client.address | default('N/A') }}</p>
+                <p>{{ labels.contact | default('Contact:') }} {{ client.representative_name | default('N/A') }}</p>
+            </div>
+
+            <div class="details-column notify-party-details">
+                <h3>{{ labels.notify_party | default('Notifier:') }}</h3>
+                <p>{{ doc.notify_party_name | default('N/A') }}</p>
+                <p>{{ doc.notify_party_address | default('N/A') }}</p>
+            </div>
+        </div>
+
+        <div class="shipment-info">
+            <p><strong>{{ labels.packing_list_no | default('Packing List N°:') }}</strong> {{ doc.packing_list_id | default('N/A') }}</p>
+            <p><strong>{{ labels.date | default('Date:') }}</strong> {{ doc.current_date | default('N/A') }}</p>
+            <p><strong>{{ labels.invoice_no | default('Facture N°:') }}</strong> {{ doc.invoice_id | default('N/A') }}</p>
+            <p><strong>{{ labels.order_ref | default('Commande Réf:') }}</strong> {{ order.reference | default('N/A') }}</p>
+            <p><strong>{{ labels.project_id | default('Projet ID:') }}</strong> {{ project.identifier | default(project.name) | default('N/A') }}</p>
+            <p><strong>{{ labels.vessel_flight | default('Navire/Vol N°:') }}</strong> {{ shipment.vessel_flight_no | default('N/A') }}</p>
+            <p><strong>{{ labels.port_loading | default('Port de Chargement:') }}</strong> {{ shipment.port_of_loading | default('N/A') }}</p>
+            <p><strong>{{ labels.port_discharge | default('Port de Déchargement:') }}</strong> {{ shipment.port_of_discharge | default('N/A') }}</p>
+            <p><strong>{{ labels.final_destination | default('Destination Finale:') }}</strong> {{ shipment.final_destination_country | default('N/A') }}</p>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>{{ labels.marks_nos | default('Marques & N°') }}</th>
+                    <th>{{ labels.description_goods | default('Description des Marchandises') }}</th>
+                    <th class="number">{{ labels.num_packages | default('Nbr Colis') }}</th>
+                    <th>{{ labels.type_packages | default('Type Colis') }}</th>
+                    <th class="number">{{ labels.net_weight_kg | default('Poids Net (kg)') }}</th>
+                    <th class="number">{{ labels.gross_weight_kg | default('Poids Brut (kg)') }}</th>
+                    <th>{{ labels.dimensions_cm | default('Dimensions (cm)') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>{{ item.marks_and_numbers | default('N/A') }}</td>
+                    <td>
+                        <strong>{{ item.product_name | default('N/A') }}</strong>
+                        {% if item.description and item.description != item.product_name %}
+                        <br><small>{{ item.description }}</small>
+                        {% endif %}
+                    </td>
+                    <td class="number">{{ item.package_count | default(0) }}</td>
+                    <td class="text-center">{{ item.package_type | default('N/A') }}</td>
+                    <td class="number">{{ "%.2f"|format(item.net_weight_kg | default(0.0)) }}</td>
+                    <td class="number">{{ "%.2f"|format(item.gross_weight_kg | default(0.0)) }}</td>
+                    <td>{{ item.dimensions_text | default('N/A') }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center">{{ labels.no_items_listed | default('Aucun article listé.') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="totals-summary">
+            <p>{{ labels.total_packages | default('Nombre Total de Colis:') }} <span>{{ totals.package_count | default(0) }}</span></p>
+            <p>{{ labels.total_net_weight | default('Poids Net Total:') }} <span>{{ "%.2f"|format(totals.net_weight_kg | default(0.0)) }} kg</span></p>
+            <p>{{ labels.total_gross_weight | default('Poids Brut Total:') }} <span>{{ "%.2f"|format(totals.gross_weight_kg | default(0.0)) }} kg</span></p>
+            <p>{{ labels.total_volume | default('Volume Total:') }} <span>{{ "%.3f"|format(totals.volume_cbm | default(0.000)) }} CBM</span></p>
+        </div>
+
+        {% if doc.packing_notes and doc.packing_notes != 'N/A' %}
+        <div class="notes-section" style="margin-top:20px; margin-bottom:20px; padding:10px; background-color:#f9f9f9; border-radius:5px;">
+            <h4>{{ labels.notes | default('Notes:') }}</h4>
+            <p>{{ doc.packing_notes | replace('\n', '<br>') | safe }}</p>
+        </div>
+        {% endif %}
+
+        <div class="footer">
+            <p>{{ labels.exporter_signature | default("Signature de l'Exportateur:") }} _________________________</p>
+            <p>{{ labels.date | default('Date:') }} {{ doc.current_date | default('N/A') }}</p>
+            <p style="margin-top: 15px;"><em>{{ labels.packing_list_footer_notice | default('Ce document atteste du contenu et des détails d’emballage de l’expédition.') }}</em></p>
+        </div>
+    </div>
+</body>
+</html>

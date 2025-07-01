@@ -132,9 +132,9 @@ def get_generic_input_style():
             border-top-right-radius: 3px; border-bottom-right-radius: 3px;
         }
         QComboBox::down-arrow {
-            image: url(icons/arrow_down.png);
+        image: url(resources/icons/arrow_down.png);
         }
-    """ # Assuming icons/arrow_down.png exists or will be added
+""" # Assuming resources/icons/arrow_down.png exists or will be added
 
 def get_group_box_style():
     return """
@@ -297,12 +297,12 @@ class DocumentManager(QMainWindow):
 
         # Input and ComboBox styling for filter/search area
         self.status_filter_combo = QComboBox(); self.status_filter_combo.addItem(self.tr("Tous les statuts"))
-        self.status_filter_combo.setStyleSheet(get_generic_input_style())
+        self.status_filter_combo.setProperty("class", "genericInput") # Updated
         self.load_statuses_into_filter_combo()
         self.status_filter_combo.currentIndexChanged.connect(self.filter_client_list_display)
 
         self.search_input_field = QLineEdit(); self.search_input_field.setPlaceholderText(self.tr("Rechercher client..."))
-        self.search_input_field.setStyleSheet(get_generic_input_style())
+        self.search_input_field.setProperty("class", "genericInput") # Updated
         self.search_input_field.textChanged.connect(self.filter_client_list_display)
 
         filter_search_layout = QHBoxLayout()

@@ -44,7 +44,7 @@ def get_user_by_username(username: str, conn: sqlite3.Connection = None) -> dict
     sql = """SELECT u.*, r.role_name
              FROM Users u
              JOIN Roles r ON u.role_id = r.role_id
-             WHERE u.username = ?"""
+             WHERE u.username = ? AND u.is_active = 1 AND (u.is_deleted = 0 OR u.is_deleted IS NULL)"""
     try:
         cursor = conn.cursor()
         cursor.execute(sql, (username,))
@@ -133,30 +133,53 @@ def record_login_time(user_id: str, conn: sqlite3.Connection = None) -> bool:
         return False
 
 @_manage_conn
-def list_users(conn: sqlite3.Connection = None) -> list[dict]:
-    """Lists all users with their role names."""
-    sql = """SELECT u.user_id, u.username, u.full_name, u.email, r.role_name, u.is_active, u.created_at, u.last_login_at
+def list_users(role_id_filter: int = None, status_filter: str = None, include_deleted: bool = False, conn: sqlite3.Connection = None) -> list[dict]:
+    """
+    Lists all users with their role names, with optional filtering by role_id, active status, and deleted status.
+    Args:
+        role_id_filter (int, optional): Role ID to filter by. Defaults to None (no role filter).
+        status_filter (str, optional): Status to filter by ('active', 'inactive'). Defaults to None (all statuses).
+        include_deleted (bool, optional): Whether to include soft-deleted users. Defaults to False.
+        conn (sqlite3.Connection, optional): Database connection.
+    Returns:
+        list[dict]: A list of user dictionaries.
+    """
+    params = []
+    sql = """SELECT u.user_id, u.username, u.full_name, u.email, r.role_name, u.is_active, u.created_at, u.last_login_at, u.is_deleted, u.deleted_at
              FROM Users u
-             JOIN Roles r ON u.role_id = r.role_id
-             ORDER BY u.username"""
+             JOIN Roles r ON u.role_id = r.role_id"""
+
+    conditions = []
+    if not include_deleted:
+        conditions.append("(u.is_deleted = 0 OR u.is_deleted IS NULL)")
+
+    if role_id_filter is not None:
+        conditions.append("u.role_id = ?")
+        params.append(role_id_filter)
+
+    if status_filter == "active":
+        conditions.append("u.is_active = 1")
+    elif status_filter == "inactive":
+        # When filtering for inactive, we should only show non-deleted inactive users
+        # unless include_deleted is true.
+        # If include_deleted is true, this filter might show users that are inactive AND deleted.
+        conditions.append("u.is_active = 0")
+
+
+    if conditions:
+        sql += " WHERE " + " AND ".join(conditions)
+
+    sql += " ORDER BY u.username"
+
     try:
         cursor = conn.cursor()
-        cursor.execute(sql)
+        cursor.execute(sql, params)
         return [dict(row) for row in cursor.fetchall()]
     except sqlite3.Error as e:
-        logger.error(f"Database error listing users: {e}", exc_info=True)
+        logger.error(f"Database error listing users with filters (role_id: {role_id_filter}, status: {status_filter}): {e}", exc_info=True)
         return []
 
-def verify_password(hashed_password: str, provided_password: str) -> bool:
-    """
-    Verifies a provided password against a stored hash.
-    Internal helper, typically not called directly from outside for login.
-    Uses the verify_password function imported from utils.py (which uses passlib).
-    Now returns a tuple: (bool_verified, new_hash_if_updated_or_None)
-    """
-    # The function signature in utils.verify_password is (plain_password, hashed_password)
-    # So, the call should be utils.verify_password(provided_password, hashed_password)
-    return verify_password(provided_password, hashed_password) # Corrected argument order from previous step if it was wrong
+# Removed local verify_password function. Will use the one imported from utils directly.
 
 @_manage_conn
 def _update_user_password_hash_only(user_id: str, new_hashed_password: str, conn: sqlite3.Connection = None) -> bool:
@@ -199,8 +222,9 @@ def verify_user_password(username: str, password: str, conn: sqlite3.Connection 
             logger.error(f"User record for {username} is missing 'hashed_password'. Cannot verify.")
             return None
 
-        # verify_password (the internal one) now calls utils.verify_password which returns a tuple
-        verified, new_hash = verify_password(user['hashed_password'], password)
+        # Call the verify_password function imported from utils.
+        # The expected signature is verify_password(plain_password, hashed_password)
+        verified, new_hash = verify_password(password, user['hashed_password'])
 
         if verified:
             logger.info(f"Password verification successful for user: {username}")
@@ -228,3 +252,37 @@ def verify_user_password(username: str, password: str, conn: sqlite3.Connection 
 # If the previous users_crud.py was very different, this overwrite is fine.
 # users_crud_instance = UsersCRUD() # If it were a class-based CRUD
 # For now, these are module-level functions.
+
+@_manage_conn
+def soft_delete_user(user_id_to_delete: str, current_user_id: str, conn: sqlite3.Connection = None) -> bool:
+    """
+    Soft deletes a user by setting is_deleted = 1, deleted_at = now(), and is_active = 0.
+    Prevents self-deletion.
+    """
+    if user_id_to_delete == current_user_id:
+        logger.error(f"User {current_user_id} cannot soft delete themselves.")
+        # Consider raising a specific exception here if preferred for API/service layer handling
+        return False
+
+    now = datetime.utcnow().isoformat() + "Z"
+    sql = """UPDATE Users
+             SET is_deleted = 1,
+                 deleted_at = ?,
+                 is_active = 0,
+                 updated_at = ?
+             WHERE user_id = ?"""
+    params = (now, now, user_id_to_delete)
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute(sql, params)
+        # conn.commit() # Handled by _manage_conn
+        if cursor.rowcount > 0:
+            logger.info(f"User {user_id_to_delete} soft deleted successfully by user {current_user_id}.")
+            return True
+        else:
+            logger.warning(f"Soft delete failed for user {user_id_to_delete} (user not found or no change needed).")
+            return False # User not found or already in desired state (though updated_at would change)
+    except sqlite3.Error as e:
+        logger.error(f"Database error soft deleting user {user_id_to_delete}: {e}", exc_info=True)
+        return False

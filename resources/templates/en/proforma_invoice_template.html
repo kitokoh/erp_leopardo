@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Proforma Invoice</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            color: #333;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+        .container {
+            width: 800px; /* Fixed width for better PDF rendering consistency */
+            margin: 30px auto;
+            background-color: #fff;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #007bff; /* Accent color */
+        }
+        .header .logo-container {
+            flex-grow: 1;
+        }
+        .header .logo {
+            max-width: 200px;
+            max-height: 80px;
+        }
+        .header h1 {
+            color: #007bff;
+            font-size: 28px;
+            margin: 0;
+            text-align: right;
+            font-weight: 300;
+            white-space: nowrap;
+        }
+        .details-section {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+        }
+        .company-details, .client-details {
+            width: 48%;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            border: 1px solid #e7e7e7;
+        }
+        .company-details h3, .client-details h3 {
+            margin-top: 0;
+            color: #007bff;
+            font-size: 14px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+        .company-details p, .client-details p {
+            margin: 4px 0;
+            font-size: 11px;
+        }
+        .invoice-meta {
+            margin-bottom: 30px;
+            background-color: #f0f8ff; /* Light blue accent */
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .invoice-meta p {
+            margin: 6px 0;
+            font-size: 12px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px; /* Increased padding */
+            text-align: left;
+            font-size: 11px;
+        }
+        th {
+            background-color: #007bff; /* Primary accent color */
+            color: #fff;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 11px;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .number { /* Class for numerical cells */
+            text-align: right;
+        }
+        .total-section {
+            text-align: right;
+            margin-top: 30px;
+            padding-right: 10px;
+        }
+        .total-section p {
+            margin: 5px 0;
+            font-size: 12px;
+        }
+        .total-section h3 {
+            color: #007bff;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            font-size: 10px;
+            color: #666;
+        }
+        .footer p {
+            margin: 3px 0;
+        }
+        .bank-details {
+            margin-bottom:20px;
+            padding:15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            text-align:left;
+        }
+        .bank-details p {
+            margin: 4px 0;
+            font-size: 11px;
+        }
+        .bank-details strong {
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            {% if seller.logo_path %}
+            <img src="{{ seller.logo_path }}" alt="Company Logo" class="logo" />
+            {% else %}
+            <!-- Optionally, display company name if no logo -->
+            <!-- <p class="no-logo-placeholder">{{ seller.name }}</p> -->
+            {% endif %}
+            <h1>PROFORMA INVOICE</h1>
+        </div>
+
+        <div class="details-section">
+            <div class="company-details">
+                <h3>{{ labels.from | default('From:') }}</h3>
+                <p><strong>{{ seller.name | default('N/A') }}</strong></p>
+                <p>{{ seller.address | default('N/A') }}</p>
+                <p>{{ labels.phone | default('Phone:') }} {{ seller.phone | default('N/A') }}</p>
+                <p>{{ labels.email | default('Email:') }} {{ seller.email | default('N/A') }}</p>
+                <p>{{ labels.vat_id | default('VAT ID:') }} {{ seller.vat_id | default('N/A') }}</p>
+                <p>{{ labels.reg_number | default('Reg. No.:') }} {{ seller.registration_number | default('N/A') }}</p>
+            </div>
+
+            <div class="client-details">
+                <h3>{{ labels.to | default('To:') }}</h3>
+                <p><strong>{{ client.company_name | default(client.representative_name) | default('N/A') }}</strong></p>
+                <p>{{ client.address | default('N/A') }}</p>
+                <p>{{ labels.contact | default('Contact:') }} {{ client.representative_name | default('N/A') }}</p>
+                <p>{{ labels.email | default('Email:') }} {{ client.email | default('N/A') }}</p>
+                <p>{{ labels.vat_id | default('VAT ID:') }} {{ client.vat_id | default('N/A') }}</p>
+            </div>
+        </div>
+
+        <div class="invoice-meta">
+            <p><strong>{{ labels.proforma_no | default('Proforma Invoice No:') }}</strong> {{ doc.proforma_id | default('N/A') }}</p>
+            <p><strong>{{ labels.date | default('Date:') }}</strong> {{ doc.current_date | default('N/A') }}</p>
+            <p><strong>{{ labels.project_id | default('Project ID:') }}</strong> {{ project.identifier | default(project.name) | default('N/A') }}</p>
+            <p><strong>{{ labels.payment_terms | default('Payment Terms:') }}</strong> {{ doc.payment_terms | default('N/A') }}</p>
+            <p><strong>{{ labels.delivery_terms | default('Delivery Terms:') }}</strong> {{ doc.delivery_terms | default('N/A') }}</p>
+            {% if doc.incoterms and doc.incoterms != 'N/A' %}
+            <p><strong>{{ labels.incoterms | default('Incoterms:') }}</strong> {{ doc.incoterms }}{% if doc.named_place_of_delivery and doc.named_place_of_delivery != 'N/A' %} - {{ doc.named_place_of_delivery }}{% endif %}</p>
+            {% endif %}
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:10%;">{{ labels.item_ref | default('Ref.') }}</th>
+                    <th style="width:40%;">{{ labels.item_description | default('Description') }}</th>
+                    <th style="width:10%;" class="number">{{ labels.quantity | default('Qty') }}</th>
+                    <th style="width:15%;" class="number">{{ labels.unit_price | default('Unit Price') }}</th>
+                    <th style="width:15%;" class="number">{{ labels.total_price | default('Total') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for product in products %}
+                <tr>
+                    <td>{{ product.product_code | default(loop.index) }}</td>
+                    <td>
+                        <strong>{{ product.name | default('N/A') }}</strong>
+                        {% if product.description and product.description != product.name %}
+                        <br><small>{{ product.description }}</small>
+                        {% endif %}
+                         {% if product.original_name and product.original_name != product.name and product.original_name != product.description %}
+                        <br><small><em>Original name: {{ product.original_name }}</em></small>
+                        {% endif %}
+                    </td>
+                    <td class="number">{{ product.quantity | default(0) }}</td>
+                    <td class="number">{{ product.unit_price_formatted | default('N/A') }}</td>
+                    <td class="number">{{ product.total_price_formatted | default('N/A') }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center;">{{ labels.no_products_listed | default("No products listed.") }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if order.client_order_number and order.client_order_number != 'N/A' %}
+        <div class="invoice-meta" style="margin-top: 10px; margin-bottom: 20px;">
+            <p><strong>{{ labels.client_order_ref | default('Client Order Ref.:') }}</strong> {{ order.client_order_number }}</p>
+            {% if order.client_order_date and order.client_order_date != 'N/A' %}
+            <p><strong>{{ labels.client_order_date | default('Client Order Date:') }}</strong> {{ order.client_order_date }}</p>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <div class="total-section">
+            <p>{{ labels.subtotal | default('Subtotal:') }} {{ doc.subtotal_amount_formatted | default('N/A') }}</p>
+            {% if doc.discount_amount_raw and doc.discount_amount_raw > 0 %}
+            <p>{{ labels.discount | default('Discount') }} ({{ doc.discount_rate_percentage | default(0) }}%): -{{ doc.discount_amount_formatted | default('N/A') }}</p>
+            {% endif %}
+            <p>{{ doc.vat_label | default('VAT') }} ({{ doc.vat_rate_percentage | default(0) }}%): {{ doc.vat_amount_formatted | default('N/A') }}</p>
+            <h3><strong>{{ labels.grand_total | default('Total Amount:') }} {{ doc.grand_total_amount_formatted | default('N/A') }}</strong></h3>
+            {% if doc.grand_total_amount_words and doc.grand_total_amount_words != 'N/A' %}
+            <!-- <p>({{ doc.grand_total_amount_words }})</p> -->
+            {% endif %}
+        </div>
+
+        {% if doc.proforma_notes and doc.proforma_notes != 'N/A' %}
+        <div class="notes-section" style="margin-top:20px; margin-bottom:20px; padding:10px; background-color:#f9f9f9; border-radius:5px;">
+            <h4>{{ labels.notes | default('Notes:') }}</h4>
+            <p>{{ doc.proforma_notes | replace('\n', '<br>') | safe }}</p>
+        </div>
+        {% endif %}
+
+        <div class="footer" style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 15px;">
+            <p><strong>{{ labels.bank_details | default('Our Bank Details:') }}</strong></p>
+            <p>{{ labels.bank_name | default('Bank:') }} {{ seller.bank_name }}</p>
+            <p>{{ labels.bank_account_holder | default('Account Holder:') }} {{ seller.bank_account_holder_name }}</p>
+            <p>{{ labels.bank_iban | default('IBAN:') }} {{ seller.bank_iban }}</p>
+            <p>{{ labels.bank_swift_bic | default('SWIFT/BIC:') }} {{ seller.bank_swift_bic }}</p>
+            <p>{{ labels.bank_address | default('Bank Address:') }} {{ seller.bank_address }}</p>
+            <hr>
+            {% if doc.client_specific_footer_notes %}
+            <p>{{doc.client_specific_footer_notes}}</p>
+            {% endif %}
+            <p style="margin-top: 10px;"><em>{{ labels.proforma_notice | default('This is a proforma invoice and not a demand for payment.') }}</em></p>
+            <p><em>{{ labels.thank_you_message | default('Thank you for your business!') }}</em></p>
+            <p style="font-size: 0.8em; color: #999; margin-top: 20px;">{{ seller.company_name }} - {{ seller.address }} - {{ labels.vat_id | default('VAT ID:') }} {{ seller.vat_id }} - {{ labels.reg_number | default('Reg. No.:') }} {{ seller.registration_number }}</p>
+        </div>
+    </div>
+</body>
+</html>
