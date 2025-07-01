@@ -223,21 +223,93 @@ class ClientWidget(QWidget):
             self.details_layout = QFormLayout() # This is the layout for client fields
             self.details_layout.setLabelAlignment(Qt.AlignLeft)
             self.details_layout.setSpacing(10)
-            self.category_label = QLabel(self.tr("Catégorie:")) # Initialized here, used in populate_details_layout
-            self.category_value_label = QLabel() # Initialized here, used in populate_details_layout
 
-            # self.status_combo must be created here ONCE and added to details_tab_layout
-            # Then populate_details_layout will only update its contents and enabled state.
-            if not hasattr(self, 'status_combo') or self.status_combo is None: # Should only happen once
-                self.status_combo = QComboBox()
-                 # The actual load_statuses and setting current text will be done in populate_details_layout
-                # and when switching to edit mode.
-            # Add it to a layout that will be part of details_tab_layout (e.g., within the QFormLayout handled by populate_details_layout)
+            # --- Persistent UI Elements for Client Details Tab ---
+            # These are created once here and updated by populate_details_layout
 
-            details_tab_layout.addLayout(self.details_layout) # details_layout will contain status_combo via populate_details_layout
+            # Project ID
+            self.project_id_label = QLabel(self.tr("ID Projet:"))
+            self.project_id_value_label = QLabel(self.tr("N/A"))
+            self.details_layout.addRow(self.project_id_label, self.project_id_value_label)
+
+            # Country and City
+            self.country_city_label = QLabel(self.tr("Localisation:"))
+            self.country_city_widget = QWidget()
+            country_city_h_layout = QHBoxLayout(self.country_city_widget)
+            country_city_h_layout.setContentsMargins(0,0,0,0)
+            self.country_label_static = QLabel(self.tr("Pays:")) # Static label
+            self.country_value_label = QLabel(self.tr("N/A"))
+            self.city_label_static = QLabel(self.tr("Ville:")) # Static label
+            self.city_value_label = QLabel(self.tr("N/A"))
+            country_city_h_layout.addWidget(self.country_label_static)
+            country_city_h_layout.addWidget(self.country_value_label)
+            country_city_h_layout.addSpacing(20)
+            country_city_h_layout.addWidget(self.city_label_static)
+            country_city_h_layout.addWidget(self.city_value_label)
+            country_city_h_layout.addStretch()
+            self.details_layout.addRow(self.country_city_label, self.country_city_widget)
+
+            # Price and Creation Date
+            self.price_date_label = QLabel(self.tr("Finances & Date:"))
+            self.price_date_widget = QWidget()
+            price_date_h_layout = QHBoxLayout(self.price_date_widget)
+            price_date_h_layout.setContentsMargins(0,0,0,0)
+            self.price_label_static = QLabel(self.tr("Prix Final:")) # Static label
+            self.price_value_label = QLabel(self.tr("0 €"))
+            self.date_label_static = QLabel(self.tr("Date Création:")) # Static label
+            self.date_value_label = QLabel(self.tr("N/A"))
+            price_date_h_layout.addWidget(self.price_label_static)
+            price_date_h_layout.addWidget(self.price_value_label)
+            price_date_h_layout.addSpacing(20)
+            price_date_h_layout.addWidget(self.date_label_static)
+            price_date_h_layout.addWidget(self.date_value_label)
+            price_date_h_layout.addStretch()
+            self.details_layout.addRow(self.price_date_label, self.price_date_widget)
+
+            # Status and Category
+            self.status_category_label = QLabel(self.tr("Classification:"))
+            self.status_category_widget = QWidget() # Persistent container for this row
+            status_category_h_layout = QHBoxLayout(self.status_category_widget)
+            status_category_h_layout.setContentsMargins(0,0,0,0)
+            self.status_label_static = QLabel(self.tr("Statut:")) # Static label for "Statut:"
+            self.status_combo = QComboBox() # Created once
+            self.category_label_static = QLabel(self.tr("Catégorie:")) # Static label for "Catégorie:"
+            self.category_value_label = QLabel(self.tr("N/A")) # Value label for category
+            status_category_h_layout.addWidget(self.status_label_static)
+            status_category_h_layout.addWidget(self.status_combo)
+            status_category_h_layout.addSpacing(20)
+            status_category_h_layout.addWidget(self.category_label_static)
+            status_category_h_layout.addWidget(self.category_value_label)
+            status_category_h_layout.addStretch()
+            self.details_layout.addRow(self.status_category_label, self.status_category_widget)
+
+            # Distributor Specific Info (conditionally visible)
+            self.distributor_info_label_static = QLabel(self.tr("Info Distributeur:")) # Static label
+            self.distributor_info_value_label = QLabel(self.tr("N/A")) # Value label
+            self.distributor_info_value_label.setWordWrap(True)
+            self.distributor_info_value_label.setObjectName("distributorInfoValueLabel")
+            self.distributor_info_label_static.setObjectName("distributorInfoLabel") # Label for the row
+            self.details_layout.addRow(self.distributor_info_label_static, self.distributor_info_value_label)
+
+
+            # Need (Besoin Principal)
+            self.need_label_static = QLabel(self.tr("Besoin Principal:")) # Static label
+            self.need_value_label = QLabel(self.tr("N/A")) # Value label
+            self.details_layout.addRow(self.need_label_static, self.need_value_label)
+
+            # Base Folder Path
+            self.folder_label_static = QLabel(self.tr("Chemin Dossier:")) # Static label
+            self.folder_value_label = QLabel(self.tr("N/A")) # Value label, will contain link
+            self.folder_value_label.setOpenExternalLinks(True)
+            self.folder_value_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+            self.details_layout.addRow(self.folder_label_static, self.folder_value_label)
+            # --- End of Persistent UI Elements for Client Details Tab ---
+
+            details_tab_layout.addLayout(self.details_layout)
             self.internal_client_info_tabs.addTab(self.client_details_tab, self.client_info.get('client_name', self.tr("Détails Client")))
 
-            self.populate_details_layout() # Populate the details in the first tab, this will add status_combo to details_layout
+            # Initial population of the now persistent elements
+            self.populate_details_layout()
 
 
             # --- Tab 2: Contacts ---
@@ -3945,36 +4017,39 @@ class ClientWidget(QWidget):
         # Clear existing rows from the layout, EXCEPT for the status_combo's row if managed differently
         # For simplicity, we'll clear and re-add, ensuring status_combo is handled carefully.
 
-        # Disconnect signals first to prevent issues during repopulation
+        # This method now updates existing widgets rather than clearing and rebuilding the layout.
+        logging.info(f"Populating details layout for: {self.client_info.get('client_name')}")
+
+        # Update Project ID
+        project_identifier_value = self.client_info.get("project_identifier", self.tr("N/A"))
+        self.project_id_value_label.setText(project_identifier_value)
+        logging.info(f"Setting project_identifier: {project_identifier_value}")
+
+        # Update Country and City
+        country_text_value = self.client_info.get("country", self.tr("N/A"))
+        self.country_value_label.setText(country_text_value)
+        logging.info(f"Setting country: {country_text_value}")
+        city_text_value = self.client_info.get("city", self.tr("N/A"))
+        self.city_value_label.setText(city_text_value)
+        logging.info(f"Setting city: {city_text_value}")
+
+        # Update Price and Creation Date
+        price_value_data = self.client_info.get('price', 0)
+        self.price_value_label.setText(f"{price_value_data} €")
+        logging.info(f"Setting price: {price_value_data}")
+        creation_date_data = self.client_info.get("creation_date", self.tr("N/A"))
+        self.date_value_label.setText(creation_date_data)
+        logging.info(f"Setting creation_date: {creation_date_data}")
+
+        # Update Status ComboBox
+        # Disconnect signal temporarily to prevent premature updates if any
         if hasattr(self, 'status_combo'):
             try:
                 self.status_combo.currentTextChanged.disconnect(self.update_client_status)
             except TypeError:
-                pass # Not connected
+                pass # Not connected or already disconnected
 
-        # Detach category labels if they exist and are parented to details_layout
-        if hasattr(self, 'category_label') and self.category_label and self.category_label.layout() == self.details_layout:
-            self.category_label.setParent(None)
-        if hasattr(self, 'category_value_label') and self.category_value_label and self.category_value_label.layout() == self.details_layout:
-            self.category_value_label.setParent(None)
-
-        # Clear all rows from details_layout
-        while self.details_layout.rowCount() > 0:
-            self.details_layout.removeRow(0)
-
-        self.detail_value_labels = {} # Re-initialize
-        logging.info(f"Populating details layout for: {self.client_info.get('client_name')}")
-
-        # Ensure status_combo is created (should be done in setup_ui, but as a fallback)
-        if not hasattr(self, 'status_combo') or self.status_combo is None:
-            logging.warning("status_combo was None in populate_details_layout, re-creating. This should ideally be created in setup_ui.")
-            self.status_combo = QComboBox()
-            # self.load_statuses() # load_statuses will be called below anyway
-
-        # Always reload statuses to ensure items are up-to-date
-        self.load_statuses()
-
-        # Set current status and enabled state
+        self.load_statuses() # This populates self.status_combo
         self.status_combo.setEnabled(False) # Non-editable in display mode
         current_status_text = self.client_info.get("status", self.tr("En cours"))
         status_idx = self.status_combo.findText(current_status_text)
@@ -3982,124 +4057,54 @@ class ClientWidget(QWidget):
             self.status_combo.setCurrentIndex(status_idx)
         elif self.status_combo.count() > 0:
             self.status_combo.setCurrentIndex(0) # Default to first if not found
+        logging.info(f"Setting status: {current_status_text} (Index: {self.status_combo.currentIndex()})")
 
-        # Manage signal connection
-        try:
-            self.status_combo.currentTextChanged.disconnect(self.update_client_status)
-        except TypeError:
-            pass # Not connected
-        self.status_combo.currentTextChanged.connect(self.update_client_status)
+        # Reconnect signal
+        if hasattr(self, 'status_combo'):
+            self.status_combo.currentTextChanged.connect(self.update_client_status)
 
-
-        # Project ID
-        project_id_label = QLabel(self.tr("ID Projet:"))
-        project_identifier_value = self.client_info.get("project_identifier", self.tr("N/A"))
-        logging.info(f"Setting project_identifier: {project_identifier_value}")
-        project_id_value_label = QLabel(project_identifier_value)
-        self.details_layout.addRow(project_id_label, project_id_value_label)
-        self.detail_value_labels["project_identifier"] = project_id_value_label
-
-        # Country and City
-        country_city_widget = QWidget()
-        country_city_h_layout = QHBoxLayout(country_city_widget)
-        country_city_h_layout.setContentsMargins(0,0,0,0)
-        country_label = QLabel(self.tr("Pays:"))
-        country_text_value = self.client_info.get("country", self.tr("N/A"))
-        logging.info(f"Setting country: {country_text_value}")
-        country_value_label = QLabel(country_text_value)
-        city_label = QLabel(self.tr("Ville:"))
-        city_text_value = self.client_info.get("city", self.tr("N/A"))
-        logging.info(f"Setting city: {city_text_value}")
-        city_value_label = QLabel(city_text_value)
-        country_city_h_layout.addWidget(country_label)
-        country_city_h_layout.addWidget(country_value_label)
-        country_city_h_layout.addSpacing(20)
-        country_city_h_layout.addWidget(city_label)
-        country_city_h_layout.addWidget(city_value_label)
-        country_city_h_layout.addStretch()
-        self.details_layout.addRow(self.tr("Localisation:"), country_city_widget)
-        self.detail_value_labels["country"] = country_value_label
-        self.detail_value_labels["city"] = city_value_label
-
-        # Price and Creation Date
-        price_date_widget = QWidget()
-        price_date_h_layout = QHBoxLayout(price_date_widget)
-        price_date_h_layout.setContentsMargins(0,0,0,0)
-        price_label = QLabel(self.tr("Prix Final:"))
-        price_value_data = self.client_info.get('price', 0)
-        logging.info(f"Setting price: {price_value_data}")
-        price_value_label = QLabel(f"{price_value_data} €")
-        date_label = QLabel(self.tr("Date Création:"))
-        creation_date_data = self.client_info.get("creation_date", self.tr("N/A"))
-        logging.info(f"Setting creation_date: {creation_date_data}")
-        date_value_label = QLabel(creation_date_data)
-        price_date_h_layout.addWidget(price_label)
-        price_date_h_layout.addWidget(price_value_label)
-        price_date_h_layout.addSpacing(20)
-        price_date_h_layout.addWidget(date_label)
-        price_date_h_layout.addWidget(date_value_label)
-        price_date_h_layout.addStretch()
-        self.details_layout.addRow(self.tr("Finances & Date:"), price_date_widget)
-        self.detail_value_labels["price"] = price_value_label
-        self.detail_value_labels["creation_date"] = date_value_label
-
-        # Status and Category
-        status_category_widget = QWidget()
-        status_category_h_layout = QHBoxLayout(status_category_widget)
-        status_category_h_layout.setContentsMargins(0,0,0,0)
-        logging.info(f"Setting status: {self.client_info.get('status', self.tr('En cours'))}") # status_combo text set elsewhere
-        status_category_h_layout.addWidget(QLabel(self.tr("Statut:")))
-        status_category_h_layout.addWidget(self.status_combo) # status_combo itself is added
-        status_category_h_layout.addSpacing(20)
+        # Update Category
         category_text_value = self.client_info.get("category", self.tr("N/A"))
+        self.category_value_label.setText(category_text_value)
         logging.info(f"Setting category: {category_text_value}")
-        self.category_value_label.setText(category_text_value) # Set text on the instance member
-        status_category_h_layout.addWidget(self.category_label) # Add instance member label
-        status_category_h_layout.addWidget(self.category_value_label) # Add instance member value label
-        status_category_h_layout.addStretch()
-        self.details_layout.addRow(self.tr("Classification:"), status_category_widget)
-        self.detail_value_labels["category_value"] = self.category_value_label # Store for edit mode
 
-        # Distributor Specific Info (conditionally visible)
-        self.distributor_info_label = QLabel(self.tr("Info Distributeur:"))
+        # Update Distributor Specific Info (visibility handled by toggle_distributor_info_visibility)
         distributor_specific_info_value = self.client_info.get('distributor_specific_info', '')
-        # Logging for distributor_specific_info is implicitly covered by toggle_distributor_info_visibility if shown
-        self.distributor_info_value_label = QLabel(distributor_specific_info_value)
-        self.distributor_info_value_label.setWordWrap(True)
-        self.distributor_info_value_label.setObjectName("distributorInfoValueLabel")
-        self.distributor_info_label.setObjectName("distributorInfoLabel")
-        self.details_layout.addRow(self.distributor_info_label, self.distributor_info_value_label)
-        self.toggle_distributor_info_visibility()
+        self.distributor_info_value_label.setText(distributor_specific_info_value)
+        self.toggle_distributor_info_visibility() # Updates visibility based on category
 
-        # Need (Besoin Principal)
-        need_label = QLabel(self.tr("Besoin Principal:"))
+        # Update Need (Besoin Principal)
         need_text_value = self.client_info.get("need", self.client_info.get("primary_need_description", self.tr("N/A")))
+        self.need_value_label.setText(need_text_value)
         logging.info(f"Setting need: {need_text_value}")
-        need_value_label = QLabel(need_text_value)
-        self.details_layout.addRow(need_label, need_value_label)
-        self.detail_value_labels["need"] = need_value_label
 
-        # Base Folder Path
-        folder_label = QLabel(self.tr("Chemin Dossier:"))
+        # Update Base Folder Path
         folder_path_value = self.client_info.get('base_folder_path')
         if not folder_path_value:
-            folder_path_value = self.client_info.get('default_base_folder_path', '') # Fallback to default_base_folder_path
-        logging.info(f"Retrieved folder_path_value: '{folder_path_value}' (tried 'base_folder_path' then 'default_base_folder_path')")
-        if folder_path_value and os.path.isdir(folder_path_value): # Check if path is valid and a directory
+            folder_path_value = self.client_info.get('default_base_folder_path', '')
+        logging.info(f"Retrieved folder_path_value: '{folder_path_value}'")
+
+        if folder_path_value and os.path.isdir(folder_path_value):
             folder_display_text = f"<a href='file:///{folder_path_value}'>{folder_path_value}</a>"
-            folder_value_label = QLabel(folder_display_text)
-            folder_value_label.setOpenExternalLinks(True)
-            folder_value_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+            self.folder_value_label.setText(folder_display_text)
         else:
             if not folder_path_value:
                 logging.warning(f"Client {self.client_info.get('client_id')}: base_folder_path and default_base_folder_path are missing or empty.")
                 folder_display_text = self.tr("N/A - Chemin non configuré")
-            else: # Path exists but is not a directory
+            else:
                 logging.warning(f"Client {self.client_info.get('client_id')}: folder_path_value '{folder_path_value}' is not a valid directory.")
                 folder_display_text = self.tr("Chemin invalide: {0}").format(folder_path_value)
-            folder_value_label = QLabel(folder_display_text)
-        self.details_layout.addRow(folder_label, folder_value_label)
-        self.detail_value_labels["base_folder_path"] = folder_value_label
+            self.folder_value_label.setText(folder_display_text)
+
+        # The detail_value_labels dictionary is no longer needed for display mode updates
+        # as we are directly updating instance member labels.
+        # It might still be used by edit mode logic if that wasn't changed.
+        # For consistency, if edit mode also transitions to using instance member edit widgets,
+        # self.detail_value_labels could be removed entirely or repurposed.
+        # For now, keeping it for edit mode compatibility if edit mode still relies on it.
+        # self.detail_value_labels assignment removed as direct updates are used.
+        # If edit mode needs these, it should refer to the instance members directly or
+        # self.edit_widgets dictionary.
 
     def refresh_display(self, new_client_info):
         # logging.info(f"ClientWidget refresh_display: client_id={new_client_info.get('client_id')}, client_name={new_client_info.get('client_name')}")
