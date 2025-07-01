@@ -62,6 +62,11 @@ class CommandeDialog(QDialog):
         self.description_commande_edit.setFixedHeight(60)
         form_layout.addRow("Description:", self.description_commande_edit)
 
+        self.notes_edit = QTextEdit() # Added notes field
+        self.notes_edit.setFixedHeight(80) # Added notes field
+        self.notes_edit.setPlaceholderText("Entrez des notes spécifiques à cette commande...") # Added notes field
+        form_layout.addRow("Notes Commande:", self.notes_edit) # Added notes field
+
         # Project linking (optional or for later)
         self.project_combo = QComboBox()
         self.project_combo.addItem("Aucun Projet Lié", None)
@@ -168,6 +173,8 @@ class CommandeDialog(QDialog):
             else: # Project might not be in list if it was deleted, or from another context
                 self.project_combo.addItem(f"Projet Lié (ID: {project_id[:8]}...)", project_id)
                 self.project_combo.setCurrentIndex(self.project_combo.findData(project_id))
+
+        self.notes_edit.setPlainText(self.commande_data.get("notes", "")) # Load notes
 
         # Load items
         self.commande_items_data = commandes_crud.get_items_for_commande(self.commande_id_to_edit)
@@ -337,6 +344,7 @@ class CommandeDialog(QDialog):
             "commande_date": self.commande_date_edit.date().toString("yyyy-MM-dd") + "T00:00:00Z", # Store as ISO string
             "status_commande_id": status_id,
             "description_commande": self.description_commande_edit.toPlainText().strip(),
+            "notes": self.notes_edit.toPlainText().strip(), # Added notes
             "project_id": self.project_combo.currentData() if self.project_combo.currentData() != "CREATE_NEW" else None,
             "created_by_user_id": self.current_user_id,
             # Totals will be calculated based on items or handled by a separate update later
