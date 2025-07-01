@@ -138,68 +138,11 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
         return # Stop further execution
 
     # --- Project and Task Creation (remains largely the same, using actual_new_client_id) ---
-    try:
-        project_status_planning_obj = get_status_setting_by_name("Planning", "Project")
-        project_status_id_for_pm = project_status_planning_obj['status_id'] if project_status_planning_obj else None
-
-        if not project_status_id_for_pm:
-            QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Configuration Projet"),
-                                doc_manager.tr("Statut de projet par défaut 'Planning' non trouvé. Le projet ne sera pas créé avec un statut initial."))
-            doc_manager.notify(title=doc_manager.tr("Erreur Configuration Projet"),
-                               message=doc_manager.tr("Statut projet par défaut 'Planning' non trouvé."),
-                               type='WARNING')
-
-        project_data_for_db = {
-            'client_id': actual_new_client_id,
-            'project_name': f"Projet pour {created_client_info.get('client_name', client_name_val)}", # Use name from controller if available
-            'description': f"Projet pour client: {created_client_info.get('client_name', client_name_val)}. Besoin initial: {created_client_info.get('primary_need_description', '')}",
-            'start_date': datetime.now().strftime("%Y-%m-%d"),
-            'deadline_date': (datetime.now() + timedelta(days=60)).strftime("%Y-%m-%d"),
-            'budget': created_client_info.get('price', 0.0), # Price from controller (likely 0 or default)
-            'status_id': project_status_id_for_pm,
-            'priority': 1
-        }
-        logging.info(f"Attempting to create project for client {actual_new_client_id} with data: {project_data_for_db}")
-        new_project_id_central_db = add_project(project_data_for_db)
-
-        if new_project_id_central_db:
-            QMessageBox.information(doc_manager, doc_manager.tr("Projet Créé (Central DB)"),
-                                    doc_manager.tr("Un projet associé a été créé pour {0}.").format(created_client_info.get('client_name', client_name_val)))
-
-            task_status_todo_obj = get_status_setting_by_name("To Do", "Task")
-            task_status_id_for_todo = task_status_todo_obj['status_id'] if task_status_todo_obj else None
-
-            if not task_status_id_for_todo:
-                QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Configuration Tâche"),
-                                    doc_manager.tr("Statut de tâche par défaut 'To Do' non trouvé."))
-
-            standard_tasks = [
-                {"name": "Initial Client Consultation & Needs Assessment", "description": "Understand client requirements, objectives, target markets, and budget.", "priority_val": 2, "deadline_days": 3},
-                {"name": "Market Research & Analysis", "description": "Research target international markets, including competition, regulations, and cultural nuances.", "priority_val": 1, "deadline_days": 7},
-                {"name": "Post-Sales Follow-up & Support", "description": "Follow up with the client after delivery.", "priority_val": 1, "deadline_days": 60}
-            ]
-
-            for task_item in standard_tasks:
-                task_deadline = (datetime.now() + timedelta(days=task_item["deadline_days"])).strftime("%Y-%m-%d")
-                task_data_for_db = {
-                    'project_id': new_project_id_central_db,
-                    'task_name': task_item["name"],
-                    'description': task_item["description"],
-                    'status_id': task_status_id_for_todo,
-                    'priority': task_item["priority_val"],
-                    'due_date': task_deadline
-                }
-                logging.info(f"Attempting to add task for project {new_project_id_central_db} with data: {task_data_for_db}")
-                add_task(task_data_for_db)
-            QMessageBox.information(doc_manager, doc_manager.tr("Tâches Créées (Central DB)"),
-                                    doc_manager.tr("Des tâches standard ont été ajoutées au projet pour {0}.").format(created_client_info.get('client_name', client_name_val)))
-        else:
-            logging.error(f"Failed to create project for client {actual_new_client_id}. Data attempted: {project_data_for_db}")
-            QMessageBox.warning(doc_manager, doc_manager.tr("Erreur DB Projet"),
-                                doc_manager.tr("Le client a été créé, mais la création du projet associé a échoué."))
-            doc_manager.notify(title=doc_manager.tr("Erreur Création Projet Associé"),
-                               message=doc_manager.tr("Client créé (ID: {0}), mais échec de la création du projet associé.").format(actual_new_client_id),
-                               type='WARNING')
+    # The automatic default order and its associated project are now created within clients_crud.add_client.
+    # The following logic for creating a *separate* general project and tasks right after client creation
+    # is now removed to avoid duplication and simplify the flow.
+    # The user will be notified that a default order and project were made.
+    # Specific tasks related to that default project can be managed via the project management module.
 
         # --- Update UI Map Data (ui_map_data) ---
         client_dict_from_controller = created_client_info # Use the data from controller
@@ -238,108 +181,55 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
             doc_manager.add_client_to_list_widget(ui_map_data) # Add to the list widget in DocumentManager UI
 
         # --- Automatic Commande Creation ---
-        commande_created_project_id = None
-        if actual_new_client_id: # Ensure client was successfully created
-            logging.info(f"Attempting to automatically create first commande for new client {actual_new_client_id}")
-            from commande_management.commande_dialog import CommandeDialog # Local import
+        # This section is removed as the default order/project creation is now handled by clients_crud.add_client
+        commande_created_project_id = None # Will be determined by the default order's project
 
-            # Instantiate CommandeDialog. It should handle fetching next commande_reference internally.
-            # It will also handle creation of its associated project.
-            commande_dialog = CommandeDialog(client_id=actual_new_client_id,
-                                             current_user_id=doc_manager.current_user_id,
-                                             # No commande_id_to_edit, so it's a new commande
-                                             parent=doc_manager)
-
-            # Open the dialog for the user to fill in details and products
-            if commande_dialog.exec_() == QDialog.Accepted:
-                # CommandeDialog's accept_dialog method handles saving the commande and its items.
-                # It also handles creating/linking the project.
-                # We need to get the project_id that was created or linked by the CommandeDialog.
-                if hasattr(commande_dialog, 'get_created_project_id'):
-                    commande_created_project_id = commande_dialog.get_created_project_id()
-                    if commande_created_project_id:
-                         logging.info(f"Commande dialog created/linked project ID: {commande_created_project_id} for the new commande.")
-                else:
-                    logging.warning("CommandeDialog does not have get_created_project_id() method. Cannot retrieve project_id for tasks.")
-
-                doc_manager.notify(title=doc_manager.tr("Première Commande Créée"),
-                                   message=doc_manager.tr("La première commande a été créée et initialisée."), type='SUCCESS')
-                # Refresh ClientWidget's Commande tab if it's open
-                for i in range(doc_manager.client_tabs_widget.count()):
-                    tab_widget = doc_manager.client_tabs_widget.widget(i)
-                    if hasattr(tab_widget, 'client_info') and tab_widget.client_info.get("client_id") == actual_new_client_id:
-                        if hasattr(tab_widget, 'commandes_tab_widget') and hasattr(tab_widget.commandes_tab_widget, 'refresh_commandes'):
-                             tab_widget.commandes_tab_widget.refresh_commandes()
-                        break
+        # Fetch the project_id of the default order that was just created.
+        # This requires querying the default order.
+        if actual_new_client_id:
+            from db.cruds import commandes_crud
+            client_orders = commandes_crud.get_commandes_for_client(actual_new_client_id, conn=None) # Use default conn management
+            default_order_found = next((o for o in client_orders if o.get('is_default')), None)
+            if default_order_found:
+                commande_created_project_id = default_order_found.get('project_id')
+                logging.info(f"Found default order {default_order_found.get('commande_id')} for client {actual_new_client_id}, linked project_id: {commande_created_project_id}")
             else:
-                logging.info(f"User cancelled the initial CommandeDialog for client {actual_new_client_id}.")
-                # If the user cancels the first commande, we might still want a default project.
-                # Or, we might decide that no project is created if the first commande is cancelled.
-                # For now, let's proceed with creating a default project if no commande-linked project exists.
-                doc_manager.notify(title=doc_manager.tr("Création de Commande Annulée"),
-                                   message=doc_manager.tr("La création de la première commande a été annulée. Un projet administratif général sera créé."), type='INFO')
+                logging.warning(f"Could not find the automatically created default order for client {actual_new_client_id} to retrieve its project_id.")
 
-        # --- Project and Task Creation ---
-        # Use project_id from commande if available, otherwise create a default project.
-        project_id_for_tasks = commande_created_project_id
+        project_id_for_tasks = commande_created_project_id # Use the project from the default order
 
-        if not project_id_for_tasks:
-            logging.info(f"No project linked from commande for client {actual_new_client_id}. Creating default administrative project.")
-            project_status_planning_obj = get_status_setting_by_name("Planning", "Project")
-            project_status_id_for_pm = project_status_planning_obj['status_id'] if project_status_planning_obj else None
-            if not project_status_id_for_pm:
-                 QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Configuration Projet"),
-                                     doc_manager.tr("Statut de projet par défaut 'Planning' non trouvé."))
-            project_data_for_db_default = {
-                'client_id': actual_new_client_id,
-                'project_name': f"Projet Administratif pour {created_client_info.get('client_name', client_name_val)}",
-                'description': f"Suivi administratif général pour client: {created_client_info.get('client_name', client_name_val)}.",
-                'start_date': datetime.now().strftime("%Y-%m-%d"),
-                'status_id': project_status_id_for_pm,
-                'priority': 0
-            }
-            new_default_project_id = add_project(project_data_for_db_default)
-            if new_default_project_id:
-                project_id_for_tasks = new_default_project_id
-                QMessageBox.information(doc_manager, doc_manager.tr("Projet Administratif Créé"),
-                                        doc_manager.tr("Un projet administratif général a été créé pour {0}.").format(created_client_info.get('client_name', client_name_val)))
-            else:
-                QMessageBox.warning(doc_manager, doc_manager.tr("Erreur DB Projet"),
-                                    doc_manager.tr("La création du projet administratif général a échoué."))
+        # The rest of the original "Project and Task Creation" and subsequent "Automatic Commande Creation"
+        # (which was a manual prompt for the first order) is removed or significantly simplified
+        # because the default order and its project are now the primary starting point.
 
-        # Ensure a clean transition to the next block of code.
-        # All lines between the above 'else' and the below 'if' must be either comments or truly blank.
-        # Any hidden 'try:' statement would be removed by this re-application of the structure.
-
-        # Now, if project_id_for_tasks is set (either from commande or default creation), create tasks for it.
+        # Standard tasks can still be added to this default project if desired.
         if project_id_for_tasks:
             task_status_todo_obj = get_status_setting_by_name("To Do", "Task")
             task_status_id_for_todo = task_status_todo_obj['status_id'] if task_status_todo_obj else None
             if not task_status_id_for_todo:
                 QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Configuration Tâche"),
                                     doc_manager.tr("Statut de tâche par défaut 'To Do' non trouvé."))
-
-            standard_tasks = [
-                {"name": "Initial Client Consultation & Needs Assessment", "description": "Understand client requirements, objectives, target markets, and budget.", "priority_val": 2, "deadline_days": 3},
-                {"name": "Market Research & Analysis", "description": "Research target international markets, including competition, regulations, and cultural nuances.", "priority_val": 1, "deadline_days": 7},
-                {"name": "Post-Sales Follow-up & Support", "description": "Follow up with the client after delivery.", "priority_val": 1, "deadline_days": 60}
-            ]
-            for task_item in standard_tasks:
-                task_deadline = (datetime.now() + timedelta(days=task_item["deadline_days"])).strftime("%Y-%m-%d")
-                task_data_for_db = {
-                    'project_id': project_id_for_tasks,
-                    'task_name': task_item["name"],
-                    'description': task_item["description"],
-                    'status_id': task_status_id_for_todo,
-                    'priority': task_item["priority_val"],
-                    'due_date': task_deadline
-                }
-                add_task(task_data_for_db)
-            QMessageBox.information(doc_manager, doc_manager.tr("Tâches Créées"),
-                                    doc_manager.tr("Des tâches standard ont été ajoutées au projet associé."))
+            else: # Proceed with adding tasks if status is found
+                standard_tasks = [
+                    {"name": "Initial Client Consultation & Needs Assessment", "description": "Understand client requirements, objectives, target markets, and budget.", "priority_val": 2, "deadline_days": 3},
+                    {"name": "Market Research & Analysis", "description": "Research target international markets, including competition, regulations, and cultural nuances.", "priority_val": 1, "deadline_days": 7},
+                    {"name": "Post-Sales Follow-up & Support", "description": "Follow up with the client after delivery.", "priority_val": 1, "deadline_days": 60}
+                ]
+                for task_item in standard_tasks:
+                    task_deadline = (datetime.now() + timedelta(days=task_item["deadline_days"])).strftime("%Y-%m-%d")
+                    task_data_for_db = {
+                        'project_id': project_id_for_tasks,
+                        'task_name': task_item["name"],
+                        'description': task_item["description"],
+                        'status_id': task_status_id_for_todo,
+                        'priority': task_item["priority_val"],
+                        'due_date': task_deadline
+                    }
+                    add_task(task_data_for_db)
+                QMessageBox.information(doc_manager, doc_manager.tr("Tâches Créées"),
+                                        doc_manager.tr("Des tâches standard ont été ajoutées au projet par défaut associé au client."))
         else:
-            logging.warning(f"No project ID available (commande or default) for client {actual_new_client_id}. No tasks created.")
-
+            logging.warning(f"No project ID available from default order for client {actual_new_client_id}. No standard tasks created.")
 
 
         if ui_map_data: # This block should run regardless of commande creation, to ensure Proforma/Contact/Product dialogs sequence
@@ -476,9 +366,11 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                 # This is a bit indirect; ideally CommandeDialog would pass back the commande_reference if created.
                 # For now, try to fetch the latest commande if one was made.
                 commande_ref_for_proforma = f"PF-AUTO-{datetime.now().strftime('%Y%m%d%H%M%S')}" # Default
-                if hasattr(commande_dialog, 'get_created_commande_reference'): # Check if CommandeDialog can provide this
-                    _ref = commande_dialog.get_created_commande_reference()
-                    if _ref: commande_ref_for_proforma = _ref
+                # The CommandeDialog is no longer called here, so get_created_commande_reference is not available.
+                # Use the default order's reference if found.
+                if default_order_found and default_order_found.get('commande_reference'):
+                    commande_ref_for_proforma = default_order_found.get('commande_reference')
+
 
                 proforma_specific_additional_context = {
                     'document_title': f"{proforma_doc_title_base} - {client_info_for_pdf_gen.get('client_name', 'Client')}",
@@ -494,7 +386,7 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                     project_id=project_id_for_tasks, # Use the determined project_id
                     additional_context=proforma_specific_additional_context,
                     document_type_for_context=default_proforma_template.get('template_type'),
-                    allow_empty_products=True
+                    allow_empty_products=True # Default order has no products initially
                 )
                 logging.info(f"Called generate_pdf_for_document for AUTO PROFORMA. File: {template_base_filename}, Lang: {target_proforma_lang}, allow_empty_products=True. Result path: {generated_pdf_path}")
 
@@ -510,9 +402,7 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                 relative_pdf_path_for_db = os.path.relpath(generated_pdf_path, base_folder_full_path)
 
                 # Link to commande_id if available
-                linked_commande_id = None
-                if hasattr(commande_dialog, 'get_created_commande_id'): # CommandeDialog should expose this
-                    linked_commande_id = commande_dialog.get_created_commande_id()
+                linked_commande_id = default_order_found.get('commande_id') if default_order_found else None
 
                 auto_proforma_doc_data = {
                     'client_id': actual_new_client_id,
@@ -589,7 +479,7 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
 # --- Final notifications and UI updates (outside the main if ui_map_data block, but relies on its outcomes) ---
 
         doc_manager.notify(title=doc_manager.tr("Client Créé"),
-                           message=doc_manager.tr("Le client '{0}' (ID: {1}) a été créé avec succès.").format(created_client_info.get('client_name', client_name_val), actual_new_client_id),
+                           message=doc_manager.tr("Le client '{0}' (ID: {1}) a été créé avec succès. Une commande et un projet par défaut ont aussi été initialisés.").format(created_client_info.get('client_name', client_name_val), actual_new_client_id),
                            type='SUCCESS')
         doc_manager.open_client_tab_by_id(actual_new_client_id)
         doc_manager.stats_widget.update_stats()

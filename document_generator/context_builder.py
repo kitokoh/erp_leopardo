@@ -17,8 +17,9 @@ from db.cruds import (
     get_project_by_id,
     get_client_document_notes,
     get_equivalent_products,
-    get_media_links_for_product, 
+    get_media_links_for_product,
     get_personnel_for_company,
+    application_settings_crud, # Added for default footer notes
 )
 from db.connection import get_db_connection # Changed from db.utils
 # Assuming these config variables are correctly defined in your project.
@@ -564,6 +565,25 @@ def get_document_context(
         context["placeholders"]["GRAND_TOTAL_AMOUNT"] = context["doc"]["grand_total_amount"]
         context["placeholders"]["SUBTOTAL_AMOUNT"] = context["doc"]["subtotal_amount"]
         context["placeholders"]["CURRENCY_SYMBOL"] = context["doc"]["currency_symbol"]
+
+        # 7. Footer Notes
+        custom_footer_notes = additional_data.get('footer_notes')
+        final_footer_notes = ""
+        if custom_footer_notes and custom_footer_notes.strip():
+            final_footer_notes = custom_footer_notes
+            logger.info(f"Using custom footer notes for document: {custom_footer_notes[:50]}...")
+        else:
+            default_footer_key = f"default_document_footer_notes_{language_code}"
+            # The get_setting CRUD is already decorated with _manage_conn, so it handles its own connection.
+            default_notes = application_settings_crud.get_setting(default_footer_key, default="")
+            if default_notes and default_notes.strip():
+                final_footer_notes = default_notes
+                logger.info(f"Using default footer notes for language '{language_code}': {default_notes[:50]}...")
+            else:
+                logger.info(f"No custom or default footer notes found for language '{language_code}'. Footer notes will be empty.")
+
+        context["doc"]["footer_notes"] = final_footer_notes
+        context["placeholders"]["FOOTER_NOTES"] = final_footer_notes
 
     except Exception as e:
         logger.error(f"Error building document context: {e}", exc_info=True)

@@ -427,6 +427,7 @@ class SettingsPage(QWidget):
         self._setup_data_backup_tab()
         self._setup_logistics_tab()
         self._setup_document_templates_tab()
+        self._setup_document_customization_tab() # Added new tab setup
         self._setup_security_tab()
 
 
@@ -882,6 +883,36 @@ class SettingsPage(QWidget):
 
         main_layout.addStretch(1)
         self.tabs_widget.addTab(tab_widget, self.tr("Document Templates"))
+
+    def _setup_document_customization_tab(self):
+        tab_widget = QWidget()
+        main_layout = QVBoxLayout(tab_widget)
+        main_layout.setContentsMargins(15, 15, 15, 15)
+        main_layout.setSpacing(15)
+
+        footer_notes_group = QGroupBox(self.tr("Default Document Footer Notes"))
+        footer_notes_form_layout = QFormLayout(footer_notes_group)
+        footer_notes_form_layout.setSpacing(10)
+
+        self.footer_notes_edits = {} # Store QTextEdits by lang code
+        # Assuming SUPPORTED_LANGUAGES is available or define it here
+        # For now, let's use a predefined list similar to other parts of the app
+        supported_langs_for_footers = [
+            ("French", "fr"), ("English", "en"), ("Arabic", "ar"),
+            ("Turkish", "tr"), ("Portuguese", "pt"), ("Russian", "ru")
+        ]
+
+        for lang_name, lang_code in supported_langs_for_footers:
+            label = QLabel(self.tr(f"Default Footer ({lang_name} - {lang_code}):"))
+            text_edit = QTextEdit()
+            text_edit.setFixedHeight(60) # Small height for footer notes
+            text_edit.setPlaceholderText(self.tr(f"Enter default footer for {lang_name} documents..."))
+            footer_notes_form_layout.addRow(label, text_edit)
+            self.footer_notes_edits[lang_code] = text_edit
+
+        main_layout.addWidget(footer_notes_group)
+        main_layout.addStretch(1)
+        self.tabs_widget.addTab(tab_widget, self.tr("Document Customization"))
 
 
     def _browse_download_monitor_path(self):
@@ -1372,12 +1403,32 @@ class SettingsPage(QWidget):
             # Template visibility settings are saved via _save_template_visibility_data, not directly into main_config here
         }
 
+    def get_document_customization_settings_data(self):
+        settings_data = {}
+        if hasattr(self, 'footer_notes_edits'):
+            for lang_code, text_edit_widget in self.footer_notes_edits.items():
+                setting_key = f"default_document_footer_notes_{lang_code}"
+                settings_data[setting_key] = text_edit_widget.toPlainText().strip()
+        return settings_data
+
+    def _load_document_customization_tab_data(self):
+        if not db_manager:
+            print("WARNING: db_manager not available for _load_document_customization_tab_data.")
+            return
+        if hasattr(self, 'footer_notes_edits'):
+            for lang_code, text_edit_widget in self.footer_notes_edits.items():
+                setting_key = f"default_document_footer_notes_{lang_code}"
+                value = db_manager.get_setting(setting_key, default="")
+                text_edit_widget.setPlainText(value)
+            print("Document Customization (Footer Notes) settings loaded.")
+
 
     def _load_all_settings_from_config(self):
         self._load_general_tab_data()
         self._load_connectivity_tab_data() # For Email
         self._load_data_backup_tab_data() # For DB, Download Monitor, Backup
         self._load_document_templates_tab_data() # For Template Dirs
+        self._load_document_customization_tab_data() # Load footer notes
 
         self._load_modules_tab_data() # Loads from DB settings table
 
@@ -1401,10 +1452,21 @@ class SettingsPage(QWidget):
             self.get_connectivity_settings_data(),
             self.get_data_backup_settings_data(),
             self.get_document_templates_settings_data(),
+            # Document customization settings (footer notes) are saved directly to DB, not main_config
         ]
         for settings_group in settings_collections:
             for key, value in settings_group.items():
                 self.main_config[key] = value
+
+        # Save footer notes directly to DB settings
+        if db_manager:
+            footer_notes_data = self.get_document_customization_settings_data()
+            for key, value in footer_notes_data.items():
+                db_manager.set_setting(key, value)
+            print("Default document footer notes saved to DB.")
+        else:
+            print("WARNING: db_manager not available. Default footer notes not saved to DB.")
+
 
         # Save module activation states (persisted in DB, not main_config directly)
         self._save_modules_tab_data()
