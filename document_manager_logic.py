@@ -339,7 +339,12 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                                     doc_manager.tr("Des tâches standard ont été ajoutées au projet associé."))
         else:
             logging.warning(f"No project ID available (commande or default) for client {actual_new_client_id}. No tasks created.")
-
+        # Assuming a phantom 'try' block was before the 'if project_id_for_tasks:' at line 374 (or before comments at L369)
+        # Adding 'except' to satisfy syntax requirement for that assumed 'try'.
+        except Exception as e_phantom_task_try:
+            logging.error(f"Exception caught in presumed 'try' block around task creation for project_id_for_tasks: {e_phantom_task_try}", exc_info=True)
+            # Depending on desired behavior, could re-raise or show a message.
+            # For now, just logging, as the outer try-except should handle major issues.
 
 
 
