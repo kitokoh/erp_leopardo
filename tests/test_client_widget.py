@@ -12,17 +12,44 @@ app = None
 def setUpModule():
     global app
     # QApplication instance is required for PyQt widgets
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication(sys.argv)
+    # Try with a minimal sys.argv
+    current_app_instance = QApplication.instance()
+    if current_app_instance is None:
+        app = QApplication([])
+    else:
+        app = current_app_instance
 
 def tearDownModule():
     global app
-    app.quit()
+    if app is not None:
+        # Check if it's the instance we created, or if it's safe to quit
+        # For now, let's be cautious. If instance() was not None initially, maybe don't quit.
+        # However, if setUpModule created it, it should quit it.
+        # This logic can be tricky. Defaulting to quit if app exists.
+        app.quit()
     app = None
 
 
 class TestClientWidgetPopulateDocTable(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        # This ensures QApplication exists before any test in this class runs.
+        # setUpModule is generally preferred for one-time setup for the whole module.
+        # If setUpModule is correctly creating the app, this might be redundant
+        # but can act as a safeguard or be used if setUpModule is removed.
+        global app
+        if QApplication.instance() is None:
+            # Fallback, should ideally be handled by setUpModule
+            app = QApplication(sys.argv if sys.argv else ['pytest_runner_class'])
+
+
+    @classmethod
+    def tearDownClass(cls):
+        # Correspondingly, if setUpClass created an app, it might manage its lifecycle here.
+        # However, managing QApplication lifecycle per class can be tricky.
+        # Module-level or session-level is often better.
+        pass # Let tearDownModule handle app cleanup
 
     def setUp(self):
         # Basic client_info
