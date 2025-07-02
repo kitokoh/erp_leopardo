@@ -1279,7 +1279,44 @@ class MainDashboard(QWidget): # Changed from QMainWindow to QWidget
         pass
     def change_page(self, index): pass
     def resizeEvent(self, event): super().resizeEvent(event) # Basic implementation
-    def focus_on_project(self, project_id_to_focus): pass # Placeholder for the method body
+
+    def find_and_display_project(self, project_id_to_find):
+        """
+        Finds a project by its ID in the projects_table and attempts to select/scroll to it.
+        Optionally, could open its details dialog.
+        """
+        if not hasattr(self, 'projects_table'):
+            logging.warning("find_and_display_project: projects_table does not exist.")
+            return
+
+        self.main_content.setCurrentWidget(self.projects_page) # Ensure the projects page is visible
+
+        found = False
+        for row in range(self.projects_table.rowCount()):
+            item = self.projects_table.item(row, 0) # Assuming project_id is in UserRole of first column item
+            if item and item.data(Qt.UserRole) == project_id_to_find:
+                self.projects_table.selectRow(row)
+                self.projects_table.scrollToItem(item, QAbstractItemView.PositionAtCenter)
+                logging.info(f"Project ID {project_id_to_find} found and selected in projects_table.")
+                # Optionally, open details dialog directly:
+                # self.show_project_details(project_id_to_find)
+                found = True
+                break
+
+        if not found:
+            logging.warning(f"Project ID {project_id_to_find} not found in the currently loaded projects_table rows.")
+            # Consider if we should try to reload/filter projects to find it.
+            # For now, just notify if not found in current view.
+            if hasattr(self, 'parent') and hasattr(self.parent(), 'notify'): # Check if parent has notify (DocumentManager)
+                self.parent().notify(
+                    self.tr("Projet Introuvable"),
+                    self.tr("Le projet avec l'ID {0} n'a pas été trouvé dans la vue actuelle du tableau de bord des projets.").format(project_id_to_find),
+                    type='WARNING'
+                )
+            else: # Fallback if notify is not available via parent
+                QMessageBox.information(self, self.tr("Projet Introuvable"),
+                                        self.tr("Le projet avec l'ID {0} n'a pas été trouvé dans la vue actuelle.").format(project_id_to_find))
+
 
 # --- End of MainDashboard class ---
 
