@@ -122,56 +122,36 @@ class StatisticsDashboard(QWidget):
         """Deferred initialization of map components and initial data load."""
         logging.info("StatisticsDashboard: _initialize_map_and_load_data called by QTimer.")
 
-        # Ensure the container widget for the map exists
+        # Ensure the container widget for the map exists and has its layout.
+        # self._left_map_actual_layout is initialized in __init__ and set as the layout
+        # for self.left_widget_for_map. We rely on that setup.
         if self.left_widget_for_map is None:
-            logging.critical("StatisticsDashboard: self.left_widget_for_map is None at the start of _initialize_map_and_load_data. Cannot initialize map.")
-            # This indicates a severe problem with the widget's construction or state.
+            logging.critical("StatisticsDashboard: self.left_widget_for_map is None. Cannot initialize map.")
             return
 
-        # --- BEGIN PROPOSED FIX ---
-        # Ensure self.left_widget_for_map has a layout and self._left_map_actual_layout refers to it.
-        current_layout = self.left_widget_for_map.layout()
-        if current_layout is None:
-            logging.warning("StatisticsDashboard: No layout on left_widget_for_map. Creating a new one.")
-            # Create new layout, parent it to the widget (which also sets it on the widget)
-            new_layout = QVBoxLayout(self.left_widget_for_map)
-            new_layout.setContentsMargins(0,0,0,0)
-            self._left_map_actual_layout = new_layout # Update our reference
-        else:
-            # A layout exists on the widget. Ensure our instance variable points to this current, active layout.
-            # This handles cases where the layout might have been replaced externally,
-            # or our self._left_map_actual_layout reference became stale or was None.
-            if self._left_map_actual_layout is not current_layout:
-                logging.warning(
-                    "StatisticsDashboard: self._left_map_actual_layout (id: %s) was stale or different from widget's current layout (id: %s). Updating reference.",
-                    id(self._left_map_actual_layout), id(current_layout)
-                )
-                self._left_map_actual_layout = current_layout
-
-            # As an additional safeguard, if _left_map_actual_layout is somehow still None here
-            # (e.g., if current_layout was a valid object but _left_map_actual_layout was None and the 'is not' check passed due to distinct None IDs - unlikely but defensive)
-            # or if current_layout itself was some non-None but "falsy" object that _left_map_actual_layout became.
-            if not self._left_map_actual_layout: # Check the truthiness of our reference
-                 logging.error("StatisticsDashboard: self._left_map_actual_layout is unexpectedly None/falsy after attempting to sync with widget's existing layout. Re-creating layout.")
-                 # Fallback: Re-create the layout for left_widget_for_map
-                 # This might replace current_layout if it was problematic.
-                 new_layout = QVBoxLayout(self.left_widget_for_map) # This will replace the old layout if any
-                 new_layout.setContentsMargins(0,0,0,0)
-                 self._left_map_actual_layout = new_layout
-
-        # At this point, self._left_map_actual_layout should be valid and set on the widget.
-        # The original critical check can remain as a final confirmation.
-        if not self._left_map_actual_layout:
-            logging.critical("StatisticsDashboard: self._left_map_actual_layout is None AFTER ATTEMPTED FIX. Cannot proceed with map initialization.")
-
+        # Verify that _left_map_actual_layout (which should be the layout of left_widget_for_map) is valid.
+        # This also implicitly checks if left_widget_for_map.layout() is valid if _left_map_actual_layout
+        # indeed points to it as intended by __init__.
+        if self._left_map_actual_layout is None:
+            logging.critical("StatisticsDashboard: self._left_map_actual_layout is None. This should have been set in __init__. Cannot proceed with map initialization.")
             return
 
-        # Now, self._left_map_actual_layout is assumed to be the correct, valid layout for self.left_widget_for_map
+        # As an additional check, ensure the widget's current layout is indeed the one we stored.
+        # This can catch unexpected external modifications to the widget's layout.
+        if self.left_widget_for_map.layout() is None:
+            logging.critical("StatisticsDashboard: self.left_widget_for_map.layout() is None, but _left_map_actual_layout was expected to be set. Critical state inconsistency.")
+            return
+        elif self.left_widget_for_map.layout() is not self._left_map_actual_layout:
+            logging.warning("StatisticsDashboard: self.left_widget_for_map.layout() differs from self._left_map_actual_layout. Using the widget's current layout.")
+            self._left_map_actual_layout = self.left_widget_for_map.layout()
+
+
+        # Now, self._left_map_actual_layout is confirmed to be the layout of self.left_widget_for_map
         if self.map_view is None:
             # Parent QWebEngineView to self.left_widget_for_map.
             # It will be managed by self._left_map_actual_layout.
-            self.map_view = QWebEngineView(self.left_widget_for_map)
-            self._left_map_actual_layout.addWidget(self.map_view) # Add map_view to the confirmed layout
+            self.map_view = QWebEngineView(self.left_widget_for_map) # Parented to the widget
+            self._left_map_actual_layout.addWidget(self.map_view) # Added to the layout
             logging.info("StatisticsDashboard: QWebEngineView (self.map_view) created and added to _left_map_actual_layout.")
 
             self.map_interaction_handler = MapInteractionHandler(self)
@@ -387,13 +367,19 @@ class StatisticsDashboard(QWidget):
     def update_map(self):
         logging.info("Updating interactive map...")
         try:
-            geojson_path = os.path.join(APP_ROOT_DIR, "assets", "world_countries.geojson")
+            # Robustly determine APP_ROOT_DIR within this module's context for asset loading
+            # Assumes statistics_module.py is in the project root directory.
+            current_module_path = os.path.abspath(__file__)
+            project_root_dir_local = os.path.dirname(current_module_path)
+
+            geojson_path = os.path.join(project_root_dir_local, "assets", "world_countries.geojson")
+            logging.info(f"StatisticsDashboard: Attempting to load GeoJSON from: {geojson_path}")
 
             if not os.path.exists(geojson_path):
-                logging.error(f"GeoJSON file not found at: {geojson_path}")
-            error_message = self.tr("Les données géographiques de la carte (GeoJSON) sont introuvables. La carte ne peut pas être affichée. Veuillez vérifier l'installation de l'application ou contacter le support.")
-            self._set_map_error_html(error_message)
-            return
+                logging.error(f"GeoJSON file not found at: {geojson_path}. Imported APP_ROOT_DIR was {APP_ROOT_DIR}")
+                error_message = self.tr("Les données géographiques de la carte (GeoJSON) sont introuvables. La carte ne peut pas être affichée. Veuillez vérifier l'installation de l'application ou contacter le support.")
+                self._set_map_error_html(error_message)
+                return
 
             m = folium.Map(location=[20, 0], zoom_start=2, tiles="CartoDB positron")
             # clients_by_country_counts = get_client_counts_by_country() # Removed redundant call
