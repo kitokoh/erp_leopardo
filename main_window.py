@@ -372,7 +372,7 @@ class DocumentManager(QMainWindow):
         #     self.calendar_module_widget_instance = None
 
 
-        self.home_page_widget_instance = HomePageWidget(parent=self) # Create Home Page instance
+        self.home_page_widget_instance = HomePageWidget(main_window=self, parent=self) # Pass self as main_window
         self.main_area_stack.addWidget(self.home_page_widget_instance)
 
         # User Management Page (always create, visibility of action controlled by RBAC)
@@ -407,6 +407,13 @@ class DocumentManager(QMainWindow):
         self.main_area_stack.setCurrentWidget(self.home_page_widget_instance) # Set Home Page as default view
         self.create_actions_main(); self.create_menus_main() # Menus and actions are created before _apply_permissions
         
+        # Log all widgets in main_area_stack after initialization
+        logging.debug("--- Widgets in main_area_stack after DocumentManager.__init__ ---")
+        for i in range(self.main_area_stack.count()):
+            widget = self.main_area_stack.widget(i)
+            logging.debug(f"  Index {i}: {widget} (Type: {type(widget).__name__})")
+        logging.debug("-----------------------------------------------------------------")
+
         self.voice_input_service = VoiceInputService() # Instantiate VoiceInputService
 
         self.load_clients_from_db_slot() # Initial load
@@ -417,13 +424,10 @@ class DocumentManager(QMainWindow):
         self.populate_saved_filters_combo() # Populate saved filters on init
 
 
-        # Set bottom widget for HomePageWidget if statistics module is enabled
-        if self.home_page_widget_instance and hasattr(self.home_page_widget_instance, 'set_bottom_widget'):
-            stats_widget_instance = self.get_statistics_widget_instance()
-            if stats_widget_instance:
-                self.home_page_widget_instance.set_bottom_widget(stats_widget_instance)
-            else: # Optionally hide or set a default placeholder if stats are disabled/unavailable
-                self.home_page_widget_instance.set_bottom_widget(None)
+        # Removed the block that called self.home_page_widget_instance.set_bottom_widget(stats_widget_instance)
+        # This prevents StatisticsDashboard from being reparented by HomePageWidget.
+        # The HomePageWidget's go_to_statistics button will now directly call self.show_statistics_view()
+        # on the main_window instance.
 
 
     def get_statistics_widget_instance(self):
@@ -1541,17 +1545,39 @@ class DocumentManager(QMainWindow):
             QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Partner Management est désactivé."))
 
     def show_statistics_view(self):
-        logging.info(f"Attempting to show Statistics View. Instance: {self.statistics_dashboard_instance}")
+        logging.info(f"Attempting to show Statistics View. Target Instance: {self.statistics_dashboard_instance} (Type: {type(self.statistics_dashboard_instance).__name__})")
         if self.statistics_dashboard_instance:
-            # Diagnostic: Log widgets currently in the stack
-            stacked_widgets = [self.main_area_stack.widget(i) for i in range(self.main_area_stack.count())]
-            logging.info(f"Widgets in main_area_stack: {stacked_widgets}")
-            if self.statistics_dashboard_instance in stacked_widgets:
-                logging.info("StatisticsDashboard instance IS in main_area_stack. Calling setCurrentWidget.")
+            logging.debug(f"--- Verifying main_area_stack contents before showing Statistics View ({self.statistics_dashboard_instance}) ---")
+            found_by_iteration = False
+            for i in range(self.main_area_stack.count()):
+                widget_in_stack = self.main_area_stack.widget(i)
+                logging.debug(f"  Stack Index {i}: {widget_in_stack} (Type: {type(widget_in_stack).__name__})")
+                if widget_in_stack == self.statistics_dashboard_instance:
+                    found_by_iteration = True
+                    logging.debug(f"    MATCH FOUND: Target instance {self.statistics_dashboard_instance} is at index {i}.")
+            logging.debug("--- End of stack verification ---")
+
+            # The original check using 'in' operator on a list comprehension:
+            # stacked_widgets_list = [self.main_area_stack.widget(i) for i in range(self.main_area_stack.count())]
+            # is_in_stack_via_list = self.statistics_dashboard_instance in stacked_widgets_list
+            # logging.debug(f"Check using 'in stacked_widgets_list': {is_in_stack_via_list}")
+
+            # More direct check using QStackedWidget.indexOf()
+            index_in_stack = self.main_area_stack.indexOf(self.statistics_dashboard_instance)
+            logging.debug(f"QStackedWidget.indexOf(self.statistics_dashboard_instance) returned: {index_in_stack}")
+
+            if index_in_stack != -1: # Preferred way to check if widget is in QStackedWidget
+            # if found_by_iteration: # Use our manual iteration result
+                logging.info("StatisticsDashboard instance IS in main_area_stack (verified by indexOf). Calling setCurrentWidget.")
                 self.main_area_stack.setCurrentWidget(self.statistics_dashboard_instance)
                 logging.info("setCurrentWidget called for StatisticsDashboard.")
             else:
-                logging.error("StatisticsDashboard instance is NOT in main_area_stack. This is the cause of the QStackedWidget error.")
+                logging.error(f"StatisticsDashboard instance {self.statistics_dashboard_instance} is NOT in main_area_stack (indexOf returned -1). This is the cause of the QStackedWidget error.")
+                # Log the full list of widgets again for comparison if error occurs
+                logging.error("Current main_area_stack contents at time of error:")
+                for i in range(self.main_area_stack.count()):
+                    widget = self.main_area_stack.widget(i)
+                    logging.error(f"  Error Stack Index {i}: {widget} (Type: {type(widget).__name__})")
                 QMessageBox.critical(self, self.tr("Erreur Module"),
                                      self.tr("Le module Statistiques n'a pas été correctement chargé dans l'interface principale."))
         else:
