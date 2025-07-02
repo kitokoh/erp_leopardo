@@ -22,8 +22,10 @@ from datetime import datetime # Added for client acquisition stats
 from dateutil.relativedelta import relativedelta # Added for client acquisition stats
 import json # Added for robust JS string escaping
 import folium
-import pandas as pd
+# import pandas as pd # pandas might not be directly needed in dashboard.py if map_utils handles its own data structures
 from branca.colormap import StepColormap # Import StepColormap
+
+from .map_utils import generate_folium_map_html # Import the new utility
 
 from db import (
     get_total_clients_count,
@@ -368,8 +370,7 @@ class StatisticsDashboard(QWidget):
     def update_map(self):
         logging.info("update_map: Method entered.")
         try:
-            # APP_ROOT_DIR is imported from app_setup and points to the project root.
-            # The GeoJSON file is now in resources/assets/
+            # GeoJSON path setup
             geojson_path = os.path.join(APP_ROOT_DIR, "resources", "assets", "world_countries.geojson")
             logging.info(f"update_map: Attempting to load GeoJSON from: {geojson_path}")
 
@@ -379,128 +380,49 @@ class StatisticsDashboard(QWidget):
                 self._set_map_error_html(error_message)
                 return
 
-            logging.info("update_map: About to create folium.Map object.")
-            m = folium.Map(location=[20, 0], zoom_start=2, tiles="CartoDB positron")
-            logging.info(f"update_map: folium.Map object created: {m}")
-
+            # Fetch data needed for the map
+            clients_by_country_counts = None
             try:
                 clients_by_country_counts = get_client_counts_by_country()
+                logging.info(f"update_map: Fetched client_counts_by_country. Count: {len(clients_by_country_counts) if clients_by_country_counts else 0}")
             except Exception as db_exc:
                 logging.error(f"Database error while fetching client counts for map: {db_exc}", exc_info=True)
-                error_message = self.tr("Erreur de récupération des données statistiques pour la carte : {error_details}. L'affichage de la carte est indisponible.").format(error_details=str(db_exc))
+                error_message = self.tr("Erreur de récupération des données statistiques (comptes par pays) pour la carte.").format(error_details=str(db_exc))
                 self._set_map_error_html(error_message)
                 return
 
-            logging.info(f"update_map: Fetched client_counts_by_country. Count: {len(clients_by_country_counts) if clients_by_country_counts else 0}")
+            all_clients_for_main_map_popups = []
+            try:
+                all_clients_for_main_map_popups = clients_crud_instance.get_all_clients_with_details(include_deleted=False)
+                logging.info(f"update_map: Fetched {len(all_clients_for_main_map_popups)} client details for popups.")
+            except Exception as e_popup_data:
+                logging.error(f"update_map: Error fetching all client details for popups: {e_popup_data}", exc_info=True)
+                # Proceeding with empty list for popups, map will still render basic info.
 
-            if clients_by_country_counts:
-                logging.info("update_map: Adding client distribution GeoJson...")
-                counts_dict = {item['country_name']: item['client_count'] for item in clients_by_country_counts}
-                max_observed_clients = max(item['client_count'] for item in clients_by_country_counts) if clients_by_country_counts else 0
-                category_colors = ['#f7f7f7', '#c6dbef', '#6baed6', '#08519c']
-                color_index = [0, 1, 2, 4]
-                client_colormap = StepColormap(colors=category_colors, index=color_index, vmin=0, vmax=max(4, max_observed_clients), caption=self.tr("Nombre de Clients par Pays (Catégories)"))
-                def style_function(feature):
-                    count = counts_dict.get(feature['properties']['name'], 0)
-                    return {'fillColor': client_colormap(count), 'color': '#555555', 'weight': 0.5, 'fillOpacity': 0.7}
-                folium.GeoJson(geojson_path, name=self.tr("Distribution des Clients par Pays"), style_function=style_function, tooltip=folium.features.GeoJsonTooltip(fields=['name'], aliases=[self.tr('Pays:')], localize=True)).add_to(m)
-                client_colormap.add_to(m)
-                logging.info("update_map: Client distribution GeoJson added.")
-            else:
-                logging.info("update_map: No client count data. Adding basic GeoJSON layer for choropleth.")
-                folium.GeoJson(geojson_path, name=self.tr("Pays (Base)"), tooltip=folium.features.GeoJsonTooltip(fields=['name'], aliases=[self.tr('Pays:')])).add_to(m)
-                logging.info("update_map: Basic GeoJSON layer added.")
-
-            logging.info("update_map: Adding popup GeoJson...")
-            popup_layer = folium.GeoJson(
-                geojson_path,
-                name=self.tr("Informations Pays"),
-                style_function=lambda x: {'fillColor':'transparent', 'color':'transparent', 'weight':0},
-                tooltip=None
+            # Call the utility function to generate map HTML
+            map_html_content = generate_folium_map_html(
+                geojson_path=geojson_path,
+                clients_by_country_counts=clients_by_country_counts,
+                all_clients_details_for_popups=all_clients_for_main_map_popups,
+                app_translator_func=self.tr, # Pass the instance's tr method
+                map_interaction_handler_name="pyMapConnector" # Specific to this dashboard's handler
             )
-            # ... (popup generation loop remains the same) ...
-            for feature in popup_layer.data.get('features', []):
-                country_name = feature.get('properties', {}).get('name', 'N/A')
-                if country_name == 'N/A': continue
-                country_client_count = next((item['client_count'] for item in clients_by_country_counts if item['country_name'] == country_name), 0)
-                popup_html = f"<b>{country_name}</b><br>"
-                popup_html += f"{self.tr('Clients (Total)')}: {country_client_count}<br><hr>"
-                country_obj = get_country_by_name(country_name)
-                city_client_map = {}
-                if country_obj:
-                    country_id = country_obj.get('country_id')
-                    clients_in_country = clients_crud_instance.get_all_clients_with_details(filters={'country_id': country_id}, include_deleted=False)
-                    if clients_in_country:
-                        for client in clients_in_country:
-                            city_name = client.get('city', self.tr('Ville Inconnue'))
-                            client_detail_name = client.get('client_name', self.tr('Client Inconnu'))
-                            client_id = client.get('client_id')
-                            if city_name not in city_client_map: city_client_map[city_name] = []
-                            if len(city_client_map[city_name]) < 3: city_client_map[city_name].append({'id': client_id, 'name': client_detail_name})
-                if city_client_map:
-                    for city_name_iter, clients_in_city_list in city_client_map.items():
-                        popup_html += f"<b>{self.tr('Ville')}: {city_name_iter}</b> ({len(clients_in_city_list)} {self.tr('client(s) affiché(s)')})<br>"
-                        popup_html += "<ul>"
-                        for client_data_item in clients_in_city_list:
-                            js_client_id_arg = json.dumps(client_data_item['id'])
-                            js_client_name_arg = json.dumps(client_data_item['name'])
-                            onclick_js = f"pyMapConnector.clientClickedOnMap({js_client_id_arg}, {js_client_name_arg}); return false;"
-                            popup_html += f"<li><a href='#' onclick='{onclick_js}'>{client_data_item['name']}</a></li>"
-                        popup_html += "</ul>"
-                else:
-                    popup_html += f"{self.tr('Aucun client détaillé à afficher pour les villes.')}<br>"
 
-                js_country_name_arg = json.dumps(country_name)
-                button_text = self.tr('Ajouter Client Ici')
-                onclick_country_js = f"pyMapConnector.countryClicked({js_country_name_arg}); return false;"
-                popup_html += f"<br><button onclick='{onclick_country_js}'>{button_text}</button>"
-                feature['properties']['popup_content'] = popup_html
-
-            popup_layer.add_child(folium.features.GeoJsonPopup(fields=['popup_content'], localize=True))
-            popup_layer.add_to(m)
-            logging.info("update_map: Popup GeoJson added.")
-
-            folium.LayerControl().add_to(m)
-
-            logging.info("update_map: Rendering map to HTML...")
-            map_html_content = m.get_root().render()
-            logging.info(f"update_map: Map HTML rendered. Content length: {len(map_html_content) if map_html_content else 0}")
-
-            webchannel_setup_js = """
-            <script type="text/javascript" src="qrc:///qtwebchannel/qwebchannel.js"></script>
-            <script type="text/javascript">
-                document.addEventListener("DOMContentLoaded", function() {
-                    if (typeof QWebChannel !== 'undefined') {
-                        new QWebChannel(qt.webChannelTransport, function(channel) {
-                            window.pyMapConnector = channel.objects.pyMapConnector;
-                            if (window.pyMapConnector === undefined) {
-                                console.error("pyMapConnector object not found in channel.objects. Available objects:", Object.keys(channel.objects));
-                            } else {
-                                console.log("pyMapConnector initialized successfully.");
-                            }
-                        });
-                    } else {
-                        console.error("QWebChannel JavaScript library not loaded. pyMapConnector will not be available.");
-                    }
-                });
-            </script>
-            """
-            if "</body>" in map_html_content:
-                map_html_content = map_html_content.replace("</body>", webchannel_setup_js + "</body>", 1)
-            elif "</html>" in map_html_content:
-                map_html_content = map_html_content.replace("</html>", webchannel_setup_js + "</html>", 1)
-            else:
-                map_html_content += webchannel_setup_js
+            if map_html_content is None:
+                logging.error("update_map: generate_folium_map_html returned None. Map generation failed.")
+                self._set_map_error_html(self.tr("La génération du contenu HTML de la carte a échoué."))
+                return
 
             if self.map_view:
+                logging.info("update_map: About to set HTML content in QWebEngineView...")
                 self.map_view.setHtml(map_html_content)
-                logging.info(f"Map HTML content successfully set in QWebEngineView. Map should be attempting to render. HTML content length: {len(map_html_content) if map_html_content else 0}.")
+                logging.info(f"Map HTML content successfully set in QWebEngineView. Map should be attempting to render. HTML content length: {len(map_html_content)}.")
             else:
-                logging.error("StatisticsDashboard: self.map_view is None. Cannot set HTML for the map.")
+                logging.error("StatisticsDashboard: self.map_view is None. Cannot set HTML for the map after generation.")
 
         except Exception as e:
-            logging.error(f"General error updating interactive map: {e}", exc_info=True) # Changed log message slightly for clarity
-            error_message = self.tr("Une erreur inattendue est survenue lors de la génération de la carte : {error_details}. L'affichage de la carte est indisponible. Veuillez réessayer ou contacter le support si le problème persiste.").format(error_details=str(e))
+            logging.error(f"General error in update_map: {e}", exc_info=True)
+            error_message = self.tr("Une erreur inattendue est survenue lors de la mise à jour de la carte.").format(error_details=str(e))
             self._set_map_error_html(error_message)
 
     def _set_map_error_html(self, message: str):
