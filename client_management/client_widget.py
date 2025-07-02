@@ -234,6 +234,7 @@ class ClientWidget(QWidget):
             relocated_buttons_layout.addStretch() # Push buttons to the left
             details_tab_layout.addLayout(relocated_buttons_layout) # Add this button bar
 
+
             self.status_combo = QComboBox()
 
             self.details_layout = QFormLayout() # This is the QFormLayout for client fields
@@ -2213,15 +2214,11 @@ class ClientWidget(QWidget):
             QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
         else:
             QMessageBox.warning(self, self.tr("Fichier Introuvable"),
-                                self.tr("Le fichier PDF spécifié est introuvable ou le chemin est invalide:\n{0}").format(file_path))
+                                self.tr("Le fichier PDF spécifié est introuvable ou le chemin est invalide:\n{0}").format(file_path or self.tr("Non spécifié")))
+            # --- Collapsible Client Info Section ---
+            self.client_info_group_box = QGroupBox(self.client_info.get('client_name', self.tr("Client Information")))
+            self.client_info_group_box.setCheckable(True)
 
-        # --- Collapsible Client Info Section ---
-        # try: # This try block was part of the original erroneous structure and should be removed or properly handled.
-            # For now, removing the try and focusing on the layout calls.
-            # self._setup_main_tabs_section(layout) # This call was also part of the erroneous structure.
-
-        self.client_info_group_box = QGroupBox(self.client_info.get('client_name', self.tr("Client Information")))
-        self.client_info_group_box.setCheckable(True)
             client_info_group_layout = QVBoxLayout(self.client_info_group_box) # Layout for the GroupBox itself
 
             self.info_container_widget = QWidget() # Container for all info elements
