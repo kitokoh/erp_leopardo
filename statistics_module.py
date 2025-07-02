@@ -163,13 +163,15 @@ class StatisticsDashboard(QWidget):
         # The original critical check can remain as a final confirmation.
         if not self._left_map_actual_layout:
             logging.critical("StatisticsDashboard: self._left_map_actual_layout is None AFTER ATTEMPTED FIX. Cannot proceed with map initialization.")
+
             return
 
+        # Now, self._left_map_actual_layout is assumed to be the correct, valid layout for self.left_widget_for_map
         if self.map_view is None:
-            # Parent QWebEngineView to self.left_widget_for_map, which is its container
-            self.map_view = QWebEngineView(self.left_widget_for_map) # Parent to the widget
-            # Add the map_view to self._left_map_actual_layout, which is confirmed or restored/recreated.
-            self._left_map_actual_layout.addWidget(self.map_view)
+            # Parent QWebEngineView to self.left_widget_for_map.
+            # It will be managed by self._left_map_actual_layout.
+            self.map_view = QWebEngineView(self.left_widget_for_map)
+            self._left_map_actual_layout.addWidget(self.map_view) # Add map_view to the confirmed layout
             logging.info("StatisticsDashboard: QWebEngineView (self.map_view) created and added to _left_map_actual_layout.")
 
             self.map_interaction_handler = MapInteractionHandler(self)
