@@ -1721,12 +1721,62 @@ class ClientWidget(QWidget):
             self.doc_type_filter_combo.currentIndexChanged.connect(self.populate_doc_table)
             doc_filter_layout.addWidget(self.doc_type_filter_combo)
 
-            doc_filter_layout.addStretch(1) # Add stretch before the button
-            if hasattr(self, 'compile_pdf_btn'): # Ensure button was created
-                doc_filter_layout.addWidget(self.compile_pdf_btn) # Add compile PDF button here
+            # Add "Combiné" button (renaming existing compile_pdf_btn for this purpose)
+            if hasattr(self, 'compile_pdf_btn'):
+                self.combine_docs_btn = self.compile_pdf_btn # Use the existing button instance
+                self.combine_docs_btn.setText(self.tr("Combiné"))
+                self.combine_docs_btn.setIcon(QIcon.fromTheme("document-export", QIcon(":/icons/folder.svg"))) # Example icon, adjust as needed
+                self.combine_docs_btn.setToolTip(self.tr("Combiner plusieurs documents PDF"))
+                # Ensure it's connected if it wasn't, or re-verify connection:
+                # self.combine_docs_btn.clicked.connect(self.open_compile_pdf_dialog) # Already connected if compile_pdf_btn was
+                doc_filter_layout.addWidget(self.combine_docs_btn)
+            else: # Fallback if compile_pdf_btn was not created for some reason
+                self.combine_docs_btn = QPushButton(self.tr("Combiné"))
+                self.combine_docs_btn.setIcon(QIcon.fromTheme("document-export", QIcon(":/icons/folder.svg")))
+                self.combine_docs_btn.setToolTip(self.tr("Combiner plusieurs documents PDF"))
+                self.combine_docs_btn.clicked.connect(self.open_compile_pdf_dialog) # Ensure connection
+                doc_filter_layout.addWidget(self.combine_docs_btn)
+
+            # Add new "+" (Add) button
+            self.plus_add_doc_btn = QPushButton("+")
+            self.plus_add_doc_btn.setToolTip(self.tr("Ajouter un document (depuis modèle ou importation directe)"))
+            self.plus_add_doc_btn.setFixedSize(30, 30) # Make it a small square button
+        self.plus_add_doc_btn.clicked.connect(self.handle_plus_add_doc_button_click) # Connected
+            doc_filter_layout.addWidget(self.plus_add_doc_btn)
+
+            doc_filter_layout.addStretch(1) # Add stretch after all buttons
 
             docs_layout.addWidget(self.doc_filter_layout_widget)
             self.doc_filter_layout_widget.setVisible(True)
+
+    def handle_plus_add_doc_button_click(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle(self.tr("Ajouter un Document"))
+        layout = QVBoxLayout(dialog)
+
+        btn_from_template = QPushButton(self.tr("Ajouter à partir d'un modèle"))
+        btn_from_template.setIcon(QIcon(":/icons/file-plus.svg")) # Consistent icon
+        def action_from_template():
+            dialog.accept() # Close this dialog
+            self.open_create_docs_dialog() # Call existing method
+        btn_from_template.clicked.connect(action_from_template)
+        layout.addWidget(btn_from_template)
+
+        btn_direct_import = QPushButton(self.tr("Ajouter directement un document"))
+        btn_direct_import.setIcon(QIcon(":/icons/upload.svg")) # Consistent icon (assuming upload.svg exists or use another)
+        def action_direct_import():
+            dialog.accept() # Close this dialog
+            self.add_document() # Call existing method
+        btn_direct_import.clicked.connect(action_direct_import)
+        layout.addWidget(btn_direct_import)
+
+        # Add a cancel button for completeness
+        btn_cancel = QPushButton(self.tr("Annuler"))
+        btn_cancel.clicked.connect(dialog.reject)
+        layout.addWidget(btn_cancel)
+
+        dialog.setLayout(layout)
+        dialog.exec_()
             self.documents_empty_label = QLabel(self.tr("Aucun document trouvé pour ce client.\nUtilisez les boutons ci-dessous pour ajouter ou générer des documents."))
             self.documents_empty_label.setAlignment(Qt.AlignCenter)
             font_docs_empty = self.documents_empty_label.font()
@@ -2330,22 +2380,22 @@ class ClientWidget(QWidget):
         self.doc_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         docs_layout.addWidget(self.doc_table)
         doc_btn_layout = QHBoxLayout()
-        self.add_doc_btn = QPushButton(self.tr("Importer Document"))
-        self.add_doc_btn.setIcon(QIcon(":/icons/file-plus.svg"))
-        self.add_doc_btn.setToolTip(self.tr("Importer un fichier document existant pour ce client"))
-        self.add_doc_btn.clicked.connect(self.add_document) # Connect the signal
-        doc_btn_layout.addWidget(self.add_doc_btn)
+            # self.add_doc_btn = QPushButton(self.tr("Importer Document")) # Button removed
+            # self.add_doc_btn.setIcon(QIcon(":/icons/file-plus.svg"))
+            # self.add_doc_btn.setToolTip(self.tr("Importer un fichier document existant pour ce client"))
+            # self.add_doc_btn.clicked.connect(self.add_document)
+            # doc_btn_layout.addWidget(self.add_doc_btn) # Button removed
 
-        self.refresh_docs_btn = QPushButton(self.tr("Actualiser"))
-        self.refresh_docs_btn.setIcon(QIcon.fromTheme("view-refresh"))
-        self.refresh_docs_btn.clicked.connect(self.populate_doc_table)
-        doc_btn_layout.addWidget(self.refresh_docs_btn)
+            # self.refresh_docs_btn = QPushButton(self.tr("Actualiser")) # Button removed
+            # self.refresh_docs_btn.setIcon(QIcon.fromTheme("view-refresh"))
+            # self.refresh_docs_btn.clicked.connect(self.populate_doc_table)
+            # doc_btn_layout.addWidget(self.refresh_docs_btn) # Button removed
 
-        self.add_template_btn = QPushButton(self.tr("Générer via Modèle"))
-        self.add_template_btn.setIcon(QIcon.fromTheme("document-new", QIcon(":/icons/file-plus.svg"))) # Reverted
-        self.add_template_btn.setToolTip(self.tr("Générer un nouveau document pour ce client à partir d'un modèle"))
-        self.add_template_btn.clicked.connect(self.open_create_docs_dialog)
-        doc_btn_layout.addWidget(self.add_template_btn)
+            # self.add_template_btn = QPushButton(self.tr("Générer via Modèle")) # Button removed
+            # self.add_template_btn.setIcon(QIcon.fromTheme("document-new", QIcon(":/icons/file-plus.svg")))
+            # self.add_template_btn.setToolTip(self.tr("Générer un nouveau document pour ce client à partir d'un modèle"))
+            # self.add_template_btn.clicked.connect(self.open_create_docs_dialog)
+            # doc_btn_layout.addWidget(self.add_template_btn) # Button removed
         docs_layout.addLayout(doc_btn_layout)
         self.tab_widget.addTab(docs_tab, self.tr("Documents"))
 
