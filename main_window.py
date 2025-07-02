@@ -1079,11 +1079,11 @@ class DocumentManager(QMainWindow):
         self.calculator_module_action.triggered.connect(self.show_calculator_module_view)
 
         # Action for Commande Management (Global View)
-        self.commande_management_action = QAction(QIcon(":/icons/shopping-cart.svg"), self.tr("Gestion des Commandes"), self) # Assumes shopping-cart.svg will be added
+        self.commande_management_action = QAction(QIcon(":/icons/briefcase.svg"), self.tr("Gestion des Commandes"), self) # Replaced shopping-cart.svg with briefcase.svg
         self.commande_management_action.triggered.connect(self.show_commande_management_view)
 
         # Action for managing roles
-        self.manage_roles_action = QAction(QIcon(":/icons/shield.svg"), self.tr("Gérer les Rôles"), self) # Assuming shield.svg or similar
+        self.manage_roles_action = QAction(QIcon(":/icons/settings.svg"), self.tr("Gérer les Rôles"), self) # Replaced shield.svg with settings.svg
         self.manage_roles_action.triggered.connect(self.open_role_management_dialog)
 
 
