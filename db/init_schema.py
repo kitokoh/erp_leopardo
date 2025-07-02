@@ -2606,33 +2606,23 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         # Ensure PERMISSION_MAP and role names (ADMINISTRATOR, etc.) are imported or accessible
         # from auth.permissions
 
-        # Fetch role IDs first
+        # Fetch role IDs
         role_id_map = {}
         cursor.execute("SELECT role_id, role_name FROM Roles")
         for row in cursor.fetchall():
             role_id_map[row['role_name']] = row['role_id']
+        print(f"DEBUG_INIT_DB: Role ID Map for permission seeding: {role_id_map}")
 
-        # Fetch role IDs first
-        role_id_map = {}
-        cursor.execute("SELECT role_id, role_name FROM Roles")
-        for row in cursor.fetchall():
-            role_id_map[row['role_name']] = row['role_id']
-
-        # Explicitly ensure Administrator has all permissions
-        admin_role_name_str = auth_perms_module.ADMINISTRATOR # This is "Administrator"
-        admin_role_id = role_id_map.get(admin_role_name_str)
+        # 1. Seed Administrator with ALL permissions
+        # The constant auth_perms_module.ADMINISTRATOR holds the string "Administrator"
+        admin_role_name_from_const = auth_perms_module.ADMINISTRATOR
+        admin_role_id = role_id_map.get(admin_role_name_from_const)
 
         if admin_role_id:
-            print(f"DEBUG_INIT_DB: Force-checking/seeding ALL permissions for {admin_role_name_str} (ID: {admin_role_id}). Total defined P_ keys: {len(all_permission_keys)}")
-            current_admin_perms_count = 0
-            newly_added_admin_perms_count = 0
-
-            # Get existing permissions for admin to avoid redundant checks if not necessary
-            cursor.execute("SELECT permission_key FROM RolePermissions WHERE role_id = ?", (admin_role_id,))
-            existing_admin_permission_keys = {row['permission_key'] for row in cursor.fetchall()}
-            current_admin_perms_count = len(existing_admin_permission_keys)
-
+            print(f"DEBUG_INIT_DB: Seeding ALL {len(all_permission_keys)} permissions for role '{admin_role_name_from_const}' (ID: {admin_role_id}).")
+            added_admin_perms_count = 0
             for p_key in all_permission_keys:
+
                 if p_key not in existing_admin_permission_keys:
                     try:
                         cursor.execute("INSERT INTO RolePermissions (role_id, permission_key) VALUES (?, ?)",
@@ -2648,34 +2638,49 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
             if (current_admin_perms_count + newly_added_admin_perms_count) != len(all_permission_keys):
                 print(f"DEBUG_INIT_DB: WARNING - Admin total permissions ({current_admin_perms_count + newly_added_admin_perms_count}) does not match total defined P_ keys ({len(all_permission_keys)}). Check for issues.")
         else:
-            print(f"DEBUG_INIT_DB: Could not find Administrator role ID ({admin_role_name_str}) to force-seed all permissions. Role ID Map: {role_id_map}")
+            print(f"DEBUG_INIT_DB: CRITICAL - Role '{admin_role_name_from_const}' not found in role_id_map. Cannot seed its permissions.")
 
-        # Seed other roles based on PERMISSION_MAP (excluding Administrator as it's handled above)
-        seeded_role_permissions_count = 0 # Reset for other roles
-        for role_name_const, perm_keys_list in auth_perms_module.PERMISSION_MAP.items():
-            actual_role_name = getattr(auth_perms_module, role_name_const, role_name_const)
+        # 2. Seed other roles based on PERMISSION_MAP (excluding Administrator)
+        # PERMISSION_MAP keys are constants like ADMINISTRATOR, TEAM_LEAD, OPERATOR
+        # The values associated with these constants in auth_perms_module are the actual role names (strings)
+        seeded_other_role_permissions_count = 0
+        for role_name_key_in_map, perm_keys_list_for_role in auth_perms_module.PERMISSION_MAP.items():
+            # Get the actual role name string (e.g., "Team Lead") using the constant (e.g., TEAM_LEAD)
+            # getattr(auth_perms_module, role_name_key_in_map, role_name_key_in_map)
+            # auth_perms_module.TEAM_LEAD will give "Team Lead"
+            # auth_perms_module.OPERATOR will give "Operator"
 
-            if actual_role_name == admin_role_name_str: # Skip Administrator, already handled
-                continue
+            # The keys in PERMISSION_MAP are already the string role names as defined by the constants
+            # e.g., PERMISSION_MAP = { ADMINISTRATOR: [...], TEAM_LEAD: [...], OPERATOR: [...] }
+            # where ADMINISTRATOR = "Administrator", TEAM_LEAD = "Team Lead", OPERATOR = "Operator"
 
-            if isinstance(actual_role_name, str) and actual_role_name in role_id_map:
-                role_id = role_id_map[actual_role_name]
-                for perm_key in perm_keys_list:
+            actual_role_name_str = role_name_key_in_map # The keys in PERMISSION_MAP *are* the role name strings
+
+            if actual_role_name_str == admin_role_name_from_const:
+                print(f"DEBUG_INIT_DB: Skipping '{actual_role_name_str}' in PERMISSION_MAP loop as it's handled (all perms).")
+                continue # Skip Administrator, already handled with all permissions
+
+            role_id = role_id_map.get(actual_role_name_str)
+            if role_id:
+                print(f"DEBUG_INIT_DB: Seeding permissions for role '{actual_role_name_str}' (ID: {role_id}) from PERMISSION_MAP.")
+                current_role_perms_added = 0
+                for perm_key in perm_keys_list_for_role:
                     if perm_key in all_permission_keys: # Ensure permission exists in Permissions table
                         try:
-                            # Using INSERT OR IGNORE for other roles is fine
                             cursor.execute("INSERT OR IGNORE INTO RolePermissions (role_id, permission_key) VALUES (?, ?)",
                                            (role_id, perm_key))
-                            # This count won't be accurate for "newly added" if OR IGNORE skips, but indicates attempts
-                            seeded_role_permissions_count +=1
+                            if cursor.rowcount > 0:
+                                seeded_other_role_permissions_count += 1
+                                current_role_perms_added +=1
                         except sqlite3.IntegrityError:
+                             print(f"DEBUG_INIT_DB: IntegrityError while seeding permission '{perm_key}' for role '{actual_role_name_str}'. Skipping.")
 
-                            pass
                     else:
-                        print(f"Warning: Permission key '{perm_key}' in PERMISSION_MAP for role '{actual_role_name}' not in defined P_ constants. Skipping.")
+                        print(f"DEBUG_INIT_DB: WARNING - Permission key '{perm_key}' for role '{actual_role_name_str}' in PERMISSION_MAP not found in defined P_ constants (ALL_PERMISSIONS). Skipping.")
+                print(f"DEBUG_INIT_DB: Added {current_role_perms_added} permissions for '{actual_role_name_str}'.")
             else:
-                 print(f"Warning: Role name '{actual_role_name}' from PERMISSION_MAP not found in Roles table (IDs: {role_id_map}). Skipping its permissions.")
-        print(f"DEBUG_INIT_DB: {seeded_role_permissions_count} role-permission links attempted/verified for non-Admin roles based on PERMISSION_MAP.")
+                print(f"DEBUG_INIT_DB: WARNING - Role name '{actual_role_name_str}' from PERMISSION_MAP not found in Roles table (IDs: {role_id_map}). Skipping its permissions.")
+        print(f"DEBUG_INIT_DB: Total of {seeded_other_role_permissions_count} role-permission links added/verified for non-Admin roles from PERMISSION_MAP.")
         # --- End Seed Permissions and RolePermissions ---
 
 

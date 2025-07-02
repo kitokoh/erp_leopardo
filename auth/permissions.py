@@ -125,8 +125,17 @@ PERMISSION_MAP = {
     OPERATOR: OPERATOR_PERMISSIONS,
 }
 
-# PERMISSION_MAP is now obsolete and will be removed.  <- This comment can be updated or removed later.
-# The initial state of permissions is seeded from this map into the database.
+# --- PERMISSION_MAP is now OBSOLETE ---
+# The PERMISSION_MAP above is no longer directly used by the has_permission function.
+# Its structure was used as the source for the initial seeding of the
+# RolePermissions table in `db/init_schema.py`.
+# For any future changes to default permissions for roles, modifications should
+# either be done via the Role Management UI (once implemented) or by adjusting
+# the seeding logic in `db/init_schema.py` if fundamental defaults need to change
+# prior to application deployment or for new installations.
+# It is kept here temporarily for historical reference during development of dynamic permissions.
+# Consider removing it entirely once the dynamic permission management is fully stable.
+# --- End of PERMISSION_MAP obsolescence notice ---
 
 # Import necessary CRUDs for the new has_permission logic
 from db.cruds import roles_crud, role_permissions_crud

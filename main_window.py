@@ -2400,10 +2400,16 @@ class DocumentManager(QMainWindow):
             return
 
         dialog = RoleManagementDialog(current_user_info=self.current_user_info, parent=self)
-        # Connect the signal from RoleManagementDialog to a handler in MainWindow
-        # if roles might affect other parts of MainWindow (e.g., UserManagementPage's role filter)
         dialog.roles_changed_signal.connect(self._handle_roles_changed)
+        # Check if RoleManagementDialog has a 'changes_made_flag' or similar to decide if refresh is needed
+        # For now, assuming exec_() implies potential changes if it doesn't return QDialog.Rejected
+        # A more explicit way is for RoleManagementDialog to set a flag if actual changes occurred.
         dialog.exec_()
+        # The connection to _handle_roles_changed should cover refreshes if the dialog emits the signal.
+        # If the dialog only emits on *actual* changes, this is fine.
+        # If it emits always on close (even without changes), _handle_roles_changed might do unnecessary work.
+        # Let's assume RoleManagementDialog's signal is specific to actual data changes.
+
 
     def _handle_roles_changed(self):
         """
@@ -2411,24 +2417,38 @@ class DocumentManager(QMainWindow):
         Refreshes UI components that depend on the list of roles.
         """
         logging.info("MainWindow: Roles have changed. Refreshing relevant UI components.")
-        self.notify(self.tr("Rôles Modifiés"), self.tr("La liste des rôles a été mise à jour."), type='INFO')
+        self.notify(self.tr("Rôles Modifiés"), self.tr("La liste des rôles ou leurs permissions ont été mises à jour."), type='INFO')
 
-        # Refresh UserManagementPage if it's currently visible or loaded
+        # 1. Refresh UserManagementPage's role filter and user table
         if self.user_management_page_instance:
-            # Refresh its role filter combo
+            # Check if _populate_role_filter method exists
             if hasattr(self.user_management_page_instance, '_populate_role_filter'):
+                logging.debug("Refreshing role filter in UserManagementPage.")
                 self.user_management_page_instance._populate_role_filter()
+            else:
+                logging.warning("UserManagementPage does not have _populate_role_filter method.")
+
             # If UserManagementPage is the current view, also refresh its user table
             # as role names might have changed for listed users.
             if self.main_area_stack.currentWidget() == self.user_management_page_instance:
                 if hasattr(self.user_management_page_instance, 'load_users_to_table'):
+                    logging.debug("UserManagementPage is current view, refreshing user table.")
                     self.user_management_page_instance.load_users_to_table()
+                else:
+                    logging.warning("UserManagementPage does not have load_users_to_table method.")
 
-        # Potentially refresh EditUserDialog if it were open and non-modal,
-        # or ensure it reloads roles next time it's opened.
-        # For modal dialogs, they would typically fetch fresh roles upon opening.
+        # 2. Re-apply permissions for the main window
+        # This is important if the current user's role's permissions were changed.
+        logging.debug("Re-applying permissions for MainWindow due to role changes.")
+        self._apply_permissions()
+
+        # 3. If EditUserDialog instances could be open and non-modal, they'd need updating.
+        # For now, assuming EditUserDialog is modal and will fetch fresh roles upon its next opening.
+        # If UserMenuButton displays role name and it could change, refresh it:
+        # self._update_user_display() # Already done if _apply_permissions changes user_menu_button state.
 
         # If any other part of MainWindow directly displays role names or uses a role combo,
         # it should be refreshed here as well.
-        # Example: If the UserMenuButton's displayed role name could change due to role edit (unlikely but for illustration)
-        # self._update_user_display()
+        # Example: If a ClientWidget had a role dropdown (it doesn't currently), it would need refresh.
+
+[end of main_window.py]
