@@ -479,6 +479,64 @@ def seed_initial_data_master(cursor: sqlite3.Cursor):
     _seed_motivational_messages(cursor, conn, logger_passed=logger)
     _seed_user_motivational_messages(cursor, conn, logger_passed=logger)
     _seed_default_document_footers(cursor, conn, logger_passed=logger)
+    _seed_new_default_document_notes(cursor, conn, logger_passed=logger) # Call the new seeding function
+
+
+def _seed_new_default_document_notes(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
+    logger = logger_passed
+    logger.info("Attempting to seed DefaultDocumentNotes...")
+
+    # Import the CRUD function for adding notes
+    # Placed here to avoid potential circular imports if notes_crud uses get_db_connection
+    from db.cruds.notes_crud import add_default_document_note, get_default_document_note
+
+    # Define document types based on template analysis (simplified names)
+    # These should ideally match the 'document_type_generated' values or a defined enum/list
+    document_types = [
+        "contact_page", "sales_contract_excel", "cover_page", "packing_list_html",
+        "packing_list_excel", "product_images", "proforma_invoice_html", "proforma_invoice_excel",
+        "sales_contract_html", "technical_specs_excel", "technical_specs_html", "warranty_document"
+    ]
+    # It's better to have a canonical list of document_types used across the application.
+    # For now, using derived names.
+
+    supported_languages = ["en", "fr", "ar", "tr", "pt", "ru"] # From template folders
+
+    default_notes_content = {
+        "en": "Default note: Please review all details carefully.",
+        "fr": "Note par défaut : Veuillez vérifier attentivement tous les détails.",
+        "ar": "ملاحظة افتراضية: يرجى مراجعة جميع التفاصيل بعناية.",
+        "tr": "Varsayılan not: Lütfen tüm ayrıntıları dikkatlice inceleyin.",
+        "pt": "Nota padrão: Revise todos os detalhes com atenção.",
+        "ru": "Примечание по умолчанию: Пожалуйста, внимательно проверьте все детали."
+    }
+
+    added_count = 0
+    skipped_count = 0
+
+    for doc_type in document_types:
+        for lang_code in supported_languages:
+            # Check if a note already exists for this combination
+            existing_note = get_default_document_note(doc_type, lang_code, conn=conn)
+            if existing_note:
+                logger.debug(f"Default note for type '{doc_type}', lang '{lang_code}' already exists. Skipping.")
+                skipped_count += 1
+                continue
+
+            note_content_for_lang = default_notes_content.get(lang_code, f"Default note for {doc_type} ({lang_code}).")
+
+            new_note_id = add_default_document_note(doc_type, lang_code, note_content_for_lang, conn=conn)
+            if new_note_id:
+                added_count += 1
+                logger.info(f"Added default note ID {new_note_id} for type '{doc_type}', lang '{lang_code}'.")
+            else:
+                # This might happen due to an unexpected error or if add_default_document_note returns None on IntegrityError
+                # (though we check for existing_note before calling add)
+                logger.warning(f"Failed to add default note for type '{doc_type}', lang '{lang_code}'.")
+                skipped_count +=1
+
+
+    logger.info(f"DefaultDocumentNotes seeding complete. Added: {added_count}, Skipped/Existing: {skipped_count}")
 
 
 def _seed_default_document_footers(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
