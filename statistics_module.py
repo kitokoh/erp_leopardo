@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import logging
+import sip # For checking if C++ object is deleted
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QSplitter, QHBoxLayout,
     QGroupBox, QFormLayout, QTableWidget, QHeaderView, QTabWidget, QProgressBar,
@@ -144,7 +145,6 @@ class StatisticsDashboard(QWidget):
         elif self.left_widget_for_map.layout() is not self._left_map_actual_layout:
             logging.warning("StatisticsDashboard: self.left_widget_for_map.layout() differs from self._left_map_actual_layout. Using the widget's current layout.")
             self._left_map_actual_layout = self.left_widget_for_map.layout()
-
 
         # Now, self._left_map_actual_layout is confirmed to be the layout of self.left_widget_for_map
         if self.map_view is None:
@@ -365,8 +365,10 @@ class StatisticsDashboard(QWidget):
 
     # Placeholder for update_map - to be filled in Phase 3
     def update_map(self):
-        logging.info("Updating interactive map...")
+        logging.info("update_map: Method entered.")
         try:
+            logging.info("update_map: About to create folium.Map object.")
+
             # Robustly determine APP_ROOT_DIR within this module's context for asset loading
             # Assumes statistics_module.py is in the project root directory.
             current_module_path = os.path.abspath(__file__)
@@ -835,6 +837,8 @@ class StatisticsDashboard(QWidget):
                 self.segmentation_chart_pages[key] = tab_widget # Store the page widget
 
             self.segmentation_tabs.addTab(tab_widget, title)
+        logging.debug(f"segmentation_chart_pages initialized: {self.segmentation_chart_pages}")
+        logging.debug(f"segmentation_tables initialized: {self.segmentation_tables}")
 
         logging.debug(f"segmentation_tables initialized: {self.segmentation_tables}")
 
@@ -874,6 +878,20 @@ class StatisticsDashboard(QWidget):
         chart_layout = page_widget.layout()
         logging.debug(f"Retrieved chart_layout from page_widget: {chart_layout} (type: {type(chart_layout)})")
 
+        if chart_layout is not None:
+            try:
+                is_deleted = sip.isdeleted(chart_layout)
+                logging.debug(f"sip.isdeleted(chart_layout) for 'status' returned: {is_deleted}")
+                if is_deleted:
+                    logging.error(f"Chart layout for 'status' ({chart_layout}) C++ object IS DELETED according to sip.isdeleted().")
+                    # If sip says it's deleted, the object is unusable.
+                    # The 'elif not chart_layout:' below will likely catch this due to falsy evaluation.
+            except NameError: # If sip is not imported/available
+                logging.warning("`sip` module not available, cannot check sip.isdeleted(chart_layout).")
+            except Exception as e_sip:
+                logging.warning(f"Error calling sip.isdeleted(chart_layout): {e_sip}.")
+
+
         if chart_layout is None:
             logging.error(f"Chart layout for 'status' IS EXPLICITLY NONE (retrieved from page_widget.layout()). Page widget was: {page_widget}")
             # Attempt to re-set a layout if page_widget exists but has no layout (should not happen if setup is correct)
@@ -890,11 +908,11 @@ class StatisticsDashboard(QWidget):
             else: # page_widget was None or layout() was not None initially but chart_layout became None (less likely)
                 return
 
-        # Check again if chart_layout is valid after potential recreation
-        if chart_layout is None:
-             logging.error("Chart layout for 'status' remains None even after attempting to fix. Cannot proceed.")
+        # Check again if chart_layout is valid after potential recreation AND sip check
+        if chart_layout is None: # Could have been set to None by sip check logic if we decide to do that
+             logging.error("Chart layout for 'status' remains None even after attempting to fix or due to sip.isdeleted. Cannot proceed.")
              return
-        elif not chart_layout: # Should be caught by 'is None', but as a safeguard for unexpected falsy QLayout
+        elif not chart_layout:
             logging.critical(f"CRITICAL UNEXPECTED: Chart layout for 'status' is NOT None ({chart_layout}, type: {type(chart_layout)}), but it evaluates to FALSY. This is highly unusual. Cannot proceed.")
 
             return
