@@ -372,7 +372,7 @@ class DocumentManager(QMainWindow):
         #     self.calendar_module_widget_instance = None
 
 
-        self.home_page_widget_instance = HomePageWidget(parent=self) # Create Home Page instance
+        self.home_page_widget_instance = HomePageWidget(main_window=self, parent=self) # Pass self as main_window
         self.main_area_stack.addWidget(self.home_page_widget_instance)
 
         # User Management Page (always create, visibility of action controlled by RBAC)
@@ -424,13 +424,10 @@ class DocumentManager(QMainWindow):
         self.populate_saved_filters_combo() # Populate saved filters on init
 
 
-        # Set bottom widget for HomePageWidget if statistics module is enabled
-        if self.home_page_widget_instance and hasattr(self.home_page_widget_instance, 'set_bottom_widget'):
-            stats_widget_instance = self.get_statistics_widget_instance()
-            if stats_widget_instance:
-                self.home_page_widget_instance.set_bottom_widget(stats_widget_instance)
-            else: # Optionally hide or set a default placeholder if stats are disabled/unavailable
-                self.home_page_widget_instance.set_bottom_widget(None)
+        # Removed the block that called self.home_page_widget_instance.set_bottom_widget(stats_widget_instance)
+        # This prevents StatisticsDashboard from being reparented by HomePageWidget.
+        # The HomePageWidget's go_to_statistics button will now directly call self.show_statistics_view()
+        # on the main_window instance.
 
 
     def get_statistics_widget_instance(self):
@@ -1564,7 +1561,6 @@ class DocumentManager(QMainWindow):
             # stacked_widgets_list = [self.main_area_stack.widget(i) for i in range(self.main_area_stack.count())]
             # is_in_stack_via_list = self.statistics_dashboard_instance in stacked_widgets_list
             # logging.debug(f"Check using 'in stacked_widgets_list': {is_in_stack_via_list}")
-            
             # More direct check using QStackedWidget.indexOf()
             index_in_stack = self.main_area_stack.indexOf(self.statistics_dashboard_instance)
             logging.debug(f"QStackedWidget.indexOf(self.statistics_dashboard_instance) returned: {index_in_stack}")
