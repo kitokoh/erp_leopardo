@@ -2216,6 +2216,7 @@ class ClientWidget(QWidget):
             QMessageBox.warning(self, self.tr("Fichier Introuvable"),
                                 self.tr("Le fichier PDF spécifié est introuvable ou le chemin est invalide:\n{0}").format(file_path or self.tr("Non spécifié")))
             # --- Collapsible Client Info Section ---
+        try:
             self.client_info_group_box = QGroupBox(self.client_info.get('client_name', self.tr("Client Information")))
             self.client_info_group_box.setCheckable(True)
 
@@ -2418,6 +2419,7 @@ class ClientWidget(QWidget):
 
         dialog.setLayout(layout)
         dialog.exec_()
+        try:
             self.documents_empty_label = QLabel(self.tr("Aucun document trouvé pour ce client.\nUtilisez les boutons ci-dessous pour ajouter ou générer des documents."))
             self.documents_empty_label.setAlignment(Qt.AlignCenter)
             font_docs_empty = self.documents_empty_label.font()
