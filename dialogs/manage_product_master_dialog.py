@@ -23,8 +23,25 @@ class ManageProductMasterDialog(QDialog):
         self.load_products_triggered_by_text_change = False
 
         self.setup_ui()
-        self.load_products()
+        self._populate_master_category_filter() # Populate categories
+        self.load_products() # Initial load
         self._clear_form_and_disable_buttons()
+
+    def _populate_master_category_filter(self):
+        self.category_filter_combo.blockSignals(True)
+        self.category_filter_combo.clear()
+        self.category_filter_combo.addItem(self.tr("Toutes Catégories"), None)
+        try:
+            categories = products_crud_instance.get_distinct_product_categories()
+            if categories:
+                for category_name in sorted(categories):
+                    if category_name:
+                        self.category_filter_combo.addItem(category_name, category_name)
+        except AttributeError: # Should not happen if products_crud is updated
+            logging.error("products_crud_instance.get_distinct_product_categories() not found.")
+        except Exception as e:
+            logging.error(f"Error populating master category filter: {e}", exc_info=True)
+        self.category_filter_combo.blockSignals(False)
 
     def setup_ui(self):
         main_layout = QVBoxLayout(self)
@@ -32,10 +49,35 @@ class ManageProductMasterDialog(QDialog):
 
         product_list_group = QGroupBox(self.tr("Liste des Produits"))
         product_list_layout = QVBoxLayout(product_list_group)
+
+        # Filter Layout
+        filter_widget = QWidget()
+        filters_layout = QHBoxLayout(filter_widget)
+        filters_layout.setContentsMargins(0,0,0,0)
+
         self.search_product_input = QLineEdit()
-        self.search_product_input.setPlaceholderText(self.tr("Rechercher par nom, catégorie..."))
+        self.search_product_input.setPlaceholderText(self.tr("Nom, Code, Desc..."))
         self.search_product_input.textChanged.connect(self._trigger_load_products_from_search)
-        product_list_layout.addWidget(self.search_product_input)
+        filters_layout.addWidget(self.search_product_input, 1) # Stretch search input
+
+        filters_layout.addWidget(QLabel(self.tr("Catégorie:")))
+        self.category_filter_combo = QComboBox()
+        self.category_filter_combo.addItem(self.tr("Toutes"), None)
+        # TODO: Populate categories in a separate method after setup_ui
+        self.category_filter_combo.currentIndexChanged.connect(self.load_products)
+        filters_layout.addWidget(self.category_filter_combo)
+
+        filters_layout.addWidget(QLabel(self.tr("Langue:")))
+        self.language_filter_combo = QComboBox()
+        self.language_filter_combo.addItem(self.tr("Toutes"), None)
+        # Example languages, make this dynamic or match supported ones
+        for lang_code in ["fr", "en", "ar", "tr", "pt"]:
+            self.language_filter_combo.addItem(lang_code, lang_code)
+        self.language_filter_combo.currentIndexChanged.connect(self.load_products)
+        filters_layout.addWidget(self.language_filter_combo)
+
+        product_list_layout.addWidget(filter_widget)
+
         self.products_table = QTableWidget()
         self.products_table.setColumnCount(5)
         self.products_table.setHorizontalHeaderLabels([
@@ -54,17 +96,19 @@ class ManageProductMasterDialog(QDialog):
         self.product_form_group.setDisabled(True)
         form_layout = QFormLayout(self.product_form_group)
         self.name_input = QLineEdit()
-        form_layout.addRow(self.tr("Nom:"), self.name_input)
-        self.product_code_input = QLineEdit() # Added QLineEdit for product_code
-        form_layout.addRow(self.tr("Code Produit:"), self.product_code_input) # Added to form_layout
+        form_layout.addRow(self.tr("Nom *:"), self.name_input) # Added asterisk
+        self.product_code_input = QLineEdit()
+        self.product_code_input.setToolTip(self.tr("Identifiant unique global du produit (SKU). Requis."))
+        form_layout.addRow(self.tr("Code Produit *:"), self.product_code_input) # Added asterisk and tooltip
         self.description_input = QTextEdit()
         self.description_input.setFixedHeight(80)
         form_layout.addRow(self.tr("Description:"), self.description_input)
         self.category_input = QLineEdit()
         form_layout.addRow(self.tr("Catégorie:"), self.category_input)
         self.language_code_combo = QComboBox()
-        self.language_code_combo.addItems(["fr", "en", "ar", "tr", "pt"]) # Ensure this list is comprehensive or dynamically populated
-        form_layout.addRow(self.tr("Code Langue:"), self.language_code_combo)
+        self.language_code_combo.addItems(["fr", "en", "ar", "tr", "pt"])
+        self.language_code_combo.setToolTip(self.tr("Langue principale de cette entrée de produit."))
+        form_layout.addRow(self.tr("Code Langue *:"), self.language_code_combo) # Added asterisk
         self.base_unit_price_input = QDoubleSpinBox()
         self.base_unit_price_input.setRange(0.0, 1_000_000_000.0)
         self.base_unit_price_input.setDecimals(2)
@@ -134,16 +178,30 @@ class ManageProductMasterDialog(QDialog):
         self.products_table.setSortingEnabled(False)
         self.products_table.clearContents()
         self.products_table.setRowCount(0)
+
         search_text = self.search_product_input.text().strip()
+        selected_category = self.category_filter_combo.currentData()
+        selected_language = self.language_filter_combo.currentData()
+
         filters = {}
-        if search_text: filters['product_name'] = f'%{search_text}%'
-        include_deleted = False
-        if hasattr(self, 'include_deleted_checkbox_master') and self.include_deleted_checkbox_master.isChecked(): # Assuming such checkbox might exist
-            include_deleted = True
+        if search_text:
+            filters['search_term_generic'] = search_text # Use a new key for generic search
+        if selected_category:
+            filters['category'] = selected_category
+        if selected_language:
+            filters['language_code'] = selected_language
+
+        include_deleted = False # For now, master list doesn't show deleted, can be a feature
+
         try:
+            # products_crud_instance.get_all_products will need to be updated
+            # to understand 'search_term_generic'
             products = products_crud_instance.get_all_products(
-                filters=filters, include_deleted=include_deleted
+                filters=filters,
+                include_deleted=include_deleted
             )
+            if products is None: products = [] # Ensure iterable
+
             for row_idx, product_data in enumerate(products):
                 self.products_table.insertRow(row_idx)
                 id_item = QTableWidgetItem(str(product_data['product_id']))

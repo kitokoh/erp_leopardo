@@ -521,10 +521,432 @@ class ClientWidget(QWidget):
         # Apply permissions
         self._apply_permissions()
 
+        # Connect tab change signal for overview refresh
+        if hasattr(self, 'tab_widget') and self.tab_widget:
+            self.tab_widget.currentChanged.connect(self._on_main_client_tab_changed)
+
         # Event filter for notes auto-save
         if hasattr(self, 'notes_edit'):
             self.notes_edit.installEventFilter(self)
         logging.info(f"ClientWidget.setup_ui: FULL UI SETUP COMPLETED for client_id={self.client_info.get('client_id')}")
+
+    def _on_main_client_tab_changed(self, index):
+        """Called when the current tab in self.tab_widget (main client tabs) changes."""
+        if not hasattr(self, 'tab_widget') or not self.tab_widget:
+            return
+
+        current_tab_widget = self.tab_widget.widget(index)
+        if hasattr(self, 'overview_tab') and current_tab_widget == self.overview_tab:
+            logging.debug(f"ClientWidget: Aperçu tab selected for client {self.client_info.get('client_id')}. Refreshing its content.")
+            if hasattr(self, '_load_overview_metrics'):
+                self._load_overview_metrics()
+            # Also ensure the header part of overview tab is up-to-date if client_info could have changed
+            # This is typically handled by refresh_display, but an explicit call here might be useful
+            # if refresh_display wasn't called for some reason before tab switch.
+            self._update_overview_header_labels(self.client_info)
+
+
+    def _update_overview_header_labels(self, client_data_dict):
+        """Helper to update the labels in the overview tab's header section."""
+        if not hasattr(self, 'overview_client_name_label'): # Check if overview tab UI is initialized
+            return
+
+        self.overview_client_name_label.setText(f"<b>{client_data_dict.get('client_name', 'N/A')}</b>")
+        self.overview_company_name_label.setText(client_data_dict.get('company_name', 'N/A') or self.tr("N/A"))
+        self.overview_category_label.setText(client_data_dict.get('category', 'N/A'))
+
+        status_text = client_data_dict.get('status', 'N/A')
+        self.overview_status_label.setText(status_text)
+        status_id = client_data_dict.get('status_id')
+        status_color = "black"
+        if status_id:
+            status_setting = db_manager.get_status_setting_by_id(status_id)
+            if status_setting and status_setting.get('color_hex'):
+                status_color = status_setting.get('color_hex')
+        self.overview_status_label.setStyleSheet(f"color: {status_color}; font-weight: bold;")
+
+        last_update_raw = client_data_dict.get('updated_at', client_data_dict.get('creation_date', ''))
+        last_update_display = self.tr("N/A")
+        if last_update_raw:
+            try:
+                dt_obj = datetime.fromisoformat(last_update_raw.replace('Z', '+00:00'))
+                last_update_display = dt_obj.strftime('%Y-%m-%d %H:%M')
+            except ValueError:
+                last_update_display = last_update_raw
+        if hasattr(self, 'overview_last_activity_label'): # Check if this label exists
+            self.overview_last_activity_label.setText(last_update_display)
+
+
+    def _load_overview_metrics(self):
+        client_id = self.client_info.get("client_id")
+        if not client_id:
+            self.overview_active_projects_label.setText(self.tr("N/A"))
+            self.overview_open_orders_label.setText(self.tr("N/A"))
+            return
+
+        # Active Projects
+        try:
+            all_projects = projects_crud.get_projects_by_client_id(client_id)
+            active_project_count = 0
+            if all_projects:
+                # Fetch all 'Project' statuses once
+                project_statuses_settings = db_manager.get_all_status_settings(type_filter='Project')
+                active_status_ids = {
+                    s['status_id'] for s in project_statuses_settings
+                    if not s.get('is_completion_status') and not s.get('is_archival_status')
+                }
+                for project in all_projects:
+                    if project.get('status_id') in active_status_ids:
+                        active_project_count += 1
+            self.overview_active_projects_label.setText(str(active_project_count))
+        except Exception as e:
+            logging.error(f"Error loading active projects for overview: {e}", exc_info=True)
+            self.overview_active_projects_label.setText(self.tr("Erreur"))
+
+        # Open Orders
+        try:
+            all_commandes = db_manager.get_commandes_for_client(client_id) # Using existing db_manager alias
+            open_order_count = 0
+            if all_commandes:
+                # Fetch all 'Commande' statuses once
+                commande_statuses_settings = db_manager.get_all_status_settings(type_filter='Commande')
+                open_status_ids = {
+                    s['status_id'] for s in commande_statuses_settings
+                    if not s.get('is_completion_status') and not s.get('is_archival_status')
+                    # Add more specific conditions if 'is_open_status' isn't a field:
+                    # and s.get('status_name') not in ["Annulée", "Livrée", "Facturée"]
+                }
+                for commande in all_commandes:
+                    if commande.get('status_commande_id') in open_status_ids:
+                        open_order_count += 1
+            self.overview_open_orders_label.setText(str(open_order_count))
+        except Exception as e:
+            logging.error(f"Error loading open orders for overview: {e}", exc_info=True)
+            self.overview_open_orders_label.setText(self.tr("Erreur"))
+
+        # Last client update date is already set directly in setup_ui for overview_last_activity_label
+
+        # ---- Populate Open Projects Snippet ----
+        # Clear previous project widgets from self.overview_projects_layout, except the placeholder
+        for i in reversed(range(self.overview_projects_layout.count())):
+            widget = self.overview_projects_layout.itemAt(i).widget()
+            if widget and widget != self.overview_no_projects_label: # Don't remove the placeholder
+                widget.setParent(None)
+                widget.deleteLater()
+
+        try:
+            all_projects = projects_crud.get_projects_by_client_id(client_id)
+            active_projects_list = []
+            if all_projects:
+                project_statuses_settings = db_manager.get_all_status_settings(type_filter='Project')
+                active_status_ids = {
+                    s['status_id'] for s in project_statuses_settings
+                    if not s.get('is_completion_status') and not s.get('is_archival_status')
+                }
+                for project in all_projects:
+                    if project.get('status_id') in active_status_ids:
+                        status_name = self.tr("Inconnu")
+                        status_color = "grey"
+                        for s_set in project_statuses_settings:
+                            if s_set['status_id'] == project.get('status_id'):
+                                status_name = s_set.get('status_name', status_name)
+                                status_color = s_set.get('color_hex', status_color)
+                                break
+                        project['status_name_resolved'] = status_name
+                        project['status_color_resolved'] = status_color
+                        active_projects_list.append(project)
+
+            # Sort by creation date descending (newest first) and take top 3
+            active_projects_list.sort(key=lambda p: p.get('created_at', ''), reverse=True)
+            projects_to_display = active_projects_list[:3]
+
+            if projects_to_display:
+                self.overview_no_projects_label.setVisible(False)
+                for project_data in projects_to_display:
+                    project_id = project_data.get('project_id')
+                    project_name = project_data.get('project_name', self.tr('Projet Sans Nom'))
+                    status_name = project_data.get('status_name_resolved', self.tr('Statut Inconnu'))
+                    status_color = project_data.get('status_color_resolved', 'grey')
+                    deadline_date = project_data.get('deadline_date', '')
+
+                    project_widget = QWidget()
+                    project_layout = QHBoxLayout(project_widget)
+                    project_layout.setContentsMargins(0,0,0,0)
+
+                    name_label = QLabel(f"<a href='{project_id}'>{project_name}</a>")
+                    name_label.setTextInteractionFlags(Qt.TextBrowserInteraction) # Make it look clickable
+                    name_label.linkActivated.connect(lambda link_text, p_id=project_id: self._handle_project_snippet_clicked(p_id))
+
+                    status_label = QLabel(status_name)
+                    status_label.setStyleSheet(f"color: {status_color}; font-weight: bold; padding: 2px 5px; background-color: #f0f0f0; border-radius: 3px;")
+                    status_label.setToolTip(self.tr("Statut du projet"))
+
+                    deadline_label_text = ""
+                    if deadline_date:
+                        try:
+                            # Assuming deadline_date is YYYY-MM-DD format
+                            deadline_dt = datetime.strptime(deadline_date, "%Y-%m-%d").date()
+                            today = datetime.now().date()
+                            days_left = (deadline_dt - today).days
+                            if days_left < 0:
+                                deadline_label_text = self.tr("Échéance dépassée")
+                                deadline_label_style = "color: red;"
+                            elif days_left <= 7:
+                                deadline_label_text = self.tr("Échéance: {0} ({1}j)").format(deadline_dt.strftime("%d/%m/%y"), days_left)
+                                deadline_label_style = "color: orange;"
+                            else:
+                                deadline_label_text = self.tr("Échéance: {0}").format(deadline_dt.strftime("%d/%m/%y"))
+                                deadline_label_style = "color: green;"
+                        except ValueError:
+                            deadline_label_text = deadline_date # Show raw if format is unexpected
+                            deadline_label_style = "color: grey;"
+
+                    deadline_display_label = QLabel(deadline_label_text)
+                    deadline_display_label.setStyleSheet(deadline_label_style)
+                    deadline_display_label.setToolTip(self.tr("Date d'échéance du projet"))
+
+                    project_layout.addWidget(name_label, 1) # Stretch name
+                    project_layout.addWidget(status_label)
+                    project_layout.addWidget(deadline_display_label)
+                    project_layout.addStretch(0)
+
+                    self.overview_projects_layout.addWidget(project_widget)
+            else:
+                self.overview_no_projects_label.setVisible(True)
+        except Exception as e:
+            logging.error(f"Error loading projects snippet for overview: {e}", exc_info=True)
+            self.overview_no_projects_label.setText(self.tr("Erreur chargement projets."))
+            self.overview_no_projects_label.setVisible(True)
+        # ---- End Populate Open Projects Snippet ----
+
+        # ---- Populate Recent Orders Snippet ----
+        # Clear previous order widgets
+        for i in reversed(range(self.overview_orders_layout.count())):
+            widget = self.overview_orders_layout.itemAt(i).widget()
+            if widget and widget != self.overview_no_orders_label: # Don't remove the placeholder
+                widget.setParent(None)
+                widget.deleteLater()
+
+        try:
+            all_commandes = db_manager.get_commandes_for_client(client_id) # Uses existing db_manager alias
+            open_commandes_list = []
+            if all_commandes:
+                commande_statuses_settings = db_manager.get_all_status_settings(type_filter='Commande')
+                open_status_ids = {
+                    s['status_id'] for s in commande_statuses_settings
+                    if not s.get('is_completion_status') and not s.get('is_archival_status')
+                }
+                for commande in all_commandes:
+                    if commande.get('status_commande_id') in open_status_ids:
+                        status_name = self.tr("Inconnu")
+                        status_color = "grey"
+                        for s_set in commande_statuses_settings:
+                            if s_set['status_id'] == commande.get('status_commande_id'):
+                                status_name = s_set.get('status_name', status_name)
+                                status_color = s_set.get('color_hex', status_color)
+                                break
+                        commande['status_name_resolved'] = status_name
+                        commande['status_color_resolved'] = status_color
+                        open_commandes_list.append(commande)
+
+            # Sort by commande_date descending (newest first) and take top 3
+            open_commandes_list.sort(key=lambda c: c.get('commande_date', ''), reverse=True)
+            orders_to_display = open_commandes_list[:3]
+
+            if orders_to_display:
+                self.overview_no_orders_label.setVisible(False)
+                for order_data in orders_to_display:
+                    commande_id = order_data.get('commande_id')
+                    commande_ref = order_data.get('commande_reference', self.tr('Commande Sans Réf'))
+                    status_name = order_data.get('status_name_resolved', self.tr('Statut Inconnu'))
+                    status_color = order_data.get('status_color_resolved', 'grey')
+                    total_ttc = order_data.get('total_ttc', 0.0)
+                    currency = order_data.get('currency', '€')
+
+                    order_widget = QWidget()
+                    order_layout = QHBoxLayout(order_widget)
+                    order_layout.setContentsMargins(0,0,0,0)
+
+                    ref_label = QLabel(f"<a href='{commande_id}'>{commande_ref}</a>")
+                    ref_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+                    ref_label.linkActivated.connect(lambda link_text, c_id=commande_id: self._handle_order_snippet_clicked(c_id))
+
+                    status_label = QLabel(status_name)
+                    status_label.setStyleSheet(f"color: {status_color}; font-weight: bold; padding: 2px 5px; background-color: #f0f0f0; border-radius: 3px;")
+                    status_label.setToolTip(self.tr("Statut de la commande"))
+
+                    amount_label = QLabel(f"{total_ttc:,.2f} {currency}")
+                    amount_label.setStyleSheet("font-weight: bold;")
+                    amount_label.setToolTip(self.tr("Montant Total TTC"))
+
+                    order_layout.addWidget(ref_label, 1) # Stretch reference
+                    order_layout.addWidget(status_label)
+                    order_layout.addWidget(amount_label)
+                    order_layout.addStretch(0)
+
+                    self.overview_orders_layout.addWidget(order_widget)
+            else:
+                self.overview_no_orders_label.setVisible(True)
+        except Exception as e:
+            logging.error(f"Error loading orders snippet for overview: {e}", exc_info=True)
+            self.overview_no_orders_label.setText(self.tr("Erreur chargement commandes."))
+            self.overview_no_orders_label.setVisible(True)
+        # ---- End Populate Recent Orders Snippet ----
+
+        # ---- Populate Recent Activity Snippet ----
+        # Clear previous activity widgets
+        for i in reversed(range(self.overview_activity_layout.count())):
+            widget = self.overview_activity_layout.itemAt(i).widget()
+            if widget and widget != self.overview_no_activity_label:
+                widget.setParent(None)
+                widget.deleteLater()
+
+        try:
+            # Use the updated get_activity_logs from db_manager (which should point to activity_logs_crud)
+            activities = db_manager.get_activity_logs(limit=5, related_client_id_filter=client_id)
+
+            if activities:
+                self.overview_no_activity_label.setVisible(False)
+                for activity in activities:
+                    timestamp_raw = activity.get('created_at', '')
+                    timestamp_display = ""
+                    if timestamp_raw:
+                        try:
+                            dt_obj = datetime.fromisoformat(timestamp_raw.replace('Z', '+00:00'))
+                            timestamp_display = dt_obj.strftime('%d/%m/%y %H:%M')
+                        except ValueError:
+                            timestamp_display = timestamp_raw # fallback
+
+                    action_type = activity.get('action_type', self.tr('Action Inconnue'))
+                    details = activity.get('details', '')
+                    username = activity.get('username', self.tr('Système')) # Username from JOIN
+
+                    activity_text = f"<small>[{timestamp_display}] <b>{username}</b>: {action_type} - <i>{details}</i></small>"
+
+                    activity_label = QLabel(activity_text)
+                    activity_label.setWordWrap(True)
+                    activity_label.setToolTip(f"{self.tr('Type')}: {action_type}\n{self.tr('Détails')}: {details}\n{self.tr('Date')}: {timestamp_display}\n{self.tr('Utilisateur')}: {username}")
+                    self.overview_activity_layout.addWidget(activity_label)
+            else:
+                self.overview_no_activity_label.setVisible(True)
+                self.overview_no_activity_label.setText(self.tr("Aucune activité récente à afficher pour ce client."))
+
+        except AttributeError:
+            logging.error("Error loading recent activity: db_manager.get_activity_logs might be missing or not updated.", exc_info=True)
+            self.overview_no_activity_label.setText(self.tr("Erreur: Fonctionnalité d'activité non disponible."))
+            self.overview_no_activity_label.setVisible(True)
+        except Exception as e:
+            logging.error(f"Error loading recent activity for overview: {e}", exc_info=True)
+            self.overview_no_activity_label.setText(self.tr("Erreur chargement activité."))
+            self.overview_no_activity_label.setVisible(True)
+        # ---- End Populate Recent Activity Snippet ----
+
+
+    def _handle_project_snippet_clicked(self, project_id):
+        if not project_id:
+            return
+
+        # Find the main DocumentManager instance (or main window)
+        doc_manager = self._get_document_manager_instance()
+        if not doc_manager:
+            return
+
+        client_id_of_this_widget = self.client_info.get("client_id")
+
+        # Find the ClientWidget tab corresponding to this client_id in DocumentManager
+        target_client_tab_widget = None
+        target_client_tab_index = -1
+
+        for i in range(doc_manager.client_tabs_widget.count()):
+            widget = doc_manager.client_tabs_widget.widget(i)
+            if isinstance(widget, ClientWidget) and widget.client_info.get("client_id") == client_id_of_this_widget:
+                target_client_tab_widget = widget
+                doc_manager.client_tabs_widget.setCurrentIndex(i) # Activate this client's main tab
+                break
+
+        if target_client_tab_widget:
+            # Now, within this ClientWidget, find its 'Projets' tab (which is actually CommandeWidget)
+            # The 'Projets' functionality is embedded within the CommandeWidget, which has its own tabs.
+            # The CommandeWidget is stored as self.commandes_tab_widget within ClientWidget.
+
+            commandes_widget_instance = getattr(target_client_tab_widget, 'commandes_tab_widget', None)
+            if commandes_widget_instance and hasattr(commandes_widget_instance, 'main_tab_widget'):
+                # Switch ClientWidget's main tab to "Commandes" (where projects are listed)
+                # Find the "Commandes" tab index in self.tab_widget (the main one in ClientWidget)
+                commandes_tab_main_index = -1
+                for i in range(target_client_tab_widget.tab_widget.count()):
+                    if target_client_tab_widget.tab_widget.tabText(i) == self.tr("Commandes"):
+                        commandes_tab_main_index = i
+                        break
+
+                if commandes_tab_main_index != -1:
+                    target_client_tab_widget.tab_widget.setCurrentIndex(commandes_tab_main_index)
+
+                    # Now, within CommandeWidget, switch to its "Projets" sub-tab
+                    # CommandeWidget's main_tab_widget contains "Liste des Commandes" and "Liste des Projets"
+                    projets_sub_tab_index = -1
+                    for i in range(commandes_widget_instance.main_tab_widget.count()):
+                        if commandes_widget_instance.main_tab_widget.tabText(i) == self.tr("Liste des Projets"):
+                            projets_sub_tab_index = i
+                            break
+
+                    if projets_sub_tab_index != -1:
+                        commandes_widget_instance.main_tab_widget.setCurrentIndex(projets_sub_tab_index)
+                        # Further selection/highlighting of the project_id within the projects table
+                        # in CommandeWidget would require that table to be accessible and have a method
+                        # to select a row by project_id. This is a V2 enhancement.
+                        logging.info(f"Navigated to Client {client_id_of_this_widget} -> Commandes Tab -> Liste des Projets sub-tab for project_id {project_id}.")
+                        QMessageBox.information(self, self.tr("Navigation Projet"), self.tr("Onglet Projets ouvert. Sélection spécifique du projet non implémentée dans cet aperçu."))
+
+                    else:
+                        logging.warning("Could not find 'Liste des Projets' sub-tab in CommandeWidget.")
+                else:
+                    logging.warning("Could not find 'Commandes' tab in ClientWidget's main tabs.")
+            else:
+                logging.warning("CommandeWidget or its main_tab_widget not found in target ClientWidget.")
+        else:
+            logging.warning(f"Could not find the ClientWidget for client ID {client_id_of_this_widget} in DocumentManager.")
+
+    def _handle_order_snippet_clicked(self, commande_id):
+        if not commande_id:
+            return
+
+        doc_manager = self._get_document_manager_instance()
+        if not doc_manager:
+            return
+
+        client_id_of_this_widget = self.client_info.get("client_id")
+        target_client_tab_widget = None
+
+        for i in range(doc_manager.client_tabs_widget.count()):
+            widget = doc_manager.client_tabs_widget.widget(i)
+            if isinstance(widget, ClientWidget) and widget.client_info.get("client_id") == client_id_of_this_widget:
+                target_client_tab_widget = widget
+                doc_manager.client_tabs_widget.setCurrentIndex(i) # Activate this client's main tab
+                break
+
+        if target_client_tab_widget:
+            commandes_tab_main_index = -1
+            for i in range(target_client_tab_widget.tab_widget.count()):
+                if target_client_tab_widget.tab_widget.tabText(i) == self.tr("Commandes"):
+                    commandes_tab_main_index = i
+                    break
+
+            if commandes_tab_main_index != -1:
+                target_client_tab_widget.tab_widget.setCurrentIndex(commandes_tab_main_index)
+                # The CommandeWidget's first tab is usually the list of orders.
+                # Further selection can be a V2 enhancement if CommandeWidget exposes a method.
+                commande_widget_instance = getattr(target_client_tab_widget, 'commandes_tab_widget', None)
+                if commande_widget_instance and hasattr(commande_widget_instance, 'select_commande_in_list'):
+                    commande_widget_instance.select_commande_in_list(commande_id) # Assumed method
+                else:
+                     QMessageBox.information(self, self.tr("Navigation Commande"), self.tr("Onglet Commandes ouvert. Sélection spécifique de la commande non implémentée dans cet aperçu."))
+                logging.info(f"Navigated to Client {client_id_of_this_widget} -> Commandes Tab for commande_id {commande_id}.")
+            else:
+                logging.warning("Could not find 'Commandes' tab in ClientWidget's main tabs.")
+        else:
+            logging.warning(f"Could not find the ClientWidget for client ID {client_id_of_this_widget} in DocumentManager for order navigation.")
+
 
     def handle_archive_client(self):
         client_id = self.client_info.get("client_id")
@@ -697,14 +1119,150 @@ class ClientWidget(QWidget):
             tabs_group_layout = QVBoxLayout(self.tabs_group_box)
             self.tab_widget = QTabWidget()
             tabs_group_layout.addWidget(self.tab_widget)
-            self.tabs_group_box.setChecked(False)
+            self.tabs_group_box.setChecked(False) # Start collapsed
             main_layout.addWidget(self.tabs_group_box)
 
-            self._setup_documents_tab()
+            # ---- New Overview Tab Setup ----
+            self.overview_tab = QWidget()
+            self.overview_tab_layout = QVBoxLayout(self.overview_tab)
 
-            self._setup_products_tab()
-            self._setup_document_notes_tab()
-            self._setup_product_dimensions_tab()
+            # ---- Client Header Section for Overview Tab ----
+            header_group = QGroupBox(self.tr("Informations Clés du Client"))
+            header_group.setObjectName("overviewHeaderGroup")
+            header_form_layout = QFormLayout(header_group)
+
+            self.overview_client_name_label = QLabel(f"<b>{self.client_info.get('client_name', 'N/A')}</b>")
+            self.overview_client_name_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            header_form_layout.addRow(self.tr("Nom du Client:"), self.overview_client_name_label)
+
+            self.overview_company_name_label = QLabel(self.client_info.get('company_name', 'N/A') or self.tr("N/A"))
+            self.overview_company_name_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            header_form_layout.addRow(self.tr("Société:"), self.overview_company_name_label)
+
+            self.overview_category_label = QLabel(self.client_info.get('category', 'N/A'))
+            self.overview_category_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            header_form_layout.addRow(self.tr("Catégorie:"), self.overview_category_label)
+
+            self.overview_status_label = QLabel(self.client_info.get('status', 'N/A'))
+            self.overview_status_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            status_id = self.client_info.get('status_id')
+            status_color = "black" # Default color
+            if status_id:
+                status_setting = db_manager.get_status_setting_by_id(status_id)
+                if status_setting and status_setting.get('color_hex'):
+                    status_color = status_setting.get('color_hex')
+            self.overview_status_label.setStyleSheet(f"color: {status_color}; font-weight: bold;")
+            header_form_layout.addRow(self.tr("Statut Client:"), self.overview_status_label)
+
+            self.overview_tab_layout.addWidget(header_group)
+            # ---- End Client Header Section ----
+
+            # ---- Key Metrics Section for Overview Tab ----
+            metrics_group = QGroupBox(self.tr("Indicateurs Clés"))
+            metrics_group.setObjectName("overviewMetricsGroup")
+            metrics_form_layout = QFormLayout(metrics_group)
+
+            self.overview_active_projects_label = QLabel(self.tr("Chargement..."))
+            metrics_form_layout.addRow(self.tr("Projets Actifs:"), self.overview_active_projects_label)
+
+            self.overview_open_orders_label = QLabel(self.tr("Chargement..."))
+            metrics_form_layout.addRow(self.tr("Commandes Ouvertes:"), self.overview_open_orders_label)
+
+            # Last client update date as a proxy for "last interaction" for now
+            last_update_raw = self.client_info.get('updated_at', self.client_info.get('creation_date', ''))
+            last_update_display = self.tr("N/A")
+            if last_update_raw:
+                try:
+                    dt_obj = datetime.fromisoformat(last_update_raw.replace('Z', '+00:00'))
+                    last_update_display = dt_obj.strftime('%Y-%m-%d %H:%M')
+                except ValueError:
+                    last_update_display = last_update_raw # Show raw if parsing fails
+
+            self.overview_last_activity_label = QLabel(last_update_display)
+            metrics_form_layout.addRow(self.tr("Dernière Mise à Jour Client:"), self.overview_last_activity_label)
+
+            self.overview_tab_layout.addWidget(metrics_group)
+            # ---- End Key Metrics Section ----
+
+            # ---- Quick Actions Section for Overview Tab ----
+            quick_actions_group = QGroupBox(self.tr("Actions Rapides"))
+            quick_actions_group.setObjectName("overviewQuickActionsGroup")
+            quick_actions_layout = QHBoxLayout(quick_actions_group) # Use QHBoxLayout for horizontal buttons
+
+            self.overview_new_order_btn = QPushButton(QIcon(":/icons/plus-circle.svg"), self.tr("Nouvelle Commande"))
+            self.overview_new_order_btn.clicked.connect(self._handle_overview_new_order)
+            quick_actions_layout.addWidget(self.overview_new_order_btn)
+
+            self.overview_new_project_btn = QPushButton(QIcon(":/icons/folder-add.svg"), self.tr("Nouveau Projet"))
+            self.overview_new_project_btn.clicked.connect(self._handle_overview_new_project)
+            quick_actions_layout.addWidget(self.overview_new_project_btn)
+
+            self.overview_add_contact_btn = QPushButton(QIcon(":/icons/user-plus.svg"), self.tr("Ajouter Contact"))
+            self.overview_add_contact_btn.clicked.connect(self.add_contact) # Reuses existing method
+            quick_actions_layout.addWidget(self.overview_add_contact_btn)
+
+            self.overview_generate_doc_btn = QPushButton(QIcon(":/icons/file-plus.svg"), self.tr("Générer Document"))
+            self.overview_generate_doc_btn.clicked.connect(self._handle_overview_generate_document)
+            quick_actions_layout.addWidget(self.overview_generate_doc_btn)
+
+            # Placeholder for Log Communication if functionality is added
+            # self.overview_log_comm_btn = QPushButton(QIcon(":/icons/message-square.svg"), self.tr("Log Communication"))
+            # self.overview_log_comm_btn.clicked.connect(self._handle_overview_log_communication)
+            # quick_actions_layout.addWidget(self.overview_log_comm_btn)
+
+            quick_actions_layout.addStretch()
+            self.overview_tab_layout.addWidget(quick_actions_group)
+            # ---- End Quick Actions Section ----
+
+            # ---- Open Projects Snippet Section ----
+            self.overview_projects_group = QGroupBox(self.tr("Projets Récents/Actifs"))
+            self.overview_projects_group.setObjectName("overviewProjectsGroup")
+            self.overview_projects_layout = QVBoxLayout(self.overview_projects_group) # QVBoxLayout for vertical list
+            self.overview_projects_layout.setSpacing(5) # Compact spacing
+            # Placeholder if no projects
+            self.overview_no_projects_label = QLabel(self.tr("Aucun projet actif à afficher."))
+            self.overview_no_projects_label.setAlignment(Qt.AlignCenter)
+            self.overview_projects_layout.addWidget(self.overview_no_projects_label)
+            self.overview_tab_layout.addWidget(self.overview_projects_group)
+            # ---- End Open Projects Snippet Section ----
+
+            # ---- Recent Orders Snippet Section ----
+            self.overview_orders_group = QGroupBox(self.tr("Commandes Récentes/Ouvertes"))
+            self.overview_orders_group.setObjectName("overviewOrdersGroup")
+            self.overview_orders_layout = QVBoxLayout(self.overview_orders_group) # QVBoxLayout for vertical list
+            self.overview_orders_layout.setSpacing(5) # Compact spacing
+            # Placeholder if no orders
+            self.overview_no_orders_label = QLabel(self.tr("Aucune commande récente/ouverte à afficher."))
+            self.overview_no_orders_label.setAlignment(Qt.AlignCenter)
+            self.overview_orders_layout.addWidget(self.overview_no_orders_label)
+            self.overview_tab_layout.addWidget(self.overview_orders_group)
+            # ---- End Recent Orders Snippet Section ----
+
+            # ---- Recent Activity Snippet Section ----
+            self.overview_activity_group = QGroupBox(self.tr("Activité Récente"))
+            self.overview_activity_group.setObjectName("overviewActivityGroup")
+            self.overview_activity_layout = QVBoxLayout(self.overview_activity_group)
+            self.overview_activity_layout.setSpacing(3) # Very compact
+            # Placeholder if no activity
+            self.overview_no_activity_label = QLabel(self.tr("Aucune activité récente à afficher pour ce client."))
+            self.overview_no_activity_label.setAlignment(Qt.AlignCenter)
+            self.overview_activity_layout.addWidget(self.overview_no_activity_label)
+            self.overview_tab_layout.addWidget(self.overview_activity_group)
+            # ---- End Recent Activity Snippet Section ----
+
+            self.tab_widget.insertTab(0, self.overview_tab, self.tr("Aperçu")) # Insert as first tab
+            # ---- End New Overview Tab Setup ----
+
+            # Initial call to load metrics for the overview tab
+            self._load_overview_metrics()
+
+            self._setup_documents_tab() # Index 1
+
+            self._setup_commandes_tab() # Index 2 - This was called separately later, integrating here for order
+
+            self._setup_products_tab() # Index 3
+            self._setup_document_notes_tab() # Index 4
+            self._setup_product_dimensions_tab() # Index 5
             # self._setup_available_templates_tab() # Call removed
 
             logging.info("ClientWidget._setup_main_tabs_section: PRE-CALL self._setup_sav_tab()")
@@ -987,7 +1545,7 @@ class ClientWidget(QWidget):
             prod_dims_layout.addWidget(self.dim_product_selector_combo)
             logging.debug("ClientWidget._setup_product_dimensions_tab: Added dim_product_selector_combo to layout")
 
-            self.edit_client_product_dimensions_button = QPushButton(self.tr("Modifier Dimensions Produit"))
+            self.edit_client_product_dimensions_button = QPushButton(self.tr("Modifier Dimensions Produit (Global)"))
             logging.debug("ClientWidget._setup_product_dimensions_tab: Created edit_client_product_dimensions_button")
 
             self.edit_client_product_dimensions_button.setIcon(QIcon.fromTheme("document-edit", QIcon(":/icons/pencil.svg")))
@@ -1014,10 +1572,10 @@ class ClientWidget(QWidget):
             logging.debug(f"ClientWidget._setup_product_dimensions_tab: notes_doc_tab_index determined as {notes_doc_tab_index}")
 
             if notes_doc_tab_index != -1:
-                self.tab_widget.insertTab(notes_doc_tab_index + 1, self.product_dimensions_tab, self.tr("Dimensions Produit (Client)"))
+                self.tab_widget.insertTab(notes_doc_tab_index + 1, self.product_dimensions_tab, self.tr("Dimensions Produit (Global)"))
                 logging.debug(f"ClientWidget._setup_product_dimensions_tab: Inserted product_dimensions_tab at index {notes_doc_tab_index + 1}")
             else: # Fallback if "Notes de Document" not found
-                self.tab_widget.addTab(self.product_dimensions_tab, self.tr("Dimensions Produit (Client)"))
+                self.tab_widget.addTab(self.product_dimensions_tab, self.tr("Dimensions Produit (Global)"))
                 logging.debug("ClientWidget._setup_product_dimensions_tab: Added product_dimensions_tab as a new tab (fallback)")
 
             self.dim_product_selector_combo.currentIndexChanged.connect(self.on_dim_product_selected)
@@ -4134,6 +4692,14 @@ class ClientWidget(QWidget):
             if hasattr(self.commandes_tab_widget, 'populate_status_filters'): # If it has filters
                 self.commandes_tab_widget.populate_status_filters()
 
+        # Refresh overview tab content (metrics, projects, orders, activity)
+        if hasattr(self, '_load_overview_metrics'): # This method now handles all dynamic content for overview
+            self._load_overview_metrics()
+
+        # Explicitly refresh the overview header labels as they are part of ClientWidget's direct UI
+        if hasattr(self, '_update_overview_header_labels'):
+            self._update_overview_header_labels(new_client_info)
+
 
     def load_statuses(self):
         current_client_status_id = self.client_info.get("status_id")
@@ -6103,6 +6669,88 @@ class ClientWidget(QWidget):
             self.notes_edit.insertPlainText("\n" + f"{timestamp_prefix} ")
 
         self.save_client_notes()
+
+    # --- Handlers for Overview Tab Quick Actions ---
+    def _get_document_manager_instance(self):
+        """Helper to try and get the DocumentManager instance."""
+        parent = self.parent()
+        while parent is not None:
+            # Check for a known method that DocumentManager should have
+            if hasattr(parent, 'handle_new_order_action') or hasattr(parent, 'open_client_tab_by_id'):
+                return parent
+            parent = parent.parent()
+
+        app_instance = QApplication.instance()
+        if app_instance:
+            for widget in app_instance.topLevelWidgets():
+                if hasattr(widget, 'handle_new_order_action') or hasattr(widget, 'open_client_tab_by_id'):
+                    return widget
+
+        logging.error("ClientWidget: Could not find DocumentManager instance.")
+        QMessageBox.critical(self, self.tr("Erreur Interne"), self.tr("Impossible de trouver la fenêtre principale de l'application."))
+        return None
+
+    def _handle_overview_new_order(self):
+        client_id = self.client_info.get("client_id")
+        if not client_id:
+            QMessageBox.warning(self, self.tr("Erreur Client"), self.tr("ID Client non disponible."))
+            return
+
+        from commande_management.commande_dialog import CommandeDialog # Ensure it's imported
+        dialog = CommandeDialog(client_id=client_id, current_user_id=self.current_user_id, parent=self)
+        if dialog.exec_() == QDialog.Accepted:
+            if hasattr(self, 'commandes_tab_widget') and hasattr(self.commandes_tab_widget, 'refresh_commandes'):
+                self.commandes_tab_widget.refresh_commandes()
+            if hasattr(self, '_load_overview_metrics'):
+                self._load_overview_metrics()
+            self.notify(self.tr("Nouvelle Commande"), self.tr("Nouvelle commande créée/initialisée."), type='SUCCESS')
+
+    def _handle_overview_new_project(self):
+        client_id = self.client_info.get("client_id")
+        client_name = self.client_info.get("client_name", self.tr("Client Inconnu"))
+        if not client_id:
+            QMessageBox.warning(self, self.tr("Erreur Client"), self.tr("ID Client non disponible."))
+            return
+
+        project_name, ok = QInputDialog.getText(self, self.tr("Nouveau Projet"), self.tr("Nom du Projet:"), QLineEdit.Normal, f"Projet pour {client_name} - {datetime.now().strftime('%Y%m%d')}")
+        if ok and project_name:
+            project_status_planning = db_manager.get_status_setting_by_name("Planning", "Project")
+            status_id = project_status_planning['status_id'] if project_status_planning else None
+
+            project_data = {
+                'client_id': client_id,
+                'project_name': project_name,
+                'description': self.tr("Nouveau projet pour {0}").format(client_name),
+                'start_date': datetime.now().strftime("%Y-%m-%d"),
+                'status_id': status_id,
+                'priority': 1
+            }
+            new_project_id = projects_crud.add_project(project_data)
+            if new_project_id:
+                self.notify(self.tr("Projet Créé"), self.tr("Nouveau projet '{0}' créé.").format(project_name), type='SUCCESS')
+                # Try to refresh the main projects tab if available on DocumentManager
+                doc_manager = self._get_document_manager_instance()
+                if doc_manager and hasattr(doc_manager, 'projects_dashboard_widget_instance'):
+                    if hasattr(doc_manager.projects_dashboard_widget_instance, 'load_projects_summary'):
+                        doc_manager.projects_dashboard_widget_instance.load_projects_summary()
+                if hasattr(self, '_load_overview_metrics'):
+                    self._load_overview_metrics()
+            else:
+                QMessageBox.warning(self, self.tr("Erreur DB"), self.tr("Impossible de créer le projet."))
+        else:
+            self.notify(self.tr("Annulé"), self.tr("Création de projet annulée."), type='INFO')
+
+    def _handle_overview_generate_document(self):
+        if not hasattr(self, 'CreateDocumentDialog') or self.CreateDocumentDialog is None:
+            logging.error("CreateDocumentDialog is not available in ClientWidget.")
+            QMessageBox.critical(self, self.tr("Erreur Composant"), self.tr("Le composant de création de document n'est pas chargé."))
+            return
+
+        dialog = self.CreateDocumentDialog(self.client_info, self.config, self.current_user_id, self)
+        if dialog.exec_() == QDialog.Accepted:
+            if hasattr(self, 'populate_doc_table'):
+                self.populate_doc_table()
+    # --- End Handlers for Overview Tab Quick Actions ---
 
     def handle_generate_final_invoice(self):
         if not self.client_info or not self.client_info.get('client_id'):

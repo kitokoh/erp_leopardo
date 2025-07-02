@@ -35,12 +35,56 @@ def get_activity_logs(limit: int = 100, offset: int = 0, user_id_filter: str = N
         filters_clauses.append("user_id = ?")
         params.append(user_id_filter)
 
+    # New filter for related_client_id
+    related_client_id_filter = data.get('related_client_id_filter') if isinstance(data, dict) else None # Assuming data might be passed for other filters in future
+    if not related_client_id_filter and 'related_client_id_filter' in locals() and locals()['related_client_id_filter']: # Check if passed directly as kwarg
+        related_client_id_filter = locals()['related_client_id_filter']
+
+    if related_client_id_filter:
+        filters_clauses.append("related_client_id = ?")
+        params.append(related_client_id_filter)
+
     # Add more filters here if needed, e.g., by date range, action_type, related_entity
 
     if filters_clauses:
         sql += " WHERE " + " AND ".join(filters_clauses)
 
     sql += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+    params.extend([limit, offset])
+
+# --- get_activity_logs function signature needs to be updated if related_client_id_filter is a direct param ---
+# For now, keeping the original signature and assuming it might be passed via a 'data' dict
+# or a more complex filter object in the future.
+# If it's intended as a direct named argument, the signature should be:
+# def get_activity_logs(limit: int = 100, offset: int = 0, user_id_filter: str = None, related_client_id_filter: str = None, conn: sqlite3.Connection = None) -> list[dict]:
+# And the logic to get related_client_id_filter would be simpler.
+# Let's adjust the signature for clarity and direct use.
+
+@_manage_conn
+def get_activity_logs(limit: int = 100, offset: int = 0, user_id_filter: str = None, related_client_id_filter: str = None, conn: sqlite3.Connection = None) -> list[dict]:
+    cursor = conn.cursor()
+    sql = "SELECT al.*, u.username FROM ActivityLogs al LEFT JOIN Users u ON al.user_id = u.user_id" # Join with Users to get username
+    filters_clauses = []
+    params = []
+
+    if user_id_filter:
+        filters_clauses.append("al.user_id = ?")
+        params.append(user_id_filter)
+
+    if related_client_id_filter:
+        filters_clauses.append("al.related_client_id = ?")
+        params.append(related_client_id_filter)
+
+    # Example: Add filter for related_entity_type if needed
+    # related_entity_type_filter = data.get('related_entity_type_filter')
+    # if related_entity_type_filter:
+    #     filters_clauses.append("al.related_entity_type = ?")
+    #     params.append(related_entity_type_filter)
+
+    if filters_clauses:
+        sql += " WHERE " + " AND ".join(filters_clauses)
+
+    sql += " ORDER BY al.created_at DESC LIMIT ? OFFSET ?"
     params.extend([limit, offset])
 
     try:

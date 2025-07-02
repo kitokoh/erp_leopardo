@@ -34,28 +34,51 @@ class HtmlTemplateCreatorDialog(QDialog):
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText(self.tr("e.g., Proforma Invoice Extra"))
         form_layout.addWidget(self.name_label, 0, 0)
-        form_layout.addWidget(self.name_input, 0, 1)
+        form_layout.addWidget(self.name_input, 0, 1, 1, 2) # Span 2 columns
+
+        self.type_label = QLabel(self.tr("Template Type:"))
+        self.type_combo = QComboBox()
+        form_layout.addWidget(self.type_label, 1, 0)
+        form_layout.addWidget(self.type_combo, 1, 1, 1, 2)
 
         self.language_label = QLabel(self.tr("Language:"))
         self.language_combo = QComboBox()
-        form_layout.addWidget(self.language_label, 1, 0)
-        form_layout.addWidget(self.language_combo, 1, 1)
+        form_layout.addWidget(self.language_label, 2, 0)
+        form_layout.addWidget(self.language_combo, 2, 1, 1, 2)
 
         self.category_label = QLabel(self.tr("Category:"))
         self.category_combo = QComboBox()
-        form_layout.addWidget(self.category_label, 2, 0)
-        form_layout.addWidget(self.category_combo, 2, 1)
+        form_layout.addWidget(self.category_label, 3, 0)
+        form_layout.addWidget(self.category_combo, 3, 1)
 
         self.new_category_button = QPushButton(self.tr("New Category..."))
-        form_layout.addWidget(self.new_category_button, 2, 2)
+        form_layout.addWidget(self.new_category_button, 3, 2)
 
+        self.description_label = QLabel(self.tr("Description:"))
+        self.description_input = QTextEdit()
+        self.description_input.setFixedHeight(60)
+        form_layout.addWidget(self.description_label, 4, 0)
+        form_layout.addWidget(self.description_input, 4, 1, 1, 2)
+
+        self.email_subject_label = QLabel(self.tr("Email Subject Template (if applicable):"))
+        self.email_subject_input = QLineEdit()
+        self.email_subject_input.setPlaceholderText(self.tr("e.g., Regarding your order {{order.id}}"))
+        form_layout.addWidget(self.email_subject_label, 5, 0)
+        form_layout.addWidget(self.email_subject_input, 5, 1, 1, 2)
+        self.email_subject_label.hide() # Hidden by default
+        self.email_subject_input.hide() # Hidden by default
+
+        self.version_label = QLabel(self.tr("Version:"))
+        self.version_input = QLineEdit("1.0")
+        form_layout.addWidget(self.version_label, 6, 0)
+        form_layout.addWidget(self.version_input, 6, 1, 1, 2)
 
         # Client ID - Optional
         self.client_id_label = QLabel(self.tr("Client ID (Optional):"))
         self.client_id_input = QLineEdit()
         self.client_id_input.setPlaceholderText(self.tr("Leave blank for global template"))
-        form_layout.addWidget(self.client_id_label, 3, 0)
-        form_layout.addWidget(self.client_id_input, 3, 1)
+        form_layout.addWidget(self.client_id_label, 7, 0)
+        form_layout.addWidget(self.client_id_input, 7, 1, 1, 2)
 
         main_layout.addLayout(form_layout)
 
@@ -66,6 +89,34 @@ class HtmlTemplateCreatorDialog(QDialog):
         self.button_box.accepted.connect(self.accept_creation)
         self.button_box.rejected.connect(self.reject)
         self.new_category_button.clicked.connect(self._create_new_category)
+        self.type_combo.currentTextChanged.connect(self._toggle_email_subject_visibility)
+
+    def _populate_type_combo(self):
+        self.type_combo.clear()
+        self.type_combo.addItem(self.tr("-- Select Type --"), None)
+        # Common document types, can be expanded
+        doc_types = [
+            "PROFORMA_INVOICE_HTML", "PACKING_LIST_HTML", "SALES_CONTRACT_HTML",
+            "TECHNICAL_SPECIFICATIONS_HTML", "GENERAL_HTML_DOCUMENT",
+            "EMAIL_BODY_HTML", "EMAIL_BODY_TXT",
+            # Add more specific types as needed, e.g., from CreateDocumentDialog.DOCUMENT_TYPE_MAPPING
+        ]
+        # Add types from CreateDocumentDialog for consistency
+        from dialogs.create_document_dialog import CreateDocumentDialog
+        for key, info in CreateDocumentDialog.DOCUMENT_TYPE_MAPPING.items():
+            if info["template_type_filter"] not in doc_types:
+                 doc_types.append(info["template_type_filter"])
+
+        # Remove duplicates and sort
+        unique_doc_types = sorted(list(set(doc_types)))
+
+        for doc_type in unique_doc_types:
+            self.type_combo.addItem(doc_type, doc_type)
+
+    def _toggle_email_subject_visibility(self, selected_type_text):
+        is_email_type = selected_type_text and ("EMAIL_BODY" in selected_type_text.upper())
+        self.email_subject_label.setVisible(is_email_type)
+        self.email_subject_input.setVisible(is_email_type)
 
     def populate_category_combo(self):
         self.category_combo.clear()
