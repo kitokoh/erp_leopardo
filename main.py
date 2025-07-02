@@ -239,6 +239,10 @@ def main():
     atexit.register(logging.shutdown)
     logging.info("logging.shutdown registered with atexit.")
 
+    # Register logging.shutdown() to be called on exit to properly close handlers
+    atexit.register(logging.shutdown)
+    logging.info("logging.shutdown registered with atexit.")
+
     # Initialize database after logging and API server start attempt
     db.initialize_database()
 
