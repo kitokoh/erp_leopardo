@@ -2423,7 +2423,8 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         from accounting import models as acc_models_pydantic # Pydantic models
         from sqlalchemy.orm import Session
 
-        engine_acc = create_engine(f"sqlite:///{config.DATABASE_PATH}") 
+        engine_acc = create_engine(f"sqlite:///{config.DATABASE_PATH}")
+
 
         acc_models.Base.metadata.create_all(bind=engine_acc, checkfirst=True)
         print("DEBUG_INIT_DB: Accounting Module Tables creation attempted using SQLAlchemy engine.")
@@ -2466,7 +2467,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
                     if not acc_cruds.chart_of_accounts.get_by_code(db=session_acc, code=acc_in.code):
                         acc_cruds.chart_of_accounts.create(db=session_acc, obj_in=acc_in)
                 print("DEBUG_INIT_DB: Minimal Chart of Accounts seeded.")
-            
+
             session_acc.commit()
             print("DEBUG_INIT_DB: Accounting module specific seed data committed using SQLAlchemy session.")
 
@@ -2474,7 +2475,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         print("DEBUG_INIT_DB: Could not import accounting cruds/models for schema/seeding. Skipping accounting part.")
     except Exception as e_acc_setup:
         print(f"CRITICAL ERROR during Accounting module schema/data setup: {e_acc_setup}", exc_info=True)
-    
+
     # --- Create Accounting Indexes (using a new raw connection) ---
     print("DEBUG_INIT_DB: Creating Accounting Module Indexes (manual via new raw connection)...")
     conn_idx = sqlite3.connect(config.DATABASE_PATH)
@@ -2520,40 +2521,48 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor_cal = conn_cal.cursor()
     try:
         cursor_cal.execute("""
-    CREATE TABLE IF NOT EXISTS CompanyCalendarSettings (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id TEXT NOT NULL UNIQUE, -- Assuming user_id is a string UUID from Users table
-        business_type TEXT, -- B2B, B2C, Both
-        activity_category TEXT,
-        country_iso TEXT NOT NULL, -- ISO 3166-1 alpha-2 country code
-        region TEXT, -- Subdivision of the country
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
-    )
-    """)
+        CREATE TABLE IF NOT EXISTS CompanyCalendarSettings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL UNIQUE, -- Assuming user_id is a string UUID from Users table
+            business_type TEXT, -- B2B, B2C, Both
+            activity_category TEXT,
+            country_iso TEXT NOT NULL, -- ISO 3166-1 alpha-2 country code
+            region TEXT, -- Subdivision of the country
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
+        )
+        """)
+
     print("DEBUG_INIT_DB: Table CompanyCalendarSettings created or exists.")
 
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS UserCalendarEvents (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id TEXT NOT NULL, -- Assuming user_id is a string UUID from Users table
-        event_date DATE NOT NULL,
-        event_type TEXT NOT NULL, -- Holiday, RemoteWork, WorkDay, OtherPersonal
-        description TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
-    )
-    """)
+        cursor_cal.execute("""
+        CREATE TABLE IF NOT EXISTS UserCalendarEvents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL, -- Assuming user_id is a string UUID from Users table
+            event_date DATE NOT NULL,
+            event_type TEXT NOT NULL, -- Holiday, RemoteWork, WorkDay, OtherPersonal
+            description TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
+        )
+        """)
     print("DEBUG_INIT_DB: Table UserCalendarEvents created or exists.")
 
-    # Indexes for Calendar Module
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_companycalendarsettings_user_id ON CompanyCalendarSettings(user_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_user_id ON UserCalendarEvents(user_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_date ON UserCalendarEvents(event_date)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_type ON UserCalendarEvents(event_type)")
+        # Indexes for Calendar Module
+        cursor_cal.execute("CREATE INDEX IF NOT EXISTS idx_companycalendarsettings_user_id ON CompanyCalendarSettings(user_id)")
+        cursor_cal.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_user_id ON UserCalendarEvents(user_id)")
+        cursor_cal.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_date ON UserCalendarEvents(event_date)")
+        cursor_cal.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_type ON UserCalendarEvents(event_type)")
     print("DEBUG_INIT_DB: Indexes for Calendar Module created or already exist.")
+        conn_cal.commit()
+    except sqlite3.Error as e_cal_schema:
+        print(f"Error during Calendar module schema/index creation: {e_cal_schema}")
+        conn_cal.rollback()
+    finally:
+        conn_cal.close()
+        print("DEBUG_INIT_DB: Raw SQLite connection for Calendar module closed.")
     # --- End Calendar Module Tables ---
 
     # --- Create tables for MainBase (e.g., CalculatorHistory) ---
@@ -2612,12 +2621,12 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         # Explicitly ensure Administrator has all permissions
         admin_role_name_str = auth_perms_module.ADMINISTRATOR # This is "Administrator"
         admin_role_id = role_id_map.get(admin_role_name_str)
-        
+
         if admin_role_id:
             print(f"DEBUG_INIT_DB: Force-checking/seeding ALL permissions for {admin_role_name_str} (ID: {admin_role_id}). Total defined P_ keys: {len(all_permission_keys)}")
             current_admin_perms_count = 0
             newly_added_admin_perms_count = 0
-            
+
             # Get existing permissions for admin to avoid redundant checks if not necessary
             cursor.execute("SELECT permission_key FROM RolePermissions WHERE role_id = ?", (admin_role_id,))
             existing_admin_permission_keys = {row['permission_key'] for row in cursor.fetchall()}
@@ -2634,7 +2643,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
                          # Or if p_key somehow wasn't in all_permission_keys but was attempted (should not happen here)
                          print(f"DEBUG_INIT_DB: IntegrityError trying to add {p_key} for Admin ID {admin_role_id}, might already exist or perm_key not in Permissions table.")
                 # else: # Already exists, no action needed for this key
-                    # pass 
+
             print(f"DEBUG_INIT_DB: {admin_role_name_str} (ID: {admin_role_id}) had {current_admin_perms_count} permissions. Newly added: {newly_added_admin_perms_count} permissions.")
             if (current_admin_perms_count + newly_added_admin_perms_count) != len(all_permission_keys):
                 print(f"DEBUG_INIT_DB: WARNING - Admin total permissions ({current_admin_perms_count + newly_added_admin_perms_count}) does not match total defined P_ keys ({len(all_permission_keys)}). Check for issues.")
@@ -2645,7 +2654,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         seeded_role_permissions_count = 0 # Reset for other roles
         for role_name_const, perm_keys_list in auth_perms_module.PERMISSION_MAP.items():
             actual_role_name = getattr(auth_perms_module, role_name_const, role_name_const)
-            
+
             if actual_role_name == admin_role_name_str: # Skip Administrator, already handled
                 continue
 
@@ -2658,8 +2667,9 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
                             cursor.execute("INSERT OR IGNORE INTO RolePermissions (role_id, permission_key) VALUES (?, ?)",
                                            (role_id, perm_key))
                             # This count won't be accurate for "newly added" if OR IGNORE skips, but indicates attempts
-                            seeded_role_permissions_count +=1 
-                        except sqlite3.IntegrityError: 
+                            seeded_role_permissions_count +=1
+                        except sqlite3.IntegrityError:
+
                             pass
                     else:
                         print(f"Warning: Permission key '{perm_key}' in PERMISSION_MAP for role '{actual_role_name}' not in defined P_ constants. Skipping.")
