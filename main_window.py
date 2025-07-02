@@ -114,7 +114,7 @@ from PyQt5.QtWidgets import QDateEdit
 
 from client_management.client_widget import ClientWidget
 from project_management import MainDashboard as ProjectManagementDashboard
-from statistics_module import StatisticsDashboard
+from statistics import StatisticsDashboard, StatisticsSummaryWidget # Updated import
 # from statistics_panel import CollapsibleStatisticsWidget # Unused in main_window
 
 from utils import save_config
@@ -425,11 +425,16 @@ class DocumentManager(QMainWindow):
         self.init_or_update_download_monitor() # Initialize or update based on config
         self.populate_saved_filters_combo() # Populate saved filters on init
 
+        # Instantiate StatisticsSummaryWidget
+        if self.module_states.get('statistics', True):
+            self.statistics_summary_widget_instance = StatisticsSummaryWidget(parent=self)
+            if self.home_page_widget_instance and hasattr(self.home_page_widget_instance, 'set_bottom_widget'):
+                self.home_page_widget_instance.set_bottom_widget(self.statistics_summary_widget_instance)
+        else:
+            self.statistics_summary_widget_instance = None
+            if self.home_page_widget_instance and hasattr(self.home_page_widget_instance, 'set_bottom_widget'):
+                 self.home_page_widget_instance.set_bottom_widget(None) # Ensure it's cleared if module disabled
 
-        # Removed the block that called self.home_page_widget_instance.set_bottom_widget(stats_widget_instance)
-        # This prevents StatisticsDashboard from being reparented by HomePageWidget.
-        # The HomePageWidget's go_to_statistics button will now directly call self.show_statistics_view()
-        # on the main_window instance.
 
 
     def get_statistics_widget_instance(self):

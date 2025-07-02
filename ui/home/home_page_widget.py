@@ -148,7 +148,7 @@ class HomePageWidget(QWidget):
         while self.bottom_content_area.count() > 0:
             widget = self.bottom_content_area.widget(0)
             self.bottom_content_area.removeWidget(widget)
-            # widget.deleteLater() # Important pour éviter les fuites de mémoire si les widgets ne sont pas réutilisés
+            widget.deleteLater() # Important pour éviter les fuites de mémoire si les widgets ne sont pas réutilisés
 
 
         if widget_to_display:
