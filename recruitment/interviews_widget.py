@@ -66,7 +66,17 @@ class InterviewsWidget(QWidget):
         self.setLayout(self.main_layout)
 
         self.update_action_buttons_state()
-        self.load_job_openings_filter() # Initial load
+        # self.load_job_openings_filter() # Initial load
+
+    def load_initial_data(self):
+        """Loads initial data for the widget, typically called when it becomes visible."""
+        # Load job openings only if the filter combo is empty, preventing redundant loads.
+        if self.job_filter_combo.count() <= 1: # Accounts for "All Job Openings" if it's pre-added or similar logic
+            self.load_job_openings_filter()
+        else:
+            # If job openings are already loaded, ensure candidates and interviews are refreshed
+            # based on the current filter selections.
+            self.job_filter_changed() # This should trigger candidate and interview loads as per existing logic
 
     def job_filter_changed(self):
         self.load_candidates_filter()

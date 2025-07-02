@@ -279,132 +279,50 @@ class DocumentManager(QMainWindow):
 
         self.setup_ui_main() # Sets up self.main_area_stack
 
-        # Conditional Widget Initialization based on module states
-        if self.module_states.get('project_management', True):
-            logging.info("DocumentManager: Creating ProjectManagementDashboard...")
-
-            self.project_management_widget_instance = ProjectManagementDashboard(parent=self, current_user_info=self.current_user_info)
-            logging.info("DocumentManager: ProjectManagementDashboard instance created.")
-            # Add the widget directly instead of deferring
-            self.main_area_stack.addWidget(self.project_management_widget_instance)
-            logging.info("DocumentManager: ProjectManagementDashboard directly added to main_area_stack.")
-        else:
-            self.project_management_widget_instance = None
-            logging.info("DocumentManager: Project Management module disabled, widget not created.")
-
-        if self.module_states.get('statistics', True):
-            logging.info("DocumentManager: Attempting to create StatisticsDashboard...") # Kept for diagnostics
-            self.statistics_dashboard_instance = StatisticsDashboard(parent=self)
-            logging.info("DocumentManager: StatisticsDashboard instance created.") # Kept for diagnostics
-            self.statistics_dashboard_instance.request_add_client_for_country.connect(self.handle_add_client_from_stats_map)
-            self.statistics_dashboard_instance.request_view_client_details.connect(self.handle_view_client_from_stats_map)
-
-            logging.info(f"DocumentManager: BEFORE addWidget for StatisticsDashboard. Current stack count: {self.main_area_stack.count()}. Instance: {self.statistics_dashboard_instance}")
-            self.main_area_stack.addWidget(self.statistics_dashboard_instance)
-            logging.info(f"DocumentManager: AFTER addWidget for StatisticsDashboard. New stack count: {self.main_area_stack.count()}. Widget added: {self.main_area_stack.widget(self.main_area_stack.count() -1) == self.statistics_dashboard_instance}")
-            # Verify if it's really in the stack
-            found_in_stack_after_add = False
-            for i in range(self.main_area_stack.count()):
-                if self.main_area_stack.widget(i) == self.statistics_dashboard_instance:
-                    found_in_stack_after_add = True
-                    logging.info(f"DocumentManager: StatisticsDashboard IS found in stack at index {i} immediately after addWidget.")
-                    break
-            if not found_in_stack_after_add:
-                logging.error("DocumentManager: CRITICAL - StatisticsDashboard was NOT found in stack immediately after addWidget call!")
-        else:
-            self.statistics_dashboard_instance = None
-
-        if self.module_states.get('partner_management', True):
-            self.partner_management_widget_instance = PartnerMainWidget(parent=self)
-            self.main_area_stack.addWidget(self.partner_management_widget_instance)
-        else:
-            self.partner_management_widget_instance = None
-
-        if self.module_states.get('product_management', True):
-            self.product_management_page_instance = ProductManagementPage(current_user_info=self.current_user_info, parent=self) # Pass current_user_info
-            self.main_area_stack.addWidget(self.product_management_page_instance)
-        else:
-            self.product_management_page_instance = None
-
-        # SettingsPage is always available
+        # Initialize all widget instance attributes to None for lazy loading
+        self.project_management_widget_instance = None
+        self.statistics_dashboard_instance = None
+        self.partner_management_widget_instance = None
+        self.product_management_page_instance = None
+        # SettingsPage is always available and initialized upfront as it's fundamental
         self.settings_page_instance = SettingsPage(
             main_config=self.config,
             app_root_dir=self.app_root_dir,
             current_user_id=self.current_user_id,
             parent=self
         )
-        self.main_area_stack.addWidget(self.settings_page_instance)
-        self.searchable_actions_map = {}
+        self.main_area_stack.addWidget(self.settings_page_instance) # Add settings page to stack
 
-        if self.module_states.get('botpress_integration', True):
-            self.botpress_integration_ui_instance = BotpressIntegrationUI(parent=self, current_user_id=self.current_user_id)
-            self.main_area_stack.addWidget(self.botpress_integration_ui_instance)
-        else:
-            self.botpress_integration_ui_instance = None
-
-        if self.module_states.get('inventory_management', True):
-            self.inventory_browser_widget_instance = InventoryBrowserWidget(parent=self)
-            self.main_area_stack.addWidget(self.inventory_browser_widget_instance)
-        else:
-            self.inventory_browser_widget_instance = None
-
-        if self.module_states.get('recruitment', True):
-            self.recruitment_dashboard_instance = RecruitmentDashboard(parent=self)
-            self.main_area_stack.addWidget(self.recruitment_dashboard_instance)
-        else:
-            self.recruitment_dashboard_instance = None
-        if self.module_states.get('camera_management', True):
-            self.camera_management_widget_instance = CameraManagementWidget(parent=self, current_user_id=self.current_user_id)
-            self.main_area_stack.addWidget(self.camera_management_widget_instance)
-        else:
-            self.camera_management_widget_instance = None
-
-        if self.module_states.get('experience_management', True): # Default to True
-            self.experience_management_widget_instance = ExperienceModuleWidget(parent=self)
-            self.main_area_stack.addWidget(self.experience_management_widget_instance)
-        else:
-            self.experience_management_widget_instance = None
-
-        # Initialize CalendarWidget (assuming always enabled for now)
-        # If made configurable, this would be inside an "if self.module_states.get('calendar', True):" block
-        self.calendar_module_widget_instance = CalendarWidget(parent=self, current_user_id=self.current_user_id)
-        self.main_area_stack.addWidget(self.calendar_module_widget_instance)
-        # else:
-        #     self.calendar_module_widget_instance = None
+        self.botpress_integration_ui_instance = None
+        self.inventory_browser_widget_instance = None
+        self.recruitment_dashboard_instance = None
+        self.camera_management_widget_instance = None
+        self.experience_management_widget_instance = None
+        self.calendar_module_widget_instance = None # Calendar also lazy loaded
 
 
         self.home_page_widget_instance = HomePageWidget(main_window=self, parent=self) # Pass self as main_window
+
         self.main_area_stack.addWidget(self.home_page_widget_instance)
 
-        # User Management Page (always create, visibility of action controlled by RBAC)
+        # UserManagementPage is fundamental, initialize it upfront and add to stack
         self.user_management_page_instance = UserManagementPage(current_user_info=self.current_user_info, parent=self)
         self.main_area_stack.addWidget(self.user_management_page_instance)
 
-        # Calculator Module
-        if self.module_states.get('calculator', True): # Default to True if not in DB settings yet
-            # Pass self as app_auth_manager (it holds current_user_info and can have methods)
-            # Pass AppSessionLocal_MW as db_session_factory
-            self.calculator_module_widget_instance = MainCalculatorWidget(
-                parent=self,
-                app_auth_manager=self, # DocumentManager can act as a source for user info
-                db_session_factory=None
-            )
-            self.main_area_stack.addWidget(self.calculator_module_widget_instance)
-            logging.info("DocumentManager: Calculator module widget instance created and added to stack.")
-        else:
-            self.calculator_module_widget_instance = None
-            logging.info("DocumentManager: Calculator module disabled, widget not created.")
+        self.calculator_module_widget_instance = None # Calculator also lazy loaded
 
-        # Commandes Dashboard Widget (always create, visibility of menu action controlled by RBAC)
+        # CommandesDashboardWidget is fundamental, initialize upfront and add to stack
         self.commandes_dashboard_widget_instance = CommandesDashboardWidget(
             parent=self,
             current_user_info=self.current_user_info,
-            app_root_dir=self.app_root_dir # Pass app_root_dir
+            app_root_dir=self.app_root_dir
         )
         self.main_area_stack.addWidget(self.commandes_dashboard_widget_instance)
-        logging.info("DocumentManager: CommandesDashboardWidget instance created and added to stack.")
 
+        # Documents page (client list and tabs) is also fundamental and setup in setup_ui_main
+        # It's added to the stack there.
 
+        self.searchable_actions_map = {} # Initialize for create_actions_main
         self.main_area_stack.setCurrentWidget(self.home_page_widget_instance) # Set Home Page as default view
         self.create_actions_main(); self.create_menus_main() # Menus and actions are created before _apply_permissions
         
@@ -417,7 +335,10 @@ class DocumentManager(QMainWindow):
 
         self.voice_input_service = VoiceInputService() # Instantiate VoiceInputService
 
-        self.load_clients_from_db_slot() # Initial load
+        # Defer initial client list loading to allow UI to draw first
+        QTimer.singleShot(0, self.load_clients_from_db_slot)
+        logging.info("Initial client list loading deferred using QTimer.singleShot(0).")
+
         # if self.stats_widget: self.stats_widget.update_stats() # self.stats_widget removed
         # self.update_integrated_map() # Method removed
         self.check_timer = QTimer(self); self.check_timer.timeout.connect(self.check_old_clients_routine_slot); self.check_timer.start(3600000)
@@ -1540,27 +1461,49 @@ class DocumentManager(QMainWindow):
             QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("La page d'accueil n'a pas pu être chargée."))
 
     def show_project_management_view(self):
-        if self.project_management_widget_instance:
-            self.main_area_stack.setCurrentWidget(self.project_management_widget_instance)
-        else:
-            logging.warning("Project Management widget instance is None. Cannot show view.")
-            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Gestion de Projet est désactivé."))
+        if not self.module_states.get('project_management', True):
+            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Gestion de Projet est désactivé dans les paramètres."))
+            logging.info("Project Management module is disabled by settings. View not shown.")
+            return
+
+        if self.project_management_widget_instance is None:
+            logging.info("DocumentManager: Lazily creating ProjectManagementDashboard...")
+            self.project_management_widget_instance = ProjectManagementDashboard(parent=self, current_user_info=self.current_user_info)
+            self.main_area_stack.addWidget(self.project_management_widget_instance)
+            logging.info("DocumentManager: ProjectManagementDashboard instance created and added to stack.")
+            # If ProjectManagementDashboard had a load_initial_data method, call it here:
+            # if hasattr(self.project_management_widget_instance, 'load_initial_data'):
+            #     self.project_management_widget_instance.load_initial_data()
+
+        self.main_area_stack.setCurrentWidget(self.project_management_widget_instance)
+        logging.info("Switched to Project Management view.")
 
     def show_documents_view(self):
         print("DocumentManager: show_documents_view called.")
         self.main_area_stack.setCurrentWidget(self.documents_page_widget)
 
     def show_partner_management_view(self):
-        print("DocumentManager: show_partner_management_view called.")
-        if self.partner_management_widget_instance:
-            self.main_area_stack.setCurrentWidget(self.partner_management_widget_instance)
-        else:
-            logging.warning("Partner Management widget instance is None. Cannot show view.")
-            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Partner Management est désactivé."))
+        if not self.module_states.get('partner_management', True):
+            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Gestion des Partenaires est désactivé dans les paramètres."))
+            logging.info("Partner Management module is disabled by settings. View not shown.")
+            return
+
+        if self.partner_management_widget_instance is None:
+            logging.info("DocumentManager: Lazily creating PartnerMainWidget...")
+            self.partner_management_widget_instance = PartnerMainWidget(parent=self)
+            self.main_area_stack.addWidget(self.partner_management_widget_instance)
+            logging.info("DocumentManager: PartnerMainWidget instance created and added to stack.")
+            # If PartnerMainWidget had a load_initial_data method, call it here:
+            # if hasattr(self.partner_management_widget_instance, 'load_initial_data'):
+            #     self.partner_management_widget_instance.load_initial_data()
+
+        self.main_area_stack.setCurrentWidget(self.partner_management_widget_instance)
+        logging.info("Switched to Partner Management view.")
 
     def show_statistics_view(self):
         logging.info(f"Attempting to show Statistics View. Target Instance: {self.statistics_dashboard_instance} (Type: {type(self.statistics_dashboard_instance).__name__})")
         if self.statistics_dashboard_instance:
+
             logging.debug(f"--- Verifying main_area_stack contents before showing Statistics View ({self.statistics_dashboard_instance}) ---")
             found_by_iteration = False
             for i in range(self.main_area_stack.count()):
@@ -1599,44 +1542,93 @@ class DocumentManager(QMainWindow):
             QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Statistiques est désactivé ou n'a pas pu être initialisé."))
 
     def show_inventory_browser_view(self):
-        print("DocumentManager: show_inventory_browser_view called.")
-        if self.inventory_browser_widget_instance:
-            self.main_area_stack.setCurrentWidget(self.inventory_browser_widget_instance)
-        else:
-            logging.warning("Inventory Browser widget instance is None. Cannot show view.")
-            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Gestion Stock Atelier est désactivé."))
+        if not self.module_states.get('inventory_management', True):
+            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Gestion Stock Atelier est désactivé dans les paramètres."))
+            logging.info("Inventory Management module is disabled by settings. View not shown.")
+            return
+
+        if self.inventory_browser_widget_instance is None:
+            logging.info("DocumentManager: Lazily creating InventoryBrowserWidget...")
+            self.inventory_browser_widget_instance = InventoryBrowserWidget(parent=self)
+            self.main_area_stack.addWidget(self.inventory_browser_widget_instance)
+            logging.info("DocumentManager: InventoryBrowserWidget instance created and added to stack.")
+            if hasattr(self.inventory_browser_widget_instance, 'load_initial_data'): # Or 'refresh_data' etc.
+                self.inventory_browser_widget_instance.load_initial_data()
+
+        self.main_area_stack.setCurrentWidget(self.inventory_browser_widget_instance)
+        logging.info("Switched to Inventory Browser view.")
 
     def show_botpress_integration_view(self):
-        if self.botpress_integration_ui_instance:
-            self.main_area_stack.setCurrentWidget(self.botpress_integration_ui_instance)
-        else:
-            logging.warning("Botpress Integration UI instance is None. Cannot show view.")
-            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Botpress Integration est désactivé."))
+        if not self.module_states.get('botpress_integration', True):
+            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Intégration Chatbot est désactivé dans les paramètres."))
+            logging.info("Botpress Integration module is disabled by settings. View not shown.")
+            return
+
+        if self.botpress_integration_ui_instance is None:
+            logging.info("DocumentManager: Lazily creating BotpressIntegrationUI...")
+            self.botpress_integration_ui_instance = BotpressIntegrationUI(parent=self, current_user_id=self.current_user_id)
+            self.main_area_stack.addWidget(self.botpress_integration_ui_instance)
+            logging.info("DocumentManager: BotpressIntegrationUI instance created and added to stack.")
+            # BotpressIntegrationUI loads its settings in __init__, which is fine for lazy load context
+            # If it had a separate load_initial_data, it would be called here.
+
+        self.main_area_stack.setCurrentWidget(self.botpress_integration_ui_instance)
+        logging.info("Switched to Botpress Integration view.")
 
     def show_product_management_page(self):
-        print("DocumentManager: show_product_management_page called.")
-        if self.product_management_page_instance:
-            self.main_area_stack.setCurrentWidget(self.product_management_page_instance)
-        else:
-            logging.warning("Product Management page instance is None. Cannot show view.")
-            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Product Management est désactivé."))
+        if not self.module_states.get('product_management', True):
+            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Gestion des Produits est désactivé dans les paramètres."))
+            logging.info("Product Management module is disabled by settings. View not shown.")
+            return
+
+        if self.product_management_page_instance is None:
+            logging.info("DocumentManager: Lazily creating ProductManagementPage...")
+            self.product_management_page_instance = ProductManagementPage(current_user_info=self.current_user_info, parent=self)
+            self.main_area_stack.addWidget(self.product_management_page_instance)
+            logging.info("DocumentManager: ProductManagementPage instance created and added to stack.")
+            if hasattr(self.product_management_page_instance, 'load_initial_data'):
+                 self.product_management_page_instance.load_initial_data()
+
+        self.main_area_stack.setCurrentWidget(self.product_management_page_instance)
+        logging.info("Switched to Product Management page.")
 
     def show_recruitment_view(self):
-        if self.recruitment_dashboard_instance:
-            self.main_area_stack.setCurrentWidget(self.recruitment_dashboard_instance)
-        else:
-            logging.warning("Recruitment dashboard instance is None. Cannot show view.")
-            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Recrutement est désactivé."))
+        if not self.module_states.get('recruitment', True):
+            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Recrutement est désactivé dans les paramètres."))
+            logging.info("Recruitment module is disabled by settings. View not shown.")
+            return
+
+        if self.recruitment_dashboard_instance is None:
+            logging.info("DocumentManager: Lazily creating RecruitmentDashboard...")
+            self.recruitment_dashboard_instance = RecruitmentDashboard(parent=self)
+            self.main_area_stack.addWidget(self.recruitment_dashboard_instance)
+            logging.info("DocumentManager: RecruitmentDashboard instance created and added to stack.")
+            # RecruitmentDashboard's handle_tab_changed will call load_initial_data for the current tab.
+            # If it's the first time, it will load the first tab.
+
+        self.main_area_stack.setCurrentWidget(self.recruitment_dashboard_instance)
+        logging.info("Switched to Recruitment view.")
 
     def show_camera_management_view(self):
-        print("DocumentManager: show_camera_management_view called.")
-        if self.camera_management_widget_instance:
-            self.main_area_stack.setCurrentWidget(self.camera_management_widget_instance)
-            if hasattr(self.camera_management_widget_instance, 'set_current_user_id'): # Ensure user_id is up-to-date
-                self.camera_management_widget_instance.set_current_user_id(self.current_user_id)
-        else:
-            logging.warning("Camera Management widget instance is None. Cannot show view.")
-            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Gestion Caméras est désactivé."))
+        if not self.module_states.get('camera_management', True):
+            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Gestion Caméras est désactivé dans les paramètres."))
+            logging.info("Camera Management module is disabled by settings. View not shown.")
+            return
+
+        if self.camera_management_widget_instance is None:
+            logging.info("DocumentManager: Lazily creating CameraManagementWidget...")
+            self.camera_management_widget_instance = CameraManagementWidget(parent=self, current_user_id=self.current_user_id)
+            self.main_area_stack.addWidget(self.camera_management_widget_instance)
+            logging.info("DocumentManager: CameraManagementWidget instance created and added to stack.")
+            if hasattr(self.camera_management_widget_instance, 'load_initial_data'):
+                self.camera_management_widget_instance.load_initial_data()
+
+        # Ensure user_id is up-to-date even if widget was already created
+        if hasattr(self.camera_management_widget_instance, 'set_current_user_id'):
+            self.camera_management_widget_instance.set_current_user_id(self.current_user_id)
+
+        self.main_area_stack.setCurrentWidget(self.camera_management_widget_instance)
+        logging.info("Switched to Camera Management view.")
 
     def show_about_dialog(self): QMessageBox.about(self, self.tr("À propos"), self.tr("<b>Gestionnaire de Documents Client</b><br><br>Version 4.0<br>Application de gestion de documents clients avec templates Excel.<br><br>Développé par Saadiya Management (Concept)"))
         
@@ -2117,28 +2109,45 @@ class DocumentManager(QMainWindow):
         pass
 
     def show_experience_module_view(self):
-        print("DocumentManager: show_experience_module_view called.")
-        if self.experience_management_widget_instance:
-            self.main_area_stack.setCurrentWidget(self.experience_management_widget_instance)
-        else:
-            logging.warning("Experience Management widget instance is None. Cannot show view.")
-            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Gestion des Connaissances est désactivé."))
+        if not self.module_states.get('experience_management', True): # Default to True if not in DB settings
+            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Gestion des Connaissances est désactivé dans les paramètres."))
+            logging.info("Experience Management module is disabled by settings. View not shown.")
+            return
+
+        if self.experience_management_widget_instance is None:
+            logging.info("DocumentManager: Lazily creating ExperienceModuleWidget...")
+            self.experience_management_widget_instance = ExperienceModuleWidget(parent=self)
+            self.main_area_stack.addWidget(self.experience_management_widget_instance)
+            logging.info("DocumentManager: ExperienceModuleWidget instance created and added to stack.")
+            if hasattr(self.experience_management_widget_instance, 'load_initial_data'):
+                self.experience_management_widget_instance.load_initial_data()
+
+        self.main_area_stack.setCurrentWidget(self.experience_management_widget_instance)
+        logging.info("Switched to Experience Management view.")
 
     def show_calendar_module_view(self):
-        if self.calendar_module_widget_instance:
-            # Pass current_user_id again or ensure it's updated if it can change during app session
-            if hasattr(self.calendar_module_widget_instance, 'current_user_id'):
-                 self.calendar_module_widget_instance.current_user_id = self.current_user_id
-            # Reload settings and events when the view is shown, in case they changed
-            if hasattr(self.calendar_module_widget_instance, '_load_company_settings'):
-                self.calendar_module_widget_instance._load_company_settings()
-            if hasattr(self.calendar_module_widget_instance, '_load_user_events'):
-                self.calendar_module_widget_instance._load_user_events() # This also calls highlight
-            self.main_area_stack.setCurrentWidget(self.calendar_module_widget_instance)
-        else:
-            # This case would apply if the module was made configurable and then disabled
-            logging.warning("Calendar Module widget instance is None. Cannot show view.")
-            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Calendrier est désactivé ou non initialisé."))
+        # Assuming 'module_calendar_enabled' is the key if it were configurable
+        if not self.module_states.get('calendar', True): # Default to True as it's not in CONFIGURABLE_MODULES list in the prompt
+            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Calendrier est désactivé dans les paramètres."))
+            logging.info("Calendar module is disabled by settings. View not shown.")
+            return
+
+        if self.calendar_module_widget_instance is None:
+            logging.info("DocumentManager: Lazily creating CalendarWidget...")
+            self.calendar_module_widget_instance = CalendarWidget(parent=self, current_user_id=self.current_user_id)
+            self.main_area_stack.addWidget(self.calendar_module_widget_instance)
+            logging.info("DocumentManager: CalendarWidget instance created and added to stack.")
+
+        # Ensure data is loaded/refreshed when shown, even if already instantiated
+        if hasattr(self.calendar_module_widget_instance, 'current_user_id'):
+             self.calendar_module_widget_instance.current_user_id = self.current_user_id
+        if hasattr(self.calendar_module_widget_instance, '_load_company_settings'):
+            self.calendar_module_widget_instance._load_company_settings()
+        if hasattr(self.calendar_module_widget_instance, '_load_user_events'):
+            self.calendar_module_widget_instance._load_user_events() # This also calls highlight
+
+        self.main_area_stack.setCurrentWidget(self.calendar_module_widget_instance)
+        logging.info("Switched to Calendar module view.")
 
     def show_user_management_page(self):
         """Switches the main stacked widget to display the User Management page."""
@@ -2155,21 +2164,31 @@ class DocumentManager(QMainWindow):
 
     def show_calculator_module_view(self):
         """Switches the main stacked widget to display the Calculator module."""
-        if self.calculator_module_widget_instance:
-            # Pass/update auth_manager and db_session_factory if they can change or need to be set late
-            # For now, assuming they are set at __init__
-            if hasattr(self.calculator_module_widget_instance, 'app_auth_manager') and \
-               self.calculator_module_widget_instance.app_auth_manager is None:
-                self.calculator_module_widget_instance.app_auth_manager = self # Pass self as auth manager
+        if not self.module_states.get('calculator', True): # Default to True if not in DB settings
+            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Calculatrices est désactivé dans les paramètres."))
+            logging.info("Calculator module is disabled by settings. View not shown.")
+            return
 
-            # Potentially refresh history or user specific things if needed when view is shown
-            # if hasattr(self.calculator_module_widget_instance, 'refresh_on_display'):
-            #     self.calculator_module_widget_instance.refresh_on_display()
+        if self.calculator_module_widget_instance is None:
+            logging.info("DocumentManager: Lazily creating MainCalculatorWidget...")
+            self.calculator_module_widget_instance = MainCalculatorWidget(
+                parent=self,
+                app_auth_manager=self,
+                db_session_factory=None # Or your actual session factory if needed by calculator
+            )
+            self.main_area_stack.addWidget(self.calculator_module_widget_instance)
+            logging.info("DocumentManager: MainCalculatorWidget instance created and added to stack.")
+            # If MainCalculatorWidget had a load_initial_data method, call it here:
+            # if hasattr(self.calculator_module_widget_instance, 'load_initial_data'):
+            #     self.calculator_module_widget_instance.load_initial_data()
 
-            self.main_area_stack.setCurrentWidget(self.calculator_module_widget_instance)
-        else:
-            logging.warning("Calculator module widget instance is None. Cannot show view.")
-            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Calculatrices est désactivé ou non initialisé."))
+        # Ensure app_auth_manager is set, even if widget was already created (e.g. if it could be None initially)
+        if hasattr(self.calculator_module_widget_instance, 'app_auth_manager') and \
+           self.calculator_module_widget_instance.app_auth_manager is None:
+            self.calculator_module_widget_instance.app_auth_manager = self
+
+        self.main_area_stack.setCurrentWidget(self.calculator_module_widget_instance)
+        logging.info("Switched to Calculator module view.")
 
     def show_commande_management_view(self):
         """Switches to the main Commandes management view (e.g., dashboard)."""

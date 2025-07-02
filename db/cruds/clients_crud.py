@@ -918,6 +918,7 @@ class ClientsCRUD(GenericCRUD):
             return []
 
     @_manage_conn
+
     def get_client_count_by_country_id(self, country_id: int, conn: sqlite3.Connection = None, include_deleted: bool = False) -> int:
         """
         Counts clients for a specific country_id.
@@ -991,6 +992,7 @@ __all__ = [
     "get_active_clients_count_up_to_date",
     "get_client_count_by_country_id",
     "get_clients_by_status_id", # Added new function
+
     "ClientsCRUD", # Exporting the class itself for type hinting or direct instantiation
     "clients_crud_instance" # Exporting the instance if needed elsewhere
 ]
