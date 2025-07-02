@@ -9,6 +9,7 @@ from PyQt5.QtGui import QIcon
 
 from db.cruds import roles_crud, users_crud, permissions_crud, role_permissions_crud # Added new cruds
 # from auth.permissions import has_permission, P_MANAGE_ROLES # For later, if dialog itself checks perms
+from PyQt5.QtWidgets import QWidget
 
 import logging
 

@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QTextEdit, QListWidget, QLineEdit,
     QComboBox, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
     QInputDialog, QTabWidget, QGroupBox, QMessageBox, QDialog, QFileDialog, QApplication,
-    QSizePolicy # Added QSizePolicy
+    QSizePolicy, QToolTip # Added QToolTip
 )
 from PyQt5.QtGui import QIcon, QDesktopServices, QFont, QColor, QPixmap, QTextCursor
 from PyQt5.QtCore import Qt, QUrl, QCoreApplication, QEvent, QStandardPaths
@@ -24,6 +24,7 @@ from PyQt5.QtGui import QPixmap
 
 import db as db_manager
 from db.cruds import client_documents_crud, users_crud, activity_logs_crud # Added for document deletion and user fetching
+from db.cruds import notes_crud # Import notes_crud for get_effective_document_note
 
 from db.cruds.clients_crud import clients_crud_instance
 from excel_editor import ExcelEditor
@@ -90,6 +91,8 @@ from auth.permissions import has_permission, \
 
 # Import CommandeWidget
 from commande_management.commande_widget import CommandeWidget
+from .ui.tabs.overview_tab_widget import OverviewTabWidget
+from .ui.tabs.documents_tab_widget import DocumentsTabWidget
 
 
 class ClientWidget(QWidget):
@@ -170,7 +173,13 @@ class ClientWidget(QWidget):
             self.header_label.setObjectName("clientHeaderLabel")
             info_container_layout.addWidget(self.header_label)
 
-            action_layout = QHBoxLayout()
+            # Original action_layout and its buttons are being relocated or removed.
+            # The buttons ("Envoyer Mail", "Modifier Client", "Archiver Client")
+            # will be added to the 'Détails Client' tab later in this method.
+            # self.create_docs_btn, self.compile_pdf_btn, self.edit_save_client_btn,
+            # self.send_whatsapp_btn, self.archive_client_btn are initialized here
+            # but added to their new locations.
+
             self.create_docs_btn = QPushButton(self.tr("Envoyer Mail"))
             self.create_docs_btn.setIcon(QIcon.fromTheme("mail-send", QIcon(":/icons/bell.svg")))
             self.create_docs_btn.setToolTip(self.tr("Envoyer un email au client"))
@@ -178,35 +187,38 @@ class ClientWidget(QWidget):
             try:
                 self.create_docs_btn.clicked.disconnect(self.open_create_docs_dialog)
             except TypeError:
-                pass # Not connected or already disconnected
+                pass
             self.create_docs_btn.clicked.connect(self.open_send_email_dialog)
-            action_layout.addWidget(self.create_docs_btn)
+            # Not adding to action_layout here
 
-            self.compile_pdf_btn = QPushButton(self.tr("Compiler PDF"))
+            # compile_pdf_btn is effectively redundant as "Combiné" button exists in Documents tab.
+            # We can remove its creation here if it's not used elsewhere.
+            # For now, let's assume it's removed from the visible UI.
+            self.compile_pdf_btn = QPushButton(self.tr("Compiler PDF")) # Still create if other logic uses it internally
             self.compile_pdf_btn.setIcon(QIcon.fromTheme("document-export"))
             self.compile_pdf_btn.setProperty("primary", True)
             self.compile_pdf_btn.clicked.connect(self.open_compile_pdf_dialog)
-            # action_layout.addWidget(self.compile_pdf_btn) # Moved to documents tab filters
 
             self.edit_save_client_btn = QPushButton(self.tr("Modifier Client"))
             self.edit_save_client_btn.setIcon(QIcon.fromTheme("document-edit", QIcon(":/icons/pencil.svg")))
             self.edit_save_client_btn.setToolTip(self.tr("Modifier les informations du client"))
             self.edit_save_client_btn.clicked.connect(self.toggle_client_edit_mode)
-            action_layout.addWidget(self.edit_save_client_btn)
+            # Not adding to action_layout here
 
-            self.send_whatsapp_btn = QPushButton(self.tr("Send WhatsApp"))
+            # send_whatsapp_btn is redundant due to internal tab
+            self.send_whatsapp_btn = QPushButton(self.tr("Send WhatsApp")) # Still create if other logic uses it
             self.send_whatsapp_btn.setIcon(QIcon.fromTheme("contact-new", QIcon(":/icons/user.svg")))
             self.send_whatsapp_btn.setToolTip(self.tr("Send a WhatsApp message to the client"))
             self.send_whatsapp_btn.clicked.connect(self.open_send_whatsapp_dialog)
-            # action_layout.addWidget(self.send_whatsapp_btn) # Moved to an internal tab
 
             self.archive_client_btn = QPushButton(self.tr("Archiver Client"))
-            self.archive_client_btn.setIcon(QIcon(":/icons/folder.svg")) # Replaced archive.svg with folder.svg
+            self.archive_client_btn.setIcon(QIcon(":/icons/folder.svg"))
             self.archive_client_btn.setToolTip(self.tr("Archiver ce client (soft delete)"))
-            self.archive_client_btn.clicked.connect(self.handle_archive_client) # Connect to the new handler
-            action_layout.addWidget(self.archive_client_btn)
+            self.archive_client_btn.clicked.connect(self.handle_archive_client)
+            # Not adding to action_layout here
 
-            info_container_layout.addLayout(action_layout)
+            # Original action_layout is removed from info_container_layout
+            # info_container_layout.addLayout(action_layout) # This line is removed
 
             # Create the internal QTabWidget
             self.internal_client_info_tabs = QTabWidget()
@@ -214,16 +226,23 @@ class ClientWidget(QWidget):
 
             # --- Tab 1: Client Details (populated by populate_details_layout) ---
             self.client_details_tab = QWidget()
-            details_tab_layout = QVBoxLayout(self.client_details_tab)
+            details_tab_layout = QVBoxLayout(self.client_details_tab) # Main layout for this tab
 
-            self.status_combo = QComboBox() # Status combo will be part of the details tab
-            # self.load_statuses() # load_statuses will be called by populate_details_layout or refresh_display
-            # self.status_combo.setCurrentText(self.client_info.get("status", self.tr("En cours")))
-            # self.status_combo.currentTextChanged.connect(self.update_client_status)
+            # New layout for relocated buttons, to be added at the top of details_tab_layout
+            relocated_buttons_layout = QHBoxLayout()
+            relocated_buttons_layout.addWidget(self.create_docs_btn) # "Envoyer Mail"
+            relocated_buttons_layout.addWidget(self.edit_save_client_btn) # "Modifier Client"
+            relocated_buttons_layout.addWidget(self.archive_client_btn) # "Archiver Client"
+            relocated_buttons_layout.addStretch() # Push buttons to the left
+            details_tab_layout.addLayout(relocated_buttons_layout) # Add this button bar
 
-            self.details_layout = QFormLayout() # This is the layout for client fields
+
+            self.status_combo = QComboBox()
+
+            self.details_layout = QFormLayout() # This is the QFormLayout for client fields
             self.details_layout.setLabelAlignment(Qt.AlignLeft)
             self.details_layout.setSpacing(10)
+            details_tab_layout.addLayout(self.details_layout) # Add QFormLayout below buttons
 
             # --- Persistent UI Elements for Client Details Tab ---
             # These are created once here and updated by populate_details_layout
@@ -316,6 +335,9 @@ class ClientWidget(QWidget):
 
             # Initial population of the now persistent elements
             self.populate_details_layout()
+
+            # Call _setup_notes_section to add the "Notes" tab to internal_client_info_tabs
+            self._setup_notes_section(self.internal_client_info_tabs)
 
 
             # --- Tab 2: Contacts ---
@@ -503,10 +525,8 @@ class ClientWidget(QWidget):
             logging.error(f"Error in _setup_client_info_section: {e}", exc_info=True)
             QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation section infos client:\n{0}").format(str(e)))
 
-        self._setup_notes_section(layout)
-        self._setup_main_tabs_section(layout) # This will call sub-methods for each tab
-        self._setup_commandes_tab() # Add the new Commandes tab
-
+        # self._setup_notes_section(layout) # Notes section is now an internal tab
+        self._setup_main_tabs_section(layout) # This will call sub-methods for each tab, including notes as an internal tab
         self._setup_commandes_tab() # Add the new Commandes tab
 
         # Initial data loading calls
@@ -599,10 +619,140 @@ class ClientWidget(QWidget):
         # Apply permissions
         self._apply_permissions()
 
+        # Connect tab change signal for overview refresh
+        if hasattr(self, 'tab_widget') and self.tab_widget:
+            self.tab_widget.currentChanged.connect(self._on_main_client_tab_changed)
+
         # Event filter for notes auto-save
         if hasattr(self, 'notes_edit'):
             self.notes_edit.installEventFilter(self)
         logging.info(f"ClientWidget.setup_ui: FULL UI SETUP COMPLETED for client_id={self.client_info.get('client_id')}")
+
+    def _on_main_client_tab_changed(self, index):
+        """Called when the current tab in self.tab_widget (main client tabs) changes."""
+        if not hasattr(self, 'tab_widget') or not self.tab_widget:
+            return
+
+        current_tab_widget = self.tab_widget.widget(index)
+        if hasattr(self, 'overview_tab') and current_tab_widget == self.overview_tab:
+            logging.debug(f"ClientWidget: Aperçu tab selected for client {self.client_info.get('client_id')}. Refreshing its content.")
+            if hasattr(self, '_load_overview_metrics'):
+                self._load_overview_metrics()
+            # Also ensure the header part of overview tab is up-to-date if client_info could have changed
+            # This is typically handled by refresh_display, but an explicit call here might be useful
+            # if refresh_display wasn't called for some reason before tab switch.
+            # self._update_overview_header_labels(self.client_info) # Now called by OverviewTabWidget
+            if hasattr(self, 'overview_tab_widget_instance'):
+                self.overview_tab_widget_instance.update_client_info(self.client_info) # Ensure child tab has latest info
+
+
+    # _update_overview_header_labels and _load_overview_metrics have been moved to OverviewTabWidget.
+
+    def _handle_project_snippet_clicked(self, project_id):
+        if not project_id:
+            return
+
+        # Find the main DocumentManager instance (or main window)
+        doc_manager = self._get_document_manager_instance()
+        if not doc_manager:
+            return
+
+        client_id_of_this_widget = self.client_info.get("client_id")
+
+        # Find the ClientWidget tab corresponding to this client_id in DocumentManager
+        target_client_tab_widget = None
+        target_client_tab_index = -1
+
+        for i in range(doc_manager.client_tabs_widget.count()):
+            widget = doc_manager.client_tabs_widget.widget(i)
+            if isinstance(widget, ClientWidget) and widget.client_info.get("client_id") == client_id_of_this_widget:
+                target_client_tab_widget = widget
+                doc_manager.client_tabs_widget.setCurrentIndex(i) # Activate this client's main tab
+                break
+
+        if target_client_tab_widget:
+            # Now, within this ClientWidget, find its 'Projets' tab (which is actually CommandeWidget)
+            # The 'Projets' functionality is embedded within the CommandeWidget, which has its own tabs.
+            # The CommandeWidget is stored as self.commandes_tab_widget within ClientWidget.
+
+            commandes_widget_instance = getattr(target_client_tab_widget, 'commandes_tab_widget', None)
+            if commandes_widget_instance and hasattr(commandes_widget_instance, 'main_tab_widget'):
+                # Switch ClientWidget's main tab to "Commandes" (where projects are listed)
+                # Find the "Commandes" tab index in self.tab_widget (the main one in ClientWidget)
+                commandes_tab_main_index = -1
+                for i in range(target_client_tab_widget.tab_widget.count()):
+                    if target_client_tab_widget.tab_widget.tabText(i) == self.tr("Commandes"):
+                        commandes_tab_main_index = i
+                        break
+
+                if commandes_tab_main_index != -1:
+                    target_client_tab_widget.tab_widget.setCurrentIndex(commandes_tab_main_index)
+
+                    # Now, within CommandeWidget, switch to its "Projets" sub-tab
+                    # CommandeWidget's main_tab_widget contains "Liste des Commandes" and "Liste des Projets"
+                    projets_sub_tab_index = -1
+                    for i in range(commandes_widget_instance.main_tab_widget.count()):
+                        if commandes_widget_instance.main_tab_widget.tabText(i) == self.tr("Liste des Projets"):
+                            projets_sub_tab_index = i
+                            break
+
+                    if projets_sub_tab_index != -1:
+                        commandes_widget_instance.main_tab_widget.setCurrentIndex(projets_sub_tab_index)
+                        # Further selection/highlighting of the project_id within the projects table
+                        # in CommandeWidget would require that table to be accessible and have a method
+                        # to select a row by project_id. This is a V2 enhancement.
+                        logging.info(f"Navigated to Client {client_id_of_this_widget} -> Commandes Tab -> Liste des Projets sub-tab for project_id {project_id}.")
+                        QMessageBox.information(self, self.tr("Navigation Projet"), self.tr("Onglet Projets ouvert. Sélection spécifique du projet non implémentée dans cet aperçu."))
+
+                    else:
+                        logging.warning("Could not find 'Liste des Projets' sub-tab in CommandeWidget.")
+                else:
+                    logging.warning("Could not find 'Commandes' tab in ClientWidget's main tabs.")
+            else:
+                logging.warning("CommandeWidget or its main_tab_widget not found in target ClientWidget.")
+        else:
+            logging.warning(f"Could not find the ClientWidget for client ID {client_id_of_this_widget} in DocumentManager.")
+
+    def _handle_order_snippet_clicked(self, commande_id):
+        if not commande_id:
+            return
+
+        doc_manager = self._get_document_manager_instance()
+        if not doc_manager:
+            return
+
+        client_id_of_this_widget = self.client_info.get("client_id")
+        target_client_tab_widget = None
+
+        for i in range(doc_manager.client_tabs_widget.count()):
+            widget = doc_manager.client_tabs_widget.widget(i)
+            if isinstance(widget, ClientWidget) and widget.client_info.get("client_id") == client_id_of_this_widget:
+                target_client_tab_widget = widget
+                doc_manager.client_tabs_widget.setCurrentIndex(i) # Activate this client's main tab
+                break
+
+        if target_client_tab_widget:
+            commandes_tab_main_index = -1
+            for i in range(target_client_tab_widget.tab_widget.count()):
+                if target_client_tab_widget.tab_widget.tabText(i) == self.tr("Commandes"):
+                    commandes_tab_main_index = i
+                    break
+
+            if commandes_tab_main_index != -1:
+                target_client_tab_widget.tab_widget.setCurrentIndex(commandes_tab_main_index)
+                # The CommandeWidget's first tab is usually the list of orders.
+                # Further selection can be a V2 enhancement if CommandeWidget exposes a method.
+                commande_widget_instance = getattr(target_client_tab_widget, 'commandes_tab_widget', None)
+                if commande_widget_instance and hasattr(commande_widget_instance, 'select_commande_in_list'):
+                    commande_widget_instance.select_commande_in_list(commande_id) # Assumed method
+                else:
+                     QMessageBox.information(self, self.tr("Navigation Commande"), self.tr("Onglet Commandes ouvert. Sélection spécifique de la commande non implémentée dans cet aperçu."))
+                logging.info(f"Navigated to Client {client_id_of_this_widget} -> Commandes Tab for commande_id {commande_id}.")
+            else:
+                logging.warning("Could not find 'Commandes' tab in ClientWidget's main tabs.")
+        else:
+            logging.warning(f"Could not find the ClientWidget for client ID {client_id_of_this_widget} in DocumentManager for order navigation.")
+
 
     def handle_archive_client(self):
         client_id = self.client_info.get("client_id")
@@ -746,24 +896,27 @@ class ClientWidget(QWidget):
         logging.info(f"ClientWidget permissions applied for role: {role_name}")
 
 
-    def _setup_notes_section(self, main_layout):
+    def _setup_notes_section(self, internal_tab_widget): # Changed to accept internal_tab_widget
         try:
-            logging.info("ClientWidget.setup_ui: Starting setup for Notes Section...")
+            logging.info("ClientWidget.setup_ui: Starting setup for Notes Internal Tab...")
             self.notes_edit = QTextEdit(self.client_info.get("notes", ""))
             self.notes_edit.setPlaceholderText(self.tr("Ajoutez des notes sur ce client..."))
-            self.notes_group_box = QGroupBox(self.tr("Notes"))
-            self.notes_group_box.setCheckable(True)
-            notes_group_layout = QVBoxLayout(self.notes_group_box)
-            self.notes_container_widget = QWidget()
-            notes_container_layout = QVBoxLayout(self.notes_container_widget)
-            notes_container_layout.setContentsMargins(0, 5, 0, 0)
-            notes_container_layout.addWidget(self.notes_edit)
-            notes_group_layout.addWidget(self.notes_container_widget)
-            self.notes_group_box.setChecked(False)
-            main_layout.addWidget(self.notes_group_box)
+
+            # Create a new QWidget for the "Notes" tab
+            notes_internal_tab_content_widget = QWidget()
+            notes_internal_tab_layout = QVBoxLayout(notes_internal_tab_content_widget)
+            notes_internal_tab_layout.setContentsMargins(5, 5, 5, 5) # Add some margins
+            notes_internal_tab_layout.addWidget(self.notes_edit)
+
+            # Add this new widget as a tab to the passed internal_tab_widget
+            internal_tab_widget.addTab(notes_internal_tab_content_widget, self.tr("Notes"))
+            logging.info("ClientWidget.setup_ui: 'Notes' tab added to internal_client_info_tabs.")
+
+            # The notes_group_box and its container are no longer needed in the main layout.
+            # self.notes_group_box = QGroupBox(self.tr("Notes")) ... etc.
         except Exception as e:
-            logging.error(f"Error in _setup_notes_section: {e}", exc_info=True)
-            QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation section notes:\n{0}").format(str(e)))
+            logging.error(f"Error in _setup_notes_section (internal tab): {e}", exc_info=True)
+            QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation onglet notes interne:\n{0}").format(str(e)))
 
     def _setup_main_tabs_section(self, main_layout):
         try:
@@ -773,16 +926,54 @@ class ClientWidget(QWidget):
             self.tabs_group_box = QGroupBox(self.tr("Autres Informations"))
             self.tabs_group_box.setCheckable(True)
             tabs_group_layout = QVBoxLayout(self.tabs_group_box)
-            self.tab_widget = QTabWidget()
+            self.tab_widget = QTabWidget() # This is the main QTabWidget for Documents, Products, etc.
             tabs_group_layout.addWidget(self.tab_widget)
-            self.tabs_group_box.setChecked(False)
+            self.tabs_group_box.setChecked(False) # Start collapsed
             main_layout.addWidget(self.tabs_group_box)
 
-            self._setup_documents_tab()
+            # Call to setup notes as an internal tab within client_info_group_box's internal_client_info_tabs
+            # This needs internal_client_info_tabs to be created first.
+            # So, _setup_notes_section will be called from within the _setup_client_info_section block.
+            # For now, ensure the rest of _setup_main_tabs_section correctly sets up self.tab_widget.
 
-            self._setup_products_tab()
-            self._setup_document_notes_tab()
-            self._setup_product_dimensions_tab()
+            # ---- Overview Tab Setup (now handled by OverviewTabWidget) ----
+            # The following lines related to self.overview_tab, self.overview_tab_layout,
+            # and all its content (header_group, metrics_group, quick_actions_group, etc.)
+            # have been moved to OverviewTabWidget._setup_ui()
+
+            # We will instantiate OverviewTabWidget and add it to self.tab_widget here.
+            # Ensure OverviewTabWidget is imported at the top of client_widget.py
+            # from .ui.tabs.overview_tab_widget import OverviewTabWidget # Example import
+
+            self.overview_tab_widget_instance = OverviewTabWidget(
+                client_info=self.client_info,
+                parent_client_widget=self, # Pass self (ClientWidget) as parent_client_widget
+                parent=self # Standard Qt parent
+            )
+            self.tab_widget.insertTab(0, self.overview_tab_widget_instance, self.tr("Aperçu"))
+            # ---- End Overview Tab Setup ----
+
+            # Initial data load for the overview tab is now handled within OverviewTabWidget's __init__ or a refresh method.
+            # If _load_overview_metrics or _update_overview_header_labels are still needed by OverviewTabWidget
+            # and remain in ClientWidget, OverviewTabWidget will call them via its self.parent_client_widget.
+            # For now, we assume OverviewTabWidget.refresh_overview_data() handles its own data.
+
+            # self._setup_documents_tab() # Index 1 (after Overview) - Now handled by DocumentsTabWidget
+            self.documents_tab_widget_instance = DocumentsTabWidget(
+                client_info=self.client_info,
+                config=self.config,
+                current_user_info=self.current_user_info,
+                parent_client_widget=self,
+                parent=self
+            )
+            self.tab_widget.addTab(self.documents_tab_widget_instance, self.tr("Documents"))
+
+
+            self._setup_commandes_tab() # Index 2 - This was called separately later, integrating here for order
+
+            self._setup_products_tab() # Index 3
+            self._setup_document_notes_tab() # Index 4
+            self._setup_product_dimensions_tab() # Index 5
             # self._setup_available_templates_tab() # Call removed
 
             logging.info("ClientWidget._setup_main_tabs_section: PRE-CALL self._setup_sav_tab()")
@@ -804,95 +995,35 @@ class ClientWidget(QWidget):
     # _setup_available_templates_tab and load_available_templates removed.
     # handle_generate_template_button_clicked was only called by load_available_templates, so it can also be removed.
 
+    # _setup_documents_tab() has been moved to DocumentsTabWidget._setup_ui()
 
-    def _setup_documents_tab(self):
-        try:
-            logging.info("ClientWidget.setup_ui: Starting setup for Documents Tab Structure...")
-            # --- Documents Tab Structure ---
+    def handle_plus_add_doc_button_click(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle(self.tr("Ajouter un Document"))
+        layout = QVBoxLayout(dialog)
 
-            docs_tab = QWidget(); docs_layout = QVBoxLayout(docs_tab)
-            self.doc_filter_layout_widget = QWidget()
-            doc_filter_layout = QHBoxLayout(self.doc_filter_layout_widget)
-            doc_filter_layout.setContentsMargins(0,0,0,0)
-            doc_filter_label = QLabel(self.tr("Filtrer par Commande:"))
-            doc_filter_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-            doc_filter_layout.addWidget(doc_filter_label)
-            self.doc_order_filter_combo = QComboBox()
-            self.doc_order_filter_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-            self.doc_order_filter_combo.currentIndexChanged.connect(self.populate_doc_table)
-            doc_filter_layout.addWidget(self.doc_order_filter_combo)
-            doc_filter_layout.addSpacing(10)
-            doc_lang_filter_label = QLabel(self.tr("Filtrer par Langue:"))
-            doc_lang_filter_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-            doc_filter_layout.addWidget(doc_lang_filter_label)
-            self.doc_language_filter_combo = QComboBox()
-            self.doc_language_filter_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-            self.doc_language_filter_combo.addItem(self.tr("Toutes"), "ALL")
-            for lang_code in SUPPORTED_LANGUAGES:
-                self.doc_language_filter_combo.addItem(lang_code, lang_code)
-            self.doc_language_filter_combo.currentIndexChanged.connect(self.populate_doc_table)
-            doc_filter_layout.addWidget(self.doc_language_filter_combo)
-            doc_filter_layout.addSpacing(10)
-            doc_type_filter_label = QLabel(self.tr("Filtrer par Type:"))
-            doc_type_filter_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-            doc_filter_layout.addWidget(doc_type_filter_label)
-            self.doc_type_filter_combo = QComboBox()
-            self.doc_type_filter_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-            self.doc_type_filter_combo.addItem(self.tr("Tous"), "ALL")
-            self.doc_type_filter_combo.addItem("HTML", "HTML")
-            self.doc_type_filter_combo.addItem("PDF", "PDF")
-            self.doc_type_filter_combo.addItem("XLSX", "XLSX")
-            self.doc_type_filter_combo.addItem("DOCX", "DOCX")
-            self.doc_type_filter_combo.addItem(self.tr("Autre"), "OTHER")
-            self.doc_type_filter_combo.currentIndexChanged.connect(self.populate_doc_table)
-            doc_filter_layout.addWidget(self.doc_type_filter_combo)
-            docs_layout.addWidget(self.doc_filter_layout_widget)
-            self.doc_filter_layout_widget.setVisible(True)
-            self.documents_empty_label = QLabel(self.tr("Aucun document trouvé pour ce client.\nUtilisez les boutons ci-dessous pour ajouter ou générer des documents."))
-            self.documents_empty_label.setAlignment(Qt.AlignCenter)
-            font_docs_empty = self.documents_empty_label.font()
-            font_docs_empty.setPointSize(10)
-            self.documents_empty_label.setFont(font_docs_empty)
-            docs_layout.addWidget(self.documents_empty_label)
-            self.doc_table = QTableWidget()
-            # Increased column count for new "Quick Actions" column
-            self.doc_table.setColumnCount(6)
-            self.doc_table.setHorizontalHeaderLabels([
-                self.tr("Nom"), self.tr("Type"), self.tr("Langue"),
-                self.tr("Date"), self.tr("Fichier Original"), self.tr("Actions Rapides") # Added "Fichier Original" and "Actions Rapides"
-            ])
-            self.doc_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-            # Adjust column widths - make Actions Rapides and Fichier Original fit content
-            self.doc_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch) # Nom
-            self.doc_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents) # Type
-            self.doc_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents) # Langue
-            self.doc_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents) # Date
-            self.doc_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents) # Fichier Original
-            self.doc_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents) # Actions Rapides
+        btn_from_template = QPushButton(self.tr("Ajouter à partir d'un modèle"))
+        btn_from_template.setIcon(QIcon(":/icons/file-plus.svg"))
+        def action_from_template():
+            dialog.accept()
+            self.open_create_docs_dialog()
+        btn_from_template.clicked.connect(action_from_template)
+        layout.addWidget(btn_from_template)
 
-            self.doc_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-            self.doc_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            docs_layout.addWidget(self.doc_table)
-            doc_btn_layout = QHBoxLayout()
-            self.add_doc_btn = QPushButton(self.tr("Importer Document"))
-            self.add_doc_btn.setIcon(QIcon(":/icons/file-plus.svg"))
-            self.add_doc_btn.setToolTip(self.tr("Importer un fichier document existant pour ce client"))
-            self.add_doc_btn.clicked.connect(self.add_document)
-            doc_btn_layout.addWidget(self.add_doc_btn)
-            self.refresh_docs_btn = QPushButton(self.tr("Actualiser"))
-            self.refresh_docs_btn.setIcon(QIcon.fromTheme("view-refresh"))
-            self.refresh_docs_btn.clicked.connect(self.populate_doc_table)
-            doc_btn_layout.addWidget(self.refresh_docs_btn)
-            self.add_template_btn = QPushButton(self.tr("Générer via Modèle"))
-            self.add_template_btn.setIcon(QIcon.fromTheme("document-new", QIcon(":/icons/file-plus.svg")))
-            self.add_template_btn.setToolTip(self.tr("Générer un nouveau document pour ce client à partir d'un modèle"))
-            self.add_template_btn.clicked.connect(self.open_create_docs_dialog)
-            doc_btn_layout.addWidget(self.add_template_btn)
-            docs_layout.addLayout(doc_btn_layout)
-            self.tab_widget.addTab(docs_tab, self.tr("Documents"))
-        except Exception as e:
-            logging.error(f"Error in _setup_documents_tab: {e}", exc_info=True)
-            QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation onglet Documents:\n{0}").format(str(e)))
+        btn_direct_import = QPushButton(self.tr("Ajouter directement un document"))
+        btn_direct_import.setIcon(QIcon(":/icons/upload.svg"))
+        def action_direct_import():
+            dialog.accept()
+            self.add_document()
+        btn_direct_import.clicked.connect(action_direct_import)
+        layout.addWidget(btn_direct_import)
+
+        btn_cancel = QPushButton(self.tr("Annuler"))
+        btn_cancel.clicked.connect(dialog.reject)
+        layout.addWidget(btn_cancel)
+
+        dialog.setLayout(layout)
+        dialog.exec_()
 
     def _setup_contacts_tab(self):
         try:
@@ -1444,72 +1575,6 @@ class ClientWidget(QWidget):
             logging.error(f"Error in _setup_commandes_tab: {e}", exc_info=True)
             QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation onglet Commandes:\n{0}").format(str(e)))
 
-    def _setup_commandes_tab(self):
-        """Sets up the Commandes tab."""
-        try:
-            logging.info("ClientWidget.setup_ui: Starting setup for Commandes Tab...")
-            self.commandes_tab_widget = CommandeWidget(
-                client_info=self.client_info,
-                current_user_info=self.current_user_info,
-                parent=self
-            )
-            # Add this as a top-level tab in self.tab_widget (main tab container)
-            # Or, if Commandes should be part of the "Autres Informations" group box, then add to self.tab_widget
-            # For now, let's add it to the main self.tab_widget
-            if hasattr(self, 'tab_widget'):
-                 # Insert it before "Available Templates" or as the second tab for prominence
-                docs_tab_index = -1
-                for i in range(self.tab_widget.count()):
-                    if self.tab_widget.tabText(i) == self.tr("Documents"):
-                        docs_tab_index = i
-                        break
-
-                if docs_tab_index != -1:
-                    self.tab_widget.insertTab(docs_tab_index + 1, self.commandes_tab_widget, self.tr("Commandes"))
-                else: # Fallback if Documents tab isn't found by that exact name
-                    self.tab_widget.addTab(self.commandes_tab_widget, self.tr("Commandes"))
-
-                logging.info("ClientWidget._setup_commandes_tab: Commandes tab added.")
-            else:
-                logging.error("ClientWidget._setup_commandes_tab: self.tab_widget not found. Cannot add Commandes tab.")
-
-        except Exception as e:
-            logging.error(f"Error in _setup_commandes_tab: {e}", exc_info=True)
-            QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation onglet Commandes:\n{0}").format(str(e)))
-
-    def _setup_commandes_tab(self):
-        """Sets up the Commandes tab."""
-        try:
-            logging.info("ClientWidget.setup_ui: Starting setup for Commandes Tab...")
-            self.commandes_tab_widget = CommandeWidget(
-                client_info=self.client_info,
-                current_user_info=self.current_user_info,
-                parent=self
-            )
-            # Add this as a top-level tab in self.tab_widget (main tab container)
-            # Or, if Commandes should be part of the "Autres Informations" group box, then add to self.tab_widget
-            # For now, let's add it to the main self.tab_widget
-            if hasattr(self, 'tab_widget'):
-                 # Insert it before "Available Templates" or as the second tab for prominence
-                docs_tab_index = -1
-                for i in range(self.tab_widget.count()):
-                    if self.tab_widget.tabText(i) == self.tr("Documents"):
-                        docs_tab_index = i
-                        break
-
-                if docs_tab_index != -1:
-                    self.tab_widget.insertTab(docs_tab_index + 1, self.commandes_tab_widget, self.tr("Commandes"))
-                else: # Fallback if Documents tab isn't found by that exact name
-                    self.tab_widget.addTab(self.commandes_tab_widget, self.tr("Commandes"))
-
-                logging.info("ClientWidget._setup_commandes_tab: Commandes tab added.")
-            else:
-                logging.error("ClientWidget._setup_commandes_tab: self.tab_widget not found. Cannot add Commandes tab.")
-
-        except Exception as e:
-            logging.error(f"Error in _setup_commandes_tab: {e}", exc_info=True)
-            QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation onglet Commandes:\n{0}").format(str(e)))
-
 
     def _setup_billing_tab(self):
         try:
@@ -1574,15 +1639,14 @@ class ClientWidget(QWidget):
     def _handle_edit_pdf_action(self, file_path, document_id):
         if file_path and os.path.exists(file_path):
             QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
-        # layout = QVBoxLayout(self) # This line seems out of place, QVBoxLayout is already set for the widget
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(15)
-
-        try:
-            self._setup_main_tabs_section(layout) #FIXED
+        else:
+            QMessageBox.warning(self, self.tr("Fichier Introuvable"),
+                                self.tr("Le fichier PDF spécifié est introuvable ou le chemin est invalide:\n{0}").format(file_path or self.tr("Non spécifié")))
             # --- Collapsible Client Info Section ---
+        try:
             self.client_info_group_box = QGroupBox(self.client_info.get('client_name', self.tr("Client Information")))
             self.client_info_group_box.setCheckable(True)
+
             client_info_group_layout = QVBoxLayout(self.client_info_group_box) # Layout for the GroupBox itself
 
             self.info_container_widget = QWidget() # Container for all info elements
@@ -1721,12 +1785,66 @@ class ClientWidget(QWidget):
             self.doc_type_filter_combo.currentIndexChanged.connect(self.populate_doc_table)
             doc_filter_layout.addWidget(self.doc_type_filter_combo)
 
-            doc_filter_layout.addStretch(1) # Add stretch before the button
-            if hasattr(self, 'compile_pdf_btn'): # Ensure button was created
-                doc_filter_layout.addWidget(self.compile_pdf_btn) # Add compile PDF button here
+            # Add "Combiné" button (renaming existing compile_pdf_btn for this purpose)
+            if hasattr(self, 'compile_pdf_btn'):
+                self.combine_docs_btn = self.compile_pdf_btn # Use the existing button instance
+                self.combine_docs_btn.setText(self.tr("Combiné"))
+                self.combine_docs_btn.setIcon(QIcon.fromTheme("document-export", QIcon(":/icons/folder.svg"))) # Example icon, adjust as needed
+                self.combine_docs_btn.setToolTip(self.tr("Combiner plusieurs documents PDF"))
+                # Ensure it's connected if it wasn't, or re-verify connection:
+                # self.combine_docs_btn.clicked.connect(self.open_compile_pdf_dialog) # Already connected if compile_pdf_btn was
+                doc_filter_layout.addWidget(self.combine_docs_btn)
+            else: # Fallback if compile_pdf_btn was not created for some reason
+                self.combine_docs_btn = QPushButton(self.tr("Combiné"))
+                self.combine_docs_btn.setIcon(QIcon.fromTheme("document-export", QIcon(":/icons/folder.svg")))
+                self.combine_docs_btn.setToolTip(self.tr("Combiner plusieurs documents PDF"))
+                self.combine_docs_btn.clicked.connect(self.open_compile_pdf_dialog) # Ensure connection
+                doc_filter_layout.addWidget(self.combine_docs_btn)
+
+            # Add new "+" (Add) button
+            self.plus_add_doc_btn = QPushButton("+")
+            self.plus_add_doc_btn.setToolTip(self.tr("Ajouter un document (depuis modèle ou importation directe)"))
+            self.plus_add_doc_btn.setFixedSize(30, 30) # Make it a small square button
+            self.plus_add_doc_btn.clicked.connect(self.handle_plus_add_doc_button_click) # Connected
+            doc_filter_layout.addWidget(self.plus_add_doc_btn)
+
+            doc_filter_layout.addStretch(1) # Add stretch after all buttons
 
             docs_layout.addWidget(self.doc_filter_layout_widget)
             self.doc_filter_layout_widget.setVisible(True)
+        except Exception as e_doc_tab:
+            logging.error(f"Error in _setup_documents_tab: {e_doc_tab}", exc_info=True)
+            QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation onglet Documents:\n{0}").format(str(e_doc_tab)))
+
+    def handle_plus_add_doc_button_click(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle(self.tr("Ajouter un Document"))
+        layout = QVBoxLayout(dialog)
+
+        btn_from_template = QPushButton(self.tr("Ajouter à partir d'un modèle"))
+        btn_from_template.setIcon(QIcon(":/icons/file-plus.svg")) # Consistent icon
+        def action_from_template():
+            dialog.accept() # Close this dialog
+            self.open_create_docs_dialog() # Call existing method
+        btn_from_template.clicked.connect(action_from_template)
+        layout.addWidget(btn_from_template)
+
+        btn_direct_import = QPushButton(self.tr("Ajouter directement un document"))
+        btn_direct_import.setIcon(QIcon(":/icons/upload.svg")) # Consistent icon (assuming upload.svg exists or use another)
+        def action_direct_import():
+            dialog.accept() # Close this dialog
+            self.add_document() # Call existing method
+        btn_direct_import.clicked.connect(action_direct_import)
+        layout.addWidget(btn_direct_import)
+
+        # Add a cancel button for completeness
+        btn_cancel = QPushButton(self.tr("Annuler"))
+        btn_cancel.clicked.connect(dialog.reject)
+        layout.addWidget(btn_cancel)
+
+        dialog.setLayout(layout)
+        dialog.exec_()
+        try:
             self.documents_empty_label = QLabel(self.tr("Aucun document trouvé pour ce client.\nUtilisez les boutons ci-dessous pour ajouter ou générer des documents."))
             self.documents_empty_label.setAlignment(Qt.AlignCenter)
             font_docs_empty = self.documents_empty_label.font()
@@ -2220,13 +2338,9 @@ class ClientWidget(QWidget):
     def _handle_edit_pdf_action(self, file_path, document_id):
         if file_path and os.path.exists(file_path):
             QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
-        try:
-            self._setup_main_tabs_section(layout) #FIXED
-            self.notes_edit.textChanged.disconnect(self.save_client_notes)
-        except TypeError:
-            pass # Signal was not connected or already disconnected
-        self.notes_edit.installEventFilter(self)
-
+        else:
+            QMessageBox.warning(self, self.tr("Fichier Introuvable"),
+                                self.tr("Le fichier PDF spécifié est introuvable ou le chemin est invalide:\n{0}").format(file_path))
 
         # --- Collapsible Notes Section ---
         self.notes_group_box = QGroupBox(self.tr("Notes"))
@@ -2330,22 +2444,22 @@ class ClientWidget(QWidget):
         self.doc_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         docs_layout.addWidget(self.doc_table)
         doc_btn_layout = QHBoxLayout()
-        self.add_doc_btn = QPushButton(self.tr("Importer Document"))
-        self.add_doc_btn.setIcon(QIcon(":/icons/file-plus.svg"))
-        self.add_doc_btn.setToolTip(self.tr("Importer un fichier document existant pour ce client"))
-        self.add_doc_btn.clicked.connect(self.add_document) # Connect the signal
-        doc_btn_layout.addWidget(self.add_doc_btn)
+            # self.add_doc_btn = QPushButton(self.tr("Importer Document")) # Button removed
+            # self.add_doc_btn.setIcon(QIcon(":/icons/file-plus.svg"))
+            # self.add_doc_btn.setToolTip(self.tr("Importer un fichier document existant pour ce client"))
+            # self.add_doc_btn.clicked.connect(self.add_document)
+            # doc_btn_layout.addWidget(self.add_doc_btn) # Button removed
 
-        self.refresh_docs_btn = QPushButton(self.tr("Actualiser"))
-        self.refresh_docs_btn.setIcon(QIcon.fromTheme("view-refresh"))
-        self.refresh_docs_btn.clicked.connect(self.populate_doc_table)
-        doc_btn_layout.addWidget(self.refresh_docs_btn)
+            # self.refresh_docs_btn = QPushButton(self.tr("Actualiser")) # Button removed
+            # self.refresh_docs_btn.setIcon(QIcon.fromTheme("view-refresh"))
+            # self.refresh_docs_btn.clicked.connect(self.populate_doc_table)
+            # doc_btn_layout.addWidget(self.refresh_docs_btn) # Button removed
 
-        self.add_template_btn = QPushButton(self.tr("Générer via Modèle"))
-        self.add_template_btn.setIcon(QIcon.fromTheme("document-new", QIcon(":/icons/file-plus.svg"))) # Reverted
-        self.add_template_btn.setToolTip(self.tr("Générer un nouveau document pour ce client à partir d'un modèle"))
-        self.add_template_btn.clicked.connect(self.open_create_docs_dialog)
-        doc_btn_layout.addWidget(self.add_template_btn)
+            # self.add_template_btn = QPushButton(self.tr("Générer via Modèle")) # Button removed
+            # self.add_template_btn.setIcon(QIcon.fromTheme("document-new", QIcon(":/icons/file-plus.svg")))
+            # self.add_template_btn.setToolTip(self.tr("Générer un nouveau document pour ce client à partir d'un modèle"))
+            # self.add_template_btn.clicked.connect(self.open_create_docs_dialog)
+            # doc_btn_layout.addWidget(self.add_template_btn) # Button removed
         docs_layout.addLayout(doc_btn_layout)
         self.tab_widget.addTab(docs_tab, self.tr("Documents"))
 
@@ -2758,19 +2872,19 @@ class ClientWidget(QWidget):
                         try:
                             os.remove(file_path)
                             logging.info(f"File {file_path} deleted from disk.")
-                            self.notify(self.tr("Succès"), self.tr("Document et fichier supprimés avec succès."), type='SUCCESS')
+                            self.notification_manager.show(self.tr("Succès"), self.tr("Document et fichier supprimés avec succès."), type='SUCCESS')
                         except OSError as e_file:
                             logging.error(f"Error deleting file {file_path}: {e_file}", exc_info=True)
-                            self.notify(self.tr("Erreur Fichier"), self.tr("Document supprimé de la base de données, mais échec de la suppression du fichier:\n{0}").format(str(e_file)), type='ERROR')
+                            self.notification_manager.show(self.tr("Erreur Fichier"), self.tr("Document supprimé de la base de données, mais échec de la suppression du fichier:\n{0}").format(str(e_file)), type='ERROR')
                     else:
                         logging.warning(f"File path not provided or file does not exist for document ID {document_id}: {file_path}. DB entry deleted.")
-                        self.notify(self.tr("Succès (Partiel)"), self.tr("Entrée de document supprimée de la base de données. Fichier non trouvé ou chemin non spécifié."), type='WARNING')
+                        self.notification_manager.show(self.tr("Succès (Partiel)"), self.tr("Entrée de document supprimée de la base de données. Fichier non trouvé ou chemin non spécifié."), type='WARNING')
                 else:
-                    self.notify(self.tr("Erreur DB"), self.tr("Impossible de supprimer l'entrée du document de la base de données (ID: {0}). Vérifiez les logs.").format(document_id), type='ERROR')
+                    self.notification_manager.show(self.tr("Erreur DB"), self.tr("Impossible de supprimer l'entrée du document de la base de données (ID: {0}). Vérifiez les logs.").format(document_id), type='ERROR')
 
             except Exception as e:
                 logging.error(f"Error in delete_client_document_entry for doc ID {document_id}: {e}", exc_info=True)
-                self.notify(self.tr("Erreur Suppression"), self.tr("Une erreur inattendue est survenue:\n{0}").format(str(e)), type='CRITICAL')
+                self.notification_manager.show(self.tr("Erreur Suppression"), self.tr("Une erreur inattendue est survenue:\n{0}").format(str(e)), type='CRITICAL')
             finally:
                 self.populate_doc_table()
 
@@ -4126,22 +4240,37 @@ class ClientWidget(QWidget):
         logging.info(f"Setting need: {need_text_value}")
 
         # Update Base Folder Path
-        folder_path_value = self.client_info.get('base_folder_path')
-        if not folder_path_value:
-            folder_path_value = self.client_info.get('default_base_folder_path', '')
-        logging.info(f"Retrieved folder_path_value: '{folder_path_value}'")
+        folder_path_value_relative = self.client_info.get('base_folder_path')
+        if not folder_path_value_relative:
+            folder_path_value_relative = self.client_info.get('default_base_folder_path', '')
+        logging.info(f"Retrieved relative folder_path_value: '{folder_path_value_relative}' for display.")
 
-        if folder_path_value and os.path.isdir(folder_path_value):
-            folder_display_text = f"<a href='file:///{folder_path_value}'>{folder_path_value}</a>"
-            self.folder_value_label.setText(folder_display_text)
-        else:
-            if not folder_path_value:
-                logging.warning(f"Client {self.client_info.get('client_id')}: base_folder_path and default_base_folder_path are missing or empty.")
-                folder_display_text = self.tr("N/A - Chemin non configuré")
+        folder_display_text = self.tr("N/A - Chemin non configuré")
+        if folder_path_value_relative and self.app_root_dir:
+            folder_path_value_absolute = os.path.normpath(os.path.join(self.app_root_dir, folder_path_value_relative))
+            logging.info(f"Constructed absolute folder_path_value: '{folder_path_value_absolute}' for display logic.")
+
+            try:
+                if not os.path.isdir(folder_path_value_absolute):
+                    logging.info(f"Directory '{folder_path_value_absolute}' not found in populate_details_layout. Attempting to create it.")
+                    os.makedirs(folder_path_value_absolute, exist_ok=True)
+                    logging.info(f"Directory '{folder_path_value_absolute}' created or already exists (populate_details_layout).")
+            except OSError as e:
+                logging.error(f"Failed to create directory '{folder_path_value_absolute}' in populate_details_layout: {e}")
+                # Continue, path might still be invalid for display below
+
+            if os.path.isdir(folder_path_value_absolute):
+                folder_display_text = f"<a href='file:///{folder_path_value_absolute}'>{folder_path_value_absolute}</a>"
             else:
-                logging.warning(f"Client {self.client_info.get('client_id')}: folder_path_value '{folder_path_value}' is not a valid directory.")
-                folder_display_text = self.tr("Chemin invalide: {0}").format(folder_path_value)
-            self.folder_value_label.setText(folder_display_text)
+                logging.warning(f"Client {self.client_info.get('client_id')}: Absolute folder_path_value '{folder_path_value_absolute}' is not a valid directory after attempting creation.")
+                folder_display_text = self.tr("Chemin invalide: {0}").format(folder_path_value_absolute)
+        elif not folder_path_value_relative:
+            logging.warning(f"Client {self.client_info.get('client_id')}: base_folder_path and default_base_folder_path are missing or empty (populate_details_layout).")
+        elif not self.app_root_dir:
+            logging.error("ClientWidget: self.app_root_dir is not set. Cannot construct absolute path for client folder (populate_details_layout).")
+            folder_display_text = self.tr("Erreur configuration application (app_root_dir)")
+
+        self.folder_value_label.setText(folder_display_text)
 
         # Update Created By
         created_by_user_id = self.client_info.get("created_by_user_id")
@@ -4198,6 +4327,45 @@ class ClientWidget(QWidget):
                 self.commandes_tab_widget.load_commandes()
             if hasattr(self.commandes_tab_widget, 'populate_status_filters'): # If it has filters
                 self.commandes_tab_widget.populate_status_filters()
+
+        # Refresh overview tab content (metrics, projects, orders, activity)
+        if hasattr(self, '_load_overview_metrics'): # This method now handles all dynamic content for overview
+            self._load_overview_metrics()
+
+        # Explicitly refresh the overview header labels as they are part of ClientWidget's direct UI
+        if hasattr(self, '_update_overview_header_labels'):
+            self._update_overview_header_labels(new_client_info)
+
+    def handle_edit_document_note_clicked(self):
+        button = self.sender()
+        if not button:
+            return
+
+        document_id = button.property("document_id_for_note")
+        document_type = button.property("document_type_for_note")
+        language_code = button.property("language_code_for_note")
+
+        if not document_id:
+            QMessageBox.warning(self, self.tr("Erreur"), self.tr("ID de document manquant pour l'édition de la note."))
+            return
+
+        # Ensure EditDocumentNoteDialog is available
+        # Similar dynamic import or ensure it's imported at the top of the file
+        try:
+            from dialogs.edit_document_note_dialog import EditDocumentNoteDialog
+        except ImportError:
+            logging.error("Failed to import EditDocumentNoteDialog.")
+            QMessageBox.critical(self, self.tr("Erreur Importation"), self.tr("Le module d'édition de note de document n'a pas pu être chargé."))
+            return
+
+        dialog = EditDocumentNoteDialog(document_id, document_type, language_code, parent=self)
+        if dialog.exec_() == QDialog.Accepted:
+            self.populate_doc_table() # Refresh the document list to show updated note
+            self.notification_manager.show(
+                self.tr("Note Modifiée"),
+                self.tr("La note du document a été mise à jour avec succès."),
+                type='SUCCESS'
+            )
 
 
     def load_statuses(self):
@@ -4479,10 +4647,19 @@ class ClientWidget(QWidget):
             logging.info(f"PT_DEBUG: populate_doc_table - App root dir: {self.app_root_dir}")
             logging.info(f"PT_DEBUG: populate_doc_table - Effective absolute base_client_path used: {actual_absolute_base_client_path}")
 
+            try:
+                if not os.path.isdir(actual_absolute_base_client_path):
+                    logging.info(f"PT_DEBUG: Directory '{actual_absolute_base_client_path}' not found in populate_doc_table. Attempting to create it.")
+                    os.makedirs(actual_absolute_base_client_path, exist_ok=True)
+                    logging.info(f"PT_DEBUG: Directory '{actual_absolute_base_client_path}' created or already exists (populate_doc_table).")
+            except OSError as e:
+                logging.error(f"PT_DEBUG: Failed to create directory '{actual_absolute_base_client_path}' in populate_doc_table: {e}")
+                # The original isdir check below will then fail and handle the error message.
+
             if not os.path.isdir(actual_absolute_base_client_path):
-                logging.error(f"PT_DEBUG: populate_doc_table - Invalid or missing constructed absolute base_client_path: '{actual_absolute_base_client_path}'")
+                logging.error(f"PT_DEBUG: populate_doc_table - Invalid or missing constructed absolute base_client_path: '{actual_absolute_base_client_path}' (after attempting creation).")
                 if hasattr(self, 'documents_empty_label'):
-                    self.documents_empty_label.setText(self.tr("Erreur: Dossier client introuvable ou non configuré à l'emplacement attendu."))
+                    self.documents_empty_label.setText(self.tr("Erreur: Dossier client introuvable ou inaccessible à l'emplacement attendu: {0}").format(actual_absolute_base_client_path))
                     self.documents_empty_label.setVisible(True)
                 self.doc_table.setVisible(False)
                 logging.info("PT_DEBUG: populate_doc_table - END (invalid actual_absolute_base_client_path)")
@@ -4591,17 +4768,28 @@ class ClientWidget(QWidget):
                 self.doc_table.setItem(row_idx, 2, QTableWidgetItem(language_code))
                 self.doc_table.setItem(row_idx, 3, QTableWidgetItem(mod_time_formatted))
 
-                logging.debug(f"PT_DEBUG: populate_doc_table - Row {row_idx}: Creating action widget.")
-                action_widget = QWidget(); action_layout = QHBoxLayout(action_widget); action_layout.setContentsMargins(2,2,2,2); action_layout.setSpacing(5)
+                # Column 4: Note
+                effective_note_content = db_manager.get_effective_document_note(
+                    commande_document_id=document_id, # ClientDocument.document_id is the commande_document_id
+                    document_type=doc_data.get('document_type_generated', ''),
+                    language_code=language_code # Use the resolved language_code for this document
+                )
+                note_display_text = (effective_note_content[:50] + '...') if effective_note_content and len(effective_note_content) > 50 else (effective_note_content or self.tr("N/A"))
+                note_item = QTableWidgetItem(note_display_text)
+                note_item.setToolTip(effective_note_content or self.tr("Aucune note définie."))
+                self.doc_table.setItem(row_idx, 4, note_item)
+
+
+                logging.debug(f"PT_DEBUG: populate_doc_table - Row {row_idx}: Creating legacy action widget (Fichier Original).")
+                legacy_action_widget = QWidget(); legacy_action_layout = QHBoxLayout(legacy_action_widget); legacy_action_layout.setContentsMargins(2,2,2,2); legacy_action_layout.setSpacing(5)
 
                 pdf_btn = QPushButton(""); pdf_btn.setIcon(QIcon(":/icons/file-text.svg")); pdf_btn.setToolTip(self.tr("Générer/Ouvrir PDF")); pdf_btn.setFixedSize(30,30)
-                # Pass the full doc_data to the handler
                 pdf_btn.clicked.connect(lambda _, doc=doc_data: self._handle_generate_and_open_pdf_action(doc))
-                action_layout.addWidget(pdf_btn)
+                legacy_action_layout.addWidget(pdf_btn)
 
                 source_btn = QPushButton(""); source_btn.setIcon(QIcon(":/icons/eye.svg")); source_btn.setToolTip(self.tr("Afficher source")); source_btn.setFixedSize(30,30)
                 source_btn.clicked.connect(lambda _, p=full_file_path: QDesktopServices.openUrl(QUrl.fromLocalFile(p)))
-                action_layout.addWidget(source_btn)
+                legacy_action_layout.addWidget(source_btn)
 
                 source_template_id = doc_data.get('source_template_id')
                 can_edit_source_template = False
@@ -4617,50 +4805,45 @@ class ClientWidget(QWidget):
                     if can_edit_source_template:
                         edit_source_template_btn = QPushButton(""); edit_source_template_btn.setIcon(QIcon(":/icons/edit-2.svg")); edit_source_template_btn.setToolTip(self.tr("Modifier modèle source")); edit_source_template_btn.setFixedSize(30,30)
                         edit_source_template_btn.clicked.connect(lambda _, doc_d=doc_data: self.handle_edit_source_template(doc_d))
-                        action_layout.addWidget(edit_source_template_btn)
+                        legacy_action_layout.addWidget(edit_source_template_btn)
                     elif file_type_str.upper() == "PDF":
                         edit_pdf_btn = QPushButton(""); edit_pdf_btn.setIcon(QIcon(":/icons/pencil.svg")); edit_pdf_btn.setToolTip(self.tr("Modifier PDF")); edit_pdf_btn.setFixedSize(30, 30)
                         edit_pdf_btn.clicked.connect(lambda _, p=full_file_path, doc_id=document_id: self._handle_edit_pdf_action(p, doc_id))
-                        action_layout.addWidget(edit_pdf_btn)
-                    elif doc_name.lower().endswith('.html'): # Specific to HTML for HtmlEditor and PDF regen
+                        legacy_action_layout.addWidget(edit_pdf_btn)
+                    elif doc_name.lower().endswith('.html'):
                         edit_btn = QPushButton(""); edit_btn.setIcon(QIcon(":/icons/pencil.svg")); edit_btn.setToolTip(self.tr("Modifier document HTML")); edit_btn.setFixedSize(30,30)
-                        # Pass doc_data to open_document
                         edit_btn.clicked.connect(lambda _, d=doc_data: self.open_document(d))
-                        action_layout.addWidget(edit_btn)
-                    elif doc_name.lower().endswith('.xlsx'): # Specific to Excel for ExcelEditor
+                        legacy_action_layout.addWidget(edit_btn)
+                    elif doc_name.lower().endswith('.xlsx'):
                         edit_btn = QPushButton(""); edit_btn.setIcon(QIcon(":/icons/pencil.svg")); edit_btn.setToolTip(self.tr("Modifier document Excel")); edit_btn.setFixedSize(30,30)
-                        # Pass only full_file_path for Excel as PDF regen is not directly tied here
-                        edit_btn.clicked.connect(lambda _, p=full_file_path: self.open_document(p)) # Keep old behavior for non-HTML
-                        action_layout.addWidget(edit_btn)
+                        edit_btn.clicked.connect(lambda _, p=full_file_path: self.open_document(p))
+                        legacy_action_layout.addWidget(edit_btn)
                     else:
-                        spacer_widget = QWidget(); spacer_widget.setFixedSize(30,30); action_layout.addWidget(spacer_widget)
-                else: # No permission to manage/edit
-                    spacer_widget = QWidget(); spacer_widget.setFixedSize(30,30); action_layout.addWidget(spacer_widget)
+                        spacer_widget = QWidget(); spacer_widget.setFixedSize(30,30); legacy_action_layout.addWidget(spacer_widget)
+                else:
+                    spacer_widget = QWidget(); spacer_widget.setFixedSize(30,30); legacy_action_layout.addWidget(spacer_widget)
 
                 if can_manage_docs:
                     delete_btn = QPushButton(""); delete_btn.setIcon(QIcon(":/icons/trash.svg")); delete_btn.setToolTip(self.tr("Supprimer document")); delete_btn.setFixedSize(30,30)
                     delete_btn.clicked.connect(lambda _, doc_id=document_id, p=full_file_path: self.delete_client_document_entry(doc_id, p))
-                    action_layout.addWidget(delete_btn)
-                else: # No permission to delete
-                    spacer_widget = QWidget(); spacer_widget.setFixedSize(30,30); action_layout.addWidget(spacer_widget)
+                    legacy_action_layout.addWidget(delete_btn)
+                else:
+                    spacer_widget = QWidget(); spacer_widget.setFixedSize(30,30); legacy_action_layout.addWidget(spacer_widget)
 
-                action_layout.addStretch(); action_widget.setLayout(action_layout)
-                logging.debug(f"PT_DEBUG: populate_doc_table - Row {row_idx}: Setting legacy actions cell widget (column 4).")
-                # This is the old "Actions" column, now "Fichier Original"
-                self.doc_table.setCellWidget(row_idx, 4, action_widget)
+                legacy_action_layout.addStretch(); legacy_action_widget.setLayout(legacy_action_layout)
+                self.doc_table.setCellWidget(row_idx, 5, legacy_action_widget) # Column 5: Fichier Original Actions
 
-                # --- New Quick Actions Column (Column 5) ---
+                # --- New Quick Actions Column (Column 6) ---
                 quick_actions_widget = QWidget()
                 quick_actions_layout = QHBoxLayout(quick_actions_widget)
                 quick_actions_layout.setContentsMargins(2, 2, 2, 2)
                 quick_actions_layout.setSpacing(5)
 
                 btn_preview_quick = QPushButton("")
-                btn_preview_quick.setProperty("class", "tableActionButton") # Added class property
+                btn_preview_quick.setProperty("class", "tableActionButton")
                 btn_preview_quick.setIcon(QIcon(":/icons/eye.svg"))
                 btn_preview_quick.setToolTip(self.tr("Aperçu rapide du document (meilleur effort)"))
-                btn_preview_quick.setFixedSize(28, 28) # Smaller buttons
-                # Store document data needed for the action
+                btn_preview_quick.setFixedSize(28, 28)
                 btn_preview_quick.setProperty("document_id", document_id)
                 btn_preview_quick.setProperty("file_path", full_file_path)
                 btn_preview_quick.setProperty("file_name", doc_name)
@@ -4668,25 +4851,37 @@ class ClientWidget(QWidget):
                 quick_actions_layout.addWidget(btn_preview_quick)
 
                 btn_download_quick = QPushButton("")
-                btn_download_quick.setProperty("class", "tableActionButton") # Added class property
+                btn_download_quick.setProperty("class", "tableActionButton")
                 btn_download_quick.setIcon(QIcon(":/icons/download.svg"))
                 btn_download_quick.setToolTip(self.tr("Télécharger ce document"))
                 btn_download_quick.setFixedSize(28, 28)
                 btn_download_quick.setProperty("document_id", document_id)
                 btn_download_quick.setProperty("file_path", full_file_path)
-                btn_download_quick.setProperty("file_name", doc_name) # Original name for download
+                btn_download_quick.setProperty("file_name", doc_name)
                 btn_download_quick.clicked.connect(self.on_download_doc_button_clicked)
                 quick_actions_layout.addWidget(btn_download_quick)
 
-                # Button for "New Version"
+                # Button for "Edit Note"
+                btn_edit_note = QPushButton("")
+                btn_edit_note.setProperty("class", "tableActionButton")
+                btn_edit_note.setIcon(QIcon(":/icons/comment.svg")) # Placeholder, find a good icon for notes
+                btn_edit_note.setToolTip(self.tr("Modifier la note de ce document"))
+                btn_edit_note.setFixedSize(28, 28)
+                # Store necessary data for the handler
+                btn_edit_note.setProperty("document_id_for_note", document_id)
+                btn_edit_note.setProperty("document_type_for_note", doc_data.get('document_type_generated', ''))
+                btn_edit_note.setProperty("language_code_for_note", language_code)
+                btn_edit_note.clicked.connect(self.handle_edit_document_note_clicked)
+                quick_actions_layout.addWidget(btn_edit_note)
+
+
                 btn_new_version = QPushButton("")
                 btn_new_version.setProperty("class", "tableActionButton")
-                btn_new_version.setIcon(QIcon(":/icons/plus-square.svg")) # Placeholder icon
+                btn_new_version.setIcon(QIcon(":/icons/plus-square.svg"))
                 btn_new_version.setToolTip(self.tr("Créer une nouvelle version de ce document"))
                 btn_new_version.setFixedSize(28, 28)
-
                 source_template_id_for_version = doc_data.get('source_template_id')
-                if source_template_id_for_version and can_manage_docs: # Enable only if it's from a template and user has permission
+                if source_template_id_for_version and can_manage_docs:
                     btn_new_version.clicked.connect(
                         lambda checked, doc_id=document_id, templ_id=source_template_id_for_version: \
                         self.handle_create_new_version_clicked(doc_id, templ_id)
@@ -4697,13 +4892,11 @@ class ClientWidget(QWidget):
                         btn_new_version.setToolTip(self.tr("Impossible de créer une version pour un document non basé sur un modèle."))
                     elif not can_manage_docs:
                          btn_new_version.setToolTip(self.tr("Permissions insuffisantes pour créer une nouvelle version."))
-
-
                 quick_actions_layout.addWidget(btn_new_version)
 
                 quick_actions_layout.addStretch()
                 quick_actions_widget.setLayout(quick_actions_layout)
-                self.doc_table.setCellWidget(row_idx, 5, quick_actions_widget) # New column index
+                self.doc_table.setCellWidget(row_idx, 6, quick_actions_widget) # New column index for Quick Actions
                 # --- End New Quick Actions Column ---
 
                 logging.info(f"PT_DEBUG: populate_doc_table - Finished populating row {row_idx + 1}/{len(filtered_list)}.")
@@ -6256,6 +6449,88 @@ class ClientWidget(QWidget):
             self.notes_edit.insertPlainText("\n" + f"{timestamp_prefix} ")
 
         self.save_client_notes()
+
+    # --- Handlers for Overview Tab Quick Actions ---
+    def _get_document_manager_instance(self):
+        """Helper to try and get the DocumentManager instance."""
+        parent = self.parent()
+        while parent is not None:
+            # Check for a known method that DocumentManager should have
+            if hasattr(parent, 'handle_new_order_action') or hasattr(parent, 'open_client_tab_by_id'):
+                return parent
+            parent = parent.parent()
+
+        app_instance = QApplication.instance()
+        if app_instance:
+            for widget in app_instance.topLevelWidgets():
+                if hasattr(widget, 'handle_new_order_action') or hasattr(widget, 'open_client_tab_by_id'):
+                    return widget
+
+        logging.error("ClientWidget: Could not find DocumentManager instance.")
+        QMessageBox.critical(self, self.tr("Erreur Interne"), self.tr("Impossible de trouver la fenêtre principale de l'application."))
+        return None
+
+    def _handle_overview_new_order(self):
+        client_id = self.client_info.get("client_id")
+        if not client_id:
+            QMessageBox.warning(self, self.tr("Erreur Client"), self.tr("ID Client non disponible."))
+            return
+
+        from commande_management.commande_dialog import CommandeDialog # Ensure it's imported
+        dialog = CommandeDialog(client_id=client_id, current_user_id=self.current_user_id, parent=self)
+        if dialog.exec_() == QDialog.Accepted:
+            if hasattr(self, 'commandes_tab_widget') and hasattr(self.commandes_tab_widget, 'refresh_commandes'):
+                self.commandes_tab_widget.refresh_commandes()
+            if hasattr(self, '_load_overview_metrics'):
+                self._load_overview_metrics()
+            self.notification_manager.show(self.tr("Nouvelle Commande"), self.tr("Nouvelle commande créée/initialisée."), type='SUCCESS')
+
+    def _handle_overview_new_project(self):
+        client_id = self.client_info.get("client_id")
+        client_name = self.client_info.get("client_name", self.tr("Client Inconnu"))
+        if not client_id:
+            QMessageBox.warning(self, self.tr("Erreur Client"), self.tr("ID Client non disponible."))
+            return
+
+        project_name, ok = QInputDialog.getText(self, self.tr("Nouveau Projet"), self.tr("Nom du Projet:"), QLineEdit.Normal, f"Projet pour {client_name} - {datetime.now().strftime('%Y%m%d')}")
+        if ok and project_name:
+            project_status_planning = db_manager.get_status_setting_by_name("Planning", "Project")
+            status_id = project_status_planning['status_id'] if project_status_planning else None
+
+            project_data = {
+                'client_id': client_id,
+                'project_name': project_name,
+                'description': self.tr("Nouveau projet pour {0}").format(client_name),
+                'start_date': datetime.now().strftime("%Y-%m-%d"),
+                'status_id': status_id,
+                'priority': 1
+            }
+            new_project_id = projects_crud.add_project(project_data)
+            if new_project_id:
+                self.notification_manager.show(self.tr("Projet Créé"), self.tr("Nouveau projet '{0}' créé.").format(project_name), type='SUCCESS')
+                # Try to refresh the main projects tab if available on DocumentManager
+                doc_manager = self._get_document_manager_instance()
+                if doc_manager and hasattr(doc_manager, 'projects_dashboard_widget_instance'):
+                    if hasattr(doc_manager.projects_dashboard_widget_instance, 'load_projects_summary'):
+                        doc_manager.projects_dashboard_widget_instance.load_projects_summary()
+                if hasattr(self, '_load_overview_metrics'):
+                    self._load_overview_metrics()
+            else:
+                QMessageBox.warning(self, self.tr("Erreur DB"), self.tr("Impossible de créer le projet."))
+        else:
+            self.notification_manager.show(self.tr("Annulé"), self.tr("Création de projet annulée."), type='INFO')
+
+    def _handle_overview_generate_document(self):
+        if not hasattr(self, 'CreateDocumentDialog') or self.CreateDocumentDialog is None:
+            logging.error("CreateDocumentDialog is not available in ClientWidget.")
+            QMessageBox.critical(self, self.tr("Erreur Composant"), self.tr("Le composant de création de document n'est pas chargé."))
+            return
+
+        dialog = self.CreateDocumentDialog(self.client_info, self.config, self.current_user_id, self)
+        if dialog.exec_() == QDialog.Accepted:
+            if hasattr(self, 'populate_doc_table'):
+                self.populate_doc_table()
+    # --- End Handlers for Overview Tab Quick Actions ---
 
     def handle_generate_final_invoice(self):
         if not self.client_info or not self.client_info.get('client_id'):

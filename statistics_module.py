@@ -835,7 +835,7 @@ class StatisticsDashboard(QWidget):
                 self.segmentation_chart_pages[key] = tab_widget # Store the page widget
 
             self.segmentation_tabs.addTab(tab_widget, title)
-        logging.debug(f"segmentation_chart_pages initialized: {self.segmentation_chart_pages}")
+
         logging.debug(f"segmentation_tables initialized: {self.segmentation_tables}")
 
 
@@ -896,6 +896,7 @@ class StatisticsDashboard(QWidget):
              return
         elif not chart_layout: # Should be caught by 'is None', but as a safeguard for unexpected falsy QLayout
             logging.critical(f"CRITICAL UNEXPECTED: Chart layout for 'status' is NOT None ({chart_layout}, type: {type(chart_layout)}), but it evaluates to FALSY. This is highly unusual. Cannot proceed.")
+
             return
 
         # Clear previous canvas if any
