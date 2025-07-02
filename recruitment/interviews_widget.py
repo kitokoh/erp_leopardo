@@ -66,7 +66,13 @@ class InterviewsWidget(QWidget):
         self.setLayout(self.main_layout)
 
         self.update_action_buttons_state()
-        self.load_job_openings_filter() # Initial load
+        # self.load_job_openings_filter() # Initial load - DEFERRED
+        self.initial_load_done = False
+
+    def initial_load_if_needed(self):
+        if not self.initial_load_done:
+            self.load_job_openings_filter()
+            self.initial_load_done = True
 
     def job_filter_changed(self):
         self.load_candidates_filter()
