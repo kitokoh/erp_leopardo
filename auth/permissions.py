@@ -4,6 +4,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Define Role Names (consistent with what's stored in DB or used by auth_service)
+SUPER_ADMIN = "Super Administrator" # Added SUPER_ADMIN
 ADMINISTRATOR = "Administrator"
 TEAM_LEAD = "Team Lead"
 OPERATOR = "Operator"
@@ -120,6 +121,7 @@ OPERATOR_PERMISSIONS = [
 ]
 
 PERMISSION_MAP = {
+    SUPER_ADMIN: ALL_PERMISSIONS, # Added SUPER_ADMIN
     ADMINISTRATOR: ALL_PERMISSIONS,
     TEAM_LEAD: TEAM_LEAD_PERMISSIONS,
     OPERATOR: OPERATOR_PERMISSIONS,
@@ -129,6 +131,7 @@ PERMISSION_MAP = {
 # The PERMISSION_MAP above is no longer directly used by the has_permission function.
 # Its structure was used as the source for the initial seeding of the
 # RolePermissions table in `db/init_schema.py`.
+# This map includes SUPER_ADMIN, ADMINISTRATOR, TEAM_LEAD, and OPERATOR.
 # For any future changes to default permissions for roles, modifications should
 # either be done via the Role Management UI (once implemented) or by adjusting
 # the seeding logic in `db/init_schema.py` if fundamental defaults need to change

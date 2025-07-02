@@ -4126,22 +4126,37 @@ class ClientWidget(QWidget):
         logging.info(f"Setting need: {need_text_value}")
 
         # Update Base Folder Path
-        folder_path_value = self.client_info.get('base_folder_path')
-        if not folder_path_value:
-            folder_path_value = self.client_info.get('default_base_folder_path', '')
-        logging.info(f"Retrieved folder_path_value: '{folder_path_value}'")
+        folder_path_value_relative = self.client_info.get('base_folder_path')
+        if not folder_path_value_relative:
+            folder_path_value_relative = self.client_info.get('default_base_folder_path', '')
+        logging.info(f"Retrieved relative folder_path_value: '{folder_path_value_relative}' for display.")
 
-        if folder_path_value and os.path.isdir(folder_path_value):
-            folder_display_text = f"<a href='file:///{folder_path_value}'>{folder_path_value}</a>"
-            self.folder_value_label.setText(folder_display_text)
-        else:
-            if not folder_path_value:
-                logging.warning(f"Client {self.client_info.get('client_id')}: base_folder_path and default_base_folder_path are missing or empty.")
-                folder_display_text = self.tr("N/A - Chemin non configuré")
+        folder_display_text = self.tr("N/A - Chemin non configuré")
+        if folder_path_value_relative and self.app_root_dir:
+            folder_path_value_absolute = os.path.normpath(os.path.join(self.app_root_dir, folder_path_value_relative))
+            logging.info(f"Constructed absolute folder_path_value: '{folder_path_value_absolute}' for display logic.")
+
+            try:
+                if not os.path.isdir(folder_path_value_absolute):
+                    logging.info(f"Directory '{folder_path_value_absolute}' not found in populate_details_layout. Attempting to create it.")
+                    os.makedirs(folder_path_value_absolute, exist_ok=True)
+                    logging.info(f"Directory '{folder_path_value_absolute}' created or already exists (populate_details_layout).")
+            except OSError as e:
+                logging.error(f"Failed to create directory '{folder_path_value_absolute}' in populate_details_layout: {e}")
+                # Continue, path might still be invalid for display below
+
+            if os.path.isdir(folder_path_value_absolute):
+                folder_display_text = f"<a href='file:///{folder_path_value_absolute}'>{folder_path_value_absolute}</a>"
             else:
-                logging.warning(f"Client {self.client_info.get('client_id')}: folder_path_value '{folder_path_value}' is not a valid directory.")
-                folder_display_text = self.tr("Chemin invalide: {0}").format(folder_path_value)
-            self.folder_value_label.setText(folder_display_text)
+                logging.warning(f"Client {self.client_info.get('client_id')}: Absolute folder_path_value '{folder_path_value_absolute}' is not a valid directory after attempting creation.")
+                folder_display_text = self.tr("Chemin invalide: {0}").format(folder_path_value_absolute)
+        elif not folder_path_value_relative:
+            logging.warning(f"Client {self.client_info.get('client_id')}: base_folder_path and default_base_folder_path are missing or empty (populate_details_layout).")
+        elif not self.app_root_dir:
+            logging.error("ClientWidget: self.app_root_dir is not set. Cannot construct absolute path for client folder (populate_details_layout).")
+            folder_display_text = self.tr("Erreur configuration application (app_root_dir)")
+
+        self.folder_value_label.setText(folder_display_text)
 
         # Update Created By
         created_by_user_id = self.client_info.get("created_by_user_id")
@@ -4479,10 +4494,19 @@ class ClientWidget(QWidget):
             logging.info(f"PT_DEBUG: populate_doc_table - App root dir: {self.app_root_dir}")
             logging.info(f"PT_DEBUG: populate_doc_table - Effective absolute base_client_path used: {actual_absolute_base_client_path}")
 
+            try:
+                if not os.path.isdir(actual_absolute_base_client_path):
+                    logging.info(f"PT_DEBUG: Directory '{actual_absolute_base_client_path}' not found in populate_doc_table. Attempting to create it.")
+                    os.makedirs(actual_absolute_base_client_path, exist_ok=True)
+                    logging.info(f"PT_DEBUG: Directory '{actual_absolute_base_client_path}' created or already exists (populate_doc_table).")
+            except OSError as e:
+                logging.error(f"PT_DEBUG: Failed to create directory '{actual_absolute_base_client_path}' in populate_doc_table: {e}")
+                # The original isdir check below will then fail and handle the error message.
+
             if not os.path.isdir(actual_absolute_base_client_path):
-                logging.error(f"PT_DEBUG: populate_doc_table - Invalid or missing constructed absolute base_client_path: '{actual_absolute_base_client_path}'")
+                logging.error(f"PT_DEBUG: populate_doc_table - Invalid or missing constructed absolute base_client_path: '{actual_absolute_base_client_path}' (after attempting creation).")
                 if hasattr(self, 'documents_empty_label'):
-                    self.documents_empty_label.setText(self.tr("Erreur: Dossier client introuvable ou non configuré à l'emplacement attendu."))
+                    self.documents_empty_label.setText(self.tr("Erreur: Dossier client introuvable ou inaccessible à l'emplacement attendu: {0}").format(actual_absolute_base_client_path))
                     self.documents_empty_label.setVisible(True)
                 self.doc_table.setVisible(False)
                 logging.info("PT_DEBUG: populate_doc_table - END (invalid actual_absolute_base_client_path)")

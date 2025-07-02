@@ -876,6 +876,7 @@ class StatisticsDashboard(QWidget):
             # To provide more context if .get() was behaving weirdly (though direct access might clarify)
             if "status" in self.segmentation_canvases:
                  logging.warning(f"Key 'status' IS IN self.segmentation_canvases, but direct access failed or resulted in None. Value: {self.segmentation_canvases.get('status')}")
+
             return
 
         # Clear previous canvas if any
