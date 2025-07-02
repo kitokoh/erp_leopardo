@@ -135,7 +135,7 @@ class StatisticsDashboard(QWidget):
         if self._left_map_actual_layout is None:
             logging.critical("StatisticsDashboard: self._left_map_actual_layout is None. This should have been set in __init__. Cannot proceed with map initialization.")
             return
-        
+
         # As an additional check, ensure the widget's current layout is indeed the one we stored.
         # This can catch unexpected external modifications to the widget's layout.
         if self.left_widget_for_map.layout() is None:
@@ -371,7 +371,7 @@ class StatisticsDashboard(QWidget):
             # Assumes statistics_module.py is in the project root directory.
             current_module_path = os.path.abspath(__file__)
             project_root_dir_local = os.path.dirname(current_module_path)
-            
+
             geojson_path = os.path.join(project_root_dir_local, "assets", "world_countries.geojson")
             logging.info(f"StatisticsDashboard: Attempting to load GeoJSON from: {geojson_path}")
 
@@ -804,7 +804,8 @@ class StatisticsDashboard(QWidget):
 
     def _setup_segmentation_tab_ui_internal(self):
         self.segmentation_tables = {}
-        self.segmentation_canvases = {} # For Matplotlib canvases
+        self.segmentation_chart_pages = {} # New dictionary for storing page widgets of charts
+        # self.segmentation_canvases = {} # Removed
 
         tab_configs = [
             ("country", self.tr("Par Pays"), ["Pays", "Nombre de Clients"], "table"),
@@ -829,13 +830,12 @@ class StatisticsDashboard(QWidget):
                 tab_layout.addWidget(table_widget)
                 self.segmentation_tables[key] = table_widget
             elif tab_type == "chart":
-                # For chart tabs, we'll create a FigureCanvas later when data is available
-                # We can store the layout or a placeholder widget if needed.
-                # For simplicity, we'll store the layout and add the canvas to it in the update method.
-                self.segmentation_canvases[key] = tab_layout # Store the layout for the canvas
+                # For chart tabs, store the QWidget page itself.
+                # The layout will be retrieved from this page widget when needed.
+                self.segmentation_chart_pages[key] = tab_widget # Store the page widget
 
             self.segmentation_tabs.addTab(tab_widget, title)
-        logging.debug(f"segmentation_canvases initialized: {self.segmentation_canvases}")
+
         logging.debug(f"segmentation_tables initialized: {self.segmentation_tables}")
 
 
@@ -858,32 +858,45 @@ class StatisticsDashboard(QWidget):
             table.setSortingEnabled(True)
 
     def _update_status_segmentation_chart(self):
-        logging.debug(f"Current segmentation_canvases at start of _update_status_segmentation_chart: {self.segmentation_canvases}")
+        logging.debug(f"Current segmentation_chart_pages at start of _update_status_segmentation_chart: {getattr(self, 'segmentation_chart_pages', 'Not Initialized')}")
         logging.info("Updating status segmentation chart...")
-        chart_layout = None # Initialize
-        try:
-            chart_layout = self.segmentation_canvases["status"]
-            logging.debug(f"Successfully retrieved chart_layout for 'status' via direct access: {chart_layout}")
-        except KeyError:
-            logging.error("Chart layout for 'status' NOT FOUND using direct key access (KeyError).")
-            # chart_layout remains None, will be caught by the next check
-        except Exception as e_direct_access:
-            logging.error(f"Unexpected error retrieving chart_layout for 'status' via direct access: {e_direct_access}", exc_info=True)
-            # chart_layout remains None
+
+        page_widget = None
+        if hasattr(self, 'segmentation_chart_pages'):
+            page_widget = self.segmentation_chart_pages.get("status")
+
+        logging.debug(f"Retrieved page_widget for 'status': {page_widget}")
+
+        if page_widget is None:
+            logging.error("Page widget for 'status' chart not found in self.segmentation_chart_pages.")
+            return
+
+        chart_layout = page_widget.layout()
+        logging.debug(f"Retrieved chart_layout from page_widget: {chart_layout} (type: {type(chart_layout)})")
 
         if chart_layout is None:
-            logging.error("Chart layout for 'status' IS EXPLICITLY NONE after retrieval attempt.")
-            if "status" in self.segmentation_canvases:
-                 logging.warning(f"Diagnosis: Key 'status' IS IN self.segmentation_canvases, but its value might be None or direct access failed. Current value via get: {self.segmentation_canvases.get('status')}")
-            else:
-                 logging.warning("Diagnosis: Key 'status' is NOT IN self.segmentation_canvases dictionary.")
-            return
-        # The following 'if not chart_layout:' is a fallback for the highly unlikely scenario where chart_layout is not None but still falsy.
-        # Given it's a QVBoxLayout, this shouldn't happen unless it's a very unusual Qt state.
-        elif not chart_layout: 
-            logging.critical(f"CRITICAL UNEXPECTED: Chart layout for 'status' is NOT None ({chart_layout}, type: {type(chart_layout)}), but it evaluates to FALSY. This is highly unusual and indicates a deeper issue. Cannot proceed with chart update.")
-            if "status" in self.segmentation_canvases:
-                 logging.warning(f"Further Diagnosis: Key 'status' IS IN self.segmentation_canvases. Value via get: {self.segmentation_canvases.get('status')}")
+            logging.error(f"Chart layout for 'status' IS EXPLICITLY NONE (retrieved from page_widget.layout()). Page widget was: {page_widget}")
+            # Attempt to re-set a layout if page_widget exists but has no layout (should not happen if setup is correct)
+            if page_widget and page_widget.layout() is None: # Double check
+                logging.warning(f"Page widget {page_widget} for 'status' exists but has no layout. Attempting to set a new QVBoxLayout.")
+                try:
+                    new_layout = QVBoxLayout(page_widget) # Set new layout on the page_widget
+                    page_widget.setLayout(new_layout) # Ensure it's set
+                    chart_layout = new_layout # Use this new layout
+                    logging.info(f"Successfully set a new QVBoxLayout on page_widget for 'status': {chart_layout}")
+                except Exception as e_set_layout:
+                    logging.error(f"Failed to set a new layout on page_widget for 'status': {e_set_layout}", exc_info=True)
+                    return # Cannot proceed
+            else: # page_widget was None or layout() was not None initially but chart_layout became None (less likely)
+                return
+
+        # Check again if chart_layout is valid after potential recreation
+        if chart_layout is None:
+             logging.error("Chart layout for 'status' remains None even after attempting to fix. Cannot proceed.")
+             return
+        elif not chart_layout: # Should be caught by 'is None', but as a safeguard for unexpected falsy QLayout
+            logging.critical(f"CRITICAL UNEXPECTED: Chart layout for 'status' is NOT None ({chart_layout}, type: {type(chart_layout)}), but it evaluates to FALSY. This is highly unusual. Cannot proceed.")
+
             return
 
         # Clear previous canvas if any
