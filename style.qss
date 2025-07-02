@@ -11,8 +11,6 @@
     *   Success Color: #28A745 (Green)
     *   Warning Color: #FFC107 (Yellow)
     *   Error Color: #DC3545 (Red)
-    *   Extravagant Accent: #FF4081 (Deep Pink - for specific highlights if desired)
-    *   Extravagant Background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2C3E50, stop:1 #4CA1AF) (Dark Blue/Teal Gradient)
 */
 
 /* Base QWidget Style */
@@ -755,163 +753,39 @@ QSplitter::handle:hover {
     background-color: #007BFF;
 }
 
-/*
-    Extravagant Menu Styling
-*/
-
-/* Main Menu Bar */
-QMenuBar#mainMenuBar {
-    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2c3e50, stop:0.7 #3498db, stop:1 #4a148c); /* Dark Blue/Teal to Purple Gradient */
-    padding: 8px 5px; /* Vertical padding, less horizontal for actions */
-    border-bottom: 2px solid #FF4081; /* Extravagant Accent border */
-    font-size: 10pt; /* Keep readable */
-}
-
-/* Direct Actions on MenuBar (Home, Create Order, Add User) */
-QMenuBar#mainMenuBar::item { /* Targets QActions added directly */
-    spacing: 3px;
-    padding: 8px 12px; /* Slightly less padding than full menus */
-    background: transparent;
-    color: #FFFFFF; /* White text on dark gradient */
-    border-radius: 5px;
-    margin-left: 3px;
-    margin-right: 3px;
-}
-
-QMenuBar#mainMenuBar::item:selected { /* Hover/selected for direct actions */
-    background-color: rgba(255, 255, 255, 0.2); /* Subtle highlight */
-}
-
-QMenuBar#mainMenuBar::item:pressed {
-    background-color: rgba(255, 255, 255, 0.3);
-}
-
-/* Top-level Menu Titles (Modules, Paramètres, Aide) */
-QMenuBar QMenu { /* This might not be how to target top-level menu titles if they are ::item */
-    /* The QMenuBar::item above will style these if they are considered items */
-}
-
-/* Dropdown Menus */
+/* QMenu */
 QMenu {
-    background-color: #34495E; /* Darker background for dropdowns */
-    border: 1px solid #FF4081; /* Extravagant Accent border */
-    padding: 8px;
-    border-radius: 6px;
-    color: #ECF0F1; /* Light text for readability */
+    background-color: #FFFFFF;
+    border: 1px solid #B0BEC5;
+    padding: 5px;
+    border-radius: 4px;
 }
 
 QMenu::item {
-    padding: 10px 25px 10px 20px;
-    color: #ECF0F1;
+    padding: 5px 20px 5px 20px;
+    color: #263238;
     background-color: transparent;
-    border-radius: 4px;
-    margin: 2px 0;
+    border-radius: 3px;
 }
 
 QMenu::item:selected {
-    background-color: #FF4081; /* Extravagant Accent for selection */
+    background-color: #007BFF;
     color: #FFFFFF;
-}
-
-QMenu::item:disabled {
-    color: #7F8C8D; /* Muted color for disabled items */
-    background-color: transparent;
-}
-
-QMenu::icon {
-    padding-left: 8px;
-    padding-right: 10px; /* More space after icon */
-    /* Consider styling icons if they are SVGs that can take color */
 }
 
 QMenu::separator {
     height: 1px;
-    background: #4A6175; /* Darker separator */
-    margin: 8px 4px; /* More vertical margin */
+    background: #DDE2E6;
+    margin: 4px 0px;
 }
-
 QMenu::indicator {
-    width: 20px;
-    height: 20px;
-    left: 10px;
-}
-QMenu::indicator:non-exclusive:checked {
-    image: url(:/icons/check-square.svg); /* Use a filled square or distinct check */
-    /* Or, if you want to color the SVG:
-       icon: url(:/icons/check.svg);
-       icon-theme: color #FF4081; (This is more advanced and might need custom icon engine)
-    */
-}
-QMenu::indicator:non-exclusive:unchecked {
-    image: url(:/icons/square.svg); /* Empty square */
-}
-
-
-QMenu::right-arrow {
-    image: url(:/icons/chevron-right-light.svg); /* Ensure a light version for dark menu */
     width: 16px;
     height: 16px;
-    right: 8px;
+    left: 6px;
 }
-
-/* User Menu Button - specific styling for the button itself */
-QPushButton#userMenuButton {
-    background-color: transparent; /* Match menubar or be distinct */
-    border: 2px solid #FF4081; /* Extravagant Accent border */
-    border-radius: 18px; /* For a 36x36 button, or adjust based on actual UserMenuButton size */
-    padding: 0px;
-    /* Ensure UserMenuButton has a fixed size in Python code, e.g., self.setFixedSize(36, 36) */
-    min-width: 32px; /* Adjust to actual size */
-    max-width: 32px;
-    min-height: 32px;
-    max-height: 32px;
+QMenu::indicator:non-exclusive:checked {
+    image: url(:/icons/check.svg);
 }
-
-QPushButton#userMenuButton:hover {
-    background-color: rgba(255, 64, 129, 0.3); /* Light pinkish hover */
-}
-
-QPushButton#userMenuButton:pressed {
-    background-color: rgba(255, 64, 129, 0.5); /* Darker pinkish press */
-}
-
-QPushButton#userMenuButton::menu-indicator {
-    image: none; /* Hide default menu indicator if UserMenuButton is a QPushButton with a menu */
-}
-
-
-/* Search bar in Menu Bar - make it blend with the new theme */
-QLineEdit#menuBarSearch {
-    font-size: 9pt;
-    border: 1px solid #4A6175; /* Border that fits the dark theme */
-    border-radius: 14px; /* More rounded */
-    padding: 5px 10px;
-    background-color: #2C3E50; /* Dark background */
-    color: #ECF0F1; /* Light text */
-    min-width: 220px;
-    margin: 4px 5px; /* Adjust margins to fit visually */
-}
-
-QLineEdit#menuBarSearch:focus {
-    border-color: #FF4081; /* Extravagant Accent on focus */
-    background-color: #34495E; /* Slightly lighter on focus */
-}
-
-/* Styling for the completer popup for search bar */
-QListView#menuBarSearchCompleterView {
-    background-color: #34495E; /* Dark background */
-    border: 1px solid #FF4081; /* Extravagant Accent border */
-    selection-background-color: #FF4081; /* Extravagant Accent for selection */
-    selection-color: #FFFFFF;
-    color: #ECF0F1; /* Light text */
-    outline: 0px;
-    font-size: 9pt;
-}
-
-QListView#menuBarSearchCompleterView::item {
-    padding: 6px 10px;
-}
-
 
 /* Specific Label Styles from Dialogs */
 QLabel#priceInfoLabel {
@@ -1078,13 +952,209 @@ QFrame#promoAreaFrame QLabel#promoTextLabel {
     :/icons/radio-checked-dot.svg, :/icons/check-disabled.svg,
     :/icons/radio-checked-dot-disabled.svg, :/icons/chevron-right.svg, :/icons/x.svg,
     :/icons/chevron-down-light.svg (for dark topbar menu buttons)
-    :/icons/check-square.svg (for QMenu indicator checked)
-    :/icons/square.svg (for QMenu indicator unchecked)
-    :/icons/chevron-right-light.svg (for QMenu right arrow)
 */
 
 
 /* End of Modern Theme for ClientDocManager */
+
+/* Search bar in Menu Bar */
+QLineEdit#menuBarSearch {
+    font-size: 9pt;
+    border: 1px solid #B0BEC5; /* Softer border */
+    border-radius: 12px; /* Rounded edges */
+    padding: 4px 8px 4px 8px; /* Top, Right, Bottom, Left */
+    background-color: #FFFFFF;
+    color: #263238;
+    min-width: 200px;
+    margin-top: 4px; /* Add some top margin */
+    margin-bottom: 4px; /* Add some bottom margin */
+    margin-right: 5px; /* Add some right margin if needed */
+}
+
+QLineEdit#menuBarSearch:focus {
+    border-color: #007BFF; /* Accent color on focus */
+}
+
+/* Styling for the completer popup */
+QListView#menuBarSearchCompleterView {
+    background-color: #FFFFFF;
+    border: 1px solid #DDE2E6; /* Consistent with other dropdowns */
+    selection-background-color: #007BFF;
+    selection-color: #FFFFFF;
+    outline: 0px; /* Remove focus outline on the popup itself */
+    font-size: 9pt; /* Match search bar font or app default */
+}
+
+QListView#menuBarSearchCompleterView::item {
+    padding: 5px 8px; /* Slightly more padding for readability */
+    border-radius: 0px; /* Ensure items are not rounded */
+}
+
+QListView#menuBarSearchCompleterView::item:selected {
+    /* Already covered by selection-background-color and selection-color on the QListView */
+}
+
+/* == MENU STYLING ENHANCEMENTS (Improved for better UX) == */
+
+QMenuBar {
+    background-color: #F5F7FA; /* Light grey, less stark than white */
+    border-bottom: 1px solid #DDE2E6;
+    padding: 5px 8px; /* Increased padding for a more spacious feel */
+    font-size: 10pt; /* Consistent font size */
+    font-weight: 500; /* Slightly bolder for menu bar items */
+}
+
+QMenuBar::item {
+    spacing: 6px; /* Increased spacing between menu bar items */
+    padding: 8px 15px; /* More padding within each menu bar item */
+    background: transparent;
+    color: #34495E; /* Darker, more saturated blue-grey for text */
+    border-radius: 5px; /* Slightly more rounded corners */
+    /* transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out; */ /* For smoother transitions (conceptual) */
+}
+
+QMenuBar::item:selected { /* When menu is open or hovered */
+    background-color: #007BFF; /* Accent blue background */
+    color: #FFFFFF; /* White text for contrast */
+}
+
+QMenuBar::item:pressed { /* When menu item is pressed */
+    background-color: #0056B3; /* Darker Accent Blue */
+    color: #FFFFFF;
+}
+
+/* QMenu (Dropdowns) - Refinements for a premium feel */
+QMenu {
+    background-color: #FFFFFF; /* Clean white background */
+    border: 1px solid #C0C6CC; /* Slightly darker border for better definition */
+    padding: 8px; /* Generous padding around the menu items */
+    border-radius: 6px; /* More pronounced rounding */
+    /* box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); */ /* Conceptual shadow for depth (not directly supported) */
+}
+
+QMenu::item {
+    padding: 10px 25px 10px 20px; /* Increased padding: T/B, R, L */
+    color: #2C3E50; /* Dark slate blue for text */
+    background-color: transparent;
+    border-radius: 4px;
+    margin: 2px 0; /* Slightly more margin between items */
+    font-size: 10pt;
+    /* transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out; */ /* Conceptual */
+}
+
+QMenu::item:selected { /* Hover/selected state in dropdown */
+    background-color: #007BFF; /* Accent blue */
+    color: #FFFFFF; /* White text */
+}
+
+QMenu::item:disabled {
+    color: #95A5A6; /* Greyed out for disabled items */
+    background-color: transparent;
+}
+
+QMenu::icon {
+    padding-left: 8px; /* More space for icons */
+    padding-right: 8px; /* Space between icon and text */
+    /* size: 18px 18px; */ /* Slightly larger icons if desired */
+}
+
+QMenu::separator {
+    height: 1px;
+    background: #EAECEE; /* Very light separator */
+    margin: 6px 4px; /* More vertical margin, less horizontal */
+}
+
+QMenu::indicator { /* For checkable menu items */
+    width: 20px; /* Slightly larger indicator */
+    height: 20px;
+    left: 10px; /* Adjusted position */
+}
+
+QMenu::indicator:non-exclusive:checked {
+    image: url(:/icons/check.svg); /* Ensure icon is modern and clear */
+    /* Consider adding a subtle background to the indicator itself if needed */
+}
+
+QMenu::indicator:non-exclusive:unchecked {
+    /* image: url(:/icons/checkbox-unchecked.svg); */ /* Optional: specific unchecked icon */
+    image: none;
+}
+
+/* Style for sub-menus */
+QMenu::right-arrow { /* Arrow for sub-menus */
+    image: url(:/icons/chevron-right.svg); /* Ensure icon is modern */
+    width: 16px;
+    height: 16px;
+    right: 8px; /* Position from the right edge */
+}
+
+/* == END OF MENU STYLING ENHANCEMENTS == */
+
+
+/* HomePageWidget Specific Styles */
+QWidget#HomePageWidget {
+    background-color: #F5F7FA; /* Secondary Background, plus doux que blanc pur */
+    /* Ou un dégradé léger :
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                stop:0 #FFFFFF, stop:1 #F0F4F8);
+    */
+}
+
+QLabel#homePageWelcomeLabel {
+    color: #007BFF; /* Couleur accentuée du thème */
+    font-family: "Open Sans", "Segoe UI", Arial, sans-serif; /* Assurer la cohérence */
+    /* Pour une ombre de texte (peut être coûteux en performance, à tester) :
+       text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1); (Pas directement supporté en QSS standard)
+       Alternative : utiliser un QLabel superposé avec un offset léger et une couleur plus sombre.
+       Pour l'instant, je vais me concentrer sur la couleur et la police.
+    */
+    padding-bottom: 10px; /* Un peu d'espace en dessous */
+    background-color: transparent; /* S'assurer qu'il n'y a pas de fond coloré par défaut */
+}
+
+/* HomePageWidget Button Styles (Cartes de Module) */
+QWidget#homePageButtonGridContainer QPushButton {
+    background-color: #FFFFFF; /* Fond blanc pour l'aspect carte */
+    border: 1px solid #DDE2E6; /* Bordure légère et moderne */
+    border-radius: 12px;       /* Coins plus arrondis */
+    padding: 20px;
+    font-size: 14px;
+    font-weight: bold;
+    color: #333333;
+    text-align: center;
+    min-height: 120px; /* Hauteur augmentée pour icône + texte */
+    min-width: 200px;  /* Largeur augmentée */
+    /* transition: all 0.2s ease-in-out; */ /* Pour des transitions douces (pas universellement supporté en QSS) */
+    /* Effet d'ombre via bordure plus foncée en bas et à droite pour simuler la profondeur */
+    border-bottom-width: 2px;
+    border-right-width: 2px;
+    border-bottom-color: #C0C6CC;
+    border-right-color: #C0C6CC;
+}
+
+QWidget#homePageButtonGridContainer QPushButton:hover {
+    background-color: #E3F2FD; /* Bleu très clair au survol, rappel de l'accent */
+    border-color: #007BFF;     /* Bordure accentuée au survol */
+    color: #0056B3;            /* Texte plus foncé au survol */
+    /* Léger agrandissement au survol si possible (pas direct en QSS, mais l'effet de bordure peut aider) */
+    border-bottom-width: 2px; /* Maintenir l'effet d'ombre */
+    border-right-width: 2px;
+    border-bottom-color: #0056B3; /* Ombre plus prononcée */
+    border-right-color: #0056B3;
+}
+
+QWidget#homePageButtonGridContainer QPushButton:pressed {
+    background-color: #CCE5FF; /* Bleu un peu plus foncé quand pressé */
+    border-color: #004085;
+    color: #004085;
+}
+
+/* Style pour les icônes à l'intérieur des boutons de la page d'accueil si nécessaire */
+/* Actuellement, la taille est définie en Python. On pourrait ajouter des filtres ou des effets ici si Qt le supporte. */
+/* QWidget#homePageButtonGridContainer QPushButton::icon { ... } */
+/* QWidget#homePageButtonGridContainer QPushButton::icon { ... } */
+/* QWidget#homePageButtonGridContainer QPushButton::icon { ... } */
+
 
 /* Specific button for "More Filters" */
 QPushButton#moreFiltersButton {
@@ -1107,29 +1177,43 @@ QPushButton#moreFiltersButton:checked { /* When active/expanded */
     color: #007BFF;
 }
 
+/* == END OF MENU STYLING ENHANCEMENTS == */
+
 /* HomePageWidget Specific Styles */
 QWidget#HomePageWidget {
     background-color: #F5F7FA; /* Secondary Background, plus doux que blanc pur */
+    /* Ou un dégradé léger :
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                stop:0 #FFFFFF, stop:1 #F0F4F8);
+    */
 }
 
 QLabel#homePageWelcomeLabel {
-    color: #007BFF;
-    font-family: "Open Sans", "Segoe UI", Arial, sans-serif;
-    padding-bottom: 10px;
-    background-color: transparent;
+    color: #007BFF; /* Couleur accentuée du thème */
+    font-family: "Open Sans", "Segoe UI", Arial, sans-serif; /* Assurer la cohérence */
+    /* Pour une ombre de texte (peut être coûteux en performance, à tester) :
+       text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1); (Pas directement supporté en QSS standard)
+       Alternative : utiliser un QLabel superposé avec un offset léger et une couleur plus sombre.
+       Pour l'instant, je vais me concentrer sur la couleur et la police.
+    */
+    padding-bottom: 10px; /* Un peu d'espace en dessous */
+    background-color: transparent; /* S'assurer qu'il n'y a pas de fond coloré par défaut */
 }
 
+/* HomePageWidget Button Styles (Cartes de Module) */
 QWidget#homePageButtonGridContainer QPushButton {
-    background-color: #FFFFFF;
-    border: 1px solid #DDE2E6;
-    border-radius: 12px;
+    background-color: #FFFFFF; /* Fond blanc pour l'aspect carte */
+    border: 1px solid #DDE2E6; /* Bordure légère et moderne */
+    border-radius: 12px;       /* Coins plus arrondis */
     padding: 20px;
     font-size: 14px;
     font-weight: bold;
     color: #333333;
     text-align: center;
-    min-height: 120px;
-    min-width: 200px;
+    min-height: 120px; /* Hauteur augmentée pour icône + texte */
+    min-width: 200px;  /* Largeur augmentée */
+    /* transition: all 0.2s ease-in-out; */ /* Pour des transitions douces (pas universellement supporté en QSS) */
+    /* Effet d'ombre via bordure plus foncée en bas et à droite pour simuler la profondeur */
     border-bottom-width: 2px;
     border-right-width: 2px;
     border-bottom-color: #C0C6CC;
@@ -1137,21 +1221,25 @@ QWidget#homePageButtonGridContainer QPushButton {
 }
 
 QWidget#homePageButtonGridContainer QPushButton:hover {
-    background-color: #E3F2FD;
-    border-color: #007BFF;
-    color: #0056B3;
-    border-bottom-width: 2px;
+    background-color: #E3F2FD; /* Bleu très clair au survol, rappel de l'accent */
+    border-color: #007BFF;     /* Bordure accentuée au survol */
+    color: #0056B3;            /* Texte plus foncé au survol */
+    /* Léger agrandissement au survol si possible (pas direct en QSS, mais l'effet de bordure peut aider) */
+    border-bottom-width: 2px; /* Maintenir l'effet d'ombre */
     border-right-width: 2px;
-    border-bottom-color: #0056B3;
+    border-bottom-color: #0056B3; /* Ombre plus prononcée */
     border-right-color: #0056B3;
 }
 
 QWidget#homePageButtonGridContainer QPushButton:pressed {
-    background-color: #CCE5FF;
+    background-color: #CCE5FF; /* Bleu un peu plus foncé quand pressé */
     border-color: #004085;
     color: #004085;
 }
 
+/* Style pour les icônes à l'intérieur des boutons de la page d'accueil si nécessaire */
+/* Actuellement, la taille est définie en Python. On pourrait ajouter des filtres ou des effets ici si Qt le supporte. */
+/* QWidget#homePageButtonGridContainer QPushButton::icon { ... } */
 /* Reset Filters Button */
 QPushButton#resetFiltersButton {
     background-color: #FFFFFF;
@@ -1174,6 +1262,8 @@ QPushButton[class="tableActionButton"] {
     border: none;
     padding: 1px; /* Minimal padding for icon buttons */
     color: #546E7A; /* Default secondary text color for icons */
+    /* Fixed size is set in code (28x28), ensure icon fits well */
+    /* min-width, min-height might not be needed if fixedSize is used */
     border-radius: 3px; /* Slight rounding for consistency */
 }
 
@@ -1185,4 +1275,82 @@ QPushButton[class="tableActionButton"]:hover {
 QPushButton[class="tableActionButton"]:pressed {
     background-color: #CCE5FF; /* Darker blue when pressed */
     color: #0056B3;
+
+
+}
+
+/* User Menu Button in Menu Bar */
+QPushButton#userMenuButton {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 16px; /* Half of the button's fixed size (32px / 2) */
+    padding: 0px;
+    min-width: 32px; /* Consistent with UserMenuButton fixed size */
+    max-width: 32px;
+    min-height: 32px;
+    max-height: 32px;
+    /* icon-size: 20px; */ /* Icon size is best controlled from UserMenuButton.py if precise sizing needed */
+}
+
+QPushButton#userMenuButton:hover {
+    background-color: #E0E0E0; /* Light grey hover */
+}
+
+QPushButton#userMenuButton:pressed {
+    background-color: #CFD8DC; /* Slightly darker grey when pressed */
+}
+
+QPushButton#userMenuButton::menu-indicator {
+    image: none; /* Hide default menu indicator arrow */
+}
+
+/* User Menu Button in Menu Bar */
+QPushButton#userMenuButton {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 16px; /* Half of the button's fixed size (32px / 2) */
+    padding: 0px;
+    min-width: 32px; /* Consistent with UserMenuButton fixed size */
+    max-width: 32px;
+    min-height: 32px;
+    max-height: 32px;
+    /* icon-size: 20px; */ /* Icon size is best controlled from UserMenuButton.py if precise sizing needed */
+}
+
+QPushButton#userMenuButton:hover {
+    background-color: #E0E0E0; /* Light grey hover */
+}
+
+
+QPushButton#userMenuButton:pressed {
+    background-color: #CFD8DC; /* Slightly darker grey when pressed */
+}
+
+QPushButton#userMenuButton::menu-indicator {
+    image: none; /* Hide default menu indicator arrow */
+}
+
+/* User Menu Button in Menu Bar */
+QPushButton#userMenuButton {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 16px; /* Half of the button's fixed size (32px / 2) */
+    padding: 0px;
+    min-width: 32px; /* Consistent with UserMenuButton fixed size */
+    max-width: 32px;
+    min-height: 32px;
+    max-height: 32px;
+    /* icon-size: 20px; */ /* Icon size is best controlled from UserMenuButton.py if precise sizing needed */
+}
+
+QPushButton#userMenuButton:hover {
+    background-color: #E0E0E0; /* Light grey hover */
+}
+
+QPushButton#userMenuButton:pressed {
+    background-color: #CFD8DC; /* Slightly darker grey when pressed */
+}
+
+QPushButton#userMenuButton::menu-indicator {
+    image: none; /* Hide default menu indicator arrow */
 }

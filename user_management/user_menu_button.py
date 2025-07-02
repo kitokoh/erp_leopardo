@@ -18,23 +18,16 @@ class UserMenuButton(QPushButton):
     request_show_user_management_page = pyqtSignal()
     request_open_edit_my_account_dialog = pyqtSignal() # Emits current_user_info
     request_open_add_user_dialog = pyqtSignal()
-    request_quit_application = pyqtSignal() # NEW: Signal to quit the application
 
     def __init__(self, current_user_info: dict | None, parent=None):
         super().__init__(parent)
         self.current_user_info = current_user_info
         self.main_window_ref = parent # Assuming parent is DocumentManager (main window)
 
-        # MODIFIED: Attempt to use a more modern user icon. Fallback to old one if not found.
-        user_icon_path = ":/icons/modern/user-circle.svg"
-        if not QIcon(user_icon_path).isNull(): # Check if icon actually exists
-             self.setIcon(QIcon(user_icon_path))
-        else:
-            self.setIcon(QIcon(":/icons/user.svg")) # Fallback
-
-        self.setFixedSize(32, 32)
+        self.setIcon(QIcon(":/icons/user.svg"))
+        self.setFixedSize(32, 32) # Default size, can be styled further with QSS
         self.setToolTip(self.tr("Options Utilisateur"))
-        self.setFlat(True)
+        self.setFlat(True) # Make it look less like a bulky button
 
         self.user_menu = QMenu(self)
         self.clicked.connect(self._show_user_menu)
@@ -75,34 +68,22 @@ class UserMenuButton(QPushButton):
 
         # 3. Logout
         logout_action = QAction(QIcon(":/icons/log-out.svg"), self.tr("Déconnexion"), self.user_menu)
-        logout_action.triggered.connect(self._handle_logout)
+        logout_action.triggered.connect(self._handle_logout) # Emit signal
         self.user_menu.addAction(logout_action)
 
         # 4. Admin-only section
+        # Check P_MANAGE_USERS permission for the current user
         user_role = self.current_user_info.get('role_name')
-        # MODIFIED: Use P_MANAGE_USERS for the entire admin section visibility for now
         if has_permission(user_role, P_MANAGE_USERS):
             self.user_menu.addSeparator()
 
-            # NEW: Admin Panel Action
-            admin_panel_action = QAction(QIcon(":/icons/tool.svg"), self.tr("Panneau d'Administration"), self.user_menu) # Assuming tool.svg or similar
-            admin_panel_action.triggered.connect(self._handle_show_user_management) # Re-uses existing signal for User Mgt Page
-            self.user_menu.addAction(admin_panel_action)
-
-            # Kept "Gérer les Utilisateurs" as it's more specific than "Panneau d'Administration" if that panel becomes broader
-            manage_users_action = QAction(QIcon(":/icons/users.svg"), self.tr("Gérer les Utilisateurs (spécifique)"), self.user_menu)
-            manage_users_action.triggered.connect(self._handle_show_user_management)
+            manage_users_action = QAction(QIcon(":/icons/users.svg"), self.tr("Gérer les Utilisateurs"), self.user_menu)
+            manage_users_action.triggered.connect(self._handle_show_user_management) # Emit signal
             self.user_menu.addAction(manage_users_action)
 
             create_user_action = QAction(QIcon(":/icons/user-plus.svg"), self.tr("Créer un Nouvel Utilisateur"), self.user_menu)
-            create_user_action.triggered.connect(self._handle_add_user)
+            create_user_action.triggered.connect(self._handle_add_user) # Emit signal
             self.user_menu.addAction(create_user_action)
-
-        # 5. Quit Application (always available at the end of this menu)
-        self.user_menu.addSeparator()
-        quit_app_action = QAction(QIcon(":/icons/power.svg"), self.tr("Quitter l'application"), self.user_menu) # Assuming power.svg or similar
-        quit_app_action.triggered.connect(self._handle_quit_application)
-        self.user_menu.addAction(quit_app_action)
 
     def _show_user_menu(self):
         # Position menu below the button
@@ -131,11 +112,6 @@ class UserMenuButton(QPushButton):
     def _handle_add_user(self):
         logger.info("UserMenuButton: Emitting request_open_add_user_dialog.")
         self.request_open_add_user_dialog.emit()
-
-    # NEW: Handler for quitting the application
-    def _handle_quit_application(self):
-        logger.info("UserMenuButton: Emitting request_quit_application.")
-        self.request_quit_application.emit()
 
 if __name__ == '__main__':
     # Basic test for the UserMenuButton

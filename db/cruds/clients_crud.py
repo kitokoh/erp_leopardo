@@ -882,6 +882,34 @@ class ClientsCRUD(GenericCRUD):
             logging.error(f"Unexpected error in get_active_clients_count_up_to_date: {ex}", exc_info=True)
             return 0
 
+    @_manage_conn
+    def get_client_count_by_country_id(self, country_id: int, conn: sqlite3.Connection = None, include_deleted: bool = False) -> int:
+        """
+        Counts clients for a specific country_id.
+
+        Args:
+            country_id (int): The ID of the country.
+            conn (sqlite3.Connection, optional): Database connection.
+            include_deleted (bool, optional): If True, includes soft-deleted clients. Defaults to False.
+
+        Returns:
+            int: The count of clients in the specified country.
+        """
+        cursor = conn.cursor()
+        sql = "SELECT COUNT(client_id) as count FROM Clients WHERE country_id = ?"
+        params = [country_id]
+
+        if not include_deleted:
+            sql += " AND (is_deleted IS NULL OR is_deleted = 0)"
+
+        try:
+            cursor.execute(sql, tuple(params))
+            row = cursor.fetchone()
+            return row['count'] if row else 0
+        except sqlite3.Error as e:
+            self.logger.error(f"Error getting client count for country_id {country_id}: {e}", exc_info=True)
+            return 0
+
 # Instantiate the CRUD class for easy import and use elsewhere
 clients_crud_instance = ClientsCRUD()
 
@@ -925,7 +953,8 @@ __all__ = [
     "get_client_notes",
     "get_clients_count_created_between",
     "get_total_clients_count_up_to_date",
-    "get_active_clients_count_up_to_date", # Added to __all__
+    "get_active_clients_count_up_to_date",
+    "get_client_count_by_country_id", # Added new function
     "ClientsCRUD", # Exporting the class itself for type hinting or direct instantiation
     "clients_crud_instance" # Exporting the instance if needed elsewhere
 ]

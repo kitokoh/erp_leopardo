@@ -22,8 +22,10 @@ from datetime import datetime # Added for client acquisition stats
 from dateutil.relativedelta import relativedelta # Added for client acquisition stats
 import json # Added for robust JS string escaping
 import folium
-import pandas as pd
+# import pandas as pd # pandas might not be directly needed in dashboard.py if map_utils handles its own data structures
 from branca.colormap import StepColormap # Import StepColormap
+
+from .map_utils import generate_folium_map_html # Import the new utility
 
 from db import (
     get_total_clients_count,
@@ -42,12 +44,14 @@ from db import (
 )
 # It seems db_manager is not directly imported, but functions are. If needed, import db as db_manager
 from db.cruds.clients_crud import clients_crud_instance
-from db.cruds.proforma_invoices_crud import list_proforma_invoices # Added for proforma sales
-from db.connection import get_db_connection # Added for proforma sales
+# from db.cruds.proforma_invoices_crud import list_proforma_invoices # No longer directly used by dashboard
+from db.connection import get_db_connection # Used by some stats methods
 # It seems db_manager is not directly imported, but functions are. If needed, import db as db_manager
-from db.cruds.clients_crud import clients_crud_instance
+# from db.cruds.clients_crud import clients_crud_instance # Duplicate
 from db.cruds.client_project_products_crud import get_product_usage_counts # Added for product popularity
-from db.cruds.proforma_invoices_crud import get_total_sales_amount_for_period # Added for sales trend
+from db.cruds.proforma_invoices_crud import get_total_sales_amount_for_period, get_total_proforma_sales_for_country_id # Added for sales trend and country stats
+from db.cruds.projects_crud import get_active_project_count_by_country_id # Added for country stats
+
 
 from app_setup import APP_ROOT_DIR
 
@@ -170,8 +174,9 @@ class StatisticsDashboard(QWidget):
 
     @pyqtSlot(str)
     def _on_map_country_clicked(self, country_name):
-        logging.info(f"Map country clicked: {country_name}. Emitting request_add_client_for_country.")
-        self.request_add_client_for_country.emit(country_name)
+        logging.info(f"Map country clicked: {country_name}. Switching to country stats view.")
+        self._show_country_stats_view(country_name)
+        # The request_add_client_for_country signal is now emitted by CountryStatsDisplayWidget
 
     # This slot is now replaced by _display_client_details_in_panel if request_view_client_details signal is removed.
     # For now, keep it if the signal is still defined, but it won't be connected to map_interaction_handler.
@@ -297,10 +302,49 @@ class StatisticsDashboard(QWidget):
         self.client_details_widget.setLayout(client_details_page_layout)
         self.stats_stack.addWidget(self.client_details_widget)
 
+        # Country Stats Display Widget
+        self.country_stats_display_widget = CountryStatsDisplayWidget(self)
+        self.stats_stack.addWidget(self.country_stats_display_widget)
+        self.country_stats_display_widget.back_to_global_requested.connect(self._show_global_stats_view)
+        self.country_stats_display_widget.add_client_to_country_requested.connect(self.request_add_client_for_country) # Re-emit original signal
+
         self.stats_stack.setCurrentWidget(self.global_stats_widget) # Show global stats by default
 
     def _show_global_stats_view(self):
         self.stats_stack.setCurrentWidget(self.global_stats_widget)
+
+    def _show_country_stats_view(self, country_name: str):
+        """Fetches data and shows country-specific stats view."""
+        logging.info(f"Fetching and showing stats for country: {country_name}")
+        country_obj = get_country_by_name(country_name) # Assumes this function handles DB session
+        if not country_obj:
+            logging.error(f"Country '{country_name}' not found in DB.")
+            self._show_global_stats_view() # Fallback
+            # Optionally show a message to the user
+            # (Requires self to be QWidget or have access to QMessageBox)
+            if hasattr(self, 'parent') and callable(self.parent) and hasattr(self.parent(), 'notify'):
+                 self.parent().notify("Erreur Données", f"Pays '{country_name}' non trouvé.", "ERROR")
+            return
+
+        country_id = country_obj['country_id']
+
+        # These calls need a DB session. Assuming CRUD methods handle it via @_manage_conn
+        # or that a session is passed if necessary (not shown here for brevity).
+        # For SQLite, @_manage_conn usually creates a new connection per call.
+        client_count = clients_crud_instance.get_client_count_by_country_id(country_id=country_id, include_deleted=False)
+        project_count = get_active_project_count_by_country_id(country_id=country_id) # This is a direct import
+
+        # For SQLAlchemy based CRUDs, a session needs to be passed or handled by the function.
+        # Let's assume get_total_proforma_sales_for_country_id handles its session.
+        db_session_proforma = get_db_connection() # Get a session for this call
+        sales_value = 0.0
+        try:
+            sales_value = get_total_proforma_sales_for_country_id(db_session_proforma, country_id=country_id)
+        finally:
+            if db_session_proforma: db_session_proforma.close()
+
+        self.country_stats_display_widget.update_display(country_name, client_count, project_count, sales_value)
+        self.stats_stack.setCurrentWidget(self.country_stats_display_widget)
 
     @pyqtSlot(str, str)
     def _display_client_details_in_panel(self, client_id_str, client_name_str):
@@ -368,8 +412,7 @@ class StatisticsDashboard(QWidget):
     def update_map(self):
         logging.info("update_map: Method entered.")
         try:
-            # APP_ROOT_DIR is imported from app_setup and points to the project root.
-            # The GeoJSON file is now in resources/assets/
+            # GeoJSON path setup
             geojson_path = os.path.join(APP_ROOT_DIR, "resources", "assets", "world_countries.geojson")
             logging.info(f"update_map: Attempting to load GeoJSON from: {geojson_path}")
 
@@ -379,128 +422,49 @@ class StatisticsDashboard(QWidget):
                 self._set_map_error_html(error_message)
                 return
 
-            logging.info("update_map: About to create folium.Map object.")
-            m = folium.Map(location=[20, 0], zoom_start=2, tiles="CartoDB positron")
-            logging.info(f"update_map: folium.Map object created: {m}")
-
+            # Fetch data needed for the map
+            clients_by_country_counts = None
             try:
                 clients_by_country_counts = get_client_counts_by_country()
+                logging.info(f"update_map: Fetched client_counts_by_country. Count: {len(clients_by_country_counts) if clients_by_country_counts else 0}")
             except Exception as db_exc:
                 logging.error(f"Database error while fetching client counts for map: {db_exc}", exc_info=True)
-                error_message = self.tr("Erreur de récupération des données statistiques pour la carte : {error_details}. L'affichage de la carte est indisponible.").format(error_details=str(db_exc))
+                error_message = self.tr("Erreur de récupération des données statistiques (comptes par pays) pour la carte.").format(error_details=str(db_exc))
                 self._set_map_error_html(error_message)
                 return
 
-            logging.info(f"update_map: Fetched client_counts_by_country. Count: {len(clients_by_country_counts) if clients_by_country_counts else 0}")
+            all_clients_for_main_map_popups = []
+            try:
+                all_clients_for_main_map_popups = clients_crud_instance.get_all_clients_with_details(include_deleted=False)
+                logging.info(f"update_map: Fetched {len(all_clients_for_main_map_popups)} client details for popups.")
+            except Exception as e_popup_data:
+                logging.error(f"update_map: Error fetching all client details for popups: {e_popup_data}", exc_info=True)
+                # Proceeding with empty list for popups, map will still render basic info.
 
-            if clients_by_country_counts:
-                logging.info("update_map: Adding client distribution GeoJson...")
-                counts_dict = {item['country_name']: item['client_count'] for item in clients_by_country_counts}
-                max_observed_clients = max(item['client_count'] for item in clients_by_country_counts) if clients_by_country_counts else 0
-                category_colors = ['#f7f7f7', '#c6dbef', '#6baed6', '#08519c']
-                color_index = [0, 1, 2, 4]
-                client_colormap = StepColormap(colors=category_colors, index=color_index, vmin=0, vmax=max(4, max_observed_clients), caption=self.tr("Nombre de Clients par Pays (Catégories)"))
-                def style_function(feature):
-                    count = counts_dict.get(feature['properties']['name'], 0)
-                    return {'fillColor': client_colormap(count), 'color': '#555555', 'weight': 0.5, 'fillOpacity': 0.7}
-                folium.GeoJson(geojson_path, name=self.tr("Distribution des Clients par Pays"), style_function=style_function, tooltip=folium.features.GeoJsonTooltip(fields=['name'], aliases=[self.tr('Pays:')], localize=True)).add_to(m)
-                client_colormap.add_to(m)
-                logging.info("update_map: Client distribution GeoJson added.")
-            else:
-                logging.info("update_map: No client count data. Adding basic GeoJSON layer for choropleth.")
-                folium.GeoJson(geojson_path, name=self.tr("Pays (Base)"), tooltip=folium.features.GeoJsonTooltip(fields=['name'], aliases=[self.tr('Pays:')])).add_to(m)
-                logging.info("update_map: Basic GeoJSON layer added.")
-
-            logging.info("update_map: Adding popup GeoJson...")
-            popup_layer = folium.GeoJson(
-                geojson_path,
-                name=self.tr("Informations Pays"),
-                style_function=lambda x: {'fillColor':'transparent', 'color':'transparent', 'weight':0},
-                tooltip=None
+            # Call the utility function to generate map HTML
+            map_html_content = generate_folium_map_html(
+                geojson_path=geojson_path,
+                clients_by_country_counts=clients_by_country_counts,
+                all_clients_details_for_popups=all_clients_for_main_map_popups,
+                app_translator_func=self.tr, # Pass the instance's tr method
+                map_interaction_handler_name="pyMapConnector" # Specific to this dashboard's handler
             )
-            # ... (popup generation loop remains the same) ...
-            for feature in popup_layer.data.get('features', []):
-                country_name = feature.get('properties', {}).get('name', 'N/A')
-                if country_name == 'N/A': continue
-                country_client_count = next((item['client_count'] for item in clients_by_country_counts if item['country_name'] == country_name), 0)
-                popup_html = f"<b>{country_name}</b><br>"
-                popup_html += f"{self.tr('Clients (Total)')}: {country_client_count}<br><hr>"
-                country_obj = get_country_by_name(country_name)
-                city_client_map = {}
-                if country_obj:
-                    country_id = country_obj.get('country_id')
-                    clients_in_country = clients_crud_instance.get_all_clients_with_details(filters={'country_id': country_id}, include_deleted=False)
-                    if clients_in_country:
-                        for client in clients_in_country:
-                            city_name = client.get('city', self.tr('Ville Inconnue'))
-                            client_detail_name = client.get('client_name', self.tr('Client Inconnu'))
-                            client_id = client.get('client_id')
-                            if city_name not in city_client_map: city_client_map[city_name] = []
-                            if len(city_client_map[city_name]) < 3: city_client_map[city_name].append({'id': client_id, 'name': client_detail_name})
-                if city_client_map:
-                    for city_name_iter, clients_in_city_list in city_client_map.items():
-                        popup_html += f"<b>{self.tr('Ville')}: {city_name_iter}</b> ({len(clients_in_city_list)} {self.tr('client(s) affiché(s)')})<br>"
-                        popup_html += "<ul>"
-                        for client_data_item in clients_in_city_list:
-                            js_client_id_arg = json.dumps(client_data_item['id'])
-                            js_client_name_arg = json.dumps(client_data_item['name'])
-                            onclick_js = f"pyMapConnector.clientClickedOnMap({js_client_id_arg}, {js_client_name_arg}); return false;"
-                            popup_html += f"<li><a href='#' onclick='{onclick_js}'>{client_data_item['name']}</a></li>"
-                        popup_html += "</ul>"
-                else:
-                    popup_html += f"{self.tr('Aucun client détaillé à afficher pour les villes.')}<br>"
 
-                js_country_name_arg = json.dumps(country_name)
-                button_text = self.tr('Ajouter Client Ici')
-                onclick_country_js = f"pyMapConnector.countryClicked({js_country_name_arg}); return false;"
-                popup_html += f"<br><button onclick='{onclick_country_js}'>{button_text}</button>"
-                feature['properties']['popup_content'] = popup_html
-
-            popup_layer.add_child(folium.features.GeoJsonPopup(fields=['popup_content'], localize=True))
-            popup_layer.add_to(m)
-            logging.info("update_map: Popup GeoJson added.")
-
-            folium.LayerControl().add_to(m)
-
-            logging.info("update_map: Rendering map to HTML...")
-            map_html_content = m.get_root().render()
-            logging.info(f"update_map: Map HTML rendered. Content length: {len(map_html_content) if map_html_content else 0}")
-
-            webchannel_setup_js = """
-            <script type="text/javascript" src="qrc:///qtwebchannel/qwebchannel.js"></script>
-            <script type="text/javascript">
-                document.addEventListener("DOMContentLoaded", function() {
-                    if (typeof QWebChannel !== 'undefined') {
-                        new QWebChannel(qt.webChannelTransport, function(channel) {
-                            window.pyMapConnector = channel.objects.pyMapConnector;
-                            if (window.pyMapConnector === undefined) {
-                                console.error("pyMapConnector object not found in channel.objects. Available objects:", Object.keys(channel.objects));
-                            } else {
-                                console.log("pyMapConnector initialized successfully.");
-                            }
-                        });
-                    } else {
-                        console.error("QWebChannel JavaScript library not loaded. pyMapConnector will not be available.");
-                    }
-                });
-            </script>
-            """
-            if "</body>" in map_html_content:
-                map_html_content = map_html_content.replace("</body>", webchannel_setup_js + "</body>", 1)
-            elif "</html>" in map_html_content:
-                map_html_content = map_html_content.replace("</html>", webchannel_setup_js + "</html>", 1)
-            else:
-                map_html_content += webchannel_setup_js
+            if map_html_content is None:
+                logging.error("update_map: generate_folium_map_html returned None. Map generation failed.")
+                self._set_map_error_html(self.tr("La génération du contenu HTML de la carte a échoué."))
+                return
 
             if self.map_view:
+                logging.info("update_map: About to set HTML content in QWebEngineView...")
                 self.map_view.setHtml(map_html_content)
-                logging.info(f"Map HTML content successfully set in QWebEngineView. Map should be attempting to render. HTML content length: {len(map_html_content) if map_html_content else 0}.")
+                logging.info(f"Map HTML content successfully set in QWebEngineView. Map should be attempting to render. HTML content length: {len(map_html_content)}.")
             else:
-                logging.error("StatisticsDashboard: self.map_view is None. Cannot set HTML for the map.")
+                logging.error("StatisticsDashboard: self.map_view is None. Cannot set HTML for the map after generation.")
 
         except Exception as e:
-            logging.error(f"General error updating interactive map: {e}", exc_info=True) # Changed log message slightly for clarity
-            error_message = self.tr("Une erreur inattendue est survenue lors de la génération de la carte : {error_details}. L'affichage de la carte est indisponible. Veuillez réessayer ou contacter le support si le problème persiste.").format(error_details=str(e))
+            logging.error(f"General error in update_map: {e}", exc_info=True)
+            error_message = self.tr("Une erreur inattendue est survenue lors de la mise à jour de la carte.").format(error_details=str(e))
             self._set_map_error_html(error_message)
 
     def _set_map_error_html(self, message: str):
@@ -1095,3 +1059,75 @@ class StatisticsSummaryWidget(QWidget):
 
     def refresh_data(self): # Public method for external refresh if needed
         self.update_summary_stats()
+
+class CountryStatsDisplayWidget(QWidget):
+    """
+    A widget to display country-specific statistics.
+    Emits signals for 'back' and 'add_client_to_country'.
+    """
+    back_to_global_requested = pyqtSignal()
+    add_client_to_country_requested = pyqtSignal(str) # Emits country name
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("CountryStatsDisplayWidget")
+        self.current_country_name = None # To store the name of the country being displayed
+        self._init_ui()
+
+    def _init_ui(self):
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setSpacing(10)
+
+        self.title_label = QLabel("Statistiques par Pays") # Placeholder, will be updated
+        font = self.title_label.font()
+        font.setPointSize(font.pointSize() + 2)
+        font.setBold(True)
+        self.title_label.setFont(font)
+        self.title_label.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(self.title_label)
+
+        stats_group = QGroupBox(self.tr("Détails")) # GroupBox for the stats
+        form_layout = QFormLayout(stats_group)
+
+        self.client_count_label = QLabel("N/A")
+        self.project_count_label = QLabel("N/A")
+        self.sales_value_label = QLabel("N/A")
+
+        form_layout.addRow(self.tr("Clients Totaux:"), self.client_count_label)
+        form_layout.addRow(self.tr("Projets Actifs:"), self.project_count_label)
+        form_layout.addRow(self.tr("Ventes Proforma Totales:"), self.sales_value_label)
+
+        main_layout.addWidget(stats_group)
+
+        # --- Action Buttons ---
+        buttons_layout = QHBoxLayout()
+        self.add_client_button = QPushButton(self.tr("Ajouter Client à ce Pays"))
+        self.add_client_button.setIcon(QIcon(":/icons/user-add.svg")) # Placeholder icon
+        self.add_client_button.clicked.connect(self._emit_add_client_signal)
+        buttons_layout.addWidget(self.add_client_button)
+
+        buttons_layout.addStretch() # Pushes back button to the right
+
+        self.back_button = QPushButton(self.tr("Retour aux Stats Globales"))
+        self.back_button.setIcon(QIcon(":/icons/arrow-left-circle.svg")) # Placeholder icon
+        self.back_button.clicked.connect(self.back_to_global_requested)
+        buttons_layout.addWidget(self.back_button)
+
+        main_layout.addLayout(buttons_layout)
+        main_layout.addStretch(1) # Push content to the top
+        self.setLayout(main_layout)
+
+    def update_display(self, country_name: str, client_count: int, project_count: int, sales_value: float):
+        self.current_country_name = country_name # Store for the "Add Client" button
+        self.title_label.setText(self.tr("Statistiques pour: {0}").format(country_name))
+        self.client_count_label.setText(str(client_count))
+        self.project_count_label.setText(str(project_count))
+        self.sales_value_label.setText("€ {:,.2f}".format(sales_value))
+        logging.info(f"CountryStatsDisplayWidget updated for {country_name}.")
+
+    def _emit_add_client_signal(self):
+        if self.current_country_name:
+            self.add_client_to_country_requested.emit(self.current_country_name)
+        else:
+            logging.warning("CountryStatsDisplayWidget: _emit_add_client_signal called but current_country_name is not set.")
