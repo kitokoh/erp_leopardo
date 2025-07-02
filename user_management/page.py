@@ -136,11 +136,23 @@ class UserManagementPage(QWidget):
 
     def _populate_role_filter(self):
         """Populates the role filter combo box with roles from the database."""
+        current_selection_data = self.role_filter_combo.currentData()
+        self.role_filter_combo.blockSignals(True) # Block signals during repopulation
+        self.role_filter_combo.clear()
+        self.role_filter_combo.addItem(self.tr("Tous les rôles"), None) # Add the default "All roles" item back
         try:
             roles = roles_crud.list_roles()
             if roles:
                 for role in roles:
                     self.role_filter_combo.addItem(role['role_name'], role['role_id'])
+
+            # Attempt to restore previous selection
+            index_to_restore = self.role_filter_combo.findData(current_selection_data)
+            if index_to_restore != -1:
+                self.role_filter_combo.setCurrentIndex(index_to_restore)
+            else:
+                self.role_filter_combo.setCurrentIndex(0) # Default to "Tous les rôles"
+
         except Exception as e:
             QMessageBox.critical(self, self.tr("Erreur Chargement Rôles"),
                                  self.tr("Impossible de charger les rôles pour le filtre : {0}").format(str(e)))
