@@ -2399,48 +2399,172 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     except Exception as e_acc_schema:
         print(f"CRITICAL ERROR during Accounting module schema/index creation: {e_acc_schema}")
         conn.rollback() # Rollback if using raw conn for anything in this block
-    # --- End Accounting Module Tables and Indexes ---
+    # --- End Accounting Module Tables and Indexes (This section will be moved and handled with a new connection) ---
 
-    # --- Calendar Module Tables ---
-    print("DEBUG_INIT_DB: Creating Calendar Module Tables...")
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS CompanyCalendarSettings (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id TEXT NOT NULL UNIQUE, -- Assuming user_id is a string UUID from Users table
-        business_type TEXT, -- B2B, B2C, Both
-        activity_category TEXT,
-        country_iso TEXT NOT NULL, -- ISO 3166-1 alpha-2 country code
-        region TEXT, -- Subdivision of the country
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
-    )
-    """)
+    # Commit and close the main raw connection used for most schema setup up to this point
+    # This is done BEFORE the SQLAlchemy block for accounting and other subsequent raw connection blocks.
+    try:
+        logging.info("DEBUG_INIT_DB: Committing main schema/index changes (pre-accounting/calendar/main_base_sqla) before closing raw conn.")
+        conn.commit()
+        logging.info("DEBUG_INIT_DB: Main schema/index changes committed (pre-accounting/calendar/main_base_sqla).")
+    except sqlite3.Error as e_commit_main_schema_final:
+        logging.error(f"DEBUG_INIT_DB: Error committing main schema changes: {e_commit_main_schema_final}", exc_info=True)
+        conn.rollback() # Rollback before closing if commit failed
+    finally:
+        conn.close() # Close the initial raw connection
+        logging.info("DEBUG_INIT_DB: Initial raw SQLite connection 'conn' closed.")
+
+
+    # --- Accounting Module Tables (SQLAlchemy part) ---
+    # This part uses its own SQLAlchemy engine and session.
+    try:
+        logging.info("DEBUG_INIT_DB: Creating/Seeding Accounting Module Tables & Data using SQLAlchemy engine.")
+        from accounting import cruds as acc_cruds
+        from accounting import models as acc_models_pydantic # Pydantic models
+        from sqlalchemy.orm import Session
+
+        engine_acc = create_engine(f"sqlite:///{config.DATABASE_PATH}")
+
+        acc_models.Base.metadata.create_all(bind=engine_acc, checkfirst=True)
+        print("DEBUG_INIT_DB: Accounting Module Tables creation attempted using SQLAlchemy engine.")
+
+        # Seed Accounting Data
+        with Session(engine_acc) as session_acc:
+            base_curr = acc_cruds.currency.get_base_currency(db=session_acc)
+            if not base_curr:
+                print("DEBUG_INIT_DB: No base currency found. Seeding USD as base.")
+                usd_currency_in = acc_models_pydantic.CurrencyCreate(
+                    code="USD", name="US Dollar", symbol="$",
+                    exchange_rate_to_base=Decimal("1.000000"), is_base_currency=True
+                )
+                acc_cruds.currency.create(db=session_acc, obj_in=usd_currency_in)
+                print("DEBUG_INIT_DB: USD seeded as base currency.")
+
+            current_year_name = f"FY{datetime.now().year}"
+            existing_fy = acc_cruds.fiscal_year.get_by_name(db=session_acc, name=current_year_name)
+            if not existing_fy:
+                print(f"DEBUG_INIT_DB: No fiscal year found for {current_year_name}. Seeding it now.")
+                default_fy_in = acc_models_pydantic.FiscalYearCreate(
+                    name=current_year_name, start_date=date(datetime.now().year, 1, 1),
+                    end_date=date(datetime.now().year, 12, 31), status=acc_models_pydantic.FiscalYearStatusEnum.OPEN
+                )
+                acc_cruds.fiscal_year.create(db=session_acc, obj_in=default_fy_in)
+                print(f"DEBUG_INIT_DB: Fiscal year {current_year_name} seeded.")
+
+            if not acc_cruds.chart_of_accounts.get_multi(db=session_acc, limit=1):
+                print("DEBUG_INIT_DB: Chart of Accounts is empty. Seeding minimal accounts.")
+                accounts_to_seed = [
+                    {"code": "1010", "name": "Cash", "account_type": acc_models_pydantic.AccountTypeEnum.ASSET},
+                    {"code": "1020", "name": "Accounts Receivable", "account_type": acc_models_pydantic.AccountTypeEnum.ASSET},
+                    {"code": "2010", "name": "Accounts Payable", "account_type": acc_models_pydantic.AccountTypeEnum.LIABILITY},
+                    {"code": "3010", "name": "Common Stock", "account_type": acc_models_pydantic.AccountTypeEnum.EQUITY},
+                    {"code": "4010", "name": "Sales Revenue", "account_type": acc_models_pydantic.AccountTypeEnum.REVENUE},
+                    {"code": "5010", "name": "Office Supplies Expense", "account_type": acc_models_pydantic.AccountTypeEnum.EXPENSE},
+                ]
+                for acc_data in accounts_to_seed:
+                    acc_in = acc_models_pydantic.ChartOfAccountsCreate(**acc_data)
+                    if not acc_cruds.chart_of_accounts.get_by_code(db=session_acc, code=acc_in.code):
+                        acc_cruds.chart_of_accounts.create(db=session_acc, obj_in=acc_in)
+                print("DEBUG_INIT_DB: Minimal Chart of Accounts seeded.")
+
+            session_acc.commit()
+            print("DEBUG_INIT_DB: Accounting module specific seed data committed using SQLAlchemy session.")
+
+    except ImportError:
+        print("DEBUG_INIT_DB: Could not import accounting cruds/models for schema/seeding. Skipping accounting part.")
+    except Exception as e_acc_setup:
+        print(f"CRITICAL ERROR during Accounting module schema/data setup: {e_acc_setup}", exc_info=True)
+
+    # --- Create Accounting Indexes (using a new raw connection) ---
+    print("DEBUG_INIT_DB: Creating Accounting Module Indexes (manual via new raw connection)...")
+    conn_idx = sqlite3.connect(config.DATABASE_PATH)
+    conn_idx.row_factory = sqlite3.Row
+    cursor_idx = conn_idx.cursor()
+    try:
+        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_fiscal_years_name ON acc_fiscal_years(name)")
+        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_fiscal_years_start_date ON acc_fiscal_years(start_date)")
+        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_fiscal_years_end_date ON acc_fiscal_years(end_date)")
+        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_fiscal_years_status ON acc_fiscal_years(status)")
+        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_currencies_name ON acc_currencies(name)")
+        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_currencies_is_base ON acc_currencies(is_base_currency)")
+        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_tax_rates_name ON acc_tax_rates(name)")
+        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_tax_rates_type ON acc_tax_rates(tax_type)")
+        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_coa_code ON acc_chart_of_accounts(code)")
+        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_coa_name ON acc_chart_of_accounts(name)")
+        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_coa_type ON acc_chart_of_accounts(account_type)")
+        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_coa_parent_id ON acc_chart_of_accounts(parent_id)")
+        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_journal_entries_date ON acc_journal_entries(entry_date)")
+        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_journal_entries_ref ON acc_journal_entries(reference_number)")
+        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_journal_entries_fy_id ON acc_journal_entries(fiscal_year_id)")
+        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_journal_items_entry_id ON acc_journal_items(journal_entry_id)")
+        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_journal_items_account_id ON acc_journal_items(account_id)")
+        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_fin_stmt_name ON acc_financial_statements(name)")
+        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_fin_stmt_type ON acc_financial_statements(statement_type)")
+        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_fin_stmt_fy_id ON acc_financial_statements(fiscal_year_id)")
+        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_fin_stmt_period_end ON acc_financial_statements(period_end_date)")
+        conn_idx.commit()
+        print("DEBUG_INIT_DB: Accounting Module Indexes committed using new raw connection.")
+    except sqlite3.Error as e_acc_idx:
+        print(f"Error creating accounting indexes: {e_acc_idx}")
+        conn_idx.rollback()
+    finally:
+        conn_idx.close()
+        print("DEBUG_INIT_DB: New raw SQLite connection for accounting indexes closed.")
+    # --- End Accounting Module Operations ---
+
+
+    # --- Calendar Module Tables (Must use a new connection as 'conn' was closed) ---
+    print("DEBUG_INIT_DB: Creating Calendar Module Tables (using a new raw connection)...")
+    conn_cal = sqlite3.connect(config.DATABASE_PATH)
+    conn_cal.row_factory = sqlite3.Row
+    cursor_cal = conn_cal.cursor()
+    try:
+        cursor_cal.execute("""
+        CREATE TABLE IF NOT EXISTS CompanyCalendarSettings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL UNIQUE, -- Assuming user_id is a string UUID from Users table
+            business_type TEXT, -- B2B, B2C, Both
+            activity_category TEXT,
+            country_iso TEXT NOT NULL, -- ISO 3166-1 alpha-2 country code
+            region TEXT, -- Subdivision of the country
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
+        )
+        """)
     print("DEBUG_INIT_DB: Table CompanyCalendarSettings created or exists.")
 
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS UserCalendarEvents (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id TEXT NOT NULL, -- Assuming user_id is a string UUID from Users table
-        event_date DATE NOT NULL,
-        event_type TEXT NOT NULL, -- Holiday, RemoteWork, WorkDay, OtherPersonal
-        description TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
-    )
-    """)
+        cursor_cal.execute("""
+        CREATE TABLE IF NOT EXISTS UserCalendarEvents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL, -- Assuming user_id is a string UUID from Users table
+            event_date DATE NOT NULL,
+            event_type TEXT NOT NULL, -- Holiday, RemoteWork, WorkDay, OtherPersonal
+            description TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
+        )
+        """)
     print("DEBUG_INIT_DB: Table UserCalendarEvents created or exists.")
 
-    # Indexes for Calendar Module
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_companycalendarsettings_user_id ON CompanyCalendarSettings(user_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_user_id ON UserCalendarEvents(user_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_date ON UserCalendarEvents(event_date)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_type ON UserCalendarEvents(event_type)")
+        # Indexes for Calendar Module
+        cursor_cal.execute("CREATE INDEX IF NOT EXISTS idx_companycalendarsettings_user_id ON CompanyCalendarSettings(user_id)")
+        cursor_cal.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_user_id ON UserCalendarEvents(user_id)")
+        cursor_cal.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_date ON UserCalendarEvents(event_date)")
+        cursor_cal.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_type ON UserCalendarEvents(event_type)")
     print("DEBUG_INIT_DB: Indexes for Calendar Module created or already exist.")
+        conn_cal.commit()
+    except sqlite3.Error as e_cal_schema:
+        print(f"Error during Calendar module schema/index creation: {e_cal_schema}")
+        conn_cal.rollback()
+    finally:
+        conn_cal.close()
+        print("DEBUG_INIT_DB: Raw SQLite connection for Calendar module closed.")
     # --- End Calendar Module Tables ---
 
     # --- Create tables for MainBase (e.g., CalculatorHistory) ---
+    # This needs to happen after the main 'conn' is closed if 'main_engine' uses a new connection.
     if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None and main_engine is not None:
         try:
             logging.info("DEBUG_INIT_DB: Creating tables for MainBase (e.g., CalculatorHistory) using SQLAlchemy main_engine.")
@@ -2486,27 +2610,69 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         for row in cursor.fetchall():
             role_id_map[row['role_name']] = row['role_id']
 
-        seeded_role_permissions_count = 0
+        # Fetch role IDs first
+        role_id_map = {}
+        cursor.execute("SELECT role_id, role_name FROM Roles")
+        for row in cursor.fetchall():
+            role_id_map[row['role_name']] = row['role_id']
+
+        # Explicitly ensure Administrator has all permissions
+        admin_role_name_str = auth_perms_module.ADMINISTRATOR # This is "Administrator"
+        admin_role_id = role_id_map.get(admin_role_name_str)
+
+        if admin_role_id:
+            print(f"DEBUG_INIT_DB: Force-checking/seeding ALL permissions for {admin_role_name_str} (ID: {admin_role_id}). Total defined P_ keys: {len(all_permission_keys)}")
+            current_admin_perms_count = 0
+            newly_added_admin_perms_count = 0
+
+            # Get existing permissions for admin to avoid redundant checks if not necessary
+            cursor.execute("SELECT permission_key FROM RolePermissions WHERE role_id = ?", (admin_role_id,))
+            existing_admin_permission_keys = {row['permission_key'] for row in cursor.fetchall()}
+            current_admin_perms_count = len(existing_admin_permission_keys)
+
+            for p_key in all_permission_keys:
+                if p_key not in existing_admin_permission_keys:
+                    try:
+                        cursor.execute("INSERT INTO RolePermissions (role_id, permission_key) VALUES (?, ?)",
+                                       (admin_role_id, p_key))
+                        newly_added_admin_perms_count += 1
+                    except sqlite3.IntegrityError:
+                         # This might happen if another process added it, or if there's a race (unlikely for init)
+                         # Or if p_key somehow wasn't in all_permission_keys but was attempted (should not happen here)
+                         print(f"DEBUG_INIT_DB: IntegrityError trying to add {p_key} for Admin ID {admin_role_id}, might already exist or perm_key not in Permissions table.")
+                # else: # Already exists, no action needed for this key
+                    # pass
+            print(f"DEBUG_INIT_DB: {admin_role_name_str} (ID: {admin_role_id}) had {current_admin_perms_count} permissions. Newly added: {newly_added_admin_perms_count} permissions.")
+            if (current_admin_perms_count + newly_added_admin_perms_count) != len(all_permission_keys):
+                print(f"DEBUG_INIT_DB: WARNING - Admin total permissions ({current_admin_perms_count + newly_added_admin_perms_count}) does not match total defined P_ keys ({len(all_permission_keys)}). Check for issues.")
+        else:
+            print(f"DEBUG_INIT_DB: Could not find Administrator role ID ({admin_role_name_str}) to force-seed all permissions. Role ID Map: {role_id_map}")
+
+        # Seed other roles based on PERMISSION_MAP (excluding Administrator as it's handled above)
+        seeded_role_permissions_count = 0 # Reset for other roles
         for role_name_const, perm_keys_list in auth_perms_module.PERMISSION_MAP.items():
-            # role_name_const will be like "Administrator", "Team Lead" from auth.permissions
-            # We need its actual string value if it's a variable holding the name
-            # e.g. if auth_perms_module.ADMINISTRATOR = "Administrator"
-            actual_role_name = getattr(auth_perms_module, role_name_const, role_name_const) # Handles if it's a const name or direct string key
+            actual_role_name = getattr(auth_perms_module, role_name_const, role_name_const)
+
+            if actual_role_name == admin_role_name_str: # Skip Administrator, already handled
+                continue
+
             if isinstance(actual_role_name, str) and actual_role_name in role_id_map:
                 role_id = role_id_map[actual_role_name]
                 for perm_key in perm_keys_list:
                     if perm_key in all_permission_keys: # Ensure permission exists in Permissions table
                         try:
+                            # Using INSERT OR IGNORE for other roles is fine
                             cursor.execute("INSERT OR IGNORE INTO RolePermissions (role_id, permission_key) VALUES (?, ?)",
                                            (role_id, perm_key))
+                            # This count won't be accurate for "newly added" if OR IGNORE skips, but indicates attempts
                             seeded_role_permissions_count +=1
-                        except sqlite3.IntegrityError: # Should be caught by OR IGNORE
+                        except sqlite3.IntegrityError:
                             pass
                     else:
-                        print(f"Warning: Permission key '{perm_key}' found in PERMISSION_MAP for role '{actual_role_name}' but not in defined P_ constants. Skipping.")
+                        print(f"Warning: Permission key '{perm_key}' in PERMISSION_MAP for role '{actual_role_name}' not in defined P_ constants. Skipping.")
             else:
                  print(f"Warning: Role name '{actual_role_name}' from PERMISSION_MAP not found in Roles table (IDs: {role_id_map}). Skipping its permissions.")
-        print(f"DEBUG_INIT_DB: {seeded_role_permissions_count} role-permission links seeded into RolePermissions table.")
+        print(f"DEBUG_INIT_DB: {seeded_role_permissions_count} role-permission links attempted/verified for non-Admin roles based on PERMISSION_MAP.")
         # --- End Seed Permissions and RolePermissions ---
 
 

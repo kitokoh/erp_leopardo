@@ -1244,7 +1244,8 @@ class DocumentManager(QMainWindow):
                                      P_ACCESS_RECRUITMENT_MODULE, P_ACCESS_EXPERIENCE_MODULE, \
                                      P_ACCESS_CALENDAR_MODULE, P_ACCESS_BOTPRESS_MODULE, \
                                      P_ACCESS_CARRIER_MAP_MODULE, P_ACCESS_CAMERA_MODULE, \
-                                     P_MANAGE_GLOBAL_PRODUCTS, P_ACCESS_CALCULATOR_MODULE, P_MANAGE_STATUSES # Added P_MANAGE_ROLES
+                                     P_MANAGE_GLOBAL_PRODUCTS, P_VIEW_GLOBAL_PRODUCTS, \
+                                     P_ACCESS_CALCULATOR_MODULE, P_MANAGE_STATUSES # Added P_VIEW_GLOBAL_PRODUCTS
 
         role_name = self.current_user_info.get('role_name') if self.current_user_info else None
         if not role_name: # Should not happen if login is enforced, but good for safety
