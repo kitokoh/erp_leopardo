@@ -23,7 +23,8 @@ from PyQt5.QtWidgets import QListWidgetItem
 from PyQt5.QtGui import QPixmap
 
 import db as db_manager
-from db.cruds import client_documents_crud # Added for document deletion
+from db.cruds import client_documents_crud, users_crud, activity_logs_crud # Added for document deletion and user fetching
+
 from db.cruds.clients_crud import clients_crud_instance
 from excel_editor import ExcelEditor
 from html_editor import HtmlEditor
@@ -200,7 +201,7 @@ class ClientWidget(QWidget):
             # action_layout.addWidget(self.send_whatsapp_btn) # Moved to an internal tab
 
             self.archive_client_btn = QPushButton(self.tr("Archiver Client"))
-            self.archive_client_btn.setIcon(QIcon(":/icons/archive.svg"))
+            self.archive_client_btn.setIcon(QIcon(":/icons/folder.svg")) # Replaced archive.svg with folder.svg
             self.archive_client_btn.setToolTip(self.tr("Archiver ce client (soft delete)"))
             self.archive_client_btn.clicked.connect(self.handle_archive_client) # Connect to the new handler
             action_layout.addWidget(self.archive_client_btn)
@@ -223,21 +224,98 @@ class ClientWidget(QWidget):
             self.details_layout = QFormLayout() # This is the layout for client fields
             self.details_layout.setLabelAlignment(Qt.AlignLeft)
             self.details_layout.setSpacing(10)
-            self.category_label = QLabel(self.tr("Catégorie:")) # Initialized here, used in populate_details_layout
-            self.category_value_label = QLabel() # Initialized here, used in populate_details_layout
 
-            # self.status_combo must be created here ONCE and added to details_tab_layout
-            # Then populate_details_layout will only update its contents and enabled state.
-            if not hasattr(self, 'status_combo') or self.status_combo is None: # Should only happen once
-                self.status_combo = QComboBox()
-                 # The actual load_statuses and setting current text will be done in populate_details_layout
-                # and when switching to edit mode.
-            # Add it to a layout that will be part of details_tab_layout (e.g., within the QFormLayout handled by populate_details_layout)
+            # --- Persistent UI Elements for Client Details Tab ---
+            # These are created once here and updated by populate_details_layout
 
-            details_tab_layout.addLayout(self.details_layout) # details_layout will contain status_combo via populate_details_layout
+            # Project ID
+            self.project_id_label = QLabel(self.tr("ID Projet:"))
+            self.project_id_value_label = QLabel(self.tr("N/A"))
+            self.details_layout.addRow(self.project_id_label, self.project_id_value_label)
+
+            # Country and City
+            self.country_city_label = QLabel(self.tr("Localisation:"))
+            self.country_city_widget = QWidget()
+            country_city_h_layout = QHBoxLayout(self.country_city_widget)
+            country_city_h_layout.setContentsMargins(0,0,0,0)
+            self.country_label_static = QLabel(self.tr("Pays:")) # Static label
+            self.country_value_label = QLabel(self.tr("N/A"))
+            self.city_label_static = QLabel(self.tr("Ville:")) # Static label
+            self.city_value_label = QLabel(self.tr("N/A"))
+            country_city_h_layout.addWidget(self.country_label_static)
+            country_city_h_layout.addWidget(self.country_value_label)
+            country_city_h_layout.addSpacing(20)
+            country_city_h_layout.addWidget(self.city_label_static)
+            country_city_h_layout.addWidget(self.city_value_label)
+            country_city_h_layout.addStretch()
+            self.details_layout.addRow(self.country_city_label, self.country_city_widget)
+
+            # Price and Creation Date
+            self.price_date_label = QLabel(self.tr("Finances & Date:"))
+            self.price_date_widget = QWidget()
+            price_date_h_layout = QHBoxLayout(self.price_date_widget)
+            price_date_h_layout.setContentsMargins(0,0,0,0)
+            self.price_label_static = QLabel(self.tr("Prix Final:")) # Static label
+            self.price_value_label = QLabel(self.tr("0 €"))
+            self.date_label_static = QLabel(self.tr("Date Création:")) # Static label
+            self.date_value_label = QLabel(self.tr("N/A"))
+            price_date_h_layout.addWidget(self.price_label_static)
+            price_date_h_layout.addWidget(self.price_value_label)
+            price_date_h_layout.addSpacing(20)
+            price_date_h_layout.addWidget(self.date_label_static)
+            price_date_h_layout.addWidget(self.date_value_label)
+            price_date_h_layout.addStretch()
+            self.details_layout.addRow(self.price_date_label, self.price_date_widget)
+
+            # Status and Category
+            self.status_category_label = QLabel(self.tr("Classification:"))
+            self.status_category_widget = QWidget() # Persistent container for this row
+            status_category_h_layout = QHBoxLayout(self.status_category_widget)
+            status_category_h_layout.setContentsMargins(0,0,0,0)
+            self.status_label_static = QLabel(self.tr("Statut:")) # Static label for "Statut:"
+            self.status_combo = QComboBox() # Created once
+            self.category_label_static = QLabel(self.tr("Catégorie:")) # Static label for "Catégorie:"
+            self.category_value_label = QLabel(self.tr("N/A")) # Value label for category
+            status_category_h_layout.addWidget(self.status_label_static)
+            status_category_h_layout.addWidget(self.status_combo)
+            status_category_h_layout.addSpacing(20)
+            status_category_h_layout.addWidget(self.category_label_static)
+            status_category_h_layout.addWidget(self.category_value_label)
+            status_category_h_layout.addStretch()
+            self.details_layout.addRow(self.status_category_label, self.status_category_widget)
+
+            # Distributor Specific Info (conditionally visible)
+            self.distributor_info_label_static = QLabel(self.tr("Info Distributeur:")) # Static label
+            self.distributor_info_value_label = QLabel(self.tr("N/A")) # Value label
+            self.distributor_info_value_label.setWordWrap(True)
+            self.distributor_info_value_label.setObjectName("distributorInfoValueLabel")
+            self.distributor_info_label_static.setObjectName("distributorInfoLabel") # Label for the row
+            self.details_layout.addRow(self.distributor_info_label_static, self.distributor_info_value_label)
+
+
+            # Need (Besoin Principal)
+            self.need_label_static = QLabel(self.tr("Besoin Principal:")) # Static label
+            self.need_value_label = QLabel(self.tr("N/A")) # Value label
+            self.details_layout.addRow(self.need_label_static, self.need_value_label)
+
+            # Base Folder Path
+            self.folder_label_static = QLabel(self.tr("Chemin Dossier:")) # Static label
+            self.folder_value_label = QLabel(self.tr("N/A")) # Value label, will contain link
+            self.folder_value_label.setOpenExternalLinks(True)
+            self.folder_value_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+            self.details_layout.addRow(self.folder_label_static, self.folder_value_label)
+
+            # Created By
+            self.created_by_label_static = QLabel(self.tr("Créé par:"))
+            self.created_by_value_label = QLabel(self.tr("N/A"))
+            self.details_layout.addRow(self.created_by_label_static, self.created_by_value_label)
+            # --- End of Persistent UI Elements for Client Details Tab ---
+
+            details_tab_layout.addLayout(self.details_layout)
             self.internal_client_info_tabs.addTab(self.client_details_tab, self.client_info.get('client_name', self.tr("Détails Client")))
 
-            self.populate_details_layout() # Populate the details in the first tab, this will add status_combo to details_layout
+            # Initial population of the now persistent elements
+            self.populate_details_layout()
 
 
             # --- Tab 2: Contacts ---
@@ -4503,34 +4581,30 @@ class ClientWidget(QWidget):
         # Clear existing rows from the layout, EXCEPT for the status_combo's row if managed differently
         # For simplicity, we'll clear and re-add, ensuring status_combo is handled carefully.
 
-        # Disconnect signals first to prevent issues during repopulation
-        if hasattr(self, 'status_combo'):
-            try:
-                self.status_combo.currentTextChanged.disconnect(self.update_client_status)
-            except TypeError:
-                pass # Not connected
+        # The status_combo is persistent, created in setup_ui. It should not be deleted here.
+        # Its items will be updated by self.load_statuses().
 
         # Detach category labels if they exist and are parented to details_layout
-        if hasattr(self, 'category_label') and self.category_label and self.category_label.layout() == self.details_layout:
-            self.category_label.setParent(None)
-        if hasattr(self, 'category_value_label') and self.category_value_label and self.category_value_label.layout() == self.details_layout:
-            self.category_value_label.setParent(None)
+        # This is important if they are not recreated each time.
+        # if hasattr(self, 'category_label') and self.category_label and self.category_label.parentWidget() is not None:
+        #     self.category_label.setParent(None)
+        # if hasattr(self, 'category_value_label') and self.category_value_label and self.category_value_label.parentWidget() is not None:
+        #     self.category_value_label.setParent(None)
 
-        # Clear all rows from details_layout
-        while self.details_layout.rowCount() > 0:
-            self.details_layout.removeRow(0)
+        # DO NOT Clear all rows from details_layout if labels are persistent instance members.
+        # while self.details_layout.rowCount() > 0:
+        #     self.details_layout.removeRow(0)
 
-        self.detail_value_labels = {} # Re-initialize
+        self.detail_value_labels = {} # Re-initialize, though it might not be strictly needed if not used by edit mode.
         logging.info(f"Populating details layout for: {self.client_info.get('client_name')}")
 
-        # Ensure status_combo is created (should be done in setup_ui, but as a fallback)
+        # Ensure status_combo is created (it will be None now due to the above logic)
         if not hasattr(self, 'status_combo') or self.status_combo is None:
-            logging.warning("status_combo was None in populate_details_layout, re-creating. This should ideally be created in setup_ui.")
+            logging.debug("status_combo is None, creating new instance.")
             self.status_combo = QComboBox()
-            # self.load_statuses() # load_statuses will be called below anyway
 
-        # Always reload statuses to ensure items are up-to-date
-        self.load_statuses()
+        # Always reload statuses into the (potentially new) combo box
+        self.load_statuses() # This should now operate on a valid, new QComboBox
 
         # Set current status and enabled state
         self.status_combo.setEnabled(False) # Non-editable in display mode
@@ -4551,113 +4625,119 @@ class ClientWidget(QWidget):
 
         # Project ID
         project_id_label = QLabel(self.tr("ID Projet:"))
+
         project_identifier_value = self.client_info.get("project_identifier", self.tr("N/A"))
+        self.project_id_value_label.setText(project_identifier_value)
         logging.info(f"Setting project_identifier: {project_identifier_value}")
-        project_id_value_label = QLabel(project_identifier_value)
-        self.details_layout.addRow(project_id_label, project_id_value_label)
-        self.detail_value_labels["project_identifier"] = project_id_value_label
 
-        # Country and City
-        country_city_widget = QWidget()
-        country_city_h_layout = QHBoxLayout(country_city_widget)
-        country_city_h_layout.setContentsMargins(0,0,0,0)
-        country_label = QLabel(self.tr("Pays:"))
+        # Update Country and City
         country_text_value = self.client_info.get("country", self.tr("N/A"))
+        self.country_value_label.setText(country_text_value)
         logging.info(f"Setting country: {country_text_value}")
-        country_value_label = QLabel(country_text_value)
-        city_label = QLabel(self.tr("Ville:"))
         city_text_value = self.client_info.get("city", self.tr("N/A"))
+        self.city_value_label.setText(city_text_value)
         logging.info(f"Setting city: {city_text_value}")
-        city_value_label = QLabel(city_text_value)
-        country_city_h_layout.addWidget(country_label)
-        country_city_h_layout.addWidget(country_value_label)
-        country_city_h_layout.addSpacing(20)
-        country_city_h_layout.addWidget(city_label)
-        country_city_h_layout.addWidget(city_value_label)
-        country_city_h_layout.addStretch()
-        self.details_layout.addRow(self.tr("Localisation:"), country_city_widget)
-        self.detail_value_labels["country"] = country_value_label
-        self.detail_value_labels["city"] = city_value_label
 
-        # Price and Creation Date
-        price_date_widget = QWidget()
-        price_date_h_layout = QHBoxLayout(price_date_widget)
-        price_date_h_layout.setContentsMargins(0,0,0,0)
-        price_label = QLabel(self.tr("Prix Final:"))
+        # Update Price and Creation Date
         price_value_data = self.client_info.get('price', 0)
+        self.price_value_label.setText(f"{price_value_data} €")
         logging.info(f"Setting price: {price_value_data}")
-        price_value_label = QLabel(f"{price_value_data} €")
-        date_label = QLabel(self.tr("Date Création:"))
         creation_date_data = self.client_info.get("creation_date", self.tr("N/A"))
+        self.date_value_label.setText(creation_date_data)
         logging.info(f"Setting creation_date: {creation_date_data}")
-        date_value_label = QLabel(creation_date_data)
-        price_date_h_layout.addWidget(price_label)
-        price_date_h_layout.addWidget(price_value_label)
-        price_date_h_layout.addSpacing(20)
-        price_date_h_layout.addWidget(date_label)
-        price_date_h_layout.addWidget(date_value_label)
-        price_date_h_layout.addStretch()
-        self.details_layout.addRow(self.tr("Finances & Date:"), price_date_widget)
-        self.detail_value_labels["price"] = price_value_label
-        self.detail_value_labels["creation_date"] = date_value_label
 
-        # Status and Category
-        status_category_widget = QWidget()
-        status_category_h_layout = QHBoxLayout(status_category_widget)
-        status_category_h_layout.setContentsMargins(0,0,0,0)
-        logging.info(f"Setting status: {self.client_info.get('status', self.tr('En cours'))}") # status_combo text set elsewhere
-        status_category_h_layout.addWidget(QLabel(self.tr("Statut:")))
-        status_category_h_layout.addWidget(self.status_combo) # status_combo itself is added
-        status_category_h_layout.addSpacing(20)
+        # Update Status ComboBox
+        # Disconnect signal temporarily to prevent premature updates if any
+        if hasattr(self, 'status_combo'):
+            try:
+                self.status_combo.currentTextChanged.disconnect(self.update_client_status)
+            except TypeError:
+                pass # Not connected or already disconnected
+
+        self.load_statuses() # This populates self.status_combo
+        self.status_combo.setEnabled(False) # Non-editable in display mode
+        current_status_text = self.client_info.get("status", self.tr("En cours"))
+        status_idx = self.status_combo.findText(current_status_text)
+        if status_idx != -1:
+            self.status_combo.setCurrentIndex(status_idx)
+        elif self.status_combo.count() > 0:
+            self.status_combo.setCurrentIndex(0) # Default to first if not found
+        logging.info(f"Setting status: {current_status_text} (Index: {self.status_combo.currentIndex()})")
+
+        # Reconnect signal
+        if hasattr(self, 'status_combo'):
+            self.status_combo.currentTextChanged.connect(self.update_client_status)
+
+        # Update Category
         category_text_value = self.client_info.get("category", self.tr("N/A"))
+        self.category_value_label.setText(category_text_value)
         logging.info(f"Setting category: {category_text_value}")
-        self.category_value_label.setText(category_text_value) # Set text on the instance member
-        status_category_h_layout.addWidget(self.category_label) # Add instance member label
-        status_category_h_layout.addWidget(self.category_value_label) # Add instance member value label
-        status_category_h_layout.addStretch()
-        self.details_layout.addRow(self.tr("Classification:"), status_category_widget)
-        self.detail_value_labels["category_value"] = self.category_value_label # Store for edit mode
 
-        # Distributor Specific Info (conditionally visible)
-        self.distributor_info_label = QLabel(self.tr("Info Distributeur:"))
+        # Update Distributor Specific Info (visibility handled by toggle_distributor_info_visibility)
         distributor_specific_info_value = self.client_info.get('distributor_specific_info', '')
-        # Logging for distributor_specific_info is implicitly covered by toggle_distributor_info_visibility if shown
-        self.distributor_info_value_label = QLabel(distributor_specific_info_value)
-        self.distributor_info_value_label.setWordWrap(True)
-        self.distributor_info_value_label.setObjectName("distributorInfoValueLabel")
-        self.distributor_info_label.setObjectName("distributorInfoLabel")
-        self.details_layout.addRow(self.distributor_info_label, self.distributor_info_value_label)
-        self.toggle_distributor_info_visibility()
+        self.distributor_info_value_label.setText(distributor_specific_info_value)
+        self.toggle_distributor_info_visibility() # Updates visibility based on category
 
-        # Need (Besoin Principal)
-        need_label = QLabel(self.tr("Besoin Principal:"))
+        # Update Need (Besoin Principal)
         need_text_value = self.client_info.get("need", self.client_info.get("primary_need_description", self.tr("N/A")))
+        self.need_value_label.setText(need_text_value)
         logging.info(f"Setting need: {need_text_value}")
-        need_value_label = QLabel(need_text_value)
-        self.details_layout.addRow(need_label, need_value_label)
-        self.detail_value_labels["need"] = need_value_label
 
-        # Base Folder Path
-        folder_label = QLabel(self.tr("Chemin Dossier:"))
-        folder_path_value = self.client_info.get('base_folder_path')
-        if not folder_path_value:
-            folder_path_value = self.client_info.get('default_base_folder_path', '') # Fallback to default_base_folder_path
-        logging.info(f"Retrieved folder_path_value: '{folder_path_value}' (tried 'base_folder_path' then 'default_base_folder_path')")
-        if folder_path_value and os.path.isdir(folder_path_value): # Check if path is valid and a directory
-            folder_display_text = f"<a href='file:///{folder_path_value}'>{folder_path_value}</a>"
-            folder_value_label = QLabel(folder_display_text)
-            folder_value_label.setOpenExternalLinks(True)
-            folder_value_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
-        else:
-            if not folder_path_value:
-                logging.warning(f"Client {self.client_info.get('client_id')}: base_folder_path and default_base_folder_path are missing or empty.")
-                folder_display_text = self.tr("N/A - Chemin non configuré")
-            else: # Path exists but is not a directory
-                logging.warning(f"Client {self.client_info.get('client_id')}: folder_path_value '{folder_path_value}' is not a valid directory.")
-                folder_display_text = self.tr("Chemin invalide: {0}").format(folder_path_value)
-            folder_value_label = QLabel(folder_display_text)
-        self.details_layout.addRow(folder_label, folder_value_label)
-        self.detail_value_labels["base_folder_path"] = folder_value_label
+        # Update Base Folder Path
+        folder_path_value_relative = self.client_info.get('base_folder_path')
+        if not folder_path_value_relative:
+            folder_path_value_relative = self.client_info.get('default_base_folder_path', '')
+        logging.info(f"Retrieved relative folder_path_value: '{folder_path_value_relative}' for display.")
+
+        folder_display_text = self.tr("N/A - Chemin non configuré")
+        if folder_path_value_relative and self.app_root_dir:
+            folder_path_value_absolute = os.path.normpath(os.path.join(self.app_root_dir, folder_path_value_relative))
+            logging.info(f"Constructed absolute folder_path_value: '{folder_path_value_absolute}' for display logic.")
+
+            try:
+                if not os.path.isdir(folder_path_value_absolute):
+                    logging.info(f"Directory '{folder_path_value_absolute}' not found in populate_details_layout. Attempting to create it.")
+                    os.makedirs(folder_path_value_absolute, exist_ok=True)
+                    logging.info(f"Directory '{folder_path_value_absolute}' created or already exists (populate_details_layout).")
+            except OSError as e:
+                logging.error(f"Failed to create directory '{folder_path_value_absolute}' in populate_details_layout: {e}")
+                # Continue, path might still be invalid for display below
+
+            if os.path.isdir(folder_path_value_absolute):
+                folder_display_text = f"<a href='file:///{folder_path_value_absolute}'>{folder_path_value_absolute}</a>"
+            else:
+                logging.warning(f"Client {self.client_info.get('client_id')}: Absolute folder_path_value '{folder_path_value_absolute}' is not a valid directory after attempting creation.")
+                folder_display_text = self.tr("Chemin invalide: {0}").format(folder_path_value_absolute)
+        elif not folder_path_value_relative:
+            logging.warning(f"Client {self.client_info.get('client_id')}: base_folder_path and default_base_folder_path are missing or empty (populate_details_layout).")
+        elif not self.app_root_dir:
+            logging.error("ClientWidget: self.app_root_dir is not set. Cannot construct absolute path for client folder (populate_details_layout).")
+            folder_display_text = self.tr("Erreur configuration application (app_root_dir)")
+
+        self.folder_value_label.setText(folder_display_text)
+
+        # Update Created By
+        created_by_user_id = self.client_info.get("created_by_user_id")
+        created_by_user_name = self.tr("N/A")
+        if created_by_user_id:
+            user = users_crud.get_user_by_id(created_by_user_id)
+            if user:
+                created_by_user_name = user.get("full_name") or user.get("username", self.tr("Inconnu"))
+            else:
+                created_by_user_name = self.tr("Utilisateur Inconnu (ID: {0})").format(created_by_user_id)
+
+        self.created_by_value_label.setText(created_by_user_name)
+        logging.info(f"Setting created_by: {created_by_user_name} (ID: {created_by_user_id})")
+
+        # The detail_value_labels dictionary is no longer needed for display mode updates
+        # as we are directly updating instance member labels.
+        # It might still be used by edit mode logic if that wasn't changed.
+        # For consistency, if edit mode also transitions to using instance member edit widgets,
+        # self.detail_value_labels could be removed entirely or repurposed.
+        # For now, keeping it for edit mode compatibility if edit mode still relies on it.
+        # self.detail_value_labels assignment removed as direct updates are used.
+        # If edit mode needs these, it should refer to the instance members directly or
+        # self.edit_widgets dictionary.
 
     def refresh_display(self, new_client_info):
         # logging.info(f"ClientWidget refresh_display: client_id={new_client_info.get('client_id')}, client_name={new_client_info.get('client_name')}")
@@ -4947,27 +5027,58 @@ class ClientWidget(QWidget):
             filtered_list = [] # Initialize filtered_list
 
 
-            # --- Path Correction: Use absolute path directly ---
-            base_client_path_abs = self.client_info.get("default_base_folder_path")
-            if not base_client_path_abs: # Fallback
-                base_client_path_abs = self.client_info.get("base_folder_path", "")
+            # --- Path Correction: Construct absolute path ---
+            relative_base_client_path = self.client_info.get("default_base_folder_path")
+            if not relative_base_client_path: # Fallback
+                relative_base_client_path = self.client_info.get("base_folder_path", "")
 
-            logging.info(f"PT_DEBUG: populate_doc_table - ClientInfo 'default_base_folder_path': {self.client_info.get('default_base_folder_path')}")
-            logging.info(f"PT_DEBUG: populate_doc_table - ClientInfo 'base_folder_path': {self.client_info.get('base_folder_path')}")
-            logging.info(f"PT_DEBUG: populate_doc_table - Effective absolute base_client_path used: {base_client_path_abs}")
-
-            if not base_client_path_abs or not os.path.isdir(base_client_path_abs):
-                logging.error(f"PT_DEBUG: populate_doc_table - Invalid or missing absolute base_client_path: '{base_client_path_abs}'")
+            if not relative_base_client_path:
+                logging.error("PT_DEBUG: populate_doc_table - Relative base client path is missing in client_info.")
                 if hasattr(self, 'documents_empty_label'):
-                    self.documents_empty_label.setText(self.tr("Erreur: Dossier client (base_folder_path) introuvable ou non configuré."))
+                    self.documents_empty_label.setText(self.tr("Erreur: Chemin de base du client non configuré."))
                     self.documents_empty_label.setVisible(True)
                 self.doc_table.setVisible(False)
-                logging.info("PT_DEBUG: populate_doc_table - END (invalid base_client_path)")
-                # Ensure guard is reset before early return due to invalid path
-                # This return was missing the reset, which was the SyntaxError cause.
-                # The 'finally' block will now handle this.
-                return # Early return for invalid base_client_path
-            logging.info("PT_DEBUG: populate_doc_table - base_client_path is valid.")
+                self._is_populating_docs = False # Reset guard
+                return
+
+            # Construct the absolute path using app_root_dir
+            # self.app_root_dir is initialized in ClientWidget's __init__
+            if not self.app_root_dir or not os.path.isdir(self.app_root_dir):
+                 logging.error(f"PT_DEBUG: populate_doc_table - self.app_root_dir '{self.app_root_dir}' is invalid. Cannot construct absolute client path.")
+                 if hasattr(self, 'documents_empty_label'):
+                    self.documents_empty_label.setText(self.tr("Erreur: Configuration racine de l'application invalide."))
+                    self.documents_empty_label.setVisible(True)
+                 self.doc_table.setVisible(False)
+                 self._is_populating_docs = False # Reset guard
+                 return
+
+            actual_absolute_base_client_path = os.path.join(self.app_root_dir, relative_base_client_path)
+            actual_absolute_base_client_path = os.path.normpath(actual_absolute_base_client_path)
+
+            logging.info(f"PT_DEBUG: populate_doc_table - ClientInfo 'default_base_folder_path' (relative): {self.client_info.get('default_base_folder_path')}")
+            logging.info(f"PT_DEBUG: populate_doc_table - ClientInfo 'base_folder_path' (relative): {self.client_info.get('base_folder_path')}")
+            logging.info(f"PT_DEBUG: populate_doc_table - App root dir: {self.app_root_dir}")
+            logging.info(f"PT_DEBUG: populate_doc_table - Effective absolute base_client_path used: {actual_absolute_base_client_path}")
+
+            try:
+                if not os.path.isdir(actual_absolute_base_client_path):
+                    logging.info(f"PT_DEBUG: Directory '{actual_absolute_base_client_path}' not found in populate_doc_table. Attempting to create it.")
+                    os.makedirs(actual_absolute_base_client_path, exist_ok=True)
+                    logging.info(f"PT_DEBUG: Directory '{actual_absolute_base_client_path}' created or already exists (populate_doc_table).")
+            except OSError as e:
+                logging.error(f"PT_DEBUG: Failed to create directory '{actual_absolute_base_client_path}' in populate_doc_table: {e}")
+                # The original isdir check below will then fail and handle the error message.
+
+            if not os.path.isdir(actual_absolute_base_client_path):
+                logging.error(f"PT_DEBUG: populate_doc_table - Invalid or missing constructed absolute base_client_path: '{actual_absolute_base_client_path}' (after attempting creation).")
+                if hasattr(self, 'documents_empty_label'):
+                    self.documents_empty_label.setText(self.tr("Erreur: Dossier client introuvable ou inaccessible à l'emplacement attendu: {0}").format(actual_absolute_base_client_path))
+                    self.documents_empty_label.setVisible(True)
+                self.doc_table.setVisible(False)
+                logging.info("PT_DEBUG: populate_doc_table - END (invalid actual_absolute_base_client_path)")
+                self._is_populating_docs = False # Reset guard
+                return
+            logging.info("PT_DEBUG: populate_doc_table - actual_absolute_base_client_path is valid.")
 
             # Fetch and filter documents
             try:
@@ -5041,18 +5152,19 @@ class ClientWidget(QWidget):
 
                 full_file_path = ""
                 if file_path_relative_from_db:
-                    if order_identifier_for_doc:
-                        safe_order_subfolder = str(order_identifier_for_doc).replace(':', '_').replace(' ', '_')
-                        full_file_path = os.path.join(base_client_path_abs, safe_order_subfolder, file_path_relative_from_db)
-                    else:
-                        full_file_path = os.path.join(base_client_path_abs, file_path_relative_from_db)
+                    # file_path_relative_from_db ALREADY includes subfolders like language or order_id/language.
+                    # So, just join it with the absolute base path of the client.
+                    full_file_path = os.path.join(actual_absolute_base_client_path, file_path_relative_from_db)
+                    full_file_path = os.path.normpath(full_file_path) # Normalize the path
+
                     if not os.path.exists(full_file_path):
-                        logging.warning(f"PT_DEBUG: populate_doc_table - File not found: {full_file_path} for doc_id {document_id}")
+                        logging.warning(f"PT_DEBUG: populate_doc_table - File not found at constructed path: {full_file_path} (from relative: {file_path_relative_from_db}) for doc_id {document_id}")
                 else:
-                    logging.warning(f"PT_DEBUG: populate_doc_table - Missing relative path for doc_id {document_id}")
+                    logging.warning(f"PT_DEBUG: populate_doc_table - Missing relative path (file_path_relative_from_db) for doc_id {document_id}")
 
                 name_item = QTableWidgetItem(doc_name)
-                name_item.setData(Qt.UserRole, full_file_path if full_file_path else None)
+                # Store the potentially correct full_file_path, or None if issues.
+                name_item.setData(Qt.UserRole, full_file_path if file_path_relative_from_db and os.path.exists(full_file_path) else None)
 
                 file_type_str = doc_data.get('document_type_generated', 'N/A')
                 created_at_str = doc_data.get('created_at', '')
@@ -6313,6 +6425,21 @@ class ClientWidget(QWidget):
             self.edit_widgets['languages_list'].addItem(item)
         self.details_layout.addRow(self.tr("Langues Documents:"), self.edit_widgets['languages_list'])
 
+        # Display "Created By" (non-editable)
+        created_by_user_id = self.client_info.get("created_by_user_id")
+        created_by_user_name = self.tr("N/A")
+        if created_by_user_id:
+            user = users_crud.get_user_by_id(created_by_user_id) # users_crud should be imported
+            if user:
+                created_by_user_name = user.get("full_name") or user.get("username", self.tr("Inconnu"))
+            else:
+                created_by_user_name = self.tr("Utilisateur Inconnu (ID: {0})").format(created_by_user_id)
+
+        created_by_label_edit = QLabel(self.tr("Créé par:"))
+        created_by_value_edit = QLabel(created_by_user_name)
+        self.details_layout.addRow(created_by_label_edit, created_by_value_edit)
+
+
     def _populate_country_edit_combo(self, combo, current_country_id):
         combo.blockSignals(True)
         combo.clear()
@@ -6424,18 +6551,68 @@ class ClientWidget(QWidget):
                 # distributor_specific_info is also part of updated_client_full_info now
                 # Other fields like client_name, company_name, notes etc. are directly from updated_client_full_info
 
-            self.populate_details_layout() # Rebuild display view, which calls toggle_distributor_info_visibility
+            # ---- Restore details_layout to display mode ----
+            # 1. Clear current edit widgets from details_layout
+            #    (switchTo_edit_client_view already cleared the original display widgets)
+            #    Now, clear the edit widgets that were added.
+            while self.details_layout.rowCount() > 0:
+                self.details_layout.removeRow(0)
+
+            # 2. Delete the edit widgets themselves to free resources
+            for widget_key in list(self.edit_widgets.keys()): # Iterate over keys for safe deletion
+                widget = self.edit_widgets.pop(widget_key)
+                if isinstance(widget, QWidget):
+                    widget.deleteLater()
+            # self.edit_widgets.clear() # Already cleared by popping
+
+            # 3. Re-add the persistent display widgets to details_layout
+            #    These are instance members created in setup_ui.
+            self.details_layout.addRow(self.project_id_label, self.project_id_value_label)
+            self.details_layout.addRow(self.country_city_label, self.country_city_widget)
+            self.details_layout.addRow(self.price_date_label, self.price_date_widget)
+            # self.status_category_widget contains self.status_combo. Ensure self.status_combo is valid.
+            # If self.status_combo was logging as None, it implies it might have been deleted.
+            # This should not happen if it's an instance member and its parent (status_category_widget) is also an instance member
+            # and not deleted.
+            if not hasattr(self, 'status_combo') or not self.status_combo: # Defensive check
+                logging.warning("self.status_combo is invalid before re-adding to layout. Recreating.")
+                self.status_combo = QComboBox() # Recreate if it was somehow lost
+                # This new combo needs to be put back into self.status_category_widget's layout
+                # This part is tricky if status_category_widget's layout was also cleared.
+                # For now, assume status_category_widget's internal layout and self.status_combo instance are intact from setup_ui.
+            self.details_layout.addRow(self.status_category_label, self.status_category_widget)
+            self.details_layout.addRow(self.distributor_info_label_static, self.distributor_info_value_label)
+            self.details_layout.addRow(self.need_label_static, self.need_value_label)
+            self.details_layout.addRow(self.folder_label_static, self.folder_value_label)
+            self.details_layout.addRow(self.created_by_label_static, self.created_by_value_label)
+            # ---- End restore ----
+
+            self.populate_details_layout() # Now this will update the re-added persistent widgets
             self.header_label.setText(f"<h2>{self.client_info.get('client_name', '')}</h2>") # Update header
 
             # Reconnect signals that were disconnected for edit mode
             self.notes_edit.textChanged.connect(self.save_client_notes)
             self.status_combo.currentTextChanged.connect(self.update_client_status)
-            # No need to reconnect category textChanged for distributor info visibility in display mode,
-            # as populate_details_layout handles it.
 
             self.update_sav_tab_visibility() # Update SAV tab based on potentially changed status
 
             QMessageBox.information(self, self.tr("Succès"), self.tr("Informations client sauvegardées."))
+
+            # Log activity for client update
+            try:
+                log_data = {
+                    "user_id": self.current_user_id, # Assuming self.current_user_id holds the logged-in user's ID
+                    "action_type": "CLIENT_UPDATED",
+                    "details": f"Client '{self.client_info.get('client_name')}' (ID: {self.client_info['client_id']}) mis à jour. Changements: {data_to_save}",
+                    "related_entity_type": "Client",
+                    "related_entity_id": self.client_info['client_id'],
+                    "related_client_id": self.client_info['client_id']
+                }
+                activity_logs_crud.add_activity_log(log_data)
+                logging.info(f"Activity logged for CLIENT_UPDATED: {self.client_info['client_id']}")
+            except Exception as e_log:
+                logging.error(f"Failed to log CLIENT_UPDATED activity for client {self.client_info['client_id']}: {e_log}", exc_info=True)
+
             return True
         else:
             QMessageBox.warning(self, self.tr("Erreur DB"), self.tr("Échec de la sauvegarde des informations client."))

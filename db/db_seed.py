@@ -124,7 +124,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                 # IMPORTANT: This password MUST be changed immediately by the administrator.
                 # For a real deployment, this password should be very strong or generated
                 # and displayed once, or set via a secure first-time setup process.
-                temp_admin_password = "admin" # Changed to user's request
+                temp_admin_password = "admin"
 
                 new_admin_id = crud_add_user(
                     username=DEFAULT_ADMIN_USERNAME, # This is "admin" from config.py
@@ -294,7 +294,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         logger.info("Finished seeding products.")
 
         # Seed default hydraulic presses
-        _seed_default_hydraulic_presses(cursor, conn, logger_passed=logger)
+
         
         # 11. SmtpConfigs
         logger.info("Seeding placeholder SMTP config...")

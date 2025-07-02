@@ -7,27 +7,30 @@ from datetime import datetime
 def add_activity_log(data: dict, conn: sqlite3.Connection = None) -> int | None:
     cursor = conn.cursor()
     now = datetime.utcnow().isoformat() + "Z"
-    sql = """INSERT INTO ActivityLogs (user_id, action_type, details, related_entity_type, related_entity_id, created_at)
-             VALUES (?, ?, ?, ?, ?, ?)"""
+    # Corrected table name to ActivityLog and added related_client_id
+    sql = """INSERT INTO ActivityLog (user_id, action_type, details, related_entity_type, related_entity_id, related_client_id, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)"""
     params = (
         data.get('user_id'),
         data.get('action_type'),
         data.get('details'),
         data.get('related_entity_type'),
         data.get('related_entity_id'),
+        data.get('related_client_id'), # Added related_client_id
         now
     )
     try:
         cursor.execute(sql, params)
         return cursor.lastrowid
     except sqlite3.Error as e:
-        logging.error(f"Failed to add activity log: {e}")
+        logging.error(f"Failed to add activity log: {e} with params: {params}")
         return None
 
 @_manage_conn
 def get_activity_logs(limit: int = 100, offset: int = 0, user_id_filter: str = None, conn: sqlite3.Connection = None) -> list[dict]:
     cursor = conn.cursor()
-    sql = "SELECT * FROM ActivityLogs"
+    # Corrected table name to ActivityLog
+    sql = "SELECT * FROM ActivityLog"
     filters_clauses = []
     params = []
 
@@ -97,7 +100,8 @@ def get_activity_logs(limit: int = 100, offset: int = 0, user_id_filter: str = N
 @_manage_conn
 def get_activity_log_by_id(log_id: int, conn: sqlite3.Connection = None) -> dict | None:
     cursor = conn.cursor()
-    sql = "SELECT * FROM ActivityLogs WHERE log_id = ?"
+    # Corrected table name to ActivityLog
+    sql = "SELECT * FROM ActivityLog WHERE log_id = ?"
     try:
         cursor.execute(sql, (log_id,))
         row = cursor.fetchone()

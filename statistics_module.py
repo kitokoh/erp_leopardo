@@ -122,55 +122,36 @@ class StatisticsDashboard(QWidget):
         """Deferred initialization of map components and initial data load."""
         logging.info("StatisticsDashboard: _initialize_map_and_load_data called by QTimer.")
 
-        # Ensure the container widget for the map exists
+        # Ensure the container widget for the map exists and has its layout.
+        # self._left_map_actual_layout is initialized in __init__ and set as the layout
+        # for self.left_widget_for_map. We rely on that setup.
         if self.left_widget_for_map is None:
-            logging.critical("StatisticsDashboard: self.left_widget_for_map is None at the start of _initialize_map_and_load_data. Cannot initialize map.")
-            # This indicates a severe problem with the widget's construction or state.
+            logging.critical("StatisticsDashboard: self.left_widget_for_map is None. Cannot initialize map.")
             return
 
-        # self._left_map_actual_layout should have been initialized in __init__
-        # and is the correct layout for self.left_widget_for_map.
-        # We verify if self.left_widget_for_map.layout() still reports it,
-        # or if it somehow became None.
-
-        current_layout_on_widget = self.left_widget_for_map.layout()
-
-        if current_layout_on_widget is None:
-            logging.warning("StatisticsDashboard: self.left_widget_for_map.layout() is None. "
-                            "This is unexpected as it should have been set in __init__ via self._left_map_actual_layout. "
-                            "Attempting to re-apply self._left_map_actual_layout if it exists, or recreate.")
-            if self._left_map_actual_layout is not None:
-                # Re-apply the layout instance we stored in __init__
-                self.left_widget_for_map.setLayout(self._left_map_actual_layout)
-            else:
-                # This is a more critical state: self._left_map_actual_layout itself was not set in __init__
-                logging.error("StatisticsDashboard: self._left_map_actual_layout is also None. This indicates an issue in __init__. Recreating layout.")
-                self._left_map_actual_layout = QVBoxLayout(self.left_widget_for_map)
-                self._left_map_actual_layout.setContentsMargins(0,0,0,0)
-                # self.left_widget_for_map.setLayout() is implicitly called by QVBoxLayout constructor with parent
-        elif current_layout_on_widget is not self._left_map_actual_layout:
-            logging.warning("StatisticsDashboard: self.left_widget_for_map.layout() (is %s) is different from self._left_map_actual_layout (is %s). "
-                            "This is highly unexpected. Trusting the instance variable self._left_map_actual_layout.",
-                            id(current_layout_on_widget), id(self._left_map_actual_layout) )
-            # If the widget has a *different* layout, and we are sure _left_map_actual_layout is the one we want,
-            # we might need to re-set it. However, this situation implies external modification or a deep bug.
-            # For now, we assume self._left_map_actual_layout is the intended one.
-            # If self.left_widget_for_map.layout() returned a *different, valid* layout,
-            # and self._left_map_actual_layout was also valid but different,
-            # the original code would have updated self._left_map_actual_layout to match the widget.
-            # The current CRITICAL error implies self._left_map_actual_layout becomes None.
-            pass # We will proceed using self._left_map_actual_layout as defined in __init__
-
-        # Final check on self._left_map_actual_layout, which should be the one from __init__
-        if not self._left_map_actual_layout:
-            logging.critical("StatisticsDashboard: self._left_map_actual_layout is None after checks. Cannot proceed with map initialization.")
+        # Verify that _left_map_actual_layout (which should be the layout of left_widget_for_map) is valid.
+        # This also implicitly checks if left_widget_for_map.layout() is valid if _left_map_actual_layout
+        # indeed points to it as intended by __init__.
+        if self._left_map_actual_layout is None:
+            logging.critical("StatisticsDashboard: self._left_map_actual_layout is None. This should have been set in __init__. Cannot proceed with map initialization.")
             return
 
+        # As an additional check, ensure the widget's current layout is indeed the one we stored.
+        # This can catch unexpected external modifications to the widget's layout.
+        if self.left_widget_for_map.layout() is None:
+            logging.critical("StatisticsDashboard: self.left_widget_for_map.layout() is None, but _left_map_actual_layout was expected to be set. Critical state inconsistency.")
+            return
+        elif self.left_widget_for_map.layout() is not self._left_map_actual_layout:
+            logging.warning("StatisticsDashboard: self.left_widget_for_map.layout() differs from self._left_map_actual_layout. Using the widget's current layout.")
+            self._left_map_actual_layout = self.left_widget_for_map.layout()
+
+
+        # Now, self._left_map_actual_layout is confirmed to be the layout of self.left_widget_for_map
         if self.map_view is None:
-            # Parent QWebEngineView to self.left_widget_for_map, which is its container
-            self.map_view = QWebEngineView(self.left_widget_for_map) # Parent to the widget
-            # Add the map_view to self._left_map_actual_layout, which is confirmed or restored/recreated.
-            self._left_map_actual_layout.addWidget(self.map_view)
+            # Parent QWebEngineView to self.left_widget_for_map.
+            # It will be managed by self._left_map_actual_layout.
+            self.map_view = QWebEngineView(self.left_widget_for_map) # Parented to the widget
+            self._left_map_actual_layout.addWidget(self.map_view) # Added to the layout
             logging.info("StatisticsDashboard: QWebEngineView (self.map_view) created and added to _left_map_actual_layout.")
 
             self.map_interaction_handler = MapInteractionHandler(self)
@@ -386,13 +367,19 @@ class StatisticsDashboard(QWidget):
     def update_map(self):
         logging.info("Updating interactive map...")
         try:
-            geojson_path = os.path.join(APP_ROOT_DIR, "assets", "world_countries.geojson")
+            # Robustly determine APP_ROOT_DIR within this module's context for asset loading
+            # Assumes statistics_module.py is in the project root directory.
+            current_module_path = os.path.abspath(__file__)
+            project_root_dir_local = os.path.dirname(current_module_path)
+
+            geojson_path = os.path.join(project_root_dir_local, "assets", "world_countries.geojson")
+            logging.info(f"StatisticsDashboard: Attempting to load GeoJSON from: {geojson_path}")
 
             if not os.path.exists(geojson_path):
-                logging.error(f"GeoJSON file not found at: {geojson_path}")
-            error_message = self.tr("Les données géographiques de la carte (GeoJSON) sont introuvables. La carte ne peut pas être affichée. Veuillez vérifier l'installation de l'application ou contacter le support.")
-            self._set_map_error_html(error_message)
-            return
+                logging.error(f"GeoJSON file not found at: {geojson_path}. Imported APP_ROOT_DIR was {APP_ROOT_DIR}")
+                error_message = self.tr("Les données géographiques de la carte (GeoJSON) sont introuvables. La carte ne peut pas être affichée. Veuillez vérifier l'installation de l'application ou contacter le support.")
+                self._set_map_error_html(error_message)
+                return
 
             m = folium.Map(location=[20, 0], zoom_start=2, tiles="CartoDB positron")
             # clients_by_country_counts = get_client_counts_by_country() # Removed redundant call
@@ -848,6 +835,8 @@ class StatisticsDashboard(QWidget):
                 self.segmentation_canvases[key] = tab_layout # Store the layout for the canvas
 
             self.segmentation_tabs.addTab(tab_widget, title)
+        logging.debug(f"segmentation_canvases initialized: {self.segmentation_canvases}")
+        logging.debug(f"segmentation_tables initialized: {self.segmentation_tables}")
 
 
     def _populate_table(self, table_key, data_fetch_func, column_keys):
@@ -869,10 +858,25 @@ class StatisticsDashboard(QWidget):
             table.setSortingEnabled(True)
 
     def _update_status_segmentation_chart(self):
+        logging.debug(f"Current segmentation_canvases at start of _update_status_segmentation_chart: {self.segmentation_canvases}")
         logging.info("Updating status segmentation chart...")
-        chart_layout = self.segmentation_canvases.get("status")
-        if not chart_layout:
-            logging.error("Chart layout for 'status' not found.")
+        chart_layout = None # Initialize
+        try:
+            chart_layout = self.segmentation_canvases["status"]
+            logging.debug(f"Successfully retrieved chart_layout for 'status' via direct access: {chart_layout}")
+        except KeyError:
+            logging.error("Chart layout for 'status' NOT FOUND using direct key access (KeyError).")
+            # chart_layout remains None, will be caught by the next check
+        except Exception as e_direct_access:
+            logging.error(f"Unexpected error retrieving chart_layout for 'status' via direct access: {e_direct_access}", exc_info=True)
+            # chart_layout remains None
+
+        if not chart_layout: # This catches both KeyError and if chart_layout was None for other reasons
+            logging.error("Chart layout for 'status' is effectively None or not found. Cannot proceed with chart update.")
+            # To provide more context if .get() was behaving weirdly (though direct access might clarify)
+            if "status" in self.segmentation_canvases:
+                 logging.warning(f"Key 'status' IS IN self.segmentation_canvases, but direct access failed or resulted in None. Value: {self.segmentation_canvases.get('status')}")
+
             return
 
         # Clear previous canvas if any

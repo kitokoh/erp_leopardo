@@ -147,6 +147,7 @@ from calculator.main_calculator_widget import MainCalculatorWidget # Import Calc
 # from db.connection import SessionLocal as AppSessionLocal_MW # Import SessionLocal for calculator
 from user_management.user_menu_button import UserMenuButton # Import UserMenuButton
 from dialogs.edit_user_dialog import EditUserDialog # For handling edit/add user requests
+from dialogs.role_management_dialog import RoleManagementDialog # Added for Role Management
 from commande_management.commandes_dashboard_widget import CommandesDashboardWidget # Import CommandesDashboardWidget
 
 # Definition of configurable modules
@@ -371,7 +372,7 @@ class DocumentManager(QMainWindow):
         #     self.calendar_module_widget_instance = None
 
 
-        self.home_page_widget_instance = HomePageWidget(parent=self) # Create Home Page instance
+        self.home_page_widget_instance = HomePageWidget(main_window=self, parent=self) # Pass self as main_window
         self.main_area_stack.addWidget(self.home_page_widget_instance)
 
         # User Management Page (always create, visibility of action controlled by RBAC)
@@ -406,6 +407,13 @@ class DocumentManager(QMainWindow):
         self.main_area_stack.setCurrentWidget(self.home_page_widget_instance) # Set Home Page as default view
         self.create_actions_main(); self.create_menus_main() # Menus and actions are created before _apply_permissions
         
+        # Log all widgets in main_area_stack after initialization
+        logging.debug("--- Widgets in main_area_stack after DocumentManager.__init__ ---")
+        for i in range(self.main_area_stack.count()):
+            widget = self.main_area_stack.widget(i)
+            logging.debug(f"  Index {i}: {widget} (Type: {type(widget).__name__})")
+        logging.debug("-----------------------------------------------------------------")
+
         self.voice_input_service = VoiceInputService() # Instantiate VoiceInputService
 
         self.load_clients_from_db_slot() # Initial load
@@ -416,13 +424,10 @@ class DocumentManager(QMainWindow):
         self.populate_saved_filters_combo() # Populate saved filters on init
 
 
-        # Set bottom widget for HomePageWidget if statistics module is enabled
-        if self.home_page_widget_instance and hasattr(self.home_page_widget_instance, 'set_bottom_widget'):
-            stats_widget_instance = self.get_statistics_widget_instance()
-            if stats_widget_instance:
-                self.home_page_widget_instance.set_bottom_widget(stats_widget_instance)
-            else: # Optionally hide or set a default placeholder if stats are disabled/unavailable
-                self.home_page_widget_instance.set_bottom_widget(None)
+        # Removed the block that called self.home_page_widget_instance.set_bottom_widget(stats_widget_instance)
+        # This prevents StatisticsDashboard from being reparented by HomePageWidget.
+        # The HomePageWidget's go_to_statistics button will now directly call self.show_statistics_view()
+        # on the main_window instance.
 
 
     def get_statistics_widget_instance(self):
@@ -477,9 +482,10 @@ class DocumentManager(QMainWindow):
         for module_info in CONFIGURABLE_MODULES:
             # Default to 'True' (string) if setting is not found, then convert to boolean
             is_enabled_str = db_manager.get_setting(module_info['key'], default='True')
+            logging.info(f"Module Key: {module_info['key']}, Value from DB (or default): '{is_enabled_str}'")
             is_enabled = is_enabled_str.lower() == 'true' if isinstance(is_enabled_str, str) else bool(is_enabled_str)
             self.module_states[module_info['name']] = is_enabled
-            logging.info(f"Module '{module_info['name']}' state: {'Enabled' if is_enabled else 'Disabled'}")
+            logging.info(f"Processed Module '{module_info['name']}' state: {'Enabled' if is_enabled else 'Disabled'}")
         logging.info("Module states loaded.")
 
 
@@ -1078,8 +1084,12 @@ class DocumentManager(QMainWindow):
         self.calculator_module_action.triggered.connect(self.show_calculator_module_view)
 
         # Action for Commande Management (Global View)
-        self.commande_management_action = QAction(QIcon(":/icons/shopping-cart.svg"), self.tr("Gestion des Commandes"), self) # Assumes shopping-cart.svg will be added
+        self.commande_management_action = QAction(QIcon(":/icons/briefcase.svg"), self.tr("Gestion des Commandes"), self) # Replaced shopping-cart.svg with briefcase.svg
         self.commande_management_action.triggered.connect(self.show_commande_management_view)
+
+        # Action for managing roles
+        self.manage_roles_action = QAction(QIcon(":/icons/settings.svg"), self.tr("Gérer les Rôles"), self) # Replaced shield.svg with settings.svg
+        self.manage_roles_action.triggered.connect(self.open_role_management_dialog)
 
 
         # Populate searchable_actions_map
@@ -1103,6 +1113,8 @@ class DocumentManager(QMainWindow):
         self.searchable_actions_map[self.tr("Calendrier")] = self.calendar_module_action
         self.searchable_actions_map[self.tr("Gérer les Utilisateurs")] = self.manage_users_action
         self.searchable_actions_map[self.tr("Gestion des Commandes")] = self.commande_management_action
+        self.searchable_actions_map[self.tr("Gérer les Rôles")] = self.manage_roles_action
+
 
     def _placeholder_manage_users(self):
         # This is a placeholder. Actual user management UI would be complex.
@@ -1127,7 +1139,8 @@ class DocumentManager(QMainWindow):
         # Admin Menu (new menu for admin-specific tasks)
         self.admin_menu = menu_bar.addMenu(self.tr("Administration"))
         self.admin_menu.addAction(self.manage_users_action)
-        # Add other admin-specific actions here if any (e.g., manage roles, system logs)
+        self.admin_menu.addAction(self.manage_roles_action) # Add role management action
+        # Add other admin-specific actions here if any (e.g., system logs)
 
         # Modules Menu
         modules_menu = menu_bar.addMenu(self.tr("Modules"))
@@ -1143,10 +1156,12 @@ class DocumentManager(QMainWindow):
                 action = getattr(self, action_name, None)
                 if action:
                     modules_menu.addAction(action)
+                    logging.info(f"Module '{module_name}' is ENABLED (state: {self.module_states.get(module_name)}), Action '{action_name}' ADDED to Modules menu.")
                 else:
-                    logging.warning(f"Action '{action_name}' not found for module '{module_name}' but module is enabled.")
+                    logging.warning(f"Action '{action_name}' (attribute) not found for module '{module_name}', though module state is {self.module_states.get(module_name)}.")
             else:
-                logging.info(f"Module '{module_name}' is disabled. Action '{action_name}' not added to menu.")
+                logging.info(f"Module '{module_name}' is DISABLED (state: {self.module_states.get(module_name)}). Action '{action_name}' NOT ADDED to Modules menu.")
+
 
         # Add separator if any module actions were added, before non-module specific actions like Carrier Map (if it's always there or handled differently)
         # For now, assuming Carrier Map is part of CONFIGURABLE_MODULES, so it's handled above.
@@ -1231,87 +1246,126 @@ class DocumentManager(QMainWindow):
     def _apply_permissions(self):
         """Applies role-based permissions to UI elements."""
         from auth.permissions import has_permission, P_MANAGE_SYSTEM_SETTINGS, P_CREATE_CLIENT, \
-                                     P_MANAGE_USERS, P_ACCESS_PROJECT_MODULE, P_ACCESS_STATISTICS_MODULE, \
+                                     P_MANAGE_USERS, P_MANAGE_ROLES, P_ACCESS_PROJECT_MODULE, P_ACCESS_STATISTICS_MODULE, \
                                      P_ACCESS_PARTNER_MODULE, P_ACCESS_INVENTORY_MODULE, \
                                      P_ACCESS_RECRUITMENT_MODULE, P_ACCESS_EXPERIENCE_MODULE, \
                                      P_ACCESS_CALENDAR_MODULE, P_ACCESS_BOTPRESS_MODULE, \
                                      P_ACCESS_CARRIER_MAP_MODULE, P_ACCESS_CAMERA_MODULE, \
-                                     P_MANAGE_GLOBAL_PRODUCTS, P_ACCESS_CALCULATOR_MODULE, P_MANAGE_STATUSES # Added P_MANAGE_STATUSES
+                                     P_MANAGE_GLOBAL_PRODUCTS, P_VIEW_GLOBAL_PRODUCTS, \
+                                     P_ACCESS_CALCULATOR_MODULE, P_MANAGE_STATUSES # Added P_VIEW_GLOBAL_PRODUCTS
 
         role_name = self.current_user_info.get('role_name') if self.current_user_info else None
-        if not role_name: # Should not happen if login is enforced, but good for safety
-            # Disable almost everything if no role (e.g. error state)
-            is_admin_or_similar = False # Fallback to least privilege
+        role_name = self.current_user_info.get('role_name') if self.current_user_info else "UnknownRole"
+        logging.info(f"Applying permissions for role: {role_name}")
+
+        if not self.current_user_info: # Should not happen if login is enforced
+            logging.error("_apply_permissions called with no current_user_info. Disabling most actions.")
+            # Fallback to disable everything if user_info is missing
+            is_admin_or_similar = False
             can_create_client = False
-        else:
-            is_admin_or_similar = has_permission(role_name, P_MANAGE_SYSTEM_SETTINGS) # Good proxy for admin-like access
-            can_create_client = has_permission(role_name, P_CREATE_CLIENT)
+            # Disable all module actions
+            for module_key in self.module_states.keys():
+                action_attr_name = next((m['action_attr'] for m in CONFIGURABLE_MODULES if m['name'] == module_key), None)
+                if action_attr_name and hasattr(self, action_attr_name):
+                    getattr(self, action_attr_name).setVisible(False)
+            self.settings_action.setEnabled(False)
+            if hasattr(self, 'status_action'): self.status_action.setEnabled(False)
+            self.admin_menu.menuAction().setVisible(False)
+            self.add_new_client_button.setEnabled(False)
+            self.add_client_by_voice_button.setEnabled(False)
+            return
+
+        is_admin_or_similar = has_permission(role_name, P_MANAGE_SYSTEM_SETTINGS)
+        can_create_client = has_permission(role_name, P_CREATE_CLIENT)
+        logging.info(f"  Role '{role_name}': P_MANAGE_SYSTEM_SETTINGS={is_admin_or_similar}, P_CREATE_CLIENT={can_create_client}")
 
         # Menu Actions
+        log_msg_system_settings = f"Permission P_MANAGE_SYSTEM_SETTINGS for role '{role_name}': {'Granted' if is_admin_or_similar else 'Denied'}. Settings action {'enabled' if is_admin_or_similar else 'disabled'}."
+        logging.info(log_msg_system_settings)
         self.settings_action.setEnabled(is_admin_or_similar)
-        if hasattr(self, 'status_action'): # Check if status_action exists
-            self.status_action.setEnabled(has_permission(role_name, P_MANAGE_STATUSES))
+        logging.info(f"  Action 'settings_action' enabled: {is_admin_or_similar}")
+        if hasattr(self, 'status_action'):
+            can_manage_statuses = has_permission(role_name, P_MANAGE_STATUSES)
+            self.status_action.setEnabled(can_manage_statuses)
+            logging.info(f"  Action 'status_action' enabled: {can_manage_statuses} (Permission: P_MANAGE_STATUSES)")
+
 
         # Admin Menu visibility
-        self.admin_menu.menuAction().setVisible(has_permission(role_name, P_MANAGE_USERS)) # Hide/show whole menu
-        self.manage_users_action.setEnabled(has_permission(role_name, P_MANAGE_USERS)) # Also control action itself
+        can_manage_users = has_permission(role_name, P_MANAGE_USERS)
+        can_manage_roles = has_permission(role_name, P_MANAGE_ROLES)
+        admin_menu_visible = can_manage_users or can_manage_roles
+        self.admin_menu.menuAction().setVisible(admin_menu_visible)
+        logging.info(f"  Admin Menu visible: {admin_menu_visible} (P_MANAGE_USERS={can_manage_users}, P_MANAGE_ROLES={can_manage_roles})")
+        self.manage_users_action.setEnabled(can_manage_users) # Should already be visible if menu is
+        self.manage_roles_action.setEnabled(can_manage_roles) # Should already be visible if menu is
 
-        # Module Menu Actions (Visibility based on module access permission)
-        # Assuming specific P_ACCESS_MODULE_XYZ permissions or more granular ones.
-        # Example: self.project_management_action.setVisible(has_permission(role_name, P_ACCESS_PROJECT_MODULE))
-        # This part needs to align with how module visibility itself is handled (db config vs. role perm)
-        # For now, let's assume module visibility from DB config (self.module_states) is primary,
-        # and then role permissions might further restrict actions *within* an enabled module.
-        # If a module action should purely be role-based, then:
+        # Module Menu Actions
+        module_permissions = {
+            'project_management': P_ACCESS_PROJECT_MODULE,
+            'product_management': (P_MANAGE_GLOBAL_PRODUCTS, P_VIEW_GLOBAL_PRODUCTS), # Tuple for OR condition
+            'partner_management': P_ACCESS_PARTNER_MODULE,
+            'statistics': P_ACCESS_STATISTICS_MODULE,
+            'inventory_management': P_ACCESS_INVENTORY_MODULE,
+            'experience_management': P_ACCESS_EXPERIENCE_MODULE,
+            'calendar': P_ACCESS_CALENDAR_MODULE,
+            'botpress_integration': P_ACCESS_BOTPRESS_MODULE,
+            'carrier_map': P_ACCESS_CARRIER_MAP_MODULE,
+            'camera_management': P_ACCESS_CAMERA_MODULE,
+            'calculator': P_ACCESS_CALCULATOR_MODULE,
+            'commandes_management': P_ACCESS_PROJECT_MODULE # Placeholder, uses project module perm for now
+        }
 
-        # Example for a few module actions based on defined permissions:
-        if self.project_management_action: # Check if action exists (it's conditional on module_states)
-            self.project_management_action.setVisible(has_permission(role_name, P_ACCESS_PROJECT_MODULE))
-        if self.product_list_action: # Product Management Page
-             self.product_list_action.setVisible(has_permission(role_name, P_MANAGE_GLOBAL_PRODUCTS) or \
-                                                 has_permission(role_name, P_VIEW_GLOBAL_PRODUCTS)) # View or Manage
-        if self.partner_management_action:
-            self.partner_management_action.setVisible(has_permission(role_name, P_ACCESS_PARTNER_MODULE))
-        if self.statistics_action:
-            self.statistics_action.setVisible(has_permission(role_name, P_ACCESS_STATISTICS_MODULE))
-        if self.inventory_browser_action:
-            self.inventory_browser_action.setVisible(has_permission(role_name, P_ACCESS_INVENTORY_MODULE))
-        if self.recruitment_action: # Assuming this is the attribute name for recruitment QAction
-            self.recruitment_action.setVisible(has_permission(role_name, P_ACCESS_RECRUITMENT_MODULE))
-        if self.experience_management_action:
-            self.experience_management_action.setVisible(has_permission(role_name, P_ACCESS_EXPERIENCE_MODULE))
-        if self.calendar_module_action:
-            self.calendar_module_action.setVisible(has_permission(role_name, P_ACCESS_CALENDAR_MODULE))
-        if self.botpress_integration_action:
-             self.botpress_integration_action.setVisible(has_permission(role_name, P_ACCESS_BOTPRESS_MODULE))
-        if self.open_carrier_map_action:
-             self.open_carrier_map_action.setVisible(has_permission(role_name, P_ACCESS_CARRIER_MAP_MODULE))
-        if self.camera_management_action:
-             self.camera_management_action.setVisible(has_permission(role_name, P_ACCESS_CAMERA_MODULE))
+        for module_config in CONFIGURABLE_MODULES:
+            action_attr = module_config['action_attr']
+            module_name = module_config['name']
+            action_instance = getattr(self, action_attr, None)
 
-        if hasattr(self, 'calculator_module_action') and self.calculator_module_action:
-            # To make it visible by default if module is enabled, and then add specific permission later:
-            # self.calculator_module_action.setVisible(self.module_states.get('calculator', False))
-            # To use a specific permission (P_ACCESS_CALCULATOR_MODULE must be defined in auth/permissions.py):
-            if 'P_ACCESS_CALCULATOR_MODULE' in locals() or 'P_ACCESS_CALCULATOR_MODULE' in globals(): # Check if defined
-                 self.calculator_module_action.setVisible(has_permission(role_name, P_ACCESS_CALCULATOR_MODULE))
-            else: # Fallback if P_ACCESS_CALCULATOR_MODULE is not defined: make visible if module is on
-                logging.warning("P_ACCESS_CALCULATOR_MODULE permission constant not found. Calculator module visibility based on module_states only.")
-                self.calculator_module_action.setVisible(self.module_states.get('calculator', False))
+            if not action_instance:
+                logging.debug(f"  Module Action: '{action_attr}' not found as instance attribute, skipping permission check.")
+                continue
 
-        # Commande Management Action Visibility (assuming a general permission for now like P_ACCESS_PROJECT_MODULE)
-        # TODO: Define a specific P_ACCESS_COMMANDE_MODULE permission
-        if hasattr(self, 'commande_management_action'):
-            self.commande_management_action.setVisible(has_permission(role_name, P_ACCESS_PROJECT_MODULE)) # Placeholder permission
+            # Visibility is primarily controlled by module_states during menu creation.
+            # Here, we ensure that if it was added to the menu (module enabled), its visibility
+            # is then correctly set by permissions. If module was disabled, it's not in menu anyway.
+            if not self.module_states.get(module_name, True): # If module is disabled via DB setting
+                action_instance.setVisible(False) # Ensure it's hidden even if permissions would allow
+                logging.info(f"  Module Action '{action_attr}' for '{module_name}': Module disabled by DB setting. Action HIDDEN.")
+                continue
 
+            perm_keys = module_permissions.get(module_name)
+            permitted = False
+            log_perm_details = ""
+
+            if perm_keys:
+                if isinstance(perm_keys, tuple): # Multiple permissions, OR logic
+                    permitted = any(has_permission(role_name, pk) for pk in perm_keys)
+                    log_perm_details = f"Permissions (OR logic): {perm_keys}, Result: {permitted}"
+                else: # Single permission
+                    permitted = has_permission(role_name, perm_keys)
+                    log_perm_details = f"Permission: {perm_keys}, Result: {permitted}"
+            else:
+                # If no specific permission is defined for this module, assume visible if module is enabled.
+                # Or, default to False if strict policy is desired. For now, assume visible.
+                permitted = True
+                log_perm_details = "No specific permission defined, defaulting to permitted if module is enabled."
+
+
+            action_instance.setVisible(permitted)
+            logging.info(f"  Module Action '{action_attr}' for '{module_name}': Visible: {permitted}. {log_perm_details}")
+            # Note: setEnabled could also be used if the action should be visible but greyed out.
+            # For menu items, setVisible(False) effectively removes them.
 
         # Main Buttons on Document View
+        log_msg_create_client = f"Permission P_CREATE_CLIENT for role '{role_name}': {'Granted' if can_create_client else 'Denied'}. "
+        log_msg_create_client += f"Add New Client button {'enabled' if can_create_client else 'disabled'}."
+        logging.info(log_msg_create_client)
         self.add_new_client_button.setEnabled(can_create_client)
         self.add_client_by_voice_button.setEnabled(can_create_client) # Assuming same permission
+        logging.info(f"  Button 'add_new_client_button' enabled: {can_create_client}")
+        logging.info(f"  Button 'add_client_by_voice_button' enabled: {can_create_client}")
 
-        # Further UI elements (e.g., context menu items in client list, buttons in ClientWidget)
-        # will need similar checks when those widgets are initialized or data is loaded.
-        logging.info(f"Permissions applied for role: {role_name}")
+        logging.info(f"Permissions application completed for role: {role_name}")
+
 
 
     def _update_user_display(self):
@@ -1491,17 +1545,38 @@ class DocumentManager(QMainWindow):
             QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Partner Management est désactivé."))
 
     def show_statistics_view(self):
-        logging.info(f"Attempting to show Statistics View. Instance: {self.statistics_dashboard_instance}")
+        logging.info(f"Attempting to show Statistics View. Target Instance: {self.statistics_dashboard_instance} (Type: {type(self.statistics_dashboard_instance).__name__})")
         if self.statistics_dashboard_instance:
-            # Diagnostic: Log widgets currently in the stack
-            stacked_widgets = [self.main_area_stack.widget(i) for i in range(self.main_area_stack.count())]
-            logging.info(f"Widgets in main_area_stack: {stacked_widgets}")
-            if self.statistics_dashboard_instance in stacked_widgets:
-                logging.info("StatisticsDashboard instance IS in main_area_stack. Calling setCurrentWidget.")
+            logging.debug(f"--- Verifying main_area_stack contents before showing Statistics View ({self.statistics_dashboard_instance}) ---")
+            found_by_iteration = False
+            for i in range(self.main_area_stack.count()):
+                widget_in_stack = self.main_area_stack.widget(i)
+                logging.debug(f"  Stack Index {i}: {widget_in_stack} (Type: {type(widget_in_stack).__name__})")
+                if widget_in_stack == self.statistics_dashboard_instance:
+                    found_by_iteration = True
+                    logging.debug(f"    MATCH FOUND: Target instance {self.statistics_dashboard_instance} is at index {i}.")
+            logging.debug("--- End of stack verification ---")
+
+            # The original check using 'in' operator on a list comprehension:
+            # stacked_widgets_list = [self.main_area_stack.widget(i) for i in range(self.main_area_stack.count())]
+            # is_in_stack_via_list = self.statistics_dashboard_instance in stacked_widgets_list
+            # logging.debug(f"Check using 'in stacked_widgets_list': {is_in_stack_via_list}")
+            # More direct check using QStackedWidget.indexOf()
+            index_in_stack = self.main_area_stack.indexOf(self.statistics_dashboard_instance)
+            logging.debug(f"QStackedWidget.indexOf(self.statistics_dashboard_instance) returned: {index_in_stack}")
+
+            if index_in_stack != -1: # Preferred way to check if widget is in QStackedWidget
+            # if found_by_iteration: # Use our manual iteration result
+                logging.info("StatisticsDashboard instance IS in main_area_stack (verified by indexOf). Calling setCurrentWidget.")
                 self.main_area_stack.setCurrentWidget(self.statistics_dashboard_instance)
                 logging.info("setCurrentWidget called for StatisticsDashboard.")
             else:
-                logging.error("StatisticsDashboard instance is NOT in main_area_stack. This is the cause of the QStackedWidget error.")
+                logging.error(f"StatisticsDashboard instance {self.statistics_dashboard_instance} is NOT in main_area_stack (indexOf returned -1). This is the cause of the QStackedWidget error.")
+                # Log the full list of widgets again for comparison if error occurs
+                logging.error("Current main_area_stack contents at time of error:")
+                for i in range(self.main_area_stack.count()):
+                    widget = self.main_area_stack.widget(i)
+                    logging.error(f"  Error Stack Index {i}: {widget} (Type: {type(widget).__name__})")
                 QMessageBox.critical(self, self.tr("Erreur Module"),
                                      self.tr("Le module Statistiques n'a pas été correctement chargé dans l'interface principale."))
         else:
@@ -2334,3 +2409,71 @@ class DocumentManager(QMainWindow):
             self.load_filter_combo.setCurrentIndex(0)
         else:
             logging.info("No changes reported from ManageSavedFiltersDialog.")
+
+    def open_role_management_dialog(self):
+        """Opens the Role Management dialog if the user has permission."""
+        from auth.permissions import has_permission, P_MANAGE_ROLES # Local import for clarity
+
+        if not self.current_user_info:
+            QMessageBox.warning(self, self.tr("Accès Refusé"), self.tr("Vous devez être connecté pour gérer les rôles."))
+            return
+
+        user_role_name = self.current_user_info.get('role_name')
+        if not has_permission(user_role_name, P_MANAGE_ROLES):
+            QMessageBox.warning(self, self.tr("Permissions Insuffisantes"),
+                                self.tr("Vous n'avez pas la permission de gérer les rôles."))
+            return
+
+        dialog = RoleManagementDialog(current_user_info=self.current_user_info, parent=self)
+        dialog.roles_changed_signal.connect(self._handle_roles_changed)
+        # Check if RoleManagementDialog has a 'changes_made_flag' or similar to decide if refresh is needed
+        # For now, assuming exec_() implies potential changes if it doesn't return QDialog.Rejected
+        # A more explicit way is for RoleManagementDialog to set a flag if actual changes occurred.
+        dialog.exec_()
+        # The connection to _handle_roles_changed should cover refreshes if the dialog emits the signal.
+        # If the dialog only emits on *actual* changes, this is fine.
+        # If it emits always on close (even without changes), _handle_roles_changed might do unnecessary work.
+        # Let's assume RoleManagementDialog's signal is specific to actual data changes.
+
+
+    def _handle_roles_changed(self):
+        """
+        Slot to handle the roles_changed_signal from RoleManagementDialog.
+        Refreshes UI components that depend on the list of roles.
+        """
+        logging.info("MainWindow: Roles have changed. Refreshing relevant UI components.")
+        self.notify(self.tr("Rôles Modifiés"), self.tr("La liste des rôles ou leurs permissions ont été mises à jour."), type='INFO')
+
+        # 1. Refresh UserManagementPage's role filter and user table
+        if self.user_management_page_instance:
+            # Check if _populate_role_filter method exists
+            if hasattr(self.user_management_page_instance, '_populate_role_filter'):
+                logging.debug("Refreshing role filter in UserManagementPage.")
+                self.user_management_page_instance._populate_role_filter()
+            else:
+                logging.warning("UserManagementPage does not have _populate_role_filter method.")
+
+            # If UserManagementPage is the current view, also refresh its user table
+            # as role names might have changed for listed users.
+            if self.main_area_stack.currentWidget() == self.user_management_page_instance:
+                if hasattr(self.user_management_page_instance, 'load_users_to_table'):
+                    logging.debug("UserManagementPage is current view, refreshing user table.")
+                    self.user_management_page_instance.load_users_to_table()
+                else:
+                    logging.warning("UserManagementPage does not have load_users_to_table method.")
+
+        # 2. Re-apply permissions for the main window
+        # This is important if the current user's role's permissions were changed.
+        logging.debug("Re-applying permissions for MainWindow due to role changes.")
+        self._apply_permissions()
+
+        # 3. If EditUserDialog instances could be open and non-modal, they'd need updating.
+        # For now, assuming EditUserDialog is modal and will fetch fresh roles upon its next opening.
+        # If UserMenuButton displays role name and it could change, refresh it:
+        # self._update_user_display() # Already done if _apply_permissions changes user_menu_button state.
+
+        # If any other part of MainWindow directly displays role names or uses a role combo,
+        # it should be refreshed here as well.
+        # Example: If a ClientWidget had a role dropdown (it doesn't currently), it would need refresh.
+
+# [end of main_window.py]
