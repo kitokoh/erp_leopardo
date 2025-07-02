@@ -3316,19 +3316,19 @@ class ClientWidget(QWidget):
                         try:
                             os.remove(file_path)
                             logging.info(f"File {file_path} deleted from disk.")
-                            self.notify(self.tr("Succès"), self.tr("Document et fichier supprimés avec succès."), type='SUCCESS')
+                            self.notification_manager.show(self.tr("Succès"), self.tr("Document et fichier supprimés avec succès."), type='SUCCESS')
                         except OSError as e_file:
                             logging.error(f"Error deleting file {file_path}: {e_file}", exc_info=True)
-                            self.notify(self.tr("Erreur Fichier"), self.tr("Document supprimé de la base de données, mais échec de la suppression du fichier:\n{0}").format(str(e_file)), type='ERROR')
+                            self.notification_manager.show(self.tr("Erreur Fichier"), self.tr("Document supprimé de la base de données, mais échec de la suppression du fichier:\n{0}").format(str(e_file)), type='ERROR')
                     else:
                         logging.warning(f"File path not provided or file does not exist for document ID {document_id}: {file_path}. DB entry deleted.")
-                        self.notify(self.tr("Succès (Partiel)"), self.tr("Entrée de document supprimée de la base de données. Fichier non trouvé ou chemin non spécifié."), type='WARNING')
+                        self.notification_manager.show(self.tr("Succès (Partiel)"), self.tr("Entrée de document supprimée de la base de données. Fichier non trouvé ou chemin non spécifié."), type='WARNING')
                 else:
-                    self.notify(self.tr("Erreur DB"), self.tr("Impossible de supprimer l'entrée du document de la base de données (ID: {0}). Vérifiez les logs.").format(document_id), type='ERROR')
+                    self.notification_manager.show(self.tr("Erreur DB"), self.tr("Impossible de supprimer l'entrée du document de la base de données (ID: {0}). Vérifiez les logs.").format(document_id), type='ERROR')
 
             except Exception as e:
                 logging.error(f"Error in delete_client_document_entry for doc ID {document_id}: {e}", exc_info=True)
-                self.notify(self.tr("Erreur Suppression"), self.tr("Une erreur inattendue est survenue:\n{0}").format(str(e)), type='CRITICAL')
+                self.notification_manager.show(self.tr("Erreur Suppression"), self.tr("Une erreur inattendue est survenue:\n{0}").format(str(e)), type='CRITICAL')
             finally:
                 self.populate_doc_table()
 
@@ -6880,7 +6880,7 @@ class ClientWidget(QWidget):
                 self.commandes_tab_widget.refresh_commandes()
             if hasattr(self, '_load_overview_metrics'):
                 self._load_overview_metrics()
-            self.notify(self.tr("Nouvelle Commande"), self.tr("Nouvelle commande créée/initialisée."), type='SUCCESS')
+            self.notification_manager.show(self.tr("Nouvelle Commande"), self.tr("Nouvelle commande créée/initialisée."), type='SUCCESS')
 
     def _handle_overview_new_project(self):
         client_id = self.client_info.get("client_id")
@@ -6904,7 +6904,7 @@ class ClientWidget(QWidget):
             }
             new_project_id = projects_crud.add_project(project_data)
             if new_project_id:
-                self.notify(self.tr("Projet Créé"), self.tr("Nouveau projet '{0}' créé.").format(project_name), type='SUCCESS')
+                self.notification_manager.show(self.tr("Projet Créé"), self.tr("Nouveau projet '{0}' créé.").format(project_name), type='SUCCESS')
                 # Try to refresh the main projects tab if available on DocumentManager
                 doc_manager = self._get_document_manager_instance()
                 if doc_manager and hasattr(doc_manager, 'projects_dashboard_widget_instance'):
@@ -6915,7 +6915,7 @@ class ClientWidget(QWidget):
             else:
                 QMessageBox.warning(self, self.tr("Erreur DB"), self.tr("Impossible de créer le projet."))
         else:
-            self.notify(self.tr("Annulé"), self.tr("Création de projet annulée."), type='INFO')
+            self.notification_manager.show(self.tr("Annulé"), self.tr("Création de projet annulée."), type='INFO')
 
     def _handle_overview_generate_document(self):
         if not hasattr(self, 'CreateDocumentDialog') or self.CreateDocumentDialog is None:
