@@ -1561,6 +1561,7 @@ class DocumentManager(QMainWindow):
             # stacked_widgets_list = [self.main_area_stack.widget(i) for i in range(self.main_area_stack.count())]
             # is_in_stack_via_list = self.statistics_dashboard_instance in stacked_widgets_list
             # logging.debug(f"Check using 'in stacked_widgets_list': {is_in_stack_via_list}")
+
             # More direct check using QStackedWidget.indexOf()
             index_in_stack = self.main_area_stack.indexOf(self.statistics_dashboard_instance)
             logging.debug(f"QStackedWidget.indexOf(self.statistics_dashboard_instance) returned: {index_in_stack}")

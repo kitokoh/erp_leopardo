@@ -135,7 +135,7 @@ class StatisticsDashboard(QWidget):
         if self._left_map_actual_layout is None:
             logging.critical("StatisticsDashboard: self._left_map_actual_layout is None. This should have been set in __init__. Cannot proceed with map initialization.")
             return
-
+        
         # As an additional check, ensure the widget's current layout is indeed the one we stored.
         # This can catch unexpected external modifications to the widget's layout.
         if self.left_widget_for_map.layout() is None:
@@ -371,7 +371,7 @@ class StatisticsDashboard(QWidget):
             # Assumes statistics_module.py is in the project root directory.
             current_module_path = os.path.abspath(__file__)
             project_root_dir_local = os.path.dirname(current_module_path)
-
+            
             geojson_path = os.path.join(project_root_dir_local, "assets", "world_countries.geojson")
             logging.info(f"StatisticsDashboard: Attempting to load GeoJSON from: {geojson_path}")
 
@@ -488,7 +488,7 @@ class StatisticsDashboard(QWidget):
 
             if self.map_view:
                 self.map_view.setHtml(map_html_content)
-                logging.info("Interactive map updated successfully with QWebChannel JS.")
+                logging.info(f"Map HTML content successfully set in QWebEngineView. Map should be attempting to render. HTML content length: {len(map_html_content) if map_html_content else 0}.")
             else:
                 logging.error("StatisticsDashboard: self.map_view is None. Cannot set HTML for the map.")
 
@@ -829,12 +829,13 @@ class StatisticsDashboard(QWidget):
                 tab_layout.addWidget(table_widget)
                 self.segmentation_tables[key] = table_widget
             elif tab_type == "chart":
-                # For chart tabs, store the parent QWidget (tab_widget) instead of the layout directly.
-                # The layout will be retrieved from this parent widget later.
-                self.segmentation_canvases[key] = tab_widget # Store the parent QWidget
+                # For chart tabs, we'll create a FigureCanvas later when data is available
+                # We can store the layout or a placeholder widget if needed.
+                # For simplicity, we'll store the layout and add the canvas to it in the update method.
+                self.segmentation_canvases[key] = tab_layout # Store the layout for the canvas
 
             self.segmentation_tabs.addTab(tab_widget, title)
-        logging.debug(f"segmentation_canvases (now storing parent widgets for charts) initialized: {self.segmentation_canvases}")
+        logging.debug(f"segmentation_canvases initialized: {self.segmentation_canvases}")
         logging.debug(f"segmentation_tables initialized: {self.segmentation_tables}")
 
 
@@ -857,59 +858,35 @@ class StatisticsDashboard(QWidget):
             table.setSortingEnabled(True)
 
     def _update_status_segmentation_chart(self):
+        logging.debug(f"Current segmentation_canvases at start of _update_status_segmentation_chart: {self.segmentation_canvases}")
         logging.info("Updating status segmentation chart...")
-        logging.debug(f"Current segmentation_canvases (should be parent widgets for charts) at start of _update_status_segmentation_chart: {self.segmentation_canvases}")
-
-        parent_widget_for_chart = None
-        chart_layout = None
-
+        chart_layout = None # Initialize
         try:
-            parent_widget_for_chart = self.segmentation_canvases.get("status")
-            if parent_widget_for_chart is None:
-                logging.error("Parent widget for 'status' chart NOT FOUND in self.segmentation_canvases.")
-                return
-            if not isinstance(parent_widget_for_chart, QWidget):
-                logging.error(f"Object for 'status' in self.segmentation_canvases is not a QWidget. Type: {type(parent_widget_for_chart)}. Value: {parent_widget_for_chart}")
-                return
-
-            logging.info(f"Parent widget for 'status' chart retrieved: {parent_widget_for_chart}")
-
-            # Get the layout from the parent widget
-            layout_from_widget = parent_widget_for_chart.layout()
-            if layout_from_widget is None:
-                logging.error(f"Parent widget for 'status' chart ({parent_widget_for_chart}) has no layout (layout() returned None).")
-                return
-            if not isinstance(layout_from_widget, QVBoxLayout):
-                logging.error(f"Layout of parent widget for 'status' chart is not a QVBoxLayout. Type: {type(layout_from_widget)}. Layout: {layout_from_widget}")
-                return
-
-            chart_layout = layout_from_widget
-            logging.info(f"Successfully retrieved QVBoxLayout for 'status' chart from parent widget: {chart_layout}")
-
+            chart_layout = self.segmentation_canvases["status"]
+            logging.debug(f"Successfully retrieved chart_layout for 'status' via direct access: {chart_layout}")
         except KeyError:
-            logging.error("Key 'status' NOT FOUND in self.segmentation_canvases (should store parent QWidget).")
-            return
-        except Exception as e_retrieval:
-            logging.error(f"Unexpected error retrieving parent widget or layout for 'status' chart: {e_retrieval}", exc_info=True)
-            return
+            logging.error("Chart layout for 'status' NOT FOUND using direct key access (KeyError).")
+            # chart_layout remains None, will be caught by the next check
+        except Exception as e_direct_access:
+            logging.error(f"Unexpected error retrieving chart_layout for 'status' via direct access: {e_direct_access}", exc_info=True)
+            # chart_layout remains None
 
-        # Defensive check, though theoretically covered by above
         if chart_layout is None:
-            logging.error("Chart layout for 'status' is None after retrieval attempts. Cannot proceed with chart update.")
+            logging.error("Chart layout for 'status' IS EXPLICITLY NONE after retrieval attempt.")
+            if "status" in self.segmentation_canvases:
+                 logging.warning(f"Diagnosis: Key 'status' IS IN self.segmentation_canvases, but its value might be None or direct access failed. Current value via get: {self.segmentation_canvases.get('status')}")
+            else:
+                 logging.warning("Diagnosis: Key 'status' is NOT IN self.segmentation_canvases dictionary.")
+            return
+        # The following 'if not chart_layout:' is a fallback for the highly unlikely scenario where chart_layout is not None but still falsy.
+        # Given it's a QVBoxLayout, this shouldn't happen unless it's a very unusual Qt state.
+        elif not chart_layout: 
+            logging.critical(f"CRITICAL UNEXPECTED: Chart layout for 'status' is NOT None ({chart_layout}, type: {type(chart_layout)}), but it evaluates to FALSY. This is highly unusual and indicates a deeper issue. Cannot proceed with chart update.")
+            if "status" in self.segmentation_canvases:
+                 logging.warning(f"Further Diagnosis: Key 'status' IS IN self.segmentation_canvases. Value via get: {self.segmentation_canvases.get('status')}")
             return
 
-        # Add detailed logging for the retrieved chart_layout
-        logging.info(f"Final chart_layout to be used. Type: {type(chart_layout)}, Is None: {chart_layout is None}, Boolean eval: {bool(chart_layout)}")
-        try:
-            if hasattr(chart_layout, 'parentWidget'):
-                logging.info(f"Chart_layout's parent widget: {chart_layout.parentWidget()}")
-            else:
-                logging.info("Chart_layout does not have parentWidget attribute (e.g. if it's not a QLayout subclass directly).")
-        except Exception as e_parent_log:
-            logging.warning(f"Could not log chart_layout.parentWidget(): {e_parent_log}")
-
-
-        # Clear previous canvas if any from the layout
+        # Clear previous canvas if any
         while chart_layout.count():
             item = chart_layout.takeAt(0)
             widget = item.widget()
