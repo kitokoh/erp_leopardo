@@ -2451,4 +2451,4 @@ class DocumentManager(QMainWindow):
         # it should be refreshed here as well.
         # Example: If a ClientWidget had a role dropdown (it doesn't currently), it would need refresh.
 
-[end of main_window.py]
+# [end of main_window.py]
