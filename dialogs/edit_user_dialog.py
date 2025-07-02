@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QLineEdit,
     QComboBox, QPushButton, QMessageBox, QDialogButtonBox, QLabel
 )
+from PyQt5.QtCore import Qt # Added for Qt.TextSelectableByMouse
 from PyQt5.QtGui import QIcon
 from db.cruds import users_crud, roles_crud, activity_logs_crud
 from auth.permissions import P_MANAGE_USERS, has_permission
