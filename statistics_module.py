@@ -835,6 +835,8 @@ class StatisticsDashboard(QWidget):
                 self.segmentation_canvases[key] = tab_layout # Store the layout for the canvas
 
             self.segmentation_tabs.addTab(tab_widget, title)
+        logging.debug(f"segmentation_canvases initialized: {self.segmentation_canvases}")
+        logging.debug(f"segmentation_tables initialized: {self.segmentation_tables}")
 
 
     def _populate_table(self, table_key, data_fetch_func, column_keys):
@@ -856,10 +858,24 @@ class StatisticsDashboard(QWidget):
             table.setSortingEnabled(True)
 
     def _update_status_segmentation_chart(self):
+        logging.debug(f"Current segmentation_canvases at start of _update_status_segmentation_chart: {self.segmentation_canvases}")
         logging.info("Updating status segmentation chart...")
-        chart_layout = self.segmentation_canvases.get("status")
-        if not chart_layout:
-            logging.error("Chart layout for 'status' not found.")
+        chart_layout = None # Initialize
+        try:
+            chart_layout = self.segmentation_canvases["status"]
+            logging.debug(f"Successfully retrieved chart_layout for 'status' via direct access: {chart_layout}")
+        except KeyError:
+            logging.error("Chart layout for 'status' NOT FOUND using direct key access (KeyError).")
+            # chart_layout remains None, will be caught by the next check
+        except Exception as e_direct_access:
+            logging.error(f"Unexpected error retrieving chart_layout for 'status' via direct access: {e_direct_access}", exc_info=True)
+            # chart_layout remains None
+
+        if not chart_layout: # This catches both KeyError and if chart_layout was None for other reasons
+            logging.error("Chart layout for 'status' is effectively None or not found. Cannot proceed with chart update.")
+            # To provide more context if .get() was behaving weirdly (though direct access might clarify)
+            if "status" in self.segmentation_canvases:
+                 logging.warning(f"Key 'status' IS IN self.segmentation_canvases, but direct access failed or resulted in None. Value: {self.segmentation_canvases.get('status')}")
             return
 
         # Clear previous canvas if any
