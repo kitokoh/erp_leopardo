@@ -135,7 +135,7 @@ class StatisticsDashboard(QWidget):
         if self._left_map_actual_layout is None:
             logging.critical("StatisticsDashboard: self._left_map_actual_layout is None. This should have been set in __init__. Cannot proceed with map initialization.")
             return
-        
+
         # As an additional check, ensure the widget's current layout is indeed the one we stored.
         # This can catch unexpected external modifications to the widget's layout.
         if self.left_widget_for_map.layout() is None:
@@ -371,7 +371,7 @@ class StatisticsDashboard(QWidget):
             # Assumes statistics_module.py is in the project root directory.
             current_module_path = os.path.abspath(__file__)
             project_root_dir_local = os.path.dirname(current_module_path)
-            
+
             geojson_path = os.path.join(project_root_dir_local, "assets", "world_countries.geojson")
             logging.info(f"StatisticsDashboard: Attempting to load GeoJSON from: {geojson_path}")
 
@@ -872,14 +872,11 @@ class StatisticsDashboard(QWidget):
             # chart_layout remains None
 
         if not chart_layout: # This catches both KeyError and if chart_layout was None for other reasons
-            logging.error(
-                f"Chart layout for 'status' evaluates to False (likely C++ object deleted), though Python proxy exists: {chart_layout}. Cannot proceed with chart update."
-            )
-            # To provide more context
+            logging.error("Chart layout for 'status' is effectively None or not found. Cannot proceed with chart update.")
+            # To provide more context if .get() was behaving weirdly (though direct access might clarify)
             if "status" in self.segmentation_canvases:
-                 logging.warning(f"Key 'status' IS IN self.segmentation_canvases. Current value from .get(): {self.segmentation_canvases.get('status')}, Type: {type(self.segmentation_canvases.get('status'))}")
-            else:
-                 logging.warning(f"Key 'status' IS NOT IN self.segmentation_canvases. Current dict: {self.segmentation_canvases}")
+                 logging.warning(f"Key 'status' IS IN self.segmentation_canvases, but direct access failed or resulted in None. Value: {self.segmentation_canvases.get('status')}")
+
             return
 
         # Clear previous canvas if any
