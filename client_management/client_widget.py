@@ -170,13 +170,7 @@ class ClientWidget(QWidget):
             self.header_label.setObjectName("clientHeaderLabel")
             info_container_layout.addWidget(self.header_label)
 
-            # Original action_layout and its buttons are being relocated or removed.
-            # The buttons ("Envoyer Mail", "Modifier Client", "Archiver Client")
-            # will be added to the 'Détails Client' tab later in this method.
-            # self.create_docs_btn, self.compile_pdf_btn, self.edit_save_client_btn,
-            # self.send_whatsapp_btn, self.archive_client_btn are initialized here
-            # but added to their new locations.
-
+            action_layout = QHBoxLayout()
             self.create_docs_btn = QPushButton(self.tr("Envoyer Mail"))
             self.create_docs_btn.setIcon(QIcon.fromTheme("mail-send", QIcon(":/icons/bell.svg")))
             self.create_docs_btn.setToolTip(self.tr("Envoyer un email au client"))
@@ -184,38 +178,35 @@ class ClientWidget(QWidget):
             try:
                 self.create_docs_btn.clicked.disconnect(self.open_create_docs_dialog)
             except TypeError:
-                pass
+                pass # Not connected or already disconnected
             self.create_docs_btn.clicked.connect(self.open_send_email_dialog)
-            # Not adding to action_layout here
+            action_layout.addWidget(self.create_docs_btn)
 
-            # compile_pdf_btn is effectively redundant as "Combiné" button exists in Documents tab.
-            # We can remove its creation here if it's not used elsewhere.
-            # For now, let's assume it's removed from the visible UI.
-            self.compile_pdf_btn = QPushButton(self.tr("Compiler PDF")) # Still create if other logic uses it internally
+            self.compile_pdf_btn = QPushButton(self.tr("Compiler PDF"))
             self.compile_pdf_btn.setIcon(QIcon.fromTheme("document-export"))
             self.compile_pdf_btn.setProperty("primary", True)
             self.compile_pdf_btn.clicked.connect(self.open_compile_pdf_dialog)
+            # action_layout.addWidget(self.compile_pdf_btn) # Moved to documents tab filters
 
             self.edit_save_client_btn = QPushButton(self.tr("Modifier Client"))
             self.edit_save_client_btn.setIcon(QIcon.fromTheme("document-edit", QIcon(":/icons/pencil.svg")))
             self.edit_save_client_btn.setToolTip(self.tr("Modifier les informations du client"))
             self.edit_save_client_btn.clicked.connect(self.toggle_client_edit_mode)
-            # Not adding to action_layout here
+            action_layout.addWidget(self.edit_save_client_btn)
 
-            # send_whatsapp_btn is redundant due to internal tab
-            self.send_whatsapp_btn = QPushButton(self.tr("Send WhatsApp")) # Still create if other logic uses it
+            self.send_whatsapp_btn = QPushButton(self.tr("Send WhatsApp"))
             self.send_whatsapp_btn.setIcon(QIcon.fromTheme("contact-new", QIcon(":/icons/user.svg")))
             self.send_whatsapp_btn.setToolTip(self.tr("Send a WhatsApp message to the client"))
             self.send_whatsapp_btn.clicked.connect(self.open_send_whatsapp_dialog)
+            # action_layout.addWidget(self.send_whatsapp_btn) # Moved to an internal tab
 
             self.archive_client_btn = QPushButton(self.tr("Archiver Client"))
-            self.archive_client_btn.setIcon(QIcon(":/icons/folder.svg"))
+            self.archive_client_btn.setIcon(QIcon(":/icons/folder.svg")) # Replaced archive.svg with folder.svg
             self.archive_client_btn.setToolTip(self.tr("Archiver ce client (soft delete)"))
-            self.archive_client_btn.clicked.connect(self.handle_archive_client)
-            # Not adding to action_layout here
+            self.archive_client_btn.clicked.connect(self.handle_archive_client) # Connect to the new handler
+            action_layout.addWidget(self.archive_client_btn)
 
-            # Original action_layout is removed from info_container_layout
-            # info_container_layout.addLayout(action_layout) # This line is removed
+            info_container_layout.addLayout(action_layout)
 
             # Create the internal QTabWidget
             self.internal_client_info_tabs = QTabWidget()
@@ -223,22 +214,16 @@ class ClientWidget(QWidget):
 
             # --- Tab 1: Client Details (populated by populate_details_layout) ---
             self.client_details_tab = QWidget()
-            details_tab_layout = QVBoxLayout(self.client_details_tab) # Main layout for this tab
+            details_tab_layout = QVBoxLayout(self.client_details_tab)
 
-            # New layout for relocated buttons, to be added at the top of details_tab_layout
-            relocated_buttons_layout = QHBoxLayout()
-            relocated_buttons_layout.addWidget(self.create_docs_btn) # "Envoyer Mail"
-            relocated_buttons_layout.addWidget(self.edit_save_client_btn) # "Modifier Client"
-            relocated_buttons_layout.addWidget(self.archive_client_btn) # "Archiver Client"
-            relocated_buttons_layout.addStretch() # Push buttons to the left
-            details_tab_layout.addLayout(relocated_buttons_layout) # Add this button bar
+            self.status_combo = QComboBox() # Status combo will be part of the details tab
+            # self.load_statuses() # load_statuses will be called by populate_details_layout or refresh_display
+            # self.status_combo.setCurrentText(self.client_info.get("status", self.tr("En cours")))
+            # self.status_combo.currentTextChanged.connect(self.update_client_status)
 
-            self.status_combo = QComboBox()
-
-            self.details_layout = QFormLayout() # This is the QFormLayout for client fields
+            self.details_layout = QFormLayout() # This is the layout for client fields
             self.details_layout.setLabelAlignment(Qt.AlignLeft)
             self.details_layout.setSpacing(10)
-            details_tab_layout.addLayout(self.details_layout) # Add QFormLayout below buttons
 
             # --- Persistent UI Elements for Client Details Tab ---
             # These are created once here and updated by populate_details_layout
@@ -331,9 +316,6 @@ class ClientWidget(QWidget):
 
             # Initial population of the now persistent elements
             self.populate_details_layout()
-
-            # Call _setup_notes_section to add the "Notes" tab to internal_client_info_tabs
-            self._setup_notes_section(self.internal_client_info_tabs)
 
 
             # --- Tab 2: Contacts ---
@@ -521,8 +503,10 @@ class ClientWidget(QWidget):
             logging.error(f"Error in _setup_client_info_section: {e}", exc_info=True)
             QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation section infos client:\n{0}").format(str(e)))
 
-        # self._setup_notes_section(layout) # Notes section is now an internal tab
-        self._setup_main_tabs_section(layout) # This will call sub-methods for each tab, including notes as an internal tab
+        self._setup_notes_section(layout)
+        self._setup_main_tabs_section(layout) # This will call sub-methods for each tab
+        self._setup_commandes_tab() # Add the new Commandes tab
+
         self._setup_commandes_tab() # Add the new Commandes tab
 
         # Initial data loading calls
@@ -1184,27 +1168,24 @@ class ClientWidget(QWidget):
         logging.info(f"ClientWidget permissions applied for role: {role_name}")
 
 
-    def _setup_notes_section(self, internal_tab_widget): # Changed to accept internal_tab_widget
+    def _setup_notes_section(self, main_layout):
         try:
-            logging.info("ClientWidget.setup_ui: Starting setup for Notes Internal Tab...")
+            logging.info("ClientWidget.setup_ui: Starting setup for Notes Section...")
             self.notes_edit = QTextEdit(self.client_info.get("notes", ""))
             self.notes_edit.setPlaceholderText(self.tr("Ajoutez des notes sur ce client..."))
-
-            # Create a new QWidget for the "Notes" tab
-            notes_internal_tab_content_widget = QWidget()
-            notes_internal_tab_layout = QVBoxLayout(notes_internal_tab_content_widget)
-            notes_internal_tab_layout.setContentsMargins(5, 5, 5, 5) # Add some margins
-            notes_internal_tab_layout.addWidget(self.notes_edit)
-
-            # Add this new widget as a tab to the passed internal_tab_widget
-            internal_tab_widget.addTab(notes_internal_tab_content_widget, self.tr("Notes"))
-            logging.info("ClientWidget.setup_ui: 'Notes' tab added to internal_client_info_tabs.")
-
-            # The notes_group_box and its container are no longer needed in the main layout.
-            # self.notes_group_box = QGroupBox(self.tr("Notes")) ... etc.
+            self.notes_group_box = QGroupBox(self.tr("Notes"))
+            self.notes_group_box.setCheckable(True)
+            notes_group_layout = QVBoxLayout(self.notes_group_box)
+            self.notes_container_widget = QWidget()
+            notes_container_layout = QVBoxLayout(self.notes_container_widget)
+            notes_container_layout.setContentsMargins(0, 5, 0, 0)
+            notes_container_layout.addWidget(self.notes_edit)
+            notes_group_layout.addWidget(self.notes_container_widget)
+            self.notes_group_box.setChecked(False)
+            main_layout.addWidget(self.notes_group_box)
         except Exception as e:
-            logging.error(f"Error in _setup_notes_section (internal tab): {e}", exc_info=True)
-            QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation onglet notes interne:\n{0}").format(str(e)))
+            logging.error(f"Error in _setup_notes_section: {e}", exc_info=True)
+            QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation section notes:\n{0}").format(str(e)))
 
     def _setup_main_tabs_section(self, main_layout):
         try:
@@ -1214,15 +1195,10 @@ class ClientWidget(QWidget):
             self.tabs_group_box = QGroupBox(self.tr("Autres Informations"))
             self.tabs_group_box.setCheckable(True)
             tabs_group_layout = QVBoxLayout(self.tabs_group_box)
-            self.tab_widget = QTabWidget() # This is the main QTabWidget for Documents, Products, etc.
+            self.tab_widget = QTabWidget()
             tabs_group_layout.addWidget(self.tab_widget)
             self.tabs_group_box.setChecked(False) # Start collapsed
             main_layout.addWidget(self.tabs_group_box)
-
-            # Call to setup notes as an internal tab within client_info_group_box's internal_client_info_tabs
-            # This needs internal_client_info_tabs to be created first.
-            # So, _setup_notes_section will be called from within the _setup_client_info_section block.
-            # For now, ensure the rest of _setup_main_tabs_section correctly sets up self.tab_widget.
 
             # ---- New Overview Tab Setup ----
             self.overview_tab = QWidget()
