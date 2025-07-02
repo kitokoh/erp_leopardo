@@ -367,13 +367,19 @@ class StatisticsDashboard(QWidget):
     def update_map(self):
         logging.info("Updating interactive map...")
         try:
-            geojson_path = os.path.join(APP_ROOT_DIR, "assets", "world_countries.geojson")
+            # Robustly determine APP_ROOT_DIR within this module's context for asset loading
+            # Assumes statistics_module.py is in the project root directory.
+            current_module_path = os.path.abspath(__file__)
+            project_root_dir_local = os.path.dirname(current_module_path)
+
+            geojson_path = os.path.join(project_root_dir_local, "assets", "world_countries.geojson")
+            logging.info(f"StatisticsDashboard: Attempting to load GeoJSON from: {geojson_path}")
 
             if not os.path.exists(geojson_path):
-                logging.error(f"GeoJSON file not found at: {geojson_path}")
-            error_message = self.tr("Les données géographiques de la carte (GeoJSON) sont introuvables. La carte ne peut pas être affichée. Veuillez vérifier l'installation de l'application ou contacter le support.")
-            self._set_map_error_html(error_message)
-            return
+                logging.error(f"GeoJSON file not found at: {geojson_path}. Imported APP_ROOT_DIR was {APP_ROOT_DIR}")
+                error_message = self.tr("Les données géographiques de la carte (GeoJSON) sont introuvables. La carte ne peut pas être affichée. Veuillez vérifier l'installation de l'application ou contacter le support.")
+                self._set_map_error_html(error_message)
+                return
 
             m = folium.Map(location=[20, 0], zoom_start=2, tiles="CartoDB positron")
             # clients_by_country_counts = get_client_counts_by_country() # Removed redundant call
