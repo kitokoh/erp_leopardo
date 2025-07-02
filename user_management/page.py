@@ -99,7 +99,7 @@ class UserManagementPage(QWidget):
         self.reset_password_button.clicked.connect(self._handle_reset_password)
         action_layout.addWidget(self.reset_password_button)
 
-        self.delete_user_button = QPushButton(QIcon(":/icons/trash-2.svg"), self.tr("Supprimer Utilisateur"))
+        self.delete_user_button = QPushButton(QIcon(":/icons/trash.svg"), self.tr("Supprimer Utilisateur"))
         self.delete_user_button.clicked.connect(self._handle_soft_delete_user) # Connect method
         action_layout.addWidget(self.delete_user_button)
 

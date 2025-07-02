@@ -21,7 +21,7 @@ class RoleManagementDialog(QDialog):
         self.current_user_info = current_user_info # Needed for logging and potentially permissions
         self.parent_window = parent
         self.setWindowTitle(self.tr("Gestion des Rôles et Permissions"))
-        self.setWindowIcon(QIcon(":/icons/shield.svg")) # Or another appropriate icon
+        self.setWindowIcon(QIcon(":/icons/settings.svg")) # Replaced shield.svg with settings.svg
         self.setMinimumSize(800, 600) # Increased size for permissions panel
 
         self._setup_ui()
@@ -66,7 +66,7 @@ class RoleManagementDialog(QDialog):
         self.edit_role_button.clicked.connect(self._handle_edit_role) # Connect action
         role_buttons_layout.addWidget(self.edit_role_button)
 
-        self.delete_role_button = QPushButton(QIcon(":/icons/trash-2.svg"), self.tr("Supprimer Rôle"))
+        self.delete_role_button = QPushButton(QIcon(":/icons/trash.svg"), self.tr("Supprimer Rôle"))
         self.delete_role_button.clicked.connect(self._handle_delete_role) # Connect action
         role_buttons_layout.addWidget(self.delete_role_button)
         roles_layout.addLayout(role_buttons_layout)
