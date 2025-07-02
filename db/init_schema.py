@@ -130,6 +130,40 @@ def initialize_database():
     """)
     print("DEBUG_INIT_DB: Table Roles created or exists.")
 
+    # --- Permissions and RolePermissions Tables (New for dynamic permissions) ---
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Permissions (
+        permission_key TEXT PRIMARY KEY,
+        description TEXT
+    )
+    """)
+    print("DEBUG_INIT_DB: Table Permissions created or exists.")
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS RolePermissions (
+        role_id INTEGER NOT NULL,
+        permission_key TEXT NOT NULL,
+        PRIMARY KEY (role_id, permission_key),
+        FOREIGN KEY (role_id) REFERENCES Roles (role_id) ON DELETE CASCADE,
+        FOREIGN KEY (permission_key) REFERENCES Permissions (permission_key) ON DELETE CASCADE
+    )
+    """)
+    print("DEBUG_INIT_DB: Table RolePermissions created or exists.")
+    # --- End Permissions and RolePermissions Tables ---
+
+    # Populate Roles table (ensure default roles exist)
+    # This should happen before populating RolePermissions
+    default_roles = [
+        {"role_name": "Administrator", "description": "Full system access."},
+        {"role_name": "Team Lead", "description": "Manages projects and teams."},
+        {"role_name": "Operator", "description": "Standard user with operational access."}
+    ]
+    for role_data in default_roles:
+        cursor.execute("INSERT OR IGNORE INTO Roles (role_name, description) VALUES (?, ?)",
+                       (role_data["role_name"], role_data["description"]))
+    print("DEBUG_INIT_DB: Default roles seeded or already exist.")
+
+
     # Create Users table (modified)
     # - Changed 'role' to 'role_id' with FOREIGN KEY
     # - Renamed 'password_hash' to 'hashed_password'
@@ -2422,6 +2456,59 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     # --- Seed Data (from db/schema.py, ensuring use of db_config) ---
     try:
         print("DEBUG_INIT_DB: Starting data seeding phase.")
+
+        # --- Seed Permissions and RolePermissions ---
+        print("DEBUG_INIT_DB: Seeding Permissions and RolePermissions...")
+        # Dynamically get all permission constants from auth.permissions
+        from auth import permissions as auth_perms_module
+
+        all_permission_keys = []
+        for attr_name in dir(auth_perms_module):
+            if attr_name.startswith("P_"):
+                permission_key = getattr(auth_perms_module, attr_name)
+                if isinstance(permission_key, str):
+                    all_permission_keys.append(permission_key)
+
+        for p_key in all_permission_keys:
+            # Generate a simple description based on the key
+            desc = p_key.replace("P_", "").replace("_", " ").capitalize()
+            cursor.execute("INSERT OR IGNORE INTO Permissions (permission_key, description) VALUES (?, ?)",
+                           (p_key, f"Permission to {desc}"))
+        print(f"DEBUG_INIT_DB: {len(all_permission_keys)} permissions seeded into Permissions table.")
+
+        # Seed RolePermissions based on the old PERMISSION_MAP
+        # Ensure PERMISSION_MAP and role names (ADMINISTRATOR, etc.) are imported or accessible
+        # from auth.permissions
+
+        # Fetch role IDs first
+        role_id_map = {}
+        cursor.execute("SELECT role_id, role_name FROM Roles")
+        for row in cursor.fetchall():
+            role_id_map[row['role_name']] = row['role_id']
+
+        seeded_role_permissions_count = 0
+        for role_name_const, perm_keys_list in auth_perms_module.PERMISSION_MAP.items():
+            # role_name_const will be like "Administrator", "Team Lead" from auth.permissions
+            # We need its actual string value if it's a variable holding the name
+            # e.g. if auth_perms_module.ADMINISTRATOR = "Administrator"
+            actual_role_name = getattr(auth_perms_module, role_name_const, role_name_const) # Handles if it's a const name or direct string key
+            if isinstance(actual_role_name, str) and actual_role_name in role_id_map:
+                role_id = role_id_map[actual_role_name]
+                for perm_key in perm_keys_list:
+                    if perm_key in all_permission_keys: # Ensure permission exists in Permissions table
+                        try:
+                            cursor.execute("INSERT OR IGNORE INTO RolePermissions (role_id, permission_key) VALUES (?, ?)",
+                                           (role_id, perm_key))
+                            seeded_role_permissions_count +=1
+                        except sqlite3.IntegrityError: # Should be caught by OR IGNORE
+                            pass
+                    else:
+                        print(f"Warning: Permission key '{perm_key}' found in PERMISSION_MAP for role '{actual_role_name}' but not in defined P_ constants. Skipping.")
+            else:
+                 print(f"Warning: Role name '{actual_role_name}' from PERMISSION_MAP not found in Roles table (IDs: {role_id_map}). Skipping its permissions.")
+        print(f"DEBUG_INIT_DB: {seeded_role_permissions_count} role-permission links seeded into RolePermissions table.")
+        # --- End Seed Permissions and RolePermissions ---
+
 
         # Accounting Module Seeding (example: base currency, default fiscal year)
         try:

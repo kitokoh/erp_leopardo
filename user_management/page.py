@@ -1,10 +1,11 @@
 # user_management/page.py
+import logging # Added for logging soft delete action
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QLabel, QTableWidget,
                              QTableWidgetItem, QHeaderView, QPushButton,
-                             QHBoxLayout, QMessageBox)
+                             QHBoxLayout, QMessageBox, QDialog) # Added QDialog
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QAbstractItemView
+from PyQt5.QtWidgets import QAbstractItemView, QComboBox # Added QComboBox (already used but good to ensure)
 
 # Assuming users_crud and roles_crud are accessible for fetching data
 # and auth.permissions for permission checking if actions were added here.
@@ -33,6 +34,7 @@ class UserManagementPage(QWidget):
         self.edit_user_button.setEnabled(can_manage_users_perm)
         self.toggle_active_button.setEnabled(can_manage_users_perm)
         self.reset_password_button.setEnabled(can_manage_users_perm)
+        self.delete_user_button.setEnabled(can_manage_users_perm) # Add delete button permission
         # Add User button will also be controlled by this in a later phase
         # self.add_user_button.setEnabled(can_manage_users_perm)
 
@@ -43,6 +45,7 @@ class UserManagementPage(QWidget):
             self.edit_user_button.setToolTip(self.tr("Permissions insuffisantes"))
             self.toggle_active_button.setToolTip(self.tr("Permissions insuffisantes"))
             self.reset_password_button.setToolTip(self.tr("Permissions insuffisantes"))
+            self.delete_user_button.setToolTip(self.tr("Permissions insuffisantes")) # Add tooltip for delete
 
 
     def _setup_ui(self):
@@ -95,6 +98,10 @@ class UserManagementPage(QWidget):
         self.reset_password_button = QPushButton(QIcon(":/icons/settings.svg"), self.tr("Réinitialiser MDP")) # Changed to existing settings.svg
         self.reset_password_button.clicked.connect(self._handle_reset_password)
         action_layout.addWidget(self.reset_password_button)
+
+        self.delete_user_button = QPushButton(QIcon(":/icons/trash-2.svg"), self.tr("Supprimer Utilisateur"))
+        self.delete_user_button.clicked.connect(self._handle_soft_delete_user) # Connect method
+        action_layout.addWidget(self.delete_user_button)
 
         action_layout.addStretch()
         self.refresh_button = QPushButton(QIcon(":/icons/refresh-cw.svg"), self.tr("Actualiser"))
@@ -152,7 +159,7 @@ class UserManagementPage(QWidget):
                                 self.tr("Vous n'avez pas la permission d'ajouter des utilisateurs."))
             return
 
-        add_dialog = EditUserDialog(user_id_to_edit=None, # Indicates 'add' mode
+        add_dialog = EditUserDialog(user_id=None, # Corrected: user_id instead of user_id_to_edit
                                     current_admin_user_info=self.current_user_info,
                                     parent=self)
         if add_dialog.exec_() == QDialog.Accepted:
@@ -167,6 +174,7 @@ class UserManagementPage(QWidget):
         self.edit_user_button.setEnabled(has_selection and can_manage_users_perm)
         self.toggle_active_button.setEnabled(has_selection and can_manage_users_perm)
         self.reset_password_button.setEnabled(has_selection and can_manage_users_perm)
+        self.delete_user_button.setEnabled(has_selection and can_manage_users_perm) # Update delete button state
 
 
     def load_users_to_table(self):
@@ -257,7 +265,7 @@ class UserManagementPage(QWidget):
 
         from dialogs.edit_user_dialog import EditUserDialog
 
-        edit_dialog = EditUserDialog(user_id_to_edit=selected_user_id,
+        edit_dialog = EditUserDialog(user_id=selected_user_id, # Corrected: user_id instead of user_id_to_edit
                                      current_admin_user_info=self.current_user_info,
                                      parent=self)
         if edit_dialog.exec_() == QDialog.Accepted:
@@ -363,4 +371,68 @@ class UserManagementPage(QWidget):
                 QMessageBox.critical(self, self.tr("Erreur"),
                                      self.tr("Impossible de réinitialiser le mot de passe pour '{0}'.").format(username_to_display))
         # --- End Placeholder ---
+
+    def _handle_soft_delete_user(self):
+        """Handles the Soft Delete User button click."""
+        current_user_role = self.current_user_info.get('role_name')
+        if not has_permission(current_user_role, P_MANAGE_USERS):
+            QMessageBox.warning(self, self.tr("Permissions Insuffisantes"),
+                                self.tr("Vous n'avez pas la permission de supprimer des utilisateurs."))
+            return
+
+        selected_user_id_to_delete = self._get_selected_user_id()
+        if not selected_user_id_to_delete:
+            QMessageBox.information(self, self.tr("Aucune Sélection"),
+                                    self.tr("Veuillez sélectionner un utilisateur à supprimer."))
+            return
+
+        current_admin_user_id = self.current_user_info.get('user_id')
+        if selected_user_id_to_delete == current_admin_user_id:
+            QMessageBox.warning(self, self.tr("Action Interdite"),
+                                self.tr("Vous не pouvez pas vous supprimer vous-même."))
+            return
+
+        user_to_delete_data = users_crud.get_user_by_id(selected_user_id_to_delete) # Fetch to get username for confirmation
+        if not user_to_delete_data:
+            QMessageBox.critical(self, self.tr("Erreur"), self.tr("Utilisateur à supprimer non trouvé."))
+            self.load_users_to_table() # Refresh in case it was deleted by another admin
+            return
+
+        username_to_delete_display = user_to_delete_data.get('username', selected_user_id_to_delete)
+
+        reply = QMessageBox.question(self, self.tr("Confirmer Suppression"),
+                                     self.tr("Êtes-vous sûr de vouloir supprimer logiquement l'utilisateur '{0}' ? "
+                                          "L'utilisateur ne pourra plus se connecter et sera masqué des listes par défaut.").format(username_to_delete_display),
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+
+        if reply == QMessageBox.Yes:
+            success = users_crud.soft_delete_user(user_id_to_delete=selected_user_id_to_delete,
+                                                  current_user_id=current_admin_user_id)
+            if success:
+                QMessageBox.information(self, self.tr("Succès"),
+                                        self.tr("L'utilisateur '{0}' a été supprimé logiquement.").format(username_to_delete_display))
+                self.load_users_to_table() # Refresh the user list
+
+                # Log activity for USER_SOFT_DELETED
+                try:
+                    log_data = {
+                        "user_id": current_admin_user_id, # User performing the action
+                        "action_type": "USER_SOFT_DELETED",
+                        "details": f"Utilisateur '{username_to_delete_display}' (ID: {selected_user_id_to_delete}) supprimé logiquement.",
+                        "related_entity_type": "User",
+                        "related_entity_id": selected_user_id_to_delete
+                    }
+                    activity_logs_crud.add_activity_log(log_data)
+                    logging.info(f"Activity logged for USER_SOFT_DELETED: {selected_user_id_to_delete} by {current_admin_user_id}")
+                except Exception as e_log:
+                    logging.error(f"Failed to log USER_SOFT_DELETED activity for user {selected_user_id_to_delete}: {e_log}", exc_info=True)
+            else:
+                # Check if the failure was due to self-deletion attempt, though primary check is above
+                if selected_user_id_to_delete == current_admin_user_id:
+                     QMessageBox.warning(self, self.tr("Action Interdite"), # Should have been caught earlier
+                                         self.tr("Vous ne pouvez pas vous supprimer vous-même."))
+                else:
+                    QMessageBox.critical(self, self.tr("Erreur"),
+                                         self.tr("Impossible de supprimer logiquement l'utilisateur '{0}'. "
+                                              "Vérifiez les logs pour plus de détails.").format(username_to_delete_display))
 # ```

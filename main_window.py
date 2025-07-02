@@ -147,6 +147,7 @@ from calculator.main_calculator_widget import MainCalculatorWidget # Import Calc
 # from db.connection import SessionLocal as AppSessionLocal_MW # Import SessionLocal for calculator
 from user_management.user_menu_button import UserMenuButton # Import UserMenuButton
 from dialogs.edit_user_dialog import EditUserDialog # For handling edit/add user requests
+from dialogs.role_management_dialog import RoleManagementDialog # Added for Role Management
 from commande_management.commandes_dashboard_widget import CommandesDashboardWidget # Import CommandesDashboardWidget
 
 # Definition of configurable modules
@@ -1081,6 +1082,10 @@ class DocumentManager(QMainWindow):
         self.commande_management_action = QAction(QIcon(":/icons/shopping-cart.svg"), self.tr("Gestion des Commandes"), self) # Assumes shopping-cart.svg will be added
         self.commande_management_action.triggered.connect(self.show_commande_management_view)
 
+        # Action for managing roles
+        self.manage_roles_action = QAction(QIcon(":/icons/shield.svg"), self.tr("Gérer les Rôles"), self) # Assuming shield.svg or similar
+        self.manage_roles_action.triggered.connect(self.open_role_management_dialog)
+
 
         # Populate searchable_actions_map
         self.searchable_actions_map[self.tr("Accueil")] = self.home_action
@@ -1103,6 +1108,8 @@ class DocumentManager(QMainWindow):
         self.searchable_actions_map[self.tr("Calendrier")] = self.calendar_module_action
         self.searchable_actions_map[self.tr("Gérer les Utilisateurs")] = self.manage_users_action
         self.searchable_actions_map[self.tr("Gestion des Commandes")] = self.commande_management_action
+        self.searchable_actions_map[self.tr("Gérer les Rôles")] = self.manage_roles_action
+
 
     def _placeholder_manage_users(self):
         # This is a placeholder. Actual user management UI would be complex.
@@ -1127,7 +1134,8 @@ class DocumentManager(QMainWindow):
         # Admin Menu (new menu for admin-specific tasks)
         self.admin_menu = menu_bar.addMenu(self.tr("Administration"))
         self.admin_menu.addAction(self.manage_users_action)
-        # Add other admin-specific actions here if any (e.g., manage roles, system logs)
+        self.admin_menu.addAction(self.manage_roles_action) # Add role management action
+        # Add other admin-specific actions here if any (e.g., system logs)
 
         # Modules Menu
         modules_menu = menu_bar.addMenu(self.tr("Modules"))
@@ -1231,12 +1239,12 @@ class DocumentManager(QMainWindow):
     def _apply_permissions(self):
         """Applies role-based permissions to UI elements."""
         from auth.permissions import has_permission, P_MANAGE_SYSTEM_SETTINGS, P_CREATE_CLIENT, \
-                                     P_MANAGE_USERS, P_ACCESS_PROJECT_MODULE, P_ACCESS_STATISTICS_MODULE, \
+                                     P_MANAGE_USERS, P_MANAGE_ROLES, P_ACCESS_PROJECT_MODULE, P_ACCESS_STATISTICS_MODULE, \
                                      P_ACCESS_PARTNER_MODULE, P_ACCESS_INVENTORY_MODULE, \
                                      P_ACCESS_RECRUITMENT_MODULE, P_ACCESS_EXPERIENCE_MODULE, \
                                      P_ACCESS_CALENDAR_MODULE, P_ACCESS_BOTPRESS_MODULE, \
                                      P_ACCESS_CARRIER_MAP_MODULE, P_ACCESS_CAMERA_MODULE, \
-                                     P_MANAGE_GLOBAL_PRODUCTS, P_ACCESS_CALCULATOR_MODULE, P_MANAGE_STATUSES # Added P_MANAGE_STATUSES
+                                     P_MANAGE_GLOBAL_PRODUCTS, P_ACCESS_CALCULATOR_MODULE, P_MANAGE_STATUSES # Added P_MANAGE_ROLES
 
         role_name = self.current_user_info.get('role_name') if self.current_user_info else None
         if not role_name: # Should not happen if login is enforced, but good for safety
@@ -1253,8 +1261,13 @@ class DocumentManager(QMainWindow):
             self.status_action.setEnabled(has_permission(role_name, P_MANAGE_STATUSES))
 
         # Admin Menu visibility
-        self.admin_menu.menuAction().setVisible(has_permission(role_name, P_MANAGE_USERS)) # Hide/show whole menu
-        self.manage_users_action.setEnabled(has_permission(role_name, P_MANAGE_USERS)) # Also control action itself
+        # The menu itself is visible if user can manage users OR roles
+        can_manage_users = has_permission(role_name, P_MANAGE_USERS)
+        can_manage_roles = has_permission(role_name, P_MANAGE_ROLES)
+        self.admin_menu.menuAction().setVisible(can_manage_users or can_manage_roles)
+        self.manage_users_action.setEnabled(can_manage_users)
+        self.manage_roles_action.setEnabled(can_manage_roles)
+
 
         # Module Menu Actions (Visibility based on module access permission)
         # Assuming specific P_ACCESS_MODULE_XYZ permissions or more granular ones.
@@ -2334,3 +2347,51 @@ class DocumentManager(QMainWindow):
             self.load_filter_combo.setCurrentIndex(0)
         else:
             logging.info("No changes reported from ManageSavedFiltersDialog.")
+
+    def open_role_management_dialog(self):
+        """Opens the Role Management dialog if the user has permission."""
+        from auth.permissions import has_permission, P_MANAGE_ROLES # Local import for clarity
+
+        if not self.current_user_info:
+            QMessageBox.warning(self, self.tr("Accès Refusé"), self.tr("Vous devez être connecté pour gérer les rôles."))
+            return
+
+        user_role_name = self.current_user_info.get('role_name')
+        if not has_permission(user_role_name, P_MANAGE_ROLES):
+            QMessageBox.warning(self, self.tr("Permissions Insuffisantes"),
+                                self.tr("Vous n'avez pas la permission de gérer les rôles."))
+            return
+
+        dialog = RoleManagementDialog(current_user_info=self.current_user_info, parent=self)
+        # Connect the signal from RoleManagementDialog to a handler in MainWindow
+        # if roles might affect other parts of MainWindow (e.g., UserManagementPage's role filter)
+        dialog.roles_changed_signal.connect(self._handle_roles_changed)
+        dialog.exec_()
+
+    def _handle_roles_changed(self):
+        """
+        Slot to handle the roles_changed_signal from RoleManagementDialog.
+        Refreshes UI components that depend on the list of roles.
+        """
+        logging.info("MainWindow: Roles have changed. Refreshing relevant UI components.")
+        self.notify(self.tr("Rôles Modifiés"), self.tr("La liste des rôles a été mise à jour."), type='INFO')
+
+        # Refresh UserManagementPage if it's currently visible or loaded
+        if self.user_management_page_instance:
+            # Refresh its role filter combo
+            if hasattr(self.user_management_page_instance, '_populate_role_filter'):
+                self.user_management_page_instance._populate_role_filter()
+            # If UserManagementPage is the current view, also refresh its user table
+            # as role names might have changed for listed users.
+            if self.main_area_stack.currentWidget() == self.user_management_page_instance:
+                if hasattr(self.user_management_page_instance, 'load_users_to_table'):
+                    self.user_management_page_instance.load_users_to_table()
+
+        # Potentially refresh EditUserDialog if it were open and non-modal,
+        # or ensure it reloads roles next time it's opened.
+        # For modal dialogs, they would typically fetch fresh roles upon opening.
+
+        # If any other part of MainWindow directly displays role names or uses a role combo,
+        # it should be refreshed here as well.
+        # Example: If the UserMenuButton's displayed role name could change due to role edit (unlikely but for illustration)
+        # self._update_user_display()
