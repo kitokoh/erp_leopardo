@@ -10,8 +10,9 @@ import os
 import random
 
 class HomePageWidget(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, main_window, parent=None):
         super().__init__(parent)
+        self.main_window = main_window # Store reference to DocumentManager
         self.setObjectName("HomePageWidget")
         self._init_ui()
         self._load_styles()
@@ -147,7 +148,7 @@ class HomePageWidget(QWidget):
         while self.bottom_content_area.count() > 0:
             widget = self.bottom_content_area.widget(0)
             self.bottom_content_area.removeWidget(widget)
-            # widget.deleteLater() # Important pour éviter les fuites de mémoire si les widgets ne sont pas réutilisés
+            widget.deleteLater() # Important pour éviter les fuites de mémoire si les widgets ne sont pas réutilisés
 
 
         if widget_to_display:
@@ -159,126 +160,81 @@ class HomePageWidget(QWidget):
 
     @pyqtSlot()
     def go_to_documents(self):
-        print(f"HomePageWidget: go_to_documents called.")
-        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
-        if hasattr(self.parent(), 'show_documents_view'):
-            print(f"HomePageWidget: Parent HAS show_documents_view. Calling it.")
-            self.parent().show_documents_view()
+        if hasattr(self.main_window, 'show_documents_view'):
+            self.main_window.show_documents_view()
         else:
-            print(f"HomePageWidget: Parent does NOT have show_documents_view.")
+            print(f"HomePageWidget: main_window does NOT have show_documents_view.")
 
     @pyqtSlot()
     def go_to_project_management(self):
-        print(f"HomePageWidget: go_to_project_management called.")
-        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
-        if hasattr(self.parent(), 'show_project_management_view'):
-            print(f"HomePageWidget: Parent HAS show_project_management_view. Calling it.")
-            self.parent().show_project_management_view()
+        if hasattr(self.main_window, 'show_project_management_view'):
+            self.main_window.show_project_management_view()
         else:
-            print(f"HomePageWidget: Parent does NOT have show_project_management_view.")
+            print(f"HomePageWidget: main_window does NOT have show_project_management_view.")
 
     @pyqtSlot()
     def go_to_statistics(self):
-        print(f"HomePageWidget: go_to_statistics called.")
-        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
-        if hasattr(self.parent(), 'get_statistics_widget_instance'):
-            print(f"HomePageWidget: Parent HAS get_statistics_widget_instance. Calling it.")
-            stats_widget = self.parent().get_statistics_widget_instance()
-            if stats_widget:
-                print(f"HomePageWidget: Statistics widget instance received. Calling set_bottom_widget.")
-                self.set_bottom_widget(stats_widget)
-            else:
-                 print(f"HomePageWidget: get_statistics_widget_instance returned None. Fallback to show_statistics_view.")
-                 if hasattr(self.parent(), 'show_statistics_view'):
-                    print(f"HomePageWidget: Parent HAS show_statistics_view. Calling it for fallback.")
-                    self.parent().show_statistics_view()
-                 else:
-                    print(f"HomePageWidget: Parent does NOT have show_statistics_view for fallback.")
-        elif hasattr(self.parent(), 'show_statistics_view'):
-            print(f"HomePageWidget: Parent has show_statistics_view (no get_statistics_widget_instance). Calling it.")
-            self.parent().show_statistics_view()
+        # This button should navigate to the main statistics view, not embed it here.
+        if hasattr(self.main_window, 'show_statistics_view'):
+            self.main_window.show_statistics_view()
         else:
-            print(f"HomePageWidget: Parent does NOT have get_statistics_widget_instance OR show_statistics_view.")
+            print(f"HomePageWidget: main_window does NOT have show_statistics_view.")
 
     @pyqtSlot()
     def go_to_product_management(self):
-        print(f"HomePageWidget: go_to_product_management called.")
-        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
-        if hasattr(self.parent(), 'show_product_management_page'):
-            print(f"HomePageWidget: Parent HAS show_product_management_page. Calling it.")
-            self.parent().show_product_management_page()
+        if hasattr(self.main_window, 'show_product_management_page'):
+            self.main_window.show_product_management_page()
         else:
-            print(f"HomePageWidget: Parent does NOT have show_product_management_page.")
+            print(f"HomePageWidget: main_window does NOT have show_product_management_page.")
 
     @pyqtSlot()
     def go_to_partner_management(self):
-        print(f"HomePageWidget: go_to_partner_management called.")
-        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
-        if hasattr(self.parent(), 'show_partner_management_view'):
-            print(f"HomePageWidget: Parent HAS show_partner_management_view. Calling it.")
-            self.parent().show_partner_management_view()
+        if hasattr(self.main_window, 'show_partner_management_view'):
+            self.main_window.show_partner_management_view()
         else:
-            print(f"HomePageWidget: Parent does NOT have show_partner_management_view.")
+            print(f"HomePageWidget: main_window does NOT have show_partner_management_view.")
 
     @pyqtSlot()
     def go_to_inventory_management(self):
-        print(f"HomePageWidget: go_to_inventory_management called.")
-        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
-        if hasattr(self.parent(), 'show_inventory_browser_view'):
-            print(f"HomePageWidget: Parent HAS show_inventory_browser_view. Calling it.")
-            self.parent().show_inventory_browser_view()
+        if hasattr(self.main_window, 'show_inventory_browser_view'):
+            self.main_window.show_inventory_browser_view()
         else:
-            print(f"HomePageWidget: Parent does NOT have show_inventory_browser_view.")
+            print(f"HomePageWidget: main_window does NOT have show_inventory_browser_view.")
 
     @pyqtSlot()
     def go_to_recruitment(self):
-        print(f"HomePageWidget: go_to_recruitment called.")
-        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
-        if hasattr(self.parent(), 'show_recruitment_view'):
-            print(f"HomePageWidget: Parent HAS show_recruitment_view. Calling it.")
-            self.parent().show_recruitment_view()
+        if hasattr(self.main_window, 'show_recruitment_view'):
+            self.main_window.show_recruitment_view()
         else:
-            print(f"HomePageWidget: Parent does NOT have show_recruitment_view.")
+            print(f"HomePageWidget: main_window does NOT have show_recruitment_view.")
 
     @pyqtSlot()
     def go_to_experience_management(self):
-        print(f"HomePageWidget: go_to_experience_management called.")
-        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
-        if hasattr(self.parent(), 'show_experience_module_view'):
-            print(f"HomePageWidget: Parent HAS show_experience_module_view. Calling it.")
-            self.parent().show_experience_module_view()
+        if hasattr(self.main_window, 'show_experience_module_view'):
+            self.main_window.show_experience_module_view()
         else:
-            print(f"HomePageWidget: Parent does NOT have show_experience_module_view.")
+            print(f"HomePageWidget: main_window does NOT have show_experience_module_view.")
 
     @pyqtSlot()
     def go_to_botpress_integration(self):
-        print(f"HomePageWidget: go_to_botpress_integration called.")
-        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
-        if hasattr(self.parent(), 'show_botpress_integration_view'):
-            print(f"HomePageWidget: Parent HAS show_botpress_integration_view. Calling it.")
-            self.parent().show_botpress_integration_view()
+        if hasattr(self.main_window, 'show_botpress_integration_view'):
+            self.main_window.show_botpress_integration_view()
         else:
-            print(f"HomePageWidget: Parent does NOT have show_botpress_integration_view.")
+            print(f"HomePageWidget: main_window does NOT have show_botpress_integration_view.")
 
     @pyqtSlot()
     def go_to_camera_management(self):
-        print(f"HomePageWidget: go_to_camera_management called.")
-        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
-        if hasattr(self.parent(), 'show_camera_management_view'):
-            print(f"HomePageWidget: Parent HAS show_camera_management_view. Calling it.")
-            self.parent().show_camera_management_view()
+        if hasattr(self.main_window, 'show_camera_management_view'):
+            self.main_window.show_camera_management_view()
         else:
-            print(f"HomePageWidget: Parent does NOT have show_camera_management_view.")
+            print(f"HomePageWidget: main_window does NOT have show_camera_management_view.")
 
     @pyqtSlot()
     def go_to_settings(self):
-        print(f"HomePageWidget: go_to_settings called.")
-        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
-        if hasattr(self.parent(), 'show_settings_page'):
-            print(f"HomePageWidget: Parent HAS show_settings_page. Calling it.")
-            self.parent().show_settings_page()
+        if hasattr(self.main_window, 'show_settings_page'):
+            self.main_window.show_settings_page()
         else:
-            print(f"HomePageWidget: Parent does NOT have show_settings_page.")
+            print(f"HomePageWidget: main_window does NOT have show_settings_page.")
 
 
 
