@@ -64,8 +64,9 @@
     <file alias="credit-card.svg">resources/icons/placeholder_icon.svg</file>
     <file alias="modern/settings.svg">resources/icons/settings.svg</file>
     <file alias="search.svg">resources/icons/search.svg</file>
-    <file alias="upload.svg">resources/icons/placeholder_icon.svg</file>
-    <file alias="upload-cloud.svg">resources/icons/placeholder_icon.svg</file>
+    <file alias="upload.svg">resources/icons/upload.svg</file>
+    <file alias="upload-cloud.svg">resources/icons/upload-cloud.svg</file>
+
     <file alias="arrow-left-circle.svg">resources/icons/arrow-left-circle.svg</file>
     <file alias="mic.svg">resources/icons/placeholder_icon.svg</file>
     <file alias="edit.svg">resources/icons/edit-2.svg</file>
