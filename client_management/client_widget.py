@@ -201,7 +201,7 @@ class ClientWidget(QWidget):
             # action_layout.addWidget(self.send_whatsapp_btn) # Moved to an internal tab
 
             self.archive_client_btn = QPushButton(self.tr("Archiver Client"))
-            self.archive_client_btn.setIcon(QIcon(":/icons/archive.svg"))
+            self.archive_client_btn.setIcon(QIcon(":/icons/folder.svg")) # Replaced archive.svg with folder.svg
             self.archive_client_btn.setToolTip(self.tr("Archiver ce client (soft delete)"))
             self.archive_client_btn.clicked.connect(self.handle_archive_client) # Connect to the new handler
             action_layout.addWidget(self.archive_client_btn)
@@ -4023,40 +4023,21 @@ class ClientWidget(QWidget):
         # Clear existing rows from the layout, EXCEPT for the status_combo's row if managed differently
         # For simplicity, we'll clear and re-add, ensuring status_combo is handled carefully.
 
-        # Explicitly handle deletion and recreation of status_combo
-        if hasattr(self, 'status_combo') and self.status_combo is not None:
-            # Disconnect signals first
-            try:
-                self.status_combo.currentTextChanged.disconnect(self.update_client_status)
-            except TypeError:
-                pass # Not connected or already disconnected
-
-            # Remove from layout if it's part of one (QFormLayout handles this when row is removed)
-            # Then schedule for deletion and clear the reference
-            if self.status_combo.parent() is not None: # Check if it has a parent (might be in a layout)
-                 # If details_layout is its direct parent or part of its hierarchy, removing rows will handle it.
-                 # For safety, if it's not directly in details_layout but managed elsewhere, ensure it's handled.
-                 # However, given it's added to status_category_widget which goes into details_layout,
-                 # clearing details_layout should delete it.
-                 pass # Assuming layout clearing below handles parentage and deletion.
-
-            # More direct: just delete it and set to None so it's recreated.
-            self.status_combo.deleteLater()
-            self.status_combo = None
-            logging.debug("Old status_combo marked for deletion and reference cleared.")
+        # The status_combo is persistent, created in setup_ui. It should not be deleted here.
+        # Its items will be updated by self.load_statuses().
 
         # Detach category labels if they exist and are parented to details_layout
         # This is important if they are not recreated each time.
-        if hasattr(self, 'category_label') and self.category_label and self.category_label.parentWidget() is not None:
-            self.category_label.setParent(None)
-        if hasattr(self, 'category_value_label') and self.category_value_label and self.category_value_label.parentWidget() is not None:
-            self.category_value_label.setParent(None)
+        # if hasattr(self, 'category_label') and self.category_label and self.category_label.parentWidget() is not None:
+        #     self.category_label.setParent(None)
+        # if hasattr(self, 'category_value_label') and self.category_value_label and self.category_value_label.parentWidget() is not None:
+        #     self.category_value_label.setParent(None)
 
-        # Clear all rows from details_layout. This will delete widgets previously in the layout.
-        while self.details_layout.rowCount() > 0:
-            self.details_layout.removeRow(0)
+        # DO NOT Clear all rows from details_layout if labels are persistent instance members.
+        # while self.details_layout.rowCount() > 0:
+        #     self.details_layout.removeRow(0)
 
-        self.detail_value_labels = {} # Re-initialize
+        self.detail_value_labels = {} # Re-initialize, though it might not be strictly needed if not used by edit mode.
         logging.info(f"Populating details layout for: {self.client_info.get('client_name')}")
 
         # Ensure status_combo is created (it will be None now due to the above logic)
@@ -4465,27 +4446,49 @@ class ClientWidget(QWidget):
             filtered_list = [] # Initialize filtered_list
 
 
-            # --- Path Correction: Use absolute path directly ---
-            base_client_path_abs = self.client_info.get("default_base_folder_path")
-            if not base_client_path_abs: # Fallback
-                base_client_path_abs = self.client_info.get("base_folder_path", "")
+            # --- Path Correction: Construct absolute path ---
+            relative_base_client_path = self.client_info.get("default_base_folder_path")
+            if not relative_base_client_path: # Fallback
+                relative_base_client_path = self.client_info.get("base_folder_path", "")
 
-            logging.info(f"PT_DEBUG: populate_doc_table - ClientInfo 'default_base_folder_path': {self.client_info.get('default_base_folder_path')}")
-            logging.info(f"PT_DEBUG: populate_doc_table - ClientInfo 'base_folder_path': {self.client_info.get('base_folder_path')}")
-            logging.info(f"PT_DEBUG: populate_doc_table - Effective absolute base_client_path used: {base_client_path_abs}")
-
-            if not base_client_path_abs or not os.path.isdir(base_client_path_abs):
-                logging.error(f"PT_DEBUG: populate_doc_table - Invalid or missing absolute base_client_path: '{base_client_path_abs}'")
+            if not relative_base_client_path:
+                logging.error("PT_DEBUG: populate_doc_table - Relative base client path is missing in client_info.")
                 if hasattr(self, 'documents_empty_label'):
-                    self.documents_empty_label.setText(self.tr("Erreur: Dossier client (base_folder_path) introuvable ou non configuré."))
+                    self.documents_empty_label.setText(self.tr("Erreur: Chemin de base du client non configuré."))
                     self.documents_empty_label.setVisible(True)
                 self.doc_table.setVisible(False)
-                logging.info("PT_DEBUG: populate_doc_table - END (invalid base_client_path)")
-                # Ensure guard is reset before early return due to invalid path
-                # This return was missing the reset, which was the SyntaxError cause.
-                # The 'finally' block will now handle this.
-                return # Early return for invalid base_client_path
-            logging.info("PT_DEBUG: populate_doc_table - base_client_path is valid.")
+                self._is_populating_docs = False # Reset guard
+                return
+
+            # Construct the absolute path using app_root_dir
+            # self.app_root_dir is initialized in ClientWidget's __init__
+            if not self.app_root_dir or not os.path.isdir(self.app_root_dir):
+                 logging.error(f"PT_DEBUG: populate_doc_table - self.app_root_dir '{self.app_root_dir}' is invalid. Cannot construct absolute client path.")
+                 if hasattr(self, 'documents_empty_label'):
+                    self.documents_empty_label.setText(self.tr("Erreur: Configuration racine de l'application invalide."))
+                    self.documents_empty_label.setVisible(True)
+                 self.doc_table.setVisible(False)
+                 self._is_populating_docs = False # Reset guard
+                 return
+
+            actual_absolute_base_client_path = os.path.join(self.app_root_dir, relative_base_client_path)
+            actual_absolute_base_client_path = os.path.normpath(actual_absolute_base_client_path)
+
+            logging.info(f"PT_DEBUG: populate_doc_table - ClientInfo 'default_base_folder_path' (relative): {self.client_info.get('default_base_folder_path')}")
+            logging.info(f"PT_DEBUG: populate_doc_table - ClientInfo 'base_folder_path' (relative): {self.client_info.get('base_folder_path')}")
+            logging.info(f"PT_DEBUG: populate_doc_table - App root dir: {self.app_root_dir}")
+            logging.info(f"PT_DEBUG: populate_doc_table - Effective absolute base_client_path used: {actual_absolute_base_client_path}")
+
+            if not os.path.isdir(actual_absolute_base_client_path):
+                logging.error(f"PT_DEBUG: populate_doc_table - Invalid or missing constructed absolute base_client_path: '{actual_absolute_base_client_path}'")
+                if hasattr(self, 'documents_empty_label'):
+                    self.documents_empty_label.setText(self.tr("Erreur: Dossier client introuvable ou non configuré à l'emplacement attendu."))
+                    self.documents_empty_label.setVisible(True)
+                self.doc_table.setVisible(False)
+                logging.info("PT_DEBUG: populate_doc_table - END (invalid actual_absolute_base_client_path)")
+                self._is_populating_docs = False # Reset guard
+                return
+            logging.info("PT_DEBUG: populate_doc_table - actual_absolute_base_client_path is valid.")
 
             # Fetch and filter documents
             try:
@@ -4559,18 +4562,19 @@ class ClientWidget(QWidget):
 
                 full_file_path = ""
                 if file_path_relative_from_db:
-                    if order_identifier_for_doc:
-                        safe_order_subfolder = str(order_identifier_for_doc).replace(':', '_').replace(' ', '_')
-                        full_file_path = os.path.join(base_client_path_abs, safe_order_subfolder, file_path_relative_from_db)
-                    else:
-                        full_file_path = os.path.join(base_client_path_abs, file_path_relative_from_db)
+                    # file_path_relative_from_db ALREADY includes subfolders like language or order_id/language.
+                    # So, just join it with the absolute base path of the client.
+                    full_file_path = os.path.join(actual_absolute_base_client_path, file_path_relative_from_db)
+                    full_file_path = os.path.normpath(full_file_path) # Normalize the path
+
                     if not os.path.exists(full_file_path):
-                        logging.warning(f"PT_DEBUG: populate_doc_table - File not found: {full_file_path} for doc_id {document_id}")
+                        logging.warning(f"PT_DEBUG: populate_doc_table - File not found at constructed path: {full_file_path} (from relative: {file_path_relative_from_db}) for doc_id {document_id}")
                 else:
-                    logging.warning(f"PT_DEBUG: populate_doc_table - Missing relative path for doc_id {document_id}")
+                    logging.warning(f"PT_DEBUG: populate_doc_table - Missing relative path (file_path_relative_from_db) for doc_id {document_id}")
 
                 name_item = QTableWidgetItem(doc_name)
-                name_item.setData(Qt.UserRole, full_file_path if full_file_path else None)
+                # Store the potentially correct full_file_path, or None if issues.
+                name_item.setData(Qt.UserRole, full_file_path if file_path_relative_from_db and os.path.exists(full_file_path) else None)
 
                 file_type_str = doc_data.get('document_type_generated', 'N/A')
                 created_at_str = doc_data.get('created_at', '')
@@ -5957,14 +5961,48 @@ class ClientWidget(QWidget):
                 # distributor_specific_info is also part of updated_client_full_info now
                 # Other fields like client_name, company_name, notes etc. are directly from updated_client_full_info
 
-            self.populate_details_layout() # Rebuild display view, which calls toggle_distributor_info_visibility
+            # ---- Restore details_layout to display mode ----
+            # 1. Clear current edit widgets from details_layout
+            #    (switchTo_edit_client_view already cleared the original display widgets)
+            #    Now, clear the edit widgets that were added.
+            while self.details_layout.rowCount() > 0:
+                self.details_layout.removeRow(0)
+
+            # 2. Delete the edit widgets themselves to free resources
+            for widget_key in list(self.edit_widgets.keys()): # Iterate over keys for safe deletion
+                widget = self.edit_widgets.pop(widget_key)
+                if isinstance(widget, QWidget):
+                    widget.deleteLater()
+            # self.edit_widgets.clear() # Already cleared by popping
+
+            # 3. Re-add the persistent display widgets to details_layout
+            #    These are instance members created in setup_ui.
+            self.details_layout.addRow(self.project_id_label, self.project_id_value_label)
+            self.details_layout.addRow(self.country_city_label, self.country_city_widget)
+            self.details_layout.addRow(self.price_date_label, self.price_date_widget)
+            # self.status_category_widget contains self.status_combo. Ensure self.status_combo is valid.
+            # If self.status_combo was logging as None, it implies it might have been deleted.
+            # This should not happen if it's an instance member and its parent (status_category_widget) is also an instance member
+            # and not deleted.
+            if not hasattr(self, 'status_combo') or not self.status_combo: # Defensive check
+                logging.warning("self.status_combo is invalid before re-adding to layout. Recreating.")
+                self.status_combo = QComboBox() # Recreate if it was somehow lost
+                # This new combo needs to be put back into self.status_category_widget's layout
+                # This part is tricky if status_category_widget's layout was also cleared.
+                # For now, assume status_category_widget's internal layout and self.status_combo instance are intact from setup_ui.
+            self.details_layout.addRow(self.status_category_label, self.status_category_widget)
+            self.details_layout.addRow(self.distributor_info_label_static, self.distributor_info_value_label)
+            self.details_layout.addRow(self.need_label_static, self.need_value_label)
+            self.details_layout.addRow(self.folder_label_static, self.folder_value_label)
+            self.details_layout.addRow(self.created_by_label_static, self.created_by_value_label)
+            # ---- End restore ----
+
+            self.populate_details_layout() # Now this will update the re-added persistent widgets
             self.header_label.setText(f"<h2>{self.client_info.get('client_name', '')}</h2>") # Update header
 
             # Reconnect signals that were disconnected for edit mode
             self.notes_edit.textChanged.connect(self.save_client_notes)
             self.status_combo.currentTextChanged.connect(self.update_client_status)
-            # No need to reconnect category textChanged for distributor info visibility in display mode,
-            # as populate_details_layout handles it.
 
             self.update_sav_tab_visibility() # Update SAV tab based on potentially changed status
 

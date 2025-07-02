@@ -478,9 +478,10 @@ class DocumentManager(QMainWindow):
         for module_info in CONFIGURABLE_MODULES:
             # Default to 'True' (string) if setting is not found, then convert to boolean
             is_enabled_str = db_manager.get_setting(module_info['key'], default='True')
+            logging.info(f"Module Key: {module_info['key']}, Value from DB (or default): '{is_enabled_str}'")
             is_enabled = is_enabled_str.lower() == 'true' if isinstance(is_enabled_str, str) else bool(is_enabled_str)
             self.module_states[module_info['name']] = is_enabled
-            logging.info(f"Module '{module_info['name']}' state: {'Enabled' if is_enabled else 'Disabled'}")
+            logging.info(f"Processed Module '{module_info['name']}' state: {'Enabled' if is_enabled else 'Disabled'}")
         logging.info("Module states loaded.")
 
 
@@ -1079,11 +1080,11 @@ class DocumentManager(QMainWindow):
         self.calculator_module_action.triggered.connect(self.show_calculator_module_view)
 
         # Action for Commande Management (Global View)
-        self.commande_management_action = QAction(QIcon(":/icons/shopping-cart.svg"), self.tr("Gestion des Commandes"), self) # Assumes shopping-cart.svg will be added
+        self.commande_management_action = QAction(QIcon(":/icons/briefcase.svg"), self.tr("Gestion des Commandes"), self) # Replaced shopping-cart.svg with briefcase.svg
         self.commande_management_action.triggered.connect(self.show_commande_management_view)
 
         # Action for managing roles
-        self.manage_roles_action = QAction(QIcon(":/icons/shield.svg"), self.tr("Gérer les Rôles"), self) # Assuming shield.svg or similar
+        self.manage_roles_action = QAction(QIcon(":/icons/settings.svg"), self.tr("Gérer les Rôles"), self) # Replaced shield.svg with settings.svg
         self.manage_roles_action.triggered.connect(self.open_role_management_dialog)
 
 
@@ -1151,10 +1152,12 @@ class DocumentManager(QMainWindow):
                 action = getattr(self, action_name, None)
                 if action:
                     modules_menu.addAction(action)
+                    logging.info(f"Module '{module_name}' is ENABLED (state: {self.module_states.get(module_name)}), Action '{action_name}' ADDED to Modules menu.")
                 else:
-                    logging.warning(f"Action '{action_name}' not found for module '{module_name}' but module is enabled.")
+                    logging.warning(f"Action '{action_name}' (attribute) not found for module '{module_name}', though module state is {self.module_states.get(module_name)}.")
             else:
-                logging.info(f"Module '{module_name}' is disabled. Action '{action_name}' not added to menu.")
+                logging.info(f"Module '{module_name}' is DISABLED (state: {self.module_states.get(module_name)}). Action '{action_name}' NOT ADDED to Modules menu.")
+
 
         # Add separator if any module actions were added, before non-module specific actions like Carrier Map (if it's always there or handled differently)
         # For now, assuming Carrier Map is part of CONFIGURABLE_MODULES, so it's handled above.
@@ -1248,84 +1251,117 @@ class DocumentManager(QMainWindow):
                                      P_ACCESS_CALCULATOR_MODULE, P_MANAGE_STATUSES # Added P_VIEW_GLOBAL_PRODUCTS
 
         role_name = self.current_user_info.get('role_name') if self.current_user_info else None
-        if not role_name: # Should not happen if login is enforced, but good for safety
-            # Disable almost everything if no role (e.g. error state)
-            is_admin_or_similar = False # Fallback to least privilege
+        role_name = self.current_user_info.get('role_name') if self.current_user_info else "UnknownRole"
+        logging.info(f"Applying permissions for role: {role_name}")
+
+        if not self.current_user_info: # Should not happen if login is enforced
+            logging.error("_apply_permissions called with no current_user_info. Disabling most actions.")
+            # Fallback to disable everything if user_info is missing
+            is_admin_or_similar = False
             can_create_client = False
-        else:
-            is_admin_or_similar = has_permission(role_name, P_MANAGE_SYSTEM_SETTINGS) # Good proxy for admin-like access
-            can_create_client = has_permission(role_name, P_CREATE_CLIENT)
+            # Disable all module actions
+            for module_key in self.module_states.keys():
+                action_attr_name = next((m['action_attr'] for m in CONFIGURABLE_MODULES if m['name'] == module_key), None)
+                if action_attr_name and hasattr(self, action_attr_name):
+                    getattr(self, action_attr_name).setVisible(False)
+            self.settings_action.setEnabled(False)
+            if hasattr(self, 'status_action'): self.status_action.setEnabled(False)
+            self.admin_menu.menuAction().setVisible(False)
+            self.add_new_client_button.setEnabled(False)
+            self.add_client_by_voice_button.setEnabled(False)
+            return
+
+        is_admin_or_similar = has_permission(role_name, P_MANAGE_SYSTEM_SETTINGS)
+        can_create_client = has_permission(role_name, P_CREATE_CLIENT)
+        logging.info(f"  Role '{role_name}': P_MANAGE_SYSTEM_SETTINGS={is_admin_or_similar}, P_CREATE_CLIENT={can_create_client}")
 
         # Menu Actions
+        log_msg_system_settings = f"Permission P_MANAGE_SYSTEM_SETTINGS for role '{role_name}': {'Granted' if is_admin_or_similar else 'Denied'}. Settings action {'enabled' if is_admin_or_similar else 'disabled'}."
+        logging.info(log_msg_system_settings)
         self.settings_action.setEnabled(is_admin_or_similar)
-        if hasattr(self, 'status_action'): # Check if status_action exists
-            self.status_action.setEnabled(has_permission(role_name, P_MANAGE_STATUSES))
+        logging.info(f"  Action 'settings_action' enabled: {is_admin_or_similar}")
+        if hasattr(self, 'status_action'):
+            can_manage_statuses = has_permission(role_name, P_MANAGE_STATUSES)
+            self.status_action.setEnabled(can_manage_statuses)
+            logging.info(f"  Action 'status_action' enabled: {can_manage_statuses} (Permission: P_MANAGE_STATUSES)")
+
 
         # Admin Menu visibility
-        # The menu itself is visible if user can manage users OR roles
         can_manage_users = has_permission(role_name, P_MANAGE_USERS)
         can_manage_roles = has_permission(role_name, P_MANAGE_ROLES)
-        self.admin_menu.menuAction().setVisible(can_manage_users or can_manage_roles)
-        self.manage_users_action.setEnabled(can_manage_users)
-        self.manage_roles_action.setEnabled(can_manage_roles)
+        admin_menu_visible = can_manage_users or can_manage_roles
+        self.admin_menu.menuAction().setVisible(admin_menu_visible)
+        logging.info(f"  Admin Menu visible: {admin_menu_visible} (P_MANAGE_USERS={can_manage_users}, P_MANAGE_ROLES={can_manage_roles})")
+        self.manage_users_action.setEnabled(can_manage_users) # Should already be visible if menu is
+        self.manage_roles_action.setEnabled(can_manage_roles) # Should already be visible if menu is
+
+        # Module Menu Actions
+        module_permissions = {
+            'project_management': P_ACCESS_PROJECT_MODULE,
+            'product_management': (P_MANAGE_GLOBAL_PRODUCTS, P_VIEW_GLOBAL_PRODUCTS), # Tuple for OR condition
+            'partner_management': P_ACCESS_PARTNER_MODULE,
+            'statistics': P_ACCESS_STATISTICS_MODULE,
+            'inventory_management': P_ACCESS_INVENTORY_MODULE,
+            'experience_management': P_ACCESS_EXPERIENCE_MODULE,
+            'calendar': P_ACCESS_CALENDAR_MODULE,
+            'botpress_integration': P_ACCESS_BOTPRESS_MODULE,
+            'carrier_map': P_ACCESS_CARRIER_MAP_MODULE,
+            'camera_management': P_ACCESS_CAMERA_MODULE,
+            'calculator': P_ACCESS_CALCULATOR_MODULE,
+            'commandes_management': P_ACCESS_PROJECT_MODULE # Placeholder, uses project module perm for now
+        }
+
+        for module_config in CONFIGURABLE_MODULES:
+            action_attr = module_config['action_attr']
+            module_name = module_config['name']
+            action_instance = getattr(self, action_attr, None)
+
+            if not action_instance:
+                logging.debug(f"  Module Action: '{action_attr}' not found as instance attribute, skipping permission check.")
+                continue
+
+            # Visibility is primarily controlled by module_states during menu creation.
+            # Here, we ensure that if it was added to the menu (module enabled), its visibility
+            # is then correctly set by permissions. If module was disabled, it's not in menu anyway.
+            if not self.module_states.get(module_name, True): # If module is disabled via DB setting
+                action_instance.setVisible(False) # Ensure it's hidden even if permissions would allow
+                logging.info(f"  Module Action '{action_attr}' for '{module_name}': Module disabled by DB setting. Action HIDDEN.")
+                continue
+
+            perm_keys = module_permissions.get(module_name)
+            permitted = False
+            log_perm_details = ""
+
+            if perm_keys:
+                if isinstance(perm_keys, tuple): # Multiple permissions, OR logic
+                    permitted = any(has_permission(role_name, pk) for pk in perm_keys)
+                    log_perm_details = f"Permissions (OR logic): {perm_keys}, Result: {permitted}"
+                else: # Single permission
+                    permitted = has_permission(role_name, perm_keys)
+                    log_perm_details = f"Permission: {perm_keys}, Result: {permitted}"
+            else:
+                # If no specific permission is defined for this module, assume visible if module is enabled.
+                # Or, default to False if strict policy is desired. For now, assume visible.
+                permitted = True
+                log_perm_details = "No specific permission defined, defaulting to permitted if module is enabled."
 
 
-        # Module Menu Actions (Visibility based on module access permission)
-        # Assuming specific P_ACCESS_MODULE_XYZ permissions or more granular ones.
-        # Example: self.project_management_action.setVisible(has_permission(role_name, P_ACCESS_PROJECT_MODULE))
-        # This part needs to align with how module visibility itself is handled (db config vs. role perm)
-        # For now, let's assume module visibility from DB config (self.module_states) is primary,
-        # and then role permissions might further restrict actions *within* an enabled module.
-        # If a module action should purely be role-based, then:
-
-        # Example for a few module actions based on defined permissions:
-        if self.project_management_action: # Check if action exists (it's conditional on module_states)
-            self.project_management_action.setVisible(has_permission(role_name, P_ACCESS_PROJECT_MODULE))
-        if self.product_list_action: # Product Management Page
-             self.product_list_action.setVisible(has_permission(role_name, P_MANAGE_GLOBAL_PRODUCTS) or \
-                                                 has_permission(role_name, P_VIEW_GLOBAL_PRODUCTS)) # View or Manage
-        if self.partner_management_action:
-            self.partner_management_action.setVisible(has_permission(role_name, P_ACCESS_PARTNER_MODULE))
-        if self.statistics_action:
-            self.statistics_action.setVisible(has_permission(role_name, P_ACCESS_STATISTICS_MODULE))
-        if self.inventory_browser_action:
-            self.inventory_browser_action.setVisible(has_permission(role_name, P_ACCESS_INVENTORY_MODULE))
-        if self.recruitment_action: # Assuming this is the attribute name for recruitment QAction
-            self.recruitment_action.setVisible(has_permission(role_name, P_ACCESS_RECRUITMENT_MODULE))
-        if self.experience_management_action:
-            self.experience_management_action.setVisible(has_permission(role_name, P_ACCESS_EXPERIENCE_MODULE))
-        if self.calendar_module_action:
-            self.calendar_module_action.setVisible(has_permission(role_name, P_ACCESS_CALENDAR_MODULE))
-        if self.botpress_integration_action:
-             self.botpress_integration_action.setVisible(has_permission(role_name, P_ACCESS_BOTPRESS_MODULE))
-        if self.open_carrier_map_action:
-             self.open_carrier_map_action.setVisible(has_permission(role_name, P_ACCESS_CARRIER_MAP_MODULE))
-        if self.camera_management_action:
-             self.camera_management_action.setVisible(has_permission(role_name, P_ACCESS_CAMERA_MODULE))
-
-        if hasattr(self, 'calculator_module_action') and self.calculator_module_action:
-            # To make it visible by default if module is enabled, and then add specific permission later:
-            # self.calculator_module_action.setVisible(self.module_states.get('calculator', False))
-            # To use a specific permission (P_ACCESS_CALCULATOR_MODULE must be defined in auth/permissions.py):
-            if 'P_ACCESS_CALCULATOR_MODULE' in locals() or 'P_ACCESS_CALCULATOR_MODULE' in globals(): # Check if defined
-                 self.calculator_module_action.setVisible(has_permission(role_name, P_ACCESS_CALCULATOR_MODULE))
-            else: # Fallback if P_ACCESS_CALCULATOR_MODULE is not defined: make visible if module is on
-                logging.warning("P_ACCESS_CALCULATOR_MODULE permission constant not found. Calculator module visibility based on module_states only.")
-                self.calculator_module_action.setVisible(self.module_states.get('calculator', False))
-
-        # Commande Management Action Visibility (assuming a general permission for now like P_ACCESS_PROJECT_MODULE)
-        # TODO: Define a specific P_ACCESS_COMMANDE_MODULE permission
-        if hasattr(self, 'commande_management_action'):
-            self.commande_management_action.setVisible(has_permission(role_name, P_ACCESS_PROJECT_MODULE)) # Placeholder permission
-
+            action_instance.setVisible(permitted)
+            logging.info(f"  Module Action '{action_attr}' for '{module_name}': Visible: {permitted}. {log_perm_details}")
+            # Note: setEnabled could also be used if the action should be visible but greyed out.
+            # For menu items, setVisible(False) effectively removes them.
 
         # Main Buttons on Document View
+        log_msg_create_client = f"Permission P_CREATE_CLIENT for role '{role_name}': {'Granted' if can_create_client else 'Denied'}. "
+        log_msg_create_client += f"Add New Client button {'enabled' if can_create_client else 'disabled'}."
+        logging.info(log_msg_create_client)
         self.add_new_client_button.setEnabled(can_create_client)
         self.add_client_by_voice_button.setEnabled(can_create_client) # Assuming same permission
+        logging.info(f"  Button 'add_new_client_button' enabled: {can_create_client}")
+        logging.info(f"  Button 'add_client_by_voice_button' enabled: {can_create_client}")
 
-        # Further UI elements (e.g., context menu items in client list, buttons in ClientWidget)
-        # will need similar checks when those widgets are initialized or data is loaded.
-        logging.info(f"Permissions applied for role: {role_name}")
+        logging.info(f"Permissions application completed for role: {role_name}")
+
 
 
     def _update_user_display(self):

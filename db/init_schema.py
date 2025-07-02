@@ -2425,6 +2425,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
 
         engine_acc = create_engine(f"sqlite:///{config.DATABASE_PATH}")
 
+
         acc_models.Base.metadata.create_all(bind=engine_acc, checkfirst=True)
         print("DEBUG_INIT_DB: Accounting Module Tables creation attempted using SQLAlchemy engine.")
 
@@ -2532,6 +2533,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
             FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
         )
         """)
+
     print("DEBUG_INIT_DB: Table CompanyCalendarSettings created or exists.")
 
         cursor_cal.execute("""
@@ -2641,7 +2643,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
                          # Or if p_key somehow wasn't in all_permission_keys but was attempted (should not happen here)
                          print(f"DEBUG_INIT_DB: IntegrityError trying to add {p_key} for Admin ID {admin_role_id}, might already exist or perm_key not in Permissions table.")
                 # else: # Already exists, no action needed for this key
-                    # pass
+
             print(f"DEBUG_INIT_DB: {admin_role_name_str} (ID: {admin_role_id}) had {current_admin_perms_count} permissions. Newly added: {newly_added_admin_perms_count} permissions.")
             if (current_admin_perms_count + newly_added_admin_perms_count) != len(all_permission_keys):
                 print(f"DEBUG_INIT_DB: WARNING - Admin total permissions ({current_admin_perms_count + newly_added_admin_perms_count}) does not match total defined P_ keys ({len(all_permission_keys)}). Check for issues.")
@@ -2667,6 +2669,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
                             # This count won't be accurate for "newly added" if OR IGNORE skips, but indicates attempts
                             seeded_role_permissions_count +=1
                         except sqlite3.IntegrityError:
+
                             pass
                     else:
                         print(f"Warning: Permission key '{perm_key}' in PERMISSION_MAP for role '{actual_role_name}' not in defined P_ constants. Skipping.")
