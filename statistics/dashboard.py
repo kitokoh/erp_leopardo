@@ -44,12 +44,14 @@ from db import (
 )
 # It seems db_manager is not directly imported, but functions are. If needed, import db as db_manager
 from db.cruds.clients_crud import clients_crud_instance
-from db.cruds.proforma_invoices_crud import list_proforma_invoices # Added for proforma sales
-from db.connection import get_db_connection # Added for proforma sales
+# from db.cruds.proforma_invoices_crud import list_proforma_invoices # No longer directly used by dashboard
+from db.connection import get_db_connection # Used by some stats methods
 # It seems db_manager is not directly imported, but functions are. If needed, import db as db_manager
-from db.cruds.clients_crud import clients_crud_instance
+# from db.cruds.clients_crud import clients_crud_instance # Duplicate
 from db.cruds.client_project_products_crud import get_product_usage_counts # Added for product popularity
-from db.cruds.proforma_invoices_crud import get_total_sales_amount_for_period # Added for sales trend
+from db.cruds.proforma_invoices_crud import get_total_sales_amount_for_period, get_total_proforma_sales_for_country_id # Added for sales trend and country stats
+from db.cruds.projects_crud import get_active_project_count_by_country_id # Added for country stats
+
 
 from app_setup import APP_ROOT_DIR
 
@@ -172,8 +174,9 @@ class StatisticsDashboard(QWidget):
 
     @pyqtSlot(str)
     def _on_map_country_clicked(self, country_name):
-        logging.info(f"Map country clicked: {country_name}. Emitting request_add_client_for_country.")
-        self.request_add_client_for_country.emit(country_name)
+        logging.info(f"Map country clicked: {country_name}. Switching to country stats view.")
+        self._show_country_stats_view(country_name)
+        # The request_add_client_for_country signal is now emitted by CountryStatsDisplayWidget
 
     # This slot is now replaced by _display_client_details_in_panel if request_view_client_details signal is removed.
     # For now, keep it if the signal is still defined, but it won't be connected to map_interaction_handler.
@@ -299,10 +302,49 @@ class StatisticsDashboard(QWidget):
         self.client_details_widget.setLayout(client_details_page_layout)
         self.stats_stack.addWidget(self.client_details_widget)
 
+        # Country Stats Display Widget
+        self.country_stats_display_widget = CountryStatsDisplayWidget(self)
+        self.stats_stack.addWidget(self.country_stats_display_widget)
+        self.country_stats_display_widget.back_to_global_requested.connect(self._show_global_stats_view)
+        self.country_stats_display_widget.add_client_to_country_requested.connect(self.request_add_client_for_country) # Re-emit original signal
+
         self.stats_stack.setCurrentWidget(self.global_stats_widget) # Show global stats by default
 
     def _show_global_stats_view(self):
         self.stats_stack.setCurrentWidget(self.global_stats_widget)
+
+    def _show_country_stats_view(self, country_name: str):
+        """Fetches data and shows country-specific stats view."""
+        logging.info(f"Fetching and showing stats for country: {country_name}")
+        country_obj = get_country_by_name(country_name) # Assumes this function handles DB session
+        if not country_obj:
+            logging.error(f"Country '{country_name}' not found in DB.")
+            self._show_global_stats_view() # Fallback
+            # Optionally show a message to the user
+            # (Requires self to be QWidget or have access to QMessageBox)
+            if hasattr(self, 'parent') and callable(self.parent) and hasattr(self.parent(), 'notify'):
+                 self.parent().notify("Erreur Données", f"Pays '{country_name}' non trouvé.", "ERROR")
+            return
+
+        country_id = country_obj['country_id']
+
+        # These calls need a DB session. Assuming CRUD methods handle it via @_manage_conn
+        # or that a session is passed if necessary (not shown here for brevity).
+        # For SQLite, @_manage_conn usually creates a new connection per call.
+        client_count = clients_crud_instance.get_client_count_by_country_id(country_id=country_id, include_deleted=False)
+        project_count = get_active_project_count_by_country_id(country_id=country_id) # This is a direct import
+
+        # For SQLAlchemy based CRUDs, a session needs to be passed or handled by the function.
+        # Let's assume get_total_proforma_sales_for_country_id handles its session.
+        db_session_proforma = get_db_connection() # Get a session for this call
+        sales_value = 0.0
+        try:
+            sales_value = get_total_proforma_sales_for_country_id(db_session_proforma, country_id=country_id)
+        finally:
+            if db_session_proforma: db_session_proforma.close()
+
+        self.country_stats_display_widget.update_display(country_name, client_count, project_count, sales_value)
+        self.stats_stack.setCurrentWidget(self.country_stats_display_widget)
 
     @pyqtSlot(str, str)
     def _display_client_details_in_panel(self, client_id_str, client_name_str):
@@ -1017,3 +1059,75 @@ class StatisticsSummaryWidget(QWidget):
 
     def refresh_data(self): # Public method for external refresh if needed
         self.update_summary_stats()
+
+class CountryStatsDisplayWidget(QWidget):
+    """
+    A widget to display country-specific statistics.
+    Emits signals for 'back' and 'add_client_to_country'.
+    """
+    back_to_global_requested = pyqtSignal()
+    add_client_to_country_requested = pyqtSignal(str) # Emits country name
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("CountryStatsDisplayWidget")
+        self.current_country_name = None # To store the name of the country being displayed
+        self._init_ui()
+
+    def _init_ui(self):
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setSpacing(10)
+
+        self.title_label = QLabel("Statistiques par Pays") # Placeholder, will be updated
+        font = self.title_label.font()
+        font.setPointSize(font.pointSize() + 2)
+        font.setBold(True)
+        self.title_label.setFont(font)
+        self.title_label.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(self.title_label)
+
+        stats_group = QGroupBox(self.tr("Détails")) # GroupBox for the stats
+        form_layout = QFormLayout(stats_group)
+
+        self.client_count_label = QLabel("N/A")
+        self.project_count_label = QLabel("N/A")
+        self.sales_value_label = QLabel("N/A")
+
+        form_layout.addRow(self.tr("Clients Totaux:"), self.client_count_label)
+        form_layout.addRow(self.tr("Projets Actifs:"), self.project_count_label)
+        form_layout.addRow(self.tr("Ventes Proforma Totales:"), self.sales_value_label)
+
+        main_layout.addWidget(stats_group)
+
+        # --- Action Buttons ---
+        buttons_layout = QHBoxLayout()
+        self.add_client_button = QPushButton(self.tr("Ajouter Client à ce Pays"))
+        self.add_client_button.setIcon(QIcon(":/icons/user-add.svg")) # Placeholder icon
+        self.add_client_button.clicked.connect(self._emit_add_client_signal)
+        buttons_layout.addWidget(self.add_client_button)
+
+        buttons_layout.addStretch() # Pushes back button to the right
+
+        self.back_button = QPushButton(self.tr("Retour aux Stats Globales"))
+        self.back_button.setIcon(QIcon(":/icons/arrow-left-circle.svg")) # Placeholder icon
+        self.back_button.clicked.connect(self.back_to_global_requested)
+        buttons_layout.addWidget(self.back_button)
+
+        main_layout.addLayout(buttons_layout)
+        main_layout.addStretch(1) # Push content to the top
+        self.setLayout(main_layout)
+
+    def update_display(self, country_name: str, client_count: int, project_count: int, sales_value: float):
+        self.current_country_name = country_name # Store for the "Add Client" button
+        self.title_label.setText(self.tr("Statistiques pour: {0}").format(country_name))
+        self.client_count_label.setText(str(client_count))
+        self.project_count_label.setText(str(project_count))
+        self.sales_value_label.setText("€ {:,.2f}".format(sales_value))
+        logging.info(f"CountryStatsDisplayWidget updated for {country_name}.")
+
+    def _emit_add_client_signal(self):
+        if self.current_country_name:
+            self.add_client_to_country_requested.emit(self.current_country_name)
+        else:
+            logging.warning("CountryStatsDisplayWidget: _emit_add_client_signal called but current_country_name is not set.")
