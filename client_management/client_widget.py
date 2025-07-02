@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QTextEdit, QListWidget, QLineEdit,
     QComboBox, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
     QInputDialog, QTabWidget, QGroupBox, QMessageBox, QDialog, QFileDialog, QApplication,
-    QSizePolicy # Added QSizePolicy
+    QSizePolicy, QToolTip # Added QToolTip
 )
 from PyQt5.QtGui import QIcon, QDesktopServices, QFont, QColor, QPixmap, QTextCursor
 from PyQt5.QtCore import Qt, QUrl, QCoreApplication, QEvent, QStandardPaths
@@ -24,6 +24,7 @@ from PyQt5.QtGui import QPixmap
 
 import db as db_manager
 from db.cruds import client_documents_crud, users_crud, activity_logs_crud # Added for document deletion and user fetching
+from db.cruds import notes_crud # Import notes_crud for get_effective_document_note
 
 from db.cruds.clients_crud import clients_crud_instance
 from excel_editor import ExcelEditor
@@ -1437,20 +1438,22 @@ class ClientWidget(QWidget):
             self.documents_empty_label.setFont(font_docs_empty)
             docs_layout.addWidget(self.documents_empty_label)
             self.doc_table = QTableWidget()
-            # Increased column count for new "Quick Actions" column
-            self.doc_table.setColumnCount(6)
+            # Increased column count for new "Quick Actions" column and "Note" column
+            self.doc_table.setColumnCount(7) # Name, Type, Lang, Date, Note, Original File Actions, Quick Actions
             self.doc_table.setHorizontalHeaderLabels([
                 self.tr("Nom"), self.tr("Type"), self.tr("Langue"),
-                self.tr("Date"), self.tr("Fichier Original"), self.tr("Actions Rapides") # Added "Fichier Original" and "Actions Rapides"
+                self.tr("Date"), self.tr("Note"), self.tr("Fichier Original"), self.tr("Actions Rapides")
             ])
             self.doc_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-            # Adjust column widths - make Actions Rapides and Fichier Original fit content
+            # Adjust column widths
             self.doc_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch) # Nom
             self.doc_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents) # Type
             self.doc_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents) # Langue
             self.doc_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents) # Date
-            self.doc_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents) # Fichier Original
-            self.doc_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents) # Actions Rapides
+            self.doc_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive) # Note column, allow resize
+            self.doc_table.setColumnWidth(4, 150) # Initial width for Note
+            self.doc_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents) # Fichier Original
+            self.doc_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeToContents) # Actions Rapides
 
             self.doc_table.setSelectionBehavior(QAbstractItemView.SelectRows)
             self.doc_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -4854,6 +4857,37 @@ class ClientWidget(QWidget):
         if hasattr(self, '_update_overview_header_labels'):
             self._update_overview_header_labels(new_client_info)
 
+    def handle_edit_document_note_clicked(self):
+        button = self.sender()
+        if not button:
+            return
+
+        document_id = button.property("document_id_for_note")
+        document_type = button.property("document_type_for_note")
+        language_code = button.property("language_code_for_note")
+
+        if not document_id:
+            QMessageBox.warning(self, self.tr("Erreur"), self.tr("ID de document manquant pour l'édition de la note."))
+            return
+
+        # Ensure EditDocumentNoteDialog is available
+        # Similar dynamic import or ensure it's imported at the top of the file
+        try:
+            from dialogs.edit_document_note_dialog import EditDocumentNoteDialog
+        except ImportError:
+            logging.error("Failed to import EditDocumentNoteDialog.")
+            QMessageBox.critical(self, self.tr("Erreur Importation"), self.tr("Le module d'édition de note de document n'a pas pu être chargé."))
+            return
+
+        dialog = EditDocumentNoteDialog(document_id, document_type, language_code, parent=self)
+        if dialog.exec_() == QDialog.Accepted:
+            self.populate_doc_table() # Refresh the document list to show updated note
+            self.notification_manager.show(
+                self.tr("Note Modifiée"),
+                self.tr("La note du document a été mise à jour avec succès."),
+                type='SUCCESS'
+            )
+
 
     def load_statuses(self):
         current_client_status_id = self.client_info.get("status_id")
@@ -5255,17 +5289,28 @@ class ClientWidget(QWidget):
                 self.doc_table.setItem(row_idx, 2, QTableWidgetItem(language_code))
                 self.doc_table.setItem(row_idx, 3, QTableWidgetItem(mod_time_formatted))
 
-                logging.debug(f"PT_DEBUG: populate_doc_table - Row {row_idx}: Creating action widget.")
-                action_widget = QWidget(); action_layout = QHBoxLayout(action_widget); action_layout.setContentsMargins(2,2,2,2); action_layout.setSpacing(5)
+                # Column 4: Note
+                effective_note_content = db_manager.get_effective_document_note(
+                    commande_document_id=document_id, # ClientDocument.document_id is the commande_document_id
+                    document_type=doc_data.get('document_type_generated', ''),
+                    language_code=language_code # Use the resolved language_code for this document
+                )
+                note_display_text = (effective_note_content[:50] + '...') if effective_note_content and len(effective_note_content) > 50 else (effective_note_content or self.tr("N/A"))
+                note_item = QTableWidgetItem(note_display_text)
+                note_item.setToolTip(effective_note_content or self.tr("Aucune note définie."))
+                self.doc_table.setItem(row_idx, 4, note_item)
+
+
+                logging.debug(f"PT_DEBUG: populate_doc_table - Row {row_idx}: Creating legacy action widget (Fichier Original).")
+                legacy_action_widget = QWidget(); legacy_action_layout = QHBoxLayout(legacy_action_widget); legacy_action_layout.setContentsMargins(2,2,2,2); legacy_action_layout.setSpacing(5)
 
                 pdf_btn = QPushButton(""); pdf_btn.setIcon(QIcon(":/icons/file-text.svg")); pdf_btn.setToolTip(self.tr("Générer/Ouvrir PDF")); pdf_btn.setFixedSize(30,30)
-                # Pass the full doc_data to the handler
                 pdf_btn.clicked.connect(lambda _, doc=doc_data: self._handle_generate_and_open_pdf_action(doc))
-                action_layout.addWidget(pdf_btn)
+                legacy_action_layout.addWidget(pdf_btn)
 
                 source_btn = QPushButton(""); source_btn.setIcon(QIcon(":/icons/eye.svg")); source_btn.setToolTip(self.tr("Afficher source")); source_btn.setFixedSize(30,30)
                 source_btn.clicked.connect(lambda _, p=full_file_path: QDesktopServices.openUrl(QUrl.fromLocalFile(p)))
-                action_layout.addWidget(source_btn)
+                legacy_action_layout.addWidget(source_btn)
 
                 source_template_id = doc_data.get('source_template_id')
                 can_edit_source_template = False
@@ -5281,50 +5326,45 @@ class ClientWidget(QWidget):
                     if can_edit_source_template:
                         edit_source_template_btn = QPushButton(""); edit_source_template_btn.setIcon(QIcon(":/icons/edit-2.svg")); edit_source_template_btn.setToolTip(self.tr("Modifier modèle source")); edit_source_template_btn.setFixedSize(30,30)
                         edit_source_template_btn.clicked.connect(lambda _, doc_d=doc_data: self.handle_edit_source_template(doc_d))
-                        action_layout.addWidget(edit_source_template_btn)
+                        legacy_action_layout.addWidget(edit_source_template_btn)
                     elif file_type_str.upper() == "PDF":
                         edit_pdf_btn = QPushButton(""); edit_pdf_btn.setIcon(QIcon(":/icons/pencil.svg")); edit_pdf_btn.setToolTip(self.tr("Modifier PDF")); edit_pdf_btn.setFixedSize(30, 30)
                         edit_pdf_btn.clicked.connect(lambda _, p=full_file_path, doc_id=document_id: self._handle_edit_pdf_action(p, doc_id))
-                        action_layout.addWidget(edit_pdf_btn)
-                    elif doc_name.lower().endswith('.html'): # Specific to HTML for HtmlEditor and PDF regen
+                        legacy_action_layout.addWidget(edit_pdf_btn)
+                    elif doc_name.lower().endswith('.html'):
                         edit_btn = QPushButton(""); edit_btn.setIcon(QIcon(":/icons/pencil.svg")); edit_btn.setToolTip(self.tr("Modifier document HTML")); edit_btn.setFixedSize(30,30)
-                        # Pass doc_data to open_document
                         edit_btn.clicked.connect(lambda _, d=doc_data: self.open_document(d))
-                        action_layout.addWidget(edit_btn)
-                    elif doc_name.lower().endswith('.xlsx'): # Specific to Excel for ExcelEditor
+                        legacy_action_layout.addWidget(edit_btn)
+                    elif doc_name.lower().endswith('.xlsx'):
                         edit_btn = QPushButton(""); edit_btn.setIcon(QIcon(":/icons/pencil.svg")); edit_btn.setToolTip(self.tr("Modifier document Excel")); edit_btn.setFixedSize(30,30)
-                        # Pass only full_file_path for Excel as PDF regen is not directly tied here
-                        edit_btn.clicked.connect(lambda _, p=full_file_path: self.open_document(p)) # Keep old behavior for non-HTML
-                        action_layout.addWidget(edit_btn)
+                        edit_btn.clicked.connect(lambda _, p=full_file_path: self.open_document(p))
+                        legacy_action_layout.addWidget(edit_btn)
                     else:
-                        spacer_widget = QWidget(); spacer_widget.setFixedSize(30,30); action_layout.addWidget(spacer_widget)
-                else: # No permission to manage/edit
-                    spacer_widget = QWidget(); spacer_widget.setFixedSize(30,30); action_layout.addWidget(spacer_widget)
+                        spacer_widget = QWidget(); spacer_widget.setFixedSize(30,30); legacy_action_layout.addWidget(spacer_widget)
+                else:
+                    spacer_widget = QWidget(); spacer_widget.setFixedSize(30,30); legacy_action_layout.addWidget(spacer_widget)
 
                 if can_manage_docs:
                     delete_btn = QPushButton(""); delete_btn.setIcon(QIcon(":/icons/trash.svg")); delete_btn.setToolTip(self.tr("Supprimer document")); delete_btn.setFixedSize(30,30)
                     delete_btn.clicked.connect(lambda _, doc_id=document_id, p=full_file_path: self.delete_client_document_entry(doc_id, p))
-                    action_layout.addWidget(delete_btn)
-                else: # No permission to delete
-                    spacer_widget = QWidget(); spacer_widget.setFixedSize(30,30); action_layout.addWidget(spacer_widget)
+                    legacy_action_layout.addWidget(delete_btn)
+                else:
+                    spacer_widget = QWidget(); spacer_widget.setFixedSize(30,30); legacy_action_layout.addWidget(spacer_widget)
 
-                action_layout.addStretch(); action_widget.setLayout(action_layout)
-                logging.debug(f"PT_DEBUG: populate_doc_table - Row {row_idx}: Setting legacy actions cell widget (column 4).")
-                # This is the old "Actions" column, now "Fichier Original"
-                self.doc_table.setCellWidget(row_idx, 4, action_widget)
+                legacy_action_layout.addStretch(); legacy_action_widget.setLayout(legacy_action_layout)
+                self.doc_table.setCellWidget(row_idx, 5, legacy_action_widget) # Column 5: Fichier Original Actions
 
-                # --- New Quick Actions Column (Column 5) ---
+                # --- New Quick Actions Column (Column 6) ---
                 quick_actions_widget = QWidget()
                 quick_actions_layout = QHBoxLayout(quick_actions_widget)
                 quick_actions_layout.setContentsMargins(2, 2, 2, 2)
                 quick_actions_layout.setSpacing(5)
 
                 btn_preview_quick = QPushButton("")
-                btn_preview_quick.setProperty("class", "tableActionButton") # Added class property
+                btn_preview_quick.setProperty("class", "tableActionButton")
                 btn_preview_quick.setIcon(QIcon(":/icons/eye.svg"))
                 btn_preview_quick.setToolTip(self.tr("Aperçu rapide du document (meilleur effort)"))
-                btn_preview_quick.setFixedSize(28, 28) # Smaller buttons
-                # Store document data needed for the action
+                btn_preview_quick.setFixedSize(28, 28)
                 btn_preview_quick.setProperty("document_id", document_id)
                 btn_preview_quick.setProperty("file_path", full_file_path)
                 btn_preview_quick.setProperty("file_name", doc_name)
@@ -5332,25 +5372,37 @@ class ClientWidget(QWidget):
                 quick_actions_layout.addWidget(btn_preview_quick)
 
                 btn_download_quick = QPushButton("")
-                btn_download_quick.setProperty("class", "tableActionButton") # Added class property
+                btn_download_quick.setProperty("class", "tableActionButton")
                 btn_download_quick.setIcon(QIcon(":/icons/download.svg"))
                 btn_download_quick.setToolTip(self.tr("Télécharger ce document"))
                 btn_download_quick.setFixedSize(28, 28)
                 btn_download_quick.setProperty("document_id", document_id)
                 btn_download_quick.setProperty("file_path", full_file_path)
-                btn_download_quick.setProperty("file_name", doc_name) # Original name for download
+                btn_download_quick.setProperty("file_name", doc_name)
                 btn_download_quick.clicked.connect(self.on_download_doc_button_clicked)
                 quick_actions_layout.addWidget(btn_download_quick)
 
-                # Button for "New Version"
+                # Button for "Edit Note"
+                btn_edit_note = QPushButton("")
+                btn_edit_note.setProperty("class", "tableActionButton")
+                btn_edit_note.setIcon(QIcon(":/icons/comment.svg")) # Placeholder, find a good icon for notes
+                btn_edit_note.setToolTip(self.tr("Modifier la note de ce document"))
+                btn_edit_note.setFixedSize(28, 28)
+                # Store necessary data for the handler
+                btn_edit_note.setProperty("document_id_for_note", document_id)
+                btn_edit_note.setProperty("document_type_for_note", doc_data.get('document_type_generated', ''))
+                btn_edit_note.setProperty("language_code_for_note", language_code)
+                btn_edit_note.clicked.connect(self.handle_edit_document_note_clicked)
+                quick_actions_layout.addWidget(btn_edit_note)
+
+
                 btn_new_version = QPushButton("")
                 btn_new_version.setProperty("class", "tableActionButton")
-                btn_new_version.setIcon(QIcon(":/icons/plus-square.svg")) # Placeholder icon
+                btn_new_version.setIcon(QIcon(":/icons/plus-square.svg"))
                 btn_new_version.setToolTip(self.tr("Créer une nouvelle version de ce document"))
                 btn_new_version.setFixedSize(28, 28)
-
                 source_template_id_for_version = doc_data.get('source_template_id')
-                if source_template_id_for_version and can_manage_docs: # Enable only if it's from a template and user has permission
+                if source_template_id_for_version and can_manage_docs:
                     btn_new_version.clicked.connect(
                         lambda checked, doc_id=document_id, templ_id=source_template_id_for_version: \
                         self.handle_create_new_version_clicked(doc_id, templ_id)
@@ -5361,13 +5413,11 @@ class ClientWidget(QWidget):
                         btn_new_version.setToolTip(self.tr("Impossible de créer une version pour un document non basé sur un modèle."))
                     elif not can_manage_docs:
                          btn_new_version.setToolTip(self.tr("Permissions insuffisantes pour créer une nouvelle version."))
-
-
                 quick_actions_layout.addWidget(btn_new_version)
 
                 quick_actions_layout.addStretch()
                 quick_actions_widget.setLayout(quick_actions_layout)
-                self.doc_table.setCellWidget(row_idx, 5, quick_actions_widget) # New column index
+                self.doc_table.setCellWidget(row_idx, 6, quick_actions_widget) # New column index for Quick Actions
                 # --- End New Quick Actions Column ---
 
                 logging.info(f"PT_DEBUG: populate_doc_table - Finished populating row {row_idx + 1}/{len(filtered_list)}.")
