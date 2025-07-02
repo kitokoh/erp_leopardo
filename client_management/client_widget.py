@@ -91,6 +91,8 @@ from auth.permissions import has_permission, \
 
 # Import CommandeWidget
 from commande_management.commande_widget import CommandeWidget
+from .ui.tabs.overview_tab_widget import OverviewTabWidget
+from .ui.tabs.documents_tab_widget import DocumentsTabWidget
 
 
 class ClientWidget(QWidget):
@@ -639,304 +641,12 @@ class ClientWidget(QWidget):
             # Also ensure the header part of overview tab is up-to-date if client_info could have changed
             # This is typically handled by refresh_display, but an explicit call here might be useful
             # if refresh_display wasn't called for some reason before tab switch.
-            self._update_overview_header_labels(self.client_info)
+            # self._update_overview_header_labels(self.client_info) # Now called by OverviewTabWidget
+            if hasattr(self, 'overview_tab_widget_instance'):
+                self.overview_tab_widget_instance.update_client_info(self.client_info) # Ensure child tab has latest info
 
 
-    def _update_overview_header_labels(self, client_data_dict):
-        """Helper to update the labels in the overview tab's header section."""
-        if not hasattr(self, 'overview_client_name_label'): # Check if overview tab UI is initialized
-            return
-
-        self.overview_client_name_label.setText(f"<b>{client_data_dict.get('client_name', 'N/A')}</b>")
-        self.overview_company_name_label.setText(client_data_dict.get('company_name', 'N/A') or self.tr("N/A"))
-        self.overview_category_label.setText(client_data_dict.get('category', 'N/A'))
-
-        status_text = client_data_dict.get('status', 'N/A')
-        self.overview_status_label.setText(status_text)
-        status_id = client_data_dict.get('status_id')
-        status_color = "black"
-        if status_id:
-            status_setting = db_manager.get_status_setting_by_id(status_id)
-            if status_setting and status_setting.get('color_hex'):
-                status_color = status_setting.get('color_hex')
-        self.overview_status_label.setStyleSheet(f"color: {status_color}; font-weight: bold;")
-
-        last_update_raw = client_data_dict.get('updated_at', client_data_dict.get('creation_date', ''))
-        last_update_display = self.tr("N/A")
-        if last_update_raw:
-            try:
-                dt_obj = datetime.fromisoformat(last_update_raw.replace('Z', '+00:00'))
-                last_update_display = dt_obj.strftime('%Y-%m-%d %H:%M')
-            except ValueError:
-                last_update_display = last_update_raw
-        if hasattr(self, 'overview_last_activity_label'): # Check if this label exists
-            self.overview_last_activity_label.setText(last_update_display)
-
-
-    def _load_overview_metrics(self):
-        client_id = self.client_info.get("client_id")
-        if not client_id:
-            self.overview_active_projects_label.setText(self.tr("N/A"))
-            self.overview_open_orders_label.setText(self.tr("N/A"))
-            return
-
-        # Active Projects
-        try:
-            all_projects = projects_crud.get_projects_by_client_id(client_id)
-            active_project_count = 0
-            if all_projects:
-                # Fetch all 'Project' statuses once
-                project_statuses_settings = db_manager.get_all_status_settings(type_filter='Project')
-                active_status_ids = {
-                    s['status_id'] for s in project_statuses_settings
-                    if not s.get('is_completion_status') and not s.get('is_archival_status')
-                }
-                for project in all_projects:
-                    if project.get('status_id') in active_status_ids:
-                        active_project_count += 1
-            self.overview_active_projects_label.setText(str(active_project_count))
-        except Exception as e:
-            logging.error(f"Error loading active projects for overview: {e}", exc_info=True)
-            self.overview_active_projects_label.setText(self.tr("Erreur"))
-
-        # Open Orders
-        try:
-            all_commandes = db_manager.get_commandes_for_client(client_id) # Using existing db_manager alias
-            open_order_count = 0
-            if all_commandes:
-                # Fetch all 'Commande' statuses once
-                commande_statuses_settings = db_manager.get_all_status_settings(type_filter='Commande')
-                open_status_ids = {
-                    s['status_id'] for s in commande_statuses_settings
-                    if not s.get('is_completion_status') and not s.get('is_archival_status')
-                    # Add more specific conditions if 'is_open_status' isn't a field:
-                    # and s.get('status_name') not in ["Annulée", "Livrée", "Facturée"]
-                }
-                for commande in all_commandes:
-                    if commande.get('status_commande_id') in open_status_ids:
-                        open_order_count += 1
-            self.overview_open_orders_label.setText(str(open_order_count))
-        except Exception as e:
-            logging.error(f"Error loading open orders for overview: {e}", exc_info=True)
-            self.overview_open_orders_label.setText(self.tr("Erreur"))
-
-        # Last client update date is already set directly in setup_ui for overview_last_activity_label
-
-        # ---- Populate Open Projects Snippet ----
-        # Clear previous project widgets from self.overview_projects_layout, except the placeholder
-        for i in reversed(range(self.overview_projects_layout.count())):
-            widget = self.overview_projects_layout.itemAt(i).widget()
-            if widget and widget != self.overview_no_projects_label: # Don't remove the placeholder
-                widget.setParent(None)
-                widget.deleteLater()
-
-        try:
-            all_projects = projects_crud.get_projects_by_client_id(client_id)
-            active_projects_list = []
-            if all_projects:
-                project_statuses_settings = db_manager.get_all_status_settings(type_filter='Project')
-                active_status_ids = {
-                    s['status_id'] for s in project_statuses_settings
-                    if not s.get('is_completion_status') and not s.get('is_archival_status')
-                }
-                for project in all_projects:
-                    if project.get('status_id') in active_status_ids:
-                        status_name = self.tr("Inconnu")
-                        status_color = "grey"
-                        for s_set in project_statuses_settings:
-                            if s_set['status_id'] == project.get('status_id'):
-                                status_name = s_set.get('status_name', status_name)
-                                status_color = s_set.get('color_hex', status_color)
-                                break
-                        project['status_name_resolved'] = status_name
-                        project['status_color_resolved'] = status_color
-                        active_projects_list.append(project)
-
-            # Sort by creation date descending (newest first) and take top 3
-            active_projects_list.sort(key=lambda p: p.get('created_at', ''), reverse=True)
-            projects_to_display = active_projects_list[:3]
-
-            if projects_to_display:
-                self.overview_no_projects_label.setVisible(False)
-                for project_data in projects_to_display:
-                    project_id = project_data.get('project_id')
-                    project_name = project_data.get('project_name', self.tr('Projet Sans Nom'))
-                    status_name = project_data.get('status_name_resolved', self.tr('Statut Inconnu'))
-                    status_color = project_data.get('status_color_resolved', 'grey')
-                    deadline_date = project_data.get('deadline_date', '')
-
-                    project_widget = QWidget()
-                    project_layout = QHBoxLayout(project_widget)
-                    project_layout.setContentsMargins(0,0,0,0)
-
-                    name_label = QLabel(f"<a href='{project_id}'>{project_name}</a>")
-                    name_label.setTextInteractionFlags(Qt.TextBrowserInteraction) # Make it look clickable
-                    name_label.linkActivated.connect(lambda link_text, p_id=project_id: self._handle_project_snippet_clicked(p_id))
-
-                    status_label = QLabel(status_name)
-                    status_label.setStyleSheet(f"color: {status_color}; font-weight: bold; padding: 2px 5px; background-color: #f0f0f0; border-radius: 3px;")
-                    status_label.setToolTip(self.tr("Statut du projet"))
-
-                    deadline_label_text = ""
-                    if deadline_date:
-                        try:
-                            # Assuming deadline_date is YYYY-MM-DD format
-                            deadline_dt = datetime.strptime(deadline_date, "%Y-%m-%d").date()
-                            today = datetime.now().date()
-                            days_left = (deadline_dt - today).days
-                            if days_left < 0:
-                                deadline_label_text = self.tr("Échéance dépassée")
-                                deadline_label_style = "color: red;"
-                            elif days_left <= 7:
-                                deadline_label_text = self.tr("Échéance: {0} ({1}j)").format(deadline_dt.strftime("%d/%m/%y"), days_left)
-                                deadline_label_style = "color: orange;"
-                            else:
-                                deadline_label_text = self.tr("Échéance: {0}").format(deadline_dt.strftime("%d/%m/%y"))
-                                deadline_label_style = "color: green;"
-                        except ValueError:
-                            deadline_label_text = deadline_date # Show raw if format is unexpected
-                            deadline_label_style = "color: grey;"
-
-                    deadline_display_label = QLabel(deadline_label_text)
-                    deadline_display_label.setStyleSheet(deadline_label_style)
-                    deadline_display_label.setToolTip(self.tr("Date d'échéance du projet"))
-
-                    project_layout.addWidget(name_label, 1) # Stretch name
-                    project_layout.addWidget(status_label)
-                    project_layout.addWidget(deadline_display_label)
-                    project_layout.addStretch(0)
-
-                    self.overview_projects_layout.addWidget(project_widget)
-            else:
-                self.overview_no_projects_label.setVisible(True)
-        except Exception as e:
-            logging.error(f"Error loading projects snippet for overview: {e}", exc_info=True)
-            self.overview_no_projects_label.setText(self.tr("Erreur chargement projets."))
-            self.overview_no_projects_label.setVisible(True)
-        # ---- End Populate Open Projects Snippet ----
-
-        # ---- Populate Recent Orders Snippet ----
-        # Clear previous order widgets
-        for i in reversed(range(self.overview_orders_layout.count())):
-            widget = self.overview_orders_layout.itemAt(i).widget()
-            if widget and widget != self.overview_no_orders_label: # Don't remove the placeholder
-                widget.setParent(None)
-                widget.deleteLater()
-
-        try:
-            all_commandes = db_manager.get_commandes_for_client(client_id) # Uses existing db_manager alias
-            open_commandes_list = []
-            if all_commandes:
-                commande_statuses_settings = db_manager.get_all_status_settings(type_filter='Commande')
-                open_status_ids = {
-                    s['status_id'] for s in commande_statuses_settings
-                    if not s.get('is_completion_status') and not s.get('is_archival_status')
-                }
-                for commande in all_commandes:
-                    if commande.get('status_commande_id') in open_status_ids:
-                        status_name = self.tr("Inconnu")
-                        status_color = "grey"
-                        for s_set in commande_statuses_settings:
-                            if s_set['status_id'] == commande.get('status_commande_id'):
-                                status_name = s_set.get('status_name', status_name)
-                                status_color = s_set.get('color_hex', status_color)
-                                break
-                        commande['status_name_resolved'] = status_name
-                        commande['status_color_resolved'] = status_color
-                        open_commandes_list.append(commande)
-
-            # Sort by commande_date descending (newest first) and take top 3
-            open_commandes_list.sort(key=lambda c: c.get('commande_date', ''), reverse=True)
-            orders_to_display = open_commandes_list[:3]
-
-            if orders_to_display:
-                self.overview_no_orders_label.setVisible(False)
-                for order_data in orders_to_display:
-                    commande_id = order_data.get('commande_id')
-                    commande_ref = order_data.get('commande_reference', self.tr('Commande Sans Réf'))
-                    status_name = order_data.get('status_name_resolved', self.tr('Statut Inconnu'))
-                    status_color = order_data.get('status_color_resolved', 'grey')
-                    total_ttc = order_data.get('total_ttc', 0.0)
-                    currency = order_data.get('currency', '€')
-
-                    order_widget = QWidget()
-                    order_layout = QHBoxLayout(order_widget)
-                    order_layout.setContentsMargins(0,0,0,0)
-
-                    ref_label = QLabel(f"<a href='{commande_id}'>{commande_ref}</a>")
-                    ref_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
-                    ref_label.linkActivated.connect(lambda link_text, c_id=commande_id: self._handle_order_snippet_clicked(c_id))
-
-                    status_label = QLabel(status_name)
-                    status_label.setStyleSheet(f"color: {status_color}; font-weight: bold; padding: 2px 5px; background-color: #f0f0f0; border-radius: 3px;")
-                    status_label.setToolTip(self.tr("Statut de la commande"))
-
-                    amount_label = QLabel(f"{total_ttc:,.2f} {currency}")
-                    amount_label.setStyleSheet("font-weight: bold;")
-                    amount_label.setToolTip(self.tr("Montant Total TTC"))
-
-                    order_layout.addWidget(ref_label, 1) # Stretch reference
-                    order_layout.addWidget(status_label)
-                    order_layout.addWidget(amount_label)
-                    order_layout.addStretch(0)
-
-                    self.overview_orders_layout.addWidget(order_widget)
-            else:
-                self.overview_no_orders_label.setVisible(True)
-        except Exception as e:
-            logging.error(f"Error loading orders snippet for overview: {e}", exc_info=True)
-            self.overview_no_orders_label.setText(self.tr("Erreur chargement commandes."))
-            self.overview_no_orders_label.setVisible(True)
-        # ---- End Populate Recent Orders Snippet ----
-
-        # ---- Populate Recent Activity Snippet ----
-        # Clear previous activity widgets
-        for i in reversed(range(self.overview_activity_layout.count())):
-            widget = self.overview_activity_layout.itemAt(i).widget()
-            if widget and widget != self.overview_no_activity_label:
-                widget.setParent(None)
-                widget.deleteLater()
-
-        try:
-            # Use the updated get_activity_logs from db_manager (which should point to activity_logs_crud)
-            activities = db_manager.get_activity_logs(limit=5, related_client_id_filter=client_id)
-
-            if activities:
-                self.overview_no_activity_label.setVisible(False)
-                for activity in activities:
-                    timestamp_raw = activity.get('created_at', '')
-                    timestamp_display = ""
-                    if timestamp_raw:
-                        try:
-                            dt_obj = datetime.fromisoformat(timestamp_raw.replace('Z', '+00:00'))
-                            timestamp_display = dt_obj.strftime('%d/%m/%y %H:%M')
-                        except ValueError:
-                            timestamp_display = timestamp_raw # fallback
-
-                    action_type = activity.get('action_type', self.tr('Action Inconnue'))
-                    details = activity.get('details', '')
-                    username = activity.get('username', self.tr('Système')) # Username from JOIN
-
-                    activity_text = f"<small>[{timestamp_display}] <b>{username}</b>: {action_type} - <i>{details}</i></small>"
-
-                    activity_label = QLabel(activity_text)
-                    activity_label.setWordWrap(True)
-                    activity_label.setToolTip(f"{self.tr('Type')}: {action_type}\n{self.tr('Détails')}: {details}\n{self.tr('Date')}: {timestamp_display}\n{self.tr('Utilisateur')}: {username}")
-                    self.overview_activity_layout.addWidget(activity_label)
-            else:
-                self.overview_no_activity_label.setVisible(True)
-                self.overview_no_activity_label.setText(self.tr("Aucune activité récente à afficher pour ce client."))
-
-        except AttributeError:
-            logging.error("Error loading recent activity: db_manager.get_activity_logs might be missing or not updated.", exc_info=True)
-            self.overview_no_activity_label.setText(self.tr("Erreur: Fonctionnalité d'activité non disponible."))
-            self.overview_no_activity_label.setVisible(True)
-        except Exception as e:
-            logging.error(f"Error loading recent activity for overview: {e}", exc_info=True)
-            self.overview_no_activity_label.setText(self.tr("Erreur chargement activité."))
-            self.overview_no_activity_label.setVisible(True)
-        # ---- End Populate Recent Activity Snippet ----
-
+    # _update_overview_header_labels and _load_overview_metrics have been moved to OverviewTabWidget.
 
     def _handle_project_snippet_clicked(self, project_id):
         if not project_id:
@@ -1226,141 +936,38 @@ class ClientWidget(QWidget):
             # So, _setup_notes_section will be called from within the _setup_client_info_section block.
             # For now, ensure the rest of _setup_main_tabs_section correctly sets up self.tab_widget.
 
-            # ---- New Overview Tab Setup ----
-            self.overview_tab = QWidget()
-            self.overview_tab_layout = QVBoxLayout(self.overview_tab)
+            # ---- Overview Tab Setup (now handled by OverviewTabWidget) ----
+            # The following lines related to self.overview_tab, self.overview_tab_layout,
+            # and all its content (header_group, metrics_group, quick_actions_group, etc.)
+            # have been moved to OverviewTabWidget._setup_ui()
 
-            # ---- Client Header Section for Overview Tab ----
-            header_group = QGroupBox(self.tr("Informations Clés du Client"))
-            header_group.setObjectName("overviewHeaderGroup")
-            header_form_layout = QFormLayout(header_group)
+            # We will instantiate OverviewTabWidget and add it to self.tab_widget here.
+            # Ensure OverviewTabWidget is imported at the top of client_widget.py
+            # from .ui.tabs.overview_tab_widget import OverviewTabWidget # Example import
 
-            self.overview_client_name_label = QLabel(f"<b>{self.client_info.get('client_name', 'N/A')}</b>")
-            self.overview_client_name_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-            header_form_layout.addRow(self.tr("Nom du Client:"), self.overview_client_name_label)
+            self.overview_tab_widget_instance = OverviewTabWidget(
+                client_info=self.client_info,
+                parent_client_widget=self, # Pass self (ClientWidget) as parent_client_widget
+                parent=self # Standard Qt parent
+            )
+            self.tab_widget.insertTab(0, self.overview_tab_widget_instance, self.tr("Aperçu"))
+            # ---- End Overview Tab Setup ----
 
-            self.overview_company_name_label = QLabel(self.client_info.get('company_name', 'N/A') or self.tr("N/A"))
-            self.overview_company_name_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-            header_form_layout.addRow(self.tr("Société:"), self.overview_company_name_label)
+            # Initial data load for the overview tab is now handled within OverviewTabWidget's __init__ or a refresh method.
+            # If _load_overview_metrics or _update_overview_header_labels are still needed by OverviewTabWidget
+            # and remain in ClientWidget, OverviewTabWidget will call them via its self.parent_client_widget.
+            # For now, we assume OverviewTabWidget.refresh_overview_data() handles its own data.
 
-            self.overview_category_label = QLabel(self.client_info.get('category', 'N/A'))
-            self.overview_category_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-            header_form_layout.addRow(self.tr("Catégorie:"), self.overview_category_label)
+            # self._setup_documents_tab() # Index 1 (after Overview) - Now handled by DocumentsTabWidget
+            self.documents_tab_widget_instance = DocumentsTabWidget(
+                client_info=self.client_info,
+                config=self.config,
+                current_user_info=self.current_user_info,
+                parent_client_widget=self,
+                parent=self
+            )
+            self.tab_widget.addTab(self.documents_tab_widget_instance, self.tr("Documents"))
 
-            self.overview_status_label = QLabel(self.client_info.get('status', 'N/A'))
-            self.overview_status_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-            status_id = self.client_info.get('status_id')
-            status_color = "black" # Default color
-            if status_id:
-                status_setting = db_manager.get_status_setting_by_id(status_id)
-                if status_setting and status_setting.get('color_hex'):
-                    status_color = status_setting.get('color_hex')
-            self.overview_status_label.setStyleSheet(f"color: {status_color}; font-weight: bold;")
-            header_form_layout.addRow(self.tr("Statut Client:"), self.overview_status_label)
-
-            self.overview_tab_layout.addWidget(header_group)
-            # ---- End Client Header Section ----
-
-            # ---- Key Metrics Section for Overview Tab ----
-            metrics_group = QGroupBox(self.tr("Indicateurs Clés"))
-            metrics_group.setObjectName("overviewMetricsGroup")
-            metrics_form_layout = QFormLayout(metrics_group)
-
-            self.overview_active_projects_label = QLabel(self.tr("Chargement..."))
-            metrics_form_layout.addRow(self.tr("Projets Actifs:"), self.overview_active_projects_label)
-
-            self.overview_open_orders_label = QLabel(self.tr("Chargement..."))
-            metrics_form_layout.addRow(self.tr("Commandes Ouvertes:"), self.overview_open_orders_label)
-
-            # Last client update date as a proxy for "last interaction" for now
-            last_update_raw = self.client_info.get('updated_at', self.client_info.get('creation_date', ''))
-            last_update_display = self.tr("N/A")
-            if last_update_raw:
-                try:
-                    dt_obj = datetime.fromisoformat(last_update_raw.replace('Z', '+00:00'))
-                    last_update_display = dt_obj.strftime('%Y-%m-%d %H:%M')
-                except ValueError:
-                    last_update_display = last_update_raw # Show raw if parsing fails
-
-            self.overview_last_activity_label = QLabel(last_update_display)
-            metrics_form_layout.addRow(self.tr("Dernière Mise à Jour Client:"), self.overview_last_activity_label)
-
-            self.overview_tab_layout.addWidget(metrics_group)
-            # ---- End Key Metrics Section ----
-
-            # ---- Quick Actions Section for Overview Tab ----
-            quick_actions_group = QGroupBox(self.tr("Actions Rapides"))
-            quick_actions_group.setObjectName("overviewQuickActionsGroup")
-            quick_actions_layout = QHBoxLayout(quick_actions_group) # Use QHBoxLayout for horizontal buttons
-
-            self.overview_new_order_btn = QPushButton(QIcon(":/icons/plus-circle.svg"), self.tr("Nouvelle Commande"))
-            self.overview_new_order_btn.clicked.connect(self._handle_overview_new_order)
-            quick_actions_layout.addWidget(self.overview_new_order_btn)
-
-            self.overview_new_project_btn = QPushButton(QIcon(":/icons/folder-add.svg"), self.tr("Nouveau Projet"))
-            self.overview_new_project_btn.clicked.connect(self._handle_overview_new_project)
-            quick_actions_layout.addWidget(self.overview_new_project_btn)
-
-            self.overview_add_contact_btn = QPushButton(QIcon(":/icons/user-plus.svg"), self.tr("Ajouter Contact"))
-            self.overview_add_contact_btn.clicked.connect(self.add_contact) # Reuses existing method
-            quick_actions_layout.addWidget(self.overview_add_contact_btn)
-
-            self.overview_generate_doc_btn = QPushButton(QIcon(":/icons/file-plus.svg"), self.tr("Générer Document"))
-            self.overview_generate_doc_btn.clicked.connect(self._handle_overview_generate_document)
-            quick_actions_layout.addWidget(self.overview_generate_doc_btn)
-
-            # Placeholder for Log Communication if functionality is added
-            # self.overview_log_comm_btn = QPushButton(QIcon(":/icons/message-square.svg"), self.tr("Log Communication"))
-            # self.overview_log_comm_btn.clicked.connect(self._handle_overview_log_communication)
-            # quick_actions_layout.addWidget(self.overview_log_comm_btn)
-
-            quick_actions_layout.addStretch()
-            self.overview_tab_layout.addWidget(quick_actions_group)
-            # ---- End Quick Actions Section ----
-
-            # ---- Open Projects Snippet Section ----
-            self.overview_projects_group = QGroupBox(self.tr("Projets Récents/Actifs"))
-            self.overview_projects_group.setObjectName("overviewProjectsGroup")
-            self.overview_projects_layout = QVBoxLayout(self.overview_projects_group) # QVBoxLayout for vertical list
-            self.overview_projects_layout.setSpacing(5) # Compact spacing
-            # Placeholder if no projects
-            self.overview_no_projects_label = QLabel(self.tr("Aucun projet actif à afficher."))
-            self.overview_no_projects_label.setAlignment(Qt.AlignCenter)
-            self.overview_projects_layout.addWidget(self.overview_no_projects_label)
-            self.overview_tab_layout.addWidget(self.overview_projects_group)
-            # ---- End Open Projects Snippet Section ----
-
-            # ---- Recent Orders Snippet Section ----
-            self.overview_orders_group = QGroupBox(self.tr("Commandes Récentes/Ouvertes"))
-            self.overview_orders_group.setObjectName("overviewOrdersGroup")
-            self.overview_orders_layout = QVBoxLayout(self.overview_orders_group) # QVBoxLayout for vertical list
-            self.overview_orders_layout.setSpacing(5) # Compact spacing
-            # Placeholder if no orders
-            self.overview_no_orders_label = QLabel(self.tr("Aucune commande récente/ouverte à afficher."))
-            self.overview_no_orders_label.setAlignment(Qt.AlignCenter)
-            self.overview_orders_layout.addWidget(self.overview_no_orders_label)
-            self.overview_tab_layout.addWidget(self.overview_orders_group)
-            # ---- End Recent Orders Snippet Section ----
-
-            # ---- Recent Activity Snippet Section ----
-            self.overview_activity_group = QGroupBox(self.tr("Activité Récente"))
-            self.overview_activity_group.setObjectName("overviewActivityGroup")
-            self.overview_activity_layout = QVBoxLayout(self.overview_activity_group)
-            self.overview_activity_layout.setSpacing(3) # Very compact
-            # Placeholder if no activity
-            self.overview_no_activity_label = QLabel(self.tr("Aucune activité récente à afficher pour ce client."))
-            self.overview_no_activity_label.setAlignment(Qt.AlignCenter)
-            self.overview_activity_layout.addWidget(self.overview_no_activity_label)
-            self.overview_tab_layout.addWidget(self.overview_activity_group)
-            # ---- End Recent Activity Snippet Section ----
-
-            self.tab_widget.insertTab(0, self.overview_tab, self.tr("Aperçu")) # Insert as first tab
-            # ---- End New Overview Tab Setup ----
-
-            # Initial call to load metrics for the overview tab
-            self._load_overview_metrics()
-
-            self._setup_documents_tab() # Index 1
 
             self._setup_commandes_tab() # Index 2 - This was called separately later, integrating here for order
 
@@ -1388,121 +995,7 @@ class ClientWidget(QWidget):
     # _setup_available_templates_tab and load_available_templates removed.
     # handle_generate_template_button_clicked was only called by load_available_templates, so it can also be removed.
 
-
-    def _setup_documents_tab(self):
-        try:
-            logging.info("ClientWidget.setup_ui: Starting setup for Documents Tab Structure...")
-            docs_tab = QWidget()
-            docs_layout = QVBoxLayout(docs_tab)
-
-            self.doc_filter_layout_widget = QWidget()
-            doc_filter_layout = QHBoxLayout(self.doc_filter_layout_widget)
-            doc_filter_layout.setContentsMargins(0,0,0,0)
-            doc_filter_label = QLabel(self.tr("Filtrer par Commande:"))
-            doc_filter_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-            doc_filter_layout.addWidget(doc_filter_label)
-            self.doc_order_filter_combo = QComboBox()
-            self.doc_order_filter_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-            self.doc_order_filter_combo.currentIndexChanged.connect(self.populate_doc_table)
-            doc_filter_layout.addWidget(self.doc_order_filter_combo)
-            doc_filter_layout.addSpacing(10)
-            doc_lang_filter_label = QLabel(self.tr("Filtrer par Langue:"))
-            doc_lang_filter_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-            doc_filter_layout.addWidget(doc_lang_filter_label)
-            self.doc_language_filter_combo = QComboBox()
-            self.doc_language_filter_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-            self.doc_language_filter_combo.addItem(self.tr("Toutes"), "ALL")
-            for lang_code in SUPPORTED_LANGUAGES:
-                self.doc_language_filter_combo.addItem(lang_code, lang_code)
-            self.doc_language_filter_combo.currentIndexChanged.connect(self.populate_doc_table)
-            doc_filter_layout.addWidget(self.doc_language_filter_combo)
-            doc_filter_layout.addSpacing(10)
-            doc_type_filter_label = QLabel(self.tr("Filtrer par Type:"))
-            doc_type_filter_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-            doc_filter_layout.addWidget(doc_type_filter_label)
-            self.doc_type_filter_combo = QComboBox()
-            self.doc_type_filter_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-            self.doc_type_filter_combo.addItem(self.tr("Tous"), "ALL")
-            self.doc_type_filter_combo.addItem("HTML", "HTML")
-            self.doc_type_filter_combo.addItem("PDF", "PDF")
-            self.doc_type_filter_combo.addItem("XLSX", "XLSX")
-            self.doc_type_filter_combo.addItem("DOCX", "DOCX")
-            self.doc_type_filter_combo.addItem(self.tr("Autre"), "OTHER")
-            self.doc_type_filter_combo.currentIndexChanged.connect(self.populate_doc_table)
-            doc_filter_layout.addWidget(self.doc_type_filter_combo)
-
-            if hasattr(self, 'compile_pdf_btn'):
-                self.combine_docs_btn = self.compile_pdf_btn
-                self.combine_docs_btn.setText(self.tr("Combiné"))
-                self.combine_docs_btn.setIcon(QIcon.fromTheme("document-export", QIcon(":/icons/folder.svg")))
-                self.combine_docs_btn.setToolTip(self.tr("Combiner plusieurs documents PDF"))
-                doc_filter_layout.addWidget(self.combine_docs_btn)
-            else:
-                self.combine_docs_btn = QPushButton(self.tr("Combiné"))
-                self.combine_docs_btn.setIcon(QIcon.fromTheme("document-export", QIcon(":/icons/folder.svg")))
-                self.combine_docs_btn.setToolTip(self.tr("Combiner plusieurs documents PDF"))
-                self.combine_docs_btn.clicked.connect(self.open_compile_pdf_dialog)
-                doc_filter_layout.addWidget(self.combine_docs_btn)
-
-            self.plus_add_doc_btn = QPushButton("+")
-            self.plus_add_doc_btn.setToolTip(self.tr("Ajouter un document (depuis modèle ou importation directe)"))
-            self.plus_add_doc_btn.setFixedSize(30, 30)
-            self.plus_add_doc_btn.clicked.connect(self.handle_plus_add_doc_button_click) # Connect here
-            doc_filter_layout.addWidget(self.plus_add_doc_btn)
-            doc_filter_layout.addStretch(1)
-            docs_layout.addWidget(self.doc_filter_layout_widget)
-            self.doc_filter_layout_widget.setVisible(True)
-
-            doc_filter_layout.addStretch(1)
-            docs_layout.addWidget(self.doc_filter_layout_widget)
-            self.doc_filter_layout_widget.setVisible(True)
-
-            self.documents_empty_label = QLabel(self.tr("Aucun document trouvé pour ce client.\nUtilisez les boutons ci-dessous pour ajouter ou générer des documents."))
-            self.documents_empty_label.setAlignment(Qt.AlignCenter)
-            font_docs_empty = self.documents_empty_label.font()
-            font_docs_empty.setPointSize(10)
-            self.documents_empty_label.setFont(font_docs_empty)
-            docs_layout.addWidget(self.documents_empty_label)
-
-            self.doc_table = QTableWidget()
-            self.doc_table.setColumnCount(6)
-            self.doc_table.setHorizontalHeaderLabels([
-                self.tr("Nom"), self.tr("Type"), self.tr("Langue"),
-                self.tr("Date"), self.tr("Fichier Original"), self.tr("Actions Rapides")
-            ])
-            self.doc_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-            self.doc_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-            self.doc_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
-            self.doc_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
-            self.doc_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
-            self.doc_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
-            self.doc_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents)
-
-            self.doc_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-            self.doc_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            docs_layout.addWidget(self.doc_table)
-
-            doc_btn_layout = QHBoxLayout()
-            self.add_doc_btn = QPushButton(self.tr("Importer Document"))
-            self.add_doc_btn.setIcon(QIcon(":/icons/file-plus.svg"))
-            self.add_doc_btn.setToolTip(self.tr("Importer un fichier document existant pour ce client"))
-            self.add_doc_btn.clicked.connect(self.add_document)
-            doc_btn_layout.addWidget(self.add_doc_btn)
-            self.refresh_docs_btn = QPushButton(self.tr("Actualiser"))
-            self.refresh_docs_btn.setIcon(QIcon.fromTheme("view-refresh"))
-            self.refresh_docs_btn.clicked.connect(self.populate_doc_table)
-            doc_btn_layout.addWidget(self.refresh_docs_btn)
-            self.add_template_btn = QPushButton(self.tr("Générer via Modèle"))
-            self.add_template_btn.setIcon(QIcon.fromTheme("document-new", QIcon(":/icons/file-plus.svg")))
-            self.add_template_btn.setToolTip(self.tr("Générer un nouveau document pour ce client à partir d'un modèle"))
-            self.add_template_btn.clicked.connect(self.open_create_docs_dialog)
-            doc_btn_layout.addWidget(self.add_template_btn)
-            docs_layout.addLayout(doc_btn_layout)
-            self.tab_widget.addTab(docs_tab, self.tr("Documents"))
-
-        except Exception as e_doc_tab_setup:
-            logging.error(f"Error in _setup_documents_tab: {e_doc_tab_setup}", exc_info=True)
-            QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation onglet Documents:\n{0}").format(str(e_doc_tab_setup)))
+    # _setup_documents_tab() has been moved to DocumentsTabWidget._setup_ui()
 
     def handle_plus_add_doc_button_click(self):
         dialog = QDialog(self)
@@ -2082,72 +1575,6 @@ class ClientWidget(QWidget):
             logging.error(f"Error in _setup_commandes_tab: {e}", exc_info=True)
             QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation onglet Commandes:\n{0}").format(str(e)))
 
-    def _setup_commandes_tab(self):
-        """Sets up the Commandes tab."""
-        try:
-            logging.info("ClientWidget.setup_ui: Starting setup for Commandes Tab...")
-            self.commandes_tab_widget = CommandeWidget(
-                client_info=self.client_info,
-                current_user_info=self.current_user_info,
-                parent=self
-            )
-            # Add this as a top-level tab in self.tab_widget (main tab container)
-            # Or, if Commandes should be part of the "Autres Informations" group box, then add to self.tab_widget
-            # For now, let's add it to the main self.tab_widget
-            if hasattr(self, 'tab_widget'):
-                 # Insert it before "Available Templates" or as the second tab for prominence
-                docs_tab_index = -1
-                for i in range(self.tab_widget.count()):
-                    if self.tab_widget.tabText(i) == self.tr("Documents"):
-                        docs_tab_index = i
-                        break
-
-                if docs_tab_index != -1:
-                    self.tab_widget.insertTab(docs_tab_index + 1, self.commandes_tab_widget, self.tr("Commandes"))
-                else: # Fallback if Documents tab isn't found by that exact name
-                    self.tab_widget.addTab(self.commandes_tab_widget, self.tr("Commandes"))
-
-                logging.info("ClientWidget._setup_commandes_tab: Commandes tab added.")
-            else:
-                logging.error("ClientWidget._setup_commandes_tab: self.tab_widget not found. Cannot add Commandes tab.")
-
-        except Exception as e:
-            logging.error(f"Error in _setup_commandes_tab: {e}", exc_info=True)
-            QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation onglet Commandes:\n{0}").format(str(e)))
-
-    def _setup_commandes_tab(self):
-        """Sets up the Commandes tab."""
-        try:
-            logging.info("ClientWidget.setup_ui: Starting setup for Commandes Tab...")
-            self.commandes_tab_widget = CommandeWidget(
-                client_info=self.client_info,
-                current_user_info=self.current_user_info,
-                parent=self
-            )
-            # Add this as a top-level tab in self.tab_widget (main tab container)
-            # Or, if Commandes should be part of the "Autres Informations" group box, then add to self.tab_widget
-            # For now, let's add it to the main self.tab_widget
-            if hasattr(self, 'tab_widget'):
-                 # Insert it before "Available Templates" or as the second tab for prominence
-                docs_tab_index = -1
-                for i in range(self.tab_widget.count()):
-                    if self.tab_widget.tabText(i) == self.tr("Documents"):
-                        docs_tab_index = i
-                        break
-
-                if docs_tab_index != -1:
-                    self.tab_widget.insertTab(docs_tab_index + 1, self.commandes_tab_widget, self.tr("Commandes"))
-                else: # Fallback if Documents tab isn't found by that exact name
-                    self.tab_widget.addTab(self.commandes_tab_widget, self.tr("Commandes"))
-
-                logging.info("ClientWidget._setup_commandes_tab: Commandes tab added.")
-            else:
-                logging.error("ClientWidget._setup_commandes_tab: self.tab_widget not found. Cannot add Commandes tab.")
-
-        except Exception as e:
-            logging.error(f"Error in _setup_commandes_tab: {e}", exc_info=True)
-            QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation onglet Commandes:\n{0}").format(str(e)))
-
 
     def _setup_billing_tab(self):
         try:
@@ -2385,11 +1812,9 @@ class ClientWidget(QWidget):
 
             docs_layout.addWidget(self.doc_filter_layout_widget)
             self.doc_filter_layout_widget.setVisible(True)
-        # THIS IS THE MISSING PART - The try block for _setup_documents_tab was not closed
         except Exception as e_doc_tab:
             logging.error(f"Error in _setup_documents_tab: {e_doc_tab}", exc_info=True)
             QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation onglet Documents:\n{0}").format(str(e_doc_tab)))
-
 
     def handle_plus_add_doc_button_click(self):
         dialog = QDialog(self)
