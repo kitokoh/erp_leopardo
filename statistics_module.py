@@ -122,56 +122,36 @@ class StatisticsDashboard(QWidget):
         """Deferred initialization of map components and initial data load."""
         logging.info("StatisticsDashboard: _initialize_map_and_load_data called by QTimer.")
 
-        # Ensure the container widget for the map exists
+        # Ensure the container widget for the map exists and has its layout.
+        # self._left_map_actual_layout is initialized in __init__ and set as the layout
+        # for self.left_widget_for_map. We rely on that setup.
         if self.left_widget_for_map is None:
-            logging.critical("StatisticsDashboard: self.left_widget_for_map is None at the start of _initialize_map_and_load_data. Cannot initialize map.")
-            # This indicates a severe problem with the widget's construction or state.
+            logging.critical("StatisticsDashboard: self.left_widget_for_map is None. Cannot initialize map.")
             return
 
-        # --- BEGIN PROPOSED FIX ---
-        # Ensure self.left_widget_for_map has a layout and self._left_map_actual_layout refers to it.
-        current_layout = self.left_widget_for_map.layout()
-        if current_layout is None:
-            logging.warning("StatisticsDashboard: No layout on left_widget_for_map. Creating a new one.")
-            # Create new layout, parent it to the widget (which also sets it on the widget)
-            new_layout = QVBoxLayout(self.left_widget_for_map)
-            new_layout.setContentsMargins(0,0,0,0)
-            self._left_map_actual_layout = new_layout # Update our reference
-        else:
-            # A layout exists on the widget. Ensure our instance variable points to this current, active layout.
-            # This handles cases where the layout might have been replaced externally,
-            # or our self._left_map_actual_layout reference became stale or was None.
-            if self._left_map_actual_layout is not current_layout:
-                logging.warning(
-                    "StatisticsDashboard: self._left_map_actual_layout (id: %s) was stale or different from widget's current layout (id: %s). Updating reference.",
-                    id(self._left_map_actual_layout), id(current_layout)
-                )
-                self._left_map_actual_layout = current_layout
-
-            # As an additional safeguard, if _left_map_actual_layout is somehow still None here
-            # (e.g., if current_layout was a valid object but _left_map_actual_layout was None and the 'is not' check passed due to distinct None IDs - unlikely but defensive)
-            # or if current_layout itself was some non-None but "falsy" object that _left_map_actual_layout became.
-            if not self._left_map_actual_layout: # Check the truthiness of our reference
-                 logging.error("StatisticsDashboard: self._left_map_actual_layout is unexpectedly None/falsy after attempting to sync with widget's existing layout. Re-creating layout.")
-                 # Fallback: Re-create the layout for left_widget_for_map
-                 # This might replace current_layout if it was problematic.
-                 new_layout = QVBoxLayout(self.left_widget_for_map) # This will replace the old layout if any
-                 new_layout.setContentsMargins(0,0,0,0)
-                 self._left_map_actual_layout = new_layout
-
-        # At this point, self._left_map_actual_layout should be valid and set on the widget.
-        # The original critical check can remain as a final confirmation.
-        if not self._left_map_actual_layout:
-            logging.critical("StatisticsDashboard: self._left_map_actual_layout is None AFTER ATTEMPTED FIX. Cannot proceed with map initialization.")
-
+        # Verify that _left_map_actual_layout (which should be the layout of left_widget_for_map) is valid.
+        # This also implicitly checks if left_widget_for_map.layout() is valid if _left_map_actual_layout
+        # indeed points to it as intended by __init__.
+        if self._left_map_actual_layout is None:
+            logging.critical("StatisticsDashboard: self._left_map_actual_layout is None. This should have been set in __init__. Cannot proceed with map initialization.")
             return
 
-        # Now, self._left_map_actual_layout is assumed to be the correct, valid layout for self.left_widget_for_map
+        # As an additional check, ensure the widget's current layout is indeed the one we stored.
+        # This can catch unexpected external modifications to the widget's layout.
+        if self.left_widget_for_map.layout() is None:
+            logging.critical("StatisticsDashboard: self.left_widget_for_map.layout() is None, but _left_map_actual_layout was expected to be set. Critical state inconsistency.")
+            return
+        elif self.left_widget_for_map.layout() is not self._left_map_actual_layout:
+            logging.warning("StatisticsDashboard: self.left_widget_for_map.layout() differs from self._left_map_actual_layout. Using the widget's current layout.")
+            self._left_map_actual_layout = self.left_widget_for_map.layout()
+
+
+        # Now, self._left_map_actual_layout is confirmed to be the layout of self.left_widget_for_map
         if self.map_view is None:
             # Parent QWebEngineView to self.left_widget_for_map.
             # It will be managed by self._left_map_actual_layout.
-            self.map_view = QWebEngineView(self.left_widget_for_map)
-            self._left_map_actual_layout.addWidget(self.map_view) # Add map_view to the confirmed layout
+            self.map_view = QWebEngineView(self.left_widget_for_map) # Parented to the widget
+            self._left_map_actual_layout.addWidget(self.map_view) # Added to the layout
             logging.info("StatisticsDashboard: QWebEngineView (self.map_view) created and added to _left_map_actual_layout.")
 
             self.map_interaction_handler = MapInteractionHandler(self)
@@ -387,13 +367,19 @@ class StatisticsDashboard(QWidget):
     def update_map(self):
         logging.info("Updating interactive map...")
         try:
-            geojson_path = os.path.join(APP_ROOT_DIR, "assets", "world_countries.geojson")
+            # Robustly determine APP_ROOT_DIR within this module's context for asset loading
+            # Assumes statistics_module.py is in the project root directory.
+            current_module_path = os.path.abspath(__file__)
+            project_root_dir_local = os.path.dirname(current_module_path)
+
+            geojson_path = os.path.join(project_root_dir_local, "assets", "world_countries.geojson")
+            logging.info(f"StatisticsDashboard: Attempting to load GeoJSON from: {geojson_path}")
 
             if not os.path.exists(geojson_path):
-                logging.error(f"GeoJSON file not found at: {geojson_path}")
-            error_message = self.tr("Les données géographiques de la carte (GeoJSON) sont introuvables. La carte ne peut pas être affichée. Veuillez vérifier l'installation de l'application ou contacter le support.")
-            self._set_map_error_html(error_message)
-            return
+                logging.error(f"GeoJSON file not found at: {geojson_path}. Imported APP_ROOT_DIR was {APP_ROOT_DIR}")
+                error_message = self.tr("Les données géographiques de la carte (GeoJSON) sont introuvables. La carte ne peut pas être affichée. Veuillez vérifier l'installation de l'application ou contacter le support.")
+                self._set_map_error_html(error_message)
+                return
 
             m = folium.Map(location=[20, 0], zoom_start=2, tiles="CartoDB positron")
             # clients_by_country_counts = get_client_counts_by_country() # Removed redundant call
@@ -502,7 +488,7 @@ class StatisticsDashboard(QWidget):
 
             if self.map_view:
                 self.map_view.setHtml(map_html_content)
-                logging.info("Interactive map updated successfully with QWebChannel JS.")
+                logging.info(f"Map HTML content successfully set in QWebEngineView. Map should be attempting to render. HTML content length: {len(map_html_content) if map_html_content else 0}.")
             else:
                 logging.error("StatisticsDashboard: self.map_view is None. Cannot set HTML for the map.")
 
@@ -818,7 +804,8 @@ class StatisticsDashboard(QWidget):
 
     def _setup_segmentation_tab_ui_internal(self):
         self.segmentation_tables = {}
-        self.segmentation_canvases = {} # For Matplotlib canvases
+        self.segmentation_chart_pages = {} # New dictionary for storing page widgets of charts
+        # self.segmentation_canvases = {} # Removed
 
         tab_configs = [
             ("country", self.tr("Par Pays"), ["Pays", "Nombre de Clients"], "table"),
@@ -843,12 +830,13 @@ class StatisticsDashboard(QWidget):
                 tab_layout.addWidget(table_widget)
                 self.segmentation_tables[key] = table_widget
             elif tab_type == "chart":
-                # For chart tabs, we'll create a FigureCanvas later when data is available
-                # We can store the layout or a placeholder widget if needed.
-                # For simplicity, we'll store the layout and add the canvas to it in the update method.
-                self.segmentation_canvases[key] = tab_layout # Store the layout for the canvas
+                # For chart tabs, store the QWidget page itself.
+                # The layout will be retrieved from this page widget when needed.
+                self.segmentation_chart_pages[key] = tab_widget # Store the page widget
 
             self.segmentation_tabs.addTab(tab_widget, title)
+        logging.debug(f"segmentation_chart_pages initialized: {self.segmentation_chart_pages}")
+        logging.debug(f"segmentation_tables initialized: {self.segmentation_tables}")
 
 
     def _populate_table(self, table_key, data_fetch_func, column_keys):
@@ -870,10 +858,44 @@ class StatisticsDashboard(QWidget):
             table.setSortingEnabled(True)
 
     def _update_status_segmentation_chart(self):
+        logging.debug(f"Current segmentation_chart_pages at start of _update_status_segmentation_chart: {getattr(self, 'segmentation_chart_pages', 'Not Initialized')}")
         logging.info("Updating status segmentation chart...")
-        chart_layout = self.segmentation_canvases.get("status")
-        if not chart_layout:
-            logging.error("Chart layout for 'status' not found.")
+
+        page_widget = None
+        if hasattr(self, 'segmentation_chart_pages'):
+            page_widget = self.segmentation_chart_pages.get("status")
+
+        logging.debug(f"Retrieved page_widget for 'status': {page_widget}")
+
+        if page_widget is None:
+            logging.error("Page widget for 'status' chart not found in self.segmentation_chart_pages.")
+            return
+
+        chart_layout = page_widget.layout()
+        logging.debug(f"Retrieved chart_layout from page_widget: {chart_layout} (type: {type(chart_layout)})")
+
+        if chart_layout is None:
+            logging.error(f"Chart layout for 'status' IS EXPLICITLY NONE (retrieved from page_widget.layout()). Page widget was: {page_widget}")
+            # Attempt to re-set a layout if page_widget exists but has no layout (should not happen if setup is correct)
+            if page_widget and page_widget.layout() is None: # Double check
+                logging.warning(f"Page widget {page_widget} for 'status' exists but has no layout. Attempting to set a new QVBoxLayout.")
+                try:
+                    new_layout = QVBoxLayout(page_widget) # Set new layout on the page_widget
+                    page_widget.setLayout(new_layout) # Ensure it's set
+                    chart_layout = new_layout # Use this new layout
+                    logging.info(f"Successfully set a new QVBoxLayout on page_widget for 'status': {chart_layout}")
+                except Exception as e_set_layout:
+                    logging.error(f"Failed to set a new layout on page_widget for 'status': {e_set_layout}", exc_info=True)
+                    return # Cannot proceed
+            else: # page_widget was None or layout() was not None initially but chart_layout became None (less likely)
+                return
+
+        # Check again if chart_layout is valid after potential recreation
+        if chart_layout is None:
+             logging.error("Chart layout for 'status' remains None even after attempting to fix. Cannot proceed.")
+             return
+        elif not chart_layout: # Should be caught by 'is None', but as a safeguard for unexpected falsy QLayout
+            logging.critical(f"CRITICAL UNEXPECTED: Chart layout for 'status' is NOT None ({chart_layout}, type: {type(chart_layout)}), but it evaluates to FALSY. This is highly unusual. Cannot proceed.")
             return
 
         # Clear previous canvas if any
