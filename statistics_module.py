@@ -146,7 +146,6 @@ class StatisticsDashboard(QWidget):
             logging.warning("StatisticsDashboard: self.left_widget_for_map.layout() differs from self._left_map_actual_layout. Using the widget's current layout.")
             self._left_map_actual_layout = self.left_widget_for_map.layout()
 
-
         # Now, self._left_map_actual_layout is confirmed to be the layout of self.left_widget_for_map
         if self.map_view is None:
             # Parent QWebEngineView to self.left_widget_for_map.
@@ -369,6 +368,7 @@ class StatisticsDashboard(QWidget):
         logging.info("update_map: Method entered.")
         try:
             logging.info("update_map: About to create folium.Map object.")
+
             # Robustly determine APP_ROOT_DIR within this module's context for asset loading
             # Assumes statistics_module.py is in the project root directory.
             current_module_path = os.path.abspath(__file__)
@@ -840,6 +840,8 @@ class StatisticsDashboard(QWidget):
         logging.debug(f"segmentation_chart_pages initialized: {self.segmentation_chart_pages}")
         logging.debug(f"segmentation_tables initialized: {self.segmentation_tables}")
 
+        logging.debug(f"segmentation_tables initialized: {self.segmentation_tables}")
+
 
     def _populate_table(self, table_key, data_fetch_func, column_keys):
         table = self.segmentation_tables.get(table_key)
@@ -889,6 +891,7 @@ class StatisticsDashboard(QWidget):
             except Exception as e_sip:
                 logging.warning(f"Error calling sip.isdeleted(chart_layout): {e_sip}.")
 
+
         if chart_layout is None:
             logging.error(f"Chart layout for 'status' IS EXPLICITLY NONE (retrieved from page_widget.layout()). Page widget was: {page_widget}")
             # Attempt to re-set a layout if page_widget exists but has no layout (should not happen if setup is correct)
@@ -911,6 +914,7 @@ class StatisticsDashboard(QWidget):
              return
         elif not chart_layout:
             logging.critical(f"CRITICAL UNEXPECTED: Chart layout for 'status' is NOT None ({chart_layout}, type: {type(chart_layout)}), but it evaluates to FALSY. This is highly unusual. Cannot proceed.")
+
             return
 
         # Clear previous canvas if any
