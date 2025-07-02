@@ -135,7 +135,7 @@ class StatisticsDashboard(QWidget):
         if self._left_map_actual_layout is None:
             logging.critical("StatisticsDashboard: self._left_map_actual_layout is None. This should have been set in __init__. Cannot proceed with map initialization.")
             return
-
+        
         # As an additional check, ensure the widget's current layout is indeed the one we stored.
         # This can catch unexpected external modifications to the widget's layout.
         if self.left_widget_for_map.layout() is None:
@@ -371,7 +371,7 @@ class StatisticsDashboard(QWidget):
             # Assumes statistics_module.py is in the project root directory.
             current_module_path = os.path.abspath(__file__)
             project_root_dir_local = os.path.dirname(current_module_path)
-
+            
             geojson_path = os.path.join(project_root_dir_local, "assets", "world_countries.geojson")
             logging.info(f"StatisticsDashboard: Attempting to load GeoJSON from: {geojson_path}")
 
@@ -880,7 +880,7 @@ class StatisticsDashboard(QWidget):
             return
         # The following 'if not chart_layout:' is a fallback for the highly unlikely scenario where chart_layout is not None but still falsy.
         # Given it's a QVBoxLayout, this shouldn't happen unless it's a very unusual Qt state.
-        elif not chart_layout:
+        elif not chart_layout: 
             logging.critical(f"CRITICAL UNEXPECTED: Chart layout for 'status' is NOT None ({chart_layout}, type: {type(chart_layout)}), but it evaluates to FALSY. This is highly unusual and indicates a deeper issue. Cannot proceed with chart update.")
             if "status" in self.segmentation_canvases:
                  logging.warning(f"Further Diagnosis: Key 'status' IS IN self.segmentation_canvases. Value via get: {self.segmentation_canvases.get('status')}")
