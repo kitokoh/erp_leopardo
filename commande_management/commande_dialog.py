@@ -259,9 +259,7 @@ class CommandeDialog(QDialog):
                     total_ht = current_qty * current_price_ht
                     total_ttc = total_ht * (1 + current_vat_rate)
 
-                    # Ensure weight is a string
-                    weight_value = product_data.get("weight", "")
-                    self.items_table.setItem(row_pos, 5, QTableWidgetItem(str(weight_value))) # Poids
+                    self.items_table.setItem(row_pos, 5, QTableWidgetItem(product_data.get("weight", ""))) # Poids
                     self.items_table.setItem(row_pos, 6, QTableWidgetItem(product_data.get("dimensions", ""))) # Dimensions
                     self.items_table.setItem(row_pos, 7, QTableWidgetItem(product_data.get("language_code", "fr"))) # Langue Article (default fr)
 

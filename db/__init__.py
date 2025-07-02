@@ -429,35 +429,6 @@ __all__ = [
     "get_assigned_forwarders_for_client",
     "assign_forwarder_to_client",
     "unassign_forwarder_from_client",
-    # Note Management
-    "add_default_document_note",
-    "get_default_document_note",
-    "update_default_document_note",
-    "delete_default_document_note",
-    "list_default_document_notes",
-    "add_commande_document_note",
-    "get_commande_document_note",
-    "update_commande_document_note",
-    "upsert_commande_document_note",
-    "delete_commande_document_note",
-    "list_commande_document_notes_for_commande",
-    "get_effective_document_note",
 ]
 
 from .connection import get_db_connection
-
-# Notes CRUD functions
-from .cruds.notes_crud import (
-    add_default_document_note,
-    get_default_document_note,
-    update_default_document_note,
-    delete_default_document_note,
-    list_default_document_notes,
-    add_commande_document_note,
-    get_commande_document_note,
-    update_commande_document_note,
-    upsert_commande_document_note,
-    delete_commande_document_note,
-    list_commande_document_notes_for_commande,
-    get_effective_document_note,
-)

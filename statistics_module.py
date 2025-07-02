@@ -146,6 +146,7 @@ class StatisticsDashboard(QWidget):
             logging.warning("StatisticsDashboard: self.left_widget_for_map.layout() differs from self._left_map_actual_layout. Using the widget's current layout.")
             self._left_map_actual_layout = self.left_widget_for_map.layout()
 
+
         # Now, self._left_map_actual_layout is confirmed to be the layout of self.left_widget_for_map
         if self.map_view is None:
             # Parent QWebEngineView to self.left_widget_for_map.
@@ -367,38 +368,34 @@ class StatisticsDashboard(QWidget):
     def update_map(self):
         logging.info("update_map: Method entered.")
         try:
-            logging.info("update_map: About to create folium.Map object.")
-
-            # Robustly determine APP_ROOT_DIR within this module's context for asset loading
-            # Assumes statistics_module.py is in the project root directory.
+            # Robustly determine APP_ROOT_DIR
             current_module_path = os.path.abspath(__file__)
             project_root_dir_local = os.path.dirname(current_module_path)
-
             geojson_path = os.path.join(project_root_dir_local, "assets", "world_countries.geojson")
-            logging.info(f"StatisticsDashboard: Attempting to load GeoJSON from: {geojson_path}")
+            logging.info(f"update_map: Attempting to load GeoJSON from: {geojson_path}")
 
             if not os.path.exists(geojson_path):
-                logging.error(f"GeoJSON file not found at: {geojson_path}. Imported APP_ROOT_DIR was {APP_ROOT_DIR}")
-                error_message = self.tr("Les données géographiques de la carte (GeoJSON) sont introuvables. La carte ne peut pas être affichée. Veuillez vérifier l'installation de l'application ou contacter le support.")
+                logging.error(f"GeoJSON file not found at: {geojson_path}.") # Removed APP_ROOT_DIR from this log for clarity as it's not used here.
+                error_message = self.tr("Les données géographiques de la carte (GeoJSON) sont introuvables...")
                 self._set_map_error_html(error_message)
                 return
 
+            logging.info("update_map: About to create folium.Map object.")
             m = folium.Map(location=[20, 0], zoom_start=2, tiles="CartoDB positron")
-            # clients_by_country_counts = get_client_counts_by_country() # Removed redundant call
+            logging.info(f"update_map: folium.Map object created: {m}")
 
-        # try: sjlllls 
-            clients_by_country_counts = get_client_counts_by_country()
-        except Exception as db_exc:
-            logging.error(f"Database error while fetching client counts for map: {db_exc}", exc_info=True)
-            error_message = self.tr("Erreur de récupération des données statistiques pour la carte : {error_details}. L'affichage de la carte est indisponible.").format(error_details=str(db_exc))
-            self._set_map_error_html(error_message)
-            return
+            try:
+                clients_by_country_counts = get_client_counts_by_country()
+            except Exception as db_exc:
+                logging.error(f"Database error while fetching client counts for map: {db_exc}", exc_info=True)
+                error_message = self.tr("Erreur de récupération des données statistiques pour la carte : {error_details}. L'affichage de la carte est indisponible.").format(error_details=str(db_exc))
+                self._set_map_error_html(error_message)
+                return
 
+            logging.info(f"update_map: Fetched client_counts_by_country. Count: {len(clients_by_country_counts) if clients_by_country_counts else 0}")
 
-
-
-            # The rest of the map generation logic follows...
             if clients_by_country_counts:
+                logging.info("update_map: Adding client distribution GeoJson...")
                 counts_dict = {item['country_name']: item['client_count'] for item in clients_by_country_counts}
                 max_observed_clients = max(item['client_count'] for item in clients_by_country_counts) if clients_by_country_counts else 0
                 category_colors = ['#f7f7f7', '#c6dbef', '#6baed6', '#08519c']
@@ -409,17 +406,20 @@ class StatisticsDashboard(QWidget):
                     return {'fillColor': client_colormap(count), 'color': '#555555', 'weight': 0.5, 'fillOpacity': 0.7}
                 folium.GeoJson(geojson_path, name=self.tr("Distribution des Clients par Pays"), style_function=style_function, tooltip=folium.features.GeoJsonTooltip(fields=['name'], aliases=[self.tr('Pays:')], localize=True)).add_to(m)
                 client_colormap.add_to(m)
+                logging.info("update_map: Client distribution GeoJson added.")
             else:
+                logging.info("update_map: No client count data. Adding basic GeoJSON layer for choropleth.")
                 folium.GeoJson(geojson_path, name=self.tr("Pays (Base)"), tooltip=folium.features.GeoJsonTooltip(fields=['name'], aliases=[self.tr('Pays:')])).add_to(m)
-                logging.info("StatisticsDashboard: No client count data. Added basic GeoJSON layer for choropleth.")
+                logging.info("update_map: Basic GeoJSON layer added.")
 
+            logging.info("update_map: Adding popup GeoJson...")
             popup_layer = folium.GeoJson(
                 geojson_path,
                 name=self.tr("Informations Pays"),
                 style_function=lambda x: {'fillColor':'transparent', 'color':'transparent', 'weight':0},
                 tooltip=None
             )
-
+            # ... (popup generation loop remains the same) ...
             for feature in popup_layer.data.get('features', []):
                 country_name = feature.get('properties', {}).get('name', 'N/A')
                 if country_name == 'N/A': continue
@@ -459,8 +459,13 @@ class StatisticsDashboard(QWidget):
 
             popup_layer.add_child(folium.features.GeoJsonPopup(fields=['popup_content'], localize=True))
             popup_layer.add_to(m)
+            logging.info("update_map: Popup GeoJson added.")
+
             folium.LayerControl().add_to(m)
+
+            logging.info("update_map: Rendering map to HTML...")
             map_html_content = m.get_root().render()
+            logging.info(f"update_map: Map HTML rendered. Content length: {len(map_html_content) if map_html_content else 0}")
 
             webchannel_setup_js = """
             <script type="text/javascript" src="qrc:///qtwebchannel/qwebchannel.js"></script>
@@ -501,6 +506,7 @@ class StatisticsDashboard(QWidget):
 
     def _set_map_error_html(self, message: str):
         """Helper function to set an error message HTML in the map_view."""
+        logging.info(f"_set_map_error_html called. self.map_view is: {self.map_view}. Message: {message}")
         if self.map_view:
             # Basic styling for the error message
             # The button's onclick attempts to call a new method on pyMapConnector.
@@ -840,8 +846,6 @@ class StatisticsDashboard(QWidget):
         logging.debug(f"segmentation_chart_pages initialized: {self.segmentation_chart_pages}")
         logging.debug(f"segmentation_tables initialized: {self.segmentation_tables}")
 
-        logging.debug(f"segmentation_tables initialized: {self.segmentation_tables}")
-
 
     def _populate_table(self, table_key, data_fetch_func, column_keys):
         table = self.segmentation_tables.get(table_key)
@@ -878,44 +882,54 @@ class StatisticsDashboard(QWidget):
         chart_layout = page_widget.layout()
         logging.debug(f"Retrieved chart_layout from page_widget: {chart_layout} (type: {type(chart_layout)})")
 
+        chart_layout = page_widget.layout()
+        logging.debug(f"Retrieved chart_layout from page_widget: {chart_layout} (type: {type(chart_layout)})")
+
+        layout_usable = False
         if chart_layout is not None:
+            sip_available = False
+            is_deleted_by_sip = True # Assume deleted if sip check fails or sip not available
             try:
-                is_deleted = sip.isdeleted(chart_layout)
-                logging.debug(f"sip.isdeleted(chart_layout) for 'status' returned: {is_deleted}")
-                if is_deleted:
+                import sip # Ensure sip is available in this scope if not globally
+                is_deleted_by_sip = sip.isdeleted(chart_layout)
+                sip_available = True
+                logging.debug(f"sip.isdeleted(chart_layout) for 'status' returned: {is_deleted_by_sip}")
+                if is_deleted_by_sip:
                     logging.error(f"Chart layout for 'status' ({chart_layout}) C++ object IS DELETED according to sip.isdeleted().")
-                    # If sip says it's deleted, the object is unusable.
-                    # The 'elif not chart_layout:' below will likely catch this due to falsy evaluation.
-            except NameError: # If sip is not imported/available
-                logging.warning("`sip` module not available, cannot check sip.isdeleted(chart_layout).")
-            except Exception as e_sip:
-                logging.warning(f"Error calling sip.isdeleted(chart_layout): {e_sip}.")
+            except ImportError:
+                logging.warning("`sip` module could not be imported. Cannot perform sip.isdeleted() check.")
+            except Exception as e_sip: # Catch other errors from sip, like NameError if sip itself isn't found
+                logging.warning(f"Error calling or using sip.isdeleted(chart_layout): {e_sip}. Assuming layout might be unusable.")
 
-
-        if chart_layout is None:
-            logging.error(f"Chart layout for 'status' IS EXPLICITLY NONE (retrieved from page_widget.layout()). Page widget was: {page_widget}")
-            # Attempt to re-set a layout if page_widget exists but has no layout (should not happen if setup is correct)
-            if page_widget and page_widget.layout() is None: # Double check
+            if not sip_available:
+                # If sip check couldn't be done, rely on truthiness but log it.
+                if not chart_layout:
+                    logging.critical(f"CRITICAL FALLBACK: sip not available. Chart layout ({chart_layout}) evaluates to FALSY. Cannot proceed.")
+                else:
+                    logging.info("sip not available. Proceeding with chart layout as it's not None and truthy (fallback check).")
+                    layout_usable = True # Trust truthiness if sip fails
+            elif not is_deleted_by_sip:
+                logging.info(f"Chart layout for 'status' ({chart_layout}) is not None and sip.isdeleted() is False. Proceeding to use.")
+                layout_usable = True
+            else: # Is None or sip.isdeleted() is True
+                logging.error(f"Chart layout for 'status' ({chart_layout}) is unusable (None or deleted by sip). Cannot proceed.")
+        else: # chart_layout was None from page_widget.layout()
+            logging.error(f"Chart layout for 'status' is None (retrieved from page_widget.layout()). Page widget was: {page_widget}")
+            # Attempt to re-set a layout (defensive)
+            if page_widget and page_widget.layout() is None:
                 logging.warning(f"Page widget {page_widget} for 'status' exists but has no layout. Attempting to set a new QVBoxLayout.")
                 try:
-                    new_layout = QVBoxLayout(page_widget) # Set new layout on the page_widget
-                    page_widget.setLayout(new_layout) # Ensure it's set
-                    chart_layout = new_layout # Use this new layout
+                    new_layout = QVBoxLayout(page_widget)
+                    page_widget.setLayout(new_layout)
+                    chart_layout = new_layout
                     logging.info(f"Successfully set a new QVBoxLayout on page_widget for 'status': {chart_layout}")
+                    layout_usable = True # New layout should be usable
                 except Exception as e_set_layout:
                     logging.error(f"Failed to set a new layout on page_widget for 'status': {e_set_layout}", exc_info=True)
-                    return # Cannot proceed
-            else: # page_widget was None or layout() was not None initially but chart_layout became None (less likely)
-                return
+            # If still not usable, layout_usable remains False
 
-        # Check again if chart_layout is valid after potential recreation AND sip check
-        if chart_layout is None: # Could have been set to None by sip check logic if we decide to do that
-             logging.error("Chart layout for 'status' remains None even after attempting to fix or due to sip.isdeleted. Cannot proceed.")
-             return
-        elif not chart_layout:
-            logging.critical(f"CRITICAL UNEXPECTED: Chart layout for 'status' is NOT None ({chart_layout}, type: {type(chart_layout)}), but it evaluates to FALSY. This is highly unusual. Cannot proceed.")
-
-            return
+        if not layout_usable:
+            return # Exit if layout is not considered usable
 
         # Clear previous canvas if any
         while chart_layout.count():
