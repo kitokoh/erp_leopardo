@@ -16,6 +16,7 @@ from PyQt5.QtGui import QDesktopServices
 
 import db
 from db.cruds import commandes_crud # Assuming this will be created with necessary functions
+from PyQt5.QtWidgets import QDialog
 
 # Placeholder for CommandeDialog - will be in commande_dialog.py
 # from .commande_dialog import CommandeDialog
