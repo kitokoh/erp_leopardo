@@ -2279,12 +2279,62 @@ class ClientWidget(QWidget):
             self.doc_type_filter_combo.currentIndexChanged.connect(self.populate_doc_table)
             doc_filter_layout.addWidget(self.doc_type_filter_combo)
 
-            doc_filter_layout.addStretch(1) # Add stretch before the button
-            if hasattr(self, 'compile_pdf_btn'): # Ensure button was created
-                doc_filter_layout.addWidget(self.compile_pdf_btn) # Add compile PDF button here
+            # Add "Combiné" button (renaming existing compile_pdf_btn for this purpose)
+            if hasattr(self, 'compile_pdf_btn'):
+                self.combine_docs_btn = self.compile_pdf_btn # Use the existing button instance
+                self.combine_docs_btn.setText(self.tr("Combiné"))
+                self.combine_docs_btn.setIcon(QIcon.fromTheme("document-export", QIcon(":/icons/folder.svg"))) # Example icon, adjust as needed
+                self.combine_docs_btn.setToolTip(self.tr("Combiner plusieurs documents PDF"))
+                # Ensure it's connected if it wasn't, or re-verify connection:
+                # self.combine_docs_btn.clicked.connect(self.open_compile_pdf_dialog) # Already connected if compile_pdf_btn was
+                doc_filter_layout.addWidget(self.combine_docs_btn)
+            else: # Fallback if compile_pdf_btn was not created for some reason
+                self.combine_docs_btn = QPushButton(self.tr("Combiné"))
+                self.combine_docs_btn.setIcon(QIcon.fromTheme("document-export", QIcon(":/icons/folder.svg")))
+                self.combine_docs_btn.setToolTip(self.tr("Combiner plusieurs documents PDF"))
+                self.combine_docs_btn.clicked.connect(self.open_compile_pdf_dialog) # Ensure connection
+                doc_filter_layout.addWidget(self.combine_docs_btn)
+
+            # Add new "+" (Add) button
+            self.plus_add_doc_btn = QPushButton("+")
+            self.plus_add_doc_btn.setToolTip(self.tr("Ajouter un document (depuis modèle ou importation directe)"))
+            self.plus_add_doc_btn.setFixedSize(30, 30) # Make it a small square button
+        self.plus_add_doc_btn.clicked.connect(self.handle_plus_add_doc_button_click) # Connected
+            doc_filter_layout.addWidget(self.plus_add_doc_btn)
+
+            doc_filter_layout.addStretch(1) # Add stretch after all buttons
 
             docs_layout.addWidget(self.doc_filter_layout_widget)
             self.doc_filter_layout_widget.setVisible(True)
+
+    def handle_plus_add_doc_button_click(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle(self.tr("Ajouter un Document"))
+        layout = QVBoxLayout(dialog)
+
+        btn_from_template = QPushButton(self.tr("Ajouter à partir d'un modèle"))
+        btn_from_template.setIcon(QIcon(":/icons/file-plus.svg")) # Consistent icon
+        def action_from_template():
+            dialog.accept() # Close this dialog
+            self.open_create_docs_dialog() # Call existing method
+        btn_from_template.clicked.connect(action_from_template)
+        layout.addWidget(btn_from_template)
+
+        btn_direct_import = QPushButton(self.tr("Ajouter directement un document"))
+        btn_direct_import.setIcon(QIcon(":/icons/upload.svg")) # Consistent icon (assuming upload.svg exists or use another)
+        def action_direct_import():
+            dialog.accept() # Close this dialog
+            self.add_document() # Call existing method
+        btn_direct_import.clicked.connect(action_direct_import)
+        layout.addWidget(btn_direct_import)
+
+        # Add a cancel button for completeness
+        btn_cancel = QPushButton(self.tr("Annuler"))
+        btn_cancel.clicked.connect(dialog.reject)
+        layout.addWidget(btn_cancel)
+
+        dialog.setLayout(layout)
+        dialog.exec_()
             self.documents_empty_label = QLabel(self.tr("Aucun document trouvé pour ce client.\nUtilisez les boutons ci-dessous pour ajouter ou générer des documents."))
             self.documents_empty_label.setAlignment(Qt.AlignCenter)
             font_docs_empty = self.documents_empty_label.font()
@@ -2888,22 +2938,22 @@ class ClientWidget(QWidget):
         self.doc_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         docs_layout.addWidget(self.doc_table)
         doc_btn_layout = QHBoxLayout()
-        self.add_doc_btn = QPushButton(self.tr("Importer Document"))
-        self.add_doc_btn.setIcon(QIcon(":/icons/file-plus.svg"))
-        self.add_doc_btn.setToolTip(self.tr("Importer un fichier document existant pour ce client"))
-        self.add_doc_btn.clicked.connect(self.add_document) # Connect the signal
-        doc_btn_layout.addWidget(self.add_doc_btn)
+            # self.add_doc_btn = QPushButton(self.tr("Importer Document")) # Button removed
+            # self.add_doc_btn.setIcon(QIcon(":/icons/file-plus.svg"))
+            # self.add_doc_btn.setToolTip(self.tr("Importer un fichier document existant pour ce client"))
+            # self.add_doc_btn.clicked.connect(self.add_document)
+            # doc_btn_layout.addWidget(self.add_doc_btn) # Button removed
 
-        self.refresh_docs_btn = QPushButton(self.tr("Actualiser"))
-        self.refresh_docs_btn.setIcon(QIcon.fromTheme("view-refresh"))
-        self.refresh_docs_btn.clicked.connect(self.populate_doc_table)
-        doc_btn_layout.addWidget(self.refresh_docs_btn)
+            # self.refresh_docs_btn = QPushButton(self.tr("Actualiser")) # Button removed
+            # self.refresh_docs_btn.setIcon(QIcon.fromTheme("view-refresh"))
+            # self.refresh_docs_btn.clicked.connect(self.populate_doc_table)
+            # doc_btn_layout.addWidget(self.refresh_docs_btn) # Button removed
 
-        self.add_template_btn = QPushButton(self.tr("Générer via Modèle"))
-        self.add_template_btn.setIcon(QIcon.fromTheme("document-new", QIcon(":/icons/file-plus.svg"))) # Reverted
-        self.add_template_btn.setToolTip(self.tr("Générer un nouveau document pour ce client à partir d'un modèle"))
-        self.add_template_btn.clicked.connect(self.open_create_docs_dialog)
-        doc_btn_layout.addWidget(self.add_template_btn)
+            # self.add_template_btn = QPushButton(self.tr("Générer via Modèle")) # Button removed
+            # self.add_template_btn.setIcon(QIcon.fromTheme("document-new", QIcon(":/icons/file-plus.svg")))
+            # self.add_template_btn.setToolTip(self.tr("Générer un nouveau document pour ce client à partir d'un modèle"))
+            # self.add_template_btn.clicked.connect(self.open_create_docs_dialog)
+            # doc_btn_layout.addWidget(self.add_template_btn) # Button removed
         docs_layout.addLayout(doc_btn_layout)
         self.tab_widget.addTab(docs_tab, self.tr("Documents"))
 
@@ -3316,19 +3366,19 @@ class ClientWidget(QWidget):
                         try:
                             os.remove(file_path)
                             logging.info(f"File {file_path} deleted from disk.")
-                            self.notify(self.tr("Succès"), self.tr("Document et fichier supprimés avec succès."), type='SUCCESS')
+                            self.notification_manager.show(self.tr("Succès"), self.tr("Document et fichier supprimés avec succès."), type='SUCCESS')
                         except OSError as e_file:
                             logging.error(f"Error deleting file {file_path}: {e_file}", exc_info=True)
-                            self.notify(self.tr("Erreur Fichier"), self.tr("Document supprimé de la base de données, mais échec de la suppression du fichier:\n{0}").format(str(e_file)), type='ERROR')
+                            self.notification_manager.show(self.tr("Erreur Fichier"), self.tr("Document supprimé de la base de données, mais échec de la suppression du fichier:\n{0}").format(str(e_file)), type='ERROR')
                     else:
                         logging.warning(f"File path not provided or file does not exist for document ID {document_id}: {file_path}. DB entry deleted.")
-                        self.notify(self.tr("Succès (Partiel)"), self.tr("Entrée de document supprimée de la base de données. Fichier non trouvé ou chemin non spécifié."), type='WARNING')
+                        self.notification_manager.show(self.tr("Succès (Partiel)"), self.tr("Entrée de document supprimée de la base de données. Fichier non trouvé ou chemin non spécifié."), type='WARNING')
                 else:
-                    self.notify(self.tr("Erreur DB"), self.tr("Impossible de supprimer l'entrée du document de la base de données (ID: {0}). Vérifiez les logs.").format(document_id), type='ERROR')
+                    self.notification_manager.show(self.tr("Erreur DB"), self.tr("Impossible de supprimer l'entrée du document de la base de données (ID: {0}). Vérifiez les logs.").format(document_id), type='ERROR')
 
             except Exception as e:
                 logging.error(f"Error in delete_client_document_entry for doc ID {document_id}: {e}", exc_info=True)
-                self.notify(self.tr("Erreur Suppression"), self.tr("Une erreur inattendue est survenue:\n{0}").format(str(e)), type='CRITICAL')
+                self.notification_manager.show(self.tr("Erreur Suppression"), self.tr("Une erreur inattendue est survenue:\n{0}").format(str(e)), type='CRITICAL')
             finally:
                 self.populate_doc_table()
 
@@ -6880,7 +6930,7 @@ class ClientWidget(QWidget):
                 self.commandes_tab_widget.refresh_commandes()
             if hasattr(self, '_load_overview_metrics'):
                 self._load_overview_metrics()
-            self.notify(self.tr("Nouvelle Commande"), self.tr("Nouvelle commande créée/initialisée."), type='SUCCESS')
+            self.notification_manager.show(self.tr("Nouvelle Commande"), self.tr("Nouvelle commande créée/initialisée."), type='SUCCESS')
 
     def _handle_overview_new_project(self):
         client_id = self.client_info.get("client_id")
@@ -6904,7 +6954,7 @@ class ClientWidget(QWidget):
             }
             new_project_id = projects_crud.add_project(project_data)
             if new_project_id:
-                self.notify(self.tr("Projet Créé"), self.tr("Nouveau projet '{0}' créé.").format(project_name), type='SUCCESS')
+                self.notification_manager.show(self.tr("Projet Créé"), self.tr("Nouveau projet '{0}' créé.").format(project_name), type='SUCCESS')
                 # Try to refresh the main projects tab if available on DocumentManager
                 doc_manager = self._get_document_manager_instance()
                 if doc_manager and hasattr(doc_manager, 'projects_dashboard_widget_instance'):
@@ -6915,7 +6965,7 @@ class ClientWidget(QWidget):
             else:
                 QMessageBox.warning(self, self.tr("Erreur DB"), self.tr("Impossible de créer le projet."))
         else:
-            self.notify(self.tr("Annulé"), self.tr("Création de projet annulée."), type='INFO')
+            self.notification_manager.show(self.tr("Annulé"), self.tr("Création de projet annulée."), type='INFO')
 
     def _handle_overview_generate_document(self):
         if not hasattr(self, 'CreateDocumentDialog') or self.CreateDocumentDialog is None:
