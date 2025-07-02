@@ -300,8 +300,9 @@ class DocumentManager(QMainWindow):
         self.experience_management_widget_instance = None
         self.calendar_module_widget_instance = None # Calendar also lazy loaded
 
-        # HomePageWidget is fundamental, initialize it upfront and add to stack
-        self.home_page_widget_instance = HomePageWidget(main_window=self, parent=self)
+
+        self.home_page_widget_instance = HomePageWidget(main_window=self, parent=self) # Pass self as main_window
+
         self.main_area_stack.addWidget(self.home_page_widget_instance)
 
         # UserManagementPage is fundamental, initialize it upfront and add to stack
@@ -1500,24 +1501,9 @@ class DocumentManager(QMainWindow):
         logging.info("Switched to Partner Management view.")
 
     def show_statistics_view(self):
-        if not self.module_states.get('statistics', True):
-            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Statistiques est désactivé dans les paramètres."))
-            logging.info("Statistics module is disabled by settings. View not shown.")
-            return
-
-        if self.statistics_dashboard_instance is None:
-            logging.info("DocumentManager: Lazily creating StatisticsDashboard...")
-            self.statistics_dashboard_instance = StatisticsDashboard(parent=self)
-            self.statistics_dashboard_instance.request_add_client_for_country.connect(self.handle_add_client_from_stats_map)
-            self.statistics_dashboard_instance.request_view_client_details.connect(self.handle_view_client_from_stats_map)
-            self.main_area_stack.addWidget(self.statistics_dashboard_instance)
-            logging.info("DocumentManager: StatisticsDashboard instance created and added to stack.")
-            # StatisticsDashboard uses a QTimer for its initial data load, so no explicit call here.
-
-        # The rest of the original logging and verification logic can remain if needed,
-        # but the core is to ensure it's created before being set current.
         logging.info(f"Attempting to show Statistics View. Target Instance: {self.statistics_dashboard_instance} (Type: {type(self.statistics_dashboard_instance).__name__})")
-        if self.statistics_dashboard_instance: # Should always be true now if module enabled
+        if self.statistics_dashboard_instance:
+
             logging.debug(f"--- Verifying main_area_stack contents before showing Statistics View ({self.statistics_dashboard_instance}) ---")
             found_by_iteration = False
             for i in range(self.main_area_stack.count()):

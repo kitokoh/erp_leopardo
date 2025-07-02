@@ -306,7 +306,15 @@ class StatisticsDashboard(QWidget):
         self.country_stats_display_widget = CountryStatsDisplayWidget(self)
         self.stats_stack.addWidget(self.country_stats_display_widget)
         self.country_stats_display_widget.back_to_global_requested.connect(self._show_global_stats_view)
-        self.country_stats_display_widget.add_client_to_country_requested.connect(self.request_add_client_for_country) # Re-emit original signal
+        self.country_stats_display_widget.add_client_to_country_requested.connect(self.request_add_client_for_country)
+
+        # Status Client List Widget
+        self.status_client_list_widget = StatusClientListWidget(self)
+        self.stats_stack.addWidget(self.status_client_list_widget)
+        self.status_client_list_widget.back_to_global_requested.connect(self._show_global_stats_view)
+        self.status_client_list_widget.view_client_detail_requested.connect(self.request_view_client_details.emit)
+
+
 
         self.stats_stack.setCurrentWidget(self.global_stats_widget) # Show global stats by default
 
@@ -828,6 +836,48 @@ class StatisticsDashboard(QWidget):
         finally:
             table.setSortingEnabled(True)
 
+    def _on_status_chart_slice_picked(self, event):
+        logging.debug(f"Pie chart slice picked. Event: {event}, Artist: {event.artist}")
+        if not hasattr(self, 'last_pie_chart_labels') or not self.last_pie_chart_labels:
+            logging.warning("_on_status_chart_slice_picked: last_pie_chart_labels not available.")
+            return
+
+        # Find the index of the picked wedge
+        # The order of patches in axes.patches usually corresponds to the order of data slices
+        try:
+            # Ensure we're looking at the correct axes. Pie chart is typically the first/only one.
+            ax_patches = event.artist.axes.patches
+            wedge_index = ax_patches.index(event.artist)
+
+            if 0 <= wedge_index < len(self.last_pie_chart_labels):
+                status_name = self.last_pie_chart_labels[wedge_index]
+                logging.info(f"Clicked on status: {status_name} (index: {wedge_index})")
+
+                # Fetch status_id from DB
+                status_obj = get_status_setting_by_name(status_name, 'Client') # Assumes this handles DB session
+                if not status_obj:
+                    logging.error(f"Status '{status_name}' not found in DB for type 'Client'.")
+                    if hasattr(self, 'parent') and callable(self.parent) and hasattr(self.parent(), 'notify'):
+                        self.parent().notify("Erreur Données", f"Détails du statut '{status_name}' non trouvés.", "ERROR")
+                    return
+
+                status_id = status_obj['status_id']
+
+                # Fetch clients for this status_id
+                # clients_crud_instance.get_clients_by_status_id handles its own DB session via @_manage_conn
+                clients = clients_crud_instance.get_clients_by_status_id(status_id=status_id, include_deleted=False)
+
+                self.status_client_list_widget.update_display(status_name, clients)
+                self.stats_stack.setCurrentWidget(self.status_client_list_widget)
+            else:
+                logging.warning(f"Picked wedge index {wedge_index} out of bounds for labels (len: {len(self.last_pie_chart_labels)}).")
+        except ValueError:
+            logging.warning("Picked artist not found in axes patches. Cannot determine status.")
+        except Exception as e:
+            logging.error(f"Error handling pie chart pick event: {e}", exc_info=True)
+
+
+
     def _update_status_segmentation_chart(self):
         logging.debug(f"Current segmentation_chart_pages at start of _update_status_segmentation_chart: {getattr(self, 'segmentation_chart_pages', 'Not Initialized')}")
         logging.info("Updating status segmentation chart...")
@@ -947,18 +997,46 @@ class StatisticsDashboard(QWidget):
                 autopct=lambda p: '{:.1f}% ({:.0f})'.format(p, p * sum(sizes) / 100), # Show percentage and absolute count
                 startangle=90,
                 # colors=colors # Optional: apply custom colors
+                # picker=True # This might make the whole pie pickable, not individual wedges easily
             )
             ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+
+            # Make each wedge pickable
+            for wedge in wedges:
+                wedge.set_picker(True)
+                wedge.set_pickradius(5) # Adjust pick radius as needed
+
+            # Store labels for use in pick event handler
+            self.last_pie_chart_labels = labels
+
 
             # Add a legend
             # Place legend outside the pie chart to avoid overlap, adjust bbox_to_anchor as needed
             ax.legend(wedges, labels, title=self.tr("Statuts"), loc="center left", bbox_to_anchor=(1, 0, 0.5, 1))
             fig.tight_layout() # Adjust layout to make room for legend if it's outside
 
-            canvas = FigureCanvas(fig)
-            chart_layout.addWidget(canvas)
-            canvas.draw()
-            logging.info("Status segmentation chart updated successfully.")
+            # Disconnect previous canvas's pick_event if it exists and is connected
+            if hasattr(self, 'status_chart_canvas') and self.status_chart_canvas:
+                try:
+                    # Check if already connected to prevent multiple connections or errors on disconnect
+                    # This is tricky as mpl_connect returns a cid, not easy to check if a specific handler is connected.
+                    # For simplicity, we might risk disconnecting if not connected, or just connect once.
+                    # A robust way is to store the cid and disconnect using it.
+                    if hasattr(self, '_pick_event_cid') and self._pick_event_cid is not None:
+                        self.status_chart_canvas.mpl_disconnect(self._pick_event_cid)
+                        logging.debug("Disconnected old pick_event from status_chart_canvas.")
+                except Exception as e_disconnect:
+                    logging.warning(f"Could not disconnect old pick_event: {e_disconnect}")
+
+
+            self.status_chart_canvas = FigureCanvas(fig) # Store canvas as instance variable
+            self._pick_event_cid = self.status_chart_canvas.mpl_connect('pick_event', self._on_status_chart_slice_picked)
+            logging.debug(f"Connected new pick_event to status_chart_canvas with CID: {self._pick_event_cid}")
+
+            chart_layout.addWidget(self.status_chart_canvas)
+            self.status_chart_canvas.draw()
+            logging.info("Status segmentation chart updated successfully with pick events enabled.")
+
 
         except Exception as e:
             logging.error(f"Error updating status segmentation chart: {e}", exc_info=True)
@@ -1059,6 +1137,122 @@ class StatisticsSummaryWidget(QWidget):
 
     def refresh_data(self): # Public method for external refresh if needed
         self.update_summary_stats()
+
+
+class StatusClientListWidget(QWidget):
+    """
+    A widget to display a list of clients for a specific status.
+    Emits signals for 'back' and 'view_client_detail'.
+    """
+    back_to_global_requested = pyqtSignal()
+    view_client_detail_requested = pyqtSignal(str)  # Emits client_id
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("StatusClientListWidget")
+        self._init_ui()
+
+    def _init_ui(self):
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setSpacing(10)
+
+        self.title_label = QLabel("Clients par Statut") # Placeholder, updated by update_display
+        font = self.title_label.font()
+        font.setPointSize(font.pointSize() + 2)
+        font.setBold(True)
+        self.title_label.setFont(font)
+        self.title_label.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(self.title_label)
+
+        self.clients_table = QTableWidget()
+        self.clients_table.setColumnCount(4)
+        self.clients_table.setHorizontalHeaderLabels([
+            self.tr("Nom Client"), self.tr("Société"),
+            self.tr("Pays"), self.tr("Ville")
+        ])
+        self.clients_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.clients_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.clients_table.setSelectionMode(QTableWidget.SingleSelection)
+        self.clients_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.clients_table.itemSelectionChanged.connect(self._on_table_selection_changed)
+        self.clients_table.doubleClicked.connect(self._on_table_double_clicked) # Handle double click
+        main_layout.addWidget(self.clients_table)
+
+        buttons_layout = QHBoxLayout()
+        self.view_client_button = QPushButton(self.tr("Voir Fiche Client"))
+        self.view_client_button.setIcon(QIcon(":/icons/eye.svg")) # Placeholder icon
+        self.view_client_button.setEnabled(False) # Initially disabled
+        self.view_client_button.clicked.connect(self._emit_view_client_detail_signal)
+        buttons_layout.addWidget(self.view_client_button)
+
+        buttons_layout.addStretch()
+
+        self.back_button = QPushButton(self.tr("Retour aux Stats Globales"))
+        self.back_button.setIcon(QIcon(":/icons/arrow-left-circle.svg"))
+        self.back_button.clicked.connect(self.back_to_global_requested.emit)
+        buttons_layout.addWidget(self.back_button)
+
+        main_layout.addLayout(buttons_layout)
+        self.setLayout(main_layout)
+
+    def update_display(self, status_name: str, clients: list[dict]):
+        self.title_label.setText(self.tr("Clients - Statut: {0}").format(status_name))
+
+        self.clients_table.setRowCount(0) # Clear previous data
+        self.clients_table.setSortingEnabled(False) # Disable sorting during population
+
+        if not clients:
+            logging.info(f"StatusClientListWidget: No clients to display for status '{status_name}'.")
+            # Optionally, display a message in the table or a separate label
+            return
+
+        for row, client_data in enumerate(clients):
+            self.clients_table.insertRow(row)
+
+            name_item = QTableWidgetItem(client_data.get("client_name", "N/A"))
+            # Store client_id in the UserRole of the first item in the row for easy access
+            name_item.setData(Qt.UserRole, client_data.get("client_id"))
+
+            self.clients_table.setItem(row, 0, name_item)
+            self.clients_table.setItem(row, 1, QTableWidgetItem(client_data.get("company_name", "N/A")))
+            self.clients_table.setItem(row, 2, QTableWidgetItem(client_data.get("country", "N/A"))) # Assuming 'country' (name) is in client_data
+            self.clients_table.setItem(row, 3, QTableWidgetItem(client_data.get("city", "N/A"))) # Assuming 'city' (name) is in client_data
+
+        self.clients_table.setSortingEnabled(True)
+        self.view_client_button.setEnabled(False) # Disable after repopulating
+        logging.info(f"StatusClientListWidget updated for status '{status_name}' with {len(clients)} clients.")
+
+    def _on_table_selection_changed(self):
+        self.view_client_button.setEnabled(len(self.clients_table.selectedItems()) > 0)
+
+    def _emit_view_client_detail_signal(self):
+        selected_items = self.clients_table.selectedItems()
+        if selected_items:
+            # Get client_id from the first item in the selected row (stored in UserRole)
+            selected_row = selected_items[0].row()
+            client_id_item = self.clients_table.item(selected_row, 0) # Assuming client_id is on the first column's item
+            if client_id_item:
+                client_id = client_id_item.data(Qt.UserRole)
+                if client_id:
+                    self.view_client_detail_requested.emit(str(client_id))
+                else:
+                    logging.warning("StatusClientListWidget: No client_id found in selected table row's UserRole.")
+            else:
+                 logging.warning("StatusClientListWidget: First item in selected row is None, cannot get client_id.")
+
+    def _on_table_double_clicked(self, index):
+        # On double click, directly emit the view client detail signal for that row
+        client_id_item = self.clients_table.item(index.row(), 0) # Assuming client_id is on the first column's item
+        if client_id_item:
+            client_id = client_id_item.data(Qt.UserRole)
+            if client_id:
+                self.view_client_detail_requested.emit(str(client_id))
+            else:
+                logging.warning("StatusClientListWidget: No client_id found in double-clicked table row's UserRole.")
+        else:
+            logging.warning("StatusClientListWidget: First item in double-clicked row is None, cannot get client_id.")
+
 
 class CountryStatsDisplayWidget(QWidget):
     """
