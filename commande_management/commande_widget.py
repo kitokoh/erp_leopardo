@@ -16,7 +16,6 @@ from PyQt5.QtGui import QDesktopServices
 
 import db
 from db.cruds import commandes_crud # Assuming this will be created with necessary functions
-from PyQt5.QtWidgets import QDialog
 
 # Placeholder for CommandeDialog - will be in commande_dialog.py
 # from .commande_dialog import CommandeDialog
@@ -121,46 +120,14 @@ class CommandeWidget(QWidget):
                 self.commandes_table.setItem(row_idx, 0, ref_item)
 
                 date_str = commande_data.get("commande_date", "")
-                date_formatted = "N/A"
                 if date_str:
-                    # Ensure 'Z' is replaced with a timezone offset that strptime can handle if fromisoformat fails.
-                    # Python 3.6 and older might need a different approach for robust timezone parsing with strptime.
-                    # For +00:00, we can often parse it and assume UTC if %z doesn't work well.
-                    iso_date_str_for_parse = date_str.replace('Z', '+00:00')
                     try:
-                        # Try the modern way first (Python 3.7+)
-                        dt_obj = datetime.datetime.fromisoformat(iso_date_str_for_parse)
+                        dt_obj = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
                         date_formatted = dt_obj.strftime('%Y-%m-%d %H:%M')
-                    except AttributeError: # fromisoformat doesn't exist (likely Python < 3.7)
-                        try:
-                            # Fallback for older Python versions.
-                            # Need to handle the timezone part carefully.
-                            # If it ends with +00:00, strptime can sometimes handle it with %z
-                            # Let's try a common ISO format.
-                            # For "YYYY-MM-DDTHH:MM:SS+HH:MM"
-                            if '+' in iso_date_str_for_parse:
-                                # datetime.strptime in older Pythons might not fully support %z for +HH:MM
-                                # A more robust way is to parse the date/time and offset separately if needed,
-                                # but for +00:00, it's simpler.
-                                # We'll assume that if +00:00 is present, it's UTC.
-                                # Splitting and manually creating timezone is more robust if %z fails.
-                                dt_obj_naive = datetime.datetime.strptime(iso_date_str_for_parse[:-6], '%Y-%m-%dT%H:%M:%S')
-                                # This creates a naive datetime. If we know it's UTC:
-                                # dt_obj = dt_obj_naive.replace(tzinfo=datetime.timezone.utc)
-                                # However, strftime might not need tzinfo for simple formatting if we display as is.
-                                date_formatted = dt_obj_naive.strftime('%Y-%m-%d %H:%M') + " (UTC)"
-
-                            else: # No timezone information, or 'Z' was not present
-                                dt_obj = datetime.datetime.strptime(iso_date_str_for_parse, '%Y-%m-%dT%H:%M:%S')
-                                date_formatted = dt_obj.strftime('%Y-%m-%d %H:%M')
-
-                        except ValueError as ve_strptime:
-                            self.logger.warning(f"Could not parse date string '{date_str}' with strptime: {ve_strptime}")
-                            date_formatted = date_str # Fallback to original string if all parsing fails
-                    except ValueError as ve_iso:
-                        self.logger.warning(f"Could not parse date string '{date_str}' with fromisoformat: {ve_iso}")
-                        date_formatted = date_str # Fallback to original string
-
+                    except ValueError:
+                        date_formatted = date_str
+                else:
+                    date_formatted = "N/A"
                 self.commandes_table.setItem(row_idx, 1, QTableWidgetItem(date_formatted))
 
                 self.commandes_table.setItem(row_idx, 2, QTableWidgetItem(commande_data.get("description_commande", "")))

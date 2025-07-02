@@ -209,24 +209,27 @@ class ProductsCRUD(GenericCRUD):
             conditions.append("(p.is_deleted IS NULL OR p.is_deleted = 0)")
 
         if filters:
-            valid_filters = ['category', 'is_active', 'language_code', 'search_term_generic']
+            valid_filters = ['category', 'product_name', 'is_active', 'language_code', 'product_code_like'] # Added product_code_like
             for k, v in filters.items():
                 if k in valid_filters:
-                    if k == 'search_term_generic' and v:
-                        like_v = f"%{v}%"
-                        conditions.append("(p.product_name LIKE ? OR p.product_code LIKE ? OR p.description LIKE ?)")
-                        q_params.extend([like_v, like_v, like_v])
+                    if k == 'product_name':
+                        conditions.append("p.product_name LIKE ?")
+                        q_params.append(f"%{v}%")
+                    elif k == 'product_code_like': # Added handler for product_code_like
+                        conditions.append("p.product_code LIKE ?")
+                        q_params.append(f"%{v}%")
                     elif k == 'is_active':
+                        # This will now correctly use the value set by active_only if it was provided
                         conditions.append("p.is_active = ?")
-                        q_params.append(1 if bool(v) else 0)
-                    elif v is not None: # For category and language_code, if they are present
+                        q_params.append(1 if bool(v) else 0) # Ensure v is treated as boolean
+                    else:
                         conditions.append(f"p.{k} = ?")
                         q_params.append(v)
 
         if conditions:
             sql += " WHERE " + " AND ".join(conditions)
 
-        sql += " ORDER BY p.product_name COLLATE NOCASE" # Added COLLATE NOCASE for case-insensitive sorting
+        sql += " ORDER BY p.product_name"
 
         if limit is not None:
             sql += " LIMIT ? OFFSET ?"
@@ -464,27 +467,25 @@ class ProductsCRUD(GenericCRUD):
             return None # Or an empty list: []
 
     @_manage_conn
-    def get_all_products_for_selection_filtered(self, language_code: str = None, search_term: str = None, category_filter: str = None, conn: sqlite3.Connection = None, include_deleted: bool = False) -> list[dict]:
+    def get_all_products_for_selection_filtered(self, language_code: str = None, name_pattern: str = None, conn: sqlite3.Connection = None, include_deleted: bool = False) -> list[dict]:
         """
-        Retrieves products suitable for selection lists, filtered by language,
-        search term (name, code, description), and/or category.
-        Only returns a subset of fields.
+        Retrieves products suitable for selection lists (e.g., in UI dropdowns),
+        filtered by language and/or name pattern. Only returns a subset of fields.
 
         Args:
             language_code (str, optional): Language code to filter by.
-            search_term (str, optional): Term to search in product_name, product_code, or description.
-            category_filter (str, optional): Category to filter by.
+            name_pattern (str, optional): Pattern for product name or description.
             conn (sqlite3.Connection, optional): Database connection.
             include_deleted (bool, optional): If True, includes soft-deleted products.
                                               Defaults to False.
 
         Returns:
-            list[dict]: List of products with 'product_id', 'product_name', 'product_code',
-                        'description', 'base_unit_price', 'language_code'.
+            list[dict]: List of products with 'product_id', 'product_name', 'description',
+                        'base_unit_price', 'language_code'.
         """
         cursor = conn.cursor()
         params = []
-        conditions = ["p.is_active = TRUE"]
+        conditions = ["p.is_active = TRUE"] # Start with active products
 
         if not include_deleted:
             conditions.append("(p.is_deleted IS NULL OR p.is_deleted = 0)")
@@ -492,47 +493,16 @@ class ProductsCRUD(GenericCRUD):
         if language_code:
             conditions.append("p.language_code = ?")
             params.append(language_code)
+        if name_pattern:
+            conditions.append("(p.product_name LIKE ? OR p.description LIKE ?)")
+            params.extend([f"%{name_pattern}%", f"%{name_pattern}%"])
 
-        if category_filter:
-            conditions.append("p.category = ?")
-            params.append(category_filter)
-
-        if search_term:
-            like_term = f"%{search_term}%"
-            conditions.append("(p.product_name LIKE ? OR p.product_code LIKE ? OR p.description LIKE ?)")
-            params.extend([like_term, like_term, like_term])
-
-        # Select product_code as well
-        sql = f"SELECT p.product_id, p.product_name, p.product_code, p.description, p.base_unit_price, p.language_code FROM {self.table_name} p"
-        if conditions:
-            sql += f" WHERE {' AND '.join(conditions)}"
-        sql += " ORDER BY p.product_name"
-
+        sql = f"SELECT p.product_id, p.product_name, p.description, p.base_unit_price, p.language_code FROM {self.table_name} p WHERE {' AND '.join(conditions)} ORDER BY p.product_name"
         try:
             cursor.execute(sql, tuple(params))
             return [dict(row) for row in cursor.fetchall()]
         except sqlite3.Error as e:
-            logging.error(f"Error in get_all_products_for_selection_filtered (lang: {language_code}, term: {search_term}, cat: {category_filter}): {e}", exc_info=True)
-            return []
-
-    @_manage_conn
-    def get_distinct_product_categories(self, conn: sqlite3.Connection = None) -> List[str]:
-        """
-        Retrieves a list of distinct, non-empty product categories.
-
-        Args:
-            conn (sqlite3.Connection, optional): Database connection.
-
-        Returns:
-            List[str]: A list of distinct category names.
-        """
-        cursor = conn.cursor()
-        sql = f"SELECT DISTINCT category FROM {self.table_name} WHERE category IS NOT NULL AND category != '' ORDER BY category"
-        try:
-            cursor.execute(sql)
-            return [row['category'] for row in cursor.fetchall()]
-        except sqlite3.Error as e:
-            logging.error(f"Error getting distinct product categories: {e}", exc_info=True)
+            logging.error(f"Error in get_all_products_for_selection_filtered (lang: {language_code}, pattern: {name_pattern}): {e}")
             return []
 
     @_manage_conn
@@ -895,9 +865,6 @@ class ProductsCRUD(GenericCRUD):
 products_crud_instance = ProductsCRUD()
 
 # Expose methods as module-level functions
-# Ensure new/updated functions are also exposed if they are intended to be part of the public API of this module
-get_distinct_product_categories = products_crud_instance.get_distinct_product_categories # Added
-
 get_product_by_id = products_crud_instance.get_product_by_id
 add_product = products_crud_instance.add_product
 get_product_by_name = products_crud_instance.get_product_by_name

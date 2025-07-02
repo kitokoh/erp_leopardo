@@ -33,29 +33,8 @@ class ProductDialog(QDialog):
             logging.error(f"Error fetching client_info in ProductDialog: {e}") # Use logging
             self.client_info = {} # Fallback to empty dict
         self.setup_ui()
-        self._populate_category_filter() # Populate categories first
         self._set_initial_language_filter()
-        self._filter_products_by_language_and_search() # Initial load
-
-    def _populate_category_filter(self):
-        self.product_category_filter_combo.blockSignals(True)
-        self.product_category_filter_combo.clear()
-        self.product_category_filter_combo.addItem(self.tr("Toutes Catégories"), None)
-        try:
-            # Assuming db_manager or products_crud has a method to get distinct categories
-            # For now, let's assume products_crud.get_distinct_product_categories() exists
-            from db.cruds import products_crud
-            categories = products_crud.get_distinct_product_categories()
-            if categories:
-                for category_name in sorted(categories): # Sort for consistent order
-                    if category_name: # Ensure category_name is not None or empty
-                        self.product_category_filter_combo.addItem(category_name, category_name)
-        except AttributeError:
-            logging.error("products_crud.get_distinct_product_categories() not found. Category filter will be empty.")
-        except Exception as e:
-            logging.error(f"Error populating category filter: {e}", exc_info=True)
-        self.product_category_filter_combo.blockSignals(False)
-
+        self._filter_products_by_language_and_search()
 
     def _set_initial_language_filter(self):
         client_langs = None
@@ -67,47 +46,20 @@ class ProductDialog(QDialog):
                 if self.product_language_filter_combo.itemText(i)==primary_language:self.product_language_filter_combo.setCurrentText(primary_language);break
 
     def _filter_products_by_language_and_search(self):
-        self.existing_products_list.clear()
-        selected_language = self.product_language_filter_combo.currentText()
-        language_code_for_db = None if selected_language == self.tr("All") else selected_language
-
-        selected_category = self.product_category_filter_combo.currentData() # Get category from currentData
-
-        search_text = self.search_existing_product_input.text().lower()
-        # The backend will handle OR search for name, code, description with this single search_text
-
+        self.existing_products_list.clear();selected_language=self.product_language_filter_combo.currentText();language_code_for_db=None if selected_language==self.tr("All") else selected_language;search_text=self.search_existing_product_input.text().lower();name_pattern_for_db=f"%{search_text}%" if search_text else None
         try:
-            # Pass category_filter to the backend function
-            products = db_manager.get_all_products_for_selection_filtered(
-                language_code=language_code_for_db,
-                search_term=search_text if search_text else None, # Pass the raw search term
-                category_filter=selected_category
-            )
-            if products is None: products = []
-
+            products=db_manager.get_all_products_for_selection_filtered(language_code=language_code_for_db,name_pattern=name_pattern_for_db)
+            if products is None:products=[]
             for product_data in products:
-                product_name = product_data.get('product_name','N/A')
-                product_code = product_data.get('product_code', 'N/A')
-                lang_code_display = product_data.get('language_code', 'N/A')
-                description = product_data.get('description','')
-                if description is None: description = ""
-                base_unit_price = product_data.get('base_unit_price',0.0)
-                if base_unit_price is None: base_unit_price = 0.0
-
-                desc_snippet = (description[:20]+'...') if len(description)>20 else description
-                # Updated display_text to include Code and Language
-                display_text = f"{product_name} ({product_code}, {lang_code_display}) - {base_unit_price:.2f}€"
-                if desc_snippet:
-                    display_text += f" - Desc: {desc_snippet}"
-
-                item=QListWidgetItem(display_text)
-                item.setData(Qt.UserRole,product_data)
-                self.existing_products_list.addItem(item)
-        except AttributeError:
-            logging.error("db_manager.get_all_products_for_selection_filtered might not support new filters yet.", exc_info=True)
-            QMessageBox.warning(self, self.tr("Erreur Fonctionnalité"), self.tr("La recherche de produits n'a pas pu être complétée (fonctionnalité en cours de mise à jour)."))
+                product_name=product_data.get('product_name','N/A')
+                description=product_data.get('description','') # Default to empty string
+                if description is None: description = "" # Ensure description is a string
+                base_unit_price=product_data.get('base_unit_price',0.0)
+                if base_unit_price is None:base_unit_price=0.0
+                desc_snippet=(description[:30]+'...') if len(description)>30 else description;display_text=f"{product_name} (Desc: {desc_snippet}, Prix: {base_unit_price:.2f} €)"
+                item=QListWidgetItem(display_text);item.setData(Qt.UserRole,product_data);self.existing_products_list.addItem(item)
         except Exception as e:
-            logging.error(f"Error loading existing products: {e}")
+            logging.error(f"Error loading existing products: {e}") # Use logging
             QMessageBox.warning(self,self.tr("Erreur Chargement Produits"),self.tr("Impossible de charger la liste des produits existants:\n{0}").format(str(e)))
 
     def _populate_form_from_selected_product(self,item):
@@ -152,27 +104,16 @@ class ProductDialog(QDialog):
         main_layout=QVBoxLayout(self);main_layout.setSpacing(15);header_label=QLabel(self.tr("Ajouter Lignes de Produits")); header_label.setObjectName("dialogHeaderLabel"); main_layout.addWidget(header_label)
         two_columns_layout=QHBoxLayout();search_group_box=QGroupBox(self.tr("Rechercher Produit Existant"));search_layout=QVBoxLayout(search_group_box)
         self.product_language_filter_label=QLabel(self.tr("Filtrer par langue:"));search_layout.addWidget(self.product_language_filter_label);self.product_language_filter_combo=QComboBox();self.product_language_filter_combo.addItems([self.tr("All"),"fr","en","ar","tr","pt"]);self.product_language_filter_combo.currentTextChanged.connect(self._filter_products_by_language_and_search);search_layout.addWidget(self.product_language_filter_combo)
-
-        # Add Category Filter
-        self.product_category_filter_label = QLabel(self.tr("Filtrer par catégorie:"))
-        search_layout.addWidget(self.product_category_filter_label)
-        self.product_category_filter_combo = QComboBox()
-        self.product_category_filter_combo.addItem(self.tr("Toutes Catégories"), None) # All categories option
-        # TODO: Populate categories from DB in a separate method called after setup_ui
-        self.product_category_filter_combo.currentTextChanged.connect(self._filter_products_by_language_and_search) # Same slot
-        search_layout.addWidget(self.product_category_filter_combo)
-
-        self.search_existing_product_input=QLineEdit();self.search_existing_product_input.setPlaceholderText(self.tr("Rechercher par Nom, Code, Desc..."));self.search_existing_product_input.textChanged.connect(self._filter_products_by_language_and_search);search_layout.addWidget(self.search_existing_product_input)
+        self.search_existing_product_input=QLineEdit();self.search_existing_product_input.setPlaceholderText(self.tr("Tapez pour rechercher..."));self.search_existing_product_input.textChanged.connect(self._filter_products_by_language_and_search);search_layout.addWidget(self.search_existing_product_input)
         self.existing_products_list=QListWidget();self.existing_products_list.setMinimumHeight(150);self.existing_products_list.itemDoubleClicked.connect(self._populate_form_from_selected_product);search_layout.addWidget(self.existing_products_list);two_columns_layout.addWidget(search_group_box,1)
 
         input_group_box=QGroupBox(self.tr("Détails de la Ligne de Produit Actuelle (ou Produit Sélectionné)"));form_layout=QFormLayout(input_group_box);form_layout.setSpacing(10);
         self.name_input=QLineEdit();form_layout.addRow(self._create_icon_label_widget("package-x-generic",self.tr("Nom du Produit:")),self.name_input)
-        self.product_code_input = QLineEdit()
-        self.product_code_input.setToolTip(self.tr("Identifiant unique du produit (Stock Keeping Unit), requis si c'est un nouveau produit global."))
-        form_layout.addRow(self.tr("Code Produit (SKU) *:") if self.current_selected_global_product_id is None else self.tr("Code Produit (SKU):"), self.product_code_input)
-        self.description_input=QTextEdit();self.description_input.setFixedHeight(80);form_layout.addRow(self.tr("Description:"),self.description_input)
-        self.quantity_input=QDoubleSpinBox();self.quantity_input.setRange(0.01,1000000);self.quantity_input.setValue(1.0);self.quantity_input.setDecimals(2);self.quantity_input.valueChanged.connect(self._update_current_line_total_preview);form_layout.addRow(self._create_icon_label_widget("format-list-numbered",self.tr("Quantité *:")),self.quantity_input)
-        self.unit_price_input=QDoubleSpinBox();self.unit_price_input.setRange(0,10000000);self.unit_price_input.setPrefix("€ ");self.unit_price_input.setValue(0.0);self.unit_price_input.setDecimals(2);self.unit_price_input.valueChanged.connect(self._update_current_line_total_preview);form_layout.addRow(self._create_icon_label_widget("cash",self.tr("Prix Unitaire *:")),self.unit_price_input)
+        self.product_code_input = QLineEdit() # Add product_code_input
+        form_layout.addRow(self.tr("Code Produit (SKU):"), self.product_code_input) # Add to form
+        self.description_input=QTextEdit();self.description_input.setFixedHeight(80);form_layout.addRow(self.tr("Description:"),self.description_input) # QTextEdit was missing from plan
+        self.quantity_input=QDoubleSpinBox();self.quantity_input.setRange(0,1000000);self.quantity_input.setValue(0.0);self.quantity_input.valueChanged.connect(self._update_current_line_total_preview);form_layout.addRow(self._create_icon_label_widget("format-list-numbered",self.tr("Quantité:")),self.quantity_input)
+        self.unit_price_input=QDoubleSpinBox();self.unit_price_input.setRange(0,10000000);self.unit_price_input.setPrefix("€ ");self.unit_price_input.setValue(0.0);self.unit_price_input.valueChanged.connect(self._update_current_line_total_preview);form_layout.addRow(self._create_icon_label_widget("cash",self.tr("Prix Unitaire:")),self.unit_price_input)
 
         self.weight_input = QDoubleSpinBox()
         self.weight_input.setRange(0.0, 10000.0); self.weight_input.setSuffix(" kg"); self.weight_input.setDecimals(2); self.weight_input.setValue(0.0)

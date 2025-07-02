@@ -29,15 +29,8 @@ class RecruitmentDashboard(QWidget):
 
         # Add tab widget to main layout
         self.main_layout.addWidget(self.tab_widget)
-        self.tab_widget.currentChanged.connect(self.on_tab_changed)
 
         self.setLayout(self.main_layout)
-
-    def on_tab_changed(self, index):
-        # Check if the current tab is the InterviewsWidget
-        current_widget = self.tab_widget.widget(index)
-        if current_widget == self.interviews_widget:
-            self.interviews_widget.initial_load_if_needed()
 
 if __name__ == '__main__':
     from PyQt5.QtWidgets import QApplication
