@@ -66,7 +66,7 @@ def get_activity_logs(limit: int = 100, offset: int = 0, user_id_filter: str = N
 @_manage_conn
 def get_activity_logs(limit: int = 100, offset: int = 0, user_id_filter: str = None, related_client_id_filter: str = None, conn: sqlite3.Connection = None) -> list[dict]:
     cursor = conn.cursor()
-    sql = "SELECT al.*, u.username FROM ActivityLogs al LEFT JOIN Users u ON al.user_id = u.user_id" # Join with Users to get username
+    sql = "SELECT al.*, u.username FROM ActivityLog al LEFT JOIN Users u ON al.user_id = u.user_id" # Join with Users to get username
     filters_clauses = []
     params = []
 
