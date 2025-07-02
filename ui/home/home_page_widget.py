@@ -101,6 +101,7 @@ class HomePageWidget(QWidget):
         row, col = 0, 0
         num_columns = 4 # Changed from 3 to 4 to ensure max 3 rows for 11 buttons (4-4-3)
 
+
         for i, module_data in enumerate(self.modules):
             button = QPushButton(module_data["name"])
             button.setObjectName(module_data["object_name"])

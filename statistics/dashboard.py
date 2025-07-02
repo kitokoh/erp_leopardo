@@ -315,6 +315,7 @@ class StatisticsDashboard(QWidget):
         self.status_client_list_widget.view_client_detail_requested.connect(self.request_view_client_details.emit)
 
 
+
         self.stats_stack.setCurrentWidget(self.global_stats_widget) # Show global stats by default
 
     def _show_global_stats_view(self):
@@ -876,6 +877,7 @@ class StatisticsDashboard(QWidget):
             logging.error(f"Error handling pie chart pick event: {e}", exc_info=True)
 
 
+
     def _update_status_segmentation_chart(self):
         logging.debug(f"Current segmentation_chart_pages at start of _update_status_segmentation_chart: {getattr(self, 'segmentation_chart_pages', 'Not Initialized')}")
         logging.info("Updating status segmentation chart...")
@@ -1007,6 +1009,7 @@ class StatisticsDashboard(QWidget):
             # Store labels for use in pick event handler
             self.last_pie_chart_labels = labels
 
+
             # Add a legend
             # Place legend outside the pie chart to avoid overlap, adjust bbox_to_anchor as needed
             ax.legend(wedges, labels, title=self.tr("Statuts"), loc="center left", bbox_to_anchor=(1, 0, 0.5, 1))
@@ -1033,6 +1036,7 @@ class StatisticsDashboard(QWidget):
             chart_layout.addWidget(self.status_chart_canvas)
             self.status_chart_canvas.draw()
             logging.info("Status segmentation chart updated successfully with pick events enabled.")
+
 
         except Exception as e:
             logging.error(f"Error updating status segmentation chart: {e}", exc_info=True)
@@ -1248,6 +1252,7 @@ class StatusClientListWidget(QWidget):
                 logging.warning("StatusClientListWidget: No client_id found in double-clicked table row's UserRole.")
         else:
             logging.warning("StatusClientListWidget: First item in double-clicked row is None, cannot get client_id.")
+
 
 class CountryStatsDisplayWidget(QWidget):
     """

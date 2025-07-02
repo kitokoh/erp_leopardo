@@ -62,7 +62,19 @@ class CandidatesWidget(QWidget):
         self.setLayout(self.main_layout)
 
         self.update_action_buttons_state()
-        self.load_job_openings_into_filter() # This will trigger load_candidates via currentIndexChanged
+        # self.load_job_openings_into_filter() # This will trigger load_candidates via currentIndexChanged
+
+    def load_initial_data(self):
+        """Loads initial data for the widget, typically called when it becomes visible."""
+        # This method now encapsulates the original data loading steps from __init__
+        if not self.job_filter_combo.count(): # Load only if not already populated
+            self.load_job_openings_into_filter()
+        else:
+            # If already populated, ensure candidates for current selection are loaded
+            # This might be redundant if load_job_openings_into_filter already triggers it,
+            # but good for robustness if widget is shown/hidden multiple times.
+            self.load_candidates()
+
 
     def load_job_openings_into_filter(self):
         try:
