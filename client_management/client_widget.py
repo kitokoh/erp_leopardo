@@ -5961,14 +5961,48 @@ class ClientWidget(QWidget):
                 # distributor_specific_info is also part of updated_client_full_info now
                 # Other fields like client_name, company_name, notes etc. are directly from updated_client_full_info
 
-            self.populate_details_layout() # Rebuild display view, which calls toggle_distributor_info_visibility
+            # ---- Restore details_layout to display mode ----
+            # 1. Clear current edit widgets from details_layout
+            #    (switchTo_edit_client_view already cleared the original display widgets)
+            #    Now, clear the edit widgets that were added.
+            while self.details_layout.rowCount() > 0:
+                self.details_layout.removeRow(0)
+
+            # 2. Delete the edit widgets themselves to free resources
+            for widget_key in list(self.edit_widgets.keys()): # Iterate over keys for safe deletion
+                widget = self.edit_widgets.pop(widget_key)
+                if isinstance(widget, QWidget):
+                    widget.deleteLater()
+            # self.edit_widgets.clear() # Already cleared by popping
+
+            # 3. Re-add the persistent display widgets to details_layout
+            #    These are instance members created in setup_ui.
+            self.details_layout.addRow(self.project_id_label, self.project_id_value_label)
+            self.details_layout.addRow(self.country_city_label, self.country_city_widget)
+            self.details_layout.addRow(self.price_date_label, self.price_date_widget)
+            # self.status_category_widget contains self.status_combo. Ensure self.status_combo is valid.
+            # If self.status_combo was logging as None, it implies it might have been deleted.
+            # This should not happen if it's an instance member and its parent (status_category_widget) is also an instance member
+            # and not deleted.
+            if not hasattr(self, 'status_combo') or not self.status_combo: # Defensive check
+                logging.warning("self.status_combo is invalid before re-adding to layout. Recreating.")
+                self.status_combo = QComboBox() # Recreate if it was somehow lost
+                # This new combo needs to be put back into self.status_category_widget's layout
+                # This part is tricky if status_category_widget's layout was also cleared.
+                # For now, assume status_category_widget's internal layout and self.status_combo instance are intact from setup_ui.
+            self.details_layout.addRow(self.status_category_label, self.status_category_widget)
+            self.details_layout.addRow(self.distributor_info_label_static, self.distributor_info_value_label)
+            self.details_layout.addRow(self.need_label_static, self.need_value_label)
+            self.details_layout.addRow(self.folder_label_static, self.folder_value_label)
+            self.details_layout.addRow(self.created_by_label_static, self.created_by_value_label)
+            # ---- End restore ----
+
+            self.populate_details_layout() # Now this will update the re-added persistent widgets
             self.header_label.setText(f"<h2>{self.client_info.get('client_name', '')}</h2>") # Update header
 
             # Reconnect signals that were disconnected for edit mode
             self.notes_edit.textChanged.connect(self.save_client_notes)
             self.status_combo.currentTextChanged.connect(self.update_client_status)
-            # No need to reconnect category textChanged for distributor info visibility in display mode,
-            # as populate_details_layout handles it.
 
             self.update_sav_tab_visibility() # Update SAV tab based on potentially changed status
 
