@@ -206,6 +206,12 @@ class ClientWidget(QWidget):
             self.archive_client_btn.clicked.connect(self.handle_archive_client) # Connect to the new handler
             action_layout.addWidget(self.archive_client_btn)
 
+            self.mark_distributor_btn = QPushButton(self.tr("Gérer Statut Distributeur"))
+            self.mark_distributor_btn.setIcon(QIcon(":/icons/business.svg")) # Placeholder icon
+            self.mark_distributor_btn.setToolTip(self.tr("Marquer/Démarquer ce client comme distributeur et gérer les informations associées."))
+            self.mark_distributor_btn.clicked.connect(self.handle_mark_distributor)
+            action_layout.addWidget(self.mark_distributor_btn)
+
             info_container_layout.addLayout(action_layout)
 
             # Create the internal QTabWidget
@@ -675,6 +681,18 @@ class ClientWidget(QWidget):
             self.edit_save_client_btn.setEnabled(can_edit_full or can_edit_basic)
         if hasattr(self, 'send_whatsapp_btn'): # Assuming this is contact related
             self.send_whatsapp_btn.setEnabled(can_manage_contacts)
+
+        if hasattr(self, 'mark_distributor_btn'):
+            # Use P_EDIT_CLIENT_FULL for now, can be a more specific permission later
+            self.mark_distributor_btn.setEnabled(can_edit_full)
+
+        # Client Archival Button
+        if hasattr(self, 'archive_client_btn'):
+            # P_ARCHIVE_CLIENT is a new permission, ensure it's defined in auth/permissions.py
+            # and assigned to roles as needed. For now, let's use P_EDIT_CLIENT_FULL as a fallback.
+            can_archive = has_permission(role_name, P_ARCHIVE_CLIENT) or can_edit_full
+            self.archive_client_btn.setEnabled(can_archive)
+
 
         # Status ComboBox
         if hasattr(self, 'status_combo'):
@@ -6152,31 +6170,32 @@ class ClientWidget(QWidget):
 
         try:
             client_status_id = self.client_info.get('status_id')
-            if client_status_id is None: # If client has no status_id, assume SAV not applicable
+            if client_status_id is None:
                 self.tab_widget.setTabEnabled(self.sav_tab_index, False)
+                logging.debug("SAV tab disabled: Client has no status_id.")
                 return
 
-            vendu_status_info = db_manager.get_status_setting_by_name('Vendu', 'Client')
-            if not vendu_status_info:
-                self.tab_widget.setTabEnabled(self.sav_tab_index, False) # Vendu status not found
-                print("Warning: 'Vendu' status not found in database settings for SAV tab visibility.")
+            # Fetch the "Client SAV" status details
+            sav_status_info = db_manager.get_status_setting_by_name('Client SAV', 'Client')
+            if not sav_status_info:
+                self.tab_widget.setTabEnabled(self.sav_tab_index, False)
+                logging.warning("SAV tab disabled: 'Client SAV' status not found in database settings.")
                 return
 
-            vendu_status_id = vendu_status_info.get('status_id')
+            sav_status_id = sav_status_info.get('status_id')
 
-            if client_status_id == vendu_status_id:
+            if client_status_id == sav_status_id:
                 self.tab_widget.setTabEnabled(self.sav_tab_index, True)
-                self.load_purchase_history_table() # Load data when tab becomes visible
+                self.load_purchase_history_table()
+                self.load_sav_tickets_table() # Also load tickets when tab is enabled
+                logging.info(f"SAV tab enabled for client {self.client_info.get('client_id')} (Status: Client SAV).")
             else:
                 self.tab_widget.setTabEnabled(self.sav_tab_index, False)
+                logging.debug(f"SAV tab disabled for client {self.client_info.get('client_id')}. Client status ID {client_status_id} is not 'Client SAV' (ID: {sav_status_id}).")
         except Exception as e:
-            print(f"Error updating SAV tab visibility: {e}")
+            logging.error(f"Error updating SAV tab visibility: {e}", exc_info=True)
             if hasattr(self, 'sav_tab_index') and self.sav_tab_index >=0 :
                  self.tab_widget.setTabEnabled(self.sav_tab_index, False) # Disable on error
-
-        # Ensure tickets table is loaded if tab is now enabled
-        if self.tab_widget.isTabEnabled(self.sav_tab_index):
-            self.load_sav_tickets_table()
 
     def eventFilter(self, obj, event):
         if obj is self.notes_edit:
