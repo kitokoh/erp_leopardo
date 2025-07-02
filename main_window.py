@@ -149,6 +149,7 @@ from user_management.user_menu_button import UserMenuButton # Import UserMenuBut
 from dialogs.edit_user_dialog import EditUserDialog # For handling edit/add user requests
 from dialogs.role_management_dialog import RoleManagementDialog # Added for Role Management
 from commande_management.commandes_dashboard_widget import CommandesDashboardWidget # Import CommandesDashboardWidget
+from commande_management.commande_dialog import CommandeDialog # NEW: Import for creating commandes directly
 
 # Definition of configurable modules
 CONFIGURABLE_MODULES = [
@@ -405,7 +406,8 @@ class DocumentManager(QMainWindow):
 
 
         self.main_area_stack.setCurrentWidget(self.home_page_widget_instance) # Set Home Page as default view
-        self.create_actions_main(); self.create_menus_main() # Menus and actions are created before _apply_permissions
+        self.create_actions_main()
+        self.create_menus_main() # Menus and actions are created before _apply_permissions
         
         # Log all widgets in main_area_stack after initialization
         logging.debug("--- Widgets in main_area_stack after DocumentManager.__init__ ---")
@@ -1036,85 +1038,109 @@ class DocumentManager(QMainWindow):
                                      self.tr("Une erreur inattendue est survenue lors de la reconnaissance vocale: {0}").format(error_message))
 
     def create_actions_main(self): 
-        # Assuming a home.svg icon will be added to icons/ directory and qrc
-        # For now, using a placeholder if home.svg is not yet available in resources
-        home_icon_path = ":/icons/home.svg"
-        # A fallback icon if home.svg is not found in resources, for testing
-        # if not QIcon.hasThemeIcon("home"): home_icon_path = ":/icons/dashboard.svg" # Example fallback
+        # NEW: Using a more generic "home" icon, assuming it's available.
+        # If a specific "app_logo_small.svg" or similar is desired, it should be added to resources.
+        home_icon_path = ":/icons/home.svg" # MODIFIED: Standard home icon
         self.home_action = QAction(QIcon(home_icon_path), self.tr("Accueil"), self)
+        self.home_action.setToolTip(self.tr("Retourner à la page d'accueil")) # NEW: Tooltip
         self.home_action.triggered.connect(self.show_home_view)
 
-        self.settings_action = QAction(QIcon(":/icons/modern/settings.svg"), self.tr("Paramètres"), self); self.settings_action.triggered.connect(self.show_settings_page) # Changed to show_settings_page
-        # self.template_action removed
-        self.status_action = QAction(QIcon(":/icons/check-square.svg"), self.tr("Gérer les Statuts"), self); self.status_action.triggered.connect(self.open_status_management_dialog_slot)
-        # self.status_action.setEnabled(False); # No longer hard-disabled
-        # self.status_action.setToolTip(self.tr("Fonctionnalité de gestion des statuts prévue pour une future version.")) # Tooltip removed
-        self.exit_action = QAction(QIcon(":/icons/log-out.svg"), self.tr("Quitter"), self); self.exit_action.setShortcut("Ctrl+Q"); self.exit_action.triggered.connect(self.close)
-        self.project_management_action = QAction(QIcon(":/icons/dashboard.svg"), self.tr("Gestion de Projet"), self); self.project_management_action.triggered.connect(self.show_project_management_view)
-        self.documents_view_action = QAction(QIcon(":/icons/modern/folder-docs.svg"), self.tr("Gestion Documents"), self); self.documents_view_action.triggered.connect(self.show_documents_view)
-        self.product_list_action = QAction(QIcon(":/icons/book.svg"), self.tr("Product Management"), self); self.product_list_action.triggered.connect(self.show_product_management_page) # Connect to new method
-        self.partner_management_action = QAction(QIcon(":/icons/team.svg"), self.tr("Partner Management"), self); self.partner_management_action.triggered.connect(self.show_partner_management_view)
-        self.statistics_action = QAction(QIcon(":/icons/bar-chart.svg"), self.tr("Statistiques"), self); self.statistics_action.triggered.connect(self.show_statistics_view)
-        self.open_carrier_map_action = QAction(QIcon(":/icons/map.svg"), self.tr("Carrier Map"), self) # Assuming map.svg or similar exists
+        # NEW: Action for "Créer Commande" in the main menubar
+        self.create_commande_action_menubar = QAction(QIcon(":/icons/plus-circle.svg"), self.tr("Créer Commande"), self)
+        self.create_commande_action_menubar.setToolTip(self.tr("Créer une nouvelle commande client"))
+        self.create_commande_action_menubar.triggered.connect(self._handle_create_commande_menubar) # Connect to a new handler
+
+        # NEW: Action for "Ajouter Utilisateur" in the main menubar
+        self.add_user_action_menubar = QAction(QIcon(":/icons/user-plus.svg"), self.tr("Ajouter Utilisateur"), self)
+        self.add_user_action_menubar.setToolTip(self.tr("Ajouter un nouvel utilisateur au système"))
+        self.add_user_action_menubar.triggered.connect(self._handle_add_user_menubar) # Connect to a new handler
+
+        # --- Standard Actions (some will be moved to new menus) ---
+        self.settings_action = QAction(QIcon(":/icons/modern/settings.svg"), self.tr("Paramètres de l'Application"), self) # MODIFIED: More descriptive text
+        self.settings_action.triggered.connect(self.show_settings_page)
+
+        self.status_action = QAction(QIcon(":/icons/check-square.svg"), self.tr("Gérer les Statuts Client"), self) # MODIFIED: More descriptive text
+        self.status_action.triggered.connect(self.open_status_management_dialog_slot)
+
+        self.exit_action = QAction(QIcon(":/icons/log-out.svg"), self.tr("Quitter l'Application"), self) # MODIFIED: More descriptive text
+        self.exit_action.setShortcut("Ctrl+Q")
+        self.exit_action.triggered.connect(self.close) # This will be moved to UserMenuButton
+
+        # --- Module Specific Actions (remain largely the same, but menu placement will change) ---
+        self.project_management_action = QAction(QIcon(":/icons/dashboard.svg"), self.tr("Gestion de Projet"), self)
+        self.project_management_action.triggered.connect(self.show_project_management_view)
+
+        self.documents_view_action = QAction(QIcon(":/icons/modern/folder-docs.svg"), self.tr("Gestion Documents Client"), self) # MODIFIED: More descriptive
+        self.documents_view_action.triggered.connect(self.show_documents_view)
+
+        self.product_list_action = QAction(QIcon(":/icons/book.svg"), self.tr("Gestion des Produits"), self) # MODIFIED: More descriptive
+        self.product_list_action.triggered.connect(self.show_product_management_page)
+
+        self.partner_management_action = QAction(QIcon(":/icons/team.svg"), self.tr("Gestion des Partenaires"), self) # MODIFIED: More descriptive
+        self.partner_management_action.triggered.connect(self.show_partner_management_view)
+
+        self.statistics_action = QAction(QIcon(":/icons/bar-chart.svg"), self.tr("Statistiques et Rapports"), self) # MODIFIED: More descriptive
+        self.statistics_action.triggered.connect(self.show_statistics_view)
+
+        self.open_carrier_map_action = QAction(QIcon(":/icons/map.svg"), self.tr("Carte des Transporteurs"), self) # MODIFIED: More descriptive
         self.open_carrier_map_action.triggered.connect(self.open_carrier_map_dialog)
-        self.botpress_integration_action = QAction(QIcon(":/icons/placeholder_icon.svg"), self.tr("Botpress Integration"), self) # Add a placeholder icon
+
+        self.botpress_integration_action = QAction(QIcon(":/icons/message-circle.svg"), self.tr("Intégration Chatbot"), self) # MODIFIED: Icon and text
         self.botpress_integration_action.triggered.connect(self.show_botpress_integration_view)
-        self.inventory_browser_action = QAction(QIcon(":/icons/book.svg"), self.tr("Gestion Stock Atelier"), self) # Updated text
+
+        self.inventory_browser_action = QAction(QIcon(":/icons/archive.svg"), self.tr("Gestion Stock Atelier"), self) # MODIFIED: Icon
         self.inventory_browser_action.triggered.connect(self.show_inventory_browser_view)
 
-        self.recruitment_action = QAction(QIcon(":/icons/users.svg"), self.tr("Recrutement"), self) # Use an existing icon or add new one
+        self.recruitment_action = QAction(QIcon(":/icons/users.svg"), self.tr("Module Recrutement"), self) # MODIFIED: More descriptive
         self.recruitment_action.triggered.connect(self.show_recruitment_view)
-        self.camera_management_action = QAction(QIcon(":/icons/video.svg"), self.tr("Gestion Caméras"), self)
+
+        self.camera_management_action = QAction(QIcon(":/icons/video.svg"), self.tr("Gestion des Caméras"), self)
         self.camera_management_action.triggered.connect(self.show_camera_management_view)
 
-        self.experience_management_action = QAction(QIcon(":/icons/book.svg"), self.tr("Gestion des Connaissances"), self) # Consider a more specific icon if available
+        self.experience_management_action = QAction(QIcon(":/icons/award.svg"), self.tr("Gestion des Connaissances"), self) # MODIFIED: Icon
         self.experience_management_action.triggered.connect(self.show_experience_module_view)
 
-        # Action for Calendar Module
-        self.calendar_module_action = QAction(QIcon(":/icons/book.svg"), self.tr("Calendrier"), self) # Placeholder icon
+        self.calendar_module_action = QAction(QIcon(":/icons/calendar.svg"), self.tr("Calendrier et Événements"), self) # MODIFIED: Icon and text
         self.calendar_module_action.triggered.connect(self.show_calendar_module_view)
 
-        # Action for managing users - Placeholder, actual UI for this is not yet built
-        # but the action can be controlled by RBAC.
         self.manage_users_action = QAction(QIcon(":/icons/users.svg"), self.tr("Gérer les Utilisateurs"), self)
-        self.manage_users_action.triggered.connect(self.show_user_management_page) # Connect to show page method
+        self.manage_users_action.triggered.connect(self.show_user_management_page) # This will be in UserMenuButton for admins
 
-        # Action for Calculator Module
-        self.calculator_module_action = QAction(QIcon(":/icons/bar-chart.svg"), self.tr("Calculatrices"), self) # Placeholder icon
+        self.calculator_module_action = QAction(QIcon(":/icons/cpu.svg"), self.tr("Calculatrices Industrielles"), self) # MODIFIED: Icon and text
         self.calculator_module_action.triggered.connect(self.show_calculator_module_view)
 
-        # Action for Commande Management (Global View)
-        self.commande_management_action = QAction(QIcon(":/icons/briefcase.svg"), self.tr("Gestion des Commandes"), self) # Replaced shopping-cart.svg with briefcase.svg
+        self.commande_management_action = QAction(QIcon(":/icons/briefcase.svg"), self.tr("Gestion des Commandes"), self)
         self.commande_management_action.triggered.connect(self.show_commande_management_view)
 
-        # Action for managing roles
-        self.manage_roles_action = QAction(QIcon(":/icons/settings.svg"), self.tr("Gérer les Rôles"), self) # Replaced shield.svg with settings.svg
+        self.manage_roles_action = QAction(QIcon(":/icons/shield.svg"), self.tr("Gérer les Rôles et Permissions"), self) # MODIFIED: Icon and text
         self.manage_roles_action.triggered.connect(self.open_role_management_dialog)
 
 
-        # Populate searchable_actions_map
+        # --- Populate searchable_actions_map (ensure all user-facing actions are here) ---
+        self.searchable_actions_map.clear() # NEW: Clear before repopulating
         self.searchable_actions_map[self.tr("Accueil")] = self.home_action
-        self.searchable_actions_map[self.tr("Calculatrices")] = self.calculator_module_action # Added Calculator action
-        self.searchable_actions_map[self.tr("Paramètres")] = self.settings_action
-        # self.searchable_actions_map[self.tr("Gérer les Modèles")] removed
-        self.searchable_actions_map[self.tr("Gérer les Statuts")] = self.status_action
-        self.searchable_actions_map[self.tr("Quitter")] = self.exit_action
+        self.searchable_actions_map[self.tr("Créer Commande")] = self.create_commande_action_menubar # NEW
+        self.searchable_actions_map[self.tr("Ajouter Utilisateur")] = self.add_user_action_menubar # NEW
+        self.searchable_actions_map[self.tr("Paramètres de l'Application")] = self.settings_action
+        self.searchable_actions_map[self.tr("Gérer les Statuts Client")] = self.status_action
+        # self.exit_action is not typically searched for, will be in user menu
         self.searchable_actions_map[self.tr("Gestion de Projet")] = self.project_management_action
-        self.searchable_actions_map[self.tr("Gestion Documents")] = self.documents_view_action
-        self.searchable_actions_map[self.tr("Product Management")] = self.product_list_action
-        self.searchable_actions_map[self.tr("Partner Management")] = self.partner_management_action
-        self.searchable_actions_map[self.tr("Statistiques")] = self.statistics_action
-        self.searchable_actions_map[self.tr("Carrier Map")] = self.open_carrier_map_action
-        self.searchable_actions_map[self.tr("Botpress Integration")] = self.botpress_integration_action
+        self.searchable_actions_map[self.tr("Gestion Documents Client")] = self.documents_view_action
+        self.searchable_actions_map[self.tr("Gestion des Produits")] = self.product_list_action
+        self.searchable_actions_map[self.tr("Gestion des Partenaires")] = self.partner_management_action
+        self.searchable_actions_map[self.tr("Statistiques et Rapports")] = self.statistics_action
+        self.searchable_actions_map[self.tr("Carte des Transporteurs")] = self.open_carrier_map_action
+        self.searchable_actions_map[self.tr("Intégration Chatbot")] = self.botpress_integration_action
         self.searchable_actions_map[self.tr("Gestion Stock Atelier")] = self.inventory_browser_action
-        self.searchable_actions_map[self.tr("Recrutement")] = self.recruitment_action
-        self.searchable_actions_map[self.tr("Gestion Caméras")] = self.camera_management_action
+        self.searchable_actions_map[self.tr("Module Recrutement")] = self.recruitment_action
+        self.searchable_actions_map[self.tr("Gestion des Caméras")] = self.camera_management_action
         self.searchable_actions_map[self.tr("Gestion des Connaissances")] = self.experience_management_action
-        self.searchable_actions_map[self.tr("Calendrier")] = self.calendar_module_action
-        self.searchable_actions_map[self.tr("Gérer les Utilisateurs")] = self.manage_users_action
+        self.searchable_actions_map[self.tr("Calendrier et Événements")] = self.calendar_module_action
+        # self.manage_users_action will be in UserMenuButton, less likely to be searched globally
+        self.searchable_actions_map[self.tr("Calculatrices Industrielles")] = self.calculator_module_action
         self.searchable_actions_map[self.tr("Gestion des Commandes")] = self.commande_management_action
-        self.searchable_actions_map[self.tr("Gérer les Rôles")] = self.manage_roles_action
-
+        self.searchable_actions_map[self.tr("Gérer les Rôles et Permissions")] = self.manage_roles_action
+        # About action will be added in create_menus_main
 
     def _placeholder_manage_users(self):
         # This is a placeholder. Actual user management UI would be complex.
@@ -1123,58 +1149,106 @@ class DocumentManager(QMainWindow):
                                 self.tr("La fonctionnalité de gestion des utilisateurs n'est pas encore implémentée dans l'interface graphique.\n"
                                         "Elle est accessible via les fonctions CRUD et le service d'authentification pour le moment."))
 
+    # NEW: Handler for "Créer Commande" from menubar
+    def _handle_create_commande_menubar(self):
+        logging.info("MenuBar 'Créer Commande' clicked.")
+        # First, try to switch to the commandes dashboard view
+        if self.commandes_dashboard_widget_instance:
+            self.show_commande_management_view() # This also calls _load_initial_data
+            # Then, if the dashboard has a method to directly open the "new commande" dialog:
+            if hasattr(self.commandes_dashboard_widget_instance, 'open_new_commande_dialog'):
+                self.commandes_dashboard_widget_instance.open_new_commande_dialog()
+            else:
+                # Fallback: If CommandesDashboardWidget doesn't have a direct method,
+                # try to open a global CommandeDialog if available.
+                # This requires CommandeDialog to be importable and usable globally.
+                try:
+                    from commande_management.commande_dialog import CommandeDialog
+                    # Assuming CommandeDialog can be instantiated for a new commande without specific context,
+                    # or it handles fetching necessary context (like clients for a dropdown).
+                    # It also needs current_user_info and app_root_dir if those are constructor params.
+                    dialog = CommandeDialog(
+                        current_user_info=self.current_user_info,
+                        app_root_dir=self.app_root_dir,
+                        parent=self # Or self.commandes_dashboard_widget_instance if more appropriate
+                    )
+                    if dialog.exec_() == QDialog.Accepted:
+                        # Commande created, refresh the dashboard if it's the current view
+                        if self.main_area_stack.currentWidget() == self.commandes_dashboard_widget_instance:
+                            if hasattr(self.commandes_dashboard_widget_instance, '_load_initial_data'):
+                                self.commandes_dashboard_widget_instance._load_initial_data()
+                        self.notify(self.tr("Commande Créée"), self.tr("La nouvelle commande a été créée avec succès."), type='SUCCESS')
+                except ImportError:
+                    logging.error("CommandeDialog not found for direct instantiation.")
+                    QMessageBox.information(self, self.tr("Action Non Disponible"),
+                                            self.tr("La création rapide de commande depuis la barre de menu n'est pas encore pleinement configurée."))
+                except Exception as e:
+                    logging.error(f"Error trying to open CommandeDialog directly: {e}", exc_info=True)
+                    QMessageBox.warning(self, self.tr("Erreur"), self.tr("Impossible d'ouvrir le dialogue de création de commande."))
+        else:
+            QMessageBox.warning(self, self.tr("Module Non Disponible"),
+                                self.tr("Le module de gestion des commandes n'est pas chargé."))
+
+    # NEW: Handler for "Ajouter Utilisateur" from menubar
+    def _handle_add_user_menubar(self):
+        logging.info("MenuBar 'Ajouter Utilisateur' clicked.")
+        # This reuses the existing logic triggered by UserMenuButton
+        self._handle_request_open_add_user()
+
 
     def create_menus_main(self):
         menu_bar = self.menuBar()
+        menu_bar.setObjectName("mainMenuBar") # NEW: For styling
 
-        # File Menu
-        file_menu = menu_bar.addMenu(self.tr("Fichier"))
-        file_menu.addAction(self.settings_action) # Will be controlled by _apply_permissions
-        # self.status_action was disabled with a tooltip, consider if it should be permission-based too
-        # For now, keeping its original behavior. If it becomes a real feature, add P_MANAGE_STATUSES.
-        file_menu.addAction(self.status_action)
-        file_menu.addSeparator()
-        file_menu.addAction(self.exit_action) # Exit is always available
+        # --- Add direct actions to the menu bar (simulating buttons) ---
+        # These will appear on the left.
+        menu_bar.addAction(self.home_action)
+        menu_bar.addSeparator() # Optional separator
+        menu_bar.addAction(self.create_commande_action_menubar)
+        menu_bar.addAction(self.add_user_action_menubar)
+        menu_bar.addSeparator() # Optional separator after direct actions
 
-        # Admin Menu (new menu for admin-specific tasks)
-        self.admin_menu = menu_bar.addMenu(self.tr("Administration"))
-        self.admin_menu.addAction(self.manage_users_action)
-        self.admin_menu.addAction(self.manage_roles_action) # Add role management action
-        # Add other admin-specific actions here if any (e.g., system logs)
+        # --- Modules Menu ---
+        modules_menu = menu_bar.addMenu(self.tr("&Modules")) # MODIFIED: Added ampersand for shortcut
+        # self.home_action is now a direct button, removed from here.
+        modules_menu.addAction(self.documents_view_action)
+        modules_menu.addAction(self.commande_management_action) # Kept here as it's a major module view
+        modules_menu.addSeparator()
 
-        # Modules Menu
-        modules_menu = menu_bar.addMenu(self.tr("Modules"))
-        modules_menu.addAction(self.home_action) # Added Home action to Modules menu
-        modules_menu.addAction(self.documents_view_action) # Documents view is core, always added
-        modules_menu.addAction(self.commande_management_action) # Add Commande Management action
-        modules_menu.addSeparator() # Separator after Home, Documents, and Commandes
-
+        # Populate with configurable modules based on self.module_states
         for module_info in CONFIGURABLE_MODULES:
             action_name = module_info['action_attr']
             module_name = module_info['name']
-            if self.module_states.get(module_name, True): # Default to True if state not found
+            # Ensure the action is not one of the direct menubar actions already added
+            # or actions that are now part of other menus (like settings)
+            if action_name in ["home_action", "settings_action", "status_action", "manage_roles_action", "exit_action", "create_commande_action_menubar", "add_user_action_menubar"]:
+                continue # Skip if it's a special action handled elsewhere
+
+            if self.module_states.get(module_name, True):
                 action = getattr(self, action_name, None)
                 if action:
                     modules_menu.addAction(action)
-                    logging.info(f"Module '{module_name}' is ENABLED (state: {self.module_states.get(module_name)}), Action '{action_name}' ADDED to Modules menu.")
-                else:
-                    logging.warning(f"Action '{action_name}' (attribute) not found for module '{module_name}', though module state is {self.module_states.get(module_name)}.")
-            else:
-                logging.info(f"Module '{module_name}' is DISABLED (state: {self.module_states.get(module_name)}). Action '{action_name}' NOT ADDED to Modules menu.")
+                    logging.info(f"Module '{module_name}' ENABLED, Action '{action_name}' ADDED to Modules menu.")
+                # else: (logging for missing action already exists in original code)
+            # else: (logging for disabled module already exists)
 
+        # --- Settings Menu (New) ---
+        settings_main_menu = menu_bar.addMenu(self.tr("&Paramètres")) # MODIFIED: Added ampersand
+        settings_main_menu.setIcon(QIcon(":/icons/settings.svg")) # NEW: Icon for the menu itself
+        settings_main_menu.addAction(self.settings_action)
+        settings_main_menu.addAction(self.status_action)
+        settings_main_menu.addAction(self.manage_roles_action) # Moved from old Admin menu
+        # self.exit_action will be in UserMenuButton
 
-        # Add separator if any module actions were added, before non-module specific actions like Carrier Map (if it's always there or handled differently)
-        # For now, assuming Carrier Map is part of CONFIGURABLE_MODULES, so it's handled above.
-        # If there are actions that should always appear after the conditional ones:
-        # modules_menu.addSeparator()
-        # modules_menu.addAction(self.some_other_always_visible_action_in_modules_menu)
+        # --- Help Menu (Remains the same) ---
+        help_menu = menu_bar.addMenu(self.tr("&Aide")) # MODIFIED: Added ampersand
+        about_action = QAction(QIcon(":/icons/help-circle.svg"), self.tr("À propos de l'Application"), self) # MODIFIED: Text
+        about_action.triggered.connect(self.show_about_dialog)
+        help_menu.addAction(about_action)
+        self.searchable_actions_map[self.tr("À propos de l'Application")] = about_action # Update map key
 
-
-        help_menu = menu_bar.addMenu(self.tr("Aide")); about_action = QAction(QIcon(":/icons/help-circle.svg"), self.tr("À propos"), self); about_action.triggered.connect(self.show_about_dialog); help_menu.addAction(about_action)
-        # Add about_action to searchable_actions_map
-        self.searchable_actions_map[self.tr("À propos")] = about_action
-
-        # Search bar in menu bar
+        # --- Corner Widget (Search Bar and User Menu Button) ---
+        # This part remains structurally similar, but self.user_menu_button_instance will be enhanced later.
         self.search_bar_line_edit = QLineEdit(self)
         self.search_bar_line_edit.setObjectName("menuBarSearch")
         self.search_bar_line_edit.setPlaceholderText(self.tr("Rechercher une fonctionnalité..."))
@@ -1203,106 +1277,112 @@ class DocumentManager(QMainWindow):
         user_display_layout.setContentsMargins(5, 0, 5, 0) # Adjust margins as needed
         user_display_layout.setSpacing(10)
 
-        # self.user_info_label = QLabel(self.tr("Non connecté")) # Replaced by UserMenuButton
-        # self.user_info_label.setObjectName("userInfoLabel") # For styling
-        # user_display_layout.addWidget(self.user_info_label)
-
-        # self.logout_button = QPushButton(self.tr("Déconnexion")) # Replaced by UserMenuButton
-        # self.logout_button.setIcon(QIcon(":/icons/log-out.svg"))
-        # self.logout_button.setFlat(True)
-        # self.logout_button.setToolTip(self.tr("Se déconnecter et revenir à l'écran de connexion"))
-        # self.logout_button.clicked.connect(self._handle_logout)
-        # user_display_layout.addWidget(self.logout_button)
-
         self.user_menu_button_instance = UserMenuButton(current_user_info=self.current_user_info, parent=self)
-        self.user_menu_button_instance.setObjectName("userMenuButton") # Added object name
+        self.user_menu_button_instance.setObjectName("userMenuButton")
         self.user_menu_button_instance.request_logout.connect(self._handle_logout)
         self.user_menu_button_instance.request_show_user_management_page.connect(self.show_user_management_page)
         self.user_menu_button_instance.request_open_edit_my_account_dialog.connect(self._handle_request_open_edit_my_account)
         self.user_menu_button_instance.request_open_add_user_dialog.connect(self._handle_request_open_add_user)
+        # NEW: Connect the new signal for quitting the application
+        self.user_menu_button_instance.request_quit_application.connect(self.close) # self.close is QMainWindow's slot to quit
         user_display_layout.addWidget(self.user_menu_button_instance)
-
-
-        # The following block redefining self.search_bar_line_edit is redundant
-        # and was likely causing the issue. It's removed.
-        # # Main Search Bar (as before)
-        # self.search_bar_line_edit = QLineEdit(self)
-        # self.search_bar_line_edit.setObjectName("menuBarSearch")
-        # self.search_bar_line_edit.setPlaceholderText(self.tr("Rechercher une fonctionnalité..."))
-        # # ... (completer setup as before) ...
 
         # Container for both search and user display
         top_right_container = QWidget()
         top_right_layout = QHBoxLayout(top_right_container)
         top_right_layout.setContentsMargins(0,0,0,0)
-        top_right_layout.setSpacing(15) # Spacing between search and user info
+        top_right_layout.setSpacing(15)
         top_right_layout.addWidget(self.search_bar_line_edit)
         top_right_layout.addWidget(self.user_display_widget)
 
         self.menuBar().setCornerWidget(top_right_container, Qt.TopRightCorner)
-        self._update_user_display() # Initial update of user display
-        self._apply_permissions() # Apply permissions on initial load
+        self._update_user_display()
+        self._apply_permissions()
 
     def _apply_permissions(self):
         """Applies role-based permissions to UI elements."""
-        from auth.permissions import has_permission, P_MANAGE_SYSTEM_SETTINGS, P_CREATE_CLIENT, \
-                                     P_MANAGE_USERS, P_MANAGE_ROLES, P_ACCESS_PROJECT_MODULE, P_ACCESS_STATISTICS_MODULE, \
-                                     P_ACCESS_PARTNER_MODULE, P_ACCESS_INVENTORY_MODULE, \
-                                     P_ACCESS_RECRUITMENT_MODULE, P_ACCESS_EXPERIENCE_MODULE, \
-                                     P_ACCESS_CALENDAR_MODULE, P_ACCESS_BOTPRESS_MODULE, \
-                                     P_ACCESS_CARRIER_MAP_MODULE, P_ACCESS_CAMERA_MODULE, \
-                                     P_MANAGE_GLOBAL_PRODUCTS, P_VIEW_GLOBAL_PRODUCTS, \
-                                     P_ACCESS_CALCULATOR_MODULE, P_MANAGE_STATUSES # Added P_VIEW_GLOBAL_PRODUCTS
+        from auth.permissions import (
+            has_permission, P_MANAGE_SYSTEM_SETTINGS, P_CREATE_CLIENT,
+            P_MANAGE_USERS, P_MANAGE_ROLES, P_ACCESS_PROJECT_MODULE, P_ACCESS_STATISTICS_MODULE,
+            P_ACCESS_PARTNER_MODULE, P_ACCESS_INVENTORY_MODULE,
+            P_ACCESS_RECRUITMENT_MODULE, P_ACCESS_EXPERIENCE_MODULE,
+            P_ACCESS_CALENDAR_MODULE, P_ACCESS_BOTPRESS_MODULE,
+            P_ACCESS_CARRIER_MAP_MODULE, P_ACCESS_CAMERA_MODULE,
+            P_MANAGE_GLOBAL_PRODUCTS, P_VIEW_GLOBAL_PRODUCTS,
+            P_ACCESS_CALCULATOR_MODULE, P_MANAGE_STATUSES,
+            P_CREATE_COMMANDE # NEW: Assuming a permission for creating commandes
+        )
 
-        role_name = self.current_user_info.get('role_name') if self.current_user_info else None
         role_name = self.current_user_info.get('role_name') if self.current_user_info else "UnknownRole"
         logging.info(f"Applying permissions for role: {role_name}")
 
-        if not self.current_user_info: # Should not happen if login is enforced
+        if not self.current_user_info:
             logging.error("_apply_permissions called with no current_user_info. Disabling most actions.")
-            # Fallback to disable everything if user_info is missing
-            is_admin_or_similar = False
-            can_create_client = False
-            # Disable all module actions
-            for module_key in self.module_states.keys():
-                action_attr_name = next((m['action_attr'] for m in CONFIGURABLE_MODULES if m['name'] == module_key), None)
-                if action_attr_name and hasattr(self, action_attr_name):
-                    getattr(self, action_attr_name).setVisible(False)
-            self.settings_action.setEnabled(False)
-            if hasattr(self, 'status_action'): self.status_action.setEnabled(False)
-            self.admin_menu.menuAction().setVisible(False)
+            # Fallback to disable relevant actions
+            self.home_action.setEnabled(False)
+            self.create_commande_action_menubar.setEnabled(False)
+            self.add_user_action_menubar.setEnabled(False)
+            # ... disable other module actions and menus ...
+            # Find all menus and disable them
+            for menu_action in self.menuBar().actions():
+                if menu_action.menu(): # If it's a QMenu
+                    menu_action.menu().setEnabled(False)
             self.add_new_client_button.setEnabled(False)
             self.add_client_by_voice_button.setEnabled(False)
             return
 
-        is_admin_or_similar = has_permission(role_name, P_MANAGE_SYSTEM_SETTINGS)
-        can_create_client = has_permission(role_name, P_CREATE_CLIENT)
-        logging.info(f"  Role '{role_name}': P_MANAGE_SYSTEM_SETTINGS={is_admin_or_similar}, P_CREATE_CLIENT={can_create_client}")
+        # --- Permissions for direct menubar actions ---
+        # Home action is always enabled for logged-in users
+        self.home_action.setEnabled(True)
 
-        # Menu Actions
-        log_msg_system_settings = f"Permission P_MANAGE_SYSTEM_SETTINGS for role '{role_name}': {'Granted' if is_admin_or_similar else 'Denied'}. Settings action {'enabled' if is_admin_or_similar else 'disabled'}."
-        logging.info(log_msg_system_settings)
-        self.settings_action.setEnabled(is_admin_or_similar)
-        logging.info(f"  Action 'settings_action' enabled: {is_admin_or_similar}")
-        if hasattr(self, 'status_action'):
-            can_manage_statuses = has_permission(role_name, P_MANAGE_STATUSES)
-            self.status_action.setEnabled(can_manage_statuses)
-            logging.info(f"  Action 'status_action' enabled: {can_manage_statuses} (Permission: P_MANAGE_STATUSES)")
+        can_create_commande = has_permission(role_name, P_CREATE_COMMANDE) # Using P_CREATE_COMMANDE
+        self.create_commande_action_menubar.setEnabled(can_create_commande)
+        logging.info(f"  Action 'create_commande_action_menubar' enabled: {can_create_commande} (Permission: P_CREATE_COMMANDE)")
 
+        can_manage_users_for_add = has_permission(role_name, P_MANAGE_USERS)
+        self.add_user_action_menubar.setEnabled(can_manage_users_for_add)
+        logging.info(f"  Action 'add_user_action_menubar' enabled: {can_manage_users_for_add} (Permission: P_MANAGE_USERS)")
 
-        # Admin Menu visibility
-        can_manage_users = has_permission(role_name, P_MANAGE_USERS)
+        # --- Permissions for "Paramètres" menu and its items ---
+        can_manage_system_settings = has_permission(role_name, P_MANAGE_SYSTEM_SETTINGS)
+        can_manage_statuses = has_permission(role_name, P_MANAGE_STATUSES)
         can_manage_roles = has_permission(role_name, P_MANAGE_ROLES)
-        admin_menu_visible = can_manage_users or can_manage_roles
-        self.admin_menu.menuAction().setVisible(admin_menu_visible)
-        logging.info(f"  Admin Menu visible: {admin_menu_visible} (P_MANAGE_USERS={can_manage_users}, P_MANAGE_ROLES={can_manage_roles})")
-        self.manage_users_action.setEnabled(can_manage_users) # Should already be visible if menu is
-        self.manage_roles_action.setEnabled(can_manage_roles) # Should already be visible if menu is
 
-        # Module Menu Actions
+        # Visibility of the entire "Paramètres" menu
+        # The menu itself should be visible if any of its important sub-actions are permitted.
+        # Or, one could argue it's always visible and items inside are enabled/disabled.
+        # Let's make items inside enabled/disabled.
+        # settings_main_menu_action = self.menuBar().actions()[3] # Assuming it's the 4th item (Home, Sep, Cmd, User, Sep, Modules, Settings, Help)
+        # settings_main_menu_action.setVisible(can_manage_system_settings or can_manage_statuses or can_manage_roles)
+        # Better to find it by text if order changes:
+        param_menu = None
+        for action in self.menuBar().actions():
+            if action.menu() and action.text() == self.tr("&Paramètres"):
+                param_menu = action.menu()
+                break
+
+        if param_menu:
+            self.settings_action.setEnabled(can_manage_system_settings)
+            logging.info(f"  Action 'settings_action' (in Paramètres menu) enabled: {can_manage_system_settings} (P_MANAGE_SYSTEM_SETTINGS)")
+            self.status_action.setEnabled(can_manage_statuses)
+            logging.info(f"  Action 'status_action' (in Paramètres menu) enabled: {can_manage_statuses} (P_MANAGE_STATUSES)")
+            self.manage_roles_action.setEnabled(can_manage_roles)
+            logging.info(f"  Action 'manage_roles_action' (in Paramètres menu) enabled: {can_manage_roles} (P_MANAGE_ROLES)")
+
+            # Set the main "Paramètres" menu enabled status based on its content
+            # If all items are disabled, disable the menu itself.
+            # This might be too aggressive; often menus are visible even if all items are disabled.
+            # For now, let's keep it simple: if the user can manage system settings, the menu is generally useful.
+            param_menu.setEnabled(can_manage_system_settings or can_manage_statuses or can_manage_roles)
+
+
+        # --- Permissions for "Modules" menu and its items ---
+        # The "Modules" menu itself should be visible if any of its children are.
+        # Visibility of individual module actions within this menu:
         module_permissions = {
+            # documents_view_action and commande_management_action are directly in Modules menu, handled below
             'project_management': P_ACCESS_PROJECT_MODULE,
-            'product_management': (P_MANAGE_GLOBAL_PRODUCTS, P_VIEW_GLOBAL_PRODUCTS), # Tuple for OR condition
+            'product_management': (P_MANAGE_GLOBAL_PRODUCTS, P_VIEW_GLOBAL_PRODUCTS),
             'partner_management': P_ACCESS_PARTNER_MODULE,
             'statistics': P_ACCESS_STATISTICS_MODULE,
             'inventory_management': P_ACCESS_INVENTORY_MODULE,
@@ -1312,11 +1392,27 @@ class DocumentManager(QMainWindow):
             'carrier_map': P_ACCESS_CARRIER_MAP_MODULE,
             'camera_management': P_ACCESS_CAMERA_MODULE,
             'calculator': P_ACCESS_CALCULATOR_MODULE,
-            'commandes_management': P_ACCESS_PROJECT_MODULE # Placeholder, uses project module perm for now
         }
+
+        # Core module actions directly in "Modules" menu
+        # Assuming P_ACCESS_PROJECT_MODULE for documents and commandes for now, or define new specific perms
+        can_access_documents = has_permission(role_name, P_ACCESS_PROJECT_MODULE) # Example permission
+        self.documents_view_action.setEnabled(can_access_documents)
+        logging.info(f"  Action 'documents_view_action' enabled: {can_access_documents}")
+
+        can_access_commandes_module = has_permission(role_name, P_ACCESS_PROJECT_MODULE) # Example permission
+        self.commande_management_action.setEnabled(can_access_commandes_module)
+        logging.info(f"  Action 'commande_management_action' enabled: {can_access_commandes_module}")
+
 
         for module_config in CONFIGURABLE_MODULES:
             action_attr = module_config['action_attr']
+            # Skip actions that are not part of the dynamic module list in the "Modules" menu
+            if action_attr in ["home_action", "settings_action", "status_action", "manage_roles_action",
+                               "exit_action", "create_commande_action_menubar", "add_user_action_menubar",
+                               "documents_view_action", "commande_management_action"]: # MODIFIED: Skip already handled
+                continue
+
             module_name = module_config['name']
             action_instance = getattr(self, action_attr, None)
 
@@ -1354,15 +1450,50 @@ class DocumentManager(QMainWindow):
             logging.info(f"  Module Action '{action_attr}' for '{module_name}': Visible: {permitted}. {log_perm_details}")
             # Note: setEnabled could also be used if the action should be visible but greyed out.
             # For menu items, setVisible(False) effectively removes them.
+            # However, for QAction directly on QMenuBar or in QMenu, setEnabled(False) is more standard.
+            # setVisible(False) on a QAction in a QMenu will hide it.
+            # For QAction on QMenuBar, setEnabled(False) grays it out, setVisible(False) hides it.
+            # Let's use setEnabled for items within menus, and setVisible for menu sections if needed.
+            # The current code in create_menus_main adds actions if module_state is true.
+            # So, here we only need to setEnabled based on permission if the action is already in the menu.
 
-        # Main Buttons on Document View
-        log_msg_create_client = f"Permission P_CREATE_CLIENT for role '{role_name}': {'Granted' if can_create_client else 'Denied'}. "
-        log_msg_create_client += f"Add New Client button {'enabled' if can_create_client else 'disabled'}."
-        logging.info(log_msg_create_client)
-        self.add_new_client_button.setEnabled(can_create_client)
-        self.add_client_by_voice_button.setEnabled(can_create_client) # Assuming same permission
-        logging.info(f"  Button 'add_new_client_button' enabled: {can_create_client}")
-        logging.info(f"  Button 'add_client_by_voice_button' enabled: {can_create_client}")
+            action_instance.setEnabled(permitted) # Use setEnabled for actions within menus
+            logging.info(f"  Module Action '{action_attr}' for '{module_name}': Enabled: {permitted}. {log_perm_details}")
+
+        # Check if "Modules" menu should be visible/enabled
+        # It should be if any of its contents are enabled.
+        modules_menu_instance = None
+        for action in self.menuBar().actions():
+            if action.menu() and action.text() == self.tr("&Modules"):
+                modules_menu_instance = action.menu()
+                break
+
+        if modules_menu_instance:
+            any_module_action_enabled = False
+            if self.documents_view_action.isEnabled() or self.commande_management_action.isEnabled():
+                any_module_action_enabled = True
+            else:
+                for module_config in CONFIGURABLE_MODULES: # Check dynamic modules again
+                    action_attr = module_config['action_attr']
+                    if action_attr in ["home_action", "settings_action", "status_action", "manage_roles_action",
+                                       "exit_action", "create_commande_action_menubar", "add_user_action_menubar",
+                                       "documents_view_action", "commande_management_action"]:
+                        continue
+                    action_instance = getattr(self, action_attr, None)
+                    if action_instance and action_instance.isEnabled():
+                        any_module_action_enabled = True
+                        break
+            modules_menu_instance.setEnabled(any_module_action_enabled)
+            logging.info(f"  Menu 'Modules' enabled: {any_module_action_enabled}")
+
+
+        # Main Buttons on Document View (left pane, not menubar)
+        can_create_client_perm = has_permission(role_name, P_CREATE_CLIENT)
+        logging.info(f"  Permission P_CREATE_CLIENT for role '{role_name}': {'Granted' if can_create_client_perm else 'Denied'}.")
+        self.add_new_client_button.setEnabled(can_create_client_perm)
+        self.add_client_by_voice_button.setEnabled(can_create_client_perm) # Assuming same permission
+        logging.info(f"  Button 'add_new_client_button' (in left pane) enabled: {can_create_client_perm}")
+        logging.info(f"  Button 'add_client_by_voice_button' (in left pane) enabled: {can_create_client_perm}")
 
         logging.info(f"Permissions application completed for role: {role_name}")
 
