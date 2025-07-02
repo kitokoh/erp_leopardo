@@ -2328,7 +2328,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     except sqlite3.Error as e_commit_main_schema:
         logging.error(f"DEBUG_INIT_DB: Error committing main schema changes: {e_commit_main_schema}", exc_info=True)
         conn.rollback()
-        conn.close()
+        # conn.close() # Removed: conn needed for seeding later
         raise # Critical to have main schema committed
 
     # --- Accounting Module Tables ---
@@ -2410,9 +2410,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     except sqlite3.Error as e_commit_main_schema_final:
         logging.error(f"DEBUG_INIT_DB: Error committing main schema changes: {e_commit_main_schema_final}", exc_info=True)
         conn.rollback() # Rollback before closing if commit failed
-    finally:
-        conn.close() # Close the initial raw connection
-        logging.info("DEBUG_INIT_DB: Initial raw SQLite connection 'conn' closed.")
+    # The conn.close() was moved to the end of the function.
 
 
     # --- Accounting Module Tables (SQLAlchemy part) ---
@@ -2533,8 +2531,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
             FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
         )
         """)
-
-    print("DEBUG_INIT_DB: Table CompanyCalendarSettings created or exists.")
+        print("DEBUG_INIT_DB: Table CompanyCalendarSettings created or exists.")
 
         cursor_cal.execute("""
         CREATE TABLE IF NOT EXISTS UserCalendarEvents (
@@ -2548,14 +2545,14 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
             FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
         )
         """)
-    print("DEBUG_INIT_DB: Table UserCalendarEvents created or exists.")
+        print("DEBUG_INIT_DB: Table UserCalendarEvents created or exists.")
 
         # Indexes for Calendar Module
         cursor_cal.execute("CREATE INDEX IF NOT EXISTS idx_companycalendarsettings_user_id ON CompanyCalendarSettings(user_id)")
         cursor_cal.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_user_id ON UserCalendarEvents(user_id)")
         cursor_cal.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_date ON UserCalendarEvents(event_date)")
         cursor_cal.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_type ON UserCalendarEvents(event_type)")
-    print("DEBUG_INIT_DB: Indexes for Calendar Module created or already exist.")
+        print("DEBUG_INIT_DB: Indexes for Calendar Module created or already exist.")
         conn_cal.commit()
     except sqlite3.Error as e_cal_schema:
         print(f"Error during Calendar module schema/index creation: {e_cal_schema}")
@@ -2787,7 +2784,16 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         conn.rollback() # Rollback in case of error during seeding
         print("DEBUG_INIT_DB: Rollback due to seeding error.")
     finally:
-        conn.close()
+        try:
+            conn.commit() # Ensure all seeding changes are committed if no error occurred before finally
+            print("DEBUG_INIT_DB: Final commit in initialize_database successful.")
+        except sqlite3.Error as e_final_commit:
+            print(f"DEBUG_INIT_DB: Error during final commit in initialize_database: {e_final_commit}")
+            # Optionally rollback again, though if an error occurs here, DB state might be complex
+            conn.rollback()
+        finally:
+            conn.close()
+            print("DEBUG_INIT_DB: Main SQLite connection 'conn' closed at the end of initialize_database.")
 
 if __name__ == '__main__':
     print(f"Running init_schema.py directly. Using database path: {config.DATABASE_PATH}")
