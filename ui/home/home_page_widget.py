@@ -99,7 +99,8 @@ class HomePageWidget(QWidget):
             # {"name": self.tr("Module X"), "object_name": "btnModuleX", "icon": ":/icons/placeholder_icon.svg", "slot": self.go_to_settings} # Example, can be removed
         ]
         row, col = 0, 0
-        num_columns = 3 # Adjusted for potentially less horizontal space for buttons
+        num_columns = 4 # Changed from 3 to 4 to ensure max 3 rows for 11 buttons (4-4-3)
+
 
         for i, module_data in enumerate(self.modules):
             button = QPushButton(module_data["name"])

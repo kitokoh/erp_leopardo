@@ -303,6 +303,8 @@ class DocumentManager(QMainWindow):
 
         self.home_page_widget_instance = HomePageWidget(main_window=self, parent=self) # Pass self as main_window
 
+        self.home_page_widget_instance = HomePageWidget(main_window=self, parent=self) # Pass self as main_window
+
         self.main_area_stack.addWidget(self.home_page_widget_instance)
 
         # UserManagementPage is fundamental, initialize it upfront and add to stack
