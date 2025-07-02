@@ -10,8 +10,9 @@ import os
 import random
 
 class HomePageWidget(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, main_window, parent=None):
         super().__init__(parent)
+        self.main_window = main_window # Store reference to DocumentManager
         self.setObjectName("HomePageWidget")
         self._init_ui()
         self._load_styles()
@@ -66,14 +67,14 @@ class HomePageWidget(QWidget):
             gif_label.setStyleSheet("color: red;")
             gif_label.setAlignment(Qt.AlignCenter)
 
-        center_h_layout.addWidget(gif_label, 1)
+        center_h_layout.addWidget(gif_label, 1) # GIF on the left, stretch factor 1
 
-
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        scroll_area.setStyleSheet("QScrollArea { border: none; background-color: transparent; }")
+        # Button Grid in the Center
+        button_scroll_area = QScrollArea()
+        button_scroll_area.setWidgetResizable(True)
+        button_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        button_scroll_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        button_scroll_area.setStyleSheet("QScrollArea { border: none; background-color: transparent; }")
 
         button_container_widget = QWidget()
         button_container_widget.setObjectName("homePageButtonGridContainer")
@@ -82,7 +83,6 @@ class HomePageWidget(QWidget):
         grid_layout = QGridLayout(button_container_widget)
         grid_layout.setContentsMargins(5, 5, 5, 5)
         grid_layout.setSpacing(10)
-
 
         self.modules = [
             {"name": self.tr("Gestion Documents Client"), "object_name": "btnClientDocuments", "icon": ":/icons/modern/folder-docs.svg", "slot": self.go_to_documents},
@@ -96,29 +96,20 @@ class HomePageWidget(QWidget):
             {"name": self.tr("Intégration Botpress"), "object_name": "btnBotpressIntegration", "icon": ":/icons/placeholder_icon.svg", "slot": self.go_to_botpress_integration},
             {"name": self.tr("Gestion Caméras"), "object_name": "btnCameraManagement", "icon": ":/icons/video.svg", "slot": self.go_to_camera_management},
             {"name": self.tr("Paramètres"), "object_name": "btnSettings", "icon": ":/icons/modern/settings.svg", "slot": self.go_to_settings},
-            {"name": self.tr("Module X"), "object_name": "btnModuleX", "icon": ":/icons/placeholder_icon.svg", "slot": self.go_to_settings}
+            # {"name": self.tr("Module X"), "object_name": "btnModuleX", "icon": ":/icons/placeholder_icon.svg", "slot": self.go_to_settings} # Example, can be removed
         ]
         row, col = 0, 0
-        num_columns = 4
-
+        num_columns = 4 # Changed from 3 to 4 to ensure max 3 rows for 11 buttons (4-4-3)
 
         for i, module_data in enumerate(self.modules):
             button = QPushButton(module_data["name"])
             button.setObjectName(module_data["object_name"])
-            if module_data["icon"] and QIcon.hasThemeIcon(module_data["icon"]):
+            if module_data["icon"] and QIcon.hasThemeIcon(module_data["icon"]): # Check if icon exists
                 button.setIcon(QIcon(module_data["icon"]))
-                button.setIconSize(QSize(32, 32))
-
+            else: # Fallback icon
+                button.setIcon(QIcon(":/icons/placeholder_icon.svg"))
+            button.setIconSize(QSize(32, 32))
             button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-
-            # shadow = QGraphicsDropShadowEffect() # Temporairement désactivé
-            # shadow.setBlurRadius(12)
-            # shadow.setXOffset(1)
-            # shadow.setYOffset(2)
-            # shadow.setColor(QColor(0, 0, 0, 80))
-            # button.setGraphicsEffect(shadow)
-
-
             button.clicked.connect(module_data["slot"])
             grid_layout.addWidget(button, row, col)
             col += 1
@@ -126,15 +117,27 @@ class HomePageWidget(QWidget):
                 col = 0
                 row += 1
 
-        grid_layout.setRowStretch(row + 1, 1)
+        grid_layout.setRowStretch(row + 1, 1) # Ensure remaining rows/cols don't take extra space
         grid_layout.setColumnStretch(num_columns, 1)
 
         button_container_widget.setLayout(grid_layout)
-        scroll_area.setWidget(button_container_widget)
-        center_h_layout.addWidget(scroll_area, 2)
+        button_scroll_area.setWidget(button_container_widget)
+        center_h_layout.addWidget(button_scroll_area, 2) # Buttons in center, stretch factor 2
+
+        # Right Sidebar for Statistics Summary
+        self.right_sidebar_container = QFrame() # Use QFrame for potential styling (e.g., border)
+        self.right_sidebar_container.setObjectName("homePageRightSidebar")
+        self.right_sidebar_container.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        # self.right_sidebar_container.setFixedWidth(250) # Example fixed width, adjust as needed
+        self.right_sidebar_layout = QVBoxLayout(self.right_sidebar_container)
+        self.right_sidebar_layout.setContentsMargins(5,5,5,5)
+        self.right_sidebar_container.setLayout(self.right_sidebar_layout)
+        self.right_sidebar_container.setVisible(False) # Initially hidden until content is set
+        center_h_layout.addWidget(self.right_sidebar_container, 1) # Summary on right, stretch factor 1
 
         main_v_layout.addLayout(center_h_layout)
 
+        # Bottom Area for Map
         self.bottom_content_area = QStackedWidget()
         self.bottom_content_area.setObjectName("homePageBottomContentArea")
         self.bottom_content_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -147,7 +150,7 @@ class HomePageWidget(QWidget):
         while self.bottom_content_area.count() > 0:
             widget = self.bottom_content_area.widget(0)
             self.bottom_content_area.removeWidget(widget)
-            # widget.deleteLater() # Important pour éviter les fuites de mémoire si les widgets ne sont pas réutilisés
+            widget.deleteLater() # Important pour éviter les fuites de mémoire si les widgets ne sont pas réutilisés
 
 
         if widget_to_display:
@@ -157,128 +160,96 @@ class HomePageWidget(QWidget):
         else:
             self.bottom_content_area.setVisible(False)
 
+    def set_right_sidebar_widget(self, widget_to_display):
+        # Clear existing widgets from the right sidebar layout
+        while self.right_sidebar_layout.count() > 0:
+            item = self.right_sidebar_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        if widget_to_display:
+            self.right_sidebar_layout.addWidget(widget_to_display)
+            self.right_sidebar_container.setVisible(True)
+        else:
+            self.right_sidebar_container.setVisible(False)
+
     @pyqtSlot()
     def go_to_documents(self):
-        print(f"HomePageWidget: go_to_documents called.")
-        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
-        if hasattr(self.parent(), 'show_documents_view'):
-            print(f"HomePageWidget: Parent HAS show_documents_view. Calling it.")
-            self.parent().show_documents_view()
+        if hasattr(self.main_window, 'show_documents_view'):
+            self.main_window.show_documents_view()
         else:
-            print(f"HomePageWidget: Parent does NOT have show_documents_view.")
+            print(f"HomePageWidget: main_window does NOT have show_documents_view.")
 
     @pyqtSlot()
     def go_to_project_management(self):
-        print(f"HomePageWidget: go_to_project_management called.")
-        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
-        if hasattr(self.parent(), 'show_project_management_view'):
-            print(f"HomePageWidget: Parent HAS show_project_management_view. Calling it.")
-            self.parent().show_project_management_view()
+        if hasattr(self.main_window, 'show_project_management_view'):
+            self.main_window.show_project_management_view()
         else:
-            print(f"HomePageWidget: Parent does NOT have show_project_management_view.")
+            print(f"HomePageWidget: main_window does NOT have show_project_management_view.")
 
     @pyqtSlot()
     def go_to_statistics(self):
-        print(f"HomePageWidget: go_to_statistics called.")
-        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
-        if hasattr(self.parent(), 'get_statistics_widget_instance'):
-            print(f"HomePageWidget: Parent HAS get_statistics_widget_instance. Calling it.")
-            stats_widget = self.parent().get_statistics_widget_instance()
-            if stats_widget:
-                print(f"HomePageWidget: Statistics widget instance received. Calling set_bottom_widget.")
-                self.set_bottom_widget(stats_widget)
-            else:
-                 print(f"HomePageWidget: get_statistics_widget_instance returned None. Fallback to show_statistics_view.")
-                 if hasattr(self.parent(), 'show_statistics_view'):
-                    print(f"HomePageWidget: Parent HAS show_statistics_view. Calling it for fallback.")
-                    self.parent().show_statistics_view()
-                 else:
-                    print(f"HomePageWidget: Parent does NOT have show_statistics_view for fallback.")
-        elif hasattr(self.parent(), 'show_statistics_view'):
-            print(f"HomePageWidget: Parent has show_statistics_view (no get_statistics_widget_instance). Calling it.")
-            self.parent().show_statistics_view()
+        # This button should navigate to the main statistics view, not embed it here.
+        if hasattr(self.main_window, 'show_statistics_view'):
+            self.main_window.show_statistics_view()
         else:
-            print(f"HomePageWidget: Parent does NOT have get_statistics_widget_instance OR show_statistics_view.")
+            print(f"HomePageWidget: main_window does NOT have show_statistics_view.")
 
     @pyqtSlot()
     def go_to_product_management(self):
-        print(f"HomePageWidget: go_to_product_management called.")
-        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
-        if hasattr(self.parent(), 'show_product_management_page'):
-            print(f"HomePageWidget: Parent HAS show_product_management_page. Calling it.")
-            self.parent().show_product_management_page()
+        if hasattr(self.main_window, 'show_product_management_page'):
+            self.main_window.show_product_management_page()
         else:
-            print(f"HomePageWidget: Parent does NOT have show_product_management_page.")
+            print(f"HomePageWidget: main_window does NOT have show_product_management_page.")
 
     @pyqtSlot()
     def go_to_partner_management(self):
-        print(f"HomePageWidget: go_to_partner_management called.")
-        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
-        if hasattr(self.parent(), 'show_partner_management_view'):
-            print(f"HomePageWidget: Parent HAS show_partner_management_view. Calling it.")
-            self.parent().show_partner_management_view()
+        if hasattr(self.main_window, 'show_partner_management_view'):
+            self.main_window.show_partner_management_view()
         else:
-            print(f"HomePageWidget: Parent does NOT have show_partner_management_view.")
+            print(f"HomePageWidget: main_window does NOT have show_partner_management_view.")
 
     @pyqtSlot()
     def go_to_inventory_management(self):
-        print(f"HomePageWidget: go_to_inventory_management called.")
-        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
-        if hasattr(self.parent(), 'show_inventory_browser_view'):
-            print(f"HomePageWidget: Parent HAS show_inventory_browser_view. Calling it.")
-            self.parent().show_inventory_browser_view()
+        if hasattr(self.main_window, 'show_inventory_browser_view'):
+            self.main_window.show_inventory_browser_view()
         else:
-            print(f"HomePageWidget: Parent does NOT have show_inventory_browser_view.")
+            print(f"HomePageWidget: main_window does NOT have show_inventory_browser_view.")
 
     @pyqtSlot()
     def go_to_recruitment(self):
-        print(f"HomePageWidget: go_to_recruitment called.")
-        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
-        if hasattr(self.parent(), 'show_recruitment_view'):
-            print(f"HomePageWidget: Parent HAS show_recruitment_view. Calling it.")
-            self.parent().show_recruitment_view()
+        if hasattr(self.main_window, 'show_recruitment_view'):
+            self.main_window.show_recruitment_view()
         else:
-            print(f"HomePageWidget: Parent does NOT have show_recruitment_view.")
+            print(f"HomePageWidget: main_window does NOT have show_recruitment_view.")
 
     @pyqtSlot()
     def go_to_experience_management(self):
-        print(f"HomePageWidget: go_to_experience_management called.")
-        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
-        if hasattr(self.parent(), 'show_experience_module_view'):
-            print(f"HomePageWidget: Parent HAS show_experience_module_view. Calling it.")
-            self.parent().show_experience_module_view()
+        if hasattr(self.main_window, 'show_experience_module_view'):
+            self.main_window.show_experience_module_view()
         else:
-            print(f"HomePageWidget: Parent does NOT have show_experience_module_view.")
+            print(f"HomePageWidget: main_window does NOT have show_experience_module_view.")
 
     @pyqtSlot()
     def go_to_botpress_integration(self):
-        print(f"HomePageWidget: go_to_botpress_integration called.")
-        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
-        if hasattr(self.parent(), 'show_botpress_integration_view'):
-            print(f"HomePageWidget: Parent HAS show_botpress_integration_view. Calling it.")
-            self.parent().show_botpress_integration_view()
+        if hasattr(self.main_window, 'show_botpress_integration_view'):
+            self.main_window.show_botpress_integration_view()
         else:
-            print(f"HomePageWidget: Parent does NOT have show_botpress_integration_view.")
+            print(f"HomePageWidget: main_window does NOT have show_botpress_integration_view.")
 
     @pyqtSlot()
     def go_to_camera_management(self):
-        print(f"HomePageWidget: go_to_camera_management called.")
-        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
-        if hasattr(self.parent(), 'show_camera_management_view'):
-            print(f"HomePageWidget: Parent HAS show_camera_management_view. Calling it.")
-            self.parent().show_camera_management_view()
+        if hasattr(self.main_window, 'show_camera_management_view'):
+            self.main_window.show_camera_management_view()
         else:
-            print(f"HomePageWidget: Parent does NOT have show_camera_management_view.")
+            print(f"HomePageWidget: main_window does NOT have show_camera_management_view.")
 
     @pyqtSlot()
     def go_to_settings(self):
-        print(f"HomePageWidget: go_to_settings called.")
-        print(f"HomePageWidget: self.parent() is {self.parent()} type {type(self.parent())}")
-        if hasattr(self.parent(), 'show_settings_page'):
-            print(f"HomePageWidget: Parent HAS show_settings_page. Calling it.")
-            self.parent().show_settings_page()
+        if hasattr(self.main_window, 'show_settings_page'):
+            self.main_window.show_settings_page()
         else:
-            print(f"HomePageWidget: Parent does NOT have show_settings_page.")
+            print(f"HomePageWidget: main_window does NOT have show_settings_page.")
 
 
 

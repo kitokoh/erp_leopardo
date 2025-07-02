@@ -370,3 +370,28 @@ def get_total_sales_amount_for_period(db: Session, start_date_iso: str, end_date
     except Exception as e: # Catch broader exceptions as SQLAlchemy might raise different errors
         logger.error(f"DB error in get_total_sales_amount_for_period: {e}", exc_info=True)
         return 0.0
+
+def get_total_proforma_sales_for_country_id(db: Session, country_id: int) -> float:
+    """
+    Calculates the total sales amount from proforma invoices for a specific country.
+    Assumes ProformaInvoice is linked to Client, and Client has a country_id.
+    """
+    logger.debug(f"Calculating total proforma sales for country_id: {country_id}")
+    try:
+        # Using SQLAlchemy ORM query
+        total_sales = db.query(func.sum(ProformaInvoice.grand_total_amount)).\
+            join(Client, ProformaInvoice.client_id == Client.client_id).\
+            filter(Client.country_id == country_id).\
+            filter(Client.is_deleted == False).\
+            scalar() # Use scalar() to get a single value or None
+            # Add filter for ProformaInvoice status if needed, e.g., not 'CANCELLED'
+            # .filter(ProformaInvoice.status != ProformaInvoiceStatusEnum.CANCELLED)
+
+        if total_sales is None:
+            total_sales = 0.0
+
+        logger.debug(f"Total proforma sales for country_id {country_id}: {total_sales}")
+        return float(total_sales)
+    except Exception as e:
+        logger.error(f"DB error in get_total_proforma_sales_for_country_id for country_id {country_id}: {e}", exc_info=True)
+        return 0.0

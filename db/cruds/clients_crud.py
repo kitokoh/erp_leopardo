@@ -882,6 +882,69 @@ class ClientsCRUD(GenericCRUD):
             logging.error(f"Unexpected error in get_active_clients_count_up_to_date: {ex}", exc_info=True)
             return 0
 
+    @_manage_conn
+    def get_clients_by_status_id(self, status_id: int, conn: sqlite3.Connection = None, include_deleted: bool = False) -> list[dict]:
+        """
+        Retrieves clients matching a specific status_id, including details from joined tables.
+        """
+        cursor = conn.cursor()
+        q_params = [status_id]
+        query = """
+        SELECT c.client_id, c.client_name, c.company_name, c.primary_need_description,
+               c.project_identifier, c.default_base_folder_path, c.selected_languages,
+               c.price, c.notes, c.created_at, c.category, c.status_id, c.country_id, c.city_id,
+               c.is_deleted, c.deleted_at, c.default_template_id,
+               co.country_name AS country, ci.city_name AS city,
+               s.status_name AS status, s.color_hex AS status_color, s.icon_name AS status_icon_name,
+               t.template_name AS default_template_name
+        FROM Clients c
+        LEFT JOIN Countries co ON c.country_id = co.country_id
+        LEFT JOIN Cities ci ON c.city_id = ci.city_id
+        LEFT JOIN StatusSettings s ON c.status_id = s.status_id AND s.status_type = 'Client'
+        LEFT JOIN Templates t ON c.default_template_id = t.template_id
+        WHERE c.status_id = ?
+        """
+
+        if not include_deleted:
+            query += " AND (c.is_deleted IS NULL OR c.is_deleted = 0)"
+
+        query += " ORDER BY c.client_name"
+
+        try:
+            cursor.execute(query, tuple(q_params))
+            return [dict(row) for row in cursor.fetchall()]
+        except sqlite3.Error as e:
+            self.logger.error(f"Failed to get clients for status_id {status_id}: {e}", exc_info=True)
+            return []
+
+    @_manage_conn
+    def get_client_count_by_country_id(self, country_id: int, conn: sqlite3.Connection = None, include_deleted: bool = False) -> int:
+        """
+        Counts clients for a specific country_id.
+
+        Args:
+            country_id (int): The ID of the country.
+            conn (sqlite3.Connection, optional): Database connection.
+            include_deleted (bool, optional): If True, includes soft-deleted clients. Defaults to False.
+
+        Returns:
+            int: The count of clients in the specified country.
+        """
+        cursor = conn.cursor()
+        sql = "SELECT COUNT(client_id) as count FROM Clients WHERE country_id = ?"
+        params = [country_id]
+
+        if not include_deleted:
+            sql += " AND (is_deleted IS NULL OR is_deleted = 0)"
+
+        try:
+            cursor.execute(sql, tuple(params))
+            row = cursor.fetchone()
+            return row['count'] if row else 0
+        except sqlite3.Error as e:
+            self.logger.error(f"Error getting client count for country_id {country_id}: {e}", exc_info=True)
+            return 0
+
 # Instantiate the CRUD class for easy import and use elsewhere
 clients_crud_instance = ClientsCRUD()
 
@@ -925,7 +988,9 @@ __all__ = [
     "get_client_notes",
     "get_clients_count_created_between",
     "get_total_clients_count_up_to_date",
-    "get_active_clients_count_up_to_date", # Added to __all__
+    "get_active_clients_count_up_to_date",
+    "get_client_count_by_country_id",
+    "get_clients_by_status_id", # Added new function
     "ClientsCRUD", # Exporting the class itself for type hinting or direct instantiation
     "clients_crud_instance" # Exporting the instance if needed elsewhere
 ]
