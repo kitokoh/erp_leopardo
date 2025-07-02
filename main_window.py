@@ -1158,6 +1158,7 @@ class DocumentManager(QMainWindow):
             else:
                 logging.info(f"Module '{module_name}' is DISABLED (state: {self.module_states.get(module_name)}). Action '{action_name}' NOT ADDED to Modules menu.")
 
+
         # Add separator if any module actions were added, before non-module specific actions like Carrier Map (if it's always there or handled differently)
         # For now, assuming Carrier Map is part of CONFIGURABLE_MODULES, so it's handled above.
         # If there are actions that should always appear after the conditional ones:
@@ -1275,12 +1276,15 @@ class DocumentManager(QMainWindow):
         logging.info(f"  Role '{role_name}': P_MANAGE_SYSTEM_SETTINGS={is_admin_or_similar}, P_CREATE_CLIENT={can_create_client}")
 
         # Menu Actions
+        log_msg_system_settings = f"Permission P_MANAGE_SYSTEM_SETTINGS for role '{role_name}': {'Granted' if is_admin_or_similar else 'Denied'}. Settings action {'enabled' if is_admin_or_similar else 'disabled'}."
+        logging.info(log_msg_system_settings)
         self.settings_action.setEnabled(is_admin_or_similar)
         logging.info(f"  Action 'settings_action' enabled: {is_admin_or_similar}")
         if hasattr(self, 'status_action'):
             can_manage_statuses = has_permission(role_name, P_MANAGE_STATUSES)
             self.status_action.setEnabled(can_manage_statuses)
             logging.info(f"  Action 'status_action' enabled: {can_manage_statuses} (Permission: P_MANAGE_STATUSES)")
+
 
         # Admin Menu visibility
         can_manage_users = has_permission(role_name, P_MANAGE_USERS)
@@ -1341,18 +1345,23 @@ class DocumentManager(QMainWindow):
                 permitted = True
                 log_perm_details = "No specific permission defined, defaulting to permitted if module is enabled."
 
+
             action_instance.setVisible(permitted)
             logging.info(f"  Module Action '{action_attr}' for '{module_name}': Visible: {permitted}. {log_perm_details}")
             # Note: setEnabled could also be used if the action should be visible but greyed out.
             # For menu items, setVisible(False) effectively removes them.
 
         # Main Buttons on Document View
+        log_msg_create_client = f"Permission P_CREATE_CLIENT for role '{role_name}': {'Granted' if can_create_client else 'Denied'}. "
+        log_msg_create_client += f"Add New Client button {'enabled' if can_create_client else 'disabled'}."
+        logging.info(log_msg_create_client)
         self.add_new_client_button.setEnabled(can_create_client)
         self.add_client_by_voice_button.setEnabled(can_create_client) # Assuming same permission
         logging.info(f"  Button 'add_new_client_button' enabled: {can_create_client}")
         logging.info(f"  Button 'add_client_by_voice_button' enabled: {can_create_client}")
 
         logging.info(f"Permissions application completed for role: {role_name}")
+
 
 
     def _update_user_display(self):
