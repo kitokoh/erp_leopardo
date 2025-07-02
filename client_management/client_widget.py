@@ -2135,15 +2135,17 @@ class ClientWidget(QWidget):
     def _handle_edit_pdf_action(self, file_path, document_id):
         if file_path and os.path.exists(file_path):
             QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
-        # layout = QVBoxLayout(self) # This line seems out of place, QVBoxLayout is already set for the widget
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(15)
+        else:
+            QMessageBox.warning(self, self.tr("Fichier Introuvable"),
+                                self.tr("Le fichier PDF spécifié est introuvable ou le chemin est invalide:\n{0}").format(file_path))
 
-        try:
-            self._setup_main_tabs_section(layout) #FIXED
-            # --- Collapsible Client Info Section ---
-            self.client_info_group_box = QGroupBox(self.client_info.get('client_name', self.tr("Client Information")))
-            self.client_info_group_box.setCheckable(True)
+        # --- Collapsible Client Info Section ---
+        # try: # This try block was part of the original erroneous structure and should be removed or properly handled.
+            # For now, removing the try and focusing on the layout calls.
+            # self._setup_main_tabs_section(layout) # This call was also part of the erroneous structure.
+
+        self.client_info_group_box = QGroupBox(self.client_info.get('client_name', self.tr("Client Information")))
+        self.client_info_group_box.setCheckable(True)
             client_info_group_layout = QVBoxLayout(self.client_info_group_box) # Layout for the GroupBox itself
 
             self.info_container_widget = QWidget() # Container for all info elements
@@ -2831,13 +2833,9 @@ class ClientWidget(QWidget):
     def _handle_edit_pdf_action(self, file_path, document_id):
         if file_path and os.path.exists(file_path):
             QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
-        try:
-            self._setup_main_tabs_section(layout) #FIXED
-            self.notes_edit.textChanged.disconnect(self.save_client_notes)
-        except TypeError:
-            pass # Signal was not connected or already disconnected
-        self.notes_edit.installEventFilter(self)
-
+        else:
+            QMessageBox.warning(self, self.tr("Fichier Introuvable"),
+                                self.tr("Le fichier PDF spécifié est introuvable ou le chemin est invalide:\n{0}").format(file_path))
 
         # --- Collapsible Notes Section ---
         self.notes_group_box = QGroupBox(self.tr("Notes"))
