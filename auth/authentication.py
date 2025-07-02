@@ -73,8 +73,12 @@ def logout():
     if _current_user_data:
         logger.info(f"User '{_current_user_data.get('username')}' logged out.")
         _current_user_data = None
+        clear_remember_me_preference() # Clear remember me on explicit logout
     else:
         logger.info("Logout called but no user was logged in.")
+        # Optionally, clear remember me even if no user was logged in,
+        # as a safety measure if logout is called unexpectedly.
+        clear_remember_me_preference()
 
 def get_current_user() -> dict | None:
     """
