@@ -872,10 +872,14 @@ class StatisticsDashboard(QWidget):
             # chart_layout remains None
 
         if not chart_layout: # This catches both KeyError and if chart_layout was None for other reasons
-            logging.error("Chart layout for 'status' is effectively None or not found. Cannot proceed with chart update.")
-            # To provide more context if .get() was behaving weirdly (though direct access might clarify)
+            logging.error(
+                f"Chart layout for 'status' evaluates to False (likely C++ object deleted), though Python proxy exists: {chart_layout}. Cannot proceed with chart update."
+            )
+            # To provide more context
             if "status" in self.segmentation_canvases:
-                 logging.warning(f"Key 'status' IS IN self.segmentation_canvases, but direct access failed or resulted in None. Value: {self.segmentation_canvases.get('status')}")
+                 logging.warning(f"Key 'status' IS IN self.segmentation_canvases. Current value from .get(): {self.segmentation_canvases.get('status')}, Type: {type(self.segmentation_canvases.get('status'))}")
+            else:
+                 logging.warning(f"Key 'status' IS NOT IN self.segmentation_canvases. Current dict: {self.segmentation_canvases}")
             return
 
         # Clear previous canvas if any

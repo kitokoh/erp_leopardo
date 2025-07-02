@@ -297,7 +297,27 @@ class ClientsCRUD(GenericCRUD):
         try:
             cursor.execute(sql, params)
             # conn.commit() # Handled by _manage_conn
-            return {'success': cursor.rowcount > 0, 'updated_count': cursor.rowcount}
+            updated_count = cursor.rowcount
+
+            # If client is being marked as deleted, also soft-delete their documents
+            if data_to_set.get('is_deleted') == 1 or data_to_set.get('is_deleted') is True:
+                self.logger.info(f"Client {client_id} is being marked as deleted. Soft-deleting associated documents.")
+                from . import client_documents_crud # Local import
+                client_docs = client_documents_crud.get_documents_for_client(client_id, include_deleted=False, fetch_only_latest_versions=False, conn=conn)
+                if client_docs:
+                    for doc in client_docs:
+                        doc_id = doc.get('document_id')
+                        if doc_id:
+                            delete_success = client_documents_crud.delete_client_document(doc_id, conn=conn)
+                            if not delete_success:
+                                self.logger.error(f"Failed to soft-delete document {doc_id} for client {client_id} during client update-to-deleted.")
+                                # Decide on error handling: raise exception to rollback, or just log?
+                                # For now, log and continue. Transaction will commit if client update was successful.
+                    self.logger.info(f"Finished attempting to soft-delete {len(client_docs)} documents for client {client_id}.")
+                else:
+                    self.logger.info(f"No active documents found to soft-delete for client {client_id} during update-to-deleted.")
+
+            return {'success': updated_count > 0, 'updated_count': updated_count}
         except sqlite3.Error as e:
             logging.error(f"clients_crud.update_client: Failed to update client {client_id} with data {data_to_set}. Error: {type(e).__name__} - {e}", exc_info=True)
             # conn.rollback() # Handled by _manage_conn
@@ -318,6 +338,7 @@ class ClientsCRUD(GenericCRUD):
                   {'success': False, 'error': 'Reason for failure.'} on failure.
         """
         from . import status_settings_crud # Local import for status operations
+        from . import client_documents_crud # Local import for document operations
 
         if not client_id:
             self.logger.warning("delete_client called with no client_id.")
@@ -353,6 +374,24 @@ class ClientsCRUD(GenericCRUD):
 
         try:
             cursor = conn.cursor()
+
+            # Soft-delete associated documents first
+            self.logger.info(f"Client {client_id} is being soft-deleted via delete_client. Soft-deleting associated documents.")
+            client_docs = client_documents_crud.get_documents_for_client(client_id, include_deleted=False, fetch_only_latest_versions=False, conn=conn)
+            if client_docs:
+                for doc in client_docs:
+                    doc_id = doc.get('document_id')
+                    if doc_id:
+                        delete_success = client_documents_crud.delete_client_document(doc_id, conn=conn)
+                        if not delete_success:
+                            self.logger.error(f"Failed to soft-delete document {doc_id} for client {client_id} during client soft deletion.")
+                            # If critical, could raise an error here to rollback transaction.
+                            # For now, logging and continuing.
+                self.logger.info(f"Finished attempting to soft-delete {len(client_docs)} documents for client {client_id}.")
+            else:
+                self.logger.info(f"No active documents found to soft-delete for client {client_id} during soft deletion.")
+
+            # Now, update the client record
             cursor.execute(sql, tuple(params))
             if cursor.rowcount > 0:
                 message = f"Client {client_id} soft deleted."
