@@ -10,7 +10,7 @@ DATABASE_PATH = os.path.join(APP_ROOT_DIR, DATABASE_NAME)
 # --- Default Admin User Settings (for initial seeding) ---
 DEFAULT_ADMIN_USERNAME = "admin"
 # For production, ensure DEFAULT_ADMIN_PASSWORD environment variable is set to a strong, unique password.
-DEFAULT_ADMIN_PASSWORD = os.getenv("DEFAULT_ADMIN_PASSWORD", "adminpassword_dev_fallback")
+DEFAULT_ADMIN_PASSWORD = os.getenv("DEFAULT_ADMIN_PASSWORD", "admin")
 
 # --- Path Settings ---
 LOGO_SUBDIR = "company_logos"
