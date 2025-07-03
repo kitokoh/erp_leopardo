@@ -182,10 +182,17 @@ def initialize_database():
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         last_login_at TIMESTAMP,
+        -- Nouveaux champs pour l'authentification biométrique
+        is_fingerprint_auth_enabled BOOLEAN DEFAULT FALSE,
+        fingerprint_template_id TEXT, -- Pourrait être utilisé par l'OS ou une lib
+        is_face_auth_enabled BOOLEAN DEFAULT FALSE,
+        face_template_id TEXT,
+        is_voice_auth_enabled BOOLEAN DEFAULT FALSE,
+        voice_profile_id TEXT,
         FOREIGN KEY (role_id) REFERENCES Roles (role_id)
     )
     """)
-    print("DEBUG_INIT_DB: Table Users created or exists (with role_id FK).")
+    print("DEBUG_INIT_DB: Table Users created or exists (with role_id FK and biometric fields).")
 
     # Ensure is_deleted, and deleted_at columns exist in Users table (for migration from older schemas)
     cursor.execute("PRAGMA table_info(Users)")
@@ -212,6 +219,53 @@ def initialize_database():
             print("Added 'deleted_at' column to Users table.")
         except sqlite3.Error as e_alter_deleted_at:
             print(f"Error adding 'deleted_at' column to Users table: {e_alter_deleted_at}")
+
+    # Assurer que les nouveaux champs biométriques existent pour les bases de données existantes
+    cursor.execute("PRAGMA table_info(Users)")
+    users_columns_info_bio = cursor.fetchall() # Utiliser un nouveau nom de variable
+    users_column_names_bio = [info['name'] for info in users_columns_info_bio]
+
+    if 'is_fingerprint_auth_enabled' not in users_column_names_bio:
+        try:
+            cursor.execute("ALTER TABLE Users ADD COLUMN is_fingerprint_auth_enabled BOOLEAN DEFAULT FALSE")
+            print("Added 'is_fingerprint_auth_enabled' column to Users table.")
+        except sqlite3.Error as e_alter_bio:
+            print(f"Error adding 'is_fingerprint_auth_enabled' column to Users table: {e_alter_bio}")
+
+    if 'fingerprint_template_id' not in users_column_names_bio:
+        try:
+            cursor.execute("ALTER TABLE Users ADD COLUMN fingerprint_template_id TEXT")
+            print("Added 'fingerprint_template_id' column to Users table.")
+        except sqlite3.Error as e_alter_bio:
+            print(f"Error adding 'fingerprint_template_id' column to Users table: {e_alter_bio}")
+
+    if 'is_face_auth_enabled' not in users_column_names_bio:
+        try:
+            cursor.execute("ALTER TABLE Users ADD COLUMN is_face_auth_enabled BOOLEAN DEFAULT FALSE")
+            print("Added 'is_face_auth_enabled' column to Users table.")
+        except sqlite3.Error as e_alter_bio:
+            print(f"Error adding 'is_face_auth_enabled' column to Users table: {e_alter_bio}")
+
+    if 'face_template_id' not in users_column_names_bio:
+        try:
+            cursor.execute("ALTER TABLE Users ADD COLUMN face_template_id TEXT")
+            print("Added 'face_template_id' column to Users table.")
+        except sqlite3.Error as e_alter_bio:
+            print(f"Error adding 'face_template_id' column to Users table: {e_alter_bio}")
+
+    if 'is_voice_auth_enabled' not in users_column_names_bio:
+        try:
+            cursor.execute("ALTER TABLE Users ADD COLUMN is_voice_auth_enabled BOOLEAN DEFAULT FALSE")
+            print("Added 'is_voice_auth_enabled' column to Users table.")
+        except sqlite3.Error as e_alter_bio:
+            print(f"Error adding 'is_voice_auth_enabled' column to Users table: {e_alter_bio}")
+
+    if 'voice_profile_id' not in users_column_names_bio:
+        try:
+            cursor.execute("ALTER TABLE Users ADD COLUMN voice_profile_id TEXT")
+            print("Added 'voice_profile_id' column to Users table.")
+        except sqlite3.Error as e_alter_bio:
+            print(f"Error adding 'voice_profile_id' column to Users table: {e_alter_bio}")
 
     # Create Companies table (base from ca.py)
     cursor.execute("""
