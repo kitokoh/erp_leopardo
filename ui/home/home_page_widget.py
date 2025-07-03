@@ -138,12 +138,45 @@ class HomePageWidget(QWidget):
 
         main_v_layout.addLayout(center_h_layout)
 
-        # Bottom Area for Map
+        # Bottom Area for Map and Promotional Sections
+        bottom_h_layout = QHBoxLayout()
+        bottom_h_layout.setContentsMargins(10, 5, 10, 10) # Added some margins
+        bottom_h_layout.setSpacing(10) # Added spacing between sections
+
+        # Left Promotional Area
+        self.left_promo_area = QFrame()
+        self.left_promo_area.setObjectName("leftPromoArea")
+        self.left_promo_area.setFrameShape(QFrame.StyledPanel) # Example styling
+        # self.left_promo_area.setFixedWidth(200) # Example fixed width, adjust as needed
+        self.left_promo_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        left_promo_layout = QVBoxLayout(self.left_promo_area)
+        left_promo_label = QLabel(self.tr("Espace Promo Gauche"))
+        left_promo_label.setAlignment(Qt.AlignCenter)
+        left_promo_layout.addWidget(left_promo_label)
+        self.left_promo_area.setLayout(left_promo_layout)
+
+        # Center Map Area
         self.bottom_content_area = QStackedWidget()
         self.bottom_content_area.setObjectName("homePageBottomContentArea")
         self.bottom_content_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        main_v_layout.addWidget(self.bottom_content_area, 1)
 
+        # Right Promotional Area
+        self.right_promo_area = QFrame()
+        self.right_promo_area.setObjectName("rightPromoArea")
+        self.right_promo_area.setFrameShape(QFrame.StyledPanel) # Example styling
+        # self.right_promo_area.setFixedWidth(200) # Example fixed width, adjust as needed
+        self.right_promo_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        right_promo_layout = QVBoxLayout(self.right_promo_area)
+        right_promo_label = QLabel(self.tr("Espace Promo Droit"))
+        right_promo_label.setAlignment(Qt.AlignCenter)
+        right_promo_layout.addWidget(right_promo_label)
+        self.right_promo_area.setLayout(right_promo_layout)
+
+        bottom_h_layout.addWidget(self.left_promo_area, 1) # Stretch factor 1 for left promo
+        bottom_h_layout.addWidget(self.bottom_content_area, 3) # Stretch factor 3 for map (larger)
+        bottom_h_layout.addWidget(self.right_promo_area, 1) # Stretch factor 1 for right promo
+
+        main_v_layout.addLayout(bottom_h_layout, 1) # Add the horizontal layout to the main vertical layout
 
         self.setLayout(main_v_layout)
 
