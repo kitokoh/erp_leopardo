@@ -71,13 +71,15 @@ class ClientsCRUD(GenericCRUD):
         sql = """INSERT INTO Clients
                  (client_id, client_name, company_name, primary_need_description, project_identifier,
                   country_id, city_id, default_base_folder_path, status_id, selected_languages,
-                  price, notes, category, created_at, updated_at, created_by_user_id, is_deleted, deleted_at, default_template_id)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"""
+                  price, notes, category, lead_source, created_at, updated_at, created_by_user_id,
+                  is_deleted, deleted_at, default_template_id)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""" # Added lead_source, increased ? count
         params = (new_id, data.get('client_name'), data.get('company_name'), data.get('primary_need_description'),
                   data.get('project_identifier', 'N/A'), data.get('country_id'), data.get('city_id'),
                   data.get('default_base_folder_path'), data.get('status_id'),
                   data.get('selected_languages'), data.get('price', 0), data.get('notes'),
-                  data.get('category'), now, now, data.get('created_by_user_id'),
+                  data.get('category'), data.get('lead_source'), # Added lead_source
+                  now, now, data.get('created_by_user_id'),
                   data['is_deleted'], data['deleted_at'], data.get('default_template_id'))
         try:
             cursor.execute(sql, params)
@@ -274,8 +276,8 @@ class ClientsCRUD(GenericCRUD):
 
         valid_cols = ['client_name', 'company_name', 'primary_need_description', 'project_identifier',
                       'country_id', 'city_id', 'default_base_folder_path', 'status_id',
-                      'selected_languages', 'price', 'notes', 'category', 'updated_at',
-                      'created_by_user_id', 'is_deleted', 'deleted_at', 'default_template_id'] # Added soft delete fields and default_template_id
+                      'selected_languages', 'price', 'notes', 'category', 'lead_source', 'updated_at', # Added lead_source
+                      'created_by_user_id', 'is_deleted', 'deleted_at', 'default_template_id']
 
         data_to_set = {}
         for k, v in client_data.items():

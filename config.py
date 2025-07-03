@@ -36,5 +36,10 @@ COMPANY_FACTURES_DIR_PATH = os.path.join(APP_ROOT_DIR, COMPANY_FACTURES_SUBDIR)
 # Example: API_SECRET_KEY = os.getenv("API_SECRET_KEY", "a_sEcReT_kEy_for_dev_only")
 # (This is handled in api/auth.py, but could be centralized here if desired for other keys)
 
+# --- License Management Settings ---
+LICENSE_REQUEST_SERVER_URL = "http://127.0.0.1:5678/api/license/request"
+
+
 # print(f"Config loaded. Database Path: {DATABASE_PATH}")
 # print(f"Root app dir: {APP_ROOT_DIR}")
+

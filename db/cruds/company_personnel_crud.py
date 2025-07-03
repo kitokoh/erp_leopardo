@@ -72,6 +72,8 @@ __all__ = [
     "unlink_contact_from_personnel",
     "delete_all_contact_links_for_personnel",
     "get_personnel_linked_to_contact", # Added export
+
+    "link_existing_contact_to_personnel", # Added export for the new function
 ]
 
 # --- CompanyPersonnelContacts Link Table CRUD ---
@@ -285,3 +287,42 @@ def get_personnel_linked_to_contact(contact_id: int, conn: sqlite3.Connection = 
     except sqlite3.Error as e:
         logger.error(f"Database error in get_personnel_linked_to_contact for contact_id {contact_id}: {e}")
         return []
+
+
+@_manage_conn
+def link_existing_contact_to_personnel(personnel_id: int, contact_id: int, is_primary: bool = False, can_receive_documents: bool = True, conn: sqlite3.Connection = None) -> int | None:
+    """
+    Links an existing central contact to a company personnel in the CompanyPersonnelContacts table.
+    Args:
+        personnel_id: The ID of the CompanyPersonnel record.
+        contact_id: The ID of the existing Contact record.
+        is_primary: Whether this contact is the primary contact for the personnel.
+        can_receive_documents: Whether this contact can receive documents for the personnel.
+        conn: Database connection.
+    Returns:
+        The ID of the new link (company_personnel_contact_id), or None if linking failed.
+    """
+    now = datetime.utcnow().isoformat()
+    sql_link = """
+        INSERT INTO CompanyPersonnelContacts (personnel_id, contact_id, is_primary, can_receive_documents, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """
+    params_link = (personnel_id, contact_id, is_primary, can_receive_documents, now, now)
+    cursor = conn.cursor()
+    try:
+        cursor.execute(sql_link, params_link)
+        new_link_id = cursor.lastrowid
+        logger.info(f"Linked existing contact_id {contact_id} to personnel_id {personnel_id} with company_personnel_contact_id: {new_link_id}.")
+        return new_link_id
+    except sqlite3.IntegrityError as e:
+        # Check if it's a unique constraint violation (personnel_id, contact_id)
+        # The specific error message for unique constraint can vary by SQLite version/config.
+        # A common one is "UNIQUE constraint failed: CompanyPersonnelContacts.personnel_id, CompanyPersonnelContacts.contact_id"
+        if "UNIQUE constraint failed" in str(e) and "personnel_id" in str(e) and "contact_id" in str(e):
+             logger.warning(f"Failed to link existing contact {contact_id} to personnel {personnel_id}. Link likely already exists.")
+        else:
+            logger.error(f"Integrity error linking existing contact {contact_id} to personnel {personnel_id}: {e}")
+        return None
+    except sqlite3.Error as e:
+        logger.error(f"Database error linking existing contact {contact_id} to personnel {personnel_id}: {e}")
+        return None

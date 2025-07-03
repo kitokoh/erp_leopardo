@@ -106,7 +106,6 @@ try:
 except ImportError:
     from dashboard_extensions import ProjectTemplateManager
 
-from Installsweb.installmodules import InstallerDialog
 
 # # For FaceMainWindow, its location is unknown. Assuming a placeholder for now.
 # try:
@@ -1269,10 +1268,8 @@ class MainDashboard(QWidget): # Changed from QMainWindow to QWidget
     def edit_user_access(self, user_id_str): pass
     def save_account_settings(self): pass # This one was duplicated, ensure only one remains
     def save_preferences(self): pass
-    def add_on_page(self):
-        # from ..Installsweb.installmodules import InstallerDialog # Path adjusted
-        dialog = InstallerDialog(self)
-        dialog.exec_()
+    def add_on_page(self):pass
+    
     def open_facebook(self):
         # from ..face_main_window import FaceMainWindow # Path adjusted
         # ... (rest of method) ...

@@ -138,14 +138,85 @@ class HomePageWidget(QWidget):
 
         main_v_layout.addLayout(center_h_layout)
 
-        # Bottom Area for Map
+        # Bottom Area for Map and Promotional Sections
+        bottom_h_layout = QHBoxLayout()
+        bottom_h_layout.setContentsMargins(10, 5, 10, 10) # Added some margins
+        bottom_h_layout.setSpacing(10) # Added spacing between sections
+
+from .promo_content_manager import PromoContentManager
+from .promo_widgets import PromoSectionWidget
+
+        # --- Initialize Promo Content Manager ---
+        self.promo_manager = PromoContentManager()
+
+        # Left Promotional Area
+        self.left_promo_widget = PromoSectionWidget()
+        # self.left_promo_widget.setFixedWidth(200) # Example fixed width
+        self.left_promo_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+        left_message = self.promo_manager.get_random_message()
+        if left_message:
+            self.left_promo_widget.set_content(left_message.get("title", ""), left_message.get("body", ""))
+        else:
+            self.left_promo_widget.set_content(self.tr("Info"), self.tr("Aucun message promotionnel disponible."))
+
+        # Connect click to refresh content (example)
+        self.left_promo_widget.clicked.connect(lambda: self.update_promo_widget_content(self.left_promo_widget))
+
+
+
+        # Center Map Area
         self.bottom_content_area = QStackedWidget()
         self.bottom_content_area.setObjectName("homePageBottomContentArea")
         self.bottom_content_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        main_v_layout.addWidget(self.bottom_content_area, 1)
 
+        # Right Promotional Area
+        self.right_promo_widget = PromoSectionWidget()
+        # self.right_promo_widget.setFixedWidth(200) # Example fixed width
+        self.right_promo_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+        right_message = self.promo_manager.get_random_message()
+        # Ensure the right message is different from the left one if possible
+        if self.promo_manager.messages and len(self.promo_manager.messages) > 1:
+            while right_message == left_message: # left_message is defined in the previous block for left_promo_widget
+                right_message = self.promo_manager.get_random_message()
+
+        if right_message:
+            self.right_promo_widget.set_content(right_message.get("title", ""), right_message.get("body", ""))
+        else:
+            # Fallback if only one or no message, or if left_message itself was None
+            self.right_promo_widget.set_content(self.tr("Avis"), self.tr("Consultez nos dernières mises à jour."))
+
+        # Connect click to refresh content (example)
+        self.right_promo_widget.clicked.connect(lambda: self.update_promo_widget_content(self.right_promo_widget))
+
+        bottom_h_layout.addWidget(self.left_promo_widget, 1) # Stretch factor 1 for left promo
+        bottom_h_layout.addWidget(self.bottom_content_area, 3) # Stretch factor 3 for map (larger)
+        bottom_h_layout.addWidget(self.right_promo_widget, 1) # Stretch factor 1 for right promo
+
+
+        main_v_layout.addLayout(bottom_h_layout, 1) # Add the horizontal layout to the main vertical layout
 
         self.setLayout(main_v_layout)
+
+    def update_promo_widget_content(self, promo_widget_instance):
+        """Fetches a new random message and updates the given PromoSectionWidget."""
+        message = self.promo_manager.get_random_message()
+        if message:
+            # Simple logic to try not to show the exact same message immediately
+            current_title = promo_widget_instance.title_label.text()
+            current_body = promo_widget_instance.body_label.text()
+            if message.get("title") == current_title and message.get("body") == current_body and len(self.promo_manager.messages) > 1:
+                new_message = self.promo_manager.get_random_message()
+                # Try one more time to get a different one
+                while new_message == message and len(self.promo_manager.messages) > 1:
+                    new_message = self.promo_manager.get_random_message()
+                message = new_message
+
+            promo_widget_instance.set_content(message.get("title", ""), message.get("body", ""))
+        else:
+            promo_widget_instance.set_content(self.tr("Info"), self.tr("Contenu non disponible pour le moment."))
+
 
     def set_bottom_widget(self, widget_to_display):
         while self.bottom_content_area.count() > 0:

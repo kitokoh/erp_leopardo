@@ -10,6 +10,27 @@ import logging
 
 # Assuming CRUDS and Dialogs will be imported when needed
 from db.cruds import contacts_crud, entity_contacts_crud, client_contacts_crud, company_personnel_crud
+from datetime import datetime # Added for the manual linking example, can be removed if CRUD handles timestamps
+
+# Assuming CRUDS and Dialogs will be imported when needed
+from db.cruds import (
+    contacts_crud,
+    entity_contacts_crud,
+    # client_contacts_crud, # This was the problematic direct module import
+    company_personnel_crud,
+    # Import the aliased functions from __init__.py
+    get_clients_for_contact_from_link_table,
+    link_contact_to_client_in_link_table,
+    # The following are not directly used by this widget yet, but imported for completeness if needed later
+    # unlink_contact_from_client_in_link_table,
+    # get_specific_client_contact_link_details_from_link_table,
+    # update_client_contact_link_in_link_table,
+    # check_if_contact_linked_to_client
+
+    # Import the new function from company_personnel_crud (via __init__.py)
+    link_existing_contact_to_personnel
+)
+from PyQt5.QtWidgets import QMessageBox # Added for error/info messages
 from dialogs.contact_dialog import ContactDialog # Corrected relative import path if necessary
 
 logger = logging.getLogger(__name__)
@@ -295,6 +316,7 @@ class ContactsManagerWidget(QWidget):
 
             # 2. Clients from ClientContacts
             linked_clients = client_contacts_crud.get_clients_for_contact(contact_id)
+
             for client in linked_clients:
                 role = self.tr("Contact")
                 if client.get('is_primary_for_client'):
@@ -319,11 +341,14 @@ class ContactsManagerWidget(QWidget):
                     role_display
                 )
 
+
             self.linked_entities_table.resizeColumnsToContents()
             self.linked_entities_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
 
         except Exception as e:
-            logger.error(f"Erreur lors du chargement des entités liées pour contact {contact_id}: {e}", exc_info=True)
+
+            logger.error(f"Erreur majeure lors du chargement des entités liées pour contact {contact_id}: {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("Une erreur critique est survenue lors du chargement des entités liées."))
         finally:
             self.linked_entities_table.setSortingEnabled(True)
 
@@ -345,10 +370,104 @@ class ContactsManagerWidget(QWidget):
             if current_user_id:
                 contact_data['created_by_user_id'] = current_user_id
 
-            new_id = contacts_crud.add_contact(contact_data)
-            if new_id:
-                self.load_contacts() # Refresh the list
-                # Optionally, select the new contact
+            try:
+                new_id = contacts_crud.add_contact(contact_data)
+                if new_id:
+                    self.load_contacts() # Refresh the list
+                    # Optionally, select the new contact
+                    for row in range(self.contacts_table.rowCount()):
+                        if self.contacts_table.item(row, 0).data(Qt.UserRole) == new_id:
+                            self.contacts_table.selectRow(row)
+                            break
+                    QMessageBox.information(self, self.tr("Succès"), self.tr("Contact ajouté avec succès."))
+                else:
+                    QMessageBox.warning(self, self.tr("Erreur"), self.tr("Impossible d'ajouter le contact (pas d'ID retourné)."))
+            except Exception as e:
+                logger.error(f"Erreur lors de l'ajout du contact: {e}", exc_info=True)
+                QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("Une erreur critique est survenue lors de l'ajout du contact:\n{e}"))
+
+    def on_edit_contact(self):
+        selected_items = self.contacts_table.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, self.tr("Sélection"), self.tr("Veuillez sélectionner un contact à modifier."))
+            return
+
+        contact_id = selected_items[0].data(Qt.UserRole)
+        if contact_id is None: return
+
+        try:
+            contact_data_to_edit = contacts_crud.get_contact_by_id(contact_id)
+            if not contact_data_to_edit:
+                QMessageBox.warning(self, self.tr("Erreur"), self.tr("Contact non trouvé dans la base de données."))
+                self.load_contacts() # Refresh list
+                return
+        except Exception as e:
+            logger.error(f"Erreur lors de la récupération du contact {contact_id} pour édition: {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur Données"), self.tr("Impossible de récupérer les détails du contact pour édition."))
+            return
+
+        dialog = ContactDialog(contact_data=contact_data_to_edit, manage_link_fields=False, parent=self)
+        if dialog.exec_() == QDialog.Accepted:
+            updated_data = dialog.get_contact_data()
+            try:
+                if contacts_crud.update_contact(contact_id, updated_data):
+                    self.load_contacts() # Refresh the list
+                    # Reselect the row
+                    for row in range(self.contacts_table.rowCount()):
+                        if self.contacts_table.item(row, 0).data(Qt.UserRole) == contact_id:
+                            self.contacts_table.selectRow(row)
+                            break
+                    QMessageBox.information(self, self.tr("Succès"), self.tr("Contact mis à jour avec succès."))
+                else:
+                    QMessageBox.warning(self, self.tr("Erreur"), self.tr("Impossible de mettre à jour le contact (opération échouée)."))
+            except Exception as e:
+                logger.error(f"Erreur lors de la mise à jour du contact {contact_id}: {e}", exc_info=True)
+                QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("Une erreur critique est survenue lors de la mise à jour du contact:\n{e}"))
+
+    def on_delete_contact(self):
+        selected_items = self.contacts_table.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, self.tr("Sélection"), self.tr("Veuillez sélectionner un contact à supprimer."))
+            return
+
+        contact_id = selected_items[0].data(Qt.UserRole)
+        contact_name_display = selected_items[0].text()
+        if contact_id is None: return
+
+        linked_count = 0
+        try:
+            linked_count += len(entity_contacts_crud.get_entities_for_contact(contact_id) or [])
+            linked_count += len(get_clients_for_contact_from_link_table(contact_id) or [])
+            linked_count += len(company_personnel_crud.get_personnel_linked_to_contact(contact_id) or [])
+        except Exception as e:
+            logger.error(f"Erreur lors du comptage des entités liées pour le contact {contact_id}: {e}", exc_info=True)
+            QMessageBox.warning(self, self.tr("Erreur Comptage"), self.tr("Impossible de vérifier complètement les liens du contact. Procéder avec prudence."))
+            # Optionally, allow to proceed or not based on this partial info. For now, we proceed.
+
+        msg = self.tr(f"Êtes-vous sûr de vouloir supprimer définitivement le contact '{contact_name_display}'?")
+        if linked_count > 0:
+            msg += self.tr(f"\n\nCe contact est lié à {linked_count} entité(s).\nLa suppression entraînera la suppression de ces liens.")
+        else:
+            msg += self.tr("\n\nCe contact n'est actuellement lié à aucune autre entité connue.")
+        msg += self.tr("\nCette action est irréversible.")
+
+        reply = QMessageBox.question(self, self.tr("Confirmation de Suppression"), msg, QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+
+        if reply == QMessageBox.Yes:
+            try:
+                if contacts_crud.delete_contact(contact_id):
+                    self.load_contacts()
+                    self._clear_details_panel(clear_contact_form=True, clear_linked_entities=True)
+                    self._update_action_buttons_state()
+                    QMessageBox.information(self, self.tr("Succès"), self.tr("Contact supprimé avec succès."))
+                else:
+                    QMessageBox.warning(self, self.tr("Erreur"), self.tr("Impossible de supprimer le contact (opération échouée)."))
+            except Exception as e:
+                logger.error(f"Erreur lors de la suppression du contact {contact_id}: {e}", exc_info=True)
+                QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("Une erreur critique est survenue lors de la suppression du contact:\n{e}"))
+
+    def on_link_to_entity(self):
+        selected_items = self.contacts_table.selectedItems()
                 for row in range(self.contacts_table.rowCount()):
                     if self.contacts_table.item(row, 0).data(Qt.UserRole) == new_id:
                         self.contacts_table.selectRow(row)
@@ -411,6 +530,7 @@ class ContactsManagerWidget(QWidget):
         try:
             linked_count += len(entity_contacts_crud.get_entities_for_contact(contact_id))
             linked_count += len(client_contacts_crud.get_clients_for_contact(contact_id))
+
             linked_count += len(company_personnel_crud.get_personnel_linked_to_contact(contact_id))
         except Exception as e:
             logger.error(f"Erreur lors du comptage des entités liées pour le contact {contact_id}: {e}")
@@ -501,9 +621,36 @@ class ContactsManagerWidget(QWidget):
                     new_link_id = None
 
                     try:
+
+                        entity_id_to_use = entity_id # Default to string for generic entities
+
+                        if entity_type_str in ["Transporter", "FreightForwarder", "MoneyTransferAgent", "Partner"]:
+                            # For these, entity_id might be a string or int depending on their specific schemas.
+                            # entity_contacts_crud.link_contact_to_entity should handle type appropriately.
+                            # If they must be int, conversion with error handling would be needed here too.
+                            # For now, assume entity_contacts_crud is flexible or their IDs are typically strings.
+                            pass # entity_id_to_use remains as string from input for these
+
+                        elif entity_type_str == "Client":
+                            try:
+                                entity_id_to_use = int(entity_id)
+                            except ValueError:
+                                logger.error(f"Invalid Client ID format: {entity_id}. Must be an integer.")
+                                QMessageBox.warning(self, self.tr("Erreur ID Client"), self.tr("L'ID du client doit être un nombre entier."))
+                                return # Abort if client ID is invalid
+
+                        elif entity_type_str == "CompanyPersonnel":
+                            try:
+                                entity_id_to_use = int(entity_id)
+                            except ValueError:
+                                logger.error(f"Invalid Personnel ID format: {entity_id}. Must be an integer.")
+                                QMessageBox.warning(self, self.tr("Erreur ID Personnel"), self.tr("L'ID du personnel doit être un nombre entier."))
+                                return # Abort if personnel ID is invalid
+
+                        # Proceed with linking only if entity_id_to_use is valid for the type
                         if entity_type_str in ["Transporter", "FreightForwarder", "MoneyTransferAgent", "Partner"]:
                             new_link_id = entity_contacts_crud.link_contact_to_entity(
-                                entity_id=entity_id,
+                                entity_id=entity_id_to_use, # Use potentially string ID
                                 entity_type=entity_type_str,
                                 contact_id=contact_id,
                                 role_in_entity=link_details.get('role_in_entity'),
@@ -554,6 +701,7 @@ class ContactsManagerWidget(QWidget):
                             client_contacts_crud._release_conn_to_pool(conn)
                             success = new_link_id is not None
                             logger.info(f"Manually linked contact {contact_id} to personnel {entity_id}, link ID: {new_link_id}")
+
 
 
                         if success:

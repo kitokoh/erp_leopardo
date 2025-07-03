@@ -1294,3 +1294,4 @@ def initialize_default_templates(config, app_root_dir):
 # if __name__ == "__main__": # Or rather, in main.py
 #     setup_logging() # Call early
 #     initialize_default_templates(CONFIG, APP_ROOT_DIR)
+
