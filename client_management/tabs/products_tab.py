@@ -259,4 +259,4 @@ class ProductsTab(QWidget):
         """Public method to refresh data, callable from parent if needed."""
         self.load_products()
 
-```
+# ```

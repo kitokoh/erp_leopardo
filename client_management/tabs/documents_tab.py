@@ -489,4 +489,4 @@ class DocumentsTab(QWidget):
         # This is generally handled by not providing edit/delete buttons.
         # If table had direct editing, it would need to be setReadOnly(!can_manage_documents)
 
-```
+# ```
