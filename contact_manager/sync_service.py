@@ -131,38 +131,74 @@ def _transform_platform_contact_to_google(platform_contact: dict, contact_type: 
     else:
         logging.warning(f"Could not determine local ID for platform_contact of type {contact_type}. UserDefined fields not set.")
 
-    # Specific mappings based on contact_type
-    if contact_type == 'client_contact': # From Contacts table (linked via ClientContacts)
-        # google_person["organizations"] = [{"name": platform_contact.get("company_name", ""), "current": True}]
-        # Notes might go into biographies
-        notes = platform_contact.get("notes")
-        if notes: google_person["biographies"] = [{"value": notes, "contentType": "TEXT_PLAIN"}]
-        if platform_contact.get("position"):
-             google_person["organizations"] = [{"title": platform_contact.get("position"), "name": platform_contact.get("company_name",""), "current": True}]
+    # Specific mappings (primarily for 'client_contact' type which comes from the main Contacts table)
+    # For 'partner_contact' or 'company_personnel', the platform_contact data might be simpler
+    # and some fields below might not be present.
+
+    # Organizations (company and position/title)
+    org_name = platform_contact.get("company_name")
+    org_title = platform_contact.get("position") # 'position' from local Contacts table
+    if contact_type == 'company_personnel': # CompanyPersonnel has 'role' field
+        org_title = platform_contact.get("role", org_title)
+        # For company_personnel, company_name might need to be fetched via company_id if not in platform_contact directly
+
+    if org_name or org_title:
+        google_person["organizations"] = [{"name": org_name or "", "title": org_title or "", "current": True}]
+
+    # Biographies (notes)
+    notes = platform_contact.get("notes")
+    if notes:
+        google_person["biographies"] = [{"value": notes, "contentType": "TEXT_PLAIN"}]
+
+    # Birthdays
+    birthday_str = platform_contact.get("birthday_date") # Expected format YYYY-MM-DD
+    if birthday_str:
+        try:
+            # Google expects date components separately
+            year, month, day = map(int, birthday_str.split('-', 2))
+            google_person["birthdays"] = [{"date": {"year": year, "month": month, "day": day}}]
+        except ValueError:
+            logging.warning(f"Invalid birthday_date format for contact {local_id_val}: {birthday_str}. Expected YYYY-MM-DD.")
+
+    # Addresses (structured)
+    # Assuming platform_contact for 'client_contact' has detailed address fields
+    if platform_contact.get("address_streetAddress") or \
+       platform_contact.get("address_city") or \
+       platform_contact.get("address_postalCode") or \
+       platform_contact.get("address_country"):
+
+        address_entry = {
+            "streetAddress": platform_contact.get("address_streetAddress", ""),
+            "city": platform_contact.get("address_city", ""),
+            "postalCode": platform_contact.get("address_postalCode", ""),
+            "country": platform_contact.get("address_country", ""),
+            # "countryCode": platform_contact.get("address_country_code"), # If available
+            "type": "work" # Default type, or map from platform_contact if available
+        }
+        # Add formattedValue if you want Google to try and parse/display it,
+        # or construct it from components if not directly available.
+        # address_entry["formattedValue"] = platform_contact.get("address_formattedValue",
+        #    f"{address_entry['streetAddress']}, {address_entry['city']}, {address_entry['postalCode']} {address_entry['country']}".strip(", "))
+
+        google_person["addresses"] = [address_entry]
 
 
-    elif contact_type == 'partner_contact': # From PartnerContacts table
-        if platform_contact.get("role"):
-            # Assume partner's name is the organization if not otherwise specified
-            # This might need more context (e.g., fetching Partner's name)
-             google_person["organizations"] = [{"title": platform_contact.get("role"), "current": True}]
+    # Clean up empty top-level fields that Google might reject or that are not meaningful if empty
+    if not google_person.get("names", [{}])[0].get("givenName") and \
+       not google_person.get("names", [{}])[0].get("familyName") and \
+       not google_person.get("names", [{}])[0].get("displayName"):
+        google_person.pop("names", None)
+
+    if not google_person.get("emailAddresses"): google_person.pop("emailAddresses", None)
+    if not google_person.get("phoneNumbers"): google_person.pop("phoneNumbers", None)
+    if not google_person.get("organizations"): google_person.pop("organizations", None)
+    if not google_person.get("birthdays"): google_person.pop("birthdays", None)
+    if not google_person.get("biographies"): google_person.pop("biographies", None)
+    if not google_person.get("addresses"): google_person.pop("addresses", None)
+    if not google_person.get("userDefined"): google_person.pop("userDefined", None)
 
 
-    elif contact_type == 'company_personnel': # From CompanyPersonnel table
-        if platform_contact.get("role"):
-             google_person["organizations"] = [{"title": platform_contact.get("role"), "current": True}]
-             # Company name might need to be fetched from Companies table via company_id
-
-    # Clean up empty fields that Google might reject
-    if not google_person["names"][0]["givenName"] and not google_person["names"][0]["familyName"] and not google_person["names"][0].get("displayName"):
-        google_person.pop("names") # Remove names array if all subfields are empty
-    if not google_person["emailAddresses"]: google_person.pop("emailAddresses")
-    if not google_person["phoneNumbers"]: google_person.pop("phoneNumbers")
-    if "biographies" in google_person and not google_person["biographies"][0]["value"]: google_person.pop("biographies")
-    if "organizations" in google_person and (not google_person["organizations"][0].get("title") and not google_person["organizations"][0].get("name")):
-        google_person.pop("organizations")
-
-    logging.info(f"Transformed platform contact (type: {contact_type}) to Google format: {json.dumps(google_person, indent=2)}")
+    logging.info(f"Transformed platform contact (type: {contact_type}, id: {local_id_val}) to Google format: {json.dumps(google_person, indent=2)}")
     return google_person
 
 
@@ -223,6 +259,32 @@ def _transform_google_contact_to_platform(google_contact_data: dict, target_plat
         if bio_entry.get("contentType", "TEXT_PLAIN") == "TEXT_PLAIN":
             platform_contact["notes"] = bio_entry.get("value")
 
+    # Addresses (take first available, prefer "work" or primary)
+    if google_contact_data.get("addresses"):
+        primary_address = next((a for a in google_contact_data["addresses"] if a.get("metadata", {}).get("primary")), None)
+        work_address = next((a for a in google_contact_data["addresses"] if a.get("type", "").lower() == "work"), None)
+        address_entry = primary_address or work_address or google_contact_data["addresses"][0]
+
+        platform_contact["address_streetAddress"] = address_entry.get("streetAddress")
+        platform_contact["address_city"] = address_entry.get("city")
+        platform_contact["address_postalCode"] = address_entry.get("postalCode")
+        platform_contact["address_country"] = address_entry.get("country")
+        platform_contact["address_formattedValue"] = address_entry.get("formattedValue")
+        # platform_contact["address_type"] = address_entry.get("type") # If you want to store address type
+
+    # Birthdays (take first available)
+    if google_contact_data.get("birthdays"):
+        # Filter out birthdays without year/month/day, which can happen if only year is set in Google.
+        valid_birthdays = [b for b in google_contact_data["birthdays"]
+                           if b.get("date") and b["date"].get("year") and b["date"].get("month") and b["date"].get("day")]
+        if valid_birthdays:
+            primary_birthday = next((b for b in valid_birthdays if b.get("metadata", {}).get("primary")), None)
+            birthday_entry = primary_birthday or valid_birthdays[0]
+            bday_date = birthday_entry.get("date", {})
+            if bday_date.get("year") and bday_date.get("month") and bday_date.get("day"):
+                 platform_contact["birthday_date"] = f"{bday_date['year']}-{bday_date['month']:02d}-{bday_date['day']:02d}"
+
+
     # Extract platform_contact_id and platform_contact_type if stored in userDefined fields
     if google_contact_data.get("userDefined"):
         for ud_field in google_contact_data["userDefined"]:
@@ -231,7 +293,7 @@ def _transform_google_contact_to_platform(google_contact_data: dict, target_plat
             elif ud_field.get("key") == "platform_contact_type":
                 platform_contact["platform_contact_type"] = ud_field.get("value")
 
-    # Add Google specific IDs
+    # Add Google specific IDs and metadata for sync logic
     platform_contact["google_contact_id"] = google_contact_data.get("resourceName")
     platform_contact["google_etag"] = google_contact_data.get("etag")
 
@@ -308,44 +370,66 @@ def _sync_platform_to_google(user_id: str, user_google_account: dict):
             continue
 
         # TODO: Add ETag / Hash comparison logic here
-        # current_platform_etag = generate_etag_for_platform_contact(local_contact_data)
-        # if sync_log_entry and sync_log_entry.get('platform_etag') == current_platform_etag:
-        #    logging.info(f"Local contact {local_id_val} ({local_contact_type}) unchanged. Skipping Google update.")
-        #    continue
+        # For a real implementation:
+        # 1. Get local_contact_data['updated_at'] (ensure it's UTC)
+        # 2. Get google_last_update_time from sync_log_entry.google_etag (if storing timestamp there) or from Google metadata
+        # 3. Compare. If local is newer, proceed to update Google.
+        #    If Google is newer, this function should ideally not be called for this contact; _sync_google_to_platform handles it.
+        #    If timestamps are very close or one is missing, a conflict exists.
+
+        # For this placeholder, we assume local is always the source of truth if this function is called.
+        # A more robust check would be:
+        # platform_updated_at = datetime.fromisoformat(local_contact_data.get('updated_at').replace('Z', '+00:00'))
+        # google_updated_at_str = sync_log_entry.get('google_last_update_time') # Assuming this field is added to sync_log
+        # if google_updated_at_str:
+        #    google_updated_at = datetime.fromisoformat(google_updated_at_str.replace('Z', '+00:00'))
+        #    if platform_updated_at <= google_updated_at:
+        #        logging.info(f"Google version of {local_id_val} is newer or same. Skipping platform_to_google update.")
+        #        continue
 
         if sync_log_entry and sync_log_entry.get('google_contact_id'):
             # Update existing Google contact
             google_contact_id = sync_log_entry['google_contact_id']
-            google_etag = sync_log_entry.get('google_etag') # Pass this for optimistic locking
+            # Pass the ETag from the sync log for optimistic locking
+            google_etag_from_log = sync_log_entry.get('google_etag')
 
-            # `update_person_fields` should list all fields being sent in `google_formatted_contact`
-            # This needs to be dynamically generated based on keys in `google_formatted_contact`
-            # For example: "names,emailAddresses,phoneNumbers,userDefined"
-            # This is a complex part of the People API.
-            update_fields_list = [key for key in google_formatted_contact.keys() if google_formatted_contact[key]]
+            update_fields_list = [key for key in google_formatted_contact.keys() if google_formatted_contact[key] or key == "userDefined"] # userDefined can be empty array
             update_person_fields_str = ",".join(update_fields_list)
             if not update_person_fields_str:
                  logging.info(f"No fields to update for Google contact {google_contact_id} from local {local_id_val}. Skipping.")
                  continue
 
             logging.info(f"Updating Google contact {google_contact_id} for local {local_id_val} ({local_contact_type}). Update fields: {update_person_fields_str}")
+
+            # Add the ETag to the payload for the update operation
+            payload_for_update = google_formatted_contact.copy()
+            if google_etag_from_log: # Crucial for People API updates
+                payload_for_update['etag'] = google_etag_from_log
+
             updated_g_contact = google_people_api.update_google_contact(
-                user_id, google_contact_id, google_formatted_contact,
-                update_person_fields=update_person_fields_str, # Important: list all fields being updated
-                etag=google_etag
+                user_id, google_contact_id, payload_for_update,
+                update_person_fields=update_person_fields_str
+                # etag parameter in update_google_contact is redundant if it's in payload_for_update['etag']
             )
             if updated_g_contact:
+                # Store the new ETag and potentially the Google lastUpdateTime from updated_g_contact.metadata.sources[0].updateTime
+                new_google_etag = updated_g_contact.get('etag')
+                # google_last_update = updated_g_contact.get("metadata", {}).get("sources", [{}])[0].get("updateTime")
+
                 update_contact_sync_log(sync_log_entry['sync_log_id'], {
-                    'google_etag': updated_g_contact.get('etag'),
-                    # 'platform_etag': current_platform_etag,
+                    'google_etag': new_google_etag,
+                    # 'google_last_update_time': google_last_update,
+                    # 'platform_etag': current_platform_etag, # If you implement local ETags/timestamps
                     'sync_status': 'synced',
                     'sync_direction': 'platform_to_google',
-                    'error_message': None
+                    'error_message': None,
+                    'last_sync_timestamp': datetime.now(timezone.utc).isoformat()
                 })
-                logging.info(f"Successfully updated Google contact {google_contact_id}.")
+                logging.info(f"Successfully updated Google contact {google_contact_id}. New ETag: {new_google_etag}")
             else:
                 update_contact_sync_log(sync_log_entry['sync_log_id'], {
-                    'sync_status': 'error', 'error_message': 'Failed to update Google contact (API error)'
+                    'sync_status': 'error', 'error_message': 'Failed to update Google contact (API error)',
+                    'last_sync_timestamp': datetime.now(timezone.utc).isoformat()
                 })
                 logging.error(f"Failed to update Google contact {google_contact_id}.")
         else:
@@ -353,23 +437,26 @@ def _sync_platform_to_google(user_id: str, user_google_account: dict):
             logging.info(f"Creating new Google contact for local {local_id_val} ({local_contact_type}).")
             created_g_contact = google_people_api.create_google_contact(user_id, google_formatted_contact)
             if created_g_contact and created_g_contact.get('resourceName'):
+                new_google_etag = created_g_contact.get('etag')
+                # google_last_update = created_g_contact.get("metadata", {}).get("sources", [{}])[0].get("updateTime")
                 log_data = {
                     'user_google_account_id': user_google_account_id,
                     'local_contact_id': local_id_val,
                     'local_contact_type': local_contact_type,
                     'google_contact_id': created_g_contact['resourceName'],
-                    'google_etag': created_g_contact.get('etag'),
+                    'google_etag': new_google_etag,
+                    # 'google_last_update_time': google_last_update,
                     # 'platform_etag': current_platform_etag,
                     'sync_status': 'synced',
                     'sync_direction': 'platform_to_google',
+                    'last_sync_timestamp': datetime.now(timezone.utc).isoformat()
                 }
-                if sync_log_entry: # Update existing log if it was partial
+                if sync_log_entry:
                     update_contact_sync_log(sync_log_entry['sync_log_id'], log_data)
-                else: # Add new log
+                else:
                     add_contact_sync_log(log_data)
-                logging.info(f"Successfully created Google contact {created_g_contact['resourceName']}.")
+                logging.info(f"Successfully created Google contact {created_g_contact['resourceName']}. ETag: {new_google_etag}")
             else:
-                # Could create a log entry with error status if creation failed
                 logging.error(f"Failed to create Google contact for local {local_id_val} ({local_contact_type}).")
 
     logging.info(f"Platform-to-Google sync completed for user_id: {user_id}")
@@ -452,24 +539,33 @@ def _sync_google_to_platform(user_id: str, user_google_account: dict):
                     # Based on `local_contact_type`, call the appropriate db_manager update function.
                     # E.g., if local_contact_type == 'client_contact', update db_manager.update_contact(...)
                     logging.info(f"Placeholder: Would update local contact (ID: {sync_log_entry.get('local_contact_id')}, Type: {sync_log_entry.get('local_contact_type')}) with data from Google contact {google_contact_id}.")
-                    # Example: update_contact(sync_log_entry.get('local_contact_id'), platform_equivalent_for_specific_type)
+                    # Real implementation:
+                    # local_id_to_update = sync_log_entry.get('local_contact_id')
+                    # local_type_to_update = sync_log_entry.get('local_contact_type')
+                    # if local_id_to_update and local_type_to_update == 'client_contact': # Assuming 'client_contact' maps to main Contacts table
+                    #    # Remove google specific fields before updating local DB
+                    #    platform_data_for_update = {k:v for k,v in platform_equivalent.items() if k not in ['google_contact_id', 'google_etag', 'platform_contact_id', 'platform_contact_type']}
+                    #    contacts_crud.update_contact(int(local_id_to_update), platform_data_for_update) # Ensure ID is int if needed by CRUD
 
                     update_contact_sync_log(sync_log_entry['sync_log_id'], {
-                        'google_etag': g_contact_full.get('etag'), # Use ETag from full fetched contact
-                        'sync_status': 'synced', # Or 'pending_platform_update' if manual review needed
+                        'google_etag': g_contact_full.get('etag'),
+                        # 'google_last_update_time': g_contact_full.get("metadata", {}).get("sources", [{}])[0].get("updateTime"),
+                        'sync_status': 'synced',
                         'sync_direction': 'google_to_platform',
-                        'error_message': None
+                        'error_message': None,
+                        'last_sync_timestamp': datetime.now(timezone.utc).isoformat()
                     })
                     logging.info(f"Successfully processed update for Google contact {google_contact_id}.")
-                # else: ETag is same, assume no change from Google's side.
-            else:
-                # New contact from Google's side
+                else: # ETag is same, or Google version is older/same based on timestamp (not fully implemented here)
+                    logging.info(f"Google contact {google_contact_id} ETag same as in log, or local is newer. No platform update needed from this Google contact.")
+                    # Optionally update last_sync_timestamp if we checked it
+                    update_contact_sync_log(sync_log_entry['sync_log_id'], {'last_sync_timestamp': datetime.now(timezone.utc).isoformat()})
+
+            else: # New contact from Google's side (no existing sync_log_entry for this google_contact_id)
                 logging.info(f"New contact found on Google: {google_contact_id}. Fetching full details.")
-                # Summary might not have all fields, fetch full details
                 g_contact_full = google_people_api.get_google_contact(user_id, google_contact_id)
                 if not g_contact_full:
                     logging.error(f"Failed to fetch full details for new Google contact {google_contact_id}.")
-                    # Optionally create a log entry with error status here
                     continue
 
                 platform_equivalent = _transform_google_contact_to_platform(g_contact_full)
@@ -477,34 +573,61 @@ def _sync_google_to_platform(user_id: str, user_google_account: dict):
                     logging.warning(f"Failed to transform new Google contact {google_contact_id} to platform format.")
                     continue
 
-                # --- Placeholder: Store new platform contact ---
-                # How to store depends on platform architecture.
-                # - Could try to match to existing local contacts by email/phone (de-duplication).
-                # - Could create a new entry in a generic "Synced Contacts" table.
-                # - Could try to infer local_contact_type (e.g., if company name matches a Client).
-                # For now, just log it and create a sync log entry.
-                logging.info(f"Placeholder: New contact from Google to be processed/stored on platform: {platform_equivalent}")
-
-                # Check if this Google contact was previously a platform contact (userDefined fields)
+                # Attempt to find by userDefined fields if this contact was previously synced from platform
                 linked_local_id = platform_equivalent.get("platform_contact_id")
                 linked_local_type = platform_equivalent.get("platform_contact_type")
 
+                existing_log_by_local = None
                 if linked_local_id and linked_local_type:
-                    # This Google contact claims to be linked to a platform contact.
-                    # Verify if that platform contact still exists and if this is a re-link.
-                     logging.info(f"Google contact {google_contact_id} has userDefined fields pointing to local ID {linked_local_id} ({linked_local_type}). This might be a re-sync or requires conflict resolution.")
-                     # This scenario needs careful handling - it might be a contact previously synced from platform, deleted on platform, and now re-appearing from Google.
+                    existing_log_by_local = get_contact_sync_log_by_local_contact(user_google_account_id, linked_local_id, linked_local_type)
 
-                add_contact_sync_log({
-                    'user_google_account_id': user_google_account_id,
-                    'local_contact_id': linked_local_id or "UNKNOWN_GOOGLE_ORIGINATED", # Placeholder if no local link
-                    'local_contact_type': linked_local_type or "google_originated", # Placeholder
-                    'google_contact_id': google_contact_id,
-                    'google_etag': g_contact_full.get('etag'),
-                    'sync_status': 'pending_platform_creation', # Or 'synced' if auto-created
-                    'sync_direction': 'google_to_platform',
-                })
-                logging.info(f"Created sync log for new Google contact {google_contact_id}.")
+                if existing_log_by_local:
+                    # This Google contact matches a local contact via userDefined fields.
+                    # This could be a re-link or an update scenario not caught by ETag (e.g. log was deleted).
+                    logging.info(f"Google contact {google_contact_id} matches local ID {linked_local_id} ({linked_local_type}) via userDefined fields. Updating existing log.")
+                    # Placeholder: Update local contact based on platform_equivalent
+                    # contacts_crud.update_contact(int(linked_local_id), platform_equivalent_for_main_contacts_table)
+                    update_contact_sync_log(existing_log_by_local['sync_log_id'], {
+                        'google_contact_id': google_contact_id, # Ensure it's set/updated
+                        'google_etag': g_contact_full.get('etag'),
+                        # 'google_last_update_time': g_contact_full.get("metadata", {}).get("sources", [{}])[0].get("updateTime"),
+                        'sync_status': 'synced',
+                        'sync_direction': 'google_to_platform',
+                        'last_sync_timestamp': datetime.now(timezone.utc).isoformat()
+                    })
+                else:
+                    # Truly new contact from Google, or one whose local counterpart was deleted and log entry removed.
+                    # For now, create a new local contact in the main Contacts table.
+                    logging.info(f"Creating new local contact from Google contact {google_contact_id}.")
+                    # Remove google specific fields before adding to local DB
+                    platform_data_for_add = {k:v for k,v in platform_equivalent.items() if k not in ['google_contact_id', 'google_etag', 'platform_contact_id', 'platform_contact_type']}
+                    # Add user_id if your contacts_crud.add_contact expects it
+                    # platform_data_for_add['created_by_user_id'] = user_id # Example
+
+                    new_local_contact_id = contacts_crud.add_contact(platform_data_for_add) # Assuming this is the main Contacts table
+                    if new_local_contact_id:
+                        add_contact_sync_log({
+                            'user_google_account_id': user_google_account_id,
+                            'local_contact_id': str(new_local_contact_id),
+                            'local_contact_type': 'client_contact', # Assuming new Google contacts become this type
+                            'google_contact_id': google_contact_id,
+                            'google_etag': g_contact_full.get('etag'),
+                            # 'google_last_update_time': g_contact_full.get("metadata", {}).get("sources", [{}])[0].get("updateTime"),
+                            'sync_status': 'synced',
+                            'sync_direction': 'google_to_platform',
+                            'last_sync_timestamp': datetime.now(timezone.utc).isoformat()
+                        })
+                        logging.info(f"Successfully created new local contact (ID: {new_local_contact_id}) from Google contact {google_contact_id}.")
+                    else:
+                        logging.error(f"Failed to create new local contact from Google contact {google_contact_id}.")
+
+        # Handle deleted contacts on Google's side (contacts present in sync_log but not in current Google list)
+        # This requires fetching ALL Google contacts first, then comparing. More complex.
+        # A simpler approach for "deleted on Google": if an update to a Google contact fails with 404 Not Found,
+        # then it was deleted on Google. The _sync_platform_to_google would detect this.
+        # If Google API provides a "sync token" mechanism for changes (like Drive API), that's better.
+        # People API uses `syncToken` with `people.connections.list`. This should be the primary way to get changes.
+        # The current list-all-then-compare is less efficient.
 
         next_page_token = google_contacts_page.get("nextPageToken")
         if not next_page_token:

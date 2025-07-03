@@ -7,6 +7,9 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 import logging
+
+# Assuming CRUDS and Dialogs will be imported when needed
+from db.cruds import contacts_crud, entity_contacts_crud, client_contacts_crud, company_personnel_crud
 from datetime import datetime # Added for the manual linking example, can be removed if CRUD handles timestamps
 
 # Assuming CRUDS and Dialogs will be imported when needed
@@ -296,41 +299,54 @@ class ContactsManagerWidget(QWidget):
 
         try:
             # 1. Generic Entities from EntityContacts
+            # We need a way to get the "name" of the entity_id (e.g., transporter name)
+            # This might require joining in the CRUD or separate lookups here.
+            # For now, we'll display entity_id.
             generic_entities = entity_contacts_crud.get_entities_for_contact(contact_id)
-            if generic_entities is None: # CRUD might return None on error
-                generic_entities = []
-                QMessageBox.warning(self, self.tr("Erreur Données"), self.tr("Impossible de charger les entités génériques liées."))
             for entity in generic_entities:
                 entity_type = entity.get('entity_type', 'N/A')
+                # TODO: Fetch actual name of the entity (e.g. transporter name, partner name)
+                # For now, using entity_id. This could be improved by a helper function.
                 entity_identifier = entity.get('entity_id', 'N/A')
-                add_linked_entity_row(self.tr(entity_type), entity_identifier, entity.get('role_in_entity', ''))
+                add_linked_entity_row(
+                    self.tr(entity_type), # Translate entity_type if possible
+                    entity_identifier,
+                    entity.get('role_in_entity', '')
+                )
 
             # 2. Clients from ClientContacts
-            linked_clients = get_clients_for_contact_from_link_table(contact_id)
-            if linked_clients is None: # CRUD might return None on error
-                linked_clients = []
-                QMessageBox.warning(self, self.tr("Erreur Données"), self.tr("Impossible de charger les clients liés."))
+            linked_clients = client_contacts_crud.get_clients_for_contact(contact_id)
+
             for client in linked_clients:
                 role = self.tr("Contact")
                 if client.get('is_primary_for_client'):
                     role = self.tr("Contact Principal")
-                add_linked_entity_row(self.tr("Client"), client.get('client_name', client.get('company_name', 'N/A')), role)
+                add_linked_entity_row(
+                    self.tr("Client"),
+                    client.get('client_name', client.get('company_name', 'N/A')),
+                    role
+                )
 
             # 3. Company Personnel from CompanyPersonnelContacts
             linked_personnel_list = company_personnel_crud.get_personnel_linked_to_contact(contact_id)
-            if linked_personnel_list is None: # CRUD might return None on error
-                linked_personnel_list = []
-                QMessageBox.warning(self, self.tr("Erreur Données"), self.tr("Impossible de charger le personnel de compagnie lié."))
             for personnel in linked_personnel_list:
-                role_display = personnel.get('role', '')
+                role_display = personnel.get('role', '') # This is CompanyPersonnel.role
+                # The link specific role (if any was designed for CompanyPersonnelContacts) isn't directly here.
+                # We could add 'is_primary_for_personnel' to the display if relevant.
                 if personnel.get('is_primary_for_personnel'):
-                    role_display += f" ({self.tr('Contact Principal du Personnel')})"
-                add_linked_entity_row(self.tr("Personnel Compagnie"), personnel.get('name', 'N/A'), role_display)
+                     role_display += f" ({self.tr('Contact Principal du Personnel')})"
+                add_linked_entity_row(
+                    self.tr("Personnel Compagnie"),
+                    personnel.get('name', 'N/A'),
+                    role_display
+                )
+
 
             self.linked_entities_table.resizeColumnsToContents()
             self.linked_entities_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
 
         except Exception as e:
+
             logger.error(f"Erreur majeure lors du chargement des entités liées pour contact {contact_id}: {e}", exc_info=True)
             QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("Une erreur critique est survenue lors du chargement des entités liées."))
         finally:
@@ -353,6 +369,7 @@ class ContactsManagerWidget(QWidget):
             contact_data = dialog.get_contact_data()
             if current_user_id:
                 contact_data['created_by_user_id'] = current_user_id
+
             try:
                 new_id = contacts_crud.add_contact(contact_data)
                 if new_id:
@@ -512,8 +529,8 @@ class ContactsManagerWidget(QWidget):
         linked_count = 0
         try:
             linked_count += len(entity_contacts_crud.get_entities_for_contact(contact_id))
-            # Now using the aliased function directly
-            linked_count += len(get_clients_for_contact_from_link_table(contact_id))
+            linked_count += len(client_contacts_crud.get_clients_for_contact(contact_id))
+
             linked_count += len(company_personnel_crud.get_personnel_linked_to_contact(contact_id))
         except Exception as e:
             logger.error(f"Erreur lors du comptage des entités liées pour le contact {contact_id}: {e}")
@@ -604,6 +621,7 @@ class ContactsManagerWidget(QWidget):
                     new_link_id = None
 
                     try:
+
                         entity_id_to_use = entity_id # Default to string for generic entities
 
                         if entity_type_str in ["Transporter", "FreightForwarder", "MoneyTransferAgent", "Partner"]:
@@ -642,24 +660,48 @@ class ContactsManagerWidget(QWidget):
                             )
                             success = new_link_id is not None
                         elif entity_type_str == "Client":
-                            # Now using the aliased function directly, with the converted integer ID
-                            new_link_id = link_contact_to_client_in_link_table(
-                                client_id=entity_id_to_use, # Already converted to int or aborted
+                            # Assuming client_id is what entity_id represents here
+                            new_link_id = client_contacts_crud.link_contact_to_client(
+                                client_id=entity_id,
                                 contact_id=contact_id,
                                 is_primary=link_details.get('is_primary', False),
                                 can_receive_documents=link_details.get('can_receive_documents', True)
+                                # role_in_entity and notes are not directly in ClientContacts schema, handle as needed
                             )
                             success = new_link_id is not None
                         elif entity_type_str == "CompanyPersonnel":
-                            # Use the new CRUD function, with the converted integer ID
-                            # The ValueError for personnel_id_int is already handled above where entity_id_to_use is set
-                            new_link_id = link_existing_contact_to_personnel(
-                                personnel_id=entity_id_to_use, # Already converted to int or aborted
-                                contact_id=contact_id,
-                                is_primary=link_details.get('is_primary', False),
-                                can_receive_documents=link_details.get('can_receive_documents', True)
-                            )
+                            # Assuming entity_id is personnel_id here
+                            # company_personnel_crud.add_personnel_contact expects full contact_data, not just link.
+                            # This flow is for linking an *existing* central contact.
+                            # We'd need a specific function like:
+                            # company_personnel_crud.link_existing_contact_to_personnel(personnel_id, contact_id, link_details)
+                            # For now, let's use a placeholder or skip.
+                            # This highlights a need for more specific linking functions in some CRUDS.
+                            # temp_contact_data_for_personnel_link = {'contact_id': contact_id, **link_details}
+                            # new_link_id = company_personnel_crud.add_personnel_contact(personnel_id=int(entity_id), contact_data=temp_contact_data_for_personnel_link)
+                            # This is not ideal as add_personnel_contact tries to re-add to Contacts.
+                            # We need a function that just creates the link in CompanyPersonnelContacts.
+
+                            # Let's assume a direct insert for now for CompanyPersonnelContacts if that function doesn't exist
+                            # This is a simplified placeholder for demonstration.
+                            # A proper function in company_personnel_crud.py like `create_personnel_contact_link` would be better.
+                            conn = client_contacts_crud._get_conn_from_pool() # Example of getting a connection
+                            cursor = conn.cursor()
+                            now = datetime.utcnow().isoformat()
+                            sql_link = """INSERT INTO CompanyPersonnelContacts
+                                          (personnel_id, contact_id, is_primary, can_receive_documents, created_at, updated_at)
+                                          VALUES (?, ?, ?, ?, ?, ?)"""
+                            # Note: role_in_entity and notes from link_details are not in CompanyPersonnelContacts by default.
+                            params_link = (int(entity_id), contact_id,
+                                           link_details.get('is_primary', False),
+                                           link_details.get('can_receive_documents', True), now, now)
+                            cursor.execute(sql_link, params_link)
+                            new_link_id = cursor.lastrowid # This is sqlite specific for lastrowid
+                            conn.commit()
+                            client_contacts_crud._release_conn_to_pool(conn)
                             success = new_link_id is not None
+                            logger.info(f"Manually linked contact {contact_id} to personnel {entity_id}, link ID: {new_link_id}")
+
 
 
                         if success:

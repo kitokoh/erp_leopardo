@@ -72,6 +72,7 @@ __all__ = [
     "unlink_contact_from_personnel",
     "delete_all_contact_links_for_personnel",
     "get_personnel_linked_to_contact", # Added export
+
     "link_existing_contact_to_personnel", # Added export for the new function
 ]
 
@@ -286,6 +287,7 @@ def get_personnel_linked_to_contact(contact_id: int, conn: sqlite3.Connection = 
     except sqlite3.Error as e:
         logger.error(f"Database error in get_personnel_linked_to_contact for contact_id {contact_id}: {e}")
         return []
+
 
 @_manage_conn
 def link_existing_contact_to_personnel(personnel_id: int, contact_id: int, is_primary: bool = False, can_receive_documents: bool = True, conn: sqlite3.Connection = None) -> int | None:
