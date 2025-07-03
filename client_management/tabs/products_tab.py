@@ -122,6 +122,7 @@ class ProductsTab(QWidget):
             if selected_lang_code and products:
                 products = [p for p in products if p.get('language_code') == selected_lang_code]
 
+
             if not products:
                 self.products_empty_label.show()
                 self.products_table.hide()
@@ -266,4 +267,4 @@ class ProductsTab(QWidget):
         """Public method to refresh data, callable from parent if needed."""
         self.load_products()
 
-```
+

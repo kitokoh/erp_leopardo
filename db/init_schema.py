@@ -182,10 +182,17 @@ def initialize_database():
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         last_login_at TIMESTAMP,
+        -- Nouveaux champs pour l'authentification biométrique
+        is_fingerprint_auth_enabled BOOLEAN DEFAULT FALSE,
+        fingerprint_template_id TEXT, -- Pourrait être utilisé par l'OS ou une lib
+        is_face_auth_enabled BOOLEAN DEFAULT FALSE,
+        face_template_id TEXT,
+        is_voice_auth_enabled BOOLEAN DEFAULT FALSE,
+        voice_profile_id TEXT,
         FOREIGN KEY (role_id) REFERENCES Roles (role_id)
     )
     """)
-    print("DEBUG_INIT_DB: Table Users created or exists (with role_id FK).")
+    print("DEBUG_INIT_DB: Table Users created or exists (with role_id FK and biometric fields).")
 
     # Ensure is_deleted, and deleted_at columns exist in Users table (for migration from older schemas)
     cursor.execute("PRAGMA table_info(Users)")
@@ -212,6 +219,53 @@ def initialize_database():
             print("Added 'deleted_at' column to Users table.")
         except sqlite3.Error as e_alter_deleted_at:
             print(f"Error adding 'deleted_at' column to Users table: {e_alter_deleted_at}")
+
+    # Assurer que les nouveaux champs biométriques existent pour les bases de données existantes
+    cursor.execute("PRAGMA table_info(Users)")
+    users_columns_info_bio = cursor.fetchall() # Utiliser un nouveau nom de variable
+    users_column_names_bio = [info['name'] for info in users_columns_info_bio]
+
+    if 'is_fingerprint_auth_enabled' not in users_column_names_bio:
+        try:
+            cursor.execute("ALTER TABLE Users ADD COLUMN is_fingerprint_auth_enabled BOOLEAN DEFAULT FALSE")
+            print("Added 'is_fingerprint_auth_enabled' column to Users table.")
+        except sqlite3.Error as e_alter_bio:
+            print(f"Error adding 'is_fingerprint_auth_enabled' column to Users table: {e_alter_bio}")
+
+    if 'fingerprint_template_id' not in users_column_names_bio:
+        try:
+            cursor.execute("ALTER TABLE Users ADD COLUMN fingerprint_template_id TEXT")
+            print("Added 'fingerprint_template_id' column to Users table.")
+        except sqlite3.Error as e_alter_bio:
+            print(f"Error adding 'fingerprint_template_id' column to Users table: {e_alter_bio}")
+
+    if 'is_face_auth_enabled' not in users_column_names_bio:
+        try:
+            cursor.execute("ALTER TABLE Users ADD COLUMN is_face_auth_enabled BOOLEAN DEFAULT FALSE")
+            print("Added 'is_face_auth_enabled' column to Users table.")
+        except sqlite3.Error as e_alter_bio:
+            print(f"Error adding 'is_face_auth_enabled' column to Users table: {e_alter_bio}")
+
+    if 'face_template_id' not in users_column_names_bio:
+        try:
+            cursor.execute("ALTER TABLE Users ADD COLUMN face_template_id TEXT")
+            print("Added 'face_template_id' column to Users table.")
+        except sqlite3.Error as e_alter_bio:
+            print(f"Error adding 'face_template_id' column to Users table: {e_alter_bio}")
+
+    if 'is_voice_auth_enabled' not in users_column_names_bio:
+        try:
+            cursor.execute("ALTER TABLE Users ADD COLUMN is_voice_auth_enabled BOOLEAN DEFAULT FALSE")
+            print("Added 'is_voice_auth_enabled' column to Users table.")
+        except sqlite3.Error as e_alter_bio:
+            print(f"Error adding 'is_voice_auth_enabled' column to Users table: {e_alter_bio}")
+
+    if 'voice_profile_id' not in users_column_names_bio:
+        try:
+            cursor.execute("ALTER TABLE Users ADD COLUMN voice_profile_id TEXT")
+            print("Added 'voice_profile_id' column to Users table.")
+        except sqlite3.Error as e_alter_bio:
+            print(f"Error adding 'voice_profile_id' column to Users table: {e_alter_bio}")
 
     # Create Companies table (base from ca.py)
     cursor.execute("""
@@ -385,77 +439,87 @@ def initialize_database():
 
     # Pre-populate StatusSettings (full list from ca.py)
     default_statuses = [
-        {'status_name': 'En cours', 'status_type': 'Client', 'color_hex': '#3498db', 'icon_name': 'dialog-information', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 0},
-        {'status_name': 'Prospect', 'status_type': 'Client', 'color_hex': '#f1c40f', 'icon_name': 'user-status-pending', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 1},
-        {'status_name': 'Prospect (Proforma Envoyé)', 'status_type': 'Client', 'color_hex': '#e67e22', 'icon_name': 'document-send', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 2},
-        {'status_name': 'Actif', 'status_type': 'Client', 'color_hex': '#2ecc71', 'icon_name': 'user-available', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 3},
-        {'status_name': 'Vendu', 'status_type': 'Client', 'color_hex': '#5cb85c', 'icon_name': 'emblem-ok', 'is_completion_status': True, 'is_archival_status': False, 'sort_order': 4},
-        {'status_name': 'Inactif', 'status_type': 'Client', 'color_hex': '#95a5a6', 'icon_name': 'user-offline', 'is_completion_status': False, 'is_archival_status': True, 'sort_order': 5},
-        {'status_name': 'Complété', 'status_type': 'Client', 'color_hex': '#27ae60', 'icon_name': 'task-complete', 'is_completion_status': True, 'is_archival_status': False, 'sort_order': 6},
-        {'status_name': 'Archivé', 'status_type': 'Client', 'color_hex': '#7f8c8d', 'icon_name': 'archive', 'is_completion_status': False, 'is_archival_status': True, 'sort_order': 7},
-        {'status_name': 'Urgent', 'status_type': 'Client', 'color_hex': '#e74c3c', 'icon_name': 'dialog-warning', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 8},
-        {'status_name': 'Planning', 'status_type': 'Project', 'color_hex': '#1abc9c', 'icon_name': 'view-list-bullet', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 0},
-        {'status_name': 'En cours', 'status_type': 'Project', 'color_hex': '#3498db', 'icon_name': 'view-list-ordered', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 1},
-        {'status_name': 'En attente', 'status_type': 'Project', 'color_hex': '#f39c12', 'icon_name': 'view-list-remove', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 2},
-        {'status_name': 'Terminé', 'status_type': 'Project', 'color_hex': '#2ecc71', 'icon_name': 'task-complete', 'is_completion_status': True, 'is_archival_status': False, 'sort_order': 3},
-        {'status_name': 'Annulé', 'status_type': 'Project', 'color_hex': '#c0392b', 'icon_name': 'dialog-cancel', 'is_completion_status': False, 'is_archival_status': True, 'sort_order': 4},
-        {'status_name': 'En pause', 'status_type': 'Project', 'color_hex': '#8e44ad', 'icon_name': 'media-playback-pause', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 5},
-        {'status_name': 'To Do', 'status_type': 'Task', 'color_hex': '#bdc3c7', 'icon_name': 'view-list-todo', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 0},
-        {'status_name': 'In Progress', 'status_type': 'Task', 'color_hex': '#3498db', 'icon_name': 'view-list-progress', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 1},
-        {'status_name': 'Done', 'status_type': 'Task', 'color_hex': '#2ecc71', 'icon_name': 'task-complete', 'is_completion_status': True, 'is_archival_status': False, 'sort_order': 2},
-        {'status_name': 'Blocked', 'status_type': 'Task', 'color_hex': '#e74c3c', 'icon_name': 'dialog-error', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 3},
-        {'status_name': 'Review', 'status_type': 'Task', 'color_hex': '#f1c40f', 'icon_name': 'view-list-search', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 4},
-        {'status_name': 'Cancelled', 'status_type': 'Task', 'color_hex': '#7f8c8d', 'icon_name': 'dialog-cancel', 'is_completion_status': False, 'is_archival_status': True, 'sort_order': 5},
-        {'status_name': 'Ouvert', 'status_type': 'SAVTicket', 'color_hex': '#d35400', 'icon_name': 'folder-new', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 0},
-        {'status_name': 'En Investigation', 'status_type': 'SAVTicket', 'color_hex': '#f39c12', 'icon_name': 'system-search', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 1},
-        {'status_name': 'En Attente (Client)', 'status_type': 'SAVTicket', 'color_hex': '#3498db', 'icon_name': 'folder-locked', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 2},
-        {'status_name': 'Résolu', 'status_type': 'SAVTicket', 'color_hex': '#2ecc71', 'icon_name': 'folder-check', 'is_completion_status': True, 'is_archival_status': False, 'sort_order': 3},
-        {'status_name': 'Fermé', 'status_type': 'SAVTicket', 'color_hex': '#95a5a6', 'icon_name': 'folder', 'is_completion_status': True, 'is_archival_status': True, 'sort_order': 4},
+        # --- Client Statuses ---
+        {'status_name': 'Prospect', 'status_type': 'Client', 'color_hex': '#f1c40f', 'icon_name': 'user-status-pending', 'sort_order': 0, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Prospect Qualifié', 'status_type': 'Client', 'color_hex': '#e67e22', 'icon_name': 'document-send', 'sort_order': 5, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Client Actif', 'status_type': 'Client', 'color_hex': '#2ecc71', 'icon_name': 'user-available', 'sort_order': 10, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Client Confirmé', 'status_type': 'Client', 'color_hex': '#3498db', 'icon_name': 'emblem-ok', 'sort_order': 20, 'is_completion_status': False, 'is_archival_status': False}, # Typically after first major order
+        {'status_name': 'Client SAV', 'status_type': 'Client', 'color_hex': '#5cb85c', 'icon_name': 'emblem-favorite', 'sort_order': 30, 'is_completion_status': False, 'is_archival_status': False}, # Eligible for SAV
+        {'status_name': 'Distributeur', 'status_type': 'Client', 'color_hex': '#8e44ad', 'icon_name': 'business', 'sort_order': 40, 'is_completion_status': False, 'is_archival_status': False}, # Special status
+        {'status_name': 'Inactif', 'status_type': 'Client', 'color_hex': '#95a5a6', 'icon_name': 'user-offline', 'sort_order': 50, 'is_completion_status': False, 'is_archival_status': True},
+        {'status_name': 'Bloqué', 'status_type': 'Client', 'color_hex': '#c0392b', 'icon_name': 'user-block', 'sort_order': 60, 'is_completion_status': False, 'is_archival_status': True},
+        {'status_name': 'Archivé', 'status_type': 'Client', 'color_hex': '#7f8c8d', 'icon_name': 'archive', 'sort_order': 70, 'is_completion_status': True, 'is_archival_status': True},
+        # Note: 'Urgent' and 'Complété' for Client were removed as they seem less B2B specific or covered by others. 'Vendu' replaced by 'Client SAV' or 'Client Confirmé'.
 
-        # Recruitment Module Statuses
+        # --- Commande Statuses ---
+        {'status_name': 'Brouillon', 'status_type': 'Commande', 'color_hex': '#7f8c8d', 'icon_name': 'document-edit', 'sort_order': 0, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Devis Envoyé', 'status_type': 'Commande', 'color_hex': '#1abc9c', 'icon_name': 'document-send', 'sort_order': 10, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Confirmée par Client', 'status_type': 'Commande', 'color_hex': '#2ecc71', 'icon_name': 'document-check', 'sort_order': 20, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Paiement Partiel Reçu', 'status_type': 'Commande', 'color_hex': '#f39c12', 'icon_name': 'credit-card-multiple', 'sort_order': 25, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'En Cours de Production', 'status_type': 'Commande', 'color_hex': '#3498db', 'icon_name': 'sync', 'sort_order': 30, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Prête pour Expédition', 'status_type': 'Commande', 'color_hex': '#9b59b6', 'icon_name': 'archive-arrow-up-outline', 'sort_order': 40, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Envoi en Cours', 'status_type': 'Commande', 'color_hex': '#d35400', 'icon_name': 'truck-delivery', 'sort_order': 50, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Partiellement Livrée', 'status_type': 'Commande', 'color_hex': '#e67e22', 'icon_name': 'truck-check-outline', 'sort_order': 55, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Livrée Complètement', 'status_type': 'Commande', 'color_hex': '#27ae60', 'icon_name': 'truck-check', 'sort_order': 60, 'is_completion_status': False, 'is_archival_status': False}, # Not a final completion status for the order itself yet
+        {'status_name': 'Facturée', 'status_type': 'Commande', 'color_hex': '#f1c40f', 'icon_name': 'file-invoice-dollar', 'sort_order': 70, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Partiellement Payée', 'status_type': 'Commande', 'color_hex': '#16a085', 'icon_name': 'cash-multiple', 'sort_order': 75, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Payée Complètement', 'status_type': 'Commande', 'color_hex': '#2980b9', 'icon_name': 'hand-holding-usd', 'sort_order': 80, 'is_completion_status': True, 'is_archival_status': False},
+        {'status_name': 'Annulée', 'status_type': 'Commande', 'color_hex': '#e74c3c', 'icon_name': 'document-cancel', 'sort_order': 90, 'is_completion_status': True, 'is_archival_status': True},
+        {'status_name': 'Archivée', 'status_type': 'Commande', 'color_hex': '#95a5a6', 'icon_name': 'archive', 'sort_order': 100, 'is_completion_status': True, 'is_archival_status': True},
+
+        # --- Project Statuses (Kept as is for now, review if needed) ---
+        {'status_name': 'Planning', 'status_type': 'Project', 'color_hex': '#1abc9c', 'icon_name': 'view-list-bullet', 'sort_order': 0, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'En cours', 'status_type': 'Project', 'color_hex': '#3498db', 'icon_name': 'view-list-ordered', 'sort_order': 1, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'En attente', 'status_type': 'Project', 'color_hex': '#f39c12', 'icon_name': 'view-list-remove', 'sort_order': 2, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Terminé', 'status_type': 'Project', 'color_hex': '#2ecc71', 'icon_name': 'task-complete', 'sort_order': 3, 'is_completion_status': True, 'is_archival_status': False},
+        {'status_name': 'Annulé', 'status_type': 'Project', 'color_hex': '#c0392b', 'icon_name': 'dialog-cancel', 'sort_order': 4, 'is_completion_status': False, 'is_archival_status': True},
+        {'status_name': 'En pause', 'status_type': 'Project', 'color_hex': '#8e44ad', 'icon_name': 'media-playback-pause', 'sort_order': 5, 'is_completion_status': False, 'is_archival_status': False},
+
+        # --- Task Statuses (Kept as is for now) ---
+        {'status_name': 'To Do', 'status_type': 'Task', 'color_hex': '#bdc3c7', 'icon_name': 'view-list-todo', 'sort_order': 0, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'In Progress', 'status_type': 'Task', 'color_hex': '#3498db', 'icon_name': 'view-list-progress', 'sort_order': 1, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Done', 'status_type': 'Task', 'color_hex': '#2ecc71', 'icon_name': 'task-complete', 'sort_order': 2, 'is_completion_status': True, 'is_archival_status': False},
+        {'status_name': 'Blocked', 'status_type': 'Task', 'color_hex': '#e74c3c', 'icon_name': 'dialog-error', 'sort_order': 3, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Review', 'status_type': 'Task', 'color_hex': '#f1c40f', 'icon_name': 'view-list-search', 'sort_order': 4, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Cancelled', 'status_type': 'Task', 'color_hex': '#7f8c8d', 'icon_name': 'dialog-cancel', 'sort_order': 5, 'is_completion_status': False, 'is_archival_status': True},
+
+        # --- SAVTicket Statuses (Kept as is for now) ---
+        {'status_name': 'Ouvert', 'status_type': 'SAVTicket', 'color_hex': '#d35400', 'icon_name': 'folder-new', 'sort_order': 0, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'En Investigation', 'status_type': 'SAVTicket', 'color_hex': '#f39c12', 'icon_name': 'system-search', 'sort_order': 1, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'En Attente (Client)', 'status_type': 'SAVTicket', 'color_hex': '#3498db', 'icon_name': 'folder-locked', 'sort_order': 2, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Résolu', 'status_type': 'SAVTicket', 'color_hex': '#2ecc71', 'icon_name': 'folder-check', 'sort_order': 3, 'is_completion_status': True, 'is_archival_status': False},
+        {'status_name': 'Fermé', 'status_type': 'SAVTicket', 'color_hex': '#95a5a6', 'icon_name': 'folder', 'sort_order': 4, 'is_completion_status': True, 'is_archival_status': True},
+
+        # --- Recruitment Module Statuses (Kept as is for now) ---
         # JobOpening Statuses
-        {'status_name': 'Open', 'status_type': 'JobOpening', 'color_hex': '#27ae60', 'icon_name': 'folder-open', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 0},
-        {'status_name': 'Closed', 'status_type': 'JobOpening', 'color_hex': '#95a5a6', 'icon_name': 'folder', 'is_completion_status': True, 'is_archival_status': True, 'sort_order': 1},
-        {'status_name': 'On Hold', 'status_type': 'JobOpening', 'color_hex': '#f39c12', 'icon_name': 'folder-locked', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 2},
-        {'status_name': 'Draft', 'status_type': 'JobOpening', 'color_hex': '#bdc3c7', 'icon_name': 'folder-edit', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 3},
-
+        {'status_name': 'Open', 'status_type': 'JobOpening', 'color_hex': '#27ae60', 'icon_name': 'folder-open', 'sort_order': 0, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Closed', 'status_type': 'JobOpening', 'color_hex': '#95a5a6', 'icon_name': 'folder', 'sort_order': 1, 'is_completion_status': True, 'is_archival_status': True},
+        {'status_name': 'On Hold', 'status_type': 'JobOpening', 'color_hex': '#f39c12', 'icon_name': 'folder-locked', 'sort_order': 2, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Draft', 'status_type': 'JobOpening', 'color_hex': '#bdc3c7', 'icon_name': 'folder-edit', 'sort_order': 3, 'is_completion_status': False, 'is_archival_status': False},
         # CandidateApplication Statuses
-        {'status_name': 'Applied', 'status_type': 'CandidateApplication', 'color_hex': '#3498db', 'icon_name': 'user-plus', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 0},
-        {'status_name': 'Screening', 'status_type': 'CandidateApplication', 'color_hex': '#1abc9c', 'icon_name': 'user-search', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 1},
-        {'status_name': 'Interviewing', 'status_type': 'CandidateApplication', 'color_hex': '#9b59b6', 'icon_name': 'users-meeting', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 2},
-        {'status_name': 'Assessment', 'status_type': 'CandidateApplication', 'color_hex': '#e67e22', 'icon_name': 'user-clipboard', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 3},
-        {'status_name': 'Reference Check', 'status_type': 'CandidateApplication', 'color_hex': '#f1c40f', 'icon_name': 'user-check', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 4},
-        {'status_name': 'Offer Extended', 'status_type': 'CandidateApplication', 'color_hex': '#2ecc71', 'icon_name': 'user-contract', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 5},
-        {'status_name': 'Offer Accepted', 'status_type': 'CandidateApplication', 'color_hex': '#27ae60', 'icon_name': 'user-star', 'is_completion_status': True, 'is_archival_status': False, 'sort_order': 6},
-        {'status_name': 'Offer Declined', 'status_type': 'CandidateApplication', 'color_hex': '#e74c3c', 'icon_name': 'user-minus', 'is_completion_status': True, 'is_archival_status': True, 'sort_order': 7},
-        {'status_name': 'Hired', 'status_type': 'CandidateApplication', 'color_hex': '#16a085', 'icon_name': 'user-tie', 'is_completion_status': True, 'is_archival_status': False, 'sort_order': 8},
-        {'status_name': 'Rejected', 'status_type': 'CandidateApplication', 'color_hex': '#c0392b', 'icon_name': 'user-times', 'is_completion_status': True, 'is_archival_status': True, 'sort_order': 9},
-        {'status_name': 'Withdrawn', 'status_type': 'CandidateApplication', 'color_hex': '#7f8c8d', 'icon_name': 'user-slash', 'is_completion_status': True, 'is_archival_status': True, 'sort_order': 10},
-
+        {'status_name': 'Applied', 'status_type': 'CandidateApplication', 'color_hex': '#3498db', 'icon_name': 'user-plus', 'sort_order': 0, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Screening', 'status_type': 'CandidateApplication', 'color_hex': '#1abc9c', 'icon_name': 'user-search', 'sort_order': 1, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Interviewing', 'status_type': 'CandidateApplication', 'color_hex': '#9b59b6', 'icon_name': 'users-meeting', 'sort_order': 2, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Assessment', 'status_type': 'CandidateApplication', 'color_hex': '#e67e22', 'icon_name': 'user-clipboard', 'sort_order': 3, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Reference Check', 'status_type': 'CandidateApplication', 'color_hex': '#f1c40f', 'icon_name': 'user-check', 'sort_order': 4, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Offer Extended', 'status_type': 'CandidateApplication', 'color_hex': '#2ecc71', 'icon_name': 'user-contract', 'sort_order': 5, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Offer Accepted', 'status_type': 'CandidateApplication', 'color_hex': '#27ae60', 'icon_name': 'user-star', 'sort_order': 6, 'is_completion_status': True, 'is_archival_status': False},
+        {'status_name': 'Offer Declined', 'status_type': 'CandidateApplication', 'color_hex': '#e74c3c', 'icon_name': 'user-minus', 'sort_order': 7, 'is_completion_status': True, 'is_archival_status': True},
+        {'status_name': 'Hired', 'status_type': 'CandidateApplication', 'color_hex': '#16a085', 'icon_name': 'user-tie', 'sort_order': 8, 'is_completion_status': True, 'is_archival_status': False},
+        {'status_name': 'Rejected', 'status_type': 'CandidateApplication', 'color_hex': '#c0392b', 'icon_name': 'user-times', 'sort_order': 9, 'is_completion_status': True, 'is_archival_status': True},
+        {'status_name': 'Withdrawn', 'status_type': 'CandidateApplication', 'color_hex': '#7f8c8d', 'icon_name': 'user-slash', 'sort_order': 10, 'is_completion_status': True, 'is_archival_status': True},
         # CandidateProgress Statuses
-        {'status_name': 'Pending', 'status_type': 'CandidateProgress', 'color_hex': '#bdc3c7', 'icon_name': 'progress-clock', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 0},
-        {'status_name': 'In Progress', 'status_type': 'CandidateProgress', 'color_hex': '#3498db', 'icon_name': 'progress-download', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 1},
-        {'status_name': 'Completed', 'status_type': 'CandidateProgress', 'color_hex': '#2ecc71', 'icon_name': 'progress-check', 'is_completion_status': True, 'is_archival_status': False, 'sort_order': 2},
-        {'status_name': 'Skipped', 'status_type': 'CandidateProgress', 'color_hex': '#95a5a6', 'icon_name': 'progress-alert', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 3},
-        {'status_name': 'Failed', 'status_type': 'CandidateProgress', 'color_hex': '#e74c3c', 'icon_name': 'progress-close', 'is_completion_status': True, 'is_archival_status': False, 'sort_order': 4},
-
+        {'status_name': 'Pending', 'status_type': 'CandidateProgress', 'color_hex': '#bdc3c7', 'icon_name': 'progress-clock', 'sort_order': 0, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'In Progress', 'status_type': 'CandidateProgress', 'color_hex': '#3498db', 'icon_name': 'progress-download', 'sort_order': 1, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Completed', 'status_type': 'CandidateProgress', 'color_hex': '#2ecc71', 'icon_name': 'progress-check', 'sort_order': 2, 'is_completion_status': True, 'is_archival_status': False},
+        {'status_name': 'Skipped', 'status_type': 'CandidateProgress', 'color_hex': '#95a5a6', 'icon_name': 'progress-alert', 'sort_order': 3, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Failed', 'status_type': 'CandidateProgress', 'color_hex': '#e74c3c', 'icon_name': 'progress-close', 'sort_order': 4, 'is_completion_status': True, 'is_archival_status': False},
         # InterviewStatus Statuses
-        {'status_name': 'Scheduled', 'status_type': 'InterviewStatus', 'color_hex': '#3498db', 'icon_name': 'calendar-clock', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 0},
-        {'status_name': 'Completed', 'status_type': 'InterviewStatus', 'color_hex': '#2ecc71', 'icon_name': 'calendar-check', 'is_completion_status': True, 'is_archival_status': False, 'sort_order': 1},
-        {'status_name': 'Cancelled', 'status_type': 'InterviewStatus', 'color_hex': '#e74c3c', 'icon_name': 'calendar-times', 'is_completion_status': True, 'is_archival_status': True, 'sort_order': 2},
-        {'status_name': 'Rescheduled', 'status_type': 'InterviewStatus', 'color_hex': '#f39c12', 'icon_name': 'calendar-edit', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 3},
-        {'status_name': 'No Show', 'status_type': 'InterviewStatus', 'color_hex': '#c0392b', 'icon_name': 'calendar-question', 'is_completion_status': True, 'is_archival_status': True, 'sort_order': 4},
-
-        # Commande Statuses
-        {'status_name': 'Brouillon', 'status_type': 'Commande', 'color_hex': '#7f8c8d', 'icon_name': 'document-edit', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 0},
-        {'status_name': 'Devis Envoyé', 'status_type': 'Commande', 'color_hex': '#1abc9c', 'icon_name': 'document-send', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 1},
-        {'status_name': 'Confirmée', 'status_type': 'Commande', 'color_hex': '#2ecc71', 'icon_name': 'document-check', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 2},
-        {'status_name': 'En Préparation', 'status_type': 'Commande', 'color_hex': '#3498db', 'icon_name': 'box-archive', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 3},
-        {'status_name': 'Expédiée', 'status_type': 'Commande', 'color_hex': '#9b59b6', 'icon_name': 'truck', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 4},
-        {'status_name': 'Facturée', 'status_type': 'Commande', 'color_hex': '#f1c40f', 'icon_name': 'file-invoice-dollar', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 5},
-        {'status_name': 'Payée', 'status_type': 'Commande', 'color_hex': '#27ae60', 'icon_name': 'hand-holding-usd', 'is_completion_status': True, 'is_archival_status': False, 'sort_order': 6},
-        {'status_name': 'Annulée', 'status_type': 'Commande', 'color_hex': '#e74c3c', 'icon_name': 'document-cancel', 'is_completion_status': True, 'is_archival_status': True, 'sort_order': 7},
-        {'status_name': 'Archivée', 'status_type': 'Commande', 'color_hex': '#95a5a6', 'icon_name': 'archive', 'is_completion_status': True, 'is_archival_status': True, 'sort_order': 8},
+        {'status_name': 'Scheduled', 'status_type': 'InterviewStatus', 'color_hex': '#3498db', 'icon_name': 'calendar-clock', 'sort_order': 0, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Completed', 'status_type': 'InterviewStatus', 'color_hex': '#2ecc71', 'icon_name': 'calendar-check', 'sort_order': 1, 'is_completion_status': True, 'is_archival_status': False},
+        {'status_name': 'Cancelled', 'status_type': 'InterviewStatus', 'color_hex': '#e74c3c', 'icon_name': 'calendar-times', 'sort_order': 2, 'is_completion_status': True, 'is_archival_status': True},
+        {'status_name': 'Rescheduled', 'status_type': 'InterviewStatus', 'color_hex': '#f39c12', 'icon_name': 'calendar-edit', 'sort_order': 3, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'No Show', 'status_type': 'InterviewStatus', 'color_hex': '#c0392b', 'icon_name': 'calendar-question', 'sort_order': 4, 'is_completion_status': True, 'is_archival_status': True},
     ]
     for status in default_statuses:
         cursor.execute("""
@@ -500,6 +564,18 @@ def initialize_database():
         FOREIGN KEY (default_template_id) REFERENCES Templates (template_id)
     )
     """)
+
+    # Ensure lead_source column exists
+    cursor.execute("PRAGMA table_info(Clients)")
+    clients_columns_info_lead_source_check = cursor.fetchall()
+    clients_column_names_lead_source_check = [info['name'] for info in clients_columns_info_lead_source_check]
+    if 'lead_source' not in clients_column_names_lead_source_check:
+        try:
+            cursor.execute("ALTER TABLE Clients ADD COLUMN lead_source TEXT")
+            print("DEBUG_INIT_DB: Added 'lead_source' column to Clients table.")
+        except sqlite3.Error as e_alter_lead_source:
+            print(f"DEBUG_INIT_DB: Error adding 'lead_source' column to Clients table: {e_alter_lead_source}")
+
     cursor.execute("PRAGMA table_info(Clients)")
     columns_info = cursor.fetchall()
     column_names = [info['name'] for info in columns_info]
@@ -607,11 +683,12 @@ def initialize_database():
         created_by_user_id TEXT, -- Added column
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        employee_status TEXT, -- internal, external, not_applicable
         FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL -- Added FK
     )
     """)
 
-    # Ensure created_by_user_id column exists in Contacts table for existing databases
+    # Ensure created_by_user_id and employee_status columns exist in Contacts table for existing databases
     cursor.execute("PRAGMA table_info(Contacts)")
     contacts_columns_info = cursor.fetchall()
     contacts_column_names = [info['name'] for info in contacts_columns_info]
@@ -624,6 +701,13 @@ def initialize_database():
             print(f"DEBUG_INIT_DB: Error adding 'created_by_user_id' column to Contacts table: {e_alter_contacts_creator}")
             # Note: Older SQLite versions might not support adding FK via ALTER TABLE.
             # The FK in CREATE TABLE is for new DBs. For existing, this adds the column. App logic must handle.
+
+    if 'employee_status' not in contacts_column_names:
+        try:
+            cursor.execute("ALTER TABLE Contacts ADD COLUMN employee_status TEXT")
+            print("DEBUG_INIT_DB: Added 'employee_status' column to Contacts table.")
+        except sqlite3.Error as e_alter_contacts_status:
+            print(f"DEBUG_INIT_DB: Error adding 'employee_status' column to Contacts table: {e_alter_contacts_status}")
 
     # Create ClientContacts table (base from ca.py)
     cursor.execute("""
@@ -2243,6 +2327,29 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_exp_tags_tag_id ON ExperienceTags(tag_id)")
     # --- End Experience Module Indexes ---
 
+    # EntityContacts Table (New)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS EntityContacts (
+        entity_contact_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        entity_id TEXT NOT NULL,
+        entity_type TEXT NOT NULL, -- e.g., 'Transporter', 'FreightForwarder', 'MoneyTransferAgent', 'Partner'
+        contact_id INTEGER NOT NULL,
+        role_in_entity TEXT,
+        is_primary BOOLEAN DEFAULT FALSE,
+        can_receive_documents BOOLEAN DEFAULT TRUE,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (contact_id) REFERENCES Contacts (contact_id) ON DELETE CASCADE,
+        UNIQUE (entity_id, entity_type, contact_id)
+    )
+    """)
+    print("DEBUG_INIT_DB: Table EntityContacts created or exists.")
+
+    # --- Indexes for EntityContacts ---
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_entitycontacts_entity ON EntityContacts(entity_id, entity_type)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_entitycontacts_contact_id ON EntityContacts(contact_id)")
+    print("DEBUG_INIT_DB: Indexes for EntityContacts created or exists.")
 
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandes_client_id ON Commandes(client_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandes_project_id ON Commandes(project_id)")
@@ -2304,6 +2411,29 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     print("DEBUG_INIT_DB: Indexes for Company Expense and Facture tables created or already exist.")
     # --- End Company Expense Module Tables and Indexes ---
 
+    # --- ClientVisits Table ---
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS ClientVisits (
+        visit_id TEXT PRIMARY KEY,
+        client_id TEXT NOT NULL,
+        visit_date TEXT NOT NULL, -- ISO date string YYYY-MM-DD
+        visit_type TEXT,          -- e.g., 'Visite chez le client', 'Visite du client chez nous', 'Appel Vidéo Planifié'
+        visit_purpose TEXT,
+        notes_impressions TEXT,
+        created_by_user_id TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (client_id) REFERENCES Clients (client_id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL
+    )
+    """)
+    print("DEBUG_INIT_DB: Table ClientVisits created or exists.")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientvisits_client_id ON ClientVisits(client_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientvisits_visit_date ON ClientVisits(visit_date)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientvisits_created_by_user_id ON ClientVisits(created_by_user_id)")
+    print("DEBUG_INIT_DB: Indexes for ClientVisits created or already exist.")
+    # --- End ClientVisits Table ---
+
     # --- UserSavedFilters Table (Added for filter saving functionality) ---
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS user_saved_filters (
@@ -2319,6 +2449,42 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     """)
     print("DEBUG_INIT_DB: Table user_saved_filters created or exists.")
     # --- End UserSavedFilters Table ---
+
+    # --- Note Management Tables ---
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS DefaultDocumentNotes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        document_type TEXT NOT NULL, -- e.g., "proforma_invoice", "packing_list"
+        language_code TEXT NOT NULL, -- e.g., "en", "fr"
+        note_content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (document_type, language_code)
+    )
+    """)
+    print("DEBUG_INIT_DB: Table DefaultDocumentNotes created or exists.")
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS CommandeDocumentNotes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        commande_document_id TEXT NOT NULL, -- This will be the ClientDocuments.document_id
+        note_content TEXT NOT NULL,
+        language_code TEXT, -- Should ideally match the document's language
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (commande_document_id) -- Assuming one custom note per document instance in a commande
+        -- FOREIGN KEY (commande_document_id) REFERENCES ClientDocuments (document_id) ON DELETE CASCADE
+        -- FK constraint can be added if ClientDocuments.document_id is stable and used here.
+        -- For now, will manage relation via application logic due to potential complexities with existing schema.
+    )
+    """)
+    print("DEBUG_INIT_DB: Table CommandeDocumentNotes created or exists.")
+
+    # Indexes for Note Management Tables
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_defaultdocumentnotes_doctype_lang ON DefaultDocumentNotes(document_type, language_code)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandedocumentnotes_doc_id ON CommandeDocumentNotes(commande_document_id)")
+    print("DEBUG_INIT_DB: Indexes for Note Management tables created or exist.")
+    # --- End Note Management Tables ---
 
     # Commit schema changes made via raw SQLite connection before proceeding to SQLAlchemy part
     try:
@@ -2617,23 +2783,19 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
 
         if admin_role_id:
             print(f"DEBUG_INIT_DB: Seeding ALL {len(all_permission_keys)} permissions for role '{admin_role_name_from_const}' (ID: {admin_role_id}).")
-            added_admin_perms_count = 0
+            admin_perms_added_count = 0
             for p_key in all_permission_keys:
-
-                if p_key not in existing_admin_permission_keys:
-                    try:
-                        cursor.execute("INSERT INTO RolePermissions (role_id, permission_key) VALUES (?, ?)",
-                                       (admin_role_id, p_key))
-                        newly_added_admin_perms_count += 1
-                    except sqlite3.IntegrityError:
-                         # This might happen if another process added it, or if there's a race (unlikely for init)
-                         # Or if p_key somehow wasn't in all_permission_keys but was attempted (should not happen here)
-                         print(f"DEBUG_INIT_DB: IntegrityError trying to add {p_key} for Admin ID {admin_role_id}, might already exist or perm_key not in Permissions table.")
-                # else: # Already exists, no action needed for this key
-
-            print(f"DEBUG_INIT_DB: {admin_role_name_str} (ID: {admin_role_id}) had {current_admin_perms_count} permissions. Newly added: {newly_added_admin_perms_count} permissions.")
-            if (current_admin_perms_count + newly_added_admin_perms_count) != len(all_permission_keys):
-                print(f"DEBUG_INIT_DB: WARNING - Admin total permissions ({current_admin_perms_count + newly_added_admin_perms_count}) does not match total defined P_ keys ({len(all_permission_keys)}). Check for issues.")
+                try:
+                    # Utiliser INSERT OR IGNORE pour éviter les erreurs si la permission existe déjà pour ce rôle
+                    cursor.execute("INSERT OR IGNORE INTO RolePermissions (role_id, permission_key) VALUES (?, ?)",
+                                   (admin_role_id, p_key))
+                    if cursor.rowcount > 0: # rowcount > 0 signifie qu'une ligne a été insérée
+                        admin_perms_added_count += 1
+                except sqlite3.IntegrityError:
+                    # Normalement, INSERT OR IGNORE devrait gérer cela, mais au cas où.
+                    # Peut également se produire si p_key n'est pas dans la table Permissions (ce qui ne devrait pas arriver ici).
+                    print(f"DEBUG_INIT_DB: IntegrityError (ou permission non trouvée dans Permissions table) en essayant d'ajouter {p_key} pour Admin ID {admin_role_id}. Skipping.")
+            print(f"DEBUG_INIT_DB: {admin_perms_added_count} permissions potentiellement nouvelles ajoutées pour le rôle '{admin_role_name_from_const}'. Total de permissions définies: {len(all_permission_keys)}.")
         else:
             print(f"DEBUG_INIT_DB: CRITICAL - Role '{admin_role_name_from_const}' not found in role_id_map. Cannot seed its permissions.")
 
@@ -2641,26 +2803,19 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         # PERMISSION_MAP keys are constants like ADMINISTRATOR, TEAM_LEAD, OPERATOR
         # The values associated with these constants in auth_perms_module are the actual role names (strings)
         seeded_other_role_permissions_count = 0
-        for role_name_key_in_map, perm_keys_list_for_role in auth_perms_module.PERMISSION_MAP.items():
-            # Get the actual role name string (e.g., "Team Lead") using the constant (e.g., TEAM_LEAD)
-            # getattr(auth_perms_module, role_name_key_in_map, role_name_key_in_map)
-            # auth_perms_module.TEAM_LEAD will give "Team Lead"
-            # auth_perms_module.OPERATOR will give "Operator"
-
-            # The keys in PERMISSION_MAP are already the string role names as defined by the constants
-            # e.g., PERMISSION_MAP = { ADMINISTRATOR: [...], TEAM_LEAD: [...], OPERATOR: [...] }
-            # where ADMINISTRATOR = "Administrator", TEAM_LEAD = "Team Lead", OPERATOR = "Operator"
-
-            actual_role_name_str = role_name_key_in_map # The keys in PERMISSION_MAP *are* the role name strings
+        for role_name_constant, perm_keys_list_for_role in auth_perms_module.PERMISSION_MAP.items():
+            # role_name_constant est déjà le nom du rôle string (ex: "Team Lead")
+            # car les clés de PERMISSION_MAP sont les constantes qui contiennent ces strings.
+            actual_role_name_str = role_name_constant
 
             if actual_role_name_str == admin_role_name_from_const:
-                print(f"DEBUG_INIT_DB: Skipping '{actual_role_name_str}' in PERMISSION_MAP loop as it's handled (all perms).")
+                # print(f"DEBUG_INIT_DB: Skipping '{actual_role_name_str}' in PERMISSION_MAP loop as it's handled (all perms).")
                 continue # Skip Administrator, already handled with all permissions
 
             role_id = role_id_map.get(actual_role_name_str)
             if role_id:
-                print(f"DEBUG_INIT_DB: Seeding permissions for role '{actual_role_name_str}' (ID: {role_id}) from PERMISSION_MAP.")
-                current_role_perms_added = 0
+                # print(f"DEBUG_INIT_DB: Seeding permissions for role '{actual_role_name_str}' (ID: {role_id}) from PERMISSION_MAP.")
+                current_role_perms_added_count = 0
                 for perm_key in perm_keys_list_for_role:
                     if perm_key in all_permission_keys: # Ensure permission exists in Permissions table
                         try:
@@ -2668,13 +2823,12 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
                                            (role_id, perm_key))
                             if cursor.rowcount > 0:
                                 seeded_other_role_permissions_count += 1
-                                current_role_perms_added +=1
+                                current_role_perms_added_count +=1
                         except sqlite3.IntegrityError:
                              print(f"DEBUG_INIT_DB: IntegrityError while seeding permission '{perm_key}' for role '{actual_role_name_str}'. Skipping.")
-
                     else:
                         print(f"DEBUG_INIT_DB: WARNING - Permission key '{perm_key}' for role '{actual_role_name_str}' in PERMISSION_MAP not found in defined P_ constants (ALL_PERMISSIONS). Skipping.")
-                print(f"DEBUG_INIT_DB: Added {current_role_perms_added} permissions for '{actual_role_name_str}'.")
+                print(f"DEBUG_INIT_DB: Added {current_role_perms_added_count} permissions for '{actual_role_name_str}'.")
             else:
                 print(f"DEBUG_INIT_DB: WARNING - Role name '{actual_role_name_str}' from PERMISSION_MAP not found in Roles table (IDs: {role_id_map}). Skipping its permissions.")
         print(f"DEBUG_INIT_DB: Total of {seeded_other_role_permissions_count} role-permission links added/verified for non-Admin roles from PERMISSION_MAP.")

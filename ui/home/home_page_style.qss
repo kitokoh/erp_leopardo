@@ -55,6 +55,20 @@ QLabel#homePageGifLabel {
 /* Conteneur pour la zone inférieure (ex: statistiques) */
 QStackedWidget#homePageBottomContentArea {
     /* background-color: lightblue; */ /* Pour débogage de la zone */
-    border-top: 1px solid #DDE2E6; /* Séparateur optionnel */
+    /* border-top: 1px solid #DDE2E6; */ /* Séparateur optionnel, removed as the new layout has sections */
     /* min-height: 200px; */ /* Hauteur minimale si nécessaire */
+}
+
+/* Promotional Areas Styling */
+QFrame#leftPromoArea, QFrame#rightPromoArea {
+    background-color: #E9ECEF; /* Un gris clair, différent du fond principal */
+    border: 1px solid #CED4DA; /* Bordure subtile */
+    border-radius: 8px; /* Coins arrondis */
+}
+
+/* Optional: Style for labels inside promo areas if needed */
+QFrame#leftPromoArea QLabel, QFrame#rightPromoArea QLabel {
+    color: #495057; /* Couleur de texte pour les labels promo */
+    font-size: 14px;
+    font-weight: bold;
 }

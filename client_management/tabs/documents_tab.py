@@ -15,6 +15,7 @@ from PyQt5.QtCore import Qt, QUrl
 
 import db as db_manager
 from db.cruds import client_documents_crud, projects_crud # Added projects_crud
+
 from excel_editor import ExcelEditor
 from html_editor import HtmlEditor
 # Other necessary dialogs and modules will be imported as needed, or passed from parent
@@ -177,6 +178,7 @@ class DocumentsTab(QWidget):
                     for identifier_str in fetched_order_identifiers:
                         if identifier_str and identifier_str.strip():
                              self.doc_order_filter_combo.addItem(identifier_str, identifier_str)
+
             except Exception as e:
                 logging.error(f"Error loading order filters for documents: {e}", exc_info=True)
         self.doc_order_filter_combo.blockSignals(False)
@@ -220,6 +222,7 @@ class DocumentsTab(QWidget):
         try:
             # Call the correct function get_documents_for_client
             documents = client_documents_crud.get_documents_for_client(client_id=client_id, filters=crud_filters)
+
 
             if not documents:
                 self.documents_empty_label.show()
@@ -506,4 +509,4 @@ class DocumentsTab(QWidget):
         # This is generally handled by not providing edit/delete buttons.
         # If table had direct editing, it would need to be setReadOnly(!can_manage_documents)
 
-```
+

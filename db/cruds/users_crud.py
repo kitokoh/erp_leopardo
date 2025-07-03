@@ -21,8 +21,14 @@ def add_user(username: str, password: str, role_id: int, full_name: str = None, 
     user_id = str(uuid.uuid4()) # Generate UUID for user_id
     now = datetime.utcnow().isoformat() + "Z"
 
-    sql = """INSERT INTO Users (user_id, username, hashed_password, full_name, email, role_id, is_active, created_at, updated_at, last_login_at)
-             VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, NULL)"""
+    # Added biometric fields to the INSERT statement, defaulting to disabled/NULL
+    sql = """INSERT INTO Users (
+                 user_id, username, hashed_password, full_name, email, role_id, is_active,
+                 created_at, updated_at, last_login_at,
+                 is_fingerprint_auth_enabled, fingerprint_template_id,
+                 is_face_auth_enabled, face_template_id,
+                 is_voice_auth_enabled, voice_profile_id
+             ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, NULL, 0, NULL, 0, NULL, 0, NULL)"""
     params = (user_id, username, hashed_pw, full_name, email, role_id, now, now)
 
     try:
@@ -286,3 +292,96 @@ def soft_delete_user(user_id_to_delete: str, current_user_id: str, conn: sqlite3
     except sqlite3.Error as e:
         logger.error(f"Database error soft deleting user {user_id_to_delete}: {e}", exc_info=True)
         return False
+
+@_manage_conn
+def set_biometric_auth_status(user_id: str, method: str, enabled: bool, template_id: str = None, conn: sqlite3.Connection = None) -> bool:
+    """
+    Sets the status (enabled/disabled) and template ID for a specific biometric authentication method for a user.
+
+    Args:
+        user_id (str): The ID of the user.
+        method (str): The biometric method ('fingerprint', 'face', 'voice').
+        enabled (bool): True to enable, False to disable.
+        template_id (str, optional): The template ID provided by the OS/library. Defaults to None.
+        conn (sqlite3.Connection, optional): Database connection.
+
+    Returns:
+        bool: True if the update was successful, False otherwise.
+    """
+    now = datetime.utcnow().isoformat() + "Z"
+    enabled_int = 1 if enabled else 0
+
+    field_enabled_map = {
+        'fingerprint': 'is_fingerprint_auth_enabled',
+        'face': 'is_face_auth_enabled',
+        'voice': 'is_voice_auth_enabled'
+    }
+    field_template_id_map = {
+        'fingerprint': 'fingerprint_template_id',
+        'face': 'face_template_id',
+        'voice': 'voice_profile_id'
+    }
+
+    if method not in field_enabled_map:
+        logger.error(f"Invalid biometric method: {method}")
+        return False
+
+    sql = f"""UPDATE Users
+              SET {field_enabled_map[method]} = ?,
+                  {field_template_id_map[method]} = ?,
+                  updated_at = ?
+              WHERE user_id = ?"""
+
+    # If disabling, template_id should usually be cleared.
+    current_template_id = template_id if enabled else None
+    params = (enabled_int, current_template_id, now, user_id)
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute(sql, params)
+        if cursor.rowcount > 0:
+            logger.info(f"Biometric method '{method}' for user '{user_id}' set to {enabled} (Template ID: {current_template_id}).")
+            return True
+        else:
+            logger.warning(f"No user found with ID '{user_id}' or no change made for biometric method '{method}'.")
+            return False
+    except sqlite3.Error as e:
+        logger.error(f"Database error setting biometric auth status for user '{user_id}', method '{method}': {e}", exc_info=True)
+        return False
+
+@_manage_conn
+def get_biometric_auth_status(user_id: str, conn: sqlite3.Connection = None) -> dict | None:
+    """
+    Retrieves the biometric authentication settings for a given user.
+
+    Args:
+        user_id (str): The ID of the user.
+        conn (sqlite3.Connection, optional): Database connection.
+
+    Returns:
+        dict | None: A dictionary with biometric settings if user is found, otherwise None.
+                     Example: {'is_fingerprint_auth_enabled': True, 'fingerprint_template_id': 'xyz', ...}
+    """
+    sql = """SELECT user_id, is_fingerprint_auth_enabled, fingerprint_template_id,
+                    is_face_auth_enabled, face_template_id,
+                    is_voice_auth_enabled, voice_profile_id
+             FROM Users
+             WHERE user_id = ?"""
+    try:
+        cursor = conn.cursor()
+        cursor.execute(sql, (user_id,))
+        row = cursor.fetchone()
+        if row:
+            # Convert boolean fields from 0/1 to True/False if necessary, though dict(row) usually handles it.
+            # Ensuring boolean conversion for clarity if values are consistently 0/1.
+            user_settings = dict(row)
+            for key in ['is_fingerprint_auth_enabled', 'is_face_auth_enabled', 'is_voice_auth_enabled']:
+                if key in user_settings: # Check if key exists (it should from the SELECT)
+                    user_settings[key] = bool(user_settings[key])
+            return user_settings
+        else:
+            logger.warning(f"No biometric settings found for user ID '{user_id}' (user might not exist).")
+            return None
+    except sqlite3.Error as e:
+        logger.error(f"Database error fetching biometric auth status for user '{user_id}': {e}", exc_info=True)
+        return None

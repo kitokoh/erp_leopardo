@@ -114,4 +114,4 @@ class BillingTab(QWidget):
         self.apply_permissions_to_tab() # Re-apply permissions in case user role changed
         logging.info("BillingTab refreshed (permissions re-applied).")
 
-```
+

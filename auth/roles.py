@@ -6,6 +6,11 @@ READ_ONLY_USER = "read_only_user"
 
 ALL_ROLES = {SUPER_ADMIN, ADMINISTRATOR, STANDARD_USER, READ_ONLY_USER}
 
+# DEPRECATED: This dictionary and the has_permission function below are part of an old
+# permission system. The new system uses the 'Permissions' and 'RolePermissions' tables
+# in the database and is accessed via `auth.permissions.has_permission`.
+# This is kept for historical reference or if parts of the API still rely on it,
+# but new development should use the database-backed system.
 # Role Permissions (Module-level access for now)
 # These are more like "capabilities" or "access rights to modules"
 # For very granular permissions, a different structure might be needed.
@@ -45,9 +50,17 @@ ROLE_PERMISSIONS = {
 
 def has_permission(user_role: str, required_permission: str) -> bool:
     """
-    Checks if a user role has a specific permission.
+    DEPRECATED: Checks if a user role has a specific permission using the old ROLE_PERMISSIONS dictionary.
+    New code should use `auth.permissions.has_permission(user_role_name, permission_key)`.
     The SUPER_ADMIN role with "all_access" implicitly has all permissions.
     """
+    import logging # Import locally to avoid top-level if not always needed
+    logger = logging.getLogger(__name__)
+    logger.warning(
+        "DEPRECATED: auth.roles.has_permission() was called. "
+        "Consider migrating to auth.permissions.has_permission().",
+        stack_info=True # Log stack trace to find caller
+    )
     if not user_role or user_role not in ROLE_PERMISSIONS:
         return False
 

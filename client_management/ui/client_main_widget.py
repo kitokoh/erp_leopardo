@@ -189,11 +189,7 @@ class ClientMainWidget(QWidget): # Renamed from ClientWidget
             self.create_docs_btn.setIcon(QIcon.fromTheme("mail-send", QIcon(":/icons/bell.svg")))
             self.create_docs_btn.setToolTip(self.tr("Envoyer un email au client"))
             self.create_docs_btn.setObjectName("primaryButton")
-            # Removed problematic disconnect for a non-existent method:
-            # try:
-            #     self.create_docs_btn.clicked.disconnect(self.open_create_docs_dialog)
-            # except TypeError:
-            #     pass
+
             self.create_docs_btn.clicked.connect(self.open_send_email_dialog)
             action_layout.addWidget(self.create_docs_btn)
 
@@ -532,12 +528,12 @@ class ClientMainWidget(QWidget): # Renamed from ClientWidget
         # except Exception as e:
             # logging.error(f"ClientMainWidget.setup_ui: Error during self.populate_doc_table(): {e}", exc_info=True)
 
-        # logging.info("ClientMainWidget.setup_ui: Attempting self.load_contacts()") # Call removed as per runtime error
-        # try:
-            # self.load_contacts() # Removed as per AttributeError log
-            # logging.info("ClientMainWidget.setup_ui: Successfully completed self.load_contacts()")
-        # except Exception as e:
-            # logging.error(f"ClientMainWidget.setup_ui: Error during self.load_contacts(): {e}", exc_info=True)
+        logging.info("ClientMainWidget.setup_ui: Attempting self.load_contacts()")
+        try:
+            self.load_contacts()
+            logging.info("ClientMainWidget.setup_ui: Successfully completed self.load_contacts()")
+        except Exception as e:
+            logging.error(f"ClientMainWidget.setup_ui: Error during self.load_contacts(): {e}", exc_info=True)
 
         # logging.info("ClientMainWidget.setup_ui: Attempting self.load_products()") # Call removed
         # try:
@@ -596,6 +592,7 @@ class ClientMainWidget(QWidget): # Renamed from ClientWidget
             # logging.error(f"ClientMainWidget.setup_ui: Error during self.load_assigned_freight_forwarders(): {e}", exc_info=True)
 
         logging.info("ClientMainWidget.setup_ui: Finished initial data loading for tabs (calls moved to individual tab/section initializers).")
+
 
         # Connect accordion group box toggled signals
         if hasattr(self, 'client_info_group_box'):
@@ -3080,6 +3077,7 @@ class ClientMainWidget(QWidget): # Renamed from ClientWidget
     # def on_edit_client_product_dimensions(self): ... # REMOVED
 
     def load_document_notes_filters(self):
+
         self.load_document_notes_table()
 
 
