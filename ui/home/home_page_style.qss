@@ -55,6 +55,48 @@ QLabel#homePageGifLabel {
 /* Conteneur pour la zone inférieure (ex: statistiques) */
 QStackedWidget#homePageBottomContentArea {
     /* background-color: lightblue; */ /* Pour débogage de la zone */
-    border-top: 1px solid #DDE2E6; /* Séparateur optionnel */
+    /* border-top: 1px solid #DDE2E6; */ /* Séparateur optionnel, removed as the new layout has sections */
     /* min-height: 200px; */ /* Hauteur minimale si nécessaire */
 }
+
+/* Promotional Areas Styling */
+QFrame#leftPromoArea, QFrame#rightPromoArea {
+    background-color: #E9ECEF; /* Un gris clair, différent du fond principal */
+    border: 1px solid #CED4DA; /* Bordure subtile */
+    border-radius: 8px; /* Coins arrondis */
+}
+
+/* Styling for PromoSectionWidget */
+QFrame#PromoSectionWidget {
+    background-color: #FFFFFF; /* White background for the promo card */
+    border: 1px solid #DEE2E6; /* Lighter border color */
+    border-radius: 6px;        /* Slightly smaller border radius */
+    /* padding: 10px; */ /* Padding is handled by the widget's internal layout margins now */
+}
+
+QFrame#PromoSectionWidget:hover {
+    border-color: #007BFF; /* Highlight border on hover */
+    /* background-color: #F8F9FA; */ /* Optional: Slight background change on hover */
+}
+
+QLabel#promoTitleLabel {
+    font-family: "Open Sans", "Segoe UI", Arial, sans-serif;
+    font-size: 14px;           /* Adjust size as needed */
+    font-weight: bold;
+    color: #0056B3;        /* Darker blue for title */
+    padding-bottom: 4px;       /* Space below the title */
+    /* background-color: lightcoral; */ /* Debug color */
+}
+
+QLabel#promoBodyLabel {
+    font-family: "Open Sans", "Segoe UI", Arial, sans-serif;
+    font-size: 12px;           /* Adjust size as needed */
+    color: #343A40;            /* Standard dark grey for body text */
+    line-height: 1.5;          /* Improve readability for wrapped text */
+    /* background-color: lightblue; */ /* Debug color */
+}
+
+
+/* Remove old styling for QFrame#leftPromoArea and QFrame#rightPromoArea if they are no longer used directly */
+/* QFrame#leftPromoArea, QFrame#rightPromoArea { ... } */
+/* QFrame#leftPromoArea QLabel, QFrame#rightPromoArea QLabel { ... } */

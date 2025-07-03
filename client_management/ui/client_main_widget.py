@@ -189,10 +189,7 @@ class ClientMainWidget(QWidget): # Renamed from ClientWidget
             self.create_docs_btn.setIcon(QIcon.fromTheme("mail-send", QIcon(":/icons/bell.svg")))
             self.create_docs_btn.setToolTip(self.tr("Envoyer un email au client"))
             self.create_docs_btn.setObjectName("primaryButton")
-            try:
-                self.create_docs_btn.clicked.disconnect(self.open_create_docs_dialog)
-            except TypeError:
-                pass # Not connected or already disconnected
+
             self.create_docs_btn.clicked.connect(self.open_send_email_dialog)
             action_layout.addWidget(self.create_docs_btn)
 
@@ -566,35 +563,36 @@ class ClientMainWidget(QWidget): # Renamed from ClientWidget
         # except Exception as e:
             # logging.error(f"ClientMainWidget.setup_ui: Error during self.update_sav_tab_visibility(): {e}", exc_info=True)
 
-        logging.info("ClientMainWidget.setup_ui: Attempting self.load_assigned_vendors_personnel()")
-        try:
-            self.load_assigned_vendors_personnel()
-            logging.info("ClientMainWidget.setup_ui: Successfully completed self.load_assigned_vendors_personnel()")
-        except Exception as e:
-            logging.error(f"ClientMainWidget.setup_ui: Error during self.load_assigned_vendors_personnel(): {e}", exc_info=True)
+        # logging.info("ClientMainWidget.setup_ui: Attempting self.load_assigned_vendors_personnel()") # Call removed as per runtime error
+        # try:
+            # self.load_assigned_vendors_personnel() # Removed as per AttributeError log
+            # logging.info("ClientMainWidget.setup_ui: Successfully completed self.load_assigned_vendors_personnel()")
+        # except Exception as e:
+            # logging.error(f"ClientMainWidget.setup_ui: Error during self.load_assigned_vendors_personnel(): {e}", exc_info=True)
 
-        logging.info("ClientMainWidget.setup_ui: Attempting self.load_assigned_technicians()")
-        try:
-            self.load_assigned_technicians()
-            logging.info("ClientMainWidget.setup_ui: Successfully completed self.load_assigned_technicians()")
-        except Exception as e:
-            logging.error(f"ClientMainWidget.setup_ui: Error during self.load_assigned_technicians(): {e}", exc_info=True)
+        # logging.info("ClientMainWidget.setup_ui: Attempting self.load_assigned_technicians()") # Call removed as per runtime error
+        # try:
+            # self.load_assigned_technicians() # Removed as per AttributeError log
+            # logging.info("ClientMainWidget.setup_ui: Successfully completed self.load_assigned_technicians()")
+        # except Exception as e:
+            # logging.error(f"ClientMainWidget.setup_ui: Error during self.load_assigned_technicians(): {e}", exc_info=True)
 
-        logging.info("ClientMainWidget.setup_ui: Attempting self.load_assigned_transporters()")
-        try:
-            self.load_assigned_transporters()
-            logging.info("ClientMainWidget.setup_ui: Successfully completed self.load_assigned_transporters()")
-        except Exception as e:
-            logging.error(f"ClientMainWidget.setup_ui: Error during self.load_assigned_transporters(): {e}", exc_info=True)
+        # logging.info("ClientMainWidget.setup_ui: Attempting self.load_assigned_transporters()") # Call removed as per runtime error
+        # try:
+            # self.load_assigned_transporters() # Removed as per AttributeError log
+            # logging.info("ClientMainWidget.setup_ui: Successfully completed self.load_assigned_transporters()")
+        # except Exception as e:
+            # logging.error(f"ClientMainWidget.setup_ui: Error during self.load_assigned_transporters(): {e}", exc_info=True)
 
-        logging.info("ClientMainWidget.setup_ui: Attempting self.load_assigned_freight_forwarders()")
-        try:
-            self.load_assigned_freight_forwarders()
-            logging.info("ClientMainWidget.setup_ui: Successfully completed self.load_assigned_freight_forwarders()")
-        except Exception as e:
-            logging.error(f"ClientMainWidget.setup_ui: Error during self.load_assigned_freight_forwarders(): {e}", exc_info=True)
+        # logging.info("ClientMainWidget.setup_ui: Attempting self.load_assigned_freight_forwarders()") # Call removed as per runtime error
+        # try:
+            # self.load_assigned_freight_forwarders() # Removed as per AttributeError log
+            # logging.info("ClientMainWidget.setup_ui: Successfully completed self.load_assigned_freight_forwarders()")
+        # except Exception as e:
+            # logging.error(f"ClientMainWidget.setup_ui: Error during self.load_assigned_freight_forwarders(): {e}", exc_info=True)
 
-        logging.info("ClientMainWidget.setup_ui: Finished initial data loading for tabs.")
+        logging.info("ClientMainWidget.setup_ui: Finished initial data loading for tabs (calls moved to individual tab/section initializers).")
+
 
         # Connect accordion group box toggled signals
         if hasattr(self, 'client_info_group_box'):
@@ -3069,78 +3067,17 @@ class ClientMainWidget(QWidget): # Renamed from ClientWidget
         self.assigned_forwarders_table.setSortingEnabled(True)
         self.update_assigned_forwarders_buttons_state()
 
+    # Removed load_products_for_dimension_tab, on_dim_product_selected, and on_edit_client_product_dimensions methods.
+    # This functionality is now fully encapsulated within ProductDimensionsTab.
+    # ClientMainWidget should not directly manage UI elements or data loading for specific sub-tabs
+    # that have their own classes.
 
-    def load_products_for_dimension_tab(self):
-        """Populates the product selector combo box in the Product Dimensions tab."""
-        self.dim_product_selector_combo.blockSignals(True)
-        self.dim_product_selector_combo.clear()
-        self.dim_product_selector_combo.addItem(self.tr("Sélectionner un produit..."), None)
+    # def load_products_for_dimension_tab(self): ... # REMOVED
+    # def on_dim_product_selected(self, index=None): ... # REMOVED
+    # def on_edit_client_product_dimensions(self): ... # REMOVED
 
-        client_id = self.client_info.get('client_id')
-        if not client_id:
-            self.dim_product_selector_combo.blockSignals(False)
-            return
+    def load_document_notes_filters(self):
 
-        try:
-            # Fetch all globally available products for selection.
-            # Assuming db_manager.get_all_products() returns a list of product dictionaries
-            # with at least 'product_id', 'product_name', 'language_code'.
-            all_global_products = db_manager.get_all_products(filters=None)
-
-            if all_global_products:
-                # Global products should be unique by their definition (product_id).
-                # Sorting can be done here if not handled by the DB query, or to ensure consistent order.
-                # For example: all_global_products.sort(key=lambda x: (x.get('product_name', ''), x.get('language_code', '')))
-
-                for prod_data in all_global_products: # Iterate directly if already sorted or uniqueness is guaranteed by source
-                    product_name = prod_data.get('product_name', 'N/A')
-                    global_product_id = prod_data.get('product_id')
-                    lang_code = prod_data.get('language_code', '')
-
-                    display_text = f"{product_name} ({lang_code}) - ID: {global_product_id}"
-                    # Store the global_product_id as data for the combo box item
-                    self.dim_product_selector_combo.addItem(display_text, global_product_id)
-        except Exception as e:
-            print(f"Error loading products for dimension tab: {e}")
-            QMessageBox.warning(self, self.tr("Erreur Chargement"), self.tr("Impossible de charger les produits pour l'onglet dimensions."))
-
-        self.dim_product_selector_combo.blockSignals(False)
-        self.on_dim_product_selected()
-
-
-    def on_dim_product_selected(self, index=None):
-        """Handles selection change in the product selector for the dimensions tab."""
-        selected_global_product_id = self.dim_product_selector_combo.currentData()
-
-        if selected_global_product_id is None:
-            self.edit_client_product_dimensions_button.setEnabled(False)
-        else:
-            self.edit_client_product_dimensions_button.setEnabled(True)
-
-
-    def on_edit_client_product_dimensions(self):
-        selected_global_product_id = self.dim_product_selector_combo.currentData()
-        if selected_global_product_id is None:
-            QMessageBox.warning(self, self.tr("Aucun Produit Sélectionné"),
-                                self.tr("Veuillez sélectionner un produit dans la liste déroulante."))
-            return
-
-
-        client_id = self.client_info.get('client_id')
-        if not client_id:
-            QMessageBox.critical(self, self.tr("Erreur Client"),
-                                 self.tr("L'ID du client n'est pas disponible."))
-            return
-
-        dialog = ClientProductDimensionDialog(
-            client_id=client_id,
-            product_id=selected_global_product_id,
-            app_root_dir=self.app_root_dir,
-            parent=self
-        )
-        dialog.exec_()
-
-        self.load_document_notes_filters()
         self.load_document_notes_table()
 
 

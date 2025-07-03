@@ -14,7 +14,8 @@ from PyQt5.QtGui import QIcon, QDesktopServices, QFont # QFont might be needed f
 from PyQt5.QtCore import Qt, QUrl
 
 import db as db_manager
-from db.cruds import client_documents_crud # users_crud removed
+from db.cruds import client_documents_crud, projects_crud # Added projects_crud
+
 from excel_editor import ExcelEditor
 from html_editor import HtmlEditor
 # Other necessary dialogs and modules will be imported as needed, or passed from parent
@@ -158,12 +159,26 @@ class DocumentsTab(QWidget):
         client_id = self.client_info.get('client_id')
         if client_id:
             try:
-                order_identifiers = db_manager.get_distinct_order_identifiers_for_client(client_id)
-                if order_identifiers:
-                    for identifier_tuple in order_identifiers:
-                        identifier = identifier_tuple[0] # Assuming it returns list of tuples
-                        if identifier and identifier.strip():
-                             self.doc_order_filter_combo.addItem(identifier, identifier)
+                projects = projects_crud.get_projects_by_client_id(client_id)
+                fetched_order_identifiers = []
+                if projects:
+                    seen_identifiers = set()
+                    for project in projects:
+                        # Assuming 'project_identifier' is the desired "order identifier"
+                        # If there's a more specific 'order_id' or similar on the project, use that.
+                        identifier = project.get('project_identifier')
+                        if not identifier: # Fallback to project_name if identifier is missing
+                            identifier = project.get('project_name')
+
+                        if identifier and identifier not in seen_identifiers:
+                            fetched_order_identifiers.append(identifier) # Store the identifier itself
+                            seen_identifiers.add(identifier)
+
+                if fetched_order_identifiers:
+                    for identifier_str in fetched_order_identifiers:
+                        if identifier_str and identifier_str.strip():
+                             self.doc_order_filter_combo.addItem(identifier_str, identifier_str)
+
             except Exception as e:
                 logging.error(f"Error loading order filters for documents: {e}", exc_info=True)
         self.doc_order_filter_combo.blockSignals(False)
@@ -200,9 +215,14 @@ class DocumentsTab(QWidget):
             filters["order_identifier_is_null"] = True
             if "order_identifier" in filters: del filters["order_identifier"]
 
+        # Prepare a separate filters dict for the CRUD function, excluding client_id from it
+        crud_filters = filters.copy()
+        crud_filters.pop('client_id', None) # Remove client_id if it's in filters, as it's a direct arg
 
         try:
-            documents = client_documents_crud.get_client_documents_with_filters(filters)
+            # Call the correct function get_documents_for_client
+            documents = client_documents_crud.get_documents_for_client(client_id=client_id, filters=crud_filters)
+
 
             if not documents:
                 self.documents_empty_label.show()
@@ -489,4 +509,4 @@ class DocumentsTab(QWidget):
         # This is generally handled by not providing edit/delete buttons.
         # If table had direct editing, it would need to be setReadOnly(!can_manage_documents)
 
-# ```
+

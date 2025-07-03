@@ -5,6 +5,15 @@ import logging
 from .activity_logs_crud import add_activity_log, get_activity_logs, get_activity_log_by_id
 from .application_settings_crud import get_setting, set_setting, get_next_invoice_number
 from .client_assigned_personnel_crud import assign_personnel_to_client, get_assigned_personnel_for_client, unassign_personnel_from_client
+# Import from the new client_contacts_crud (ensure functions are defined there)
+from .client_contacts_crud import (
+    get_clients_for_contact as get_clients_for_contact_from_link_table,  # Renamed to avoid conflict if contacts_crud has a similar name
+    link_contact_to_client as link_contact_to_client_in_link_table,    # Renamed
+    unlink_contact_from_client as unlink_contact_from_client_in_link_table, # Renamed
+    get_specific_client_contact_link_details as get_specific_client_contact_link_details_from_link_table, # Renamed
+    update_client_contact_link as update_client_contact_link_in_link_table, # Renamed
+    check_if_contact_linked_to_client
+)
 from .client_documents_crud import add_client_document, get_document_by_id, get_documents_for_client, get_client_document_notes, add_client_document_note, update_client_document_note, delete_client_document_note, get_client_document_note_by_id, delete_client_document # update_client_document is a stub
 from .client_freight_forwarders_crud import assign_forwarder_to_client, get_assigned_forwarders_for_client, unassign_forwarder_from_client
 from .client_project_products_crud import get_products_for_client_or_project, add_product_to_client_or_project, update_client_project_product, remove_product_from_client_or_project, get_client_project_product_by_id, get_distinct_purchase_confirmed_at_for_client, get_product_usage_counts
@@ -12,7 +21,10 @@ from .client_order_money_transfer_agents_crud import assign_agent_to_client_orde
 from .client_transporters_crud import assign_transporter_to_client, get_assigned_transporters_for_client, unassign_transporter_from_client, update_client_transporter_email_status
 from .clients_crud import get_all_clients, get_client_by_id, get_active_clients_count, get_client_counts_by_country, get_client_segmentation_by_city, get_client_segmentation_by_status, get_client_segmentation_by_category, get_total_clients_count, update_client, add_client, delete_client as soft_delete_client, get_all_clients_with_details, get_clients_by_archival_status, get_active_clients_per_country, add_client_note as add_client_note_to_client, get_client_notes as get_client_notes_for_client, get_clients_count_created_between, get_total_clients_count_up_to_date, get_active_clients_count_up_to_date
 from .companies_crud import add_company, get_company_by_id, get_all_companies, update_company, delete_company, set_default_company, get_default_company
-from .company_personnel_crud import add_company_personnel, get_personnel_for_company, update_company_personnel, delete_company_personnel
+from .company_personnel_crud import (
+    add_company_personnel, get_personnel_for_company, update_company_personnel, delete_company_personnel,
+    link_existing_contact_to_personnel # Added new function
+)
 from .contacts_crud import get_contacts_for_client, add_contact, get_contact_by_id as get_contact_details_by_id, get_contact_by_email, get_all_contacts, update_contact, delete_contact, link_contact_to_client, unlink_contact_from_client, get_contacts_for_client_count, get_clients_for_contact, get_specific_client_contact_link_details, update_client_contact_link
 # employees_crud functions expect SQLAlchemy Session.
 from .employees_crud import create_employee as create_employee_sqla, get_employee as get_employee_sqla, get_employees as get_employees_sqla, update_employee as update_employee_sqla, delete_employee as delete_employee_sqla
@@ -72,6 +84,7 @@ from .company_expenses_crud import add_company_expense, get_company_expense_by_i
 from . import activity_logs_crud
 from . import application_settings_crud
 from . import client_assigned_personnel_crud
+from . import client_contacts_crud # Added import for the new module
 from . import client_documents_crud
 from . import client_freight_forwarders_crud
 from . import client_project_products_crud
@@ -142,6 +155,13 @@ __all__ = [
     'get_setting', 'set_setting', 'get_next_invoice_number',
     # Functions from client_assigned_personnel_crud
     'assign_personnel_to_client', 'get_assigned_personnel_for_client', 'unassign_personnel_from_client',
+    # Functions from client_contacts_crud
+    'get_clients_for_contact_from_link_table',
+    'link_contact_to_client_in_link_table',
+    'unlink_contact_from_client_in_link_table',
+    'get_specific_client_contact_link_details_from_link_table',
+    'update_client_contact_link_in_link_table',
+    'check_if_contact_linked_to_client',
     # Functions from client_documents_crud
     'add_client_document', 'get_document_by_id', 'get_documents_for_client', 'get_client_document_notes',
     'add_client_document_note', 'update_client_document_note', 'delete_client_document_note',
@@ -165,7 +185,7 @@ __all__ = [
     # Functions from companies_crud
     'add_company', 'get_company_by_id', 'get_all_companies', 'update_company', 'delete_company', 'set_default_company', 'get_default_company',
     # Functions from company_personnel_crud
-    'add_company_personnel', 'get_personnel_for_company', 'update_company_personnel', 'delete_company_personnel',
+    'add_company_personnel', 'get_personnel_for_company', 'update_company_personnel', 'delete_company_personnel', 'link_existing_contact_to_personnel',
     # Functions from contacts_crud
     'get_contacts_for_client', 'add_contact', 'get_contact_details_by_id', 'get_contact_by_email', 'get_all_contacts',
     'update_contact', 'delete_contact', 'link_contact_to_client', 'unlink_contact_from_client', 'get_contacts_for_client_count',
@@ -265,6 +285,7 @@ __all__ = [
     'activity_logs_crud',
     'application_settings_crud',
     'client_assigned_personnel_crud',
+    'client_contacts_crud', # Added new module
     'client_documents_crud',
     'client_freight_forwarders_crud',
     'client_order_money_transfer_agents_crud',

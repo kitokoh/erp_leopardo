@@ -137,4 +137,4 @@ class ProductDimensionsTab(QWidget):
         """Public method to refresh data, callable from parent."""
         self.load_products_for_dimension_tab()
 
-# ```
+
