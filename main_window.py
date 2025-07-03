@@ -247,14 +247,23 @@ class ClientListItemWidget(QWidget):
 
 
 class DocumentManager(QMainWindow):
-    def __init__(self, app_root_dir, current_user_info: dict): # Changed current_user_id to current_user_info
+    def __init__(self, app_root_dir, current_user_info: dict, current_license_info: dict | None):
         super().__init__()
         self.app_root_dir = app_root_dir
-        self.current_user_info = current_user_info # Store the full user info dictionary
-        # self.current_user_id = current_user_id # Kept for compatibility, but new code should use current_user_info
-        self.current_user_id = self.current_user_info.get('user_id') # Extract user_id for existing usage
+        self.current_user_info = current_user_info
+        self.current_license_info = current_license_info # Stocker les informations de licence
+        self.current_user_id = self.current_user_info.get('user_id')
+        self.allowed_features = set() # Initialiser l'ensemble des fonctionnalités autorisées
 
         logging.info(f"DocumentManager initialized for user: {self.current_user_info.get('username')}, Role: {self.current_user_info.get('role_name')}")
+        if self.current_license_info and self.current_license_info.get('is_active'):
+            from license_management import manager as license_manager # Importation locale
+            self.allowed_features = license_manager.get_allowed_features(self.current_license_info)
+            logging.info(f"License Type: {self.current_license_info.get('license_type')}, Active: {self.current_license_info.get('is_active')}, Allowed Features: {self.allowed_features}")
+        elif self.current_license_info: # Licence existe mais pas active
+            logging.warning(f"DocumentManager: License present but not active. Type: {self.current_license_info.get('license_type')}, Active: {self.current_license_info.get('is_active')}. No features allowed.")
+        else: # Pas d'information de licence
+            logging.warning("DocumentManager initialized with NO license information. No features allowed.")
 
         self.setWindowTitle(self.tr("Gestionnaire de Documents Client")); self.setGeometry(100, 100, 1200, 800)
         self.setWindowIcon(QIcon(":/icons/logo.svg"))
@@ -1199,9 +1208,24 @@ class DocumentManager(QMainWindow):
                                      P_MANAGE_GLOBAL_PRODUCTS, P_VIEW_GLOBAL_PRODUCTS, \
                                      P_ACCESS_CALCULATOR_MODULE, P_MANAGE_STATUSES # Added P_VIEW_GLOBAL_PRODUCTS
 
-        role_name = self.current_user_info.get('role_name') if self.current_user_info else None
+        # Importer les constantes de fonctionnalités du license_manager
+        from license_management.manager import (
+            FEATURE_CLIENT_MANAGEMENT, FEATURE_PRODUCT_MANAGEMENT, FEATURE_DOCUMENT_GENERATION,
+            FEATURE_ADVANCED_REPORTS, FEATURE_ALL # FEATURE_ALL est géré par get_allowed_features
+        )
+
+        # Mapping des noms de modules aux fonctionnalités de licence
+        # Clé: nom du module (comme dans CONFIGURABLE_MODULES), Valeur: constante FEATURE_*
+        MODULE_TO_LICENSE_FEATURE_MAP = {
+            'product_management': FEATURE_PRODUCT_MANAGEMENT,
+            'statistics': FEATURE_ADVANCED_REPORTS,
+            'project_management': FEATURE_DOCUMENT_GENERATION, # Exemple, pourrait être plus granulaire
+            'commandes_management': FEATURE_DOCUMENT_GENERATION, # Exemple
+            # Les autres modules non listés ici ne seront pas vérifiés par la licence pour l'instant (accès par rôle/DB setting)
+        }
+
         role_name = self.current_user_info.get('role_name') if self.current_user_info else "UnknownRole"
-        logging.info(f"Applying permissions for role: {role_name}")
+        logging.info(f"Applying permissions for role: {role_name}. Allowed license features: {self.allowed_features}")
 
         if not self.current_user_info: # Should not happen if login is enforced
             logging.error("_apply_permissions called with no current_user_info. Disabling most actions.")
@@ -1278,27 +1302,40 @@ class DocumentManager(QMainWindow):
                 continue
 
             perm_keys = module_permissions.get(module_name)
-            permitted = False
+            role_permitted = False
             log_perm_details = ""
 
             if perm_keys:
                 if isinstance(perm_keys, tuple): # Multiple permissions, OR logic
-                    permitted = any(has_permission(role_name, pk) for pk in perm_keys)
-                    log_perm_details = f"Permissions (OR logic): {perm_keys}, Result: {permitted}"
+                    role_permitted = any(has_permission(role_name, pk) for pk in perm_keys)
+                    log_perm_details = f"Role Permissions (OR logic): {perm_keys}, Result: {role_permitted}."
                 else: # Single permission
-                    permitted = has_permission(role_name, perm_keys)
-                    log_perm_details = f"Permission: {perm_keys}, Result: {permitted}"
+                    role_permitted = has_permission(role_name, perm_keys)
+                    log_perm_details = f"Role Permission: {perm_keys}, Result: {role_permitted}."
             else:
-                # If no specific permission is defined for this module, assume visible if module is enabled.
-                # Or, default to False if strict policy is desired. For now, assume visible.
-                permitted = True
-                log_perm_details = "No specific permission defined, defaulting to permitted if module is enabled."
+                # If no specific role permission is defined for this module, assume role permits access if module is enabled.
+                role_permitted = True
+                log_perm_details = "No specific role permission defined, role permits by default if module enabled."
 
+            # Vérification de la licence
+            license_feature_key = MODULE_TO_LICENSE_FEATURE_MAP.get(module_name)
+            license_permitted = True # Par défaut, si pas mappé, la licence ne restreint pas
+            log_license_details = "No specific license feature mapped, license permits by default."
 
-            action_instance.setVisible(permitted)
-            logging.info(f"  Module Action '{action_attr}' for '{module_name}': Visible: {permitted}. {log_perm_details}")
-            # Note: setEnabled could also be used if the action should be visible but greyed out.
-            # For menu items, setVisible(False) effectively removes them.
+            if license_feature_key:
+                if FEATURE_ALL in self.allowed_features or license_feature_key in self.allowed_features:
+                    license_permitted = True
+                    log_license_details = f"License feature '{license_feature_key}' ALLOWED (either specific or by FEATURE_ALL)."
+                else:
+                    license_permitted = False
+                    log_license_details = f"License feature '{license_feature_key}' DENIED."
+
+            # La permission finale est ET des deux
+            final_permitted = role_permitted and license_permitted
+            action_instance.setVisible(final_permitted)
+
+            logging.info(f"  Module Action '{action_attr}' for '{module_name}': Final Visible: {final_permitted}. "
+                         f"{log_perm_details} {log_license_details}")
 
         # Main Buttons on Document View
         log_msg_create_client = f"Permission P_CREATE_CLIENT for role '{role_name}': {'Granted' if can_create_client else 'Denied'}. "
