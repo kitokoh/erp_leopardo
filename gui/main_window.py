@@ -293,6 +293,8 @@ class DocumentManager(QMainWindow):
         )
         self.main_area_stack.addWidget(self.settings_page_instance) # Add settings page to stack
 
+        # Initialize potentially visible module instances to None for lazy loading,
+        # but create and add them if their module is enabled.
         self.botpress_integration_ui_instance = None
         self.inventory_browser_widget_instance = None
         self.recruitment_dashboard_instance = None
@@ -300,11 +302,29 @@ class DocumentManager(QMainWindow):
         self.experience_management_widget_instance = None
         self.calendar_module_widget_instance = None # Calendar also lazy loaded
 
+        # StatisticsDashboard: Initialize and add to stack if module is enabled
+        if self.module_states.get('statistics', True): # Default to True if not in DB/config
+            if self.statistics_dashboard_instance is None: # Should be None at this point
+                logging.info("DocumentManager: Lazily creating StatisticsDashboard during __init__ as module is enabled.")
+                self.statistics_dashboard_instance = StatisticsDashboard(parent=self)
+                self.main_area_stack.addWidget(self.statistics_dashboard_instance)
+                logging.info("DocumentManager: StatisticsDashboard instance created and added to stack during __init__.")
+                # Connect signals if they are defined on DocumentManager for map interactions
+                if hasattr(self.statistics_dashboard_instance, 'request_add_client_for_country'):
+                    self.statistics_dashboard_instance.request_add_client_for_country.connect(self.handle_add_client_from_stats_map)
+                if hasattr(self.statistics_dashboard_instance, 'request_view_client_details'):
+                     self.statistics_dashboard_instance.request_view_client_details.connect(self.handle_view_client_from_stats_map) # Or a new slot for this
+            else:
+                # This case (instance already exists) should ideally not happen here if logic is clean.
+                # If it does, ensure it's in the stack.
+                if self.main_area_stack.indexOf(self.statistics_dashboard_instance) == -1:
+                    logging.warning("StatisticsDashboard instance existed but was not in stack. Adding it now.")
+                    self.main_area_stack.addWidget(self.statistics_dashboard_instance)
+        else:
+            logging.info("Statistics module is disabled. StatisticsDashboard will not be pre-initialized.")
+
 
         self.home_page_widget_instance = HomePageWidget(main_window=self, parent=self) # Pass self as main_window
-
-        self.home_page_widget_instance = HomePageWidget(main_window=self, parent=self) # Pass self as main_window
-
         self.main_area_stack.addWidget(self.home_page_widget_instance)
 
         # UserManagementPage is fundamental, initialize it upfront and add to stack
