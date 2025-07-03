@@ -111,8 +111,8 @@ from dialogs.manage_saved_filters_dialog import ManageSavedFiltersDialog # Impor
 from PyQt5.QtWidgets import QDateEdit
 
 
-
-from client_management.client_widget import ClientWidget
+# Updated import for the refactored client widget
+from client_management.ui.client_main_widget import ClientMainWidget
 from project_management import MainDashboard as ProjectManagementDashboard
 from statistics import StatisticsDashboard, StatisticsSummaryWidget # Updated import
 from statistics.map_widget import HomePageMapWidget # Import HomePageMapWidget
@@ -1811,7 +1811,7 @@ class DocumentManager(QMainWindow):
                     logging.error(f"Failed to create directory {abs_folder_path}: {e_mkdir}")
                     # Proceeding without this could still lead to issues, but client_data_to_show will have the path
 
-            # Ensure base_folder_path is an alias to default_base_folder_path for ClientWidget
+            # Ensure base_folder_path is an alias to default_base_folder_path for ClientMainWidget
             client_data_to_show["base_folder_path"] = client_data_to_show.get("default_base_folder_path")
 
         if client_data_to_show and 'created_at' in client_data_to_show and client_data_to_show['created_at']:
@@ -1877,11 +1877,11 @@ class DocumentManager(QMainWindow):
                     tab_widget_ref.refresh_display(client_data_to_show)
                 return
 
-        logging.info(f"main_window.open_client_tab_by_id: Preparing to instantiate ClientWidget with data: {client_data_to_show}")
-        logging.info(f"main_window.open_client_tab_by_id: Attempting to create ClientWidget for client_id: {client_id_to_open}")
+        logging.info(f"main_window.open_client_tab_by_id: Preparing to instantiate ClientMainWidget with data: {client_data_to_show}")
+        logging.info(f"main_window.open_client_tab_by_id: Attempting to create ClientMainWidget for client_id: {client_id_to_open}")
         try:
             notification_manager = QApplication.instance().notification_manager
-            client_widget = ClientWidget(
+            client_widget = ClientMainWidget( # Changed ClientWidget to ClientMainWidget
                 client_info=client_data_to_show,
                 config=self.config,
                 app_root_dir=self.app_root_dir,
@@ -1889,20 +1889,20 @@ class DocumentManager(QMainWindow):
                 current_user_info=self.current_user_info, # Changed to pass current_user_info
                 parent=self
             )
-            logging.info(f"main_window.open_client_tab_by_id: Successfully created ClientWidget for client_id: {client_id_to_open} with user_info.") # Log updated
+            logging.info(f"main_window.open_client_tab_by_id: Successfully created ClientMainWidget for client_id: {client_id_to_open} with user_info.") # Log updated
         except Exception as e:
-            logging.error(f"main_window.open_client_tab_by_id: Error instantiating ClientWidget for client_id: {client_id_to_open} - {e}", exc_info=True)
+            logging.error(f"main_window.open_client_tab_by_id: Error instantiating ClientMainWidget for client_id: {client_id_to_open} - {e}", exc_info=True)
             QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("Impossible de créer l'onglet client. Erreur: {0}").format(str(e)))
             return
 
-        logging.info(f"main_window.open_client_tab_by_id: Attempting to add ClientWidget to tab for client_id: {client_id_to_open}")
+        logging.info(f"main_window.open_client_tab_by_id: Attempting to add ClientMainWidget to tab for client_id: {client_id_to_open}")
         try:
             client_name_for_tab = client_data_to_show.get("client_name", self.tr("Client Inconnu"))
             index = self.client_tabs_widget.addTab(client_widget, client_name_for_tab)
             self.client_tabs_widget.setCurrentIndex(index)
-            logging.info(f"main_window.open_client_tab_by_id: Successfully added ClientWidget tab for client_id: {client_id_to_open} at index {index}")
+            logging.info(f"main_window.open_client_tab_by_id: Successfully added ClientMainWidget tab for client_id: {client_id_to_open} at index {index}")
         except Exception as e:
-            logging.error(f"main_window.open_client_tab_by_id: Error adding ClientWidget to tab for client_id: {client_id_to_open} - {e}", exc_info=True)
+            logging.error(f"main_window.open_client_tab_by_id: Error adding ClientMainWidget to tab for client_id: {client_id_to_open} - {e}", exc_info=True)
             QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("Impossible d'ajouter l'onglet client au gestionnaire d'onglets. Erreur: {0}").format(str(e)))
             # Attempt to clean up the partially created widget if it exists
             if 'client_widget' in locals() and client_widget:

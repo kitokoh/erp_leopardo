@@ -1,8 +1,9 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-# Assuming client_widget.py is in the parent directory or accessible via PYTHONPATH
-from client_management.client_widget import ClientWidget
+# Updated imports for refactored structure
+from client_management.ui.client_main_widget import ClientMainWidget
+from client_management.tabs.documents_tab import DocumentsTab # DocumentsTab will be tested
 from PyQt5.QtWidgets import QApplication, QWidget
 
 # Required for QApplication instance
@@ -76,8 +77,11 @@ class TestClientWidgetPopulateDocTable(unittest.TestCase):
         self.patcher_isdir.stop()
         self.mock_parent.deleteLater() # Clean up the mock parent
 
-    @patch('db_manager.get_distinct_purchase_confirmed_at_for_client')
-    @patch('db_manager.get_documents_for_client')
+    # Patching db_manager where it's used by DocumentsTab.
+    # Assuming DocumentsTab receives db_manager from ClientMainWidget and uses that instance (self.db_manager).
+    # Thus, we patch db_manager in the scope of ClientMainWidget's module.
+    @patch('client_management.ui.client_main_widget.db_manager.get_distinct_purchase_confirmed_at_for_client')
+    @patch('client_management.ui.client_main_widget.db_manager.get_documents_for_client')
     def test_show_order_filter_boolean_conversion(self, mock_get_documents, mock_get_distinct_purchase):
         '''
         Test that show_order_filter is correctly converted to a boolean,
@@ -104,34 +108,49 @@ class TestClientWidgetPopulateDocTable(unittest.TestCase):
                 mock_get_distinct_purchase.return_value = order_events
 
                 # Instantiate ClientWidget - this will call setup_ui which calls populate_doc_table
-                # We need to ensure all necessary UI elements are mocked or ClientWidget is structured
-                # to allow testing populate_doc_table in isolation if possible.
-                # For this test, we'll focus on the setVisible call.
+                # We need to ensure all necessary UI elements are mocked.
+                # ClientMainWidget will create DocumentsTab.
+                # The doc_filter_layout_widget is on DocumentsTab.
 
-                # Mock the doc_filter_layout_widget and its setVisible method specifically
-                mock_doc_filter_widget = MagicMock()
+                # Update mock_config to include db_path for ClientMainWidget initialization
+                self.mock_config.db_path = "dummy.db"
+                mock_main_window = MagicMock() # ClientMainWidget expects main_window
 
-                # Create a ClientWidget instance
-                # Need to pass app_root_dir
-                widget = ClientWidget(self.client_info, self.mock_config, "/fake/app_root", self.mock_notification_manager, parent=self.mock_parent)
+                # Create a ClientMainWidget instance
+                main_widget = ClientMainWidget(
+                    client_info=self.client_info,
+                    config=self.mock_config,
+                    app_root_dir="/fake/app_root", # Already set in self.mock_config.get but explicit here
+                    notification_manager=self.mock_notification_manager,
+                    main_window=mock_main_window, # Pass main_window
+                    parent=self.mock_parent
+                )
 
-                # Replace the actual doc_filter_layout_widget with our mock AFTER instantiation
-                # This is because setup_ui creates the widget.
-                widget.doc_filter_layout_widget = mock_doc_filter_widget
+                # Access the DocumentsTab instance from ClientMainWidget
+                # Assuming it's named documents_tab_widget as per previous patterns
+                documents_tab_instance = main_widget.documents_tab_widget
 
-                # Call populate_doc_table directly to test its logic
-                widget.populate_doc_table()
+                # Mock the doc_filter_layout_widget on the DocumentsTab instance
+                # This UI element is created within DocumentsTab.setup_ui()
+                # We can directly mock it on the instance if it's an attribute.
+                # If it's not directly accessible or needs more complex mocking of setup_ui,
+                # this might need adjustment. Assuming direct attribute access for now.
+                mock_doc_filter_ui_widget = MagicMock()
+                documents_tab_instance.doc_filter_layout_widget = mock_doc_filter_ui_widget
+
+                # Call populate_doc_table on the DocumentsTab instance
+                documents_tab_instance.populate_doc_table()
 
                 # Assert that setVisible was called with the expected boolean value
-                mock_doc_filter_widget.setVisible.assert_called_once_with(expected_visibility)
+                mock_doc_filter_ui_widget.setVisible.assert_called_once_with(expected_visibility)
 
-                # Reset mock for the next subtest
-                mock_doc_filter_widget.reset_mock()
-                mock_get_distinct_purchase.reset_mock() # Ensure fresh mock for each scenario run
+                # Reset mocks for the next subtest
+                mock_doc_filter_ui_widget.reset_mock()
+                mock_get_distinct_purchase.reset_mock()
                 mock_get_documents.reset_mock()
 
-                # Clean up widget to avoid issues with subsequent tests
-                widget.deleteLater()
+                # Clean up main_widget to avoid issues with subsequent tests
+                main_widget.deleteLater()
 
 if __name__ == '__main__':
     unittest.main()
