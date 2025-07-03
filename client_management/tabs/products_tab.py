@@ -111,9 +111,17 @@ class ProductsTab(QWidget):
             # For simplicity, using client_id and project_id=None (or a primary project_id from client_info)
 
             # Language filter
-            selected_lang_code = self.product_lang_filter_combo.currentData()
+            selected_lang_code = self.product_lang_filter_combo.currentData() # Keep this to potentially use for client-side filtering if needed
 
-            products = db_manager.get_products_for_client_or_project(client_id, project_id=None, language_code=selected_lang_code)
+            # Remove language_code from the DB call as it's not supported by the CRUD function
+            products = db_manager.get_products_for_client_or_project(client_id, project_id=None)
+
+            # If language filtering is still desired, it would need to be done client-side now,
+            # or the backend CRUD function get_products_for_client_or_project needs to be updated
+            # to support language_code filtering.
+            if selected_lang_code and products:
+                products = [p for p in products if p.get('language_code') == selected_lang_code]
+
 
             if not products:
                 self.products_empty_label.show()
@@ -259,4 +267,4 @@ class ProductsTab(QWidget):
         """Public method to refresh data, callable from parent if needed."""
         self.load_products()
 
-# ```
+

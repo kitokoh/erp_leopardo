@@ -164,6 +164,7 @@ from .promo_widgets import PromoSectionWidget
         self.left_promo_widget.clicked.connect(lambda: self.update_promo_widget_content(self.left_promo_widget))
 
 
+
         # Center Map Area
         self.bottom_content_area = QStackedWidget()
         self.bottom_content_area.setObjectName("homePageBottomContentArea")
@@ -192,6 +193,7 @@ from .promo_widgets import PromoSectionWidget
         bottom_h_layout.addWidget(self.left_promo_widget, 1) # Stretch factor 1 for left promo
         bottom_h_layout.addWidget(self.bottom_content_area, 3) # Stretch factor 3 for map (larger)
         bottom_h_layout.addWidget(self.right_promo_widget, 1) # Stretch factor 1 for right promo
+
 
         main_v_layout.addLayout(bottom_h_layout, 1) # Add the horizontal layout to the main vertical layout
 

@@ -2486,6 +2486,33 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     print("DEBUG_INIT_DB: Indexes for Note Management tables created or exist.")
     # --- End Note Management Tables ---
 
+    # --- License Management Table ---
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Licenses (
+        license_id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        license_type TEXT NOT NULL CHECK(license_type IN ('gratuit', 'limite', 'complet')),
+        license_key TEXT UNIQUE,
+        activation_date TIMESTAMP,
+        expiration_date TIMESTAMP,
+        machine_info TEXT,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
+    )
+    """)
+    print("DEBUG_INIT_DB: Table Licenses created or exists.")
+
+    # Indexes for Licenses Table
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_licenses_user_id ON Licenses(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_licenses_license_key ON Licenses(license_key)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_licenses_expiration_date ON Licenses(expiration_date)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_licenses_license_type ON Licenses(license_type)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_licenses_is_active ON Licenses(is_active)")
+    print("DEBUG_INIT_DB: Indexes for Licenses table created or exists.")
+    # --- End License Management Table ---
+
     # Commit schema changes made via raw SQLite connection before proceeding to SQLAlchemy part
     try:
         logging.info("DEBUG_INIT_DB: Committing main schema/index changes before accounting module DDL.")
