@@ -38,6 +38,7 @@ import db.cruds.projects_crud as projects_crud
 
 from invoicing.final_invoice_data_dialog import FinalInvoiceDataDialog
 from document_manager_logic import create_final_invoice_and_update_db
+from dialogs.client_visit_dialog import ClientVisitDialog # Added for Client Visits
 
 
 # Globals imported from main (temporary, to be refactored)
@@ -86,7 +87,8 @@ def _import_main_elements():
 from auth.permissions import has_permission, \
     P_EDIT_CLIENT_FULL, P_EDIT_CLIENT_BASIC, P_MANAGE_CLIENT_CONTACTS, \
     P_LINK_PRODUCTS_TO_CLIENT, P_MANAGE_CLIENT_DOCUMENTS, P_ARCHIVE_CLIENT, \
-    P_MANAGE_CLIENT_ASSIGNMENTS, P_MANAGE_CLIENT_BILLING # Define more as needed
+    P_MANAGE_CLIENT_ASSIGNMENTS, P_MANAGE_CLIENT_BILLING, \
+    P_VIEW_CLIENT_VISITS, P_MANAGE_CLIENT_VISITS # Added visit permissions
 
 # Import CommandeWidget
 from commande_management.commande_widget import CommandeWidget
@@ -303,6 +305,11 @@ class ClientWidget(QWidget):
             self.need_label_static = QLabel(self.tr("Besoin Principal:")) # Static label
             self.need_value_label = QLabel(self.tr("N/A")) # Value label
             self.details_layout.addRow(self.need_label_static, self.need_value_label)
+
+            # Lead Source (Display Mode)
+            self.lead_source_label_static = QLabel(self.tr("Source Lead:"))
+            self.lead_source_value_label = QLabel(self.tr("N/A"))
+            self.details_layout.addRow(self.lead_source_label_static, self.lead_source_value_label)
 
             # Base Folder Path
             self.folder_label_static = QLabel(self.tr("Chemin Dossier:")) # Static label
@@ -761,6 +768,36 @@ class ClientWidget(QWidget):
         if hasattr(self, 'generate_invoice_button'):
             self.generate_invoice_button.setEnabled(can_manage_billing)
 
+        # Client Visits Tab and Buttons
+        can_view_visits = has_permission(role_name, P_VIEW_CLIENT_VISITS)
+        can_manage_visits = has_permission(role_name, P_MANAGE_CLIENT_VISITS)
+
+        if hasattr(self, 'client_visits_tab'):
+            # Find the index of the client_visits_tab
+            visits_tab_index = -1
+            for i in range(self.tab_widget.count()):
+                if self.tab_widget.widget(i) == self.client_visits_tab:
+                    visits_tab_index = i
+                    break
+            if visits_tab_index != -1:
+                self.tab_widget.setTabVisible(visits_tab_index, can_view_visits or can_manage_visits) # Show if can view or manage
+
+        if hasattr(self, 'add_visit_btn'):
+            self.add_visit_btn.setEnabled(can_manage_visits)
+        if hasattr(self, 'edit_visit_btn'):
+            # Enabled state also depends on selection, so _apply_permissions sets the general permission
+            # update_client_visit_buttons_state will handle selection-based enablement
+            self.edit_visit_btn.setProperty("permission_granted", can_manage_visits) # Store perm for later check
+            self.update_client_visit_buttons_state() # Call to apply initial state based on selection (likely none)
+        if hasattr(self, 'delete_visit_btn'):
+            self.delete_visit_btn.setProperty("permission_granted", can_manage_visits)
+            self.update_client_visit_buttons_state() # Call to apply initial state
+
+        # Row-level "Voir" button in client_visits_table is handled during table population,
+        # enabling/disabling based on P_VIEW_CLIENT_VISITS or P_MANAGE_CLIENT_VISITS.
+        # For now, if the tab is visible, the "Voir" button in the row will be active.
+        # Finer control can be added in load_client_visits_table if needed.
+
         logging.info(f"ClientWidget permissions applied for role: {role_name}")
 
 
@@ -815,6 +852,7 @@ class ClientWidget(QWidget):
             # logging.info("ClientWidget._setup_main_tabs_section: PRE-CALL self._setup_assignments_tab()") # Call removed, assignments are now an internal tab
             # self._setup_assignments_tab() # Logic will be moved
             self._setup_billing_tab()
+            self._setup_client_visits_tab() # Add new tab for client visits
         except Exception as e:
             logging.error(f"Error in _setup_main_tabs_section: {e}", exc_info=True)
             QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation conteneur onglets principaux:\n{0}").format(str(e)))
@@ -1545,6 +1583,68 @@ class ClientWidget(QWidget):
         except Exception as e:
             logging.error(f"Error in _setup_billing_tab: {e}", exc_info=True)
             QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation onglet Facturation:\n{0}").format(str(e)))
+
+    def _setup_client_visits_tab(self):
+        """Sets up the Client Visits tab."""
+        try:
+            logging.info("ClientWidget.setup_ui: Starting setup for Client Visits Tab...")
+            self.client_visits_tab = QWidget()
+            visits_layout = QVBoxLayout(self.client_visits_tab)
+
+            # Table for visits
+            self.client_visits_table = QTableWidget()
+            self.client_visits_table.setColumnCount(6) # Date, Type, Purpose, Created By, Notes Preview, Actions
+            self.client_visits_table.setHorizontalHeaderLabels([
+                self.tr("Date Visite"), self.tr("Type"), self.tr("Objet"),
+                self.tr("Créé par"), self.tr("Aperçu Notes"), self.tr("Actions")
+            ])
+            self.client_visits_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            self.client_visits_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents) # Date
+            self.client_visits_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents) # Type
+            self.client_visits_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents) # Created By
+            self.client_visits_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents) # Actions
+            self.client_visits_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+            self.client_visits_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            self.client_visits_table.cellDoubleClicked.connect(self.handle_view_edit_visit) # Connect double click
+            self.client_visits_table.itemSelectionChanged.connect(self.update_client_visit_buttons_state) # Connect selection change
+            visits_layout.addWidget(self.client_visits_table)
+
+            # Buttons layout
+            visits_buttons_layout = QHBoxLayout()
+            self.add_visit_btn = QPushButton(QIcon(":/icons/plus-circle.svg"), self.tr("Ajouter Visite"))
+            self.add_visit_btn.clicked.connect(self.handle_add_visit) # Connect add button
+            visits_buttons_layout.addWidget(self.add_visit_btn)
+
+            self.edit_visit_btn = QPushButton(QIcon(":/icons/pencil.svg"), self.tr("Voir/Modifier Visite"))
+            self.edit_visit_btn.clicked.connect(self.handle_view_edit_visit) # Connect edit button
+            self.edit_visit_btn.setEnabled(False) # Enabled on selection
+            visits_buttons_layout.addWidget(self.edit_visit_btn)
+
+            self.delete_visit_btn = QPushButton(QIcon(":/icons/trash.svg"), self.tr("Supprimer Visite"))
+            self.delete_visit_btn.setObjectName("dangerButton")
+            self.delete_visit_btn.clicked.connect(self.handle_delete_visit) # Connect delete button
+            self.delete_visit_btn.setEnabled(False) # Enabled on selection
+            visits_buttons_layout.addWidget(self.delete_visit_btn)
+            visits_buttons_layout.addStretch()
+
+            self.refresh_visits_btn = QPushButton(QIcon.fromTheme("view-refresh"), self.tr("Actualiser"))
+            self.refresh_visits_btn.clicked.connect(self.load_client_visits_table) # Connect refresh
+            visits_buttons_layout.addWidget(self.refresh_visits_btn)
+
+            visits_layout.addLayout(visits_buttons_layout)
+
+            if hasattr(self, 'tab_widget'):
+                self.tab_widget.addTab(self.client_visits_tab, QIcon(":/icons/calendar.svg"), self.tr("Visites Client"))
+                logging.info("ClientWidget._setup_client_visits_tab: Client Visits tab added.")
+            else:
+                logging.error("ClientWidget._setup_client_visits_tab: self.tab_widget not found. Cannot add Client Visits tab.")
+
+            self.load_client_visits_table() # Initial load of visits
+
+        except Exception as e:
+            logging.error(f"Error in _setup_client_visits_tab: {e}", exc_info=True)
+            QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation onglet Visites Client:\n{0}").format(str(e)))
+
 
     # def setup_ui(self):
     #     main_layout = QVBoxLayout(self)
@@ -4143,6 +4243,11 @@ class ClientWidget(QWidget):
         self.need_value_label.setText(need_text_value)
         logging.info(f"Setting need: {need_text_value}")
 
+        # Update Lead Source
+        lead_source_text_value = self.client_info.get("lead_source", self.tr("N/A"))
+        self.lead_source_value_label.setText(lead_source_text_value)
+        logging.info(f"Setting lead_source: {lead_source_text_value}")
+
         # Update Base Folder Path
         folder_path_value = self.client_info.get('base_folder_path')
         if not folder_path_value:
@@ -5814,6 +5919,48 @@ class ClientWidget(QWidget):
         self.details_layout.addRow(self.tr("Classification:"), status_category_edit_widget)
         self.edit_widgets['category'].textChanged.connect(self.toggle_edit_distributor_info_visibility)
 
+    def _load_and_populate_lead_sources_combo(self, combo_box: QComboBox):
+        """Loads lead sources from QSettings, populates the given QComboBox, and sets the current client's source."""
+        if not combo_box:
+            return
+
+        combo_box.blockSignals(True)
+        combo_box.clear()
+
+        settings = QSettings()
+        stored_lead_sources = settings.value("lead_sources", [], type=list)
+
+        # Ensure unique and sorted (case-insensitive sort, but keep original casing for display)
+        # Create a dictionary to handle case-insensitivity for uniqueness, preferring first-encountered casing.
+        unique_sources_dict = {}
+        for source in stored_lead_sources:
+            if source.lower() not in unique_sources_dict:
+                unique_sources_dict[source.lower()] = source
+
+        sorted_unique_sources = sorted(list(unique_sources_dict.values()), key=str.lower)
+
+        for source in sorted_unique_sources:
+            combo_box.addItem(source)
+
+        current_client_lead_source = self.client_info.get("lead_source", "")
+        if current_client_lead_source:
+            # Check if current_client_lead_source is already in the items (case-insensitive)
+            found_idx = -1
+            for i in range(combo_box.count()):
+                if combo_box.itemText(i).lower() == current_client_lead_source.lower():
+                    found_idx = i
+                    break
+
+            if found_idx != -1:
+                combo_box.setCurrentIndex(found_idx)
+            else:
+                # If not found, add it to the combo box and select it
+                combo_box.addItem(current_client_lead_source)
+                combo_box.setCurrentText(current_client_lead_source)
+
+        combo_box.blockSignals(False)
+        logging.info(f"Lead source combo populated. Sources: {sorted_unique_sources}. Current client source: '{current_client_lead_source}'")
+
 
         # Distributor Specific Info (Editable) - Placed after Category for logical flow
         self.edit_widgets['distributor_specific_info_label'] = QLabel(self.tr("Info Distributeur:"))
@@ -5825,6 +5972,16 @@ class ClientWidget(QWidget):
         self.edit_widgets['need'] = QTextEdit(self.client_info.get("need", self.client_info.get("primary_need_description", "")))
         self.edit_widgets['need'].setFixedHeight(60)
         self.details_layout.addRow(self.tr("Besoin Principal:"), self.edit_widgets['need'])
+
+        # Lead Source (New QComboBox)
+        self.edit_widgets['lead_source_label'] = QLabel(self.tr("Source Lead:"))
+        self.edit_widgets['lead_source_combo'] = QComboBox()
+        self.edit_widgets['lead_source_combo'].setEditable(True)
+        self.edit_widgets['lead_source_combo'].setPlaceholderText(self.tr("Entrez ou sélectionnez une source"))
+
+        self._load_and_populate_lead_sources_combo(self.edit_widgets['lead_source_combo']) # Populate and set current
+
+        self.details_layout.addRow(self.edit_widgets['lead_source_label'], self.edit_widgets['lead_source_combo'])
 
         folder_label_edit = QLabel(self.tr("Chemin Dossier:"))
         folder_value_edit = QLabel(self.client_info.get('base_folder_path','')) # Not editable
@@ -5945,6 +6102,20 @@ class ClientWidget(QWidget):
         data_to_save['notes'] = self.notes_edit.toPlainText().strip() # Notes are from the main notes_edit
         data_to_save['distributor_specific_info'] = self.edit_widgets['distributor_specific_info'].toPlainText().strip() if self.edit_widgets['distributor_specific_info'].isVisible() else None
 
+        current_lead_source_text = self.edit_widgets['lead_source_combo'].currentText().strip()
+        data_to_save['lead_source'] = current_lead_source_text
+
+        # Save the new lead source to QSettings if it's new
+        if current_lead_source_text:
+            settings = QSettings()
+            stored_lead_sources = settings.value("lead_sources", [], type=list)
+            # Case-insensitive check for existence
+            if not any(src.lower() == current_lead_source_text.lower() for src in stored_lead_sources):
+                stored_lead_sources.append(current_lead_source_text)
+                stored_lead_sources.sort(key=str.lower) # Keep sorted for consistent display
+                settings.setValue("lead_sources", stored_lead_sources)
+                logging.info(f"Added new lead source '{current_lead_source_text}' to QSettings. All sources: {stored_lead_sources}")
+
 
         # Retrieve selected languages from the QListWidget
         selected_langs_to_save = []
@@ -6011,6 +6182,7 @@ class ClientWidget(QWidget):
             self.details_layout.addRow(self.status_category_label, self.status_category_widget)
             self.details_layout.addRow(self.distributor_info_label_static, self.distributor_info_value_label)
             self.details_layout.addRow(self.need_label_static, self.need_value_label)
+            self.details_layout.addRow(self.lead_source_label_static, self.lead_source_value_label) # Re-add lead_source display
             self.details_layout.addRow(self.folder_label_static, self.folder_value_label)
             self.details_layout.addRow(self.created_by_label_static, self.created_by_value_label)
             # ---- End restore ----
@@ -6561,6 +6733,171 @@ class ClientWidget(QWidget):
     def update_mta_buttons_state(self):
         has_selection = bool(self.assigned_mta_table.selectedItems())
         self.remove_assigned_mta_btn.setEnabled(has_selection)
+
+    # --- Client Visit Methods ---
+    def handle_add_visit(self):
+        client_id = self.client_info.get("client_id")
+        if not client_id or not self.current_user_id:
+            QMessageBox.warning(self, self.tr("Erreur"), self.tr("Information client ou utilisateur manquante."))
+            return
+
+        dialog = ClientVisitDialog(client_id=client_id, current_user_id=self.current_user_id, parent=self)
+        if dialog.exec_() == QDialog.Accepted:
+            self.load_client_visits_table() # Reload after adding
+
+    def handle_view_edit_visit(self):
+        selected_items = self.client_visits_table.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, self.tr("Sélection Requise"), self.tr("Veuillez sélectionner une visite à voir/modifier."))
+            return
+
+        # Assuming visit_id is stored in Qt.UserRole of the first item (e.g., Date) of the selected row
+        visit_id_item = self.client_visits_table.item(selected_items[0].row(), 0) # Assuming Date is column 0
+        if not visit_id_item or visit_id_item.data(Qt.UserRole) is None:
+            QMessageBox.warning(self, self.tr("Erreur Données"), self.tr("Impossible de récupérer l'ID de la visite sélectionnée."))
+            return
+
+        visit_id = visit_id_item.data(Qt.UserRole)
+
+        try:
+            visit_data = client_visits_crud.get_client_visit_by_id(visit_id)
+            if not visit_data:
+                QMessageBox.warning(self, self.tr("Erreur"), self.tr("Visite non trouvée (ID: {0}). Elle a peut-être été supprimée.").format(visit_id))
+                self.load_client_visits_table() # Refresh if not found
+                return
+
+            client_id = self.client_info.get("client_id") # Get client_id safely
+            if not client_id: # Should not happen if we have a visit_id for this client context
+                QMessageBox.warning(self, self.tr("Erreur Client"), self.tr("ID Client non disponible pour modifier la visite."))
+                return
+
+            dialog = ClientVisitDialog(client_id=client_id, current_user_id=self.current_user_id, visit_data=visit_data, parent=self)
+            if dialog.exec_() == QDialog.Accepted:
+                self.load_client_visits_table() # Reload after editing
+        except Exception as e:
+            logging.error(f"Error opening/processing ClientVisitDialog for edit: {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("Une erreur est survenue: {0}").format(str(e)))
+
+    def update_client_visit_buttons_state(self):
+        has_selection = bool(self.client_visits_table.selectedItems())
+        self.edit_visit_btn.setEnabled(has_selection)
+        self.delete_visit_btn.setEnabled(has_selection)
+
+    def handle_delete_visit(self):
+        selected_items = self.client_visits_table.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, self.tr("Sélection Requise"), self.tr("Veuillez sélectionner une visite à supprimer."))
+            return
+
+        visit_id_item = self.client_visits_table.item(selected_items[0].row(), 0) # Assuming Date is column 0 and stores ID
+        if not visit_id_item or visit_id_item.data(Qt.UserRole) is None:
+            QMessageBox.warning(self, self.tr("Erreur Données"), self.tr("Impossible de récupérer l'ID de la visite sélectionnée pour suppression."))
+            return
+
+        visit_id = visit_id_item.data(Qt.UserRole)
+        visit_date_text = self.client_visits_table.item(selected_items[0].row(), 0).text() # For display in message
+        visit_purpose_text = self.client_visits_table.item(selected_items[0].row(), 2).text() # For display
+
+        reply = QMessageBox.question(self, self.tr("Confirmer Suppression"),
+                                     self.tr("Êtes-vous sûr de vouloir supprimer cette visite ?\n\nDate: {0}\nObjet: {1}")
+                                     .format(visit_date_text, visit_purpose_text[:50] + "..."),
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+
+        if reply == QMessageBox.Yes:
+            try:
+                result = client_visits_crud.delete_client_visit(visit_id)
+                if result and result.get("success"):
+                    QMessageBox.information(self, self.tr("Succès"), self.tr("Visite supprimée avec succès."))
+                    self.load_client_visits_table() # Refresh the table
+                else:
+                    error_msg = result.get("error", self.tr("Erreur inconnue.")) if result else self.tr("Erreur inconnue.")
+                    QMessageBox.critical(self, self.tr("Erreur Suppression"),
+                                         self.tr("Impossible de supprimer la visite: {0}").format(error_msg))
+            except Exception as e:
+                logging.error(f"Error deleting client visit (ID: {visit_id}): {e}", exc_info=True)
+                QMessageBox.critical(self, self.tr("Erreur Critique"),
+                                     self.tr("Une erreur inattendue est survenue lors de la suppression: {0}").format(str(e)))
+
+    def load_client_visits_table(self):
+        client_id = self.client_info.get("client_id")
+        if not client_id:
+            if hasattr(self, 'client_visits_table'): self.client_visits_table.setRowCount(0)
+            self.update_client_visit_buttons_state()
+            return
+
+        logging.info(f"ClientWidget.load_client_visits_table called for client_id: {client_id}.")
+        if not hasattr(self, 'client_visits_table'):
+            logging.error("client_visits_table not found in ClientWidget during load.")
+            return
+
+        self.client_visits_table.setRowCount(0) # Clear table before populating
+
+        try:
+            visits = client_visits_crud.get_client_visits_by_client_id(client_id)
+            if visits is None:
+                visits = []
+
+            self.client_visits_table.setRowCount(len(visits))
+
+            for row_idx, visit in enumerate(visits):
+                visit_id = visit.get("visit_id")
+
+                # Date Visite
+                date_item = QTableWidgetItem(visit.get("visit_date", self.tr("N/A")))
+                date_item.setData(Qt.UserRole, visit_id) # Store visit_id in the first column's item
+                self.client_visits_table.setItem(row_idx, 0, date_item)
+
+                # Type
+                self.client_visits_table.setItem(row_idx, 1, QTableWidgetItem(visit.get("visit_type", self.tr("N/A"))))
+
+                # Objet
+                self.client_visits_table.setItem(row_idx, 2, QTableWidgetItem(visit.get("visit_purpose", self.tr("N/A"))))
+
+                # Créé par
+                created_by_user_name = self.tr("Inconnu")
+                user_id = visit.get("created_by_user_id")
+                if user_id:
+                    user = users_crud.get_user_by_id(user_id) # Assuming users_crud is imported
+                    if user:
+                        created_by_user_name = user.get("full_name") or user.get("username", self.tr("Inconnu"))
+                self.client_visits_table.setItem(row_idx, 3, QTableWidgetItem(created_by_user_name))
+
+                # Aperçu Notes
+                notes_preview = visit.get("notes_impressions", "")
+                if len(notes_preview) > 100:
+                    notes_preview = notes_preview[:97] + "..."
+                self.client_visits_table.setItem(row_idx, 4, QTableWidgetItem(notes_preview))
+
+                # Actions (e.g., a "View/Edit" button per row)
+                action_widget = QWidget()
+                action_layout = QHBoxLayout(action_widget)
+                action_layout.setContentsMargins(2, 2, 2, 2)
+                action_layout.setSpacing(5)
+
+                btn_view_row = QPushButton(self.tr("Voir"))
+                btn_view_row.setToolTip(self.tr("Voir/Modifier cette visite"))
+                btn_view_row.clicked.connect(lambda checked, r=row_idx: self._handle_view_row_visit_action(r))
+                action_layout.addWidget(btn_view_row)
+                action_layout.addStretch()
+                self.client_visits_table.setCellWidget(row_idx, 5, action_widget)
+
+            self.client_visits_table.resizeColumnsToContents()
+            # Stretch the 'Objet' and 'Aperçu Notes' columns more if needed
+            self.client_visits_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch) # Objet
+            self.client_visits_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch) # Aperçu Notes
+
+        except Exception as e:
+            logging.error(f"Error loading client visits into table: {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur Chargement Visites"),
+                                 self.tr("Impossible de charger les visites client: {0}").format(str(e)))
+        finally:
+            self.update_client_visit_buttons_state()
+
+    def _handle_view_row_visit_action(self, row_index):
+        """Handles the action from a 'Voir' button in a table row."""
+        self.client_visits_table.selectRow(row_index) # Select the row first
+        self.handle_view_edit_visit() # Then call the existing handler
+
 
 # Ensure that all methods called by ClientWidget (like self.ContactDialog, self.generate_pdf_for_document)
 # Ensure that all methods called by ClientWidget (like self.ContactDialog, self.generate_pdf_for_document)
