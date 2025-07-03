@@ -2,7 +2,7 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QLabel, QFormLayout, QLineEdit, QTextEdit, QScrollArea,
-    QHeaderView, QAbstractItemView, QSplitter, QGroupBox
+    QHeaderView, QAbstractItemView, QSplitter, QGroupBox, QInputDialog
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
@@ -122,8 +122,8 @@ class ContactsManagerWidget(QWidget):
         self.contacts_table.itemSelectionChanged.connect(self.on_contact_selected)
         self.add_contact_button.clicked.connect(self.on_add_contact)
         self.edit_contact_button.clicked.connect(self.on_edit_contact)
-        # self.delete_contact_button.clicked.connect(self.on_delete_contact)
-        # self.link_to_entity_button.clicked.connect(self.on_link_to_entity)
+        self.delete_contact_button.clicked.connect(self.on_delete_contact)
+        self.link_to_entity_button.clicked.connect(self.on_link_to_entity)
         self.refresh_button.clicked.connect(lambda: self.load_contacts()) # Ensure it calls without args for refresh
         self.search_input.returnPressed.connect(self.apply_filters) # Search on Enter
         self.filter_button.clicked.connect(self.apply_filters)
@@ -393,38 +393,182 @@ class ContactsManagerWidget(QWidget):
                 QMessageBox.warning(self, self.tr("Erreur"), self.tr("Impossible de mettre à jour le contact."))
 
     def on_delete_contact(self):
-        # selected_items = self.contacts_table.selectedItems()
-        # if not selected_items: return
-        # contact_id = selected_items[0].data(Qt.UserRole)
-        # contact_name = selected_items[0].text() # Or get from contact_data
+        selected_items = self.contacts_table.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, self.tr("Sélection"), self.tr("Veuillez sélectionner un contact à supprimer."))
+            return
 
-        # # Check for linked entities (this is a simplified check)
-        # linked_entities_count = self.linked_entities_table.rowCount() # Assuming it's populated for selected contact
+        contact_id = selected_items[0].data(Qt.UserRole)
+        # It's better to get the name from the DB to be sure, but for the message, table item is usually fine.
+        contact_name_display = selected_items[0].text()
 
-        # msg = self.tr(f"Êtes-vous sûr de vouloir supprimer le contact '{contact_name}'?")
-        # if linked_entities_count > 0:
-        #     msg += self.tr(f"\nCe contact est lié à {linked_entities_count} entité(s). La suppression du contact supprimera ces liens (CASCADE).")
+        if contact_id is None: return
 
-        # reply = QMessageBox.question(self, self.tr("Confirmation"), msg, QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-        # if reply == QMessageBox.Yes:
-        #     if contacts_crud.delete_contact(contact_id):
-        #         self.load_contacts()
-        #         self._clear_details_panel()
-        #         QMessageBox.information(self, self.tr("Succès"), self.tr("Contact supprimé."))
-        #     else:
-        #         QMessageBox.warning(self, self.tr("Erreur"), self.tr("Impossible de supprimer le contact."))
-        pass
+        # Count linked entities for a more informative message
+        # Note: This might be slightly slow if there are many link types or very large tables.
+        # For now, it's acceptable for user confirmation.
+        linked_count = 0
+        try:
+            linked_count += len(entity_contacts_crud.get_entities_for_contact(contact_id))
+            linked_count += len(client_contacts_crud.get_clients_for_contact(contact_id))
+            linked_count += len(company_personnel_crud.get_personnel_linked_to_contact(contact_id))
+        except Exception as e:
+            logger.error(f"Erreur lors du comptage des entités liées pour le contact {contact_id}: {e}")
+            # Proceed with a generic message if counting fails
+
+        msg = self.tr(f"Êtes-vous sûr de vouloir supprimer définitivement le contact '{contact_name_display}'?")
+        if linked_count > 0:
+            msg += self.tr(f"\n\nCe contact est lié à {linked_count} entité(s) (clients, personnel, transporteurs, etc.).\n"
+                           "La suppression de ce contact central entraînera également la suppression de tous ces liens, "
+                           "conformément aux règles de la base de données (ON DELETE CASCADE).")
+        else:
+            msg += self.tr("\n\nCe contact n'est actuellement lié à aucune autre entité.")
+
+        msg += self.tr("\nCette action est irréversible.")
+
+        reply = QMessageBox.question(self, self.tr("Confirmation de Suppression"), msg,
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+
+        if reply == QMessageBox.Yes:
+            if contacts_crud.delete_contact(contact_id):
+                self.load_contacts() # Refresh the main list
+                self._clear_details_panel(clear_contact_form=True, clear_linked_entities=True) # Clear details
+                self._update_action_buttons_state() # Disable buttons as selection is lost
+                QMessageBox.information(self, self.tr("Succès"), self.tr("Contact supprimé avec succès."))
+            else:
+                QMessageBox.warning(self, self.tr("Erreur"), self.tr("Impossible de supprimer le contact de la base de données."))
 
     def on_link_to_entity(self):
-        # This will be more complex:
-        # 1. Get selected contact_id.
-        # 2. Open a dialog to choose entity type (Transporter, Client, etc.).
-        # 3. Open another dialog to choose the specific entity instance.
-        # 4. Open ContactDialog with manage_link_fields=True, pre-filled with contact_data.
-        # 5. On accept, call the appropriate link function (e.g., entity_contacts_crud.link_contact_to_entity).
-        # 6. Refresh linked entities table.
-        QMessageBox.information(self, self.tr("Non implémenté"), self.tr("La fonctionnalité 'Lier à une Entité' sera implémentée."))
-        pass
+        selected_items = self.contacts_table.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, self.tr("Sélection"), self.tr("Veuillez d'abord sélectionner un contact à lier."))
+            return
+
+        contact_id = selected_items[0].data(Qt.UserRole)
+        contact_data_for_dialog = contacts_crud.get_contact_by_id(contact_id)
+        if not contact_data_for_dialog:
+            QMessageBox.warning(self, self.tr("Erreur"), self.tr("Impossible de récupérer les données du contact sélectionné."))
+            return
+
+        entity_types = {
+            "Transporter": "Transporter",
+            "FreightForwarder": "FreightForwarder",
+            "MoneyTransferAgent": "MoneyTransferAgent",
+            "Client": "Client",
+            "CompanyPersonnel": "CompanyPersonnel"
+            # Add "Partner" here if a PartnerDialog for selection exists or is simple enough for QInputDialog
+        }
+
+        chosen_type_key, ok = QInputDialog.getItem(self, self.tr("Choisir le Type d'Entité"),
+                                                self.tr("À quel type d'entité voulez-vous lier ce contact ?"),
+                                                list(entity_types.keys()), 0, False)
+
+        if ok and chosen_type_key:
+            entity_type_str = entity_types[chosen_type_key]
+
+            # This is a simplification. Ideally, a proper selection dialog for entities would be used.
+            entity_id_str, ok_id = QInputDialog.getText(self, self.tr(f"ID de l'{chosen_type_key}"),
+                                                        self.tr(f"Entrez l'ID de {chosen_type_key} :"))
+
+            if ok_id and entity_id_str.strip():
+                entity_id = entity_id_str.strip()
+
+                # Check if this exact link already exists to prevent duplicates before opening dialog
+                # This is a basic check. ContactDialog should ideally handle this on accept too.
+                if entity_type_str in ["Transporter", "FreightForwarder", "MoneyTransferAgent", "Partner"]:
+                    existing_links = entity_contacts_crud.get_contacts_for_entity(entity_id, entity_type_str)
+                    if any(str(link.get('contact_id')) == str(contact_id) for link in existing_links):
+                        QMessageBox.information(self, self.tr("Lien Existant"),
+                                                self.tr(f"Ce contact est déjà lié à {chosen_type_key} ID {entity_id}."))
+                        return
+                elif entity_type_str == "Client":
+                    # client_contacts_crud.get_specific_client_contact_link_details might be useful
+                    pass # Add similar check for clients if needed
+                elif entity_type_str == "CompanyPersonnel":
+                    # company_personnel_crud.get_contacts_for_personnel might be useful
+                    pass # Add similar check for personnel if needed
+
+
+                link_dialog = ContactDialog(contact_data=contact_data_for_dialog,
+                                            link_data={}, # New link, so empty link_data
+                                            manage_link_fields=True,
+                                            parent=self)
+                link_dialog.setWindowTitle(self.tr(f"Lier Contact à {chosen_type_key} (ID: {entity_id})"))
+
+                if link_dialog.exec_() == QDialog.Accepted:
+                    link_details = link_dialog.get_link_data()
+                    success = False
+                    new_link_id = None
+
+                    try:
+                        if entity_type_str in ["Transporter", "FreightForwarder", "MoneyTransferAgent", "Partner"]:
+                            new_link_id = entity_contacts_crud.link_contact_to_entity(
+                                entity_id=entity_id,
+                                entity_type=entity_type_str,
+                                contact_id=contact_id,
+                                role_in_entity=link_details.get('role_in_entity'),
+                                is_primary=link_details.get('is_primary', False),
+                                can_receive_documents=link_details.get('can_receive_documents', True),
+                                notes=link_details.get('notes')
+                            )
+                            success = new_link_id is not None
+                        elif entity_type_str == "Client":
+                            # Assuming client_id is what entity_id represents here
+                            new_link_id = client_contacts_crud.link_contact_to_client(
+                                client_id=entity_id,
+                                contact_id=contact_id,
+                                is_primary=link_details.get('is_primary', False),
+                                can_receive_documents=link_details.get('can_receive_documents', True)
+                                # role_in_entity and notes are not directly in ClientContacts schema, handle as needed
+                            )
+                            success = new_link_id is not None
+                        elif entity_type_str == "CompanyPersonnel":
+                            # Assuming entity_id is personnel_id here
+                            # company_personnel_crud.add_personnel_contact expects full contact_data, not just link.
+                            # This flow is for linking an *existing* central contact.
+                            # We'd need a specific function like:
+                            # company_personnel_crud.link_existing_contact_to_personnel(personnel_id, contact_id, link_details)
+                            # For now, let's use a placeholder or skip.
+                            # This highlights a need for more specific linking functions in some CRUDS.
+                            # temp_contact_data_for_personnel_link = {'contact_id': contact_id, **link_details}
+                            # new_link_id = company_personnel_crud.add_personnel_contact(personnel_id=int(entity_id), contact_data=temp_contact_data_for_personnel_link)
+                            # This is not ideal as add_personnel_contact tries to re-add to Contacts.
+                            # We need a function that just creates the link in CompanyPersonnelContacts.
+
+                            # Let's assume a direct insert for now for CompanyPersonnelContacts if that function doesn't exist
+                            # This is a simplified placeholder for demonstration.
+                            # A proper function in company_personnel_crud.py like `create_personnel_contact_link` would be better.
+                            conn = client_contacts_crud._get_conn_from_pool() # Example of getting a connection
+                            cursor = conn.cursor()
+                            now = datetime.utcnow().isoformat()
+                            sql_link = """INSERT INTO CompanyPersonnelContacts
+                                          (personnel_id, contact_id, is_primary, can_receive_documents, created_at, updated_at)
+                                          VALUES (?, ?, ?, ?, ?, ?)"""
+                            # Note: role_in_entity and notes from link_details are not in CompanyPersonnelContacts by default.
+                            params_link = (int(entity_id), contact_id,
+                                           link_details.get('is_primary', False),
+                                           link_details.get('can_receive_documents', True), now, now)
+                            cursor.execute(sql_link, params_link)
+                            new_link_id = cursor.lastrowid # This is sqlite specific for lastrowid
+                            conn.commit()
+                            client_contacts_crud._release_conn_to_pool(conn)
+                            success = new_link_id is not None
+                            logger.info(f"Manually linked contact {contact_id} to personnel {entity_id}, link ID: {new_link_id}")
+
+
+                        if success:
+                            QMessageBox.information(self, self.tr("Succès"), self.tr("Contact lié avec succès."))
+                            self.load_linked_entities(contact_id) # Refresh
+                        else:
+                            QMessageBox.warning(self, self.tr("Échec"), self.tr("Impossible de lier le contact à l'entité."))
+                    except Exception as e_link:
+                        logger.error(f"Erreur lors de la liaison du contact {contact_id} à {entity_type_str} {entity_id}: {e_link}", exc_info=True)
+                        QMessageBox.critical(self, self.tr("Erreur"), self.tr("Une erreur est survenue lors de la liaison."))
+            else:
+                QMessageBox.information(self, self.tr("Annulé"), self.tr("ID d'entité non fourni."))
+        else:
+            QMessageBox.information(self, self.tr("Annulé"), self.tr("Aucun type d'entité choisi."))
+
 
     def on_search_text_changed(self, text):
         # This could be used for live search with a QTimer debounce
