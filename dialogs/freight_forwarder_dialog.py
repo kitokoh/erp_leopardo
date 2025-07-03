@@ -276,6 +276,7 @@ class FreightForwarderDialog(QDialog):
                 self._handle_main_contact_from_direct_fields(data)
 
             super().accept() # Accept the dialog after all operations
+
         except Exception as e:
             QMessageBox.critical(self, self.tr("Erreur"), self.tr("Une erreur est survenue: {0}").format(str(e)))
 

@@ -370,6 +370,7 @@ class TransporterDialog(QDialog):
             # If there are old values in DB direct fields, they are now considered deprecated.
             return
 
+
         # Check if a primary contact already exists via EntityContacts
         existing_contacts = entity_contacts_crud.get_contacts_for_entity(self.transporter_id, 'Transporter')
         primary_entity_contact = next((c for c in existing_contacts if c.get('is_primary')), None)
@@ -391,6 +392,7 @@ class TransporterDialog(QDialog):
         # This makes the method's behavior consistent with its original intent pre-migration script,
         # but it's now a fallback.
 
+
         contact_to_link_id = None
         # Try to find an existing contact by email to avoid duplicates
         if direct_email:
@@ -401,6 +403,7 @@ class TransporterDialog(QDialog):
                 if direct_contact_name and existing_central_contact.get('displayName') != direct_contact_name:
                     update_payload['displayName'] = direct_contact_name
                     update_payload['name'] = direct_contact_name # Ensure name is also updated
+
                 if direct_phone and existing_central_contact.get('phone') != direct_phone:
                     update_payload['phone'] = direct_phone
                 if update_payload:
@@ -417,11 +420,12 @@ class TransporterDialog(QDialog):
                 'email': direct_email if direct_email else None,
                 'phone': direct_phone if direct_phone else None,
                 'employee_status': 'external'
+
             }
             contact_to_link_id = contacts_crud.add_contact(contact_details)
 
         if contact_to_link_id:
-            # Link this contact as primary, only if it's not already linked to this transporter.
+
             link_details = {
                 'role_in_entity': self.tr("Contact Principal (auto)"),
                 'is_primary': True,
