@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import QApplication, QPushButton
 
 from carrier_email_dialog import CarrierEmailDialog
 # For testing ClientWidget logic, we might need ClientWidget itself or a mock
-# from client_management.client_widget import ClientWidget # Assuming direct import for now if needed
+# from client_management.ui.client_main_widget import ClientMainWidget # Corrected path and class name
 
 # Mock db_manager as it's used by CarrierEmailDialog and potentially ClientWidget logic
 # The actual db_manager is in 'db.py', but CarrierEmailDialog imports it as 'db_manager'
