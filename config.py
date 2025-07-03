@@ -42,3 +42,4 @@ LICENSE_REQUEST_SERVER_URL = "http://127.0.0.1:5678/api/license/request"
 
 # print(f"Config loaded. Database Path: {DATABASE_PATH}")
 # print(f"Root app dir: {APP_ROOT_DIR}")
+
