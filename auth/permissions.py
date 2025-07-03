@@ -37,6 +37,10 @@ P_MANAGE_CLIENT_DOCUMENTS = "manage_client_documents" # Create, view, edit, dele
 P_MANAGE_CLIENT_ASSIGNMENTS = "manage_client_assignments" # Manage assignments of personnel, transporters, etc. to a client/project
 P_MANAGE_CLIENT_BILLING = "manage_client_billing" # Manage billing aspects, generate invoices for a client
 
+# Client Visits
+P_MANAGE_CLIENT_VISITS = "manage_client_visits" # Add, edit, delete client visits
+P_VIEW_CLIENT_VISITS = "view_client_visits"     # View client visits (read-only access to the tab/data)
+
 # Modules & Specific Features
 P_ACCESS_PROJECT_MODULE = "access_project_module"
 P_MANAGE_ALL_PROJECTS = "manage_all_projects" # Create, edit, task management for all projects
@@ -69,10 +73,12 @@ P_MANAGE_STATUSES = "manage_statuses"
 ALL_PERMISSIONS = [
     P_MANAGE_USERS, P_MANAGE_ROLES, P_MANAGE_SYSTEM_SETTINGS,
     P_VIEW_ALL_CLIENTS, P_CREATE_CLIENT, P_EDIT_CLIENT_FULL, P_EDIT_CLIENT_BASIC, P_ARCHIVE_CLIENT, P_DELETE_CLIENT_PERMANENT, P_MANAGE_CLIENT_CONTACTS,
+    P_MANAGE_CLIENT_VISITS, P_VIEW_CLIENT_VISITS, # Added client visit permissions
     P_VIEW_GLOBAL_PRODUCTS, P_MANAGE_GLOBAL_PRODUCTS,
     P_LINK_PRODUCTS_TO_CLIENT,
     P_MANAGE_CLIENT_DOCUMENTS,
     P_MANAGE_CLIENT_ASSIGNMENTS, P_MANAGE_CLIENT_BILLING,
+    P_VIEW_CLIENT_VISITS, P_MANAGE_CLIENT_VISITS, # Added for Team Lead
     P_ACCESS_PROJECT_MODULE, P_MANAGE_ALL_PROJECTS, P_MANAGE_ASSIGNED_PROJECTS,
     P_ACCESS_STATISTICS_MODULE,
     P_ACCESS_PARTNER_MODULE, P_MANAGE_PARTNERS,
@@ -108,6 +114,7 @@ OPERATOR_PERMISSIONS = [
     P_VIEW_GLOBAL_PRODUCTS,
     P_LINK_PRODUCTS_TO_CLIENT,
     P_MANAGE_CLIENT_DOCUMENTS,
+    P_VIEW_CLIENT_VISITS, # Added for Operator
     P_ACCESS_PROJECT_MODULE, P_MANAGE_ASSIGNED_PROJECTS,
     P_ACCESS_STATISTICS_MODULE,
     P_ACCESS_PARTNER_MODULE,

@@ -266,16 +266,17 @@ class FreightForwarderDialog(QDialog):
                     self.forwarder_data_initial['forwarder_id'] = new_id
                     QMessageBox.information(self, self.tr("Succès"), self.tr("Transitaire ajouté avec succès (ID: {0}). Vous pouvez maintenant ajouter des contacts.").format(new_id))
                     self.update_contact_management_state(enabled=True)
-                    # super().accept() # Keep open for contact adding, similar to TransporterDialog
                 else:
                     QMessageBox.warning(self, self.tr("Échec"), self.tr("Impossible d'ajouter le transitaire."))
-                    return
+                    return # Do not proceed to accept or handle direct fields if add failed
 
-            # After successful save (add or update), handle the main contact logic
-            if self.forwarder_id and (data.get('contact_person') or data.get('email') or data.get('phone')):
+            # Handle direct fields for NEWLY created forwarders only if direct fields have data
+            if original_forwarder_id is None and self.forwarder_id and \
+               (data.get('contact_person') or data.get('email') or data.get('phone')):
                 self._handle_main_contact_from_direct_fields(data)
 
-            super().accept() # Now accept the dialog
+            super().accept() # Accept the dialog after all operations
+
         except Exception as e:
             QMessageBox.critical(self, self.tr("Erreur"), self.tr("Une erreur est survenue: {0}").format(str(e)))
 

@@ -357,10 +357,19 @@ class TransporterDialog(QDialog):
         """
         direct_contact_name = transporter_main_data.get('contact_person','').strip()
         direct_email = transporter_main_data.get('email','').strip()
-        direct_phone = transporter_main_data.get('phone','').strip()
+        direct_phone = transporter_main_data.get('phone','').strip() # Still read from form for this logic
+
+        # This method is now primarily for ensuring data consistency if direct fields were somehow still used,
+        # or for a one-time setup if a transporter is edited post-migration without prior primary contact.
+        # However, the main creation/update of contacts should now happen via the dedicated contact management UI.
+
+        if not self.transporter_id: return # Should not happen if called from accept after save
 
         if not direct_contact_name and not direct_email and not direct_phone:
-            return # No direct contact info provided
+            # If all direct fields are empty, there's nothing to infer for a primary contact.
+            # If there are old values in DB direct fields, they are now considered deprecated.
+            return
+
 
         # Check if a primary contact already exists via EntityContacts
         existing_contacts = entity_contacts_crud.get_contacts_for_entity(self.transporter_id, 'Transporter')
@@ -371,8 +380,18 @@ class TransporterDialog(QDialog):
             # Optional: We could update this primary contact if the direct fields differ significantly,
             # or simply do nothing and let the user manage it via the contacts table.
             # For now, do nothing if an explicit primary contact exists.
-            # We could also consider clearing the direct fields in the DB to avoid confusion.
+            # The migration script should handle the one-time move.
+            # Post-migration, these direct fields in the dialog are for display of primary or legacy data.
+            # They are not meant for creating new primary contacts if one is already set via EntityContacts.
             return
+
+        # If no explicit primary contact, and direct fields have data, this implies either:
+        # 1. Data from before EntityContacts was used (migration should have handled this).
+        # 2. User filled them now, expecting them to work as before.
+        # Strategy: Create/link contact based on these fields ONLY IF no primary EntityContact exists.
+        # This makes the method's behavior consistent with its original intent pre-migration script,
+        # but it's now a fallback.
+
 
         contact_to_link_id = None
         # Try to find an existing contact by email to avoid duplicates
@@ -380,28 +399,33 @@ class TransporterDialog(QDialog):
             existing_central_contact = contacts_crud.get_contact_by_email(direct_email)
             if existing_central_contact:
                 contact_to_link_id = existing_central_contact['contact_id']
-                # Update this existing contact with info from direct fields if name/phone are different
                 update_payload = {}
                 if direct_contact_name and existing_central_contact.get('displayName') != direct_contact_name:
                     update_payload['displayName'] = direct_contact_name
+                    update_payload['name'] = direct_contact_name # Ensure name is also updated
+
                 if direct_phone and existing_central_contact.get('phone') != direct_phone:
                     update_payload['phone'] = direct_phone
                 if update_payload:
                     contacts_crud.update_contact(contact_to_link_id, update_payload)
 
         if not contact_to_link_id:
-            # Create a new contact
+            # Create a new contact only if a name is present
+            if not direct_contact_name:
+                 logging.warning(f"Cannot create new contact for Transporter {self.transporter_id} from direct fields: contact_person name is missing.")
+                 return
             contact_details = {
                 'displayName': direct_contact_name,
-                'name': direct_contact_name, # Ensure 'name' is also populated
-                'email': direct_email,
-                'phone': direct_phone,
-                'employee_status': 'external' # Default for contacts created this way
+                'name': direct_contact_name,
+                'email': direct_email if direct_email else None,
+                'phone': direct_phone if direct_phone else None,
+                'employee_status': 'external'
+
             }
             contact_to_link_id = contacts_crud.add_contact(contact_details)
 
         if contact_to_link_id:
-            # Link this contact as primary
+
             link_details = {
                 'role_in_entity': self.tr("Contact Principal (auto)"),
                 'is_primary': True,
