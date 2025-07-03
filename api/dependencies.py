@@ -6,8 +6,9 @@ from typing import Set
 from .models import UserInDB  # Or from api.models if running from project root context
 from .auth import get_current_active_user # Or from api.auth
 
-# Assuming auth.roles is accessible from the root of the project
-from auth.roles import has_permission, check_user_role, ALL_ROLES
+# Assuming auth.permissions and auth.roles are accessible from the root of the project
+from auth.permissions import has_permission # Use the new DB-backed permission check
+from auth.roles import check_user_role, ALL_ROLES # Keep these if they are still relevant for role name validation
 
 class RoleRequired:
     def __init__(self, allowed_roles: Set[str]):

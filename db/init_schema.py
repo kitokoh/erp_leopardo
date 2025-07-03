@@ -385,77 +385,87 @@ def initialize_database():
 
     # Pre-populate StatusSettings (full list from ca.py)
     default_statuses = [
-        {'status_name': 'En cours', 'status_type': 'Client', 'color_hex': '#3498db', 'icon_name': 'dialog-information', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 0},
-        {'status_name': 'Prospect', 'status_type': 'Client', 'color_hex': '#f1c40f', 'icon_name': 'user-status-pending', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 1},
-        {'status_name': 'Prospect (Proforma Envoyé)', 'status_type': 'Client', 'color_hex': '#e67e22', 'icon_name': 'document-send', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 2},
-        {'status_name': 'Actif', 'status_type': 'Client', 'color_hex': '#2ecc71', 'icon_name': 'user-available', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 3},
-        {'status_name': 'Vendu', 'status_type': 'Client', 'color_hex': '#5cb85c', 'icon_name': 'emblem-ok', 'is_completion_status': True, 'is_archival_status': False, 'sort_order': 4},
-        {'status_name': 'Inactif', 'status_type': 'Client', 'color_hex': '#95a5a6', 'icon_name': 'user-offline', 'is_completion_status': False, 'is_archival_status': True, 'sort_order': 5},
-        {'status_name': 'Complété', 'status_type': 'Client', 'color_hex': '#27ae60', 'icon_name': 'task-complete', 'is_completion_status': True, 'is_archival_status': False, 'sort_order': 6},
-        {'status_name': 'Archivé', 'status_type': 'Client', 'color_hex': '#7f8c8d', 'icon_name': 'archive', 'is_completion_status': False, 'is_archival_status': True, 'sort_order': 7},
-        {'status_name': 'Urgent', 'status_type': 'Client', 'color_hex': '#e74c3c', 'icon_name': 'dialog-warning', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 8},
-        {'status_name': 'Planning', 'status_type': 'Project', 'color_hex': '#1abc9c', 'icon_name': 'view-list-bullet', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 0},
-        {'status_name': 'En cours', 'status_type': 'Project', 'color_hex': '#3498db', 'icon_name': 'view-list-ordered', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 1},
-        {'status_name': 'En attente', 'status_type': 'Project', 'color_hex': '#f39c12', 'icon_name': 'view-list-remove', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 2},
-        {'status_name': 'Terminé', 'status_type': 'Project', 'color_hex': '#2ecc71', 'icon_name': 'task-complete', 'is_completion_status': True, 'is_archival_status': False, 'sort_order': 3},
-        {'status_name': 'Annulé', 'status_type': 'Project', 'color_hex': '#c0392b', 'icon_name': 'dialog-cancel', 'is_completion_status': False, 'is_archival_status': True, 'sort_order': 4},
-        {'status_name': 'En pause', 'status_type': 'Project', 'color_hex': '#8e44ad', 'icon_name': 'media-playback-pause', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 5},
-        {'status_name': 'To Do', 'status_type': 'Task', 'color_hex': '#bdc3c7', 'icon_name': 'view-list-todo', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 0},
-        {'status_name': 'In Progress', 'status_type': 'Task', 'color_hex': '#3498db', 'icon_name': 'view-list-progress', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 1},
-        {'status_name': 'Done', 'status_type': 'Task', 'color_hex': '#2ecc71', 'icon_name': 'task-complete', 'is_completion_status': True, 'is_archival_status': False, 'sort_order': 2},
-        {'status_name': 'Blocked', 'status_type': 'Task', 'color_hex': '#e74c3c', 'icon_name': 'dialog-error', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 3},
-        {'status_name': 'Review', 'status_type': 'Task', 'color_hex': '#f1c40f', 'icon_name': 'view-list-search', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 4},
-        {'status_name': 'Cancelled', 'status_type': 'Task', 'color_hex': '#7f8c8d', 'icon_name': 'dialog-cancel', 'is_completion_status': False, 'is_archival_status': True, 'sort_order': 5},
-        {'status_name': 'Ouvert', 'status_type': 'SAVTicket', 'color_hex': '#d35400', 'icon_name': 'folder-new', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 0},
-        {'status_name': 'En Investigation', 'status_type': 'SAVTicket', 'color_hex': '#f39c12', 'icon_name': 'system-search', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 1},
-        {'status_name': 'En Attente (Client)', 'status_type': 'SAVTicket', 'color_hex': '#3498db', 'icon_name': 'folder-locked', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 2},
-        {'status_name': 'Résolu', 'status_type': 'SAVTicket', 'color_hex': '#2ecc71', 'icon_name': 'folder-check', 'is_completion_status': True, 'is_archival_status': False, 'sort_order': 3},
-        {'status_name': 'Fermé', 'status_type': 'SAVTicket', 'color_hex': '#95a5a6', 'icon_name': 'folder', 'is_completion_status': True, 'is_archival_status': True, 'sort_order': 4},
+        # --- Client Statuses ---
+        {'status_name': 'Prospect', 'status_type': 'Client', 'color_hex': '#f1c40f', 'icon_name': 'user-status-pending', 'sort_order': 0, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Prospect Qualifié', 'status_type': 'Client', 'color_hex': '#e67e22', 'icon_name': 'document-send', 'sort_order': 5, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Client Actif', 'status_type': 'Client', 'color_hex': '#2ecc71', 'icon_name': 'user-available', 'sort_order': 10, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Client Confirmé', 'status_type': 'Client', 'color_hex': '#3498db', 'icon_name': 'emblem-ok', 'sort_order': 20, 'is_completion_status': False, 'is_archival_status': False}, # Typically after first major order
+        {'status_name': 'Client SAV', 'status_type': 'Client', 'color_hex': '#5cb85c', 'icon_name': 'emblem-favorite', 'sort_order': 30, 'is_completion_status': False, 'is_archival_status': False}, # Eligible for SAV
+        {'status_name': 'Distributeur', 'status_type': 'Client', 'color_hex': '#8e44ad', 'icon_name': 'business', 'sort_order': 40, 'is_completion_status': False, 'is_archival_status': False}, # Special status
+        {'status_name': 'Inactif', 'status_type': 'Client', 'color_hex': '#95a5a6', 'icon_name': 'user-offline', 'sort_order': 50, 'is_completion_status': False, 'is_archival_status': True},
+        {'status_name': 'Bloqué', 'status_type': 'Client', 'color_hex': '#c0392b', 'icon_name': 'user-block', 'sort_order': 60, 'is_completion_status': False, 'is_archival_status': True},
+        {'status_name': 'Archivé', 'status_type': 'Client', 'color_hex': '#7f8c8d', 'icon_name': 'archive', 'sort_order': 70, 'is_completion_status': True, 'is_archival_status': True},
+        # Note: 'Urgent' and 'Complété' for Client were removed as they seem less B2B specific or covered by others. 'Vendu' replaced by 'Client SAV' or 'Client Confirmé'.
 
-        # Recruitment Module Statuses
+        # --- Commande Statuses ---
+        {'status_name': 'Brouillon', 'status_type': 'Commande', 'color_hex': '#7f8c8d', 'icon_name': 'document-edit', 'sort_order': 0, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Devis Envoyé', 'status_type': 'Commande', 'color_hex': '#1abc9c', 'icon_name': 'document-send', 'sort_order': 10, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Confirmée par Client', 'status_type': 'Commande', 'color_hex': '#2ecc71', 'icon_name': 'document-check', 'sort_order': 20, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Paiement Partiel Reçu', 'status_type': 'Commande', 'color_hex': '#f39c12', 'icon_name': 'credit-card-multiple', 'sort_order': 25, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'En Cours de Production', 'status_type': 'Commande', 'color_hex': '#3498db', 'icon_name': 'sync', 'sort_order': 30, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Prête pour Expédition', 'status_type': 'Commande', 'color_hex': '#9b59b6', 'icon_name': 'archive-arrow-up-outline', 'sort_order': 40, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Envoi en Cours', 'status_type': 'Commande', 'color_hex': '#d35400', 'icon_name': 'truck-delivery', 'sort_order': 50, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Partiellement Livrée', 'status_type': 'Commande', 'color_hex': '#e67e22', 'icon_name': 'truck-check-outline', 'sort_order': 55, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Livrée Complètement', 'status_type': 'Commande', 'color_hex': '#27ae60', 'icon_name': 'truck-check', 'sort_order': 60, 'is_completion_status': False, 'is_archival_status': False}, # Not a final completion status for the order itself yet
+        {'status_name': 'Facturée', 'status_type': 'Commande', 'color_hex': '#f1c40f', 'icon_name': 'file-invoice-dollar', 'sort_order': 70, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Partiellement Payée', 'status_type': 'Commande', 'color_hex': '#16a085', 'icon_name': 'cash-multiple', 'sort_order': 75, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Payée Complètement', 'status_type': 'Commande', 'color_hex': '#2980b9', 'icon_name': 'hand-holding-usd', 'sort_order': 80, 'is_completion_status': True, 'is_archival_status': False},
+        {'status_name': 'Annulée', 'status_type': 'Commande', 'color_hex': '#e74c3c', 'icon_name': 'document-cancel', 'sort_order': 90, 'is_completion_status': True, 'is_archival_status': True},
+        {'status_name': 'Archivée', 'status_type': 'Commande', 'color_hex': '#95a5a6', 'icon_name': 'archive', 'sort_order': 100, 'is_completion_status': True, 'is_archival_status': True},
+
+        # --- Project Statuses (Kept as is for now, review if needed) ---
+        {'status_name': 'Planning', 'status_type': 'Project', 'color_hex': '#1abc9c', 'icon_name': 'view-list-bullet', 'sort_order': 0, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'En cours', 'status_type': 'Project', 'color_hex': '#3498db', 'icon_name': 'view-list-ordered', 'sort_order': 1, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'En attente', 'status_type': 'Project', 'color_hex': '#f39c12', 'icon_name': 'view-list-remove', 'sort_order': 2, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Terminé', 'status_type': 'Project', 'color_hex': '#2ecc71', 'icon_name': 'task-complete', 'sort_order': 3, 'is_completion_status': True, 'is_archival_status': False},
+        {'status_name': 'Annulé', 'status_type': 'Project', 'color_hex': '#c0392b', 'icon_name': 'dialog-cancel', 'sort_order': 4, 'is_completion_status': False, 'is_archival_status': True},
+        {'status_name': 'En pause', 'status_type': 'Project', 'color_hex': '#8e44ad', 'icon_name': 'media-playback-pause', 'sort_order': 5, 'is_completion_status': False, 'is_archival_status': False},
+
+        # --- Task Statuses (Kept as is for now) ---
+        {'status_name': 'To Do', 'status_type': 'Task', 'color_hex': '#bdc3c7', 'icon_name': 'view-list-todo', 'sort_order': 0, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'In Progress', 'status_type': 'Task', 'color_hex': '#3498db', 'icon_name': 'view-list-progress', 'sort_order': 1, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Done', 'status_type': 'Task', 'color_hex': '#2ecc71', 'icon_name': 'task-complete', 'sort_order': 2, 'is_completion_status': True, 'is_archival_status': False},
+        {'status_name': 'Blocked', 'status_type': 'Task', 'color_hex': '#e74c3c', 'icon_name': 'dialog-error', 'sort_order': 3, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Review', 'status_type': 'Task', 'color_hex': '#f1c40f', 'icon_name': 'view-list-search', 'sort_order': 4, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Cancelled', 'status_type': 'Task', 'color_hex': '#7f8c8d', 'icon_name': 'dialog-cancel', 'sort_order': 5, 'is_completion_status': False, 'is_archival_status': True},
+
+        # --- SAVTicket Statuses (Kept as is for now) ---
+        {'status_name': 'Ouvert', 'status_type': 'SAVTicket', 'color_hex': '#d35400', 'icon_name': 'folder-new', 'sort_order': 0, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'En Investigation', 'status_type': 'SAVTicket', 'color_hex': '#f39c12', 'icon_name': 'system-search', 'sort_order': 1, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'En Attente (Client)', 'status_type': 'SAVTicket', 'color_hex': '#3498db', 'icon_name': 'folder-locked', 'sort_order': 2, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Résolu', 'status_type': 'SAVTicket', 'color_hex': '#2ecc71', 'icon_name': 'folder-check', 'sort_order': 3, 'is_completion_status': True, 'is_archival_status': False},
+        {'status_name': 'Fermé', 'status_type': 'SAVTicket', 'color_hex': '#95a5a6', 'icon_name': 'folder', 'sort_order': 4, 'is_completion_status': True, 'is_archival_status': True},
+
+        # --- Recruitment Module Statuses (Kept as is for now) ---
         # JobOpening Statuses
-        {'status_name': 'Open', 'status_type': 'JobOpening', 'color_hex': '#27ae60', 'icon_name': 'folder-open', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 0},
-        {'status_name': 'Closed', 'status_type': 'JobOpening', 'color_hex': '#95a5a6', 'icon_name': 'folder', 'is_completion_status': True, 'is_archival_status': True, 'sort_order': 1},
-        {'status_name': 'On Hold', 'status_type': 'JobOpening', 'color_hex': '#f39c12', 'icon_name': 'folder-locked', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 2},
-        {'status_name': 'Draft', 'status_type': 'JobOpening', 'color_hex': '#bdc3c7', 'icon_name': 'folder-edit', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 3},
-
+        {'status_name': 'Open', 'status_type': 'JobOpening', 'color_hex': '#27ae60', 'icon_name': 'folder-open', 'sort_order': 0, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Closed', 'status_type': 'JobOpening', 'color_hex': '#95a5a6', 'icon_name': 'folder', 'sort_order': 1, 'is_completion_status': True, 'is_archival_status': True},
+        {'status_name': 'On Hold', 'status_type': 'JobOpening', 'color_hex': '#f39c12', 'icon_name': 'folder-locked', 'sort_order': 2, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Draft', 'status_type': 'JobOpening', 'color_hex': '#bdc3c7', 'icon_name': 'folder-edit', 'sort_order': 3, 'is_completion_status': False, 'is_archival_status': False},
         # CandidateApplication Statuses
-        {'status_name': 'Applied', 'status_type': 'CandidateApplication', 'color_hex': '#3498db', 'icon_name': 'user-plus', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 0},
-        {'status_name': 'Screening', 'status_type': 'CandidateApplication', 'color_hex': '#1abc9c', 'icon_name': 'user-search', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 1},
-        {'status_name': 'Interviewing', 'status_type': 'CandidateApplication', 'color_hex': '#9b59b6', 'icon_name': 'users-meeting', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 2},
-        {'status_name': 'Assessment', 'status_type': 'CandidateApplication', 'color_hex': '#e67e22', 'icon_name': 'user-clipboard', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 3},
-        {'status_name': 'Reference Check', 'status_type': 'CandidateApplication', 'color_hex': '#f1c40f', 'icon_name': 'user-check', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 4},
-        {'status_name': 'Offer Extended', 'status_type': 'CandidateApplication', 'color_hex': '#2ecc71', 'icon_name': 'user-contract', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 5},
-        {'status_name': 'Offer Accepted', 'status_type': 'CandidateApplication', 'color_hex': '#27ae60', 'icon_name': 'user-star', 'is_completion_status': True, 'is_archival_status': False, 'sort_order': 6},
-        {'status_name': 'Offer Declined', 'status_type': 'CandidateApplication', 'color_hex': '#e74c3c', 'icon_name': 'user-minus', 'is_completion_status': True, 'is_archival_status': True, 'sort_order': 7},
-        {'status_name': 'Hired', 'status_type': 'CandidateApplication', 'color_hex': '#16a085', 'icon_name': 'user-tie', 'is_completion_status': True, 'is_archival_status': False, 'sort_order': 8},
-        {'status_name': 'Rejected', 'status_type': 'CandidateApplication', 'color_hex': '#c0392b', 'icon_name': 'user-times', 'is_completion_status': True, 'is_archival_status': True, 'sort_order': 9},
-        {'status_name': 'Withdrawn', 'status_type': 'CandidateApplication', 'color_hex': '#7f8c8d', 'icon_name': 'user-slash', 'is_completion_status': True, 'is_archival_status': True, 'sort_order': 10},
-
+        {'status_name': 'Applied', 'status_type': 'CandidateApplication', 'color_hex': '#3498db', 'icon_name': 'user-plus', 'sort_order': 0, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Screening', 'status_type': 'CandidateApplication', 'color_hex': '#1abc9c', 'icon_name': 'user-search', 'sort_order': 1, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Interviewing', 'status_type': 'CandidateApplication', 'color_hex': '#9b59b6', 'icon_name': 'users-meeting', 'sort_order': 2, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Assessment', 'status_type': 'CandidateApplication', 'color_hex': '#e67e22', 'icon_name': 'user-clipboard', 'sort_order': 3, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Reference Check', 'status_type': 'CandidateApplication', 'color_hex': '#f1c40f', 'icon_name': 'user-check', 'sort_order': 4, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Offer Extended', 'status_type': 'CandidateApplication', 'color_hex': '#2ecc71', 'icon_name': 'user-contract', 'sort_order': 5, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Offer Accepted', 'status_type': 'CandidateApplication', 'color_hex': '#27ae60', 'icon_name': 'user-star', 'sort_order': 6, 'is_completion_status': True, 'is_archival_status': False},
+        {'status_name': 'Offer Declined', 'status_type': 'CandidateApplication', 'color_hex': '#e74c3c', 'icon_name': 'user-minus', 'sort_order': 7, 'is_completion_status': True, 'is_archival_status': True},
+        {'status_name': 'Hired', 'status_type': 'CandidateApplication', 'color_hex': '#16a085', 'icon_name': 'user-tie', 'sort_order': 8, 'is_completion_status': True, 'is_archival_status': False},
+        {'status_name': 'Rejected', 'status_type': 'CandidateApplication', 'color_hex': '#c0392b', 'icon_name': 'user-times', 'sort_order': 9, 'is_completion_status': True, 'is_archival_status': True},
+        {'status_name': 'Withdrawn', 'status_type': 'CandidateApplication', 'color_hex': '#7f8c8d', 'icon_name': 'user-slash', 'sort_order': 10, 'is_completion_status': True, 'is_archival_status': True},
         # CandidateProgress Statuses
-        {'status_name': 'Pending', 'status_type': 'CandidateProgress', 'color_hex': '#bdc3c7', 'icon_name': 'progress-clock', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 0},
-        {'status_name': 'In Progress', 'status_type': 'CandidateProgress', 'color_hex': '#3498db', 'icon_name': 'progress-download', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 1},
-        {'status_name': 'Completed', 'status_type': 'CandidateProgress', 'color_hex': '#2ecc71', 'icon_name': 'progress-check', 'is_completion_status': True, 'is_archival_status': False, 'sort_order': 2},
-        {'status_name': 'Skipped', 'status_type': 'CandidateProgress', 'color_hex': '#95a5a6', 'icon_name': 'progress-alert', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 3},
-        {'status_name': 'Failed', 'status_type': 'CandidateProgress', 'color_hex': '#e74c3c', 'icon_name': 'progress-close', 'is_completion_status': True, 'is_archival_status': False, 'sort_order': 4},
-
+        {'status_name': 'Pending', 'status_type': 'CandidateProgress', 'color_hex': '#bdc3c7', 'icon_name': 'progress-clock', 'sort_order': 0, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'In Progress', 'status_type': 'CandidateProgress', 'color_hex': '#3498db', 'icon_name': 'progress-download', 'sort_order': 1, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Completed', 'status_type': 'CandidateProgress', 'color_hex': '#2ecc71', 'icon_name': 'progress-check', 'sort_order': 2, 'is_completion_status': True, 'is_archival_status': False},
+        {'status_name': 'Skipped', 'status_type': 'CandidateProgress', 'color_hex': '#95a5a6', 'icon_name': 'progress-alert', 'sort_order': 3, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Failed', 'status_type': 'CandidateProgress', 'color_hex': '#e74c3c', 'icon_name': 'progress-close', 'sort_order': 4, 'is_completion_status': True, 'is_archival_status': False},
         # InterviewStatus Statuses
-        {'status_name': 'Scheduled', 'status_type': 'InterviewStatus', 'color_hex': '#3498db', 'icon_name': 'calendar-clock', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 0},
-        {'status_name': 'Completed', 'status_type': 'InterviewStatus', 'color_hex': '#2ecc71', 'icon_name': 'calendar-check', 'is_completion_status': True, 'is_archival_status': False, 'sort_order': 1},
-        {'status_name': 'Cancelled', 'status_type': 'InterviewStatus', 'color_hex': '#e74c3c', 'icon_name': 'calendar-times', 'is_completion_status': True, 'is_archival_status': True, 'sort_order': 2},
-        {'status_name': 'Rescheduled', 'status_type': 'InterviewStatus', 'color_hex': '#f39c12', 'icon_name': 'calendar-edit', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 3},
-        {'status_name': 'No Show', 'status_type': 'InterviewStatus', 'color_hex': '#c0392b', 'icon_name': 'calendar-question', 'is_completion_status': True, 'is_archival_status': True, 'sort_order': 4},
-
-        # Commande Statuses
-        {'status_name': 'Brouillon', 'status_type': 'Commande', 'color_hex': '#7f8c8d', 'icon_name': 'document-edit', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 0},
-        {'status_name': 'Devis Envoyé', 'status_type': 'Commande', 'color_hex': '#1abc9c', 'icon_name': 'document-send', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 1},
-        {'status_name': 'Confirmée', 'status_type': 'Commande', 'color_hex': '#2ecc71', 'icon_name': 'document-check', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 2},
-        {'status_name': 'En Préparation', 'status_type': 'Commande', 'color_hex': '#3498db', 'icon_name': 'box-archive', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 3},
-        {'status_name': 'Expédiée', 'status_type': 'Commande', 'color_hex': '#9b59b6', 'icon_name': 'truck', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 4},
-        {'status_name': 'Facturée', 'status_type': 'Commande', 'color_hex': '#f1c40f', 'icon_name': 'file-invoice-dollar', 'is_completion_status': False, 'is_archival_status': False, 'sort_order': 5},
-        {'status_name': 'Payée', 'status_type': 'Commande', 'color_hex': '#27ae60', 'icon_name': 'hand-holding-usd', 'is_completion_status': True, 'is_archival_status': False, 'sort_order': 6},
-        {'status_name': 'Annulée', 'status_type': 'Commande', 'color_hex': '#e74c3c', 'icon_name': 'document-cancel', 'is_completion_status': True, 'is_archival_status': True, 'sort_order': 7},
-        {'status_name': 'Archivée', 'status_type': 'Commande', 'color_hex': '#95a5a6', 'icon_name': 'archive', 'is_completion_status': True, 'is_archival_status': True, 'sort_order': 8},
+        {'status_name': 'Scheduled', 'status_type': 'InterviewStatus', 'color_hex': '#3498db', 'icon_name': 'calendar-clock', 'sort_order': 0, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'Completed', 'status_type': 'InterviewStatus', 'color_hex': '#2ecc71', 'icon_name': 'calendar-check', 'sort_order': 1, 'is_completion_status': True, 'is_archival_status': False},
+        {'status_name': 'Cancelled', 'status_type': 'InterviewStatus', 'color_hex': '#e74c3c', 'icon_name': 'calendar-times', 'sort_order': 2, 'is_completion_status': True, 'is_archival_status': True},
+        {'status_name': 'Rescheduled', 'status_type': 'InterviewStatus', 'color_hex': '#f39c12', 'icon_name': 'calendar-edit', 'sort_order': 3, 'is_completion_status': False, 'is_archival_status': False},
+        {'status_name': 'No Show', 'status_type': 'InterviewStatus', 'color_hex': '#c0392b', 'icon_name': 'calendar-question', 'sort_order': 4, 'is_completion_status': True, 'is_archival_status': True},
     ]
     for status in default_statuses:
         cursor.execute("""
@@ -500,6 +510,18 @@ def initialize_database():
         FOREIGN KEY (default_template_id) REFERENCES Templates (template_id)
     )
     """)
+
+    # Ensure lead_source column exists
+    cursor.execute("PRAGMA table_info(Clients)")
+    clients_columns_info_lead_source_check = cursor.fetchall()
+    clients_column_names_lead_source_check = [info['name'] for info in clients_columns_info_lead_source_check]
+    if 'lead_source' not in clients_column_names_lead_source_check:
+        try:
+            cursor.execute("ALTER TABLE Clients ADD COLUMN lead_source TEXT")
+            print("DEBUG_INIT_DB: Added 'lead_source' column to Clients table.")
+        except sqlite3.Error as e_alter_lead_source:
+            print(f"DEBUG_INIT_DB: Error adding 'lead_source' column to Clients table: {e_alter_lead_source}")
+
     cursor.execute("PRAGMA table_info(Clients)")
     columns_info = cursor.fetchall()
     column_names = [info['name'] for info in columns_info]
@@ -2303,6 +2325,29 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_company_expenses_is_deleted ON company_expenses(is_deleted)")
     print("DEBUG_INIT_DB: Indexes for Company Expense and Facture tables created or already exist.")
     # --- End Company Expense Module Tables and Indexes ---
+
+    # --- ClientVisits Table ---
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS ClientVisits (
+        visit_id TEXT PRIMARY KEY,
+        client_id TEXT NOT NULL,
+        visit_date TEXT NOT NULL, -- ISO date string YYYY-MM-DD
+        visit_type TEXT,          -- e.g., 'Visite chez le client', 'Visite du client chez nous', 'Appel Vidéo Planifié'
+        visit_purpose TEXT,
+        notes_impressions TEXT,
+        created_by_user_id TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (client_id) REFERENCES Clients (client_id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL
+    )
+    """)
+    print("DEBUG_INIT_DB: Table ClientVisits created or exists.")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientvisits_client_id ON ClientVisits(client_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientvisits_visit_date ON ClientVisits(visit_date)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientvisits_created_by_user_id ON ClientVisits(created_by_user_id)")
+    print("DEBUG_INIT_DB: Indexes for ClientVisits created or already exist.")
+    # --- End ClientVisits Table ---
 
     # --- UserSavedFilters Table (Added for filter saving functionality) ---
     cursor.execute("""
