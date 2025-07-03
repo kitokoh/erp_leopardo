@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
     QLabel, QFormLayout, QLineEdit, QComboBox, QProgressBar, QWidget,
     QMessageBox, QInputDialog, QCompleter
 )
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt
+from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt, QSettings
 
 # Attempt to import db_manager, provide a mock if it fails for standalone testing.
 try:
@@ -121,6 +121,34 @@ class StatisticsAddClientDialog(QDialog):
         self.setLayout(main_layout)
         self._update_button_states()
         self._update_step_title_and_progress()
+        self._load_and_populate_lead_sources_combo(self.lead_source_combo) # Call after UI setup
+
+    def _load_and_populate_lead_sources_combo(self, combo_box: QComboBox):
+        """Loads lead sources from QSettings and populates the given QComboBox."""
+        if not combo_box:
+            return
+
+        combo_box.blockSignals(True)
+        combo_box.clear() # Clear previous items if any
+
+        settings = QSettings()
+        stored_lead_sources = settings.value("lead_sources", [], type=list)
+
+        unique_sources_dict = {}
+        for source in stored_lead_sources:
+            if source.lower() not in unique_sources_dict:
+                unique_sources_dict[source.lower()] = source
+
+        sorted_unique_sources = sorted(list(unique_sources_dict.values()), key=str.lower)
+
+        for source in sorted_unique_sources:
+            combo_box.addItem(source)
+
+        # For a new client, there's no "current" client lead source to pre-select beyond what's typed.
+        # The placeholder text will serve as the initial state.
+        combo_box.setCurrentIndex(-1) # Ensure no item is selected by default, showing placeholder
+        combo_box.blockSignals(False)
+        # logging.info(f"Lead source combo in AddClientDialog populated. Sources: {sorted_unique_sources}") # Requires logging import
 
     def _setup_step1_client_project_info(self) -> QWidget:
         page_widget = QWidget()
@@ -142,6 +170,11 @@ class StatisticsAddClientDialog(QDialog):
         self.project_identifier_input = QLineEdit()
         self.project_identifier_input.setPlaceholderText("Unique project ID or code (optional)")
         layout.addRow("Project ID:", self.project_identifier_input)
+
+        self.lead_source_combo = QComboBox()
+        self.lead_source_combo.setEditable(True)
+        self.lead_source_combo.setPlaceholderText(self.tr("Enter or select lead source (optional)"))
+        layout.addRow("Lead Source:", self.lead_source_combo)
 
         page_widget.setLayout(layout)
         return page_widget
@@ -483,6 +516,17 @@ class StatisticsAddClientDialog(QDialog):
 
         self.city_id = final_city_id
 
+        # Process and save lead source
+        current_lead_source_text = self.lead_source_combo.currentText().strip()
+        if current_lead_source_text:
+            settings = QSettings()
+            stored_lead_sources = settings.value("lead_sources", [], type=list)
+            if not any(src.lower() == current_lead_source_text.lower() for src in stored_lead_sources):
+                stored_lead_sources.append(current_lead_source_text)
+                stored_lead_sources.sort(key=str.lower)
+                settings.setValue("lead_sources", stored_lead_sources)
+                # logging.info(f"Added new lead source '{current_lead_source_text}' via AddClientDialog.") # Requires logging
+
         super().accept() # All good, proceed to close the dialog with QDialog.Accepted
 
     def get_data(self) -> dict:
@@ -504,7 +548,8 @@ class StatisticsAddClientDialog(QDialog):
             "country_name": self.country_select_combo.currentText().strip(), # Current text for display
             "city_id": self.city_id,
             "city_name": self.city_select_combo.currentText().strip(), # Current text for display
-            "selected_languages": ",".join(selected_languages_list) # Store as comma-separated string
+            "selected_languages": ",".join(selected_languages_list), # Store as comma-separated string
+            "lead_source": self.lead_source_combo.currentText().strip()
         }
 
 if __name__ == '__main__':

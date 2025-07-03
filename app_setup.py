@@ -21,7 +21,7 @@ else:
 DEFAULT_TEMPLATES_DIR = os.path.join(APP_ROOT_DIR, "resources", "templates") # Updated path
 DEFAULT_ICONS_DIR = os.path.join(APP_ROOT_DIR, "resources", "icons") # Added for icons
 DEFAULT_CLIENTS_DIR = os.path.join(APP_ROOT_DIR, "clients")   # Standardized subdir name
-LOGO_SUBDIR = "company_logos"
+LOGO_SUBDIR = os.path.join("resources", "company_logos")
 
 DATABASE_NAME = CENTRAL_DATABASE_NAME
 

@@ -175,6 +175,38 @@ def get_active_projects_count(conn: sqlite3.Connection = None) -> int:
         logger.error(f"Database error in get_active_projects_count: {e}", exc_info=True)
         return 0
 
+@_manage_conn
+def get_active_project_count_by_country_id(country_id: int, conn: sqlite3.Connection = None) -> int:
+    """
+    Counts active projects for clients in a specific country.
+    'Active' means project status is not marked as completion or archival.
+    """
+    cursor = conn.cursor()
+    # This query assumes StatusSettings table has is_completion_status and is_archival_status columns
+    # and that Clients table has country_id.
+    sql = """
+        SELECT COUNT(p.project_id) as active_project_count
+        FROM Projects p
+        JOIN Clients c ON p.client_id = c.client_id
+        JOIN StatusSettings ss ON p.status_id = ss.status_id
+        WHERE c.country_id = ?
+          AND (c.is_deleted IS NULL OR c.is_deleted = 0)      -- Client not deleted
+          AND (p.is_deleted IS NULL OR p.is_deleted = 0)      -- Project not deleted
+          AND (ss.is_completion_status = FALSE OR ss.is_completion_status = 0)
+          AND (ss.is_archival_status = FALSE OR ss.is_archival_status = 0)
+          AND ss.status_type = 'Project' -- Ensure we are looking at Project statuses
+    """
+    try:
+        cursor.execute(sql, (country_id,))
+        row = cursor.fetchone()
+        return row['active_project_count'] if row else 0
+    except sqlite3.Error as e:
+        logger.error(f"DB error in get_active_project_count_by_country_id for country_id {country_id}: {e}", exc_info=True)
+        return 0
+    except Exception as ex:
+        logger.error(f"Unexpected error in get_active_project_count_by_country_id for country_id {country_id}: {ex}", exc_info=True)
+        return 0
+
 __all__ = [
     "add_project",
     "get_project_by_id",
@@ -184,6 +216,7 @@ __all__ = [
     "get_all_projects",
     "get_total_projects_count",
     "get_active_projects_count",
+    "get_active_project_count_by_country_id", # Added new function
     # Added placeholders
     "search_projects",
     "get_projects_by_status",

@@ -67,14 +67,14 @@ class HomePageWidget(QWidget):
             gif_label.setStyleSheet("color: red;")
             gif_label.setAlignment(Qt.AlignCenter)
 
-        center_h_layout.addWidget(gif_label, 1)
+        center_h_layout.addWidget(gif_label, 1) # GIF on the left, stretch factor 1
 
-
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        scroll_area.setStyleSheet("QScrollArea { border: none; background-color: transparent; }")
+        # Button Grid in the Center
+        button_scroll_area = QScrollArea()
+        button_scroll_area.setWidgetResizable(True)
+        button_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        button_scroll_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        button_scroll_area.setStyleSheet("QScrollArea { border: none; background-color: transparent; }")
 
         button_container_widget = QWidget()
         button_container_widget.setObjectName("homePageButtonGridContainer")
@@ -83,7 +83,6 @@ class HomePageWidget(QWidget):
         grid_layout = QGridLayout(button_container_widget)
         grid_layout.setContentsMargins(5, 5, 5, 5)
         grid_layout.setSpacing(10)
-
 
         self.modules = [
             {"name": self.tr("Gestion Documents Client"), "object_name": "btnClientDocuments", "icon": ":/icons/modern/folder-docs.svg", "slot": self.go_to_documents},
@@ -97,29 +96,21 @@ class HomePageWidget(QWidget):
             {"name": self.tr("Intégration Botpress"), "object_name": "btnBotpressIntegration", "icon": ":/icons/placeholder_icon.svg", "slot": self.go_to_botpress_integration},
             {"name": self.tr("Gestion Caméras"), "object_name": "btnCameraManagement", "icon": ":/icons/video.svg", "slot": self.go_to_camera_management},
             {"name": self.tr("Paramètres"), "object_name": "btnSettings", "icon": ":/icons/modern/settings.svg", "slot": self.go_to_settings},
-            {"name": self.tr("Module X"), "object_name": "btnModuleX", "icon": ":/icons/placeholder_icon.svg", "slot": self.go_to_settings}
+            # {"name": self.tr("Module X"), "object_name": "btnModuleX", "icon": ":/icons/placeholder_icon.svg", "slot": self.go_to_settings} # Example, can be removed
         ]
         row, col = 0, 0
-        num_columns = 4
+        num_columns = 4 # Changed from 3 to 4 to ensure max 3 rows for 11 buttons (4-4-3)
 
 
         for i, module_data in enumerate(self.modules):
             button = QPushButton(module_data["name"])
             button.setObjectName(module_data["object_name"])
-            if module_data["icon"] and QIcon.hasThemeIcon(module_data["icon"]):
+            if module_data["icon"] and QIcon.hasThemeIcon(module_data["icon"]): # Check if icon exists
                 button.setIcon(QIcon(module_data["icon"]))
-                button.setIconSize(QSize(32, 32))
-
+            else: # Fallback icon
+                button.setIcon(QIcon(":/icons/placeholder_icon.svg"))
+            button.setIconSize(QSize(32, 32))
             button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-
-            # shadow = QGraphicsDropShadowEffect() # Temporairement désactivé
-            # shadow.setBlurRadius(12)
-            # shadow.setXOffset(1)
-            # shadow.setYOffset(2)
-            # shadow.setColor(QColor(0, 0, 0, 80))
-            # button.setGraphicsEffect(shadow)
-
-
             button.clicked.connect(module_data["slot"])
             grid_layout.addWidget(button, row, col)
             col += 1
@@ -127,15 +118,27 @@ class HomePageWidget(QWidget):
                 col = 0
                 row += 1
 
-        grid_layout.setRowStretch(row + 1, 1)
+        grid_layout.setRowStretch(row + 1, 1) # Ensure remaining rows/cols don't take extra space
         grid_layout.setColumnStretch(num_columns, 1)
 
         button_container_widget.setLayout(grid_layout)
-        scroll_area.setWidget(button_container_widget)
-        center_h_layout.addWidget(scroll_area, 2)
+        button_scroll_area.setWidget(button_container_widget)
+        center_h_layout.addWidget(button_scroll_area, 2) # Buttons in center, stretch factor 2
+
+        # Right Sidebar for Statistics Summary
+        self.right_sidebar_container = QFrame() # Use QFrame for potential styling (e.g., border)
+        self.right_sidebar_container.setObjectName("homePageRightSidebar")
+        self.right_sidebar_container.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        # self.right_sidebar_container.setFixedWidth(250) # Example fixed width, adjust as needed
+        self.right_sidebar_layout = QVBoxLayout(self.right_sidebar_container)
+        self.right_sidebar_layout.setContentsMargins(5,5,5,5)
+        self.right_sidebar_container.setLayout(self.right_sidebar_layout)
+        self.right_sidebar_container.setVisible(False) # Initially hidden until content is set
+        center_h_layout.addWidget(self.right_sidebar_container, 1) # Summary on right, stretch factor 1
 
         main_v_layout.addLayout(center_h_layout)
 
+        # Bottom Area for Map
         self.bottom_content_area = QStackedWidget()
         self.bottom_content_area.setObjectName("homePageBottomContentArea")
         self.bottom_content_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -148,7 +151,7 @@ class HomePageWidget(QWidget):
         while self.bottom_content_area.count() > 0:
             widget = self.bottom_content_area.widget(0)
             self.bottom_content_area.removeWidget(widget)
-            # widget.deleteLater() # Important pour éviter les fuites de mémoire si les widgets ne sont pas réutilisés
+            widget.deleteLater() # Important pour éviter les fuites de mémoire si les widgets ne sont pas réutilisés
 
 
         if widget_to_display:
@@ -157,6 +160,19 @@ class HomePageWidget(QWidget):
             self.bottom_content_area.setVisible(True)
         else:
             self.bottom_content_area.setVisible(False)
+
+    def set_right_sidebar_widget(self, widget_to_display):
+        # Clear existing widgets from the right sidebar layout
+        while self.right_sidebar_layout.count() > 0:
+            item = self.right_sidebar_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        if widget_to_display:
+            self.right_sidebar_layout.addWidget(widget_to_display)
+            self.right_sidebar_container.setVisible(True)
+        else:
+            self.right_sidebar_container.setVisible(False)
 
     @pyqtSlot()
     def go_to_documents(self):

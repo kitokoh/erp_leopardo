@@ -7349,3 +7349,4 @@ class ClientWidget(QWidget):
 # to use db_manager for all database interactions.
 
 # [end of client_widget.py]
+

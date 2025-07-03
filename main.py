@@ -577,9 +577,10 @@ def main():
             SESSION_START_TIME = datetime.datetime.now() # Start session timer
         else:
             logging.warning(f"Auto-login failed for remembered user: {remembered_username}. User not found or inactive. Clearing preference.")
-            auth_service.clear_remember_me_preference()
+            auth_service.clear_remember_me_preference() # Ensure preference is cleared on any auto-login failure for this user
             proceed_to_main_app = False # Fallback to manual login
     else:
+        # No remembered_username, so nothing to clear here based on auto-login failure
         proceed_to_main_app = False # No remembered user, proceed to manual login
 
     if not proceed_to_main_app: # If auto-login didn't happen or failed

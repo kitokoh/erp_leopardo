@@ -71,13 +71,15 @@ class ClientsCRUD(GenericCRUD):
         sql = """INSERT INTO Clients
                  (client_id, client_name, company_name, primary_need_description, project_identifier,
                   country_id, city_id, default_base_folder_path, status_id, selected_languages,
-                  price, notes, category, created_at, updated_at, created_by_user_id, is_deleted, deleted_at, default_template_id)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"""
+                  price, notes, category, lead_source, created_at, updated_at, created_by_user_id,
+                  is_deleted, deleted_at, default_template_id)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""" # Added lead_source, increased ? count
         params = (new_id, data.get('client_name'), data.get('company_name'), data.get('primary_need_description'),
                   data.get('project_identifier', 'N/A'), data.get('country_id'), data.get('city_id'),
                   data.get('default_base_folder_path'), data.get('status_id'),
                   data.get('selected_languages'), data.get('price', 0), data.get('notes'),
-                  data.get('category'), now, now, data.get('created_by_user_id'),
+                  data.get('category'), data.get('lead_source'), # Added lead_source
+                  now, now, data.get('created_by_user_id'),
                   data['is_deleted'], data['deleted_at'], data.get('default_template_id'))
         try:
             cursor.execute(sql, params)
@@ -274,8 +276,8 @@ class ClientsCRUD(GenericCRUD):
 
         valid_cols = ['client_name', 'company_name', 'primary_need_description', 'project_identifier',
                       'country_id', 'city_id', 'default_base_folder_path', 'status_id',
-                      'selected_languages', 'price', 'notes', 'category', 'updated_at',
-                      'created_by_user_id', 'is_deleted', 'deleted_at', 'default_template_id'] # Added soft delete fields and default_template_id
+                      'selected_languages', 'price', 'notes', 'category', 'lead_source', 'updated_at', # Added lead_source
+                      'created_by_user_id', 'is_deleted', 'deleted_at', 'default_template_id']
 
         data_to_set = {}
         for k, v in client_data.items():
@@ -297,27 +299,7 @@ class ClientsCRUD(GenericCRUD):
         try:
             cursor.execute(sql, params)
             # conn.commit() # Handled by _manage_conn
-            updated_count = cursor.rowcount
-
-            # If client is being marked as deleted, also soft-delete their documents
-            if data_to_set.get('is_deleted') == 1 or data_to_set.get('is_deleted') is True:
-                self.logger.info(f"Client {client_id} is being marked as deleted. Soft-deleting associated documents.")
-                from . import client_documents_crud # Local import
-                client_docs = client_documents_crud.get_documents_for_client(client_id, include_deleted=False, fetch_only_latest_versions=False, conn=conn)
-                if client_docs:
-                    for doc in client_docs:
-                        doc_id = doc.get('document_id')
-                        if doc_id:
-                            delete_success = client_documents_crud.delete_client_document(doc_id, conn=conn)
-                            if not delete_success:
-                                self.logger.error(f"Failed to soft-delete document {doc_id} for client {client_id} during client update-to-deleted.")
-                                # Decide on error handling: raise exception to rollback, or just log?
-                                # For now, log and continue. Transaction will commit if client update was successful.
-                    self.logger.info(f"Finished attempting to soft-delete {len(client_docs)} documents for client {client_id}.")
-                else:
-                    self.logger.info(f"No active documents found to soft-delete for client {client_id} during update-to-deleted.")
-
-            return {'success': updated_count > 0, 'updated_count': updated_count}
+            return {'success': cursor.rowcount > 0, 'updated_count': cursor.rowcount}
         except sqlite3.Error as e:
             logging.error(f"clients_crud.update_client: Failed to update client {client_id} with data {data_to_set}. Error: {type(e).__name__} - {e}", exc_info=True)
             # conn.rollback() # Handled by _manage_conn
@@ -338,7 +320,6 @@ class ClientsCRUD(GenericCRUD):
                   {'success': False, 'error': 'Reason for failure.'} on failure.
         """
         from . import status_settings_crud # Local import for status operations
-        from . import client_documents_crud # Local import for document operations
 
         if not client_id:
             self.logger.warning("delete_client called with no client_id.")
@@ -374,24 +355,6 @@ class ClientsCRUD(GenericCRUD):
 
         try:
             cursor = conn.cursor()
-
-            # Soft-delete associated documents first
-            self.logger.info(f"Client {client_id} is being soft-deleted via delete_client. Soft-deleting associated documents.")
-            client_docs = client_documents_crud.get_documents_for_client(client_id, include_deleted=False, fetch_only_latest_versions=False, conn=conn)
-            if client_docs:
-                for doc in client_docs:
-                    doc_id = doc.get('document_id')
-                    if doc_id:
-                        delete_success = client_documents_crud.delete_client_document(doc_id, conn=conn)
-                        if not delete_success:
-                            self.logger.error(f"Failed to soft-delete document {doc_id} for client {client_id} during client soft deletion.")
-                            # If critical, could raise an error here to rollback transaction.
-                            # For now, logging and continuing.
-                self.logger.info(f"Finished attempting to soft-delete {len(client_docs)} documents for client {client_id}.")
-            else:
-                self.logger.info(f"No active documents found to soft-delete for client {client_id} during soft deletion.")
-
-            # Now, update the client record
             cursor.execute(sql, tuple(params))
             if cursor.rowcount > 0:
                 message = f"Client {client_id} soft deleted."
@@ -921,6 +884,70 @@ class ClientsCRUD(GenericCRUD):
             logging.error(f"Unexpected error in get_active_clients_count_up_to_date: {ex}", exc_info=True)
             return 0
 
+    @_manage_conn
+    def get_clients_by_status_id(self, status_id: int, conn: sqlite3.Connection = None, include_deleted: bool = False) -> list[dict]:
+        """
+        Retrieves clients matching a specific status_id, including details from joined tables.
+        """
+        cursor = conn.cursor()
+        q_params = [status_id]
+        query = """
+        SELECT c.client_id, c.client_name, c.company_name, c.primary_need_description,
+               c.project_identifier, c.default_base_folder_path, c.selected_languages,
+               c.price, c.notes, c.created_at, c.category, c.status_id, c.country_id, c.city_id,
+               c.is_deleted, c.deleted_at, c.default_template_id,
+               co.country_name AS country, ci.city_name AS city,
+               s.status_name AS status, s.color_hex AS status_color, s.icon_name AS status_icon_name,
+               t.template_name AS default_template_name
+        FROM Clients c
+        LEFT JOIN Countries co ON c.country_id = co.country_id
+        LEFT JOIN Cities ci ON c.city_id = ci.city_id
+        LEFT JOIN StatusSettings s ON c.status_id = s.status_id AND s.status_type = 'Client'
+        LEFT JOIN Templates t ON c.default_template_id = t.template_id
+        WHERE c.status_id = ?
+        """
+
+        if not include_deleted:
+            query += " AND (c.is_deleted IS NULL OR c.is_deleted = 0)"
+
+        query += " ORDER BY c.client_name"
+
+        try:
+            cursor.execute(query, tuple(q_params))
+            return [dict(row) for row in cursor.fetchall()]
+        except sqlite3.Error as e:
+            self.logger.error(f"Failed to get clients for status_id {status_id}: {e}", exc_info=True)
+            return []
+
+    @_manage_conn
+
+    def get_client_count_by_country_id(self, country_id: int, conn: sqlite3.Connection = None, include_deleted: bool = False) -> int:
+        """
+        Counts clients for a specific country_id.
+
+        Args:
+            country_id (int): The ID of the country.
+            conn (sqlite3.Connection, optional): Database connection.
+            include_deleted (bool, optional): If True, includes soft-deleted clients. Defaults to False.
+
+        Returns:
+            int: The count of clients in the specified country.
+        """
+        cursor = conn.cursor()
+        sql = "SELECT COUNT(client_id) as count FROM Clients WHERE country_id = ?"
+        params = [country_id]
+
+        if not include_deleted:
+            sql += " AND (is_deleted IS NULL OR is_deleted = 0)"
+
+        try:
+            cursor.execute(sql, tuple(params))
+            row = cursor.fetchone()
+            return row['count'] if row else 0
+        except sqlite3.Error as e:
+            self.logger.error(f"Error getting client count for country_id {country_id}: {e}", exc_info=True)
+            return 0
+
 # Instantiate the CRUD class for easy import and use elsewhere
 clients_crud_instance = ClientsCRUD()
 
@@ -964,7 +991,10 @@ __all__ = [
     "get_client_notes",
     "get_clients_count_created_between",
     "get_total_clients_count_up_to_date",
-    "get_active_clients_count_up_to_date", # Added to __all__
+    "get_active_clients_count_up_to_date",
+    "get_client_count_by_country_id",
+    "get_clients_by_status_id", # Added new function
+
     "ClientsCRUD", # Exporting the class itself for type hinting or direct instantiation
     "clients_crud_instance" # Exporting the instance if needed elsewhere
 ]

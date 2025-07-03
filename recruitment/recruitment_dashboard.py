@@ -29,15 +29,34 @@ class RecruitmentDashboard(QWidget):
 
         # Add tab widget to main layout
         self.main_layout.addWidget(self.tab_widget)
-        self.tab_widget.currentChanged.connect(self.on_tab_changed)
 
         self.setLayout(self.main_layout)
 
-    def on_tab_changed(self, index):
-        # Check if the current tab is the InterviewsWidget
-        current_widget = self.tab_widget.widget(index)
-        if current_widget == self.interviews_widget:
-            self.interviews_widget.initial_load_if_needed()
+        # Keep track of loaded tabs to ensure data is loaded only once per tab
+        self._loaded_tabs_indices = set()
+        self.tab_widget.currentChanged.connect(self.handle_tab_changed)
+
+        # Initial load for the first visible tab (if any)
+        if self.tab_widget.count() > 0:
+            self.handle_tab_changed(self.tab_widget.currentIndex())
+
+
+    def handle_tab_changed(self, index):
+        """Handles loading data when a tab becomes current for the first time."""
+        if index not in self._loaded_tabs_indices:
+            current_widget = self.tab_widget.widget(index)
+            if hasattr(current_widget, 'load_initial_data'):
+                try:
+                    current_widget.load_initial_data()
+                    self._loaded_tabs_indices.add(index)
+                except Exception as e:
+                    # Log error or show a message to the user if data loading fails
+                    print(f"Error loading initial data for {current_widget.__class__.__name__}: {e}")
+                    # Optionally, display a QMessageBox to the user
+                    # from PyQt5.QtWidgets import QMessageBox
+                    # QMessageBox.critical(self, "Data Load Error",
+                    #                      f"Could not load data for tab: {self.tab_widget.tabText(index)}\n{e}")
+
 
 if __name__ == '__main__':
     from PyQt5.QtWidgets import QApplication
