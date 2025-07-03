@@ -21,7 +21,10 @@ from .client_order_money_transfer_agents_crud import assign_agent_to_client_orde
 from .client_transporters_crud import assign_transporter_to_client, get_assigned_transporters_for_client, unassign_transporter_from_client, update_client_transporter_email_status
 from .clients_crud import get_all_clients, get_client_by_id, get_active_clients_count, get_client_counts_by_country, get_client_segmentation_by_city, get_client_segmentation_by_status, get_client_segmentation_by_category, get_total_clients_count, update_client, add_client, delete_client as soft_delete_client, get_all_clients_with_details, get_clients_by_archival_status, get_active_clients_per_country, add_client_note as add_client_note_to_client, get_client_notes as get_client_notes_for_client, get_clients_count_created_between, get_total_clients_count_up_to_date, get_active_clients_count_up_to_date
 from .companies_crud import add_company, get_company_by_id, get_all_companies, update_company, delete_company, set_default_company, get_default_company
-from .company_personnel_crud import add_company_personnel, get_personnel_for_company, update_company_personnel, delete_company_personnel
+from .company_personnel_crud import (
+    add_company_personnel, get_personnel_for_company, update_company_personnel, delete_company_personnel,
+    link_existing_contact_to_personnel # Added new function
+)
 from .contacts_crud import get_contacts_for_client, add_contact, get_contact_by_id as get_contact_details_by_id, get_contact_by_email, get_all_contacts, update_contact, delete_contact, link_contact_to_client, unlink_contact_from_client, get_contacts_for_client_count, get_clients_for_contact, get_specific_client_contact_link_details, update_client_contact_link
 # employees_crud functions expect SQLAlchemy Session.
 from .employees_crud import create_employee as create_employee_sqla, get_employee as get_employee_sqla, get_employees as get_employees_sqla, update_employee as update_employee_sqla, delete_employee as delete_employee_sqla
@@ -182,7 +185,7 @@ __all__ = [
     # Functions from companies_crud
     'add_company', 'get_company_by_id', 'get_all_companies', 'update_company', 'delete_company', 'set_default_company', 'get_default_company',
     # Functions from company_personnel_crud
-    'add_company_personnel', 'get_personnel_for_company', 'update_company_personnel', 'delete_company_personnel',
+    'add_company_personnel', 'get_personnel_for_company', 'update_company_personnel', 'delete_company_personnel', 'link_existing_contact_to_personnel',
     # Functions from contacts_crud
     'get_contacts_for_client', 'add_contact', 'get_contact_details_by_id', 'get_contact_by_email', 'get_all_contacts',
     'update_contact', 'delete_contact', 'link_contact_to_client', 'unlink_contact_from_client', 'get_contacts_for_client_count',
