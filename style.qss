@@ -997,95 +997,94 @@ QListView#menuBarSearchCompleterView::item:selected {
 /* == MENU STYLING ENHANCEMENTS (Improved for better UX) == */
 
 QMenuBar {
-    background-color: #F5F7FA; /* Light grey, less stark than white */
-    border-bottom: 1px solid #DDE2E6;
-    padding: 5px 8px; /* Increased padding for a more spacious feel */
-    font-size: 10pt; /* Consistent font size */
-    font-weight: 500; /* Slightly bolder for menu bar items */
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #007BFF, stop:1 #0056B3); /* Vibrant blue gradient */
+    border-bottom: 1px solid #004085; /* Darker blue border */
+    padding: 8px 10px;
+    font-size: 11pt;
+    font-weight: bold; /* Bolder text for top menu */
 }
 
 QMenuBar::item {
-    spacing: 6px; /* Increased spacing between menu bar items */
-    padding: 8px 15px; /* More padding within each menu bar item */
+    spacing: 8px;
+    padding: 10px 18px;
     background: transparent;
-    color: #34495E; /* Darker, more saturated blue-grey for text */
-    border-radius: 5px; /* Slightly more rounded corners */
-    /* transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out; */ /* For smoother transitions (conceptual) */
+    color: #FFFFFF; /* White text for contrast against blue gradient */
+    border-radius: 6px;
 }
 
 QMenuBar::item:selected { /* When menu is open or hovered */
-    background-color: #007BFF; /* Accent blue background */
-    color: #FFFFFF; /* White text for contrast */
+    background-color: rgba(255, 255, 255, 0.2); /* Subtle white highlight */
+    color: #FFFFFF;
 }
 
 QMenuBar::item:pressed { /* When menu item is pressed */
-    background-color: #0056B3; /* Darker Accent Blue */
-    color: #FFFFFF;
+    background-color: rgba(0, 0, 0, 0.2); /* Subtle dark highlight */
+    color: #E0E0E0; /* Slightly dimmer white */
 }
 
 /* QMenu (Dropdowns) - Refinements for a premium feel */
 QMenu {
     background-color: #FFFFFF; /* Clean white background */
-    border: 1px solid #C0C6CC; /* Slightly darker border for better definition */
-    padding: 8px; /* Generous padding around the menu items */
-    border-radius: 6px; /* More pronounced rounding */
-    /* box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); */ /* Conceptual shadow for depth (not directly supported) */
+    border: 1px solid #B0BEC5; /* Existing border, could be slightly darker if needed #A0A0A0 */
+    padding: 8px;
+    border-radius: 6px;
+    /* Adding a subtle shadow effect using multiple borders if QGraphicsDropShadowEffect isn't used directly on QMenu */
+    /* This is a trick and might not look perfect, actual shadow is better. */
+    /* For QSS, a simple border is more reliable. */
 }
 
 QMenu::item {
-    padding: 10px 25px 10px 20px; /* Increased padding: T/B, R, L */
-    color: #2C3E50; /* Dark slate blue for text */
+    padding: 10px 25px 10px 25px; /* More horizontal padding */
+    color: #1A2B3C; /* Dark, slightly desaturated blue for text - high contrast */
     background-color: transparent;
-    border-radius: 4px;
-    margin: 2px 0; /* Slightly more margin between items */
+    border-radius: 5px; /* Rounded corners for items */
+    margin: 3px 0;
     font-size: 10pt;
-    /* transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out; */ /* Conceptual */
+    font-weight: 500; /* Medium weight for readability */
 }
 
 QMenu::item:selected { /* Hover/selected state in dropdown */
-    background-color: #007BFF; /* Accent blue */
-    color: #FFFFFF; /* White text */
+    background-color: #007BFF; /* Vibrant blue accent */
+    color: #FFFFFF;
 }
 
 QMenu::item:disabled {
-    color: #95A5A6; /* Greyed out for disabled items */
+    color: #A0A0A0; /* Lighter grey for disabled items */
     background-color: transparent;
 }
 
 QMenu::icon {
-    padding-left: 8px; /* More space for icons */
-    padding-right: 8px; /* Space between icon and text */
-    /* size: 18px 18px; */ /* Slightly larger icons if desired */
+    padding-left: 10px;
+    padding-right: 10px;
+    /* Ensure icons are visible and well-aligned */
 }
 
 QMenu::separator {
     height: 1px;
-    background: #EAECEE; /* Very light separator */
-    margin: 6px 4px; /* More vertical margin, less horizontal */
+    background: #E0E0E0; /* Lighter separator */
+    margin: 8px 5px;
 }
 
 QMenu::indicator { /* For checkable menu items */
-    width: 20px; /* Slightly larger indicator */
-    height: 20px;
-    left: 10px; /* Adjusted position */
+    width: 18px;
+    height: 18px;
+    left: 12px;
 }
 
 QMenu::indicator:non-exclusive:checked {
-    image: url(:/icons/check.svg); /* Ensure icon is modern and clear */
-    /* Consider adding a subtle background to the indicator itself if needed */
+    image: url(:/icons/check-square.svg); /* Using a filled square check for a more modern feel */
 }
 
 QMenu::indicator:non-exclusive:unchecked {
-    /* image: url(:/icons/checkbox-unchecked.svg); */ /* Optional: specific unchecked icon */
-    image: none;
+    image: url(:/icons/square.svg); /* Empty square for unchecked state */
 }
 
 /* Style for sub-menus */
 QMenu::right-arrow { /* Arrow for sub-menus */
-    image: url(:/icons/chevron-right.svg); /* Ensure icon is modern */
-    width: 16px;
-    height: 16px;
-    right: 8px; /* Position from the right edge */
+    image: url(:/icons/chevron-right.svg);
+    width: 18px;
+    height: 18px;
+    right: 10px;
 }
 
 /* == END OF MENU STYLING ENHANCEMENTS == */
