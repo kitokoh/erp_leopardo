@@ -150,6 +150,7 @@ from user_management.user_menu_button import UserMenuButton # Import UserMenuBut
 from dialogs.edit_user_dialog import EditUserDialog # For handling edit/add user requests
 from dialogs.role_management_dialog import RoleManagementDialog # Added for Role Management
 from commande_management.commandes_dashboard_widget import CommandesDashboardWidget # Import CommandesDashboardWidget
+from contact_manager.contacts_manager_widget import ContactsManagerWidget # Import ContactsManagerWidget
 
 # Definition of configurable modules
 CONFIGURABLE_MODULES = [
@@ -312,6 +313,7 @@ class DocumentManager(QMainWindow):
         self.main_area_stack.addWidget(self.user_management_page_instance)
 
         self.calculator_module_widget_instance = None # Calculator also lazy loaded
+        self.contacts_manager_widget_instance = None # For lazy loading
 
         # CommandesDashboardWidget is fundamental, initialize upfront and add to stack
         self.commandes_dashboard_widget_instance = CommandesDashboardWidget(
@@ -1028,6 +1030,10 @@ class DocumentManager(QMainWindow):
         self.manage_roles_action = QAction(QIcon(":/icons/settings.svg"), self.tr("Gérer les Rôles"), self) # Replaced shield.svg with settings.svg
         self.manage_roles_action.triggered.connect(self.open_role_management_dialog)
 
+        # Action for Contacts Manager
+        self.contacts_manager_action = QAction(QIcon(":/icons/users.svg"), self.tr("Gestionnaire de Contacts"), self) # Using 'users' icon for now
+        self.contacts_manager_action.triggered.connect(self.show_contacts_manager_view)
+
 
         # Populate searchable_actions_map
         self.searchable_actions_map[self.tr("Accueil")] = self.home_action
@@ -1051,6 +1057,7 @@ class DocumentManager(QMainWindow):
         self.searchable_actions_map[self.tr("Gérer les Utilisateurs")] = self.manage_users_action
         self.searchable_actions_map[self.tr("Gestion des Commandes")] = self.commande_management_action
         self.searchable_actions_map[self.tr("Gérer les Rôles")] = self.manage_roles_action
+        self.searchable_actions_map[self.tr("Gestionnaire de Contacts")] = self.contacts_manager_action
 
 
     def _placeholder_manage_users(self):
@@ -1084,7 +1091,8 @@ class DocumentManager(QMainWindow):
         modules_menu.addAction(self.home_action) # Added Home action to Modules menu
         modules_menu.addAction(self.documents_view_action) # Documents view is core, always added
         modules_menu.addAction(self.commande_management_action) # Add Commande Management action
-        modules_menu.addSeparator() # Separator after Home, Documents, and Commandes
+        modules_menu.addAction(self.contacts_manager_action) # Add Contacts Manager action
+        modules_menu.addSeparator() # Separator after Home, Documents, Commandes, Contacts
 
         for module_info in CONFIGURABLE_MODULES:
             action_name = module_info['action_attr']
@@ -1319,6 +1327,30 @@ class DocumentManager(QMainWindow):
                 # self.user_info_label.setText(self.tr("Non connecté")) # Old label
                 # self.logout_button.setVisible(False) # Old button
                 pass
+
+    def show_contacts_manager_view(self):
+        """Switches to the ContactsManagerWidget."""
+        # Optional: Add permission check here if needed in the future
+        # from auth.permissions import has_permission, P_ACCESS_CONTACTS_MANAGER
+        # if not has_permission(self.current_user_info.get('role_name'), P_ACCESS_CONTACTS_MANAGER):
+        #     QMessageBox.warning(self, self.tr("Accès Refusé"), self.tr("Vous n'avez pas la permission d'accéder à ce module."))
+        #     return
+
+        if self.contacts_manager_widget_instance is None:
+            logging.info("DocumentManager: Lazily creating ContactsManagerWidget...")
+            self.contacts_manager_widget_instance = ContactsManagerWidget(parent=self)
+            # Pass current_user_id if ContactsManagerWidget needs it for created_by_user_id etc.
+            if hasattr(self.contacts_manager_widget_instance, 'current_user_id'):
+                 self.contacts_manager_widget_instance.current_user_id = self.current_user_id
+            self.main_area_stack.addWidget(self.contacts_manager_widget_instance)
+            logging.info("DocumentManager: ContactsManagerWidget instance created and added to stack.")
+
+        # Ensure data is loaded/refreshed when shown
+        if hasattr(self.contacts_manager_widget_instance, 'load_contacts'):
+            self.contacts_manager_widget_instance.load_contacts()
+
+        self.main_area_stack.setCurrentWidget(self.contacts_manager_widget_instance)
+        logging.info("Switched to ContactsManagerWidget view.")
 
     def _handle_logout(self):
         # This method is now also connected to UserMenuButton.request_logout signal

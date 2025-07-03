@@ -256,7 +256,7 @@ class EditPersonnelContactDialog(QDialog):
                 QMessageBox.critical(self, self.tr("Error"), self.tr("Failed to add contact."))
 
 
-LOGO_SUBDIR = "company_logos"
+LOGO_SUBDIR = os.path.join("resources", "company_logos")
 DEFAULT_LOGO_SIZE = 128
 
 ICON_PATH = os.path.join(APP_ROOT_DIR, "icons")
