@@ -9,7 +9,7 @@ from PyQt5.QtGui import QIcon
 import logging
 
 # Assuming CRUDS and Dialogs will be imported when needed
-from db.cruds import contacts_crud #, entity_contacts_crud, client_contacts_crud, company_personnel_crud
+from db.cruds import contacts_crud, entity_contacts_crud, client_contacts_crud, company_personnel_crud
 from dialogs.contact_dialog import ContactDialog # Corrected relative import path if necessary
 
 logger = logging.getLogger(__name__)
@@ -124,12 +124,10 @@ class ContactsManagerWidget(QWidget):
         self.edit_contact_button.clicked.connect(self.on_edit_contact)
         # self.delete_contact_button.clicked.connect(self.on_delete_contact)
         # self.link_to_entity_button.clicked.connect(self.on_link_to_entity)
-        self.refresh_button.clicked.connect(self.load_contacts) # Already connected
-        # self.search_input.textChanged.connect(self.on_search_text_changed) # Or use a filter button
-        # self.filter_button.clicked.connect(self.apply_filters)
-        # pass # Connections will be done as methods are implemented
+        self.refresh_button.clicked.connect(lambda: self.load_contacts()) # Ensure it calls without args for refresh
+        self.search_input.returnPressed.connect(self.apply_filters) # Search on Enter
+        self.filter_button.clicked.connect(self.apply_filters)
 
-    # Placeholder methods to be implemented in subsequent steps
     def load_contacts(self, filters=None):
         logger.info(f"Chargement des contacts avec filtres : {filters}")
         self.contacts_table.setRowCount(0) # Clear table
@@ -267,22 +265,75 @@ class ContactsManagerWidget(QWidget):
 
     def load_linked_entities(self, contact_id):
         logger.info(f"Chargement des entités liées pour contact_id : {contact_id}")
-        # self.linked_entities_table.setRowCount(0)
-        # Example for EntityContacts:
-        # linked_generic_entities = entity_contacts_crud.get_entities_for_contact(contact_id)
-        # for entity in linked_generic_entities:
-        #    # Add row to self.linked_entities_table
-        #    pass
-        # Similar for ClientContacts, CompanyPersonnelContacts etc.
-        pass
+        self.linked_entities_table.setRowCount(0)
+        self.linked_entities_table.setSortingEnabled(False)
+
+        # Helper to add a row
+        def add_linked_entity_row(entity_type_display, entity_name_or_id, role_in_link):
+            row = self.linked_entities_table.rowCount()
+            self.linked_entities_table.insertRow(row)
+            self.linked_entities_table.setItem(row, 0, QTableWidgetItem(entity_type_display))
+            self.linked_entities_table.setItem(row, 1, QTableWidgetItem(str(entity_name_or_id)))
+            self.linked_entities_table.setItem(row, 2, QTableWidgetItem(str(role_in_link)))
+
+        try:
+            # 1. Generic Entities from EntityContacts
+            # We need a way to get the "name" of the entity_id (e.g., transporter name)
+            # This might require joining in the CRUD or separate lookups here.
+            # For now, we'll display entity_id.
+            generic_entities = entity_contacts_crud.get_entities_for_contact(contact_id)
+            for entity in generic_entities:
+                entity_type = entity.get('entity_type', 'N/A')
+                # TODO: Fetch actual name of the entity (e.g. transporter name, partner name)
+                # For now, using entity_id. This could be improved by a helper function.
+                entity_identifier = entity.get('entity_id', 'N/A')
+                add_linked_entity_row(
+                    self.tr(entity_type), # Translate entity_type if possible
+                    entity_identifier,
+                    entity.get('role_in_entity', '')
+                )
+
+            # 2. Clients from ClientContacts
+            linked_clients = client_contacts_crud.get_clients_for_contact(contact_id)
+            for client in linked_clients:
+                role = self.tr("Contact")
+                if client.get('is_primary_for_client'):
+                    role = self.tr("Contact Principal")
+                add_linked_entity_row(
+                    self.tr("Client"),
+                    client.get('client_name', client.get('company_name', 'N/A')),
+                    role
+                )
+
+            # 3. Company Personnel from CompanyPersonnelContacts
+            linked_personnel_list = company_personnel_crud.get_personnel_linked_to_contact(contact_id)
+            for personnel in linked_personnel_list:
+                role_display = personnel.get('role', '') # This is CompanyPersonnel.role
+                # The link specific role (if any was designed for CompanyPersonnelContacts) isn't directly here.
+                # We could add 'is_primary_for_personnel' to the display if relevant.
+                if personnel.get('is_primary_for_personnel'):
+                     role_display += f" ({self.tr('Contact Principal du Personnel')})"
+                add_linked_entity_row(
+                    self.tr("Personnel Compagnie"),
+                    personnel.get('name', 'N/A'),
+                    role_display
+                )
+
+            self.linked_entities_table.resizeColumnsToContents()
+            self.linked_entities_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+
+        except Exception as e:
+            logger.error(f"Erreur lors du chargement des entités liées pour contact {contact_id}: {e}", exc_info=True)
+        finally:
+            self.linked_entities_table.setSortingEnabled(True)
+
 
     def _clear_details_panel(self, clear_contact_form=True, clear_linked_entities=True):
-        # if clear_contact_form:
-        #    # Clear QLineEdit fields in self.contact_details_layout
-        #    pass
-        # if clear_linked_entities:
-        #    self.linked_entities_table.setRowCount(0)
-        pass
+        if clear_contact_form:
+           self._clear_layout(self.contact_details_layout)
+        if clear_linked_entities:
+           self.linked_entities_table.setRowCount(0)
+        # pass # Removed pass
 
     def on_add_contact(self):
         # Assuming self.current_user_id might be set on this widget if user context is needed
@@ -376,18 +427,73 @@ class ContactsManagerWidget(QWidget):
         pass
 
     def on_search_text_changed(self, text):
-        # Basic search logic, can be refined with a timer to avoid too many DB calls
-        # self.load_contacts(filters={'name_email_company_like': text})
+        # This could be used for live search with a QTimer debounce
+        # For now, we use the filter_button or Enter key.
         pass
 
     def apply_filters(self):
-        # More advanced filtering based on multiple criteria
         search_term = self.search_input.text().strip()
-        filters = {}
-        if search_term:
-            filters['name_email_company_like'] = search_term # Example filter key
-        # Add other filter criteria from UI elements if any
-        self.load_contacts(filters=filters)
+        if not search_term:
+            self.load_contacts(filters=None) # Load all if search is empty
+            return
+
+        # The contacts_crud.get_all_contacts expects specific filter keys like 'name' or 'email'.
+        # We can try to search in multiple fields by setting up the filter dict accordingly.
+        # However, the current get_all_contacts in contacts_crud.py seems to only support 'name' (for name/displayName) and 'email' separately.
+        # Let's assume we want to search the term in either name/displayName OR email.
+        # This would require a more complex filter structure or modification in the CRUD.
+        # For simplicity with current CRUD: pass it as a 'name' filter, which searches name and displayName.
+        # Users wanting to search specifically by email would need a different UI or the CRUD to handle a generic search term.
+
+        # Simple approach: Use the 'name' filter in CRUD which searches name and displayName
+        filters = {'name': search_term}
+        # To also search email with the same term, the CRUD would need adjustment or we do two queries and merge.
+        # For now, let's stick to what the CRUD directly supports for 'name' key.
+        # If we want to search for the term in email as well, we'd need a more general filter in CRUD,
+        # e.g., filters={'general_search': search_term}
+        # and then the CRUD would build "name LIKE ? OR displayName LIKE ? OR email LIKE ? OR company_name LIKE ?"
+
+        # Current CRUD structure of get_all_contacts:
+        # if 'name' in filters: clauses.append("(name LIKE ? OR displayName LIKE ?)")
+        # if 'email' in filters: clauses.append("email LIKE ?")
+        # if 'company_name' in filters: clauses.append("company_name LIKE ?")
+
+        # We will pass the search term for multiple fields if the CRUD is adapted or we manage it here.
+        # For now, let's assume a generic search term that the CRUD can handle (e.g. by searching in name, displayname, email, company)
+        # If CRUD's get_all_contacts is not adapted, we'll use a simple name/displayName search.
+
+        # Let's make the filter key more generic for the widget, and the CRUD can interpret it.
+        # Or, we can construct specific filters if the user has options to choose what to search.
+        # For a single search box, a generic 'search_term_any_field' is often expected.
+
+        # Given the current CRUD, let's try to filter by name/displayName for simplicity here.
+        # If the user types an email, it won't be found unless it's also in the name/displayName.
+        # This is a limitation of the current simple filter implementation.
+
+        # To make it more useful, let's construct a filter that the existing CRUD can understand
+        # by trying the search term for both 'name' and 'email' fields.
+        # This means results will be an OR between these.
+        # The CRUD's get_all_contacts would need to be able to handle this (e.g. if multiple filter keys are passed, how are they combined - AND/OR?)
+        # The current CRUD combines multiple filter keys with AND.
+
+        # For a simple single search box, it's better if the CRUD handles a generic search term.
+        # Let's adapt the widget to call load_contacts with a filter key that the CRUD can be modified to understand.
+        # For now, we'll use the 'name' filter as it's already supported for name/displayName.
+
+        # Simplest implementation with current CRUD: search in name/displayName
+        active_filters = {'name': search_term}
+
+        # If you want the search term to also apply to email or company, you'd add them:
+        # filters['email'] = search_term # This would make it "name/displayName LIKE term AND email LIKE term"
+        # filters['company_name'] = search_term # "AND company_name LIKE term"
+        # This is probably not what user expects from a single search box.
+
+        # A better approach for a single search box is often to have a dedicated 'q' or 'search' filter in CRUD
+        # that searches across multiple fields with OR.
+        # Since that's not there, we will just search by name/displayName.
+
+        logger.info(f"Applying filters: {active_filters}")
+        self.load_contacts(filters=active_filters)
 
 
 if __name__ == '__main__':
