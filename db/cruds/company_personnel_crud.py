@@ -71,6 +71,7 @@ __all__ = [
     "get_personnel_contact_link_details",
     "unlink_contact_from_personnel",
     "delete_all_contact_links_for_personnel",
+    "get_personnel_linked_to_contact", # Added export
 ]
 
 # --- CompanyPersonnelContacts Link Table CRUD ---
@@ -260,3 +261,27 @@ def delete_all_contact_links_for_personnel(personnel_id: int, conn: sqlite3.Conn
     except sqlite3.Error as e:
         logger.error(f"Database error deleting all contact links for personnel_id {personnel_id}: {e}")
         return False
+
+@_manage_conn
+def get_personnel_linked_to_contact(contact_id: int, conn: sqlite3.Connection = None) -> list[dict]:
+    """
+    Retrieves all CompanyPersonnel records linked to a specific contact_id
+    through the CompanyPersonnelContacts table.
+    Includes link details like is_primary for that personnel.
+    """
+    cursor = conn.cursor()
+    sql = """
+        SELECT cp.*, cpc.is_primary AS is_primary_for_personnel,
+               cpc.can_receive_documents AS can_receive_documents_for_personnel,
+               cpc.company_personnel_contact_id
+        FROM CompanyPersonnel cp
+        JOIN CompanyPersonnelContacts cpc ON cp.personnel_id = cpc.personnel_id
+        WHERE cpc.contact_id = ?
+        ORDER BY cp.name
+    """
+    try:
+        cursor.execute(sql, (contact_id,))
+        return [dict(row) for row in cursor.fetchall()]
+    except sqlite3.Error as e:
+        logger.error(f"Database error in get_personnel_linked_to_contact for contact_id {contact_id}: {e}")
+        return []
