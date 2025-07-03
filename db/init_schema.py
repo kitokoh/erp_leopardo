@@ -2450,6 +2450,42 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     print("DEBUG_INIT_DB: Table user_saved_filters created or exists.")
     # --- End UserSavedFilters Table ---
 
+    # --- Note Management Tables ---
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS DefaultDocumentNotes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        document_type TEXT NOT NULL, -- e.g., "proforma_invoice", "packing_list"
+        language_code TEXT NOT NULL, -- e.g., "en", "fr"
+        note_content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (document_type, language_code)
+    )
+    """)
+    print("DEBUG_INIT_DB: Table DefaultDocumentNotes created or exists.")
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS CommandeDocumentNotes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        commande_document_id TEXT NOT NULL, -- This will be the ClientDocuments.document_id
+        note_content TEXT NOT NULL,
+        language_code TEXT, -- Should ideally match the document's language
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (commande_document_id) -- Assuming one custom note per document instance in a commande
+        -- FOREIGN KEY (commande_document_id) REFERENCES ClientDocuments (document_id) ON DELETE CASCADE
+        -- FK constraint can be added if ClientDocuments.document_id is stable and used here.
+        -- For now, will manage relation via application logic due to potential complexities with existing schema.
+    )
+    """)
+    print("DEBUG_INIT_DB: Table CommandeDocumentNotes created or exists.")
+
+    # Indexes for Note Management Tables
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_defaultdocumentnotes_doctype_lang ON DefaultDocumentNotes(document_type, language_code)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandedocumentnotes_doc_id ON CommandeDocumentNotes(commande_document_id)")
+    print("DEBUG_INIT_DB: Indexes for Note Management tables created or exist.")
+    # --- End Note Management Tables ---
+
     # Commit schema changes made via raw SQLite connection before proceeding to SQLAlchemy part
     try:
         logging.info("DEBUG_INIT_DB: Committing main schema/index changes before accounting module DDL.")
