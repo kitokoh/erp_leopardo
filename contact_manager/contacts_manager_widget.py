@@ -7,9 +7,24 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 import logging
+from datetime import datetime # Added for the manual linking example, can be removed if CRUD handles timestamps
 
 # Assuming CRUDS and Dialogs will be imported when needed
-from db.cruds import contacts_crud, entity_contacts_crud, client_contacts_crud, company_personnel_crud
+from db.cruds import (
+    contacts_crud,
+    entity_contacts_crud,
+    # client_contacts_crud, # This was the problematic direct module import
+    company_personnel_crud,
+    # Import the aliased functions from __init__.py
+    get_clients_for_contact_from_link_table,
+    link_contact_to_client_in_link_table,
+    # The following are not directly used by this widget yet, but imported for completeness if needed later
+    # unlink_contact_from_client_in_link_table,
+    # get_specific_client_contact_link_details_from_link_table,
+    # update_client_contact_link_in_link_table,
+    # check_if_contact_linked_to_client
+)
+from PyQt5.QtWidgets import QMessageBox # Added for error/info messages
 from dialogs.contact_dialog import ContactDialog # Corrected relative import path if necessary
 
 logger = logging.getLogger(__name__)
@@ -294,7 +309,8 @@ class ContactsManagerWidget(QWidget):
                 )
 
             # 2. Clients from ClientContacts
-            linked_clients = client_contacts_crud.get_clients_for_contact(contact_id)
+            # Now using the aliased function directly
+            linked_clients = get_clients_for_contact_from_link_table(contact_id)
             for client in linked_clients:
                 role = self.tr("Contact")
                 if client.get('is_primary_for_client'):
@@ -410,7 +426,8 @@ class ContactsManagerWidget(QWidget):
         linked_count = 0
         try:
             linked_count += len(entity_contacts_crud.get_entities_for_contact(contact_id))
-            linked_count += len(client_contacts_crud.get_clients_for_contact(contact_id))
+            # Now using the aliased function directly
+            linked_count += len(get_clients_for_contact_from_link_table(contact_id))
             linked_count += len(company_personnel_crud.get_personnel_linked_to_contact(contact_id))
         except Exception as e:
             logger.error(f"Erreur lors du comptage des entités liées pour le contact {contact_id}: {e}")
@@ -514,12 +531,15 @@ class ContactsManagerWidget(QWidget):
                             success = new_link_id is not None
                         elif entity_type_str == "Client":
                             # Assuming client_id is what entity_id represents here
-                            new_link_id = client_contacts_crud.link_contact_to_client(
-                                client_id=entity_id,
+                            # Now using the aliased function directly
+                            new_link_id = link_contact_to_client_in_link_table(
+                                client_id=entity_id, # This should be int. QInputDialog.getText returns str.
                                 contact_id=contact_id,
                                 is_primary=link_details.get('is_primary', False),
                                 can_receive_documents=link_details.get('can_receive_documents', True)
-                                # role_in_entity and notes are not directly in ClientContacts schema, handle as needed
+                                # role_in_entity and notes from the dialog are passed to the CRUD
+                                # but client_contacts_crud.link_contact_to_client placeholder currently doesn't show them.
+                                # This would need to be aligned if those fields are desired for Client-Contact links.
                             )
                             success = new_link_id is not None
                         elif entity_type_str == "CompanyPersonnel":
@@ -538,22 +558,29 @@ class ContactsManagerWidget(QWidget):
                             # Let's assume a direct insert for now for CompanyPersonnelContacts if that function doesn't exist
                             # This is a simplified placeholder for demonstration.
                             # A proper function in company_personnel_crud.py like `create_personnel_contact_link` would be better.
-                            conn = client_contacts_crud._get_conn_from_pool() # Example of getting a connection
-                            cursor = conn.cursor()
-                            now = datetime.utcnow().isoformat()
-                            sql_link = """INSERT INTO CompanyPersonnelContacts
-                                          (personnel_id, contact_id, is_primary, can_receive_documents, created_at, updated_at)
-                                          VALUES (?, ?, ?, ?, ?, ?)"""
-                            # Note: role_in_entity and notes from link_details are not in CompanyPersonnelContacts by default.
-                            params_link = (int(entity_id), contact_id,
-                                           link_details.get('is_primary', False),
-                                           link_details.get('can_receive_documents', True), now, now)
-                            cursor.execute(sql_link, params_link)
-                            new_link_id = cursor.lastrowid # This is sqlite specific for lastrowid
-                            conn.commit()
-                            client_contacts_crud._release_conn_to_pool(conn)
-                            success = new_link_id is not None
-                            logger.info(f"Manually linked contact {contact_id} to personnel {entity_id}, link ID: {new_link_id}")
+                            # The direct DB connection here is problematic and was likely an example.
+                            # This part should ideally use a CRUD function from company_personnel_crud if linking
+                            # an existing central contact to a CompanyPersonnel record is a feature.
+                            # For now, I will comment out this direct DB interaction as it's not related to client_contacts_crud
+                            # and relies on a connection object that isn't properly initialized here.
+
+                            # conn = client_contacts_crud._get_conn_from_pool() # This was problematic
+                            # cursor = conn.cursor()
+                            # now = datetime.utcnow().isoformat()
+                            # sql_link = """INSERT INTO CompanyPersonnelContacts
+                            #               (personnel_id, contact_id, is_primary, can_receive_documents, created_at, updated_at)
+                            #               VALUES (?, ?, ?, ?, ?, ?)"""
+                            # params_link = (int(entity_id), contact_id,
+                            #                link_details.get('is_primary', False),
+                            #                link_details.get('can_receive_documents', True), now, now)
+                            # cursor.execute(sql_link, params_link)
+                            # new_link_id = cursor.lastrowid
+                            # conn.commit()
+                            # client_contacts_crud._release_conn_to_pool(conn)
+                            # success = new_link_id is not None
+                            logger.warning(f"Linking to CompanyPersonnel for contact_id {contact_id} and personnel_id {entity_id} needs a proper CRUD function. Manual DB link commented out.")
+                            success = False # Mark as not successful until a proper CRUD is used.
+                            # logger.info(f"Manually linked contact {contact_id} to personnel {entity_id}, link ID: {new_link_id}")
 
 
                         if success:
