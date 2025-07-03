@@ -3,6 +3,8 @@ import uuid
 from datetime import datetime, timezone
 import logging
 from .generic_crud import _manage_conn
+from . import clients_crud  # For updating client status
+from . import status_settings_crud # For fetching status definitions
 
 logger = logging.getLogger(__name__)
 
