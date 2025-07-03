@@ -89,7 +89,7 @@ sys.modules['db_main_manager'] = db_manager_mock # If used directly
 
 # Now import the classes to be tested
 from dialogs import CreateDocumentDialog, ProductDialog
-from client_management.client_widget import ClientWidget
+from client_management.ui.client_main_widget import ClientMainWidget as ClientWidget # Alias for convenience if tests use ClientWidget
 # from db.db_seed import seed_initial_data # For testing db_seed.py if needed
 # from db.cruds import locations_crud # For testing locations_crud.py if needed
 
@@ -331,56 +331,90 @@ class TestProductDialog(unittest.TestCase):
 
 class TestClientWidgetDimensionTab(unittest.TestCase):
     def setUp(self):
-        self.client_widget_db_patcher = patch('client_widget.db_manager', autospec=True)
+        # The ClientWidget class is now ClientMainWidget and is located in client_management.ui.client_main_widget
+        # We need to patch db_manager where it's imported by ClientMainWidget or its tabs.
+        # Assuming ClientMainWidget (aliased as ClientWidget in imports) or its tabs import db_manager like:
+        # from db import db_main_manager as db_manager (or similar)
+        # Or directly from client_management.ui.client_main_widget.db_manager if that's how it's structured.
+        # Given the refactoring, it's likely that individual tabs now handle their DB interactions.
+        # Let's assume the patch target should be the module where ClientWidget (ClientMainWidget) is defined.
+        self.client_widget_db_patcher = patch('client_management.ui.client_main_widget.db_manager', autospec=True)
         self.mock_db_manager_for_cw = self.client_widget_db_patcher.start()
         self.addCleanup(self.client_widget_db_patcher.stop)
 
+        # Also, if tabs import db_manager directly (e.g., from client_management.tabs.some_tab.db_manager),
+        # those would need patching too if the tested methods are in the tabs.
+        # For load_products_for_dimension_tab, it's likely still in ClientMainWidget or delegated to ProductDimensionsTab.
+        # Let's assume ProductDimensionsTab is the one calling db_manager.
+        self.product_dimensions_tab_db_patcher = patch('client_management.tabs.product_dimensions_tab.db_manager', autospec=True)
+        self.mock_db_manager_for_pdt = self.product_dimensions_tab_db_patcher.start()
+        self.addCleanup(self.product_dimensions_tab_db_patcher.stop)
+
+        # The methods might use self.db_manager passed from ClientMainWidget to the tab,
+        # or the tab might import its own instance.
+        # If it's passed, then patching client_main_widget.db_manager is key.
+        # If ProductDimensionsTab imports its own, then client_management.tabs.product_dimensions_tab.db_manager is key.
+        # We will ensure the mock from client_main_widget is used by tabs if they expect it.
+        # For this test, load_products_for_dimension_tab was originally in ClientWidget.
+        # It has been moved to ProductDimensionsTab and ClientMainWidget calls it.
+        # The ProductDimensionsTab receives db_manager from ClientMainWidget.
+        # So, patching 'client_management.ui.client_main_widget.db_manager' should be sufficient if ClientMainWidget
+        # correctly passes this mocked db_manager to its ProductDimensionsTab instance.
+
+        # If ProductDimensionsTab imports db_manager itself, the second patch is needed.
+        # Let's assume it uses the passed-in db_manager from ClientMainWidget.
+        # We will use self.mock_db_manager_for_cw as the one that should be called.
+        # The ProductDimensionsTab instance (self.client_widget.product_dimensions_tab_widget) will use this mock.
+
         # Mock essential dependencies for ClientWidget instantiation
         self.mock_client_info = {'client_id': 'test_id', 'client_name': 'Test Client Name'}
-        self.mock_config = {'app_root_dir': '/fake/root', 'clients_dir': '/fake/clients'}
+        self.mock_config = {'app_root_dir': '/fake/root', 'clients_dir': '/fake/clients', 'db_path': 'dummy.db'} # Added db_path for init
         self.mock_notification_manager = MagicMock()
+        self.mock_main_window = MagicMock() # ClientMainWidget expects main_window
 
-        # Mock _import_main_elements to prevent its execution if it causes issues
-        # However, ClientWidget calls it in __init__, so its global mocks need to be set.
-        # The global sys.modules mocks for dialogs and utils should handle this.
-
-        # Patch specific dialogs if ClientWidget tries to instantiate them early
-        # For now, rely on global mocks.
-
+        # ClientWidget (now ClientMainWidget) also initializes its tabs in setup_ui.
+        # We need to ensure that db_manager is properly passed.
+        # The ClientWidget alias is used here.
         self.client_widget = ClientWidget(
             client_info=self.mock_client_info,
             config=self.mock_config,
             app_root_dir=self.mock_config['app_root_dir'],
-            notification_manager=self.mock_notification_manager
+            notification_manager=self.mock_notification_manager,
+            main_window=self.mock_main_window # Pass main_window
         )
+        # The product_dimensions_tab_widget is created in client_widget's _setup_main_tabs_section -> _setup_product_dimensions_tab
+        # We need to access this tab instance to call its method.
+        # And its UI elements like dim_product_selector_combo are on the tab instance.
 
     def test_load_products_for_dimension_tab_populates_global_products(self):
         sample_global_products = [
             {'product_id': 'prod1', 'product_name': 'Global Product A', 'language_code': 'en'},
             {'product_id': 'prod2', 'product_name': 'Global Product B', 'language_code': 'fr'},
         ]
+        # This mock should be called by product_dimensions_tab_widget via the db_manager instance it received.
         self.mock_db_manager_for_cw.get_all_products.return_value = sample_global_products
 
-        # Clear any existing items from combo box that might have been added during init
-        self.client_widget.dim_product_selector_combo.clear = MagicMock()
-        self.client_widget.dim_product_selector_combo.addItem = MagicMock()
-        self.client_widget.dim_product_selector_combo.addItem.reset_mock() # Reset for this test
+        # Access the actual tab instance and its combo box
+        product_dim_tab = self.client_widget.product_dimensions_tab_widget
+        combo_box_mock = product_dim_tab.dim_product_selector_combo # This is already a MagicMock due to global Qt mocks
 
-        self.client_widget.load_products_for_dimension_tab()
+        # Clear any existing items from combo box that might have been added during init or previous calls
+        combo_box_mock.clear = MagicMock() # Re-assign to ensure it's a fresh mock for this test
+        combo_box_mock.addItem = MagicMock()
+        combo_box_mock.addItem.reset_mock()
+
+        product_dim_tab.load_products_for_dimension_tab()
 
         self.mock_db_manager_for_cw.get_all_products.assert_called_once_with(
             filters=None, sort_by='product_name', sort_order='ASC'
         )
 
-        # Check that addItem was called correctly
-        # First call is "Sélectionner un produit..."
-        # Then one call for each product
-        calls = self.client_widget.dim_product_selector_combo.addItem.call_args_list
+        calls = combo_box_mock.addItem.call_args_list
         self.assertEqual(len(calls), 1 + len(sample_global_products))
-        self.assertEqual(calls[0][0][0], self.client_widget.tr("Sélectionner un produit...")) # First item text
+        # The .tr method is on QWidget, product_dim_tab is a QWidget.
+        self.assertEqual(calls[0][0][0], product_dim_tab.tr("Sélectionner un produit..."))
         self.assertIsNone(calls[0][0][1]) # First item data
 
-        # Check product items
         expected_display_texts = [
             f"Global Product A (en) - ID: prod1",
             f"Global Product B (fr) - ID: prod2",
@@ -394,48 +428,84 @@ class TestClientWidgetDimensionTab(unittest.TestCase):
 
 class TestClientWidgetAssignments(unittest.TestCase):
     def setUp(self):
-        self.client_widget_db_patcher = patch('client_widget.db_manager', autospec=True)
-        self.mock_db_manager_for_cw = self.client_widget_db_patcher.start()
-        self.addCleanup(self.client_widget_db_patcher.stop)
+        # Patch db_manager in the context of ClientMainWidget (aliased as ClientWidget)
+        # and also in the context of client_info_section if assignments are managed there.
+        # Assignments are part of the ClientInfoSection's internal tabs.
+        # ClientInfoSection receives db_manager from ClientMainWidget.
+        # ClientMainWidget imports db_manager from 'client_management.ui.client_main_widget.db_manager' (implicitly via from db import...)
+        # ClientInfoSection imports db_manager from 'client_management.sections.client_info_section.db_manager' (implicitly)
 
-        self.mock_client_info = {'client_id': 'assign_client_id', 'client_name': 'Assign Client'}
-        self.mock_config = {'app_root_dir': '/fake/root'}
+        # Patch for db_manager used by ClientMainWidget itself and passed to ClientInfoSection
+        self.client_main_widget_db_patcher = patch('client_management.ui.client_main_widget.db_manager', autospec=True)
+        self.mock_db_manager_for_cmw = self.client_main_widget_db_patcher.start()
+        self.addCleanup(self.client_main_widget_db_patcher.stop)
+
+        # Patch for db_manager potentially imported directly by ClientInfoSection or its internal assignment tabs
+        # (e.g., client_assignments_internal_tab)
+        # Let's assume ClientInfoSection and its tabs use the db_manager instance passed from ClientMainWidget.
+        # So, self.mock_db_manager_for_cmw should be the one that's ultimately used.
+
+        # If client_assignments_internal_tab.py imports db_manager itself:
+        self.assignments_tab_db_patcher = patch('client_management.sections.client_assignments_internal_tab.db_manager', autospec=True)
+        self.mock_db_manager_for_assignments_tab = self.assignments_tab_db_patcher.start()
+        self.addCleanup(self.assignments_tab_db_patcher.stop)
+
+        # The ClientInfoSection gets db_manager from ClientMainWidget.
+        # The ClientAssignmentsInternalTab gets db_manager from ClientInfoSection.
+        # So, the mock_db_manager_for_cmw should be effective.
+
+        self.mock_client_info = {'client_id': 'assign_client_id', 'client_name': 'Assign Client', 'country_id': 'FR', 'city_id': 'PAR'} # Added country/city for ClientInfoSection init
+        self.mock_config = {'app_root_dir': '/fake/root', 'db_path': 'dummy.db'} # Added db_path
         self.mock_notification_manager = MagicMock()
+        self.mock_main_window = MagicMock() # Expected by ClientMainWidget
 
+        # Instantiate ClientMainWidget (aliased as ClientWidget)
         self.client_widget = ClientWidget(
             client_info=self.mock_client_info,
             config=self.mock_config,
             app_root_dir=self.mock_config['app_root_dir'],
-            notification_manager=self.mock_notification_manager
+            notification_manager=self.mock_notification_manager,
+            main_window=self.mock_main_window
         )
-        # Mock the tables directly on the instance
-        self.client_widget.assigned_vendors_table = MagicMock()
-        self.client_widget.assigned_technicians_table = MagicMock()
-        self.client_widget.assigned_transporters_table = MagicMock()
-        self.client_widget.assigned_forwarders_table = MagicMock()
+
+        # Access the assignments tab instance.
+        # ClientMainWidget -> ClientInfoSection -> ClientAssignmentsInternalTab
+        # The ClientInfoSection is typically an attribute like `client_info_section_widget` or similar,
+        # and ClientAssignmentsInternalTab is an attribute on that.
+        # Let's assume ClientMainWidget creates client_info_section_widget,
+        # and ClientInfoSection creates assignments_tab_widget.
+        self.assignments_tab = self.client_widget.client_info_section_widget.assignments_tab_widget
+
+        # The tables are now attributes of self.assignments_tab
+        # (e.g., self.assignments_tab.assigned_vendors_table)
+        # These are already MagicMocks due to global Qt mocking. We can re-assign them if needed
+        # for specific mock features per test, but usually, the global mocks are sufficient
+        # for checking calls like setRowCount, insertRow, setItem.
 
 
     def test_load_assigned_vendors_personnel_none_data(self):
-        self.mock_db_manager_for_cw.get_assigned_personnel_for_client.return_value = None
-        self.client_widget.load_assigned_vendors_personnel()
-        self.client_widget.assigned_vendors_table.setRowCount.assert_called_with(0)
-        self.mock_db_manager_for_cw.get_assigned_personnel_for_client.assert_called_once_with('assign_client_id', role_filter=None)
-        # No insertRow should be called if data is None (due to `or []` fix)
-        self.client_widget.assigned_vendors_table.insertRow.assert_not_called()
+        # This mock will be used by the assignments_tab via the db_manager instance it received.
+        self.mock_db_manager_for_cmw.get_assigned_personnel_for_client.return_value = None
+
+        self.assignments_tab.load_assigned_vendors_personnel()
+
+        self.assignments_tab.assigned_vendors_table.setRowCount.assert_called_with(0)
+        self.mock_db_manager_for_cmw.get_assigned_personnel_for_client.assert_called_once_with('assign_client_id', role_filter=None)
+        self.assignments_tab.assigned_vendors_table.insertRow.assert_not_called()
 
     def test_load_assigned_vendors_personnel_with_data(self):
         sample_data = [
             {'personnel_name': 'Vendor 1', 'assignment_id': 'a1', 'role_in_project': 'Sales', 'personnel_email': 'v1@ex.com', 'personnel_phone': '111'},
             {'personnel_name': 'Vendor 2', 'assignment_id': 'a2', 'role_in_project': 'Support', 'personnel_email': 'v2@ex.com', 'personnel_phone': '222'}
         ]
-        self.mock_db_manager_for_cw.get_assigned_personnel_for_client.return_value = sample_data
+        self.mock_db_manager_for_cmw.get_assigned_personnel_for_client.return_value = sample_data
 
-        # Mock setItem to check calls
-        self.client_widget.assigned_vendors_table.setItem = MagicMock()
+        # The table's setItem is already a MagicMock. We can reset it if needed.
+        self.assignments_tab.assigned_vendors_table.setItem = MagicMock() # Ensure fresh mock for this test
 
-        self.client_widget.load_assigned_vendors_personnel()
+        self.assignments_tab.load_assigned_vendors_personnel()
 
-        self.assertEqual(self.client_widget.assigned_vendors_table.insertRow.call_count, 2)
+        self.assertEqual(self.assignments_tab.assigned_vendors_table.insertRow.call_count, 2)
 
         # Check calls to setItem for the first row
         # Call args are (row, column, QTableWidgetItem_instance)
@@ -477,7 +547,7 @@ class TestClientWidgetAssignments(unittest.TestCase):
         # More detailed checks would require more intricate mocking or capturing of created QTableWidgetItems.
 
         # Example: Check arguments to setItem for the first row (Vendor 1)
-        # calls_to_setitem = self.client_widget.assigned_vendors_table.setItem.call_args_list
+        # calls_to_setitem = self.assignments_tab.assigned_vendors_table.setItem.call_args_list
         # For 'personnel_name' (col 0)
         # self.assertEqual(calls_to_setitem[0][0][0], 0) # row
         # self.assertEqual(calls_to_setitem[0][0][1], 0) # col
@@ -487,30 +557,30 @@ class TestClientWidgetAssignments(unittest.TestCase):
         # A more direct check on the QTableWidgetItem constructor calls (if it weren't globally mocked for all tests)
         # For now, this level of detail is hard to achieve cleanly here. We trust setItem gets called.
         # We can check that setItem was called for all cells: 2 rows * 4 cols = 8 times
-        self.assertEqual(self.client_widget.assigned_vendors_table.setItem.call_count, 2 * 4)
+        self.assertEqual(self.assignments_tab.assigned_vendors_table.setItem.call_count, 2 * 4)
 
 
     def test_load_assigned_technicians_none_data(self):
-        self.mock_db_manager_for_cw.get_assigned_personnel_for_client.return_value = None
-        self.client_widget.load_assigned_technicians()
-        self.client_widget.assigned_technicians_table.setRowCount.assert_called_with(0)
-        self.mock_db_manager_for_cw.get_assigned_personnel_for_client.assert_called_once_with('assign_client_id', role_filter="Technicien")
-        self.client_widget.assigned_technicians_table.insertRow.assert_not_called()
+        self.mock_db_manager_for_cmw.get_assigned_personnel_for_client.return_value = None
+        self.assignments_tab.load_assigned_technicians()
+        self.assignments_tab.assigned_technicians_table.setRowCount.assert_called_with(0)
+        self.mock_db_manager_for_cmw.get_assigned_personnel_for_client.assert_called_once_with('assign_client_id', role_filter="Technicien")
+        self.assignments_tab.assigned_technicians_table.insertRow.assert_not_called()
 
     def test_load_assigned_technicians_with_data(self):
         sample_data = [{'personnel_name': 'Tech 1', 'assignment_id': 't1', 'role_in_project': 'Lead Tech', 'personnel_email': 't1@ex.com', 'personnel_phone': '333'}]
-        self.mock_db_manager_for_cw.get_assigned_personnel_for_client.return_value = sample_data
-        self.client_widget.assigned_technicians_table.setItem = MagicMock()
-        self.client_widget.load_assigned_technicians()
-        self.assertEqual(self.client_widget.assigned_technicians_table.insertRow.call_count, 1)
-        self.assertEqual(self.client_widget.assigned_technicians_table.setItem.call_count, 1 * 4) # 1 row, 4 cols
+        self.mock_db_manager_for_cmw.get_assigned_personnel_for_client.return_value = sample_data
+        self.assignments_tab.assigned_technicians_table.setItem = MagicMock()
+        self.assignments_tab.load_assigned_technicians()
+        self.assertEqual(self.assignments_tab.assigned_technicians_table.insertRow.call_count, 1)
+        self.assertEqual(self.assignments_tab.assigned_technicians_table.setItem.call_count, 1 * 4) # 1 row, 4 cols
 
 
     def test_load_assigned_transporters_none_data(self):
-        self.mock_db_manager_for_cw.get_assigned_transporters_for_client.return_value = None
-        self.client_widget.load_assigned_transporters()
-        self.client_widget.assigned_transporters_table.setRowCount.assert_called_with(0)
-        self.client_widget.assigned_transporters_table.insertRow.assert_not_called()
+        self.mock_db_manager_for_cmw.get_assigned_transporters_for_client.return_value = None
+        self.assignments_tab.load_assigned_transporters()
+        self.assignments_tab.assigned_transporters_table.setRowCount.assert_called_with(0)
+        self.assignments_tab.assigned_transporters_table.insertRow.assert_not_called()
 
     def test_load_assigned_transporters_with_data_and_email_buttons(self):
         sample_data = [
@@ -521,87 +591,68 @@ class TestClientWidgetAssignments(unittest.TestCase):
             {'transporter_name': 'Slow Movers', 'client_transporter_id': 'ct3', 'contact_person': 'Mike R',
              'phone': '555-0303', 'transport_details': 'Standard', 'cost_estimate': 50.00, 'email_status': 'Failed'}
         ]
-        self.mock_db_manager_for_cw.get_assigned_transporters_for_client.return_value = sample_data
+        self.mock_db_manager_for_cmw.get_assigned_transporters_for_client.return_value = sample_data
 
-        self.client_widget.assigned_transporters_table.setCellWidget = MagicMock()
-        self.client_widget.assigned_transporters_table.setItem = MagicMock()
+        self.assignments_tab.assigned_transporters_table.setCellWidget = MagicMock()
+        self.assignments_tab.assigned_transporters_table.setItem = MagicMock()
 
         # We need to control what QPushButton instances are created to check their properties
-        mock_button_pending = MagicMock(spec=sys.modules['PyQt5.QtWidgets'].QPushButton)
-        mock_button_sent = MagicMock(spec=sys.modules['PyQt5.QtWidgets'].QPushButton)
-        mock_button_failed = MagicMock(spec=sys.modules['PyQt5.QtWidgets'].QPushButton)
+        # mock_button_pending = MagicMock(spec=sys.modules['PyQt5.QtWidgets'].QPushButton) # Not needed with global mock
+        # mock_button_sent = MagicMock(spec=sys.modules['PyQt5.QtWidgets'].QPushButton)
+        # mock_button_failed = MagicMock(spec=sys.modules['PyQt5.QtWidgets'].QPushButton)
 
-        # Use a side_effect to return different button mocks based on email_status
-        # This is a bit advanced; simpler is to check call_args on the single global mock.
-
-        global mock_qpushbutton
+        global mock_qpushbutton # Using the global mock for QPushButton
         mock_qpushbutton.reset_mock()
+        # Reset specific method mocks on the *return value* of the global mock
+        # This is because the same mock instance is returned every time QPushButton() is called
+        if hasattr(mock_qpushbutton.return_value, 'setText') and isinstance(mock_qpushbutton.return_value.setText, MagicMock):
+            mock_qpushbutton.return_value.setText.reset_mock()
+        if hasattr(mock_qpushbutton.return_value, 'setEnabled') and isinstance(mock_qpushbutton.return_value.setEnabled, MagicMock):
+            mock_qpushbutton.return_value.setEnabled.reset_mock()
+        if hasattr(mock_qpushbutton.return_value, 'setStyleSheet') and isinstance(mock_qpushbutton.return_value.setStyleSheet, MagicMock):
+            mock_qpushbutton.return_value.setStyleSheet.reset_mock()
 
-        # To check different button states, we need QPushButton to return distinct mocks or
-        # inspect its call_args_list carefully.
-        # Let's rely on inspecting call_args_list of the single global mock_qpushbutton.
 
-        self.client_widget.load_assigned_transporters()
+        self.assignments_tab.load_assigned_transporters()
 
-        self.assertEqual(self.client_widget.assigned_transporters_table.insertRow.call_count, 3)
+        self.assertEqual(self.assignments_tab.assigned_transporters_table.insertRow.call_count, 3)
         self.assertEqual(mock_qpushbutton.call_count, 3) # One button per row
 
+        # tr method would be on assignments_tab as it owns the UI elements
         button_setText_calls = [c[0][0] for c in mock_qpushbutton.return_value.setText.call_args_list]
-        self.assertIn(self.client_widget.tr("Send Email"), button_setText_calls) # For 'Pending'
-        self.assertIn(self.client_widget.tr("Email Sent"), button_setText_calls) # For 'Sent'
-        self.assertIn(self.client_widget.tr("Resend Email (Failed)"), button_setText_calls) # For 'Failed'
+        self.assertIn(self.assignments_tab.tr("Send Email"), button_setText_calls)
+        self.assertIn(self.assignments_tab.tr("Email Sent"), button_setText_calls)
+        self.assertIn(self.assignments_tab.tr("Resend Email (Failed)"), button_setText_calls)
 
-        # Check setEnabled and setStyleSheet calls for the buttons
-        # This requires capturing the instances of QPushButton created.
-        # The global mock_qpushbutton.return_value is the same mock for all instances.
-        # To test individual button properties, we need to inspect mock_qpushbutton.return_value.method.call_args_list
-
-        # Example: Check properties of the button for 'Sent' status (second button)
-        # This assumes setText, setStyleSheet, setEnabled are called in order for each button.
-        # sent_button_setText_call = mock_qpushbutton.return_value.setText.call_args_list[1]
-        # self.assertEqual(sent_button_setText_call[0][0], self.client_widget.tr("Email Sent"))
-
-        # sent_button_setEnabled_call = mock_qpushbutton.return_value.setEnabled.call_args_list[1] # if called for all
-        # self.assertFalse(sent_button_setEnabled_call[0][0]) # For 'Sent', button is disabled
-
-        # This is still a bit fragile. A more robust approach would involve
-        # mock_qpushbutton having a side_effect that returns new mocks for each call.
-        # For now, we'll assume the calls are made and trust the visual outcome would be correct.
-
-        # Check that setStyleSheet was called for each button type
         stylesheet_calls = [c[0][0] for c in mock_qpushbutton.return_value.setStyleSheet.call_args_list]
         self.assertIn("background-color: lightgray; color: black;", stylesheet_calls) # Sent
         self.assertIn("background-color: orange; color: black;", stylesheet_calls) # Failed
         self.assertIn("background-color: green; color: white;", stylesheet_calls) # Pending
 
-        # Check setEnabled calls - 'Sent' should be False, others True (implicitly or explicitly)
-        # This is hard to assert precisely without distinct button mocks.
-        # We can check if setEnabled(False) was called at least once (for the "Sent" button)
-        mock_qpushbutton.return_value.setEnabled.assert_any_call(False)
+        mock_qpushbutton.return_value.setEnabled.assert_any_call(False) # For "Sent" button
 
 
-        # Check setCellWidget calls
-        self.assertEqual(self.client_widget.assigned_transporters_table.setCellWidget.call_count, 3)
+        self.assertEqual(self.assignments_tab.assigned_transporters_table.setCellWidget.call_count, 3)
         for i in range(3):
-            args = self.client_widget.assigned_transporters_table.setCellWidget.call_args_list[i][0]
+            args = self.assignments_tab.assigned_transporters_table.setCellWidget.call_args_list[i][0]
             self.assertEqual(args[0], i) # row index
-            self.assertEqual(args[1], 5) # column index
-            self.assertIsInstance(args[2], MagicMock) # Checking it's a widget (our mocked QPushButton)
+            self.assertEqual(args[1], 5) # column index for the button
+            self.assertIsInstance(args[2], MagicMock)
 
 
     def test_load_assigned_freight_forwarders_none_data(self):
-        self.mock_db_manager_for_cw.get_assigned_forwarders_for_client.return_value = None
-        self.client_widget.load_assigned_freight_forwarders()
-        self.client_widget.assigned_forwarders_table.setRowCount.assert_called_with(0)
-        self.client_widget.assigned_forwarders_table.insertRow.assert_not_called()
+        self.mock_db_manager_for_cmw.get_assigned_forwarders_for_client.return_value = None
+        self.assignments_tab.load_assigned_freight_forwarders()
+        self.assignments_tab.assigned_forwarders_table.setRowCount.assert_called_with(0)
+        self.assignments_tab.assigned_forwarders_table.insertRow.assert_not_called()
 
     def test_load_assigned_freight_forwarders_with_data(self):
         sample_data = [{'forwarder_name': 'Forward Inc', 'client_forwarder_id': 'f1', 'contact_person': 'Anne G', 'phone': '444', 'task_description': 'Customs', 'cost_estimate': 300.00}]
-        self.mock_db_manager_for_cw.get_assigned_forwarders_for_client.return_value = sample_data
-        self.client_widget.assigned_forwarders_table.setItem = MagicMock()
-        self.client_widget.load_assigned_freight_forwarders()
-        self.assertEqual(self.client_widget.assigned_forwarders_table.insertRow.call_count, 1)
-        self.assertEqual(self.client_widget.assigned_forwarders_table.setItem.call_count, 1 * 5) # 1 row, 5 cols
+        self.mock_db_manager_for_cmw.get_assigned_forwarders_for_client.return_value = sample_data
+        self.assignments_tab.assigned_forwarders_table.setItem = MagicMock()
+        self.assignments_tab.load_assigned_freight_forwarders()
+        self.assertEqual(self.assignments_tab.assigned_forwarders_table.insertRow.call_count, 1)
+        self.assertEqual(self.assignments_tab.assigned_forwarders_table.setItem.call_count, 1 * 5) # 1 row, 5 cols
 
 
 if __name__ == '__main__':

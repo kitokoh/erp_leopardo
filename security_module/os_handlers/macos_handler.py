@@ -26,6 +26,7 @@ try:
                                   LAPolicyDeviceOwnerAuthenticationWithBiometrics as TempLAPolicy
     LAContext = TempLAContext
     LAPolicyDeviceOwnerAuthenticationWithBiometrics = TempLAPolicy
+
     PYOBJC_AVAILABLE = True
     logger.info("Successfully imported LocalAuthentication framework via PyObjC.")
 except ImportError:
@@ -55,6 +56,7 @@ except ImportError:
                 logger.error("Simulated evaluatePolicy: reply_block_placeholder not callable.")
 
 
+
 class MacOSBiometricHandler:
     """
     Provides methods to interact with macOS Local Authentication framework
@@ -66,11 +68,13 @@ class MacOSBiometricHandler:
         if not PYOBJC_AVAILABLE:
             logger.warning("MacOSBiometricHandler running with SIMULATED LocalAuthentication due to missing PyObjC.")
 
+
     def is_available(self, method: str) -> bool:
         """
         Checks if biometric authentication (Touch ID/Face ID) is available and configured on the Mac.
         Args:
             method (str): "fingerprint" or "face". The check is generic for biometrics.
+
         Returns:
             bool: True if biometrics are available, False otherwise.
         """
@@ -81,6 +85,7 @@ class MacOSBiometricHandler:
         context = LAContext.alloc().init()
         # error_ptr = objc.NULL # For NSError**
         # For canEvaluatePolicy, error is often passed as None for a quick check.
+
         can_evaluate = context.canEvaluatePolicy_error_(
             LAPolicyDeviceOwnerAuthenticationWithBiometrics, None
         )
@@ -89,6 +94,7 @@ class MacOSBiometricHandler:
             logger.info(f"MacOSHandler: Biometric authentication for '{method}' is available via LocalAuthentication.")
             return True
         else:
+
             logger.warning(f"MacOSHandler: Biometrics for '{method}' not available or not configured (canEvaluatePolicy returned False).")
             return False
 
@@ -104,6 +110,7 @@ class MacOSBiometricHandler:
         logger.info(f"MacOSHandler: Enrollment for {method} is managed by the user in macOS System Settings.")
         available = self.is_available(method)
         if available:
+
             logger.info(f"Guidance: To enroll for {method}, please go to System Settings > Touch ID & Password (or Face ID & Password).")
         return available
 
@@ -120,6 +127,7 @@ class MacOSBiometricHandler:
         """
         if not PYOBJC_AVAILABLE:
             logger.info(f"MacOSHandler (Simulated): Verifying {method} for user {username_hint}. Simulating SUCCESS.")
+
             return True
 
         if not self.is_available(method):
@@ -184,6 +192,7 @@ class MacOSBiometricHandler:
             logger.warning(f"MacOSHandler: {method} verification failed for {username_hint}. Reason: {auth_result['error_description']}")
             return False
 
+
     def delete_enrollment(self, method: str) -> bool:
         """
         Informs that biometric enrollment deletion is managed via macOS System Settings.
@@ -191,11 +200,13 @@ class MacOSBiometricHandler:
         logger.info(f"MacOSHandler: Deletion of {method} enrollments is managed by the user in macOS System Settings.")
         return True
 
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     handler = MacOSBiometricHandler()
 
     print(f"\n--- Testing macOS Biometric Handler ---")
+
     test_method = "fingerprint"
 
     available = handler.is_available(test_method)
@@ -214,5 +225,6 @@ if __name__ == '__main__':
         handler.delete_enrollment(test_method)
     else:
         print(f"Biometrics for '{test_method}' not available or PyObjC issue. Cannot run full test.")
+
 
     print("\nMacOSBiometricHandler test complete.")

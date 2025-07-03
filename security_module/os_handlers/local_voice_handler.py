@@ -34,6 +34,7 @@ N_SAMPLES_ENROLL = 5 # Augmenter pour un meilleur modèle GMM
 VOICE_PROFILES_DIR = "voice_profiles_gmm"
 MODEL_FILE_EXTENSION = ".joblib"
 
+
 if not os.path.exists(VOICE_PROFILES_DIR):
     try:
         os.makedirs(VOICE_PROFILES_DIR)
@@ -60,6 +61,7 @@ class LocalVoiceHandler:
             The full path to where the voice profile should be stored.
         """
         return os.path.join(VOICE_PROFILES_DIR, f"user_{user_app_id}_gmm_profile{MODEL_FILE_EXTENSION}")
+
 
     def _record_audio(self, duration_seconds: int, sample_rate: int) -> np.ndarray | None:
         """
@@ -107,6 +109,7 @@ class LocalVoiceHandler:
 
     def is_available(self, method: str = "voice") -> bool:
         """Checks if the local voice method is 'available' (i.e., dependencies are present)."""
+
         if method != "voice":
             return False
         try:
@@ -185,6 +188,7 @@ class LocalVoiceHandler:
 
     def verify(self, user_app_id: str, username_hint: str = "", window_handle=None) -> bool:
         """Vérifie la voix de l'utilisateur contre un modèle GMM enregistré."""
+
         if not self.is_available():
             logger.error(f"Impossible de vérifier la voix pour {user_app_id}: service non disponible.")
             return False
@@ -235,6 +239,7 @@ class LocalVoiceHandler:
             return True
         else:
             logger.warning(f"Vérification vocale GMM pour {user_app_id} ÉCHOUÉE (score {log_likelihood:.2f} <= seuil {threshold:.2f}).")
+
             return False
 
     def delete_enrollment(self, user_app_id: str, method: str = "voice") -> bool:
