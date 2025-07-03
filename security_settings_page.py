@@ -117,6 +117,8 @@ class SecuritySettingsPage(QWidget):
         and updates the UI elements (checkboxes, button states) accordingly.
         Also checks for hardware/software availability for each method.
         """
+        fp_enabled, face_enabled, voice_enabled = False, False, False # Initialize to False
+
         if not self.current_user_id:
             # This case should disable all controls, already handled in init_ui if self.current_user_id is None at that point.
             # If it becomes None later (e.g. user logs out while page is open), this ensures UI updates.

@@ -17,18 +17,24 @@ import os
 import numpy as np
 import sounddevice as sd
 import librosa
-import time # For unique filenames or waiting
+import time
+from sklearn.mixture import GaussianMixture
+import joblib # For saving/loading scikit-learn models
 
 logger = logging.getLogger(__name__)
 
-# Configuration (pourrait être dans un fichier de config global)
-SAMPLE_RATE = 16000  # Hz (taux d'échantillonnage)
-DURATION_PER_SAMPLE = 3  # secondes par échantillon d'enregistrement
-N_MFCC = 13  # Nombre de coefficients MFCC à extraire
-N_SAMPLES_ENROLL = 3 # Nombre d'échantillons à prendre pour l'enrôlement
-VOICE_PROFILES_DIR = "voice_profiles" # Répertoire pour stocker les modèles vocaux
+# Configuration
+SAMPLE_RATE = 16000
+DURATION_PER_SAMPLE = 2 # Réduire un peu pour des phrases plus courtes, ou rendre dynamique
+N_MFCC = 13
+N_COMPONENTS_GMM = 16 # Nombre de composantes pour le GMM, à ajuster
+COVARIANCE_TYPE_GMM = 'diag' # Type de covariance pour GMM ('full', 'tied', 'diag', 'spherical')
+                            # 'diag' est souvent un bon compromis.
+N_SAMPLES_ENROLL = 5 # Augmenter pour un meilleur modèle GMM
+VOICE_PROFILES_DIR = "voice_profiles_gmm"
+MODEL_FILE_EXTENSION = ".joblib"
 
-# Créer le répertoire des profils vocaux s'il n'existe pas
+
 if not os.path.exists(VOICE_PROFILES_DIR):
     try:
         os.makedirs(VOICE_PROFILES_DIR)
@@ -54,7 +60,8 @@ class LocalVoiceHandler:
         Returns:
             The full path to where the voice profile should be stored.
         """
-        return os.path.join(VOICE_PROFILES_DIR, f"user_{user_app_id}_voice_profile.npy")
+        return os.path.join(VOICE_PROFILES_DIR, f"user_{user_app_id}_gmm_profile{MODEL_FILE_EXTENSION}")
+
 
     def _record_audio(self, duration_seconds: int, sample_rate: int) -> np.ndarray | None:
         """
@@ -84,23 +91,25 @@ class LocalVoiceHandler:
             sample_rate: Sample rate of the audio signal.
             n_mfcc: Number of MFCC coefficients to extract.
         Returns:
-            A NumPy array representing the mean of MFCCs, or None on error.
+            A NumPy array representing the MFCCs (frames x n_mfcc), or None on error.
         """
         try:
             if audio_data is None or audio_data.size == 0:
-                logger.warning("Tentative d'extraction de MFCCs sur des données audio vides.")
+                logger.warning("Attempting to extract MFCCs from empty audio data.")
                 return None
-            # Assurer que les données sont de type float pour librosa
             audio_data_float = audio_data.astype(np.float32)
-            mfccs = librosa.feature.mfcc(y=audio_data_float, sr=sample_rate, n_mfcc=n_mfcc)
-            # Prendre la moyenne des MFCCs sur les trames temporelles pour obtenir un vecteur de caractéristiques fixe
-            return np.mean(mfccs.T, axis=0)
+            # hop_length can be adjusted; typically sr/100 for 10ms frames, sr/40 for 25ms frames
+            # n_fft usually power of 2, e.g. 2048 for 16kHz sr
+            mfccs = librosa.feature.mfcc(y=audio_data_float, sr=sample_rate, n_mfcc=n_mfcc,
+                                         n_fft=int(sample_rate*0.025), hop_length=int(sample_rate*0.010))
+            return mfccs.T # Transpose to have (frames, n_mfcc)
         except Exception as e:
-            logger.error(f"Erreur lors de l'extraction des MFCCs: {e}", exc_info=True)
+            logger.error(f"Error during MFCC extraction: {e}", exc_info=True)
             return None
 
     def is_available(self, method: str = "voice") -> bool:
-        """Vérifie si la méthode vocale locale est 'disponible' (càd si les dépendances sont là)."""
+        """Checks if the local voice method is 'available' (i.e., dependencies are present)."""
+
         if method != "voice":
             return False
         try:
@@ -119,91 +128,118 @@ class LocalVoiceHandler:
             return False
 
         logger.info(f"Début de l'enrôlement vocal pour l'utilisateur {user_app_id}.")
-        # L'UI devrait guider l'utilisateur ici (ex: "Veuillez prononcer la phrase X trois fois")
 
-        all_mfccs = []
+        all_mfcc_frames = [] # Collect all MFCC frames from all samples
         for i in range(N_SAMPLES_ENROLL):
-            # L'UI devrait indiquer à l'utilisateur de parler pour l'échantillon i+1
-            print(f"ENROLL_SIM_UI: Préparez-vous pour l'échantillon {i+1}/{N_SAMPLES_ENROLL}. Parlez après le bip (simulé).") # Placeholder UI
-            time.sleep(1) # Pause pour que l'utilisateur se prépare
+            # The UI calling this should provide prompts like these.
+            # For handler's direct test, these prints are placeholders.
+            print(f"ENROLL_SIM_UI: Préparez-vous pour l'enregistrement {i+1}/{N_SAMPLES_ENROLL}. Parlez après le bip (simulé).") # Placeholder UI
+            time.sleep(0.5)
 
             audio_sample = self._record_audio(DURATION_PER_SAMPLE, SAMPLE_RATE)
-            if audio_sample is None:
-                logger.warning(f"Échantillon vocal {i+1} pour {user_app_id} a échoué ou était vide.")
-                # TODO: L'UI devrait informer l'utilisateur et peut-être permettre de réessayer l'échantillon
-                return False # Échec de l'enrôlement si un échantillon manque
-
-            mfccs = self._extract_mfccs(audio_sample, SAMPLE_RATE, N_MFCC)
-            if mfccs is None:
-                logger.warning(f"Extraction MFCC pour l'échantillon {i+1} de {user_app_id} a échoué.")
+            if audio_sample is None or audio_sample.size == 0:
+                logger.warning(f"Échantillon vocal {i+1} pour {user_app_id} vide ou échec enregistrement.")
+                # QMessageBox.warning(None, "Enregistrement Échoué", f"L'enregistrement de l'échantillon {i+1} a échoué. Veuillez réessayer l'enrôlement.")
                 return False
-            all_mfccs.append(mfccs)
+
+            mfcc_frames = self._extract_mfccs(audio_sample, SAMPLE_RATE, N_MFCC)
+            if mfcc_frames is None or mfcc_frames.shape[0] == 0:
+                logger.warning(f"Extraction MFCC pour l'échantillon {i+1} de {user_app_id} a échoué ou n'a produit aucune trame.")
+                # QMessageBox.warning(None, "Erreur MFCC", f"L'analyse de l'échantillon {i+1} a échoué. Veuillez réessayer l'enrôlement.")
+                return False
+            all_mfcc_frames.append(mfcc_frames)
 
             if i < N_SAMPLES_ENROLL - 1:
-                print(f"ENROLL_SIM_UI: Échantillon {i+1} enregistré. Préparez-vous pour le suivant...") # Placeholder UI
-                time.sleep(0.5)
+                print(f"ENROLL_SIM_UI: Échantillon {i+1} enregistré. Préparez-vous pour le suivant...")
+                time.sleep(0.2)
 
-
-        if not all_mfccs:
-            logger.error(f"Aucun MFCC n'a pu être extrait pour l'enrôlement de {user_app_id}.")
+        if not all_mfcc_frames:
+            logger.error(f"Aucune trame MFCC n'a pu être extraite pour l'enrôlement de {user_app_id}.")
             return False
 
-        # Créer le profil vocal en moyennant les MFCCs (approche simple)
-        voice_profile = np.mean(all_mfccs, axis=0)
-        profile_path = self._get_profile_path(user_app_id)
+        # Concaténer toutes les trames MFCC pour entraîner le GMM
+        training_data = np.vstack(all_mfcc_frames)
+        if training_data.shape[0] < N_COMPONENTS_GMM : # Basic check: need at least as many frames as components
+            logger.error(f"Pas assez de trames MFCC ({training_data.shape[0]}) pour entraîner le GMM avec {N_COMPONENTS_GMM} composantes pour {user_app_id}.")
+            # QMessageBox.critical(None, "Erreur d'enrôlement", "Pas assez de données vocales pour créer un profil fiable. Essayez de parler plus clairement et plus longtemps.")
+            return False
 
+        logger.info(f"Entraînement du GMM pour {user_app_id} avec {training_data.shape[0]} trames MFCC et {N_COMPONENTS_GMM} composantes.")
+        gmm = GaussianMixture(n_components=N_COMPONENTS_GMM, covariance_type=COVARIANCE_TYPE_GMM, random_state=0, warm_start=False, reg_covar=1e-6)
         try:
-            np.save(profile_path, voice_profile)
-            logger.info(f"Profil vocal pour {user_app_id} sauvegardé dans {profile_path}")
+            gmm.fit(training_data)
+            if not gmm.converged_:
+                 logger.warning(f"Entraînement GMM pour {user_app_id} n'a pas convergé.")
+                 # Peut retourner False ici ou continuer avec le modèle non convergé.
+                 # Pour l'instant, on continue.
+        except Exception as e:
+            logger.error(f"Erreur lors de l'entraînement du GMM pour {user_app_id}: {e}", exc_info=True)
+            # QMessageBox.critical(None, "Erreur d'entraînement", "Une erreur est survenue lors de la création de votre profil vocal.")
+            return False
+
+        profile_path = self._get_profile_path(user_app_id)
+        try:
+            joblib.dump(gmm, profile_path)
+            logger.info(f"Modèle GMM pour {user_app_id} sauvegardé dans {profile_path}")
             return True
         except Exception as e:
-            logger.error(f"Erreur lors de la sauvegarde du profil vocal pour {user_app_id}: {e}", exc_info=True)
+            logger.error(f"Erreur lors de la sauvegarde du modèle GMM pour {user_app_id}: {e}", exc_info=True)
             return False
 
     def verify(self, user_app_id: str, username_hint: str = "", window_handle=None) -> bool:
-        """Vérifie la voix de l'utilisateur contre un profil enregistré."""
+        """Vérifie la voix de l'utilisateur contre un modèle GMM enregistré."""
+
         if not self.is_available():
             logger.error(f"Impossible de vérifier la voix pour {user_app_id}: service non disponible.")
             return False
 
         profile_path = self._get_profile_path(user_app_id)
         if not os.path.exists(profile_path):
-            logger.warning(f"Aucun profil vocal trouvé pour {user_app_id} à {profile_path}. Enrôlement nécessaire.")
+            logger.warning(f"Aucun profil vocal (modèle GMM) trouvé pour {user_app_id} à {profile_path}. Enrôlement nécessaire.")
             return False
 
         try:
-            enrolled_profile_mfccs = np.load(profile_path)
+            gmm = joblib.load(profile_path)
         except Exception as e:
-            logger.error(f"Erreur lors du chargement du profil vocal pour {user_app_id}: {e}", exc_info=True)
+            logger.error(f"Erreur lors du chargement du modèle GMM pour {user_app_id}: {e}", exc_info=True)
             return False
 
-        logger.info(f"Tentative de vérification vocale pour {user_app_id}. (Hint: {username_hint})")
-        # L'UI devrait indiquer à l'utilisateur de parler
-        print(f"VERIFY_SIM_UI: Veuillez prononcer votre phrase de passe maintenant.") # Placeholder UI
+        logger.info(f"Tentative de vérification vocale pour {user_app_id} (Hint: {username_hint}) avec modèle GMM.")
+        print(f"VERIFY_SIM_UI: Veuillez prononcer votre phrase de passe maintenant (pour vérification GMM).")
 
         audio_sample = self._record_audio(DURATION_PER_SAMPLE, SAMPLE_RATE)
-        if audio_sample is None:
-            logger.warning(f"Échantillon vocal pour vérification de {user_app_id} a échoué ou était vide.")
+        if audio_sample is None or audio_sample.size == 0:
+            logger.warning(f"Échantillon vocal pour vérification GMM de {user_app_id} vide ou échec.")
             return False
 
-        current_mfccs = self._extract_mfccs(audio_sample, SAMPLE_RATE, N_MFCC)
-        if current_mfccs is None:
-            logger.warning(f"Extraction MFCC pour vérification de {user_app_id} a échoué.")
+        mfcc_frames = self._extract_mfccs(audio_sample, SAMPLE_RATE, N_MFCC)
+        if mfcc_frames is None or mfcc_frames.shape[0] == 0:
+            logger.warning(f"Extraction MFCC pour vérification GMM de {user_app_id} a échoué.")
             return False
 
-        # Comparaison simple : distance euclidienne (plus petit = plus similaire)
-        distance = np.linalg.norm(enrolled_profile_mfccs - current_mfccs)
-        logger.info(f"Distance vocale pour {user_app_id}: {distance}")
+        try:
+            # Calculer le score de log-vraisemblance moyenne
+            log_likelihood = gmm.score(mfcc_frames) # score() returns per-sample (frame) log-likelihood.
+                                                    # For GMM, it's often the sum or mean of these.
+                                                    # sklearn's gmm.score() directly gives average log-likelihood.
+            logger.info(f"Score de log-vraisemblance GMM pour {user_app_id}: {log_likelihood}")
+        except Exception as e:
+            logger.error(f"Erreur lors du calcul du score GMM pour {user_app_id}: {e}", exc_info=True)
+            return False
 
-        # TODO: Définir un seuil approprié. Cela nécessite des tests et un ajustement.
-        # Ce seuil est très arbitraire et dépendra fortement des caractéristiques et de la méthode.
-        threshold = 15.0 # EXEMPLE DE SEUIL - À AJUSTER EMPIRIQUEMENT
+        # TODO: Définir un seuil approprié pour la log-vraisemblance.
+        # Un score plus élevé (moins négatif) est meilleur. Ce seuil est très empirique.
+        # Il dépendra de N_COMPONENTS_GMM, des données, etc.
+        # Il faudra l'ajuster après des tests.
+        # Par exemple, pour des MFCC normalisés, des scores peuvent être entre -5 et -20.
+        threshold = -15.0  # EXEMPLE DE SEUIL - À AJUSTER EMPIRIQUEMENT
 
-        if distance < threshold:
-            logger.info(f"Vérification vocale pour {user_app_id} RÉUSSIE (distance {distance} < seuil {threshold}).")
+        if log_likelihood > threshold:
+            logger.info(f"Vérification vocale GMM pour {user_app_id} RÉUSSIE (score {log_likelihood:.2f} > seuil {threshold:.2f}).")
             return True
         else:
-            logger.warning(f"Vérification vocale pour {user_app_id} ÉCHOUÉE (distance {distance} >= seuil {threshold}).")
+            logger.warning(f"Vérification vocale GMM pour {user_app_id} ÉCHOUÉE (score {log_likelihood:.2f} <= seuil {threshold:.2f}).")
+
             return False
 
     def delete_enrollment(self, user_app_id: str, method: str = "voice") -> bool:
