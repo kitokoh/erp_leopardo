@@ -110,46 +110,8 @@ class SecuritySettingsPage(QWidget):
             voice_group.setEnabled(False)
             self.status_label.setText(self.tr("No user logged in. Settings unavailable."))
 
-
-    def load_settings_for_user(self):
-        """
-        Loads the current user's biometric settings from the database via BiometricAuthenticator
-        and updates the UI elements (checkboxes, button states) accordingly.
-        Also checks for hardware/software availability for each method.
-        """
-        fp_enabled, face_enabled, voice_enabled = False, False, False # Initialize to False
-
-        if not self.current_user_id:
-            # This case should disable all controls, already handled in init_ui if self.current_user_id is None at that point.
-            # If it becomes None later (e.g. user logs out while page is open), this ensures UI updates.
-            self.cb_enable_fingerprint.setChecked(False)
-            self.btn_enroll_fingerprint.setEnabled(False)
-            self.btn_test_fingerprint.setEnabled(False)
-            # Also disable other methods' controls here
-            return
-
-        is_available = self.authenticator.is_method_available("fingerprint")
-        if not is_available:
-            self.cb_enable_fingerprint.setEnabled(False)
-            self.cb_enable_fingerprint.setText(self.tr("Enable Fingerprint Authentication (Not available on this system)"))
-            self.btn_enroll_fingerprint.setEnabled(False)
-            self.btn_test_fingerprint.setEnabled(False)
-            self.status_label.setText(self.tr("Fingerprint hardware/software not detected."))
-            return
-
-        is_enabled = self.authenticator.is_method_enabled_for_user(self.current_user_id, "fingerprint")
-
-        self.cb_enable_fingerprint.blockSignals(True) # Avoid triggering toggle_fingerprint_auth
-        self.cb_enable_fingerprint.setChecked(is_enabled)
-        self.cb_enable_fingerprint.blockSignals(False)
-
-        self.btn_enroll_fingerprint.setEnabled(is_enabled) # Can only enroll if the main checkbox is ticked
-        self.btn_test_fingerprint.setEnabled(is_enabled) # Can only test if enabled
-
-        if is_enabled:
-            self.status_label.setText(self.tr("Fingerprint authentication is enabled."))
-        else:
-            self.status_label.setText(self.tr("Fingerprint authentication is disabled."))
+    # Removed the first definition of load_settings_for_user as it was being overwritten
+    # and the corrected logic is in the second definition below.
 
     def toggle_fingerprint_auth(self, checked: bool):
         """
@@ -398,6 +360,9 @@ class SecuritySettingsPage(QWidget):
             self.status_label.setText(self.tr("Face login test failed."))
 
     def load_settings_for_user(self): # Overwrite or extend existing
+        # Initialize all _enabled variables to False at the start of the method
+        fp_enabled, face_enabled, voice_enabled = False, False, False
+
         if not self.current_user_id:
             self.cb_enable_fingerprint.setChecked(False)
             self.btn_enroll_fingerprint.setEnabled(False)
@@ -406,6 +371,10 @@ class SecuritySettingsPage(QWidget):
             self.btn_enroll_face.setEnabled(False)
             self.btn_test_face.setEnabled(False)
             # Also disable other methods' controls here
+            # Ensure voice controls are also disabled
+            self.cb_enable_voice.setChecked(False)
+            self.btn_enroll_voice.setEnabled(False)
+            self.btn_test_voice.setEnabled(False)
             return
 
         # Fingerprint
