@@ -13,7 +13,7 @@ class ReferentsCRUD(GenericCRUD):
     """
     def __init__(self):
         """Initializes the ReferentsCRUD class."""
-        super().__init__(table_name="Referents", id_column="referent_id")
+        super().__init__(table_name="Referents", primary_key="referent_id")
 
     @_manage_conn
     def add_referent(self, client_id: str, country_id: int, region_id: int | None,

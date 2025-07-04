@@ -2613,15 +2613,14 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         # If truly needing separate schema for other DBs, that's a DB-level command.
 
         # Use the SQLAlchemy engine for table creation
-    # Ensure main_engine (from db.connection) is used here, as it's initialized with app_config
-    if MAIN_SQLALCHEMY_COMPONENTS_LOADED and main_engine:
-        acc_models.Base.metadata.create_all(bind=main_engine, checkfirst=True)
-    elif not MAIN_SQLALCHEMY_COMPONENTS_LOADED:
-        logger.error("Skipping acc_models.Base.metadata.create_all because MAIN_SQLALCHEMY_COMPONENTS_LOADED is false.")
-    elif not main_engine:
-        logger.error("Skipping acc_models.Base.metadata.create_all because main_engine is None (not initialized).")
-
-
+        # Ensure main_engine (from db.connection) is used here, as it's initialized with app_config
+        if MAIN_SQLALCHEMY_COMPONENTS_LOADED and main_engine:
+            acc_models.Base.metadata.create_all(bind=main_engine, checkfirst=True)
+            print("DEBUG_INIT_DB: Accounting Module Tables creation attempted using SQLAlchemy engine.")
+        elif not MAIN_SQLALCHEMY_COMPONENTS_LOADED:
+            logging.error("Skipping acc_models.Base.metadata.create_all because MAIN_SQLALCHEMY_COMPONENTS_LOADED is false.")
+        elif not main_engine:
+            logging.error("Skipping acc_models.Base.metadata.create_all because main_engine is None (not initialized).")
 
         # print("DEBUG_INIT_DB: Table acc_fiscal_years created or exists.")
         # print("DEBUG_INIT_DB: Table acc_currencies created or exists.")
@@ -2630,8 +2629,6 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         # print("DEBUG_INIT_DB: Table acc_journal_entries created or exists.")
         # print("DEBUG_INIT_DB: Table acc_journal_items created or exists.")
         # print("DEBUG_INIT_DB: Table acc_financial_statements created or exists.")
-
-        print("DEBUG_INIT_DB: Accounting Module Tables creation attempted using SQLAlchemy engine.")
 
         # --- Indexes for Accounting Module (still use raw conn and cursor for these IF NOT managed by SQLAlchemy models) ---
         # If indexes are part of SQLAlchemy model definitions (e.g., index=True on Column),
@@ -2668,13 +2665,12 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fin_stmt_fy_id ON acc_financial_statements(fiscal_year_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fin_stmt_period_end ON acc_financial_statements(period_end_date)")
         print("DEBUG_INIT_DB: Accounting Module Indexes creation attempted.")
-        conn.commit() # Commit schema changes including manual indexes for accounting
-        print("DEBUG_INIT_DB: Accounting Module Indexes creation attempted and committed.")
-
+        # Removed conn.commit() here as it should be part of the larger transaction managed by the try block
+        # print("DEBUG_INIT_DB: Accounting Module Indexes creation attempted and committed.") # Commented out as commit is deferred
 
     except Exception as e_acc_schema:
         print(f"CRITICAL ERROR during Accounting module schema/index creation: {e_acc_schema}")
-        conn.rollback() # Rollback if using raw conn for anything in this block
+        # conn.rollback() # Rollback should be handled by the main try-except-finally for the whole function
     # --- End Accounting Module Tables and Indexes (This section will be moved and handled with a new connection) ---
 
     # Commit and close the main raw connection used for most schema setup up to this point

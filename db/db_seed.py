@@ -519,7 +519,7 @@ def _seed_default_regions(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logg
     skipped_count = 0
 
     for country_name, region_names in default_regions_data.items():
-        country = regions_crud.get_country_by_name(country_name, conn=conn)
+        country = get_country_by_name(country_name, conn=conn) # Changed from locations_crud.get_country_by_name
         if not country or 'country_id' not in country:
             logger.warning(f"Country '{country_name}' not found for seeding regions. Skipping its regions.")
             skipped_count += len(region_names)
