@@ -2,6 +2,8 @@
 import logging
 from passlib.context import CryptContext
 
+logger = logging.getLogger(__name__)
+
 # Setup CryptContext - this should ideally be done once per application
 # Using bcrypt as the primary scheme.
 # Adding sha256_crypt and sha512_crypt for compatibility with potentially older hashes.
