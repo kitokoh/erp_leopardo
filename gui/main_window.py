@@ -1,6 +1,15 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
+
+# --- BEGIN sys.path MODIFICATION ---
+# Ensure the project root is in sys.path for top-level imports
+# Correctly calculates project root assuming main_window.py is in a subdirectory (e.g., 'gui')
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+# --- END sys.path MODIFICATION ---
+
 from PyQt5.QtCore import QDate
 import logging
 
