@@ -2461,6 +2461,54 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     print("DEBUG_INIT_DB: Indexes for ClientVisits created or already exist.")
     # --- End ClientVisits Table ---
 
+    # --- Regions Table ---
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Regions (
+        region_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        region_name TEXT NOT NULL,
+        country_id INTEGER NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (country_id) REFERENCES Countries (country_id) ON DELETE CASCADE,
+        UNIQUE (region_name, country_id)
+    )
+    """)
+    print("DEBUG_INIT_DB: Table Regions created or exists.")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_regions_country_id ON Regions(country_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_regions_name_country ON Regions(region_name, country_id)")
+    print("DEBUG_INIT_DB: Indexes for Regions created or already exist.")
+    # --- End Regions Table ---
+
+    # --- Referents Table ---
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Referents (
+        referent_id TEXT PRIMARY KEY,
+        client_id TEXT NOT NULL UNIQUE,
+        country_id INTEGER NOT NULL,
+        region_id INTEGER,
+        city_id INTEGER,
+        referent_since TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        notes TEXT,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_by_user_id TEXT,
+        FOREIGN KEY (client_id) REFERENCES Clients (client_id) ON DELETE CASCADE,
+        FOREIGN KEY (country_id) REFERENCES Countries (country_id) ON DELETE CASCADE,
+        FOREIGN KEY (region_id) REFERENCES Regions (region_id) ON DELETE SET NULL,
+        FOREIGN KEY (city_id) REFERENCES Cities (city_id) ON DELETE SET NULL,
+        FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL
+    )
+    """)
+    print("DEBUG_INIT_DB: Table Referents created or exists.")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_referents_client_id ON Referents(client_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_referents_country_id ON Referents(country_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_referents_region_id ON Referents(region_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_referents_city_id ON Referents(city_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_referents_is_active ON Referents(is_active)")
+    print("DEBUG_INIT_DB: Indexes for Referents created or already exist.")
+    # --- End Referents Table ---
+
     # --- UserSavedFilters Table (Added for filter saving functionality) ---
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS user_saved_filters (
@@ -2565,13 +2613,14 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         # If truly needing separate schema for other DBs, that's a DB-level command.
 
         # Use the SQLAlchemy engine for table creation
-        # Ensure main_engine (from db.connection) is used here, as it's initialized with app_config
-        if MAIN_SQLALCHEMY_COMPONENTS_LOADED and main_engine:
-            acc_models.Base.metadata.create_all(bind=main_engine, checkfirst=True)
-        elif not MAIN_SQLALCHEMY_COMPONENTS_LOADED:
-            logger.error("Skipping acc_models.Base.metadata.create_all because MAIN_SQLALCHEMY_COMPONENTS_LOADED is false.")
-        elif not main_engine:
-            logger.error("Skipping acc_models.Base.metadata.create_all because main_engine is None (not initialized).")
+    # Ensure main_engine (from db.connection) is used here, as it's initialized with app_config
+    if MAIN_SQLALCHEMY_COMPONENTS_LOADED and main_engine:
+        acc_models.Base.metadata.create_all(bind=main_engine, checkfirst=True)
+    elif not MAIN_SQLALCHEMY_COMPONENTS_LOADED:
+        logger.error("Skipping acc_models.Base.metadata.create_all because MAIN_SQLALCHEMY_COMPONENTS_LOADED is false.")
+    elif not main_engine:
+        logger.error("Skipping acc_models.Base.metadata.create_all because main_engine is None (not initialized).")
+
 
 
         # print("DEBUG_INIT_DB: Table acc_fiscal_years created or exists.")
