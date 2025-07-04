@@ -3,10 +3,11 @@ import logging
 from passlib.context import CryptContext
 
 # Setup CryptContext - this should ideally be done once per application
-# Using bcrypt as it's specified in requirements.txt (passlib[bcrypt])
-# Deprecated algorithms can be added if migrating from older hashes.
+# Using bcrypt as the primary scheme.
+# Adding sha256_crypt and sha512_crypt for compatibility with potentially older hashes.
+# deprecated="auto" will re-hash passwords to bcrypt upon successful verification if they used an older scheme.
 pwd_context = CryptContext(
-    schemes=["bcrypt"],
+    schemes=["bcrypt", "sha256_crypt", "sha512_crypt"],
     deprecated="auto"
 )
 
