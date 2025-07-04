@@ -2,34 +2,21 @@
 import sys
 import os
 
-# Determine project root
+# Determine project root and add it to sys.path
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-
-# Ensure PROJECT_ROOT is at the beginning of sys.path for consistent module resolution
-if PROJECT_ROOT in sys.path:
-    # If it's present but not at the start, remove and re-insert at the front
-    if sys.path[0] != PROJECT_ROOT:
-        sys.path.remove(PROJECT_ROOT)
-        sys.path.insert(0, PROJECT_ROOT)
-        # Optional: log that it was moved
-        # import logging
-        # logging.info(f"Moved {PROJECT_ROOT} to the start of sys.path.")
-else:
-    # If it's not present at all, insert it at the start
+if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
-    # Optional: log that it was added
-    # import logging
-    # logging.info(f"Added {PROJECT_ROOT} to the start of sys.path.")
+elif sys.path[0] != PROJECT_ROOT:
+    # If it's in sys.path but not at the start, move it to the start
+    sys.path.remove(PROJECT_ROOT)
+    sys.path.insert(0, PROJECT_ROOT)
 
-# For diagnostics (can be removed or commented out in production)
-# print(f"[{os.path.basename(__file__)}] Effective sys.path[0]: {sys.path[0]}")
-# print(f"[{os.path.basename(__file__)}] Full sys.path: {sys.path}")
+# Ensure this debug print is AFTER the sys.path modification and BEFORE any project imports
+print(f"DEBUG main.py: Initial PROJECT_ROOT: {PROJECT_ROOT}")
+print(f"DEBUG main.py: sys.path after modification in main.py: {sys.path}")
+print(f"DEBUG main.py: current working directory: {os.getcwd()}")
 
-
-from gui.main_window import DocumentManager # The main application window
-
-# from main_window import DocumentManager # The main application window
-
+# Now, other imports can follow
 import logging # For main.py's own logging needs, and for translator parts if setup_logging isn't called first
 import icons_rc # Import the compiled resource file
 import subprocess # Added for starting API server
@@ -72,12 +59,12 @@ from PyQt5.QtWidgets import QMessageBox # Added for error dialog
 from PyQt5.QtWidgets import QSplashScreen
 import sys
 import os
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
+# PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__)) # Redundant: PROJECT_ROOT already defined and sys.path modified at the top
+# if PROJECT_ROOT not in sys.path: # Redundant
+#     sys.path.insert(0, PROJECT_ROOT) # Redundant
 
-print(f"DEBUG main.py: sys.path is now: {sys.path}")
-print(f"DEBUG main.py: current working directory is: {os.getcwd()}")
+# print(f"DEBUG main.py: sys.path is now: {sys.path}") # Redundant: sys.path printed after initial modification
+# print(f"DEBUG main.py: current working directory is: {os.getcwd()}") # Redundant: CWD printed after initial modification
 
 # --- Le reste de vos imports dans main.py commence ici ---
 # Par exemple:
