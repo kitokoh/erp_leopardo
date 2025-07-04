@@ -46,6 +46,7 @@ from db.cruds.templates_crud import add_template, get_filtered_templates, add_de
 # Ensure set_setting is imported if used by seed_initial_data directly
 # (It is used, so ensure it's available from db.cruds.application_settings_crud)
 from db.cruds.application_settings_crud import get_setting, set_setting
+from db.connection import engine as main_sqlalchemy_engine # Import the main engine
 
 
 def _seed_default_partner_categories(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
