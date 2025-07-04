@@ -32,6 +32,7 @@ from db.cruds.status_settings_crud import get_status_setting_by_name
 from db.cruds import partners_crud
 # Assuming company and company personnel functions will be imported if they were used via db_main_manager
 # For now, let's assume they are not, or will be handled if errors arise.
+from db.cruds import regions_crud, referents_crud # Added for Referents seeding
 
 LOGO_SUBDIR_CONTEXT = "company_logos" # This should match the setup
 
@@ -494,7 +495,126 @@ def seed_initial_data_master(cursor: sqlite3.Cursor):
     _seed_motivational_messages(cursor, conn, logger_passed=logger)
     _seed_user_motivational_messages(cursor, conn, logger_passed=logger)
     _seed_default_document_footers(cursor, conn, logger_passed=logger)
-    _seed_new_default_document_notes(cursor, conn, logger_passed=logger) # Call the new seeding function
+    _seed_new_default_document_notes(cursor, conn, logger_passed=logger)
+    _seed_default_regions(cursor, conn, logger_passed=logger) # Added Region seeding
+    _seed_sample_referents(cursor, conn, logger_passed=logger) # Added Referent seeding
+
+
+def _seed_default_regions(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
+    logger = logger_passed
+    logger.info("Attempting to seed default regions...")
+
+    default_regions_data = {
+        "France": ["Île-de-France", "Occitanie", "Nouvelle-Aquitaine", "Auvergne-Rhône-Alpes"],
+        "USA": ["California", "New York", "Texas", "Florida"],
+        "Algeria": ["Alger", "Oran", "Constantine"]
+        # Add more countries and their regions as needed
+    }
+
+    added_count = 0
+    skipped_count = 0
+
+    for country_name, region_names in default_regions_data.items():
+        country = regions_crud.get_country_by_name(country_name, conn=conn)
+        if not country or 'country_id' not in country:
+            logger.warning(f"Country '{country_name}' not found for seeding regions. Skipping its regions.")
+            skipped_count += len(region_names)
+            continue
+
+        country_id = country['country_id']
+        for region_name in region_names:
+            existing_region = regions_crud.get_region_by_name_and_country_id(region_name, country_id, conn=conn)
+            if existing_region:
+                logger.debug(f"Region '{region_name}' in '{country_name}' already exists. Skipping.")
+                skipped_count += 1
+                continue
+
+            region_id = regions_crud.add_region(region_name, country_id, conn=conn)
+            if region_id:
+                added_count += 1
+                logger.info(f"Added region '{region_name}' to '{country_name}' with ID {region_id}.")
+            else:
+                # This might happen if add_region itself fails for reasons other than duplicate
+                logger.warning(f"Failed to add region '{region_name}' to '{country_name}'.")
+                skipped_count +=1
+
+    logger.info(f"Default regions seeding complete. Added: {added_count}, Skipped/Existing: {skipped_count}")
+
+
+def _seed_sample_referents(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
+    logger = logger_passed
+    logger.info("Attempting to seed sample referents...")
+
+    from db.cruds import commandes_crud # For checking if client has orders
+
+    # Get a default user ID (e.g., admin) for created_by_user_id
+    admin_user = users_crud.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn)
+    if not admin_user or 'user_id' not in admin_user:
+        logger.error(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' not found. Cannot seed referents.")
+        return
+    creator_user_id = admin_user['user_id']
+
+    # Get some sample clients (e.g., the first few active ones)
+    # We need clients that already have country_id and ideally city_id
+    sample_clients = clients_crud_instance.get_all_clients_with_details(filters={'status_name': 'Client Actif'}, limit=5, conn=conn) # Get some active clients
+    if not sample_clients:
+        logger.warning("No sample active clients found to make into referents.")
+        return
+
+    added_count = 0
+    skipped_count = 0
+
+    for client_data in sample_clients:
+        client_id = client_data.get('client_id')
+        client_name = client_data.get('client_name')
+        client_country_id = client_data.get('country_id')
+        client_city_id = client_data.get('city_id')
+
+        if not all([client_id, client_country_id]):
+            logger.warning(f"Client '{client_name}' (ID: {client_id}) is missing country_id. Skipping referent seeding for this client.")
+            skipped_count +=1
+            continue
+
+        # Check if client already a referent
+        existing_referent = referents_crud.get_referent_by_client_id(client_id, conn=conn, include_inactive=True)
+        if existing_referent:
+            logger.debug(f"Client '{client_name}' (ID: {client_id}) is already a referent. Skipping.")
+            skipped_count +=1
+            continue
+
+        # Check if client has orders (simplified check)
+        client_orders = commandes_crud.get_commandes_for_client(client_id, limit=1, conn=conn)
+        if not client_orders:
+            logger.info(f"Client '{client_name}' (ID: {client_id}) has no orders. Skipping referent seeding as per policy (requires purchase).")
+            skipped_count += 1
+            continue
+
+        # Get a sample region for the client's country
+        client_regions = regions_crud.get_regions_for_country(client_country_id, conn=conn)
+        sample_region_id = None
+        if client_regions:
+            sample_region_id = client_regions[0]['region_id'] # Take the first available region for simplicity
+
+        referent_notes = f"Référent exemplaire pour la région de {client_data.get('country', 'N/A')}."
+
+        new_referent_id = referents_crud.add_referent(
+            client_id=client_id,
+            country_id=client_country_id,
+            region_id=sample_region_id, # Can be None if no regions for country
+            city_id=client_city_id,     # Can be None
+            notes=referent_notes,
+            created_by_user_id=creator_user_id,
+            conn=conn
+        )
+
+        if new_referent_id:
+            added_count += 1
+            logger.info(f"Client '{client_name}' (ID: {client_id}) made a referent with ID {new_referent_id}.")
+        else:
+            skipped_count +=1
+            logger.warning(f"Failed to make client '{client_name}' (ID: {client_id}) a referent.")
+
+    logger.info(f"Sample referents seeding complete. Added: {added_count}, Skipped/Existing/NoOrders: {skipped_count}")
 
 
 def _seed_new_default_document_notes(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
