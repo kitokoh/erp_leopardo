@@ -13,7 +13,7 @@ class RegionsCRUD(GenericCRUD):
     """
     def __init__(self):
         """Initializes the RegionsCRUD class."""
-        super().__init__(table_name="Regions", id_column="region_id")
+        super().__init__(table_name="Regions", primary_key="region_id")
 
     @_manage_conn
     def add_region(self, region_name: str, country_id: int, conn: sqlite3.Connection = None) -> int | None:
