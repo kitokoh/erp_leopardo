@@ -78,8 +78,10 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
     logger = logger_passed
 
     # Import here to avoid circular dependencies if roles_crud uses get_db_connection
+    # Alias imports to avoid conflict with the 'logger' variable in this function's scope.
     from db.cruds.roles_crud import add_role as crud_add_role, get_role_by_name as crud_get_role_by_name
-    from db.cruds.users_crud import add_user as crud_add_user, get_user_by_username as crud_get_user_by_username
+    # users_crud functions now accept logger_passed
+    from db.cruds import users_crud # Keep direct import for users_crud
     from auth.permissions import ADMINISTRATOR, TEAM_LEAD, OPERATOR # Role names
 
     try:
@@ -115,17 +117,17 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         admin_user_id = None # Initialize
         if admin_role_id: # Only proceed if Admin role exists
             logger.info(f"Checking for default admin user '{DEFAULT_ADMIN_USERNAME}'...")
-            admin_user_dict = crud_get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn)
+            admin_user_dict = users_crud.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn, logger_passed=logger)
             temp_admin_password = "admin" # Known default password
 
             if admin_user_dict:
                 admin_user_id = admin_user_dict['user_id']
                 logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' (ID: {admin_user_id}) exists. Forcing password update to default to ensure bcrypt hash.")
-                update_success = users_crud.update_user_password(admin_user_id, temp_admin_password, conn=conn) # users_crud.update_user_password now logs hash
+                update_success = users_crud.update_user_password(admin_user_id, temp_admin_password, conn=conn, logger_passed=logger)
                 if update_success:
                     logger.info(f"Password for default admin user '{DEFAULT_ADMIN_USERNAME}' (ID: {admin_user_id}) reset/updated successfully.")
                     # Re-fetch to log the hash that's now in DB
-                    updated_admin_info = crud_get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn)
+                    updated_admin_info = users_crud.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn, logger_passed=logger)
                     if updated_admin_info:
                         logger.info(f"Hash for '{DEFAULT_ADMIN_USERNAME}' in DB after update: {updated_admin_info.get('hashed_password')}")
                     else:
@@ -135,19 +137,20 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
             else:
                 logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' not found. Creating with password '{temp_admin_password}'...")
 
-                new_admin_id = crud_add_user(
+                new_admin_id = users_crud.add_user(
                     username=DEFAULT_ADMIN_USERNAME,
                     password=temp_admin_password, # crud_add_user logs the hash used
                     role_id=admin_role_id,
                     full_name="Default Administrator",
                     email="admin@example.local",
-                    conn=conn
+                    conn=conn,
+                    logger_passed=logger
                 )
                 if new_admin_id:
                     admin_user_id = new_admin_id
                     logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' created with ID {admin_user_id}. PLEASE CHANGE THE DEFAULT PASSWORD IMMEDIATELY.")
                     # Re-fetch to log the hash that's now in DB
-                    created_admin_info = crud_get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn)
+                    created_admin_info = users_crud.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn, logger_passed=logger)
                     if created_admin_info:
                         logger.info(f"Hash for new admin '{DEFAULT_ADMIN_USERNAME}' in DB: {created_admin_info.get('hashed_password')}")
                     else:
@@ -181,7 +184,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
 
         # 4. TeamMembers
         if admin_user_id:
-            admin_user_for_tm_dict = users_crud.get_user_by_id(admin_user_id, conn=conn)
+            admin_user_for_tm_dict = users_crud.get_user_by_id(admin_user_id, conn=conn, logger_passed=logger)
             if admin_user_for_tm_dict:
                 cursor.execute("SELECT COUNT(*) FROM TeamMembers WHERE user_id = ?", (admin_user_id,))
                 if cursor.fetchone()[0] == 0:
@@ -198,7 +201,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         DEFAULT_OPERATIONAL_USERNAME = "default_operational_user"
         DEFAULT_OPERATIONAL_USER_ROLE = "User" # This should be a role_id or fetched dynamically
         logger.info(f"Checking for default operational user '{DEFAULT_OPERATIONAL_USERNAME}'...")
-        existing_operational_user = users_crud.get_user_by_username(DEFAULT_OPERATIONAL_USERNAME, conn=conn)
+        existing_operational_user = users_crud.get_user_by_username(DEFAULT_OPERATIONAL_USERNAME, conn=conn, logger_passed=logger)
         if existing_operational_user is None:
             logger.info(f"Creating default operational user '{DEFAULT_OPERATIONAL_USERNAME}'...")
             # Fetch OPERATOR role_id
@@ -220,7 +223,8 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                     role_id=op_user_data['role_id'],
                     full_name=op_user_data['full_name'],
                     email=op_user_data['email'],
-                    conn=conn
+                    conn=conn,
+                    logger_passed=logger
                 )
                 if op_user_id:
                     logger.info(f"Created default operational user ID: {op_user_id}.")

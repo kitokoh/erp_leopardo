@@ -4,20 +4,23 @@ import uuid
 from datetime import datetime
 import logging
 # from werkzeug.security import generate_password_hash, check_password_hash # Replaced by passlib
-from utils import hash_password, verify_password # Using passlib functions from utils
+from utils import hash_password as util_hash_password, verify_password as util_verify_password # Using passlib functions from utils
 from .generic_crud import _manage_conn
 
-logger = logging.getLogger(__name__)
+# Module-level logger for users_crud operations
+module_logger = logging.getLogger(__name__)
 
 @_manage_conn
-def add_user(username: str, password: str, role_id: int, full_name: str = None, email: str = None, conn: sqlite3.Connection = None) -> str | None:
+def add_user(username: str, password: str, role_id: int, full_name: str = None, email: str = None, conn: sqlite3.Connection = None, logger_passed: logging.Logger | None = None) -> str | None:
     """Adds a new user with a hashed password. Returns the new user_id (UUID string)."""
+    current_logger = logger_passed if logger_passed else module_logger
     if not username or not password or role_id is None:
-        logger.error("Username, password, and role_id are required to add a user.")
+        current_logger.error("Username, password, and role_id are required to add a user.")
         return None
 
     # hashed_pw = generate_password_hash(password) # Replaced by utils.hash_password
-    hashed_pw = hash_password(password)
+    # Pass the logger to the utility function
+    hashed_pw = util_hash_password(password, logger_passed=current_logger)
     user_id = str(uuid.uuid4()) # Generate UUID for user_id
     now = datetime.utcnow().isoformat() + "Z"
 
@@ -33,21 +36,22 @@ def add_user(username: str, password: str, role_id: int, full_name: str = None, 
 
     try:
         cursor = conn.cursor()
-        logger.debug(f"Attempting to add user '{username}' with hash: {hashed_pw}")
+        current_logger.debug(f"Attempting to add user '{username}' with hash: {hashed_pw}")
         cursor.execute(sql, params)
         # conn.commit() # Handled by _manage_conn
-        logger.info(f"User '{username}' added successfully with ID {user_id}. Hash stored: {hashed_pw}")
+        current_logger.info(f"User '{username}' added successfully with ID {user_id}. Hash stored: {hashed_pw}")
         return user_id
     except sqlite3.IntegrityError as e:
-        logger.error(f"Error adding user '{username}'. Username or email might already exist: {e}", exc_info=True)
+        current_logger.error(f"Error adding user '{username}'. Username or email might already exist: {e}", exc_info=True)
         return None
     except sqlite3.Error as e:
-        logger.error(f"Database error adding user '{username}': {e}", exc_info=True)
+        current_logger.error(f"Database error adding user '{username}': {e}", exc_info=True)
         return None
 
 @_manage_conn
-def get_user_by_username(username: str, conn: sqlite3.Connection = None) -> dict | None:
+def get_user_by_username(username: str, conn: sqlite3.Connection = None, logger_passed: logging.Logger | None = None) -> dict | None:
     """Fetches a user by username, including their role information."""
+    current_logger = logger_passed if logger_passed else module_logger
     sql = """SELECT u.*, r.role_name
              FROM Users u
              JOIN Roles r ON u.role_id = r.role_id
@@ -58,18 +62,19 @@ def get_user_by_username(username: str, conn: sqlite3.Connection = None) -> dict
         row = cursor.fetchone()
         if row:
             user_data = dict(row)
-            logger.debug(f"User '{username}' found. Retrieved hash: {user_data.get('hashed_password')}")
+            current_logger.debug(f"User '{username}' found. Retrieved hash: {user_data.get('hashed_password')}")
             return user_data
         else:
-            logger.debug(f"User '{username}' not found.")
+            current_logger.debug(f"User '{username}' not found.")
             return None
     except sqlite3.Error as e:
-        logger.error(f"Database error fetching user by username '{username}': {e}", exc_info=True)
+        current_logger.error(f"Database error fetching user by username '{username}': {e}", exc_info=True)
         return None
 
 @_manage_conn
-def get_user_by_id(user_id: str, conn: sqlite3.Connection = None) -> dict | None:
+def get_user_by_id(user_id: str, conn: sqlite3.Connection = None, logger_passed: logging.Logger | None = None) -> dict | None:
     """Fetches a user by user_id, including their role information."""
+    current_logger = logger_passed if logger_passed else module_logger
     sql = """SELECT u.*, r.role_name
              FROM Users u
              JOIN Roles r ON u.role_id = r.role_id
@@ -80,12 +85,13 @@ def get_user_by_id(user_id: str, conn: sqlite3.Connection = None) -> dict | None
         row = cursor.fetchone()
         return dict(row) if row else None
     except sqlite3.Error as e:
-        logger.error(f"Database error fetching user by ID '{user_id}': {e}", exc_info=True)
+        current_logger.error(f"Database error fetching user by ID '{user_id}': {e}", exc_info=True)
         return None
 
 @_manage_conn
-def update_user_role(user_id: str, new_role_id: int, conn: sqlite3.Connection = None) -> bool:
+def update_user_role(user_id: str, new_role_id: int, conn: sqlite3.Connection = None, logger_passed: logging.Logger | None = None) -> bool:
     """Updates the role of a user."""
+    current_logger = logger_passed if logger_passed else module_logger
     now = datetime.utcnow().isoformat() + "Z"
     sql = "UPDATE Users SET role_id = ?, updated_at = ? WHERE user_id = ?"
     try:
@@ -94,37 +100,39 @@ def update_user_role(user_id: str, new_role_id: int, conn: sqlite3.Connection = 
         # conn.commit()
         return cursor.rowcount > 0
     except sqlite3.Error as e:
-        logger.error(f"Database error updating role for user ID '{user_id}': {e}", exc_info=True)
+        current_logger.error(f"Database error updating role for user ID '{user_id}': {e}", exc_info=True)
         return False
 
 @_manage_conn
-def update_user_password(user_id: str, new_password: str, conn: sqlite3.Connection = None) -> bool:
+def update_user_password(user_id: str, new_password: str, conn: sqlite3.Connection = None, logger_passed: logging.Logger | None = None) -> bool:
     """Updates the password for a user. The new password will be hashed."""
+    current_logger = logger_passed if logger_passed else module_logger
     if not new_password:
-        logger.error("New password cannot be empty.")
+        current_logger.error("New password cannot be empty.")
         return False
     # hashed_pw = generate_password_hash(new_password) # Replaced by utils.hash_password
-    hashed_pw = hash_password(new_password)
+    hashed_pw = util_hash_password(new_password, logger_passed=current_logger) # Pass the logger
     now = datetime.utcnow().isoformat() + "Z"
     sql = "UPDATE Users SET hashed_password = ?, updated_at = ? WHERE user_id = ?"
     try:
         cursor = conn.cursor()
-        logger.debug(f"Attempting to update password for user_id '{user_id}'. New hash: {hashed_pw}")
+        current_logger.debug(f"Attempting to update password for user_id '{user_id}'. New hash: {hashed_pw}")
         cursor.execute(sql, (hashed_pw, now, user_id))
         # conn.commit()
         success = cursor.rowcount > 0
         if success:
-            logger.info(f"Password updated successfully for user_id '{user_id}'. Stored hash: {hashed_pw}")
+            current_logger.info(f"Password updated successfully for user_id '{user_id}'. Stored hash: {hashed_pw}")
         else:
-            logger.warning(f"Password update for user_id '{user_id}' affected 0 rows (user may not exist or password was the same).")
+            current_logger.warning(f"Password update for user_id '{user_id}' affected 0 rows (user may not exist or password was the same).")
         return success
     except sqlite3.Error as e:
-        logger.error(f"Database error updating password for user ID '{user_id}': {e}", exc_info=True)
+        current_logger.error(f"Database error updating password for user ID '{user_id}': {e}", exc_info=True)
         return False
 
 @_manage_conn
-def set_user_active_status(user_id: str, is_active: bool, conn: sqlite3.Connection = None) -> bool:
+def set_user_active_status(user_id: str, is_active: bool, conn: sqlite3.Connection = None, logger_passed: logging.Logger | None = None) -> bool:
     """Sets the is_active status for a user."""
+    current_logger = logger_passed if logger_passed else module_logger
     now = datetime.utcnow().isoformat() + "Z"
     status_int = 1 if is_active else 0
     sql = "UPDATE Users SET is_active = ?, updated_at = ? WHERE user_id = ?"
@@ -134,12 +142,13 @@ def set_user_active_status(user_id: str, is_active: bool, conn: sqlite3.Connecti
         # conn.commit()
         return cursor.rowcount > 0
     except sqlite3.Error as e:
-        logger.error(f"Database error setting active status for user ID '{user_id}': {e}", exc_info=True)
+        current_logger.error(f"Database error setting active status for user ID '{user_id}': {e}", exc_info=True)
         return False
 
 @_manage_conn
-def record_login_time(user_id: str, conn: sqlite3.Connection = None) -> bool:
+def record_login_time(user_id: str, conn: sqlite3.Connection = None, logger_passed: logging.Logger | None = None) -> bool:
     """Updates the last_login_at timestamp for a user."""
+    current_logger = logger_passed if logger_passed else module_logger
     now = datetime.utcnow().isoformat() + "Z"
     sql = "UPDATE Users SET last_login_at = ? WHERE user_id = ?"
     try:
@@ -148,11 +157,11 @@ def record_login_time(user_id: str, conn: sqlite3.Connection = None) -> bool:
         # conn.commit()
         return cursor.rowcount > 0
     except sqlite3.Error as e:
-        logger.error(f"Database error recording login time for user ID '{user_id}': {e}", exc_info=True)
+        current_logger.error(f"Database error recording login time for user ID '{user_id}': {e}", exc_info=True)
         return False
 
 @_manage_conn
-def list_users(role_id_filter: int = None, status_filter: str = None, include_deleted: bool = False, conn: sqlite3.Connection = None) -> list[dict]:
+def list_users(role_id_filter: int = None, status_filter: str = None, include_deleted: bool = False, conn: sqlite3.Connection = None, logger_passed: logging.Logger | None = None) -> list[dict]:
     """
     Lists all users with their role names, with optional filtering by role_id, active status, and deleted status.
     Args:
@@ -163,6 +172,7 @@ def list_users(role_id_filter: int = None, status_filter: str = None, include_de
     Returns:
         list[dict]: A list of user dictionaries.
     """
+    current_logger = logger_passed if logger_passed else module_logger
     params = []
     sql = """SELECT u.user_id, u.username, u.full_name, u.email, r.role_name, u.is_active, u.created_at, u.last_login_at, u.is_deleted, u.deleted_at
              FROM Users u
@@ -195,14 +205,15 @@ def list_users(role_id_filter: int = None, status_filter: str = None, include_de
         cursor.execute(sql, params)
         return [dict(row) for row in cursor.fetchall()]
     except sqlite3.Error as e:
-        logger.error(f"Database error listing users with filters (role_id: {role_id_filter}, status: {status_filter}): {e}", exc_info=True)
+        current_logger.error(f"Database error listing users with filters (role_id: {role_id_filter}, status: {status_filter}): {e}", exc_info=True)
         return []
 
 # Removed local verify_password function. Will use the one imported from utils directly.
 
 @_manage_conn
-def _update_user_password_hash_only(user_id: str, new_hashed_password: str, conn: sqlite3.Connection = None) -> bool:
+def _update_user_password_hash_only(user_id: str, new_hashed_password: str, conn: sqlite3.Connection = None, logger_passed: logging.Logger | None = None) -> bool:
     """Updates only the hashed_password and updated_at for a user. Internal use for hash upgrades."""
+    current_logger = logger_passed if logger_passed else module_logger
     now = datetime.utcnow().isoformat() + "Z"
     sql = "UPDATE Users SET hashed_password = ?, updated_at = ? WHERE user_id = ?"
     try:
@@ -210,61 +221,62 @@ def _update_user_password_hash_only(user_id: str, new_hashed_password: str, conn
         cursor.execute(sql, (new_hashed_password, now, user_id))
         # conn.commit() # Handled by _manage_conn decorator
         if cursor.rowcount > 0:
-            logger.info(f"Password hash upgraded and updated in DB for user ID '{user_id}'.")
+            current_logger.info(f"Password hash upgraded and updated in DB for user ID '{user_id}'.")
             return True
         return False # Should not happen if user_id is valid
     except sqlite3.Error as e:
-        logger.error(f"Database error updating password hash for user ID '{user_id}': {e}", exc_info=True)
+        current_logger.error(f"Database error updating password hash for user ID '{user_id}': {e}", exc_info=True)
         return False
 
 
 @_manage_conn
-def verify_user_password(username: str, password: str, conn: sqlite3.Connection = None) -> dict | None:
+def verify_user_password(username: str, password: str, conn: sqlite3.Connection = None, logger_passed: logging.Logger | None = None) -> dict | None:
     """
     Verifies user credentials for login.
     Fetches user by username, checks if active, and verifies password.
     Returns user dictionary if valid and active, otherwise None.
     """
+    current_logger = logger_passed if logger_passed else module_logger
     if not username or not password:
-        logger.warning("Username and password are required for verification.")
+        current_logger.warning("Username and password are required for verification.")
         return None
 
-    user = get_user_by_username(username, conn=conn) # get_user_by_username is already decorated
+    user = get_user_by_username(username, conn=conn, logger_passed=current_logger) # Pass logger
 
     if user:
         if not user.get('is_active'):
-            logger.warning(f"Login attempt for inactive user: {username}")
+            current_logger.warning(f"Login attempt for inactive user: {username}")
             return None
 
         # Ensure 'hashed_password' key exists, though it should if user record is proper
         if 'hashed_password' not in user:
-            logger.error(f"User record for {username} is missing 'hashed_password'. Cannot verify.")
+            current_logger.error(f"User record for {username} is missing 'hashed_password'. Cannot verify.")
             return None
 
         # Call the verify_password function imported from utils.
-        # The expected signature is verify_password(plain_password, hashed_password)
-        verified, new_hash = verify_password(password, user['hashed_password'])
+        # Pass the logger to the utility function
+        verified, new_hash = util_verify_password(password, user['hashed_password'], logger_passed=current_logger)
 
         if verified:
-            logger.info(f"Password verification successful for user: {username}")
-            # Update last login time
-            record_login_time(user['user_id'], conn=conn)
+            current_logger.info(f"Password verification successful for user: {username}")
+            # Update last login time, pass logger
+            record_login_time(user['user_id'], conn=conn, logger_passed=current_logger)
 
             # If the hash was upgraded (old scheme), update it in the DB
             if new_hash:
-                logger.info(f"Password hash for user '{username}' needs upgrade. New hash: {new_hash[:20]}...") # Log only part of hash
-                if _update_user_password_hash_only(user['user_id'], new_hash, conn=conn):
-                    logger.info(f"Successfully upgraded password hash for user '{username}'.")
+                current_logger.info(f"Password hash for user '{username}' needs upgrade. New hash: {new_hash[:20]}...") # Log only part of hash
+                if _update_user_password_hash_only(user['user_id'], new_hash, conn=conn, logger_passed=current_logger): # Pass logger
+                    current_logger.info(f"Successfully upgraded password hash for user '{username}'.")
                 else:
-                    logger.error(f"Failed to upgrade password hash for user '{username}' in database.")
+                    current_logger.error(f"Failed to upgrade password hash for user '{username}' in database.")
                     # Depending on policy, this could be a critical error, but login can still proceed.
 
             return user  # Return the full user dictionary
         else:
-            logger.warning(f"Password verification failed for user: {username}")
+            current_logger.warning(f"Password verification failed for user: {username}")
             return None
     else:
-        logger.warning(f"Login attempt for non-existent user: {username}")
+        current_logger.warning(f"Login attempt for non-existent user: {username}")
         return None
 
 # For consistency, if there's an existing users_crud_instance, re-declare it or ensure it's updated.
@@ -273,13 +285,14 @@ def verify_user_password(username: str, password: str, conn: sqlite3.Connection 
 # For now, these are module-level functions.
 
 @_manage_conn
-def soft_delete_user(user_id_to_delete: str, current_user_id: str, conn: sqlite3.Connection = None) -> bool:
+def soft_delete_user(user_id_to_delete: str, current_user_id: str, conn: sqlite3.Connection = None, logger_passed: logging.Logger | None = None) -> bool:
     """
     Soft deletes a user by setting is_deleted = 1, deleted_at = now(), and is_active = 0.
     Prevents self-deletion.
     """
+    current_logger = logger_passed if logger_passed else module_logger
     if user_id_to_delete == current_user_id:
-        logger.error(f"User {current_user_id} cannot soft delete themselves.")
+        current_logger.error(f"User {current_user_id} cannot soft delete themselves.")
         # Consider raising a specific exception here if preferred for API/service layer handling
         return False
 
@@ -297,17 +310,17 @@ def soft_delete_user(user_id_to_delete: str, current_user_id: str, conn: sqlite3
         cursor.execute(sql, params)
         # conn.commit() # Handled by _manage_conn
         if cursor.rowcount > 0:
-            logger.info(f"User {user_id_to_delete} soft deleted successfully by user {current_user_id}.")
+            current_logger.info(f"User {user_id_to_delete} soft deleted successfully by user {current_user_id}.")
             return True
         else:
-            logger.warning(f"Soft delete failed for user {user_id_to_delete} (user not found or no change needed).")
+            current_logger.warning(f"Soft delete failed for user {user_id_to_delete} (user not found or no change needed).")
             return False # User not found or already in desired state (though updated_at would change)
     except sqlite3.Error as e:
-        logger.error(f"Database error soft deleting user {user_id_to_delete}: {e}", exc_info=True)
+        current_logger.error(f"Database error soft deleting user {user_id_to_delete}: {e}", exc_info=True)
         return False
 
 @_manage_conn
-def set_biometric_auth_status(user_id: str, method: str, enabled: bool, template_id: str = None, conn: sqlite3.Connection = None) -> bool:
+def set_biometric_auth_status(user_id: str, method: str, enabled: bool, template_id: str = None, conn: sqlite3.Connection = None, logger_passed: logging.Logger | None = None) -> bool:
     """
     Sets the status (enabled/disabled) and template ID for a specific biometric authentication method for a user.
 
@@ -321,6 +334,7 @@ def set_biometric_auth_status(user_id: str, method: str, enabled: bool, template
     Returns:
         bool: True if the update was successful, False otherwise.
     """
+    current_logger = logger_passed if logger_passed else module_logger
     now = datetime.utcnow().isoformat() + "Z"
     enabled_int = 1 if enabled else 0
 
@@ -336,7 +350,7 @@ def set_biometric_auth_status(user_id: str, method: str, enabled: bool, template
     }
 
     if method not in field_enabled_map:
-        logger.error(f"Invalid biometric method: {method}")
+        current_logger.error(f"Invalid biometric method: {method}")
         return False
 
     sql = f"""UPDATE Users
@@ -353,17 +367,17 @@ def set_biometric_auth_status(user_id: str, method: str, enabled: bool, template
         cursor = conn.cursor()
         cursor.execute(sql, params)
         if cursor.rowcount > 0:
-            logger.info(f"Biometric method '{method}' for user '{user_id}' set to {enabled} (Template ID: {current_template_id}).")
+            current_logger.info(f"Biometric method '{method}' for user '{user_id}' set to {enabled} (Template ID: {current_template_id}).")
             return True
         else:
-            logger.warning(f"No user found with ID '{user_id}' or no change made for biometric method '{method}'.")
+            current_logger.warning(f"No user found with ID '{user_id}' or no change made for biometric method '{method}'.")
             return False
     except sqlite3.Error as e:
-        logger.error(f"Database error setting biometric auth status for user '{user_id}', method '{method}': {e}", exc_info=True)
+        current_logger.error(f"Database error setting biometric auth status for user '{user_id}', method '{method}': {e}", exc_info=True)
         return False
 
 @_manage_conn
-def get_biometric_auth_status(user_id: str, conn: sqlite3.Connection = None) -> dict | None:
+def get_biometric_auth_status(user_id: str, conn: sqlite3.Connection = None, logger_passed: logging.Logger | None = None) -> dict | None:
     """
     Retrieves the biometric authentication settings for a given user.
 
@@ -375,6 +389,7 @@ def get_biometric_auth_status(user_id: str, conn: sqlite3.Connection = None) -> 
         dict | None: A dictionary with biometric settings if user is found, otherwise None.
                      Example: {'is_fingerprint_auth_enabled': True, 'fingerprint_template_id': 'xyz', ...}
     """
+    current_logger = logger_passed if logger_passed else module_logger
     sql = """SELECT user_id, is_fingerprint_auth_enabled, fingerprint_template_id,
                     is_face_auth_enabled, face_template_id,
                     is_voice_auth_enabled, voice_profile_id
@@ -393,8 +408,8 @@ def get_biometric_auth_status(user_id: str, conn: sqlite3.Connection = None) -> 
                     user_settings[key] = bool(user_settings[key])
             return user_settings
         else:
-            logger.warning(f"No biometric settings found for user ID '{user_id}' (user might not exist).")
+            current_logger.warning(f"No biometric settings found for user ID '{user_id}' (user might not exist).")
             return None
     except sqlite3.Error as e:
-        logger.error(f"Database error fetching biometric auth status for user '{user_id}': {e}", exc_info=True)
+        current_logger.error(f"Database error fetching biometric auth status for user '{user_id}': {e}", exc_info=True)
         return None
