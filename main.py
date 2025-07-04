@@ -37,7 +37,7 @@ from utils import save_config # Changed import from app_config to utils
 from utils import is_first_launch, mark_initial_setup_complete
 from auth.roles import SUPER_ADMIN
 # Import InitialSetupDialog and PromptCompanyInfoDialog
-from initial_setup_dialog import InitialSetupDialog, PromptCompanyInfoDialog
+from settings.initial_setup_dialog import InitialSetupDialog, PromptCompanyInfoDialog
 from PyQt5.QtWidgets import QDialog # Required for QDialog.Accepted check
 # Import specific db functions needed
 import db # Added import for db module
@@ -257,6 +257,21 @@ def main():
         logging.info("main.py: db.connection.set_db_config(CONFIG) called.")
     else:
         logging.error("main.py: Could not find db.connection.set_db_config. DB calls might fail.")
+
+    # Set the configuration for document_generator.context_builder
+    try:
+        from document_generator import context_builder as doc_gen_context_builder
+        if hasattr(doc_gen_context_builder, 'set_document_generator_config'):
+            doc_gen_context_builder.set_document_generator_config(CONFIG)
+            logging.info("main.py: document_generator.context_builder.set_document_generator_config(CONFIG) called.")
+        else:
+            logging.error("main.py: Could not find document_generator.context_builder.set_document_generator_config.")
+    except ImportError:
+        logging.error("main.py: Failed to import document_generator.context_builder to set its config.")
+    except Exception as e_docgen_conf:
+        logging.error(f"main.py: Error setting document_generator config: {e_docgen_conf}", exc_info=True)
+
+
 
     # --- Coordinated Data Seeding ---
     # This block handles the seeding of initial data after the schema is created,
