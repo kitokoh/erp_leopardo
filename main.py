@@ -57,8 +57,25 @@ from notifications import NotificationManager # Added for notifications
 # from db.cruds.users_crud import users_crud_instance # users_crud is used directly by auth_service
 from PyQt5.QtWidgets import QMessageBox # Added for error dialog
 from PyQt5.QtWidgets import QSplashScreen
-import sys
-import os
+
+# --- Direct Re-calculation and Re-insertion of Project Root before gui.main_window import ---
+# This is a more direct attempt to ensure the path is correct right before the import.
+# os and sys modules should already be imported at the top of main.py.
+current_file_path_for_gui_import = os.path.abspath(__file__)
+project_root_calculated_for_gui_import = os.path.dirname(current_file_path_for_gui_import)
+
+if project_root_calculated_for_gui_import not in sys.path:
+    sys.path.insert(0, project_root_calculated_for_gui_import)
+    print(f"DEBUG main.py (PRE-GUI IMPORT): Inserted project root {project_root_calculated_for_gui_import}. New sys.path: {sys.path}")
+elif sys.path[0] != project_root_calculated_for_gui_import:
+    if project_root_calculated_for_gui_import in sys.path: # Check before removing
+        sys.path.remove(project_root_calculated_for_gui_import)
+    sys.path.insert(0, project_root_calculated_for_gui_import)
+    print(f"DEBUG main.py (PRE-GUI IMPORT): Moved project root {project_root_calculated_for_gui_import} to start. New sys.path: {sys.path}")
+else:
+    print(f"DEBUG main.py (PRE-GUI IMPORT): Project root {project_root_calculated_for_gui_import} already correctly at sys.path[0]. Current sys.path: {sys.path}")
+# --- End Direct Re-calculation ---
+
 # PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__)) # Redundant: PROJECT_ROOT already defined and sys.path modified at the top
 # if PROJECT_ROOT not in sys.path: # Redundant
 #     sys.path.insert(0, PROJECT_ROOT) # Redundant
@@ -70,6 +87,7 @@ import os
 # Par exemple:
 # from some_module import something
 # from gui.main_window import DocumentManager 
+from gui.main_window import DocumentManager
 import datetime # Added for session timeout
 from PyQt5.QtCore import QSettings # Added for Remember Me
 
