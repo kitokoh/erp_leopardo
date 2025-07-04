@@ -11,25 +11,26 @@ import sys # Ensure sys is imported for path manipulation
 
 # Get the project root directory
 # This allows importing config.py from the root and db.connection
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+# project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # No longer needed for config import
+# if project_root not in sys.path:
+#     sys.path.insert(0, project_root) # No longer needed for config import
 
-try:
-    import config
-except ImportError:
-    print("CRITICAL: config.py not found at project root by db/init_schema.py. Using fallback configurations.")
-    class config_fallback:
-        DATABASE_PATH = os.path.join(project_root, "app_data_fallback_init.db")
-        DEFAULT_ADMIN_USERNAME = "admin_fallback_init"
-        DEFAULT_ADMIN_PASSWORD = "password_fallback_init"
-        # Add other necessary fallbacks if init_schema.py uses them directly
-        # For example, APP_ROOT_DIR if it were used directly for paths here.
-    config = config_fallback
+# try:
+#     import config # Removed direct config import
+# except ImportError:
+#     print("CRITICAL: config.py not found at project root by db/init_schema.py. Using fallback configurations.")
+#     class config_fallback:
+#         DATABASE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app_data_fallback_init.db")
+#         DEFAULT_ADMIN_USERNAME = "admin_fallback_init"
+#         DEFAULT_ADMIN_PASSWORD = "password_fallback_init"
+#         # Add other necessary fallbacks if init_schema.py uses them directly
+#         # For example, APP_ROOT_DIR if it were used directly for paths here.
+#     config = config_fallback
 
 # Import the main SQLAlchemy components from db.connection
+# Note: main_engine will be None here and needs to be initialized by main.py calling db.connection.initialize_engine_and_session
 try:
-    from db.connection import Base as MainBase, engine as main_engine
+    from db.connection import Base as MainBase, engine as main_engine, initialize_engine_and_session
     # Import specific models that use MainBase and need table creation here
     from calculator.models import CalculationHistory
     # from other_module.models import OtherModelUsingMainBase # Example for future models
