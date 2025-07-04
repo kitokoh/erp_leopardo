@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 import os
 from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QLineEdit,
+    QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QLineEdit, QTextEdit,
     QPushButton, QComboBox, QMessageBox, QDialogButtonBox, QApplication
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 import db as db_manager # Assuming db_manager is the way to access CRUD operations
 from db.cruds.template_categories_crud import get_all_template_categories, add_template_category
-from html_editor import HtmlEditor # To launch the editor for the new template
+from gui.widgets.html_editor import HtmlEditor # To launch the editor for the new template
 import config # For templates_dir
 
 class HtmlTemplateCreatorDialog(QDialog):

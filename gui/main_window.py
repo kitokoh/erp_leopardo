@@ -1,6 +1,15 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
+
+# --- BEGIN sys.path MODIFICATION ---
+# Ensure the project root is in sys.path for top-level imports
+# Correctly calculates project root assuming main_window.py is in a subdirectory (e.g., 'gui')
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+# --- END sys.path MODIFICATION ---
+
 from PyQt5.QtCore import QDate
 import logging
 
@@ -66,7 +75,7 @@ import icons_rc
 from app_setup import APP_ROOT_DIR, CONFIG
 # from ui_components import StatisticsWidget # StatisticsWidget removed from main_layout
 from gui.ui_components import StatusDelegate # Still used for QListWidget
-from map_client_dialog import MapClientDialog # Added for new client from map
+from gui.dialogs.map_client_dialog import MapClientDialog # Added for new client from map
 # The get_country_by_name, get_or_add_country, etc. specific imports for handle_add_client_from_stats_map might become obsolete.
 from db import get_country_by_name, get_or_add_country, get_city_by_name_and_country_id, get_or_add_city
 
