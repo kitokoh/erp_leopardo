@@ -58,20 +58,24 @@ from notifications import NotificationManager # Added for notifications
 from PyQt5.QtWidgets import QMessageBox # Added for error dialog
 from PyQt5.QtWidgets import QSplashScreen
 
-# --- Re-ensure PROJECT_ROOT is in sys.path before critical GUI import ---
-# PROJECT_ROOT should have been defined at the top of main.py
-if 'PROJECT_ROOT' in globals() and PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-    print(f"DEBUG main.py: Re-inserted PROJECT_ROOT into sys.path before gui.main_window import. New sys.path: {sys.path}")
-elif 'PROJECT_ROOT' in globals() and sys.path[0] != PROJECT_ROOT:
-    # Ensure PROJECT_ROOT is in sys.path before trying to remove, to avoid ValueError
-    if PROJECT_ROOT in sys.path:
-        sys.path.remove(PROJECT_ROOT)
-    sys.path.insert(0, PROJECT_ROOT)
-    print(f"DEBUG main.py: Moved PROJECT_ROOT to sys.path[0] before gui.main_window import. New sys.path: {sys.path}")
-# --- End Re-ensure ---
-import sys
-import os
+# --- Direct Re-calculation and Re-insertion of Project Root before gui.main_window import ---
+# This is a more direct attempt to ensure the path is correct right before the import.
+# os and sys modules should already be imported at the top of main.py.
+current_file_path_for_gui_import = os.path.abspath(__file__)
+project_root_calculated_for_gui_import = os.path.dirname(current_file_path_for_gui_import)
+
+if project_root_calculated_for_gui_import not in sys.path:
+    sys.path.insert(0, project_root_calculated_for_gui_import)
+    print(f"DEBUG main.py (PRE-GUI IMPORT): Inserted project root {project_root_calculated_for_gui_import}. New sys.path: {sys.path}")
+elif sys.path[0] != project_root_calculated_for_gui_import:
+    if project_root_calculated_for_gui_import in sys.path: # Check before removing
+        sys.path.remove(project_root_calculated_for_gui_import)
+    sys.path.insert(0, project_root_calculated_for_gui_import)
+    print(f"DEBUG main.py (PRE-GUI IMPORT): Moved project root {project_root_calculated_for_gui_import} to start. New sys.path: {sys.path}")
+else:
+    print(f"DEBUG main.py (PRE-GUI IMPORT): Project root {project_root_calculated_for_gui_import} already correctly at sys.path[0]. Current sys.path: {sys.path}")
+# --- End Direct Re-calculation ---
+
 # PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__)) # Redundant: PROJECT_ROOT already defined and sys.path modified at the top
 # if PROJECT_ROOT not in sys.path: # Redundant
 #     sys.path.insert(0, PROJECT_ROOT) # Redundant
