@@ -18,7 +18,7 @@ import db as db_manager
 from db.cruds.template_categories_crud import get_all_template_categories # Import for fetching all categories
 # get_setting is no longer used for this purpose.
 # from db.cruds.application_settings_crud import get_setting
-from html_editor import HtmlEditor
+from gui.widgets.html_editor import HtmlEditor
 from utils import populate_docx_template
 # clients_crud_instance is not used by CreateDocumentDialog
 import icons_rc # Import for Qt resource file

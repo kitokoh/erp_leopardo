@@ -45,7 +45,7 @@ from reportlab.graphics.shapes import Line, Drawing
 from reportlab.graphics.barcode import code128, qr
 from reportlab.graphics import renderPDF
 import io # Added for io.BytesIO
-from html_to_pdf_util import render_html_template, convert_html_to_pdf, WeasyPrintError # Added
+from utils.html_to_pdf_util import render_html_template, convert_html_to_pdf, WeasyPrintError # Added
 
 # Define APP_ROOT_DIR for font path resolution
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):

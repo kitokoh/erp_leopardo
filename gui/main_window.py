@@ -66,13 +66,13 @@ import icons_rc
 from app_setup import APP_ROOT_DIR, CONFIG
 # from ui_components import StatisticsWidget # StatisticsWidget removed from main_layout
 from gui.ui_components import StatusDelegate # Still used for QListWidget
-from map_client_dialog import MapClientDialog # Added for new client from map
+from gui.dialogs.map_client_dialog import MapClientDialog # Added for new client from map
 # The get_country_by_name, get_or_add_country, etc. specific imports for handle_add_client_from_stats_map might become obsolete.
 from db import get_country_by_name, get_or_add_country, get_city_by_name_and_country_id, get_or_add_city
 
 from dialogs.statistics_add_client_dialog import StatisticsAddClientDialog # Import the new dialog
 
-from document_manager_logic import (
+from utils.document_manager_logic import (
     handle_create_client_execution,
     load_and_display_clients,
     filter_and_display_clients,
