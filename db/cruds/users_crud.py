@@ -33,9 +33,10 @@ def add_user(username: str, password: str, role_id: int, full_name: str = None, 
 
     try:
         cursor = conn.cursor()
+        logger.debug(f"Attempting to add user '{username}' with hash: {hashed_pw}")
         cursor.execute(sql, params)
         # conn.commit() # Handled by _manage_conn
-        logger.info(f"User '{username}' added successfully with ID {user_id}.")
+        logger.info(f"User '{username}' added successfully with ID {user_id}. Hash stored: {hashed_pw}")
         return user_id
     except sqlite3.IntegrityError as e:
         logger.error(f"Error adding user '{username}'. Username or email might already exist: {e}", exc_info=True)
@@ -55,7 +56,13 @@ def get_user_by_username(username: str, conn: sqlite3.Connection = None) -> dict
         cursor = conn.cursor()
         cursor.execute(sql, (username,))
         row = cursor.fetchone()
-        return dict(row) if row else None
+        if row:
+            user_data = dict(row)
+            logger.debug(f"User '{username}' found. Retrieved hash: {user_data.get('hashed_password')}")
+            return user_data
+        else:
+            logger.debug(f"User '{username}' not found.")
+            return None
     except sqlite3.Error as e:
         logger.error(f"Database error fetching user by username '{username}': {e}", exc_info=True)
         return None
@@ -102,9 +109,15 @@ def update_user_password(user_id: str, new_password: str, conn: sqlite3.Connecti
     sql = "UPDATE Users SET hashed_password = ?, updated_at = ? WHERE user_id = ?"
     try:
         cursor = conn.cursor()
+        logger.debug(f"Attempting to update password for user_id '{user_id}'. New hash: {hashed_pw}")
         cursor.execute(sql, (hashed_pw, now, user_id))
         # conn.commit()
-        return cursor.rowcount > 0
+        success = cursor.rowcount > 0
+        if success:
+            logger.info(f"Password updated successfully for user_id '{user_id}'. Stored hash: {hashed_pw}")
+        else:
+            logger.warning(f"Password update for user_id '{user_id}' affected 0 rows (user may not exist or password was the same).")
+        return success
     except sqlite3.Error as e:
         logger.error(f"Database error updating password for user ID '{user_id}': {e}", exc_info=True)
         return False
