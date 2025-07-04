@@ -25,6 +25,7 @@ class LoginDialog(QDialog):
         self.setWindowIcon(QIcon(":/icons/logo.svg")) # Assuming logo.svg is in resources
         self.setMinimumSize(350, 250)
         self.user_data = None # To store user data upon successful login
+        self._raw_login_output = None # To store all 4 return values from authentication.login
         self._setup_ui()
 
     def _setup_ui(self):
@@ -120,10 +121,14 @@ class LoginDialog(QDialog):
 
         try:
             remember_me_checked = self.is_remember_me_checked()
-            success, error_message, user_info = authentication.login(username, password, remember_me=remember_me_checked)
+            # authentication.login now returns 4 values: success, error_message, user_info, license_info
+            self._raw_login_output = authentication.login(username, password, remember_me=remember_me_checked)
+            success, error_message, user_info, license_info = self._raw_login_output
 
             if success and user_info:
-                logger.info(f"Login successful for user: {username}. Remember Me: {remember_me_checked}")
+                # License check is handled by main.py using the full raw_login_output.
+                # Here, we just care about authentication success for dialog closing.
+                logger.info(f"Login attempt in dialog for user: {username}. Auth Success: {success}. Remember Me: {remember_me_checked}. License Info: {license_info is not None}")
                 self.user_data = user_info
                 self.login_successful.emit(user_info) # Emit signal with user data
                 self.accept() # Close the dialog with QDialog.Accepted status
@@ -155,6 +160,13 @@ class LoginDialog(QDialog):
     def is_remember_me_checked(self) -> bool:
         """Returns the state of the 'Remember Me' checkbox."""
         return self.remember_me_checkbox.isChecked()
+
+    def get_raw_login_output(self) -> tuple | None:
+        """
+        Returns all values from the authentication.login call.
+        This is used by main.py to get user_info and license_info.
+        """
+        return self._raw_login_output
 
 # Example Usage (for testing the dialog itself, not part of the main app flow here)
 if __name__ == '__main__':

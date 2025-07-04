@@ -29,7 +29,16 @@ from db.connection import get_db_connection # Changed from db.utils
 # APP_ROOT_DIR_CONTEXT, LOGO_SUBDIR_CONTEXT, MEDIA_FILES_BASE_PATH will now be passed or derived from app_root_dir or config object
 
 # Import config for MEDIA_FILES_BASE_PATH, assuming app_root_dir is for logos primarily
-from app_setup import CONFIG as AppGlobalConfig
+# from app_setup import CONFIG as AppGlobalConfig # Removed
+_module_config = None
+
+def set_document_generator_config(config):
+    """Sets the configuration for the document_generator module."""
+    global _module_config
+    if _module_config is not None:
+        logger.warning("document_generator.context_builder.set_document_generator_config called multiple times.")
+    _module_config = config
+    logger.info("document_generator.context_builder: Configuration has been set.")
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -221,8 +230,12 @@ def get_document_context(
             logo_filename = seller_company.get("logo_path")
             context["seller"]["logo_url"] = "" # Default to empty string
 
-            if logo_filename and app_root_dir:
-                logo_subdir = AppGlobalConfig.get('company_logo_dir', 'company_logos')
+            if _module_config is None:
+                logger.error("Document generator configuration not set. Call set_document_generator_config first.")
+                # Potentially raise an error or handle gracefully
+
+            if logo_filename and app_root_dir and _module_config:
+                logo_subdir = _module_config.get('company_logo_dir', 'company_logos')
                 logo_abs_path = os.path.join(app_root_dir, logo_subdir, logo_filename)
                 logger.info(f"Attempting to resolve seller logo. Subdir: '{logo_subdir}', Filename: '{logo_filename}', Absolute path: '{logo_abs_path}'")
                 if os.path.exists(logo_abs_path):
@@ -448,13 +461,13 @@ def get_document_context(
 
             # Media links (similar to previous product logic)
             media_links_processed = []
-            if global_product_id and app_root_dir:
+            if global_product_id and app_root_dir and _module_config:
                 media_links_raw = get_media_links_for_product(global_product_id)
                 if media_links_raw:
                     for media_link in media_links_raw:
                         file_path = media_link.get("file_path")
                         if file_path:
-                            media_root = AppGlobalConfig.get('media_files_path', os.path.join(app_root_dir, 'media_files'))
+                            media_root = _module_config.get('media_files_path', os.path.join(app_root_dir, 'media_files'))
                             abs_media_path = os.path.join(media_root, file_path.lstrip(os.sep))
                             if os.path.exists(abs_media_path):
                                  media_links_processed.append({
