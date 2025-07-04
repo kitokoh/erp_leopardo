@@ -114,6 +114,8 @@ from dialogs import (
 #     # or allowing the ModuleNotFoundError to naturally occur if this fails.
 #     pass
 # --- END TARGETED sys.path FIX ---
+print(f"DEBUG: Current sys.path before product_management import: {sys.path}")
+print(f"DEBUG: Current working directory before product_management import: {os.getcwd()}")
 from product_management.page import ProductManagementPage # Added
 from PyQt5.QtWidgets import QSizePolicy
 
