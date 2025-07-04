@@ -248,7 +248,15 @@ def main():
     logging.info("logging.shutdown registered with atexit.")
 
     # Initialize database after logging and API server start attempt
-    db.initialize_database()
+    db.initialize_database(CONFIG) # Pass CONFIG here
+
+    # Set the database configuration for db.connection module
+    # This must be done after app_setup.CONFIG is loaded and db structure might be initialized
+    if hasattr(db, 'connection') and hasattr(db.connection, 'set_db_config'):
+        db.connection.set_db_config(CONFIG)
+        logging.info("main.py: db.connection.set_db_config(CONFIG) called.")
+    else:
+        logging.error("main.py: Could not find db.connection.set_db_config. DB calls might fail.")
 
     # --- Coordinated Data Seeding ---
     # This block handles the seeding of initial data after the schema is created,
