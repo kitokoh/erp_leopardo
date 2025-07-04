@@ -70,6 +70,7 @@ import os
 # Par exemple:
 # from some_module import something
 # from gui.main_window import DocumentManager 
+from gui.main_window import DocumentManager
 import datetime # Added for session timeout
 from PyQt5.QtCore import QSettings # Added for Remember Me
 
