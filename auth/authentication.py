@@ -16,10 +16,15 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
         password (str): The password.
 
     Returns:
-        tuple[bool, str | None, dict | None]: (success_status, error_message_or_None, user_data_or_None)
-                                              user_data includes user_id, username, full_name, role_name, role_id, email.
+        tuple[bool, str | None, dict | None, dict | None]:
+            (success_status, error_message_or_None, user_data_or_None, license_info_or_None)
+            user_data includes user_id, username, full_name, role_name, role_id, email.
+            license_info includes details of the current valid license, or info about expired/missing license.
     """
     global _current_user_data
+    from license_management import manager as license_manager # Importation locale
+    from db.connection import get_db_connection # Pour obtenir une connexion DB
+
     # The 'remember_me' flag will be passed from LoginDialog
     # For now, we define the function signature to accept it.
     # The actual call from LoginDialog needs to be updated to pass this.
@@ -57,15 +62,47 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
             # This is where we'd actually get 'remember_me' from the call
             # For now, let's assume it's passed. We'll modify LoginDialog next.
             save_remember_me_preference(username, remember_me) # Save preference on successful login
-            return True, None, _current_user_data
-        else:
+
+            # Vérification de la licence
+            conn = None
+            try:
+                conn = get_db_connection()
+                is_license_valid, license_msg, license_details = license_manager.check_license_validity(conn, user['user_id'])
+
+                # Le login est réussi, mais la licence peut être invalide.
+                # Le message d'erreur de la licence sera prioritaire s'il y en a un.
+                # La fonction login retourne maintenant aussi license_details pour que main.py puisse agir.
+                if not is_license_valid:
+                    logger.warning(f"Login réussi pour {username} mais licence invalide: {license_msg}")
+                    # On ne retourne pas False pour le login, car l'utilisateur est authentifié.
+                    # C'est à l'appelant (main.py) de gérer le flux de licence.
+                    # Cependant, on peut enrichir le message d'erreur.
+                    # Le `license_details` ici pourrait être None ou contenir les infos de la licence invalide.
+                    return True, license_msg, _current_user_data, license_details # license_details peut être la licence invalide
+
+                logger.info(f"Login et vérification de licence réussis pour {username}.")
+                return True, None, _current_user_data, license_details
+
+            except Exception as e_lic:
+                logger.error(f"Erreur lors de la vérification de la licence pour {username}: {e_lic}", exc_info=True)
+                # Si la vérification de licence échoue critiquement, on peut considérer le login comme échoué
+                # ou retourner un statut spécial. Pour l'instant, on propage une erreur.
+                save_remember_me_preference(username, False) # Effacer remember_me en cas d'erreur critique de licence
+                _current_user_data = None # Ne pas considérer l'utilisateur comme loggué
+                return False, "Erreur critique lors de la vérification de la licence.", None, None
+            finally:
+                if conn:
+                    conn.close()
+
+        else: # Mot de passe incorrect
             logger.warning(f"Login attempt failed: Invalid password for user '{username}'.")
             save_remember_me_preference(username, False) # Clear on failure
-            return False, "Nom d'utilisateur ou mot de passe incorrect.", None
-    except Exception as e:
+            return False, "Nom d'utilisateur ou mot de passe incorrect.", None, None
+
+    except Exception as e: # Erreur générale pendant le login (avant la licence)
         logger.error(f"Error during login for user '{username}': {e}", exc_info=True)
         save_remember_me_preference(username, False) # Clear on exception
-        return False, "Une erreur est survenue lors de la connexion.", None
+        return False, "Une erreur est survenue lors de la connexion.", None, None
 
 def logout():
     """Logs out the current user."""

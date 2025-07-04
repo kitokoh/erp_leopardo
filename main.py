@@ -74,6 +74,11 @@ from PyQt5.QtWidgets import QSplashScreen
 import datetime # Added for session timeout
 from PyQt5.QtCore import QSettings # Added for Remember Me
 
+# Imports pour la gestion de licence
+from db.connection import get_db_connection
+from license_management import manager as license_manager
+from license_management.ui import LicenseDialog # Décommenté
+
 # Global variables for session information
 CURRENT_SESSION_TOKEN = None
 CURRENT_USER_ROLE = None
@@ -559,6 +564,7 @@ def main():
     # Login will be required each time.
 
     logged_in_user_info = None # To store user details after successful login
+    current_license_info = None # Pour stocker les détails de la licence
 
     # --- Remember Me - Attempt Auto Login ---
     remembered_username = auth_service.get_remembered_user()
@@ -567,53 +573,167 @@ def main():
         # In a real token system, we'd validate the token here.
         # For this simplified version, we fetch user details directly.
         # This assumes the user still exists and is active.
-        user_details = users_crud.get_user_by_username(remembered_username) # Corrected usage
+        user_details = users_crud.get_user_by_username(remembered_username)
 
         if user_details and user_details.get('is_active'):
-            auth_service.set_current_user(user_details) # Set the user as current
+            auth_service.set_current_user(user_details)
             logged_in_user_info = user_details
-            proceed_to_main_app = True
-            logging.info(f"Auto-login successful for user: {remembered_username}")
-            SESSION_START_TIME = datetime.datetime.now() # Start session timer
-        else:
-            logging.warning(f"Auto-login failed for remembered user: {remembered_username}. User not found or inactive. Clearing preference.")
-            auth_service.clear_remember_me_preference() # Ensure preference is cleared on any auto-login failure for this user
-            proceed_to_main_app = False # Fallback to manual login
-    else:
-        # No remembered_username, so nothing to clear here based on auto-login failure
-        proceed_to_main_app = False # No remembered user, proceed to manual login
+            logging.info(f"Auto-login (authentification) successful for user: {remembered_username}")
+            SESSION_START_TIME = datetime.datetime.now()
 
-    if not proceed_to_main_app: # If auto-login didn't happen or failed
-        while True: # Loop until successful login or explicit exit
-            login_dialog = LoginDialog()
-            if login_dialog.exec_() == QDialog.Accepted:
-                user_data_from_dialog = login_dialog.get_user_data() # This is already the full user_info from auth_service.login
-                if user_data_from_dialog:
-                    logged_in_user_info = user_data_from_dialog # Already set by auth_service.login and retrieved
-                    if logged_in_user_info: # Should always be true if user_data_from_dialog is not None
-                        logging.info(f"Manual login successful. User: {logged_in_user_info.get('username')}, Role: {logged_in_user_info.get('role_name')}")
-                        # Save remember me preference based on checkbox in LoginDialog
-                        # This is now handled inside auth_service.login based on the 'remember_me' param
-                        # auth_service.save_remember_me_preference(logged_in_user_info['username'], login_dialog.is_remember_me_checked())
-                        SESSION_START_TIME = datetime.datetime.now() # Start session timer
-                        proceed_to_main_app = True
-                        break # Exit login loop
-                    else:
-                        logging.error("Login dialog accepted, but no user data found in auth_service after manual login. Critical error.")
-                        QMessageBox.critical(None, "Erreur Critique de Connexion", "Impossible de récupérer les informations utilisateur après la connexion.")
-                        splash.hide()
-                        sys.exit(1)
+            # Vérification de la licence pour l'auto-connexion
+            conn_lic_auto = None
+            try:
+                conn_lic_auto = get_db_connection()
+                is_license_valid, license_msg, lic_details = license_manager.check_license_validity(conn_lic_auto, logged_in_user_info['user_id'])
+                current_license_info = lic_details # Peut être None ou contenir des infos sur l'invalidité
+
+                if is_license_valid:
+                    logging.info(f"Licence valide pour l'auto-connexion de {remembered_username}.")
+                    proceed_to_main_app = True
                 else:
-                    logging.error("Login dialog accepted, but get_user_data() returned None from manual login.")
-                    QMessageBox.critical(None, "Erreur de Connexion", "Échec de la récupération des données utilisateur.")
-            else: # LoginDialog was cancelled or closed
+                    logging.warning(f"Auto-login pour {remembered_username}, mais licence invalide: {license_msg}")
+                    # Ne pas aller à l'application principale, forcer la boîte de dialogue de licence/login.
+                    proceed_to_main_app = False
+                    # Afficher un message à l'utilisateur avant de retomber sur le login manuel
+                    QMessageBox.warning(None, "Licence Requise", f"Votre session a été restaurée, mais votre licence n'est plus valide : {license_msg}\nVeuillez vous reconnecter.")
+                    auth_service.logout() # Effacer la session auto-logguée pour forcer le login manuel
+                    logged_in_user_info = None # Réinitialiser
+                    current_license_info = None
+                    # La boucle while de login manuel prendra le relais
+            except Exception as e_lic_auto:
+                logging.error(f"Erreur de vérification de licence pendant l'auto-login pour {remembered_username}: {e_lic_auto}", exc_info=True)
+                proceed_to_main_app = False
+                QMessageBox.critical(None, "Erreur de Licence", "Une erreur critique est survenue lors de la vérification de votre licence.")
+                auth_service.logout()
+                logged_in_user_info = None
+                current_license_info = None
+            finally:
+                if conn_lic_auto:
+                    conn_lic_auto.close()
+        else: # user_details non valides ou inactifs
+            logging.warning(f"Auto-login failed for remembered user: {remembered_username}. User not found or inactive. Clearing preference.")
+            auth_service.clear_remember_me_preference()
+            proceed_to_main_app = False
+    else: # Pas d'utilisateur mémorisé
+        proceed_to_main_app = False
+
+    if not proceed_to_main_app: # Si auto-login n'a pas abouti à une licence valide
+        auth_service.logout() # S'assurer que toute session d'auto-login est nettoyée
+        logged_in_user_info = None
+        current_license_info = None
+
+        while True: # Boucle pour login manuel et gestion de licence
+            login_dialog = LoginDialog()
+            login_dialog_result = login_dialog.exec_()
+
+            if login_dialog_result == QDialog.Accepted:
+                # auth_service.login gère maintenant la vérification de la licence et retourne les infos
+                # user_data_from_dialog est en fait le retour de auth_service.login()
+                # qui est (success, error_message_or_None, user_info_or_None, license_info_or_None)
+
+                raw_login_output = login_dialog.get_raw_login_output()
+                if not raw_login_output or len(raw_login_output) != 4:
+                    logging.error("Le retour de LoginDialog.get_raw_login_output() est invalide.")
+                    QMessageBox.critical(None, "Erreur Critique", "Erreur interne lors de la récupération des informations de connexion.")
+                    splash.hide()
+                    sys.exit(1) # Quitter en cas d'erreur critique
+
+                auth_success, auth_message, temp_user_info, temp_license_info = raw_login_output
+
+                logged_in_user_info = temp_user_info # Peut être None si auth_success est False
+                current_license_info = temp_license_info # Peut être None ou contenir des infos sur l'invalidité
+
+                if auth_success and logged_in_user_info:
+                    logging.info(f"Authentification manuelle réussie pour: {logged_in_user_info.get('username')}")
+                    SESSION_START_TIME = datetime.datetime.now() # Démarrer le timer de session
+
+                    # La licence a déjà été vérifiée dans auth_service.login.
+                    # Si auth_message contient quelque chose, c'est probablement un message de licence.
+                    if auth_message and "licence" in auth_message.lower(): # Si le message concerne la licence
+                        logging.warning(f"Utilisateur {logged_in_user_info.get('username')} authentifié, mais problème de licence: {auth_message}")
+
+                        # Proposer d'activer la licence gratuite si c'est pertinent
+                        if "aucune licence" in auth_message.lower() or "expiré" in auth_message.lower():
+                            conn_lic_man = None
+                            try:
+                                conn_lic_man = get_db_connection()
+                                # Vérifier si une licence gratuite a déjà été utilisée sur cette machine pour cet utilisateur
+                                machine_id = license_manager.get_machine_identifier()
+                                existing_free_on_machine = license_manager.cruds.get_licenses_by_machine_info(conn_lic_man, machine_id, license_type="gratuit")
+                                has_had_free_on_machine_for_user = any(lic['user_id'] == logged_in_user_info['user_id'] for lic in existing_free_on_machine)
+
+                                if not has_had_free_on_machine_for_user:
+                                    reply = QMessageBox.question(None, "Licence Gratuite",
+                                                                 "Aucune licence valide trouvée. Souhaitez-vous activer une licence gratuite de 30 jours ?",
+                                                                 QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+                                    if reply == QMessageBox.Yes:
+                                        free_lic_details, free_msg = license_manager.activate_free_license(conn_lic_man, logged_in_user_info['user_id'])
+                                        if free_lic_details:
+                                            QMessageBox.information(None, "Licence Gratuite Activée", free_msg)
+                                            current_license_info = free_lic_details # Mettre à jour avec la nouvelle licence
+                                            proceed_to_main_app = True
+                                            break # Sortir de la boucle de login, licence OK
+                                        else:
+                                            QMessageBox.warning(None, "Échec Activation Gratuite", free_msg)
+                                            # Reste dans la boucle pour afficher la page de licence
+                                    # Si l'utilisateur dit non, ou si la gratuite n'est pas proposée, on continue vers la page de licence
+                            except Exception as e_free_act:
+                                logging.error(f"Erreur lors de la tentative d'activation de la licence gratuite: {e_free_act}", exc_info=True)
+                                QMessageBox.warning(None, "Erreur", "Une erreur est survenue lors de l'activation de la licence gratuite.")
+                            finally:
+                                if conn_lic_man:
+                                    conn_lic_man.close()
+
+                        # Si on n'a pas pu activer la gratuite ou si ce n'était pas pertinent, afficher la page de licence
+                        if not proceed_to_main_app: # proceed_to_main_app est False ici si la gratuite n'a pas résolu
+                            logging.info("Affichage de la LicenseDialog car la licence n'est pas valide après la tentative d'activation gratuite (ou si non applicable).")
+                            license_dialog_instance = LicenseDialog(
+                                current_user_info=logged_in_user_info,
+                                initial_license_info=current_license_info, # Passer les infos de licence actuelles (potentiellement invalides)
+                                parent=None # Ou login_dialog comme parent si on veut le lier
+                            )
+
+                            dialog_accepted = False
+                            if license_dialog_instance.exec_() == QDialog.Accepted:
+                                # LicenseDialog a été acceptée, ce qui signifie qu'une licence valide a été configurée.
+                                # Récupérer les informations de licence mises à jour.
+                                updated_license_details = license_dialog_instance.get_current_valid_license_info()
+                                if updated_license_details and updated_license_details.get('is_active'):
+                                    current_license_info = updated_license_details
+                                    proceed_to_main_app = True
+                                    dialog_accepted = True # Marquer que la dialog a été acceptée
+                                    logging.info("LicenseDialog acceptée, licence valide obtenue.")
+                                    break # Sortir de la boucle de login, licence OK
+                                else:
+                                    QMessageBox.critical(None, "Licence Toujours Invalide",
+                                                         "La licence n'est toujours pas valide après la tentative de configuration. L'application va se fermer.")
+                                    splash.hide()
+                                    sys.exit(1)
+
+                            if not dialog_accepted: # Si la LicenseDialog a été fermée/rejetée sans licence valide
+                                QMessageBox.information(None, "Licence Requise",
+                                                        "Une licence valide est requise pour continuer. L'application va se fermer.")
+                                splash.hide()
+                                sys.exit(0) # Quitter proprement
+
+                    else: # Authentification OK et la licence était déjà valide (pas de auth_message de licence)
+                        proceed_to_main_app = True
+                        break # Sortir de la boucle de login, tout est OK
+
+                else: # Échec de l'authentification (auth_success est False)
+                    logging.warning(f"Échec de l'authentification manuelle: {auth_message}")
+                    QMessageBox.warning(login_dialog, "Échec de la Connexion", auth_message or "Nom d'utilisateur ou mot de passe incorrect.")
+                    # Reste dans la boucle de login
+
+            else: # LoginDialog a été annulé ou fermé
                 logging.warning("Login dialog was cancelled or closed by the user. Exiting application.")
                 splash.hide()
-                sys.exit(0)
+                sys.exit(0) # Quitter l'application
 
-    if proceed_to_main_app and logged_in_user_info:
-        # Pass the full user_info dictionary to DocumentManager
-        main_window = DocumentManager(APP_ROOT_DIR, logged_in_user_info)
+    if proceed_to_main_app and logged_in_user_info and current_license_info and current_license_info.get('is_active'):
+        # Passer user_info et license_info à DocumentManager
+        main_window = DocumentManager(APP_ROOT_DIR, logged_in_user_info, current_license_info)
 
         # Setup Notification Manager
         # Ensure 'app' is the QApplication instance, available in this scope
