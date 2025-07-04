@@ -59,5 +59,23 @@
     "total_gross_weight": "Total Gross Weight:",
     "total_volume": "Total Volume:",
     "exporter_signature": "Exporter's Signature:",
-    "packing_list_footer_notice": "This document certifies the content and packing details of the shipment."
+    "packing_list_footer_notice": "This document certifies the content and packing details of the shipment.",
+
+    "referents_report_title": "Referents Report",
+    "generation_date_label": "Generation Date",
+    "client_information_title": "Client Information",
+    "client_name_label": "Client",
+    "client_company_label": "Company",
+    "client_location_label": "Location",
+    "local_referents_title": "Local Referents",
+    "unknown_country": "Unknown country",
+    "referent_name_label": "Name",
+    "referent_company_label": "Company",
+    "referent_city_label": "City",
+    "referent_region_label": "Region",
+    "referent_country_label": "Country",
+    "no_local_referents_found": "No local referents found for this location.",
+    "global_referents_title": "Global Referents",
+    "no_global_referents_found": "No global referents found.",
+    "page_label": "Page"
 }

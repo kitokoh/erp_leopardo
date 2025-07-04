@@ -59,5 +59,23 @@
     "total_gross_weight": "Poids Brut Total:",
     "total_volume": "Volume Total:",
     "exporter_signature": "Signature de l'Exportateur:",
-    "packing_list_footer_notice": "Ce document atteste du contenu et des détails d’emballage de l’expédition."
+    "packing_list_footer_notice": "Ce document atteste du contenu et des détails d’emballage de l’expédition.",
+
+    "referents_report_title": "Rapport des Référents",
+    "generation_date_label": "Date de génération",
+    "client_information_title": "Informations du Client",
+    "client_name_label": "Client",
+    "client_company_label": "Société",
+    "client_location_label": "Localité",
+    "local_referents_title": "Référents Locaux",
+    "unknown_country": "Pays inconnu",
+    "referent_name_label": "Nom",
+    "referent_company_label": "Société",
+    "referent_city_label": "Ville",
+    "referent_region_label": "Région",
+    "referent_country_label": "Pays",
+    "no_local_referents_found": "Aucun référent local trouvé pour cette localité.",
+    "global_referents_title": "Référents Globaux",
+    "no_global_referents_found": "Aucun référent global trouvé.",
+    "page_label": "Page"
 }

@@ -327,12 +327,13 @@ if __name__ == '__main__':
     logger.info(f"\n--- Testing generate_html_and_convert_to_pdf ---")
     output_pdf_file = "test_output.pdf"
 
+    # convert_html_to_pdf is already a module-level global.
+    # No need for 'global' declaration here when running as __main__.
     # Mock `convert_html_to_pdf` from `html_to_pdf_util` for this test to avoid actual PDF generation
     try:
         # Assuming html_to_pdf_util was imported and we can patch its functions
         # This is a bit tricky due to the try-except import logic earlier.
         # If `convert_html_to_pdf` is already a global in this module:
-        global convert_html_to_pdf
         original_convert_html_to_pdf = convert_html_to_pdf # Save original
         def mock_convert_html_to_pdf(html_content, base_url=None):
             logger.info(f"[MOCK] convert_html_to_pdf called with base_url: {base_url}")
@@ -380,4 +381,4 @@ if __name__ == '__main__':
     #      @patch('document_generator.html_generator.convert_html_to_pdf')
     #      def test_my_function(mock_convert_pdf, mock_get_ctx): ...
 
-```
+# ```
