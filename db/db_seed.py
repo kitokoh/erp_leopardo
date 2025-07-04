@@ -115,12 +115,19 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         if admin_role_id: # Only proceed if Admin role exists
             logger.info(f"Checking for default admin user '{DEFAULT_ADMIN_USERNAME}'...")
             admin_user_dict = crud_get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn)
+            temp_admin_password = "admin" # Known default password
+
             if admin_user_dict:
                 admin_user_id = admin_user_dict['user_id']
-                logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' already exists with ID {admin_user_id}.")
+                logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' already exists with ID {admin_user_id}. Unconditionally updating password to default to ensure bcrypt hash.")
+                update_success = users_crud.update_user_password(admin_user_id, temp_admin_password, conn=conn)
+                if update_success:
+                    logger.info(f"Password for default admin user '{DEFAULT_ADMIN_USERNAME}' has been reset/updated and hash refreshed to bcrypt.")
+                else:
+                    logger.error(f"Failed to update password for default admin user '{DEFAULT_ADMIN_USERNAME}'. This is critical for login.")
             else:
                 logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' not found. Creating...")
-                # Use a secure, but known temporary password for initial setup.
+                # Use a known temporary password for initial setup.
                 # IMPORTANT: This password MUST be changed immediately by the administrator.
                 # For a real deployment, this password should be very strong or generated
                 # and displayed once, or set via a secure first-time setup process.
