@@ -57,6 +57,19 @@ from notifications import NotificationManager # Added for notifications
 # from db.cruds.users_crud import users_crud_instance # users_crud is used directly by auth_service
 from PyQt5.QtWidgets import QMessageBox # Added for error dialog
 from PyQt5.QtWidgets import QSplashScreen
+
+# --- Re-ensure PROJECT_ROOT is in sys.path before critical GUI import ---
+# PROJECT_ROOT should have been defined at the top of main.py
+if 'PROJECT_ROOT' in globals() and PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+    print(f"DEBUG main.py: Re-inserted PROJECT_ROOT into sys.path before gui.main_window import. New sys.path: {sys.path}")
+elif 'PROJECT_ROOT' in globals() and sys.path[0] != PROJECT_ROOT:
+    # Ensure PROJECT_ROOT is in sys.path before trying to remove, to avoid ValueError
+    if PROJECT_ROOT in sys.path:
+        sys.path.remove(PROJECT_ROOT)
+    sys.path.insert(0, PROJECT_ROOT)
+    print(f"DEBUG main.py: Moved PROJECT_ROOT to sys.path[0] before gui.main_window import. New sys.path: {sys.path}")
+# --- End Re-ensure ---
 import sys
 import os
 # PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__)) # Redundant: PROJECT_ROOT already defined and sys.path modified at the top
@@ -70,6 +83,7 @@ import os
 # Par exemple:
 # from some_module import something
 # from gui.main_window import DocumentManager 
+from gui.main_window import DocumentManager
 import datetime # Added for session timeout
 from PyQt5.QtCore import QSettings # Added for Remember Me
 
