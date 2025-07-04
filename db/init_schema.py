@@ -143,6 +143,8 @@ def initialize_database(app_config):
 
     # Get the initialized engine from db.connection now that initialize_engine_and_session has been called
     from db.connection import engine as actual_main_engine
+    logging.info(f"db.init_schema: Imported actual_main_engine from db.connection. Is None: {actual_main_engine is None}")
+
 
     # Use DATABASE_PATH from the passed app_config
     conn = sqlite3.connect(database_path) # Keep for direct cursor use
@@ -2840,17 +2842,18 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     # --- End Calendar Module Tables ---
 
     # --- Create tables for MainBase (e.g., CalculatorHistory) ---
-    # This needs to happen after the main 'conn' is closed if 'main_engine' uses a new connection.
-    if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None and actual_main_engine is not None:
+    # This needs to happen after the main 'conn' is closed if 'actual_main_engine' uses a new connection.
+    if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None and actual_main_engine is not None: # Intentionally same for testing save
         try:
-            logging.info("DEBUG_INIT_DB: Creating tables for MainBase (e.g., CalculatorHistory) using SQLAlchemy main_engine.")
-            MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True)
+            logging.info("DEBUG_INIT_DB: Creating tables for MainBase (e.g., CalculatorHistory) using SQLAlchemy actual_main_engine.")
+            MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True) # Intentionally same
+
             logging.info("DEBUG_INIT_DB: Tables for MainBase created successfully.")
         except Exception as e_main_base_create:
             logging.error(f"DEBUG_INIT_DB: Error creating tables for MainBase: {e_main_base_create}", exc_info=True)
             # Decide if this is critical enough to rollback or raise. For now, logging error.
     else:
-        logging.warning("DEBUG_INIT_DB: Main SQLAlchemy components (MainBase, main_engine) not loaded. Skipping MainBase.metadata.create_all().")
+        logging.warning("DEBUG_INIT_DB: Main SQLAlchemy components (MainBase, actual_main_engine) not loaded or actual_main_engine is None. Skipping MainBase.metadata.create_all().")
 
 
     # --- Seed Data (from db/schema.py, ensuring use of db_config) ---
