@@ -125,6 +125,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                     logger.info(f"Password for default admin user '{DEFAULT_ADMIN_USERNAME}' has been reset/updated and hash refreshed to bcrypt.")
                 else:
                     logger.error(f"Failed to update password for default admin user '{DEFAULT_ADMIN_USERNAME}'. This is critical for login.")
+
             else:
                 logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' not found. Creating...")
                 # Use a known temporary password for initial setup.
