@@ -15,7 +15,7 @@ from PyQt5.QtCore import QUrl, QStandardPaths, Qt, QCoreApplication, pyqtSlot, Q
 import db as db_manager # Assuming db_manager provides necessary CRUDs
 from db.utils import get_document_context_data
 # from db.cruds.companies_crud import get_default_company # Moved into __init__
-from html_to_pdf_util import render_html_template, convert_html_to_pdf
+from utils.html_to_pdf_util import render_html_template, convert_html_to_pdf
 
 class JsBridge(QObject):
     editorContentReady = pyqtSignal(str)
