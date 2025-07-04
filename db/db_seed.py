@@ -115,12 +115,33 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         if admin_role_id: # Only proceed if Admin role exists
             logger.info(f"Checking for default admin user '{DEFAULT_ADMIN_USERNAME}'...")
             admin_user_dict = crud_get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn)
+            temp_admin_password = "admin" # Known default password
+
             if admin_user_dict:
                 admin_user_id = admin_user_dict['user_id']
-                logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' already exists with ID {admin_user_id}.")
+                logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' already exists with ID {admin_user_id}. Verifying and ensuring password hash is up-to-date.")
+
+                # Attempt to verify password. If it fails or if hash is unknown, force update.
+                # users_crud.verify_user_password should handle hash upgrades if the hash is recognizable.
+                # The UnknownHashError happens inside verify_password if the hash is bad.
+                verification_user_info = users_crud.verify_user_password(DEFAULT_ADMIN_USERNAME, temp_admin_password, conn=conn)
+
+                if verification_user_info:
+                    logger.info(f"Password for default admin user '{DEFAULT_ADMIN_USERNAME}' verified successfully. Hash should be up-to-date if it was deprecated.")
+                else:
+                    # This 'else' block will be hit if:
+                    # 1. Password was incorrect for a known hash type.
+                    # 2. UnknownHashError occurred during users_crud.verify_user_password (which calls utils.auth.verify_password).
+                    # In either case, we reset the password to the default.
+                    logger.warning(f"Password verification failed for '{DEFAULT_ADMIN_USERNAME}' or hash was unknown/problematic. Forcing password update to default.")
+                    update_success = users_crud.update_user_password(admin_user_id, temp_admin_password, conn=conn)
+                    if update_success:
+                        logger.info(f"Password for default admin user '{DEFAULT_ADMIN_USERNAME}' has been reset and hash updated to bcrypt.")
+                    else:
+                        logger.error(f"Failed to update password for default admin user '{DEFAULT_ADMIN_USERNAME}'.")
             else:
                 logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' not found. Creating...")
-                # Use a secure, but known temporary password for initial setup.
+                # Use a known temporary password for initial setup.
                 # IMPORTANT: This password MUST be changed immediately by the administrator.
                 # For a real deployment, this password should be very strong or generated
                 # and displayed once, or set via a secure first-time setup process.
