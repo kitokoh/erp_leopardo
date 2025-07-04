@@ -278,7 +278,7 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTabWidget, QLabel,
     QFormLayout, QLineEdit, QComboBox, QSpinBox, QFileDialog, QCheckBox,
     QTableWidget, QTableWidgetItem, QAbstractItemView, QMessageBox, QDialog, QTextEdit,
-    QGroupBox, QRadioButton, QHeaderView # Added QHeaderView
+    QGroupBox, QRadioButton, QHeaderView, QListWidget, QListWidgetItem # Added QHeaderView, QListWidget, QListWidgetItem
 )
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
@@ -299,6 +299,15 @@ try:
 except ImportError:
     print("ERROR: Failed to import 'products_crud_instance' from 'db.cruds.products_crud'. Export functionality will be affected.")
     products_crud_instance = None # Ensure it exists, even if None
+
+# Import CONFIGURABLE_MODULES from gui.main_window
+# This requires gui.main_window to be importable.
+# If running settings_page.py standalone, this might need careful handling or mocking.
+try:
+    from gui.main_window import CONFIGURABLE_MODULES
+except ImportError as e_configurable_modules:
+    print(f"ERROR settings_page.py: Could not import CONFIGURABLE_MODULES from gui.main_window: {e_configurable_modules}")
+    CONFIGURABLE_MODULES = [] # Fallback to empty list
 
 from dialogs.transporter_dialog import TransporterDialog
 from dialogs.freight_forwarder_dialog import FreightForwarderDialog
@@ -427,7 +436,8 @@ class SettingsPage(QWidget):
         self._setup_data_backup_tab()
         self._setup_logistics_tab()
         self._setup_document_templates_tab()
-        self._setup_document_customization_tab() # Added new tab setup
+        self._setup_document_customization_tab()
+        self._setup_menu_customization_tab() # New tab for menu customization
         self._setup_security_tab()
 
 
@@ -913,6 +923,128 @@ class SettingsPage(QWidget):
         main_layout.addWidget(footer_notes_group)
         main_layout.addStretch(1)
         self.tabs_widget.addTab(tab_widget, self.tr("Document Customization"))
+
+    def _get_user_menu_config_key(self):
+        """Generates the DB setting key for the current user's menu configuration."""
+        return f"user_menu_config_{self.current_user_id}"
+
+    def _setup_menu_customization_tab(self):
+        tab_widget = QWidget()
+        main_layout = QVBoxLayout(tab_widget)
+        main_layout.setContentsMargins(15, 15, 15, 15)
+        main_layout.setSpacing(15)
+
+        menu_custom_group = QGroupBox(self.tr("Customize 'Modules' Menu"))
+        group_layout = QVBoxLayout(menu_custom_group)
+        group_layout.setSpacing(10)
+
+        instructions_label = QLabel(self.tr(
+            "Check modules to include them in the 'Modules' menu. "
+            "Use 'Move Up' and 'Move Down' to change their order. "
+            "Unchecked modules will not appear in the menu, regardless of permissions. "
+            "Permissions will still apply (an unchecked but permitted module won't show; "
+            "a checked but non-permitted module also won't show)."
+        ))
+        instructions_label.setWordWrap(True)
+        group_layout.addWidget(instructions_label)
+
+        self.menu_modules_list_widget = QListWidget()
+        self.menu_modules_list_widget.setDragDropMode(QAbstractItemView.InternalMove) # Allow drag-drop reordering
+        group_layout.addWidget(self.menu_modules_list_widget)
+
+        # Buttons for reordering (alternative or in addition to drag-drop)
+        buttons_hbox = QHBoxLayout()
+        self.move_module_up_btn = QPushButton(self.tr("Move Up"))
+        self.move_module_up_btn.setIcon(QIcon(":/icons/chevron-up.svg"))
+        self.move_module_up_btn.clicked.connect(self._move_menu_module_up)
+        buttons_hbox.addWidget(self.move_module_up_btn)
+
+        self.move_module_down_btn = QPushButton(self.tr("Move Down"))
+        self.move_module_down_btn.setIcon(QIcon(":/icons/chevron-down.svg"))
+        self.move_module_down_btn.clicked.connect(self._move_menu_module_down)
+        buttons_hbox.addWidget(self.move_module_down_btn)
+
+        buttons_hbox.addStretch()
+
+        self.reset_menu_config_btn = QPushButton(self.tr("Reset Menu to Default"))
+        self.reset_menu_config_btn.setIcon(QIcon(":/icons/refresh-cw.svg"))
+        self.reset_menu_config_btn.clicked.connect(self._reset_menu_config_to_default)
+        buttons_hbox.addWidget(self.reset_menu_config_btn)
+        group_layout.addLayout(buttons_hbox)
+
+        main_layout.addWidget(menu_custom_group)
+        main_layout.addStretch(1)
+        self.tabs_widget.addTab(tab_widget, self.tr("Menu Customization"))
+
+    def _populate_menu_modules_list(self, config=None):
+        self.menu_modules_list_widget.clear()
+
+        # CONFIGURABLE_MODULES is a list of dicts: {'key': db_key, 'name': internal_name, 'action_attr': action_name, 'widget_attr': widget_name}
+        # We need the 'name' for identification and 'label_text' (from module_config in SettingsPage) or tr(internal_name) for display.
+
+        # Create a mapping from module 'name' to its translatable label if available in self.module_config
+        # This might be slightly redundant if CONFIGURABLE_MODULES already had a translatable label.
+        # For now, module_config in SettingsPage is for module *activation*, not menu items directly.
+        # Let's use the 'name' from CONFIGURABLE_MODULES and translate it if needed, or use a predefined mapping.
+
+        module_display_names = {
+            mod_info['name']: self.tr(mod_info['name'].replace('_', ' ').title())
+            for mod_info in CONFIGURABLE_MODULES
+        }
+        # Override with more specific translations if available from self.module_config (which has 'label_text')
+        # This assumes self.module_config's 'key' (like 'module_project_management_enabled') can be mapped to CONFIGURABLE_MODULES 'name'.
+        # This mapping is a bit indirect. A direct `label` in CONFIGURABLE_MODULES would be cleaner.
+        # For now, using module_display_names as defined above.
+
+        default_order = [mod['name'] for mod in CONFIGURABLE_MODULES]
+        default_visibility = {mod['name']: True for mod in CONFIGURABLE_MODULES}
+
+        if config is None: # No saved config, use defaults
+            current_order = default_order
+            visibility_map = default_visibility
+        else:
+            current_order = config.get('order', default_order)
+            visibility_map = config.get('visibility', default_visibility)
+            # Ensure all known modules are present in current_order, add missing ones at the end
+            for mod_name in default_order:
+                if mod_name not in current_order:
+                    current_order.append(mod_name)
+
+        for module_name in current_order:
+            module_info = next((m for m in CONFIGURABLE_MODULES if m['name'] == module_name), None)
+            if not module_info:
+                continue # Module from saved config no longer exists
+
+            display_text = module_display_names.get(module_name, module_name)
+            item = QListWidgetItem(display_text)
+            item.setData(Qt.UserRole, module_name) # Store internal name
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(Qt.Checked if visibility_map.get(module_name, True) else Qt.Unchecked)
+            self.menu_modules_list_widget.addItem(item)
+
+    def _move_menu_module_up(self):
+        current_row = self.menu_modules_list_widget.currentRow()
+        if current_row > 0:
+            item = self.menu_modules_list_widget.takeItem(current_row)
+            self.menu_modules_list_widget.insertItem(current_row - 1, item)
+            self.menu_modules_list_widget.setCurrentRow(current_row - 1)
+
+    def _move_menu_module_down(self):
+        current_row = self.menu_modules_list_widget.currentRow()
+        if current_row < self.menu_modules_list_widget.count() - 1 and current_row != -1:
+            item = self.menu_modules_list_widget.takeItem(current_row)
+            self.menu_modules_list_widget.insertItem(current_row + 1, item)
+            self.menu_modules_list_widget.setCurrentRow(current_row + 1)
+
+    def _reset_menu_config_to_default(self):
+        reply = QMessageBox.question(self, self.tr("Confirm Reset"),
+                                     self.tr("Are you sure you want to reset the menu customization to default?"),
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            self._populate_menu_modules_list(config=None) # Pass None to load defaults
+            # The actual save will happen when "Save All Settings" is clicked.
+            QMessageBox.information(self, self.tr("Menu Reset"),
+                                    self.tr("Menu customization has been reset to default. Click 'Save All Settings' to apply."))
 
 
     def _browse_download_monitor_path(self):
@@ -1429,6 +1561,7 @@ class SettingsPage(QWidget):
         self._load_data_backup_tab_data() # For DB, Download Monitor, Backup
         self._load_document_templates_tab_data() # For Template Dirs
         self._load_document_customization_tab_data() # Load footer notes
+        self._load_menu_customization_data() # Load menu customization settings
 
         self._load_modules_tab_data() # Loads from DB settings table
 
@@ -1442,8 +1575,39 @@ class SettingsPage(QWidget):
 
         # Security tab is self-contained for now (biometric test page)
         # Template Visibility table has its own load method called by _load_document_templates_tab_data
+        # Menu Customization tab data is loaded by _load_menu_customization_data
 
         print("SettingsPage: All relevant settings sections reloaded.")
+
+    def _load_menu_customization_data(self):
+        if not db_manager:
+            print("WARNING: db_manager not available. Cannot load menu customization settings.")
+            self._populate_menu_modules_list(config=None) # Populate with defaults
+            return
+
+        config_key = self._get_user_menu_config_key()
+        try:
+            # Assuming get_setting returns None if key not found and default is None
+            # And that it can handle JSON deserialization if value is a JSON string.
+            # For simplicity, let's assume it returns a dict or None.
+            menu_config_raw = db_manager.get_setting(config_key, default=None)
+            menu_config = None
+            if isinstance(menu_config_raw, str):
+                import json
+                try:
+                    menu_config = json.loads(menu_config_raw)
+                except json.JSONDecodeError:
+                    logging.error(f"Failed to decode JSON for menu config key {config_key}")
+                    menu_config = None # Fallback to default
+            elif isinstance(menu_config_raw, dict):
+                menu_config = menu_config_raw
+
+            self._populate_menu_modules_list(config=menu_config) # menu_config is now definitely dict or None
+            print(f"Menu customization settings loaded for user {self.current_user_id}. Config: {menu_config}")
+        except Exception as e: # Catch other issues
+            print(f"Error loading menu customization settings for key {config_key}: {e}")
+            self._populate_menu_modules_list(config=None) # Populate with defaults on error
+
 
     def _save_all_settings(self):
         # Consolidate settings from various getters into main_config
@@ -1469,7 +1633,7 @@ class SettingsPage(QWidget):
 
 
         # Save module activation states (persisted in DB, not main_config directly)
-        self._save_modules_tab_data()
+        self._save_modules_tab_data() # Handles its own user feedback
 
         # Save template visibility settings (persisted via API/DB, not main_config)
         self._save_template_visibility_data() # This method handles its own QMessageBox for success/failure
@@ -1484,19 +1648,19 @@ class SettingsPage(QWidget):
 
         # --- Persist main_config ---
         # This part depends on how main_config is actually saved to a file (e.g., JSON) in the application.
-        # Assuming a utility function like `ConfigManager.save_config(self.main_config)` exists.
-        # For this refactoring, we'll just log that main_config is updated.
-        # In a real app:
+        # For now, we assume self.main_config is updated in memory, and a higher-level process saves it.
+        # If SettingsPage were responsible for direct file I/O of main_config:
         # try:
-        #     actual_config_manager.save(self.main_config) # Replace with actual save call
-        #     QMessageBox.information(self, self.tr("Settings Saved"),
-        #                             self.tr("All settings have been updated. Some changes may require an application restart to take full effect."))
+        #     # actual_config_manager.save(self.main_config) # Example call
+        #     pass # Assuming save is handled elsewhere or main_config is live
         # except Exception as e:
         #     QMessageBox.critical(self, self.tr("Error Saving Configuration"),
         #                          self.tr("Could not save the main configuration file: {0}").format(str(e)))
         #     return # Prevent further messages if main config save fails
+        print("Main configuration dictionary (self.main_config) updated with new settings from UI.")
 
-        print("Main configuration dictionary (self.main_config) updated with new settings.")
+        # Save menu customization settings to DB
+        self._save_menu_customization_data() # Handles its own user feedback
 
         # Determine if a restart is likely needed
         restart_needed_msg = ""
@@ -1513,8 +1677,8 @@ class SettingsPage(QWidget):
         final_message = self.tr("Settings have been saved successfully.")
         potential_restart_message = self.tr(
             "Please note: Changes to settings like Interface Language, Database Path, "
-            "or Module Activation will require an application restart to take full effect."
-        )
+                "Module Activation, or Menu Customization will require an application restart to take full effect."
+            ) # Added Menu Customization to message
 
         # Check if any module activation changed - this is a clear restart trigger
         # This requires comparing current radio button states with initial states loaded into self.main_config
@@ -1522,7 +1686,40 @@ class SettingsPage(QWidget):
         # For now, the generic message is the most straightforward to implement.
 
         QMessageBox.information(self, self.tr("Settings Saved"), f"{final_message}\n\n{potential_restart_message}")
-        print("All settings processed (main_config updated, modules and visibility saved to DB/API).")
+        print("All settings processed (main_config updated, modules, visibility, and menu config saved to DB/API).")
+
+    def _save_menu_customization_data(self):
+        if not db_manager:
+            print("WARNING: db_manager not available. Cannot save menu customization settings.")
+            QMessageBox.warning(self, self.tr("Database Error"),
+                                self.tr("Database connection is not available. Menu customization settings cannot be saved."))
+            return
+
+        ordered_module_names = []
+        visibility_map = {}
+        for i in range(self.menu_modules_list_widget.count()):
+            item = self.menu_modules_list_widget.item(i)
+            module_name = item.data(Qt.UserRole)
+            ordered_module_names.append(module_name)
+            visibility_map[module_name] = item.checkState() == Qt.Checked
+
+        config_to_save = {
+            "order": ordered_module_names,
+            "visibility": visibility_map
+        }
+
+        config_key = self._get_user_menu_config_key()
+        try:
+            # Assuming db_manager.set_setting can handle storing a dictionary
+            # (e.g., by serializing to JSON internally if needed)
+            db_manager.set_setting(config_key, config_to_save)
+            print(f"Menu customization settings saved for user {self.current_user_id} under key {config_key}. Data: {config_to_save}")
+            # No separate QMessageBox here, as it's part of "Save All Settings"
+        except Exception as e:
+            print(f"Error saving menu customization settings for key {config_key}: {e}")
+            QMessageBox.critical(self, self.tr("Menu Save Error"),
+                                 self.tr("Could not save menu customization settings: {0}").format(str(e)))
+
 
     def _confirm_restore_defaults(self):
         reply = QMessageBox.question(self, self.tr("Confirm Restore Defaults"),
@@ -1540,8 +1737,9 @@ class SettingsPage(QWidget):
         # 3. Persist self.main_config (e.g., save to JSON file).
         # 4. Reset module activation states in the database to their defaults.
         # 5. Reset template visibility settings to their defaults (if applicable).
-        # 6. Reload the UI to reflect these defaults.
-        # 7. Inform the user that a restart is necessary.
+        # 6. Reset menu customization settings for the current user to default.
+        # 7. Reload the UI to reflect these defaults.
+        # 8. Inform the user that a restart is necessary.
 
         # For demonstration, let's assume a default config structure
         # In a real app, this should come from a reliable source or be hardcoded carefully.
@@ -1565,29 +1763,36 @@ class SettingsPage(QWidget):
         # Reset main_config
         for key, value in default_config_values.items():
             self.main_config[key] = value
-
         print("Main config reset to defaults.")
 
-        # Reset module settings in DB (assuming all modules default to True/Enabled for this example)
         if db_manager:
+            # Reset module activation settings in DB
             try:
-                for module_info in self.module_config:
-                    db_manager.set_setting(module_info["key"], 'True') # Example: default all to enabled
+                for module_info in self.module_config: # self.module_config from __init__
+                    db_manager.set_setting(module_info["key"], 'True') # Default all to enabled
                 print("Module activation settings reset to default (all enabled) in DB.")
             except Exception as e:
                 print(f"Error resetting module settings in DB: {e}")
                 QMessageBox.warning(self, self.tr("Module Reset Error"), self.tr("Could not reset all module activation settings in the database."))
 
-        # TODO: Reset template visibility settings if they are stored and have defaults.
-        # This would involve calling an API or DB function to set defaults.
-        # For now, we'll skip this part for template visibility.
+            # Reset menu customization for the current user
+            try:
+                user_menu_config_key = self._get_user_menu_config_key()
+                # Setting to None or an empty dict effectively removes/resets it,
+                # so _load_menu_customization_data will use defaults.
+                db_manager.set_setting(user_menu_config_key, None)
+                print(f"User menu customization for user {self.current_user_id} reset in DB.")
+            except Exception as e:
+                print(f"Error resetting user menu customization in DB: {e}")
+                QMessageBox.warning(self, self.tr("Menu Reset Error"), self.tr("Could not reset menu customization settings in the database."))
 
-        # Persist the now default self.main_config
-        # In a real app: actual_config_manager.save(self.main_config)
-        print("Default main_config would be persisted here.")
+        # TODO: Reset template visibility settings (if applicable and stored in DB).
+
+        # Persist the now default self.main_config (simulated)
+        print("Default main_config would be persisted here (e.g., to a JSON file).")
 
         # Reload UI from the new (default) config
-        self._load_all_settings_from_config()
+        self._load_all_settings_from_config() # This will also call _load_menu_customization_data
 
         QMessageBox.information(self, self.tr("Defaults Restored"),
                                 self.tr("All settings have been restored to their default values. "

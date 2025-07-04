@@ -2574,6 +2574,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         logger.error("Skipping acc_models.Base.metadata.create_all because main_engine is None (not initialized).")
 
 
+
         # print("DEBUG_INIT_DB: Table acc_fiscal_years created or exists.")
         # print("DEBUG_INIT_DB: Table acc_currencies created or exists.")
         # print("DEBUG_INIT_DB: Table acc_tax_rates created or exists.")
