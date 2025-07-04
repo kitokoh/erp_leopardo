@@ -2735,7 +2735,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
 
     # --- Calendar Module Tables (Must use a new connection as 'conn' was closed) ---
     print("DEBUG_INIT_DB: Creating Calendar Module Tables (using a new raw connection)...")
-    conn_cal = sqlite3.connect(config.DATABASE_PATH)
+    conn_cal = sqlite3.connect(app_config['database_path']) # Use app_config here
     conn_cal.row_factory = sqlite3.Row
     cursor_cal = conn_cal.cursor()
     try:
@@ -3005,6 +3005,31 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
             print("DEBUG_INIT_DB: Main SQLite connection 'conn' closed at the end of initialize_database.")
 
 if __name__ == '__main__':
-    print(f"Running init_schema.py directly. Using database path: {config.DATABASE_PATH}")
-    initialize_database()
-    print("Schema initialization complete (called from init_schema.py __main__).")
+    # This direct call is for testing init_schema.py itself.
+    # In the application, main.py provides the config.
+    # For standalone test, we create a mock config.
+    print("Running init_schema.py directly for testing purposes.")
+
+    # Determine a root path for the test database if needed, relative to this script
+    # This assumes db/init_schema.py, so two levels up is project root.
+    _project_root_for_test = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    _test_db_path = os.path.join(_project_root_for_test, "app_data_standalone_init_test.db")
+
+    mock_app_config = {
+        "database_path": _test_db_path,
+        # Add any other keys that initialize_database or its callees might expect from app_config
+        # for standalone execution. For now, only database_path is strictly necessary for init_schema.
+        # For example, if seeding logic inside initialize_database relies on config for default admin:
+        # "DEFAULT_ADMIN_USERNAME": "admin_standalone_test",
+        # "DEFAULT_ADMIN_PASSWORD": "password_standalone_test"
+    }
+    print(f"Using mock database path for standalone test: {mock_app_config['database_path']}")
+
+    # Ensure the directory for the mock database exists
+    _test_db_dir = os.path.dirname(mock_app_config["database_path"])
+    if _test_db_dir and not os.path.exists(_test_db_dir):
+        os.makedirs(_test_db_dir, exist_ok=True)
+        print(f"Created directory for mock test database: {_test_db_dir}")
+
+    initialize_database(mock_app_config)
+    print("Schema initialization complete (called from init_schema.py __main__ with mock_app_config).")
