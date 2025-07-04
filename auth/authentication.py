@@ -48,7 +48,22 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
             save_remember_me_preference(username, False) # Clear on failure
             return False, "Ce compte utilisateur est désactivé.", None
 
-        if users_crud.verify_password(user['hashed_password'], password):
+        # Corrected function call: users_crud.util_verify_password
+        # The users_crud module imports verify_password as util_verify_password from utils
+        # and then has its own wrapper verify_user_password.
+        # However, the original error indicates a direct call to a function named verify_password
+        # within the users_crud namespace, which was likely the util_verify_password before a potential refactor
+        # or an intended direct call to the utility.
+        # Given the error "Did you mean: 'util_verify_password'?",
+        # the most direct fix is to use users_crud.util_verify_password.
+        #
+        # An alternative would be to use users_crud.verify_user_password(username, password)
+        # but that function does more than just verify the password string (it also gets the user, checks active status).
+        # Since we already have the user object and checked active status,
+        # calling the lower-level password verification directly is more appropriate here.
+        # The users_crud module makes util_verify_password available via:
+        # from utils import verify_password as util_verify_password
+        if users_crud.util_verify_password(password, user['hashed_password'])[0]: # util_verify_password returns (bool, str|None)
             logger.info(f"User '{username}' logged in successfully.")
             users_crud.record_login_time(user['user_id'])
 

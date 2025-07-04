@@ -30,16 +30,17 @@ import sys # Ensure sys is imported for path manipulation
 # Import the main SQLAlchemy components from db.connection
 # Note: main_engine will be None here and needs to be initialized by main.py calling db.connection.initialize_engine_and_session
 try:
-    from db.connection import Base as MainBase, engine as main_engine, initialize_engine_and_session
+    # Import Base and initialize_engine_and_session. We will get 'engine' later, after it's initialized.
+    from db.connection import Base as MainBase, initialize_engine_and_session
     # Import specific models that use MainBase and need table creation here
     from calculator.models import CalculationHistory
     # from other_module.models import OtherModelUsingMainBase # Example for future models
     MAIN_SQLALCHEMY_COMPONENTS_LOADED = True
 except ImportError as e_main_sqlalchemy:
-    logging.error(f"db.init_schema: Could not import MainBase or main_engine from db.connection: {e_main_sqlalchemy}. Tables using MainBase (e.g., CalculatorHistory) might not be created by this script.")
+    logging.error(f"db.init_schema: Could not import MainBase or initialize_engine_and_session from db.connection: {e_main_sqlalchemy}. Tables using MainBase (e.g., CalculatorHistory) might not be created by this script.")
     MAIN_SQLALCHEMY_COMPONENTS_LOADED = False
     MainBase = None # Ensure it's None so later checks don't fail with NameError
-    main_engine = None
+    # main_engine = None # No longer importing main_engine directly at the top
 
 
 from auth.roles import SUPER_ADMIN
@@ -138,7 +139,10 @@ def initialize_database(app_config):
     # The `engine` variable here is local to initialize_database scope.
     # The `main_engine` imported from db.connection is the global one.
     # For acc_models.Base.metadata.create_all(bind=engine_acc), a new engine `engine_acc` is created later.
-    # For MainBase.metadata.create_all(bind=main_engine), it uses the globally set main_engine.
+    # For MainBase.metadata.create_all(bind=actual_main_engine), it uses the globally set main_engine.
+
+    # Get the initialized engine from db.connection now that initialize_engine_and_session has been called
+    from db.connection import engine as actual_main_engine
 
     # Use DATABASE_PATH from the passed app_config
     conn = sqlite3.connect(database_path) # Keep for direct cursor use
@@ -2613,14 +2617,14 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         # If truly needing separate schema for other DBs, that's a DB-level command.
 
         # Use the SQLAlchemy engine for table creation
-        # Ensure main_engine (from db.connection) is used here, as it's initialized with app_config
-        if MAIN_SQLALCHEMY_COMPONENTS_LOADED and main_engine:
-            acc_models.Base.metadata.create_all(bind=main_engine, checkfirst=True)
-            print("DEBUG_INIT_DB: Accounting Module Tables creation attempted using SQLAlchemy engine.")
+        # Ensure actual_main_engine (from db.connection, fetched after initialization) is used here.
+        if MAIN_SQLALCHEMY_COMPONENTS_LOADED and actual_main_engine:
+            acc_models.Base.metadata.create_all(bind=actual_main_engine, checkfirst=True)
+            print("DEBUG_INIT_DB: Accounting Module Tables creation attempted using SQLAlchemy engine (with actual_main_engine).")
         elif not MAIN_SQLALCHEMY_COMPONENTS_LOADED:
             logging.error("Skipping acc_models.Base.metadata.create_all because MAIN_SQLALCHEMY_COMPONENTS_LOADED is false.")
-        elif not main_engine:
-            logging.error("Skipping acc_models.Base.metadata.create_all because main_engine is None (not initialized).")
+        elif not actual_main_engine:
+            logging.error("Skipping acc_models.Base.metadata.create_all because actual_main_engine is None (not initialized).")
 
         # print("DEBUG_INIT_DB: Table acc_fiscal_years created or exists.")
         # print("DEBUG_INIT_DB: Table acc_currencies created or exists.")
@@ -2837,10 +2841,10 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
 
     # --- Create tables for MainBase (e.g., CalculatorHistory) ---
     # This needs to happen after the main 'conn' is closed if 'main_engine' uses a new connection.
-    if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None and main_engine is not None:
+    if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None and actual_main_engine is not None:
         try:
             logging.info("DEBUG_INIT_DB: Creating tables for MainBase (e.g., CalculatorHistory) using SQLAlchemy main_engine.")
-            MainBase.metadata.create_all(bind=main_engine, checkfirst=True)
+            MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True)
             logging.info("DEBUG_INIT_DB: Tables for MainBase created successfully.")
         except Exception as e_main_base_create:
             logging.error(f"DEBUG_INIT_DB: Error creating tables for MainBase: {e_main_base_create}", exc_info=True)
@@ -2949,7 +2953,8 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
             from sqlalchemy.orm import Session
 
             # Use a SQLAlchemy session for CRUD operations
-            with Session(engine) as session:
+            # FIX: Use engine_acc which is defined for accounting, instead of undefined 'engine'
+            with Session(engine_acc) as session:
                 base_curr = acc_cruds.currency.get_base_currency(db=session)
                 if not base_curr:
                     print("DEBUG_INIT_DB: No base currency found. Seeding USD as base.")
