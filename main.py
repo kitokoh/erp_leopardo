@@ -26,9 +26,9 @@ else:
 # print(f"[{os.path.basename(__file__)}] Full sys.path: {sys.path}")
 
 
-from main_window import DocumentManager # The main application window
+from gui.main_window import DocumentManager # The main application window
 
-from main_window import DocumentManager # The main application window
+# from main_window import DocumentManager # The main application window
 
 import logging # For main.py's own logging needs, and for translator parts if setup_logging isn't called first
 import icons_rc # Import the compiled resource file
