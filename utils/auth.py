@@ -3,16 +3,22 @@ import logging
 from passlib.context import CryptContext
 
 # Setup CryptContext - this should ideally be done once per application
-# Using bcrypt as it's specified in requirements.txt (passlib[bcrypt])
-# Deprecated algorithms can be added if migrating from older hashes.
+# Using bcrypt as the primary scheme.
+# Adding sha256_crypt and sha512_crypt for compatibility with potentially older hashes.
+# deprecated="auto" will re-hash passwords to bcrypt upon successful verification if they used an older scheme.
 pwd_context = CryptContext(
-    schemes=["bcrypt"],
+    schemes=["bcrypt", "sha256_crypt", "sha512_crypt"],
     deprecated="auto"
 )
 
 def hash_password(password: str) -> str:
     """Hashes a password using the configured context."""
-    return pwd_context.hash(password)
+    # Be cautious logging plain passwords, even in debug. For "admin" it's known.
+    # For real passwords, log only a confirmation or password length/type.
+    logger.debug(f"Hashing password for input (len: {len(password)})")
+    hashed = pwd_context.hash(password)
+    logger.debug(f"Generated hash (bcrypt): {hashed[:10]}...{hashed[-5:]}") # Log prefix/suffix
+    return hashed
 
 def verify_password(plain_password: str, hashed_password: str) -> tuple[bool, str | None]:
     """
