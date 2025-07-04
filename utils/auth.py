@@ -1,6 +1,7 @@
 # utils/auth.py
 import logging
 from passlib.context import CryptContext
+import logging
 
 # Setup CryptContext - this should ideally be done once per application
 # Using bcrypt as the primary scheme.
