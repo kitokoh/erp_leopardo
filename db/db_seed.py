@@ -46,6 +46,7 @@ from db.cruds.templates_crud import add_template, get_filtered_templates, add_de
 # Ensure set_setting is imported if used by seed_initial_data directly
 # (It is used, so ensure it's available from db.cruds.application_settings_crud)
 from db.cruds.application_settings_crud import get_setting, set_setting
+from db.connection import engine as main_sqlalchemy_engine # Import the main engine
 
 
 def _seed_default_partner_categories(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
@@ -115,28 +116,41 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         if admin_role_id: # Only proceed if Admin role exists
             logger.info(f"Checking for default admin user '{DEFAULT_ADMIN_USERNAME}'...")
             admin_user_dict = crud_get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn)
+            temp_admin_password = "admin" # Known default password
+
             if admin_user_dict:
                 admin_user_id = admin_user_dict['user_id']
-                logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' already exists with ID {admin_user_id}.")
+                logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' (ID: {admin_user_id}) exists. Forcing password update to default to ensure bcrypt hash.")
+                update_success = users_crud.update_user_password(admin_user_id, temp_admin_password, conn=conn) # users_crud.update_user_password now logs hash
+                if update_success:
+                    logger.info(f"Password for default admin user '{DEFAULT_ADMIN_USERNAME}' (ID: {admin_user_id}) reset/updated successfully.")
+                    # Re-fetch to log the hash that's now in DB
+                    updated_admin_info = crud_get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn)
+                    if updated_admin_info:
+                        logger.info(f"Hash for '{DEFAULT_ADMIN_USERNAME}' in DB after update: {updated_admin_info.get('hashed_password')}")
+                    else:
+                        logger.error(f"Could not re-fetch admin user '{DEFAULT_ADMIN_USERNAME}' after password update.")
+                else:
+                    logger.error(f"Failed to update password for default admin user '{DEFAULT_ADMIN_USERNAME}' (ID: {admin_user_id}). This is critical for login.")
             else:
-                logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' not found. Creating...")
-                # Use a secure, but known temporary password for initial setup.
-                # IMPORTANT: This password MUST be changed immediately by the administrator.
-                # For a real deployment, this password should be very strong or generated
-                # and displayed once, or set via a secure first-time setup process.
-                temp_admin_password = "admin"
-
+                logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' not found. Creating with password '{temp_admin_password}'...")
                 new_admin_id = crud_add_user(
-                    username=DEFAULT_ADMIN_USERNAME, # This is "admin" from config.py
-                    password=temp_admin_password,
+                    username=DEFAULT_ADMIN_USERNAME,
+                    password=temp_admin_password, # crud_add_user logs the hash used
                     role_id=admin_role_id,
                     full_name="Default Administrator",
-                    email="admin@example.local", # Placeholder email
+                    email="admin@example.local",
                     conn=conn
                 )
                 if new_admin_id:
                     admin_user_id = new_admin_id
                     logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' created with ID {admin_user_id}. PLEASE CHANGE THE DEFAULT PASSWORD IMMEDIATELY.")
+                    # Re-fetch to log the hash that's now in DB
+                    created_admin_info = crud_get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn)
+                    if created_admin_info:
+                        logger.info(f"Hash for new admin '{DEFAULT_ADMIN_USERNAME}' in DB: {created_admin_info.get('hashed_password')}")
+                    else:
+                        logger.error(f"Could not re-fetch admin user '{DEFAULT_ADMIN_USERNAME}' after creation.")
                 else:
                     logger.error(f"Failed to create default admin user '{DEFAULT_ADMIN_USERNAME}'.")
         else: # admin_role_id was not found/created

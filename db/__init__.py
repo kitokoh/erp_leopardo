@@ -219,7 +219,30 @@ from .cruds.client_freight_forwarders_crud import (
     unassign_forwarder_from_client,
 )
 from .cruds.application_settings_crud import get_setting, set_setting
-from .init_schema import initialize_database
+# from .init_schema import initialize_database # initialize_database will be called differently
+
+# Wrapper for initialize_database to accept config
+_init_schema_initialize_database = None
+
+def initialize_database(app_config=None):
+    """
+    Initializes the database schema.
+    Requires app_config to be passed from main.py.
+    """
+    global _init_schema_initialize_database
+    if _init_schema_initialize_database is None:
+        from .init_schema import initialize_database as actual_init_db
+        _init_schema_initialize_database = actual_init_db
+
+    if app_config:
+        _init_schema_initialize_database(app_config)
+    else:
+        # This case should ideally not be hit if main.py always passes config.
+        # If it can be called without config (e.g. tests needing default path),
+        # then init_schema.py's direct execution logic (with mock_config) might be relevant.
+        # For now, error out if no config provided from application.
+        raise ValueError("db.initialize_database called without app_config.")
+
 
 __all__ = [
     "DATABASE_NAME",
