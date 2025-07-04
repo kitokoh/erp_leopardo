@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import QMessageBox
 # If they are at the root, direct imports like these should work if PYTHONPATH is set up.
 # Otherwise, they might need to be relative or adjusted based on project structure.
 import db as db_manager
-from html_to_pdf_util import convert_html_to_pdf
+from .html_to_pdf_util import convert_html_to_pdf
 # HtmlEditor is imported deferred inside the function.
 
 def generate_pdf_for_document(
