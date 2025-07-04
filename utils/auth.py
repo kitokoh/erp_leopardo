@@ -3,7 +3,9 @@ import logging
 from passlib.context import CryptContext
 import logging
 
-logger = logging.getLogger(__name__)
+# Global logger for this module, used as a fallback if no logger is passed to functions.
+# This retains the original behavior for calls not originating from the seed script.
+module_logger = logging.getLogger(__name__)
 
 # Setup CryptContext - this should ideally be done once per application
 # Using bcrypt as the primary scheme.
@@ -14,22 +16,27 @@ pwd_context = CryptContext(
     deprecated="auto"
 )
 
-def hash_password(password: str) -> str:
-    """Hashes a password using the configured context."""
+def hash_password(password: str, logger_passed: logging.Logger | None = None) -> str:
+    """
+    Hashes a password using the configured context.
+    Accepts an optional logger; otherwise, uses the module-level logger.
+    """
+    current_logger = logger_passed if logger_passed else module_logger
     # Be cautious logging plain passwords, even in debug. For "admin" it's known.
     # For real passwords, log only a confirmation or password length/type.
-    logger.debug(f"Hashing password for input (len: {len(password)})")
+    current_logger.debug(f"Hashing password for input (len: {len(password)})")
     hashed = pwd_context.hash(password)
-    logger.debug(f"Generated hash (bcrypt): {hashed[:10]}...{hashed[-5:]}") # Log prefix/suffix
+    current_logger.debug(f"Generated hash (bcrypt): {hashed[:10]}...{hashed[-5:]}") # Log prefix/suffix
     return hashed
 
-def verify_password(plain_password: str, hashed_password: str) -> tuple[bool, str | None]:
+def verify_password(plain_password: str, hashed_password: str, logger_passed: logging.Logger | None = None) -> tuple[bool, str | None]:
     """
     Verifies a plain password against a hashed one and checks if the hash should be updated.
 
     Returns:
         tuple[bool, str | None]: (is_verified, new_hash_if_needed_or_None)
     """
+    current_logger = logger_passed if logger_passed else module_logger
     try:
         # verify_and_update returns (verified, new_hash_or_None)
         # new_hash_or_None is None if the hash is already in the default format.
@@ -38,5 +45,5 @@ def verify_password(plain_password: str, hashed_password: str) -> tuple[bool, st
         return verified, new_hash
     except Exception as e:
         # Log unexpected errors during verification, e.g., malformed hash, unknown scheme
-        logging.error(f"Error verifying password or during hash update check: {e}", exc_info=True)
+        current_logger.error(f"Error verifying password or during hash update check: {e}", exc_info=True)
         return False, None # Return False and no new hash on error
