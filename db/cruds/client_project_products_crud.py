@@ -206,3 +206,54 @@ def get_product_usage_counts(conn: sqlite3.Connection = None) -> list[dict]:
     except sqlite3.Error as e:
         logger.error(f"DB error in get_product_usage_counts: {e}", exc_info=True)
         return []
+
+@_manage_conn
+def get_product_sales_aggregation(conn: sqlite3.Connection = None, aggregate_by: str = 'quantity', limit: int = 10) -> list[dict]:
+    """
+    Aggregates product sales data either by total quantity sold or total value sold.
+
+    Args:
+        conn (sqlite3.Connection, optional): Database connection.
+        aggregate_by (str, optional): 'quantity' or 'value'. Defaults to 'quantity'.
+        limit (int, optional): Number of top products to return. Defaults to 10.
+
+    Returns:
+        list[dict]: A list of dictionaries, each containing:
+                    'product_id', 'product_name',
+                    'total_sold' (either sum of quantity or sum of value).
+    """
+    cursor = conn.cursor()
+
+    if aggregate_by not in ['quantity', 'value']:
+        logger.error(f"Invalid aggregate_by value: {aggregate_by}. Must be 'quantity' or 'value'.")
+        return []
+
+    if aggregate_by == 'quantity':
+        aggregation_sql = "SUM(cpp.quantity) as total_sold"
+    else: # aggregate_by == 'value'
+        # Ensure base_unit_price is treated as numeric, defaulting to 0 if NULL
+        aggregation_sql = "SUM(cpp.quantity * COALESCE(cpp.unit_price_override, IFNULL(p.base_unit_price, 0))) as total_sold"
+
+    sql = f"""
+        SELECT
+            p.product_id,
+            p.product_name,
+            {aggregation_sql}
+        FROM ClientProjectProducts cpp
+        JOIN Products p ON cpp.product_id = p.product_id
+        WHERE (p.is_deleted IS NULL OR p.is_deleted = 0) -- Only consider non-deleted products
+          AND cpp.purchase_confirmed_at IS NOT NULL -- Only consider confirmed purchases for sales aggregation
+        GROUP BY p.product_id, p.product_name
+        ORDER BY total_sold DESC
+        LIMIT ?
+    """
+    params = (limit,)
+
+    try:
+        cursor.execute(sql, params)
+        results = [dict(row) for row in cursor.fetchall()]
+        logger.debug(f"Product sales aggregation by '{aggregate_by}' retrieved successfully: {len(results)} products.")
+        return results
+    except sqlite3.Error as e:
+        logger.error(f"DB error in get_product_sales_aggregation (by {aggregate_by}): {e}", exc_info=True)
+        return []

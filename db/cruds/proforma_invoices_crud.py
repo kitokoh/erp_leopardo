@@ -395,3 +395,36 @@ def get_total_proforma_sales_for_country_id(db: Session, country_id: int) -> flo
     except Exception as e:
         logger.error(f"DB error in get_total_proforma_sales_for_country_id for country_id {country_id}: {e}", exc_info=True)
         return 0.0
+
+def get_total_proforma_sales_all_time(db: Session) -> float:
+    """Calculates the grand total sales amount from all proforma invoices."""
+    logger.debug("Calculating grand total proforma sales all time.")
+    try:
+        total_sales = db.query(func.sum(ProformaInvoice.grand_total_amount)).scalar()
+        # Consider filtering by status, e.g., not 'CANCELLED' or only 'CONFIRMED', 'PAID'
+        # query = query.filter(ProformaInvoice.status.notin_([ProformaInvoiceStatusEnum.CANCELLED, ProformaInvoiceStatusEnum.DRAFT]))
+
+
+        if total_sales is None:
+            total_sales = 0.0
+        logger.debug(f"Grand total proforma sales all time: {total_sales}")
+        return float(total_sales)
+    except Exception as e:
+        logger.error(f"DB error in get_total_proforma_sales_all_time: {e}", exc_info=True)
+        return 0.0
+
+def get_distinct_client_count_from_proformas(db: Session) -> int:
+    """Counts the number of distinct clients who have at least one proforma invoice."""
+    logger.debug("Counting distinct clients from proforma invoices.")
+    try:
+        count = db.query(func.count(func.distinct(ProformaInvoice.client_id))).scalar()
+        # Consider filtering by ProformaInvoice status if only "active" sales should count
+        # query = query.filter(ProformaInvoice.status.notin_([ProformaInvoiceStatusEnum.CANCELLED, ProformaInvoiceStatusEnum.DRAFT]))
+
+        if count is None:
+            count = 0
+        logger.debug(f"Distinct client count from proformas: {count}")
+        return int(count)
+    except Exception as e:
+        logger.error(f"DB error in get_distinct_client_count_from_proformas: {e}", exc_info=True)
+        return 0
