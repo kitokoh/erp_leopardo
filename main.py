@@ -70,7 +70,19 @@ from notifications import NotificationManager # Added for notifications
 # from db.cruds.users_crud import users_crud_instance # users_crud is used directly by auth_service
 from PyQt5.QtWidgets import QMessageBox # Added for error dialog
 from PyQt5.QtWidgets import QSplashScreen
+import sys
+import os
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
+print(f"DEBUG main.py: sys.path is now: {sys.path}")
+print(f"DEBUG main.py: current working directory is: {os.getcwd()}")
+
+# --- Le reste de vos imports dans main.py commence ici ---
+# Par exemple:
+# from some_module import something
+# from gui.main_window import DocumentManager 
 import datetime # Added for session timeout
 from PyQt5.QtCore import QSettings # Added for Remember Me
 

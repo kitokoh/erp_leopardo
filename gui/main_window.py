@@ -81,7 +81,7 @@ from db import get_country_by_name, get_or_add_country, get_city_by_name_and_cou
 
 from dialogs.statistics_add_client_dialog import StatisticsAddClientDialog # Import the new dialog
 
-from document_manager_logic import (
+from utils.document_manager_logic import (
     handle_create_client_execution,
     load_and_display_clients,
     filter_and_display_clients,
