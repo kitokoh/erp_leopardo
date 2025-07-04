@@ -2565,13 +2565,13 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         # If truly needing separate schema for other DBs, that's a DB-level command.
 
         # Use the SQLAlchemy engine for table creation
-    # Ensure main_engine (from db.connection) is used here, as it's initialized with app_config
-    if MAIN_SQLALCHEMY_COMPONENTS_LOADED and main_engine:
-        acc_models.Base.metadata.create_all(bind=main_engine, checkfirst=True)
-    elif not MAIN_SQLALCHEMY_COMPONENTS_LOADED:
-        logger.error("Skipping acc_models.Base.metadata.create_all because MAIN_SQLALCHEMY_COMPONENTS_LOADED is false.")
-    elif not main_engine:
-        logger.error("Skipping acc_models.Base.metadata.create_all because main_engine is None (not initialized).")
+        # Ensure main_engine (from db.connection) is used here, as it's initialized with app_config
+        if MAIN_SQLALCHEMY_COMPONENTS_LOADED and main_engine:
+            acc_models.Base.metadata.create_all(bind=main_engine, checkfirst=True)
+        elif not MAIN_SQLALCHEMY_COMPONENTS_LOADED:
+            logger.error("Skipping acc_models.Base.metadata.create_all because MAIN_SQLALCHEMY_COMPONENTS_LOADED is false.")
+        elif not main_engine:
+            logger.error("Skipping acc_models.Base.metadata.create_all because main_engine is None (not initialized).")
 
 
         # print("DEBUG_INIT_DB: Table acc_fiscal_years created or exists.")
