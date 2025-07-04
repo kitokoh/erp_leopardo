@@ -2641,7 +2641,8 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         from accounting import models as acc_models_pydantic # Pydantic models
         from sqlalchemy.orm import Session
 
-        engine_acc = create_engine(f"sqlite:///{config.DATABASE_PATH}")
+        # Use app_config for the database path
+        engine_acc = create_engine(f"sqlite:///{app_config['database_path']}")
 
 
         acc_models.Base.metadata.create_all(bind=engine_acc, checkfirst=True)
@@ -2692,11 +2693,11 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     except ImportError:
         print("DEBUG_INIT_DB: Could not import accounting cruds/models for schema/seeding. Skipping accounting part.")
     except Exception as e_acc_setup:
-        print(f"CRITICAL ERROR during Accounting module schema/data setup: {e_acc_setup}", exc_info=True)
+        logging.error(f"CRITICAL ERROR during Accounting module schema/data setup: {e_acc_setup}", exc_info=True)
 
     # --- Create Accounting Indexes (using a new raw connection) ---
     print("DEBUG_INIT_DB: Creating Accounting Module Indexes (manual via new raw connection)...")
-    conn_idx = sqlite3.connect(config.DATABASE_PATH)
+    conn_idx = sqlite3.connect(app_config['database_path']) # Also ensure this uses app_config
     conn_idx.row_factory = sqlite3.Row
     cursor_idx = conn_idx.cursor()
     try:
