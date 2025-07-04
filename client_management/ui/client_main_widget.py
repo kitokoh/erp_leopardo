@@ -215,6 +215,12 @@ class ClientMainWidget(QWidget):
             self.manage_referent_btn.setToolTip(self.tr("Gérer le statut de référent pour ce client"))
             self.manage_referent_btn.clicked.connect(self.manage_referent_status_for_selected_client)
             action_layout.addWidget(self.manage_referent_btn)
+
+            self.generate_referents_report_btn = QPushButton(QIcon.fromTheme("document-print", QIcon(":/icons/file-text.svg")), self.tr("Rapport Référents")) # Utilisation d'une icone standard si possible
+            self.generate_referents_report_btn.setToolTip(self.tr("Générer un rapport PDF des référents locaux et globaux pour ce client"))
+            self.generate_referents_report_btn.clicked.connect(self.handle_generate_referents_report)
+            action_layout.addWidget(self.generate_referents_report_btn)
+
             action_layout.addStretch(1)
 
             self.create_docs_btn = QPushButton(self.tr("Envoyer Mail"))
@@ -579,6 +585,11 @@ class ClientMainWidget(QWidget):
         if hasattr(self, 'manage_referent_btn'):
             is_client_selected = self.client_info is not None and self.client_info.get('client_id') is not None
             self.manage_referent_btn.setEnabled(can_manage_referents and is_client_selected)
+
+        if hasattr(self, 'generate_referents_report_btn'):
+            # Assuming P_REFERENTS_MANAGE also covers viewing/generating reports, or use a new permission
+            self.generate_referents_report_btn.setEnabled(can_manage_referents and is_client_selected)
+
 
         if hasattr(self, 'status_combo'):
             self.status_combo.setEnabled(can_edit_full or can_edit_basic)
@@ -1725,3 +1736,80 @@ class ClientMainWidget(QWidget):
 
     def _handle_generate_and_open_pdf_action(self, document_data: dict):
         QApplication.setOverrideCursor
+
+    def handle_generate_referents_report(self):
+        if not self.client_info or not self.client_info.get('client_id'):
+            QMessageBox.warning(self, self.tr("Aucun Client Sélectionné"), self.tr("Veuillez sélectionner un client."))
+            return
+
+        client_id = self.client_info.get('client_id')
+
+        # Choix de la langue
+        languages = {"Français": "fr", "English": "en", "العربية": "ar"}
+        lang_display_names = list(languages.keys())
+        # Make sure QInputDialog is imported from PyQt5.QtWidgets
+        selected_lang_display, ok = QInputDialog.getItem(self, self.tr("Choisir la langue du rapport"),
+                                                         self.tr("Langue:"), lang_display_names, 0, False)
+        if not ok or not selected_lang_display:
+            return # User cancelled
+
+        language_code = languages[selected_lang_display]
+
+        # Appel au controller
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        pdf_path = None # Initialize pdf_path
+        try:
+            if not self.client_controller:
+                logging.error("ClientMainWidget: client_controller is not initialized.")
+                QMessageBox.critical(self, self.tr("Erreur Interne"), self.tr("Le contrôleur client n'est pas initialisé."))
+                return
+            if not self.app_root_dir:
+                logging.error("ClientMainWidget: app_root_dir is not set.")
+                QMessageBox.critical(self, self.tr("Erreur Configuration"), self.tr("Le répertoire racine de l'application n'est pas configuré."))
+                return
+
+            pdf_path = self.client_controller.generate_referents_report(
+                client_id=client_id,
+                language_code=language_code,
+                app_root_dir=self.app_root_dir,
+                current_user_id=self.current_user_id
+            )
+        except Exception as e_gen:
+            logging.error(f"Exception during generate_referents_report call: {e_gen}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur Inattendue"), self.tr(f"Une erreur inattendue est survenue lors de la génération du rapport: {e_gen}"))
+            pdf_path = None # Ensure pdf_path is None on exception
+        finally:
+            QApplication.restoreOverrideCursor()
+
+        if pdf_path and os.path.exists(pdf_path):
+            # Make sure QDesktopServices, QUrl, QFileDialog, QStandardPaths are imported from PyQt5.QtGui / QtCore / QtWidgets
+            reply = QMessageBox.information(self, self.tr("Rapport Généré"),
+                                            self.tr(f"Le rapport des référents a été généré avec succès.\nChemin: {pdf_path}\n\nVoulez-vous l'ouvrir maintenant?"),
+                                            QMessageBox.Open | QMessageBox.Save | QMessageBox.Cancel,
+                                            QMessageBox.Open)
+
+            if reply == QMessageBox.Open:
+                QDesktopServices.openUrl(QUrl.fromLocalFile(pdf_path))
+            elif reply == QMessageBox.Save:
+                default_save_name = os.path.basename(pdf_path)
+                save_path, _ = QFileDialog.getSaveFileName(self, self.tr("Enregistrer le rapport sous..."),
+                                                           os.path.join(QStandardPaths.writableLocation(QStandardPaths.DocumentsLocation), default_save_name),
+                                                           self.tr("Fichiers PDF (*.pdf)"))
+                if save_path:
+                    try:
+                        import shutil
+                        shutil.copy(pdf_path, save_path)
+                        QMessageBox.information(self, self.tr("Enregistré"), self.tr(f"Rapport enregistré sous:\n{save_path}"))
+                        # Optionnel: supprimer le fichier temporaire si on ne veut pas le garder après sauvegarde
+                        # try:
+                        #     os.remove(pdf_path)
+                        # except OSError as e_del_temp:
+                        #     logging.warning(f"Could not delete temporary PDF file {pdf_path} after saving: {e_del_temp}")
+                    except Exception as e_save:
+                        QMessageBox.warning(self, self.tr("Erreur d'enregistrement"), self.tr(f"Impossible d'enregistrer le fichier: {e_save}"))
+            # If Cancel, the temporary file remains (useful for debugging, but might need cleanup strategy)
+        elif pdf_path and not os.path.exists(pdf_path): # Path was returned but file isn't there
+             QMessageBox.warning(self, self.tr("Erreur Fichier"), self.tr(f"La génération du PDF semble avoir réussi mais le fichier n'a pas été trouvé à l'emplacement attendu:\n{pdf_path}"))
+        elif not pdf_path: # Generation explicitly failed and returned None
+            QMessageBox.critical(self, self.tr("Échec de la Génération"), self.tr("La génération du rapport des référents a échoué. Veuillez consulter les logs pour plus de détails."))
+        # No else needed if pdf_path is None and an error was already shown by the controller or above.

@@ -145,6 +145,7 @@ def initialize_database(app_config):
     from db.connection import engine as actual_main_engine
     logging.info(f"db.init_schema: Imported actual_main_engine from db.connection. Is None: {actual_main_engine is None}")
 
+
     # Use DATABASE_PATH from the passed app_config
     conn = sqlite3.connect(database_path) # Keep for direct cursor use
     conn.row_factory = sqlite3.Row # Essential for accessing columns by name
@@ -2846,6 +2847,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         try:
             logging.info("DEBUG_INIT_DB: Creating tables for MainBase (e.g., CalculatorHistory) using SQLAlchemy actual_main_engine.")
             MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True) # Intentionally same
+
             logging.info("DEBUG_INIT_DB: Tables for MainBase created successfully.")
         except Exception as e_main_base_create:
             logging.error(f"DEBUG_INIT_DB: Error creating tables for MainBase: {e_main_base_create}", exc_info=True)

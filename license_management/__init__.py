@@ -250,7 +250,12 @@ class LicenseManager:
             logger.error(f"Failed to add free trial license to database for user {user_id}.")
             return False, "Échec de la création de la licence d'essai gratuite en base de données.", None
 
+
 # Instantiate the manager for the application to use
 manager = LicenseManager()
 
-[end of license_management/__init__.py]
+# This allows `from license_management import manager` to work,
+# and `manager.cruds` to be accessed.
+# Calls to the methods will log warnings.
+__all__ = ['manager']   # This is a placeholder manager for license management, simulating a valid license.
+# In a real application, this would be replaced with actual license management logic.   
