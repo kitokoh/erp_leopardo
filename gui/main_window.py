@@ -81,7 +81,7 @@ from db import get_country_by_name, get_or_add_country, get_city_by_name_and_cou
 
 from dialogs.statistics_add_client_dialog import StatisticsAddClientDialog # Import the new dialog
 
-from utils.document_manager_logic import (
+from document_manager_logic import (
     handle_create_client_execution,
     load_and_display_clients,
     filter_and_display_clients,
@@ -114,6 +114,8 @@ from dialogs import (
 #     # or allowing the ModuleNotFoundError to naturally occur if this fails.
 #     pass
 # --- END TARGETED sys.path FIX ---
+print(f"DEBUG: Current sys.path before product_management import: {sys.path}")
+print(f"DEBUG: Current working directory before product_management import: {os.getcwd()}")
 from product_management.page import ProductManagementPage # Added
 from PyQt5.QtWidgets import QSizePolicy
 
