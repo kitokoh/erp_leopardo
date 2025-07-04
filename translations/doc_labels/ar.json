@@ -59,5 +59,23 @@
     "total_gross_weight": "إجمالي الوزن الإجمالي:",
     "total_volume": "إجمالي الحجم:",
     "exporter_signature": "توقيع المصدر:",
-    "packing_list_footer_notice": "يشهد هذا المستند بمحتوى وتفاصيل تعبئة الشحنة."
+    "packing_list_footer_notice": "يشهد هذا المستند بمحتوى وتفاصيل تعبئة الشحنة.",
+
+    "referents_report_title": "تقرير المُحيلين",
+    "generation_date_label": "تاريخ الإنشاء",
+    "client_information_title": "معلومات العميل",
+    "client_name_label": "العميل",
+    "client_company_label": "الشركة",
+    "client_location_label": "الموقع",
+    "local_referents_title": "المُحيلون المحليون",
+    "unknown_country": "بلد غير معروف",
+    "referent_name_label": "الاسم",
+    "referent_company_label": "الشركة",
+    "referent_city_label": "المدينة",
+    "referent_region_label": "المنطقة",
+    "referent_country_label": "البلد",
+    "no_local_referents_found": "لم يتم العثور على مُحيلين محليين لهذا الموقع.",
+    "global_referents_title": "المُحيلون العالميون",
+    "no_global_referents_found": "لم يتم العثور على مُحيلين عالميين.",
+    "page_label": "صفحة"
 }
