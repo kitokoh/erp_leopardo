@@ -115,29 +115,31 @@ from dialogs import (
 # --- END TARGETED sys.path FIX ---
 
 # --- BEGIN Local sys.path adjustment in gui/main_window.py ---
-# This is a targeted fix to ensure product_management can be imported from here.
-# os and sys modules are imported at the top of this file.
-try:
-    _gui_main_window_file_path = os.path.abspath(__file__)
-    _gui_dir = os.path.dirname(_gui_main_window_file_path)
-    _project_root_local_calc = os.path.dirname(_gui_dir) # Project root is parent of 'gui'
-
-    if _project_root_local_calc not in sys.path:
-        sys.path.insert(0, _project_root_local_calc)
-        print(f"DEBUG gui/main_window.py (LOCAL SYS.PATH MOD): Inserted project root {_project_root_local_calc}. New sys.path: {sys.path}")
-    elif sys.path[0] != _project_root_local_calc:
-        if _project_root_local_calc in sys.path: # Check before removing
-             sys.path.remove(_project_root_local_calc)
-        sys.path.insert(0, _project_root_local_calc)
-        print(f"DEBUG gui/main_window.py (LOCAL SYS.PATH MOD): Moved project root {_project_root_local_calc} to start. New sys.path: {sys.path}")
-    # else:
-        # print(f"DEBUG gui/main_window.py (LOCAL SYS.PATH MOD): Project root {_project_root_local_calc} already at sys.path[0].")
-except Exception as e_local_sys_path_mod:
-    print(f"ERROR in gui/main_window.py local sys.path modification: {e_local_sys_path_mod}")
+# This block is removed to rely on main.py for sys.path setup.
+# # This is a targeted fix to ensure product_management can be imported from here.
+# # os and sys modules are imported at the top of this file.
+# try:
+#     _gui_main_window_file_path = os.path.abspath(__file__)
+#     _gui_dir = os.path.dirname(_gui_main_window_file_path)
+#     _project_root_local_calc = os.path.dirname(_gui_dir) # Project root is parent of 'gui'
+#
+#     if _project_root_local_calc not in sys.path:
+#         sys.path.insert(0, _project_root_local_calc)
+#         print(f"DEBUG gui/main_window.py (LOCAL SYS.PATH MOD): Inserted project root {_project_root_local_calc}. New sys.path: {sys.path}")
+#     elif sys.path[0] != _project_root_local_calc:
+#         if _project_root_local_calc in sys.path: # Check before removing
+#              sys.path.remove(_project_root_local_calc)
+#         sys.path.insert(0, _project_root_local_calc)
+#         print(f"DEBUG gui/main_window.py (LOCAL SYS.PATH MOD): Moved project root {_project_root_local_calc} to start. New sys.path: {sys.path}")
+#     # else:
+#         # print(f"DEBUG gui/main_window.py (LOCAL SYS.PATH MOD): Project root {_project_root_local_calc} already at sys.path[0].")
+# except Exception as e_local_sys_path_mod:
+#     print(f"ERROR in gui/main_window.py local sys.path modification: {e_local_sys_path_mod}")
 # --- END Local sys.path adjustment ---
 
-print(f"DEBUG: Current sys.path before product_management import: {sys.path}")
-print(f"DEBUG: Current working directory before product_management import: {os.getcwd()}")
+# Debug prints related to the removed block can also be removed or commented out.
+# print(f"DEBUG: Current sys.path before product_management import: {sys.path}")
+# print(f"DEBUG: Current working directory before product_management import: {os.getcwd()}")
 from product_management.page import ProductManagementPage # Added
 from PyQt5.QtWidgets import QSizePolicy
 
