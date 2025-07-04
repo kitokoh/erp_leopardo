@@ -134,6 +134,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                     logger.error(f"Failed to update password for default admin user '{DEFAULT_ADMIN_USERNAME}' (ID: {admin_user_id}). This is critical for login.")
             else:
                 logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' not found. Creating with password '{temp_admin_password}'...")
+
                 new_admin_id = crud_add_user(
                     username=DEFAULT_ADMIN_USERNAME,
                     password=temp_admin_password, # crud_add_user logs the hash used
