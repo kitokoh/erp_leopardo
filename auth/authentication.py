@@ -7,13 +7,14 @@ logger = logging.getLogger(__name__)
 # Module-level variable to store the current user's data
 _current_user_data = None
 
-def login(username: str, password: str, remember_me: bool = False) -> tuple[bool, str | None, dict | None]:
+def login(username: str, password: str, remember_me: bool = False) -> tuple[bool, str | None, dict | None, dict | None]:
     """
     Attempts to log in a user.
 
     Args:
         username (str): The username.
         password (str): The password.
+        remember_me (bool): Whether the user selected "Remember Me".
 
     Returns:
         tuple[bool, str | None, dict | None, dict | None]:
