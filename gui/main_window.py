@@ -5,31 +5,33 @@ from PyQt5.QtCore import QDate
 import logging
 
 # --- BEGIN WORKAROUND for ModuleNotFoundError ---
+# This workaround is removed as sys.path is now primarily managed by main.py
+# and this file (gui/main_window.py) is no longer at the project root.
 # Ensure the project root is in sys.path when main_window.py is loaded.
 # This is a targeted fix for environments where main.py's sys.path modification
 # might not be effective for all imports within main_window.py.
-_PROJECT_ROOT_MW = None
-try:
-    _current_file_path_mw = os.path.abspath(__file__)
-    _main_window_dir_mw = os.path.dirname(_current_file_path_mw)
-    # Assuming main_window.py is in the project root.
-    # If main_window.py is in a subdirectory, this logic needs to be adjusted
-    # to find the actual project root (e.g., os.path.dirname(_main_window_dir_mw) for one level up).
-    _PROJECT_ROOT_MW = _main_window_dir_mw
-
-    if _PROJECT_ROOT_MW not in sys.path:
-        sys.path.insert(0, _PROJECT_ROOT_MW)
-        # print(f"[MW_WORKAROUND] Added {_PROJECT_ROOT_MW} to sys.path[0]")
-    elif sys.path[0] != _PROJECT_ROOT_MW:
-        sys.path.remove(_PROJECT_ROOT_MW)
-        sys.path.insert(0, _PROJECT_ROOT_MW)
-        # print(f"[MW_WORKAROUND] Moved {_PROJECT_ROOT_MW} to sys.path[0]")
-    # else:
-        # print(f"[MW_WORKAROUND] {_PROJECT_ROOT_MW} already at sys.path[0]")
-
-except Exception as e_mw_path_setup:
-    # Use basic print here as logging might not be configured yet or could fail.
-    print(f"Error in main_window.py sys.path WORKAROUND: {e_mw_path_setup}. Project root may not be set correctly: {_PROJECT_ROOT_MW}")
+# _PROJECT_ROOT_MW = None
+# try:
+#     _current_file_path_mw = os.path.abspath(__file__)
+#     _main_window_dir_mw = os.path.dirname(_current_file_path_mw)
+#     # Assuming main_window.py is in the project root.
+#     # If main_window.py is in a subdirectory, this logic needs to be adjusted
+#     # to find the actual project root (e.g., os.path.dirname(_main_window_dir_mw) for one level up).
+#     _PROJECT_ROOT_MW = _main_window_dir_mw
+#
+#     if _PROJECT_ROOT_MW not in sys.path:
+#         sys.path.insert(0, _PROJECT_ROOT_MW)
+#         # print(f"[MW_WORKAROUND] Added {_PROJECT_ROOT_MW} to sys.path[0]")
+#     elif sys.path[0] != _PROJECT_ROOT_MW:
+#         sys.path.remove(_PROJECT_ROOT_MW)
+#         sys.path.insert(0, _PROJECT_ROOT_MW)
+#         # print(f"[MW_WORKAROUND] Moved {_PROJECT_ROOT_MW} to sys.path[0]")
+#     # else:
+#         # print(f"[MW_WORKAROUND] {_PROJECT_ROOT_MW} already at sys.path[0]")
+#
+# except Exception as e_mw_path_setup:
+#     # Use basic print here as logging might not be configured yet or could fail.
+#     print(f"Error in main_window.py sys.path WORKAROUND: {e_mw_path_setup}. Project root may not be set correctly: {_PROJECT_ROOT_MW}")
 # --- END WORKAROUND ---
 
 # import logging # logging is already imported
@@ -63,7 +65,7 @@ import icons_rc
 # from statistics_module import MapInteractionHandler # DocumentManager no longer has its own map handler instance
 from app_setup import APP_ROOT_DIR, CONFIG
 # from ui_components import StatisticsWidget # StatisticsWidget removed from main_layout
-from ui_components import StatusDelegate # Still used for QListWidget
+from gui.ui_components import StatusDelegate # Still used for QListWidget
 from map_client_dialog import MapClientDialog # Added for new client from map
 # The get_country_by_name, get_or_add_country, etc. specific imports for handle_add_client_from_stats_map might become obsolete.
 from db import get_country_by_name, get_or_add_country, get_city_by_name_and_country_id, get_or_add_city
@@ -86,21 +88,22 @@ from dialogs import (
 # from product_management.list_dialog import ProductListDialog # Removed
 
 # --- BEGIN TARGETED sys.path FIX for product_management import ---
-import sys # Ensure sys is imported if not already (it is at the top)
-import os  # Ensure os is imported if not already (it is at the top)
-try:
-    _mw_file_path = os.path.abspath(__file__)
-    _project_root_for_pm = os.path.dirname(_mw_file_path) # Assuming main_window.py is in project root
-
-    if _project_root_for_pm not in sys.path:
-        sys.path.insert(0, _project_root_for_pm)
-    elif sys.path[0] != _project_root_for_pm:
-        sys.path.remove(_project_root_for_pm)
-        sys.path.insert(0, _project_root_for_pm)
-except Exception:
-    # Silently pass on error during this specific fix, relying on global error handling
-    # or allowing the ModuleNotFoundError to naturally occur if this fails.
-    pass
+# This workaround is removed as sys.path is now primarily managed by main.py
+# import sys # Ensure sys is imported if not already (it is at the top)
+# import os  # Ensure os is imported if not already (it is at the top)
+# try:
+#     _mw_file_path = os.path.abspath(__file__)
+#     _project_root_for_pm = os.path.dirname(_mw_file_path) # Assuming main_window.py is in project root
+#
+#     if _project_root_for_pm not in sys.path:
+#         sys.path.insert(0, _project_root_for_pm)
+#     elif sys.path[0] != _project_root_for_pm:
+#         sys.path.remove(_project_root_for_pm)
+#         sys.path.insert(0, _project_root_for_pm)
+# except Exception:
+#     # Silently pass on error during this specific fix, relying on global error handling
+#     # or allowing the ModuleNotFoundError to naturally occur if this fails.
+#     pass
 # --- END TARGETED sys.path FIX ---
 from product_management.page import ProductManagementPage # Added
 from PyQt5.QtWidgets import QSizePolicy
