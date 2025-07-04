@@ -13,9 +13,11 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt # Included for safety and common Qt enum usage
 
-import db as db_manager
+# import db as db_manager # db_manager is not used directly anymore for core functions
 from db.cruds.clients_crud import clients_crud_instance
 from db.cruds import templates_crud
+from db.cruds import contacts_crud # Added for resolving emails to contact_ids
+from db.cruds import activity_logs_crud # Added for logging
 
 
 # Anticipated imports for other dialogs
@@ -26,11 +28,12 @@ import icons_rc # Import for Qt resource file
 
 
 class SendEmailDialog(QDialog):
-    def __init__(self, client_email, config, client_id=None, parent=None):
+    def __init__(self, client_email, config, client_id=None, current_user_id=None, parent=None): # Added current_user_id
         super().__init__(parent)
         self.client_email = client_email
         self.config = config
         self.client_id = client_id
+        self.current_user_id = current_user_id # Store current_user_id
         self.client_info = None
         if self.client_id:
             try:
@@ -39,6 +42,7 @@ class SendEmailDialog(QDialog):
                 print(f"Error fetching client_info in SendEmailDialog: {e}") # Or logging
         self.attachments = []
         self.active_template_type = None
+        self.selected_contact_ids_from_dialog = set() # To store contact_ids from SelectContactsDialog
 
         self.setWindowTitle(self.tr("Envoyer un Email"))
         self.setMinimumSize(600, 550)
@@ -268,16 +272,29 @@ class SendEmailDialog(QDialog):
             return
         dialog = SelectContactsDialog(self.client_id, self)
         if dialog.exec_() == QDialog.Accepted:
-            selected_emails = dialog.get_selected_emails()
-            if selected_emails:
+            selected_contacts = dialog.get_selected_contacts_info() # Changed method name
+            if selected_contacts:
                 current_text = self.to_edit.text().strip()
-                current_emails = [email.strip() for email in current_text.split(',') if email.strip()]
-                new_emails_to_add = [email for email in selected_emails if email not in current_emails]
-                if new_emails_to_add:
-                    prefix = ", " if current_emails and current_text and not current_text.endswith(',') else ""
-                    if not current_text: prefix = ""
-                    elif current_text.endswith(','): prefix = " "
-                    self.to_edit.setText(current_text + prefix + ", ".join(new_emails_to_add))
+                current_emails_in_field = {email.strip().lower() for email in current_text.split(',') if email.strip()}
+
+                new_emails_to_display = []
+
+                for contact_info in selected_contacts:
+                    email = contact_info.get('email')
+                    contact_id = contact_info.get('contact_id')
+                    if email and email.strip().lower() not in current_emails_in_field:
+                        new_emails_to_display.append(email.strip())
+                    if contact_id:
+                        self.selected_contact_ids_from_dialog.add(contact_id) # Store contact_id
+
+                if new_emails_to_display:
+                    prefix = ""
+                    if current_text and not current_text.endswith(',') and not current_text.endswith(';'):
+                        prefix = ", " # Use comma as a standard separator
+                    elif current_text and (current_text.endswith(',') or current_text.endswith(';')):
+                        prefix = " "
+
+                    self.to_edit.setText(current_text + prefix + ", ".join(new_emails_to_display))
 
     def add_attachment_from_client_docs(self):
         if not self.client_info:
@@ -355,6 +372,32 @@ class SendEmailDialog(QDialog):
             server = smtplib.SMTP(smtp_server, smtp_port)
             if smtp_port == 587: server.starttls()
             server.login(smtp_user, smtp_password); server.send_message(msg); server.quit()
+
+            # Log activity for each resolved contact_id
+            all_recipient_emails = [e.strip() for e in to_email.split(',') if e.strip()]
+            final_contact_ids_emailed = set(self.selected_contact_ids_from_dialog) # Start with those from dialog
+
+            for email_addr in all_recipient_emails:
+                contact = contacts_crud.get_contact_by_email(email_addr)
+                if contact and contact.get('contact_id'):
+                    final_contact_ids_emailed.add(contact.get('contact_id'))
+
+            log_details = self.tr("Email envoyé avec sujet : ") + subject
+            if len(body_content) > 100:
+                log_details += self.tr("\nCorps (aperçu) : ") + body_content[:100] + "..."
+            else:
+                log_details += self.tr("\nCorps : ") + body_content
+
+            for cid in final_contact_ids_emailed:
+                activity_logs_crud.add_activity_log({
+                    'user_id': self.current_user_id,
+                    'action_type': "EMAIL_SENT",
+                    'details': log_details,
+                    'related_contact_id': cid,
+                    'related_client_id': self.client_id if self.client_id else None
+                    # Add other relevant related_entity if applicable, e.g. related_entity_type="Email", related_entity_id= (some message id if available from SMTP server)
+                })
+
             QMessageBox.information(self, self.tr("Email Envoyé"), self.tr("L'email a été envoyé avec succès.")); self.accept()
         except Exception as e:
             QMessageBox.critical(self, self.tr("Erreur d'Envoi Email"), self.tr("Une erreur est survenue lors de l'envoi de l'email:\n{0}").format(str(e)))

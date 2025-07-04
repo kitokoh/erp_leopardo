@@ -10,7 +10,7 @@ class SelectContactsDialog(QDialog):
     def __init__(self, client_id, parent=None):
         super().__init__(parent)
         self.client_id = client_id
-        self.selected_emails = []
+        self.selected_contacts_info = [] # Changed from selected_emails
 
         self.setWindowTitle(self.tr("Sélectionner des Contacts"))
         self.setMinimumSize(400, 300)
@@ -48,18 +48,20 @@ class SelectContactsDialog(QDialog):
                 list_item = QListWidgetItem(item_text)
                 list_item.setFlags(list_item.flags() | Qt.ItemIsUserCheckable)
                 list_item.setCheckState(Qt.Unchecked)
-                list_item.setData(Qt.UserRole, email)
+                # Store both email and contact_id
+                contact_info = {'email': email, 'contact_id': contact.get('contact_id')}
+                list_item.setData(Qt.UserRole, contact_info)
                 self.contacts_list_widget.addItem(list_item)
 
     def accept_selection(self):
-        self.selected_emails = []
+        self.selected_contacts_info = [] # Changed
         for i in range(self.contacts_list_widget.count()):
             item = self.contacts_list_widget.item(i)
             if item.checkState() == Qt.Checked:
-                email = item.data(Qt.UserRole)
-                if email:
-                    self.selected_emails.append(email)
+                contact_info_data = item.data(Qt.UserRole) # This is now a dict
+                if contact_info_data and contact_info_data.get('email'): # Ensure email is still part of it
+                    self.selected_contacts_info.append(contact_info_data)
         self.accept()
 
-    def get_selected_emails(self):
-        return self.selected_emails
+    def get_selected_contacts_info(self): # Renamed
+        return self.selected_contacts_info

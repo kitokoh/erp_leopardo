@@ -133,6 +133,16 @@ def delete_contact(id: int, conn: sqlite3.Connection = None) -> bool:
         logging.error(f"Error deleting contact {id}: {e}")
         return False
 
+@_manage_conn
+def get_distinct_company_names(conn: sqlite3.Connection = None) -> list[str]:
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT DISTINCT company_name FROM Contacts WHERE company_name IS NOT NULL AND company_name != '' ORDER BY company_name")
+        return [row['company_name'] for row in cursor.fetchall()]
+    except sqlite3.Error as e:
+        logging.error(f"Error getting distinct company names: {e}")
+        return []
+
 # --- ContactLists Stubs ---
 @_manage_conn
 def add_contact_list(data: dict, conn: sqlite3.Connection = None) -> int | None:

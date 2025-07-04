@@ -30,9 +30,12 @@ except (ImportError, ValueError):
 
 PEOPLE_API_BASE_URL = "https://people.googleapis.com/v1/"
 
+# Default personFields to request for comprehensive sync
+DEFAULT_PERSON_FIELDS = "names,emailAddresses,phoneNumbers,organizations,birthdays,biographies,addresses,userDefined,metadata"
+
 # --- Google People API Functions ---
 
-def get_google_contacts_list(user_id: str, page_size: int = 100, page_token: str = None, person_fields: str = "names,emailAddresses,phoneNumbers,metadata") -> dict | None:
+def get_google_contacts_list(user_id: str, page_size: int = 100, page_token: str = None, person_fields: str = DEFAULT_PERSON_FIELDS) -> dict | None:
     """
     Fetches a list of contacts (connections) for the authenticated user from Google People API.
     Manages pagination using page_token.
@@ -65,17 +68,23 @@ def get_google_contacts_list(user_id: str, page_size: int = 100, page_token: str
         "connections": [
             {
                 "resourceName": "people/c123456789",
-                "etag": "%EgUBAj0DNy4aDAECAwQFBgcICQoLDA0ODxATFBUWFxgZExQREg==", # Example ETag
-                "names": [{"displayName": "Test User Sample"}],
-                "emailAddresses": [{"value": "test.user@example.com"}],
-                "phoneNumbers": [{"value": "+11234567890"}]
+                "etag": "%EgUBAj0DNy4aDAECAwQFBgcICQoLDA0ODxATFBUWFxgZExQREg==",
+                "metadata": {"sources": [{"type": "CONTACT", "id": "c123456789", "etag": "#dummySubEtag", "updateTime": "2023-01-01T10:00:00Z"}]},
+                "names": [{"displayName": "Test User Sample", "givenName": "Test", "familyName": "User Sample"}],
+                "emailAddresses": [{"value": "test.user@example.com", "type": "home"}],
+                "phoneNumbers": [{"value": "+11234567890", "type": "mobile"}],
+                "organizations": [{"name": "Sample Inc.", "title": "Developer", "current": True}],
+                "birthdays": [{"date": {"year": 1990, "month": 5, "day": 15}}],
+                "biographies": [{"value": "Sample notes about this contact.", "contentType": "TEXT_PLAIN"}],
+                "addresses": [{"streetAddress": "123 Main St", "city": "Anytown", "postalCode": "12345", "country": "USA", "type": "home"}],
+                "userDefined": [{"key": "platform_contact_id", "value": "local_id_xyz"}, {"key": "platform_contact_type", "value": "client_contact"}]
             }
         ],
-        "nextPageToken": None, # Or "dummyNextPageToken" to simulate pagination
-        "totalPeople": 1 # Example field
+        "nextPageToken": None,
+        "totalPeople": 1
     }
 
-def get_google_contact(user_id: str, resource_name: str, person_fields: str = "names,emailAddresses,phoneNumbers,biographies,organizations,metadata,userDefined") -> dict | None:
+def get_google_contact(user_id: str, resource_name: str, person_fields: str = DEFAULT_PERSON_FIELDS) -> dict | None:
     """
     Retrieves a specific contact by their resourceName from Google People API.
     person_fields specifies which fields to retrieve.
@@ -102,11 +111,16 @@ def get_google_contact(user_id: str, resource_name: str, person_fields: str = "n
     # Placeholder response
     return {
         "resourceName": resource_name,
-        "etag": "%EgUBAj0DNy4aDAECAwQFBgcICQoLDA0ODxATFBUWFxgZExQREg==",
+        "etag": "%EgUBAj0DNy4aDAECAwQFBgcICQoLDA0ODxATFBUWFxgZExQREg==", # Sample ETag
+        "metadata": {"sources": [{"type": "CONTACT", "id": resource_name.split('/')[-1], "etag": "#dummySubEtagDetails", "updateTime": "2023-01-02T11:00:00Z"}]},
         "names": [{"givenName": "Test", "familyName": "User Details", "displayName": "Test User Details"}],
-        "emailAddresses": [{"value": "details@example.com"}],
-        "phoneNumbers": [{"value": "+19876543210", "type": "mobile"}]
-        # Add other fields like biographies, organizations as per person_fields
+        "emailAddresses": [{"value": "details@example.com", "type": "work"}],
+        "phoneNumbers": [{"value": "+19876543210", "type": "mobile"}],
+        "organizations": [{"name": "Detail Corp.", "title": "Analyst", "current": True}],
+        "birthdays": [{"date": {"year": 1985, "month": 10, "day": 20}}],
+        "biographies": [{"value": "Detailed notes for this specific contact.", "contentType": "TEXT_PLAIN"}],
+        "addresses": [{"formattedValue": "456 Detail Dr, Detailville, DS 67890", "type": "work", "streetAddress": "456 Detail Dr", "city": "Detailville", "postalCode": "67890"}],
+        "userDefined": [{"key": "platform_contact_id", "value": "local_id_abc"}, {"key": "platform_contact_type", "value": "partner_contact"}]
     }
 
 def create_google_contact(user_id: str, contact_data: dict) -> dict | None:

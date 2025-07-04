@@ -607,11 +607,12 @@ def initialize_database():
         created_by_user_id TEXT, -- Added column
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        employee_status TEXT, -- internal, external, not_applicable
         FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL -- Added FK
     )
     """)
 
-    # Ensure created_by_user_id column exists in Contacts table for existing databases
+    # Ensure created_by_user_id and employee_status columns exist in Contacts table for existing databases
     cursor.execute("PRAGMA table_info(Contacts)")
     contacts_columns_info = cursor.fetchall()
     contacts_column_names = [info['name'] for info in contacts_columns_info]
@@ -624,6 +625,13 @@ def initialize_database():
             print(f"DEBUG_INIT_DB: Error adding 'created_by_user_id' column to Contacts table: {e_alter_contacts_creator}")
             # Note: Older SQLite versions might not support adding FK via ALTER TABLE.
             # The FK in CREATE TABLE is for new DBs. For existing, this adds the column. App logic must handle.
+
+    if 'employee_status' not in contacts_column_names:
+        try:
+            cursor.execute("ALTER TABLE Contacts ADD COLUMN employee_status TEXT")
+            print("DEBUG_INIT_DB: Added 'employee_status' column to Contacts table.")
+        except sqlite3.Error as e_alter_contacts_status:
+            print(f"DEBUG_INIT_DB: Error adding 'employee_status' column to Contacts table: {e_alter_contacts_status}")
 
     # Create ClientContacts table (base from ca.py)
     cursor.execute("""
@@ -924,10 +932,23 @@ def initialize_database():
         ip_address TEXT,
         user_agent TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        related_contact_id INTEGER, -- Added for linking log to a specific contact
         FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE SET NULL,
-        FOREIGN KEY (related_client_id) REFERENCES Clients (client_id) ON DELETE SET NULL
+        FOREIGN KEY (related_client_id) REFERENCES Clients (client_id) ON DELETE SET NULL,
+        FOREIGN KEY (related_contact_id) REFERENCES Contacts (contact_id) ON DELETE SET NULL
     )
     """)
+
+    # Ensure related_contact_id column exists if table already existed
+    cursor.execute("PRAGMA table_info(ActivityLog)")
+    activity_log_columns = [col_info['name'] for col_info in cursor.fetchall()]
+    if 'related_contact_id' not in activity_log_columns:
+        try:
+            cursor.execute("ALTER TABLE ActivityLog ADD COLUMN related_contact_id INTEGER REFERENCES Contacts(contact_id) ON DELETE SET NULL")
+            print("DEBUG_INIT_DB: Added 'related_contact_id' column to ActivityLog table.")
+        except sqlite3.Error as e_alter_activity_log:
+            print(f"DEBUG_INIT_DB: Error adding 'related_contact_id' column to ActivityLog: {e_alter_activity_log}")
+
 
     # Create TemplateCategories table (base from ca.py, pre-population logic from ca.py)
     cursor.execute("""
@@ -2100,6 +2121,8 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_activitylog_created_at ON ActivityLog(created_at)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_activitylog_action_type ON ActivityLog(action_type)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_activitylog_related_entity ON ActivityLog(related_entity_type, related_entity_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_activitylog_related_client_id ON ActivityLog(related_client_id)") # Ensure this exists
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_activitylog_related_contact_id ON ActivityLog(related_contact_id)") # New index
     # ScheduledEmails
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_scheduledemails_status_time ON ScheduledEmails(status, scheduled_send_at)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_scheduledemails_related_client_id ON ScheduledEmails(related_client_id)")
@@ -2243,6 +2266,29 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_exp_tags_tag_id ON ExperienceTags(tag_id)")
     # --- End Experience Module Indexes ---
 
+    # EntityContacts Table (New)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS EntityContacts (
+        entity_contact_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        entity_id TEXT NOT NULL,
+        entity_type TEXT NOT NULL, -- e.g., 'Transporter', 'FreightForwarder', 'MoneyTransferAgent', 'Partner'
+        contact_id INTEGER NOT NULL,
+        role_in_entity TEXT,
+        is_primary BOOLEAN DEFAULT FALSE,
+        can_receive_documents BOOLEAN DEFAULT TRUE,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (contact_id) REFERENCES Contacts (contact_id) ON DELETE CASCADE,
+        UNIQUE (entity_id, entity_type, contact_id)
+    )
+    """)
+    print("DEBUG_INIT_DB: Table EntityContacts created or exists.")
+
+    # --- Indexes for EntityContacts ---
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_entitycontacts_entity ON EntityContacts(entity_id, entity_type)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_entitycontacts_contact_id ON EntityContacts(contact_id)")
+    print("DEBUG_INIT_DB: Indexes for EntityContacts created or exists.")
 
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandes_client_id ON Commandes(client_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_commandes_project_id ON Commandes(project_id)")

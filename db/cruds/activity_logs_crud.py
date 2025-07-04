@@ -65,3 +65,29 @@ def get_activity_log_by_id(log_id: int, conn: sqlite3.Connection = None) -> dict
     except sqlite3.Error as e:
         logging.error(f"Failed to get activity log by ID {log_id}: {e}")
         return None
+
+@_manage_conn
+def get_logs_for_contact(contact_id: int, limit: int = 50, offset: int = 0, conn: sqlite3.Connection = None) -> list[dict]:
+    """Retrieves activity logs related to a specific contact_id."""
+    cursor = conn.cursor()
+    sql = """
+        SELECT al.*, u.username AS user_username
+        FROM ActivityLog al
+        LEFT JOIN Users u ON al.user_id = u.user_id
+        WHERE al.related_contact_id = ?
+        ORDER BY al.created_at DESC
+        LIMIT ? OFFSET ?
+    """
+    try:
+        cursor.execute(sql, (contact_id, limit, offset))
+        return [dict(row) for row in cursor.fetchall()]
+    except sqlite3.Error as e:
+        logging.error(f"Error getting logs for contact {contact_id}: {e}")
+        return []
+
+__all__ = [
+    "add_activity_log",
+    "get_activity_logs",
+    "get_activity_log_by_id",
+    "get_logs_for_contact"
+]
