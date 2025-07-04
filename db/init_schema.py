@@ -11,25 +11,26 @@ import sys # Ensure sys is imported for path manipulation
 
 # Get the project root directory
 # This allows importing config.py from the root and db.connection
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+# project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # No longer needed for config import
+# if project_root not in sys.path:
+#     sys.path.insert(0, project_root) # No longer needed for config import
 
-try:
-    import config
-except ImportError:
-    print("CRITICAL: config.py not found at project root by db/init_schema.py. Using fallback configurations.")
-    class config_fallback:
-        DATABASE_PATH = os.path.join(project_root, "app_data_fallback_init.db")
-        DEFAULT_ADMIN_USERNAME = "admin_fallback_init"
-        DEFAULT_ADMIN_PASSWORD = "password_fallback_init"
-        # Add other necessary fallbacks if init_schema.py uses them directly
-        # For example, APP_ROOT_DIR if it were used directly for paths here.
-    config = config_fallback
+# try:
+#     import config # Removed direct config import
+# except ImportError:
+#     print("CRITICAL: config.py not found at project root by db/init_schema.py. Using fallback configurations.")
+#     class config_fallback:
+#         DATABASE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app_data_fallback_init.db")
+#         DEFAULT_ADMIN_USERNAME = "admin_fallback_init"
+#         DEFAULT_ADMIN_PASSWORD = "password_fallback_init"
+#         # Add other necessary fallbacks if init_schema.py uses them directly
+#         # For example, APP_ROOT_DIR if it were used directly for paths here.
+#     config = config_fallback
 
 # Import the main SQLAlchemy components from db.connection
+# Note: main_engine will be None here and needs to be initialized by main.py calling db.connection.initialize_engine_and_session
 try:
-    from db.connection import Base as MainBase, engine as main_engine
+    from db.connection import Base as MainBase, engine as main_engine, initialize_engine_and_session
     # Import specific models that use MainBase and need table creation here
     from calculator.models import CalculationHistory
     # from other_module.models import OtherModelUsingMainBase # Example for future models
@@ -105,16 +106,42 @@ def _populate_default_cover_page_templates(conn_passed):
     print("Default cover page templates population attempt finished.")
 
 
-def initialize_database():
+def initialize_database(app_config):
     """
     Initializes the database by creating tables if they don't already exist.
     Combines schema from db/ca.py and db/schema.py.
+    Requires app_config to be passed in.
     """
-    # Create SQLAlchemy engine
-    engine = create_engine(f"sqlite:///{config.DATABASE_PATH}")
+    if not app_config or 'database_path' not in app_config:
+        logging.critical("initialize_database called without valid app_config or database_path. Aborting schema initialization.")
+        raise ValueError("app_config with database_path is required for initialize_database.")
 
-    # Use DATABASE_PATH from config (imported at the top)
-    conn = sqlite3.connect(config.DATABASE_PATH) # Keep for direct cursor use
+    database_path = app_config['database_path']
+    # Ensure the directory for the database exists
+    db_dir = os.path.dirname(database_path)
+    if db_dir and not os.path.exists(db_dir):
+        os.makedirs(db_dir, exist_ok=True)
+        logging.info(f"Created directory for database: {db_dir}")
+
+
+    # Initialize the main SQLAlchemy engine using the passed config.
+    # This makes main_engine available if other parts of init_schema need it,
+    # though it's primarily for use by the rest of the application via db.connection.engine.
+    # Note: `initialize_engine_and_session` is imported from `db.connection`.
+    # It sets the global `engine` and `SessionLocal` in `db.connection`.
+    initialize_engine_and_session(app_config)
+    logging.info(f"db.init_schema: Main SQLAlchemy engine initialized via db.connection.initialize_engine_and_session with path: {database_path}")
+
+
+    # Create a local SQLAlchemy engine for operations specific to init_schema if needed,
+    # or rely on the main_engine if appropriate. For create_all, main_engine is fine.
+    # The `engine` variable here is local to initialize_database scope.
+    # The `main_engine` imported from db.connection is the global one.
+    # For acc_models.Base.metadata.create_all(bind=engine_acc), a new engine `engine_acc` is created later.
+    # For MainBase.metadata.create_all(bind=main_engine), it uses the globally set main_engine.
+
+    # Use DATABASE_PATH from the passed app_config
+    conn = sqlite3.connect(database_path) # Keep for direct cursor use
     conn.row_factory = sqlite3.Row # Essential for accessing columns by name
     cursor = conn.cursor() # Keep for direct cursor use
 
