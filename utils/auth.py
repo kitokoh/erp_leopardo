@@ -13,7 +13,12 @@ pwd_context = CryptContext(
 
 def hash_password(password: str) -> str:
     """Hashes a password using the configured context."""
-    return pwd_context.hash(password)
+    # Be cautious logging plain passwords, even in debug. For "admin" it's known.
+    # For real passwords, log only a confirmation or password length/type.
+    logger.debug(f"Hashing password for input (len: {len(password)})")
+    hashed = pwd_context.hash(password)
+    logger.debug(f"Generated hash (bcrypt): {hashed[:10]}...{hashed[-5:]}") # Log prefix/suffix
+    return hashed
 
 def verify_password(plain_password: str, hashed_password: str) -> tuple[bool, str | None]:
     """
