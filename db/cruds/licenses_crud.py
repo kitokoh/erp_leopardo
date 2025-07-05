@@ -203,3 +203,22 @@ def update_license(conn: sqlite3.Connection, license_id: str, license_data: dict
 #     if retrieved_license:
 #         print(f"Active license: {retrieved_license}")
 #     conn.close()
+
+def get_license_by_key_and_machine(conn: sqlite3.Connection, license_key: str, machine_info: str) -> dict | None:
+    """
+    Retrieves a license by its license_key and machine_info.
+    This is used to check if a specific signed key has already been activated on a particular machine.
+    """
+    sql = "SELECT * FROM Licenses WHERE license_key = ? AND machine_info = ?"
+    try:
+        cursor = conn.cursor()
+        cursor.execute(sql, (license_key, machine_info))
+        row = cursor.fetchone()
+        if row:
+            logger.debug(f"License found for key '{license_key}' and machine '{machine_info}'.")
+            return dict(row)
+        logger.debug(f"No license found for key '{license_key}' and machine '{machine_info}'.")
+        return None
+    except sqlite3.Error as e:
+        logger.error(f"Error retrieving license by key '{license_key}' and machine '{machine_info}': {e}", exc_info=True)
+        return None
