@@ -1049,6 +1049,7 @@ class ClientMainWidget(QWidget):
             QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation section notes:\n{0}").format(str(e)))
 
     def _setup_main_tabs_section(self, main_layout):
+        global LAST_SELECTED_MAIN_TAB_INDEX # Déclaration pour pouvoir modifier la variable globale
         try:
             logging.info("ClientMainWidget.setup_ui: Starting setup for Main Tabs Section...")
             # Le QGroupBox "Dossier Client" (anciennement "Commandes") contiendra le QTabWidget principal
@@ -1209,7 +1210,8 @@ class ClientMainWidget(QWidget):
 
     def _on_main_tab_changed(self, index):
         """Slot to capture the current main tab index when changed by the user."""
-        global LAST_SELECTED_MAIN_TAB_INDEX
+        global LAST_SELECTED_MAIN_TAB_INDEX # S'assurer que la déclaration global est ici aussi
+
         if 0 <= index < self.tab_widget.count():
             LAST_SELECTED_MAIN_TAB_INDEX = index
             logging.debug(f"ClientMainWidget: Global LAST_SELECTED_MAIN_TAB_INDEX updated to {index} ({self.tab_widget.tabText(index)})")

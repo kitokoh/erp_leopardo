@@ -298,12 +298,12 @@ class DocumentsTab(QWidget):
 
                     if can_manage:
                         if doc.get("source_template_id"):
-                            version_btn = QPushButton(QIcon(":/icons/copy.svg"), "")
+                            version_btn = QPushButton(QIcon(":/icons/plus-square.svg"), "") # Remplacé copy.svg
                             version_btn.setToolTip(self.tr("Créer une nouvelle version"))
                             version_btn.clicked.connect(lambda checked, old_id=doc_id, t_id=doc.get("source_template_id"): self.handle_create_new_version_clicked(old_id, t_id))
                             actions_layout.addWidget(version_btn)
 
-                        delete_btn = QPushButton(QIcon(":/icons/trash-2.svg"), "")
+                        delete_btn = QPushButton(QIcon(":/icons/trash.svg"), "") # Remplacé trash-2.svg par trash.svg
                         delete_btn.setToolTip(self.tr("Supprimer Document"))
                         delete_btn.setObjectName("dangerButton")
                         delete_btn.clicked.connect(lambda checked, d_id=doc_id, p=full_file_path: self.delete_client_document_entry(d_id, p))
