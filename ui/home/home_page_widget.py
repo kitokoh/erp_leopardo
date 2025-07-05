@@ -11,7 +11,9 @@ import random
 
 from .promo_content_manager import PromoContentManager
 from .promo_widgets import PromoSectionWidget
+
 from .quick_stats_widget import QuickStatsWidget # Import the new widget
+
 
 class HomePageWidget(QWidget):
     def __init__(self, main_window, parent=None):
