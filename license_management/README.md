@@ -16,18 +16,29 @@ Ce module est responsable de la gestion des licences logicielles pour l'applicat
 
 3.  **Activation de Licence** :
     *   **Licence Gratuite** : Activée automatiquement via `license_management.manager.activate_free_license()` si l'utilisateur n'a pas de licence valide et n'a pas déjà bénéficié d'une licence gratuite sur la machine/compte concerné.
-    *   **Licence Payante** : L'utilisateur saisit une clé de licence dans `LicenseDialog`. La fonction `license_management.manager.activate_license()` est appelée pour valider et activer la clé. (La validation de la clé elle-même par rapport à un système externe de génération/vente de clés n'est pas dans le scope de ce module, qui se concentre sur l'application locale de la licence).
+    *   **Licence Payante (Clé Signée)** : L'utilisateur saisit une clé de licence dans `LicenseDialog`. La fonction `license_management.manager.activate_license()` est appelée. Cette fonction :
+        *   Vérifie la signature cryptographique de la clé en utilisant une clé publique embarquée.
+        *   Extrait les paramètres de la licence (type, date d'expiration, fonctionnalités spécifiques) directement de la clé signée.
+        *   Lie la clé activée à l'utilisateur et à un identifiant machine (`machine_info`) pour empêcher la réutilisation abusive sur d'autres machines (selon la politique de la clé).
+        *   Les clés signées sont générées par un utilitaire externe (`utils/license_key_generator.py`) utilisant une clé privée correspondante.
 
-4.  **Gestion des Droits d'Accès** :
-    *   La fonction `license_management.manager.get_allowed_features()` retourne un ensemble de chaînes représentant les fonctionnalités autorisées pour la licence active de l'utilisateur.
-    *   L'interface principale (`main_window.DocumentManager`) utilise ces informations, en combinaison avec les permissions basées sur les rôles, pour afficher/masquer les actions et modules correspondants.
+4.  **Gestion Dynamique des Droits d'Accès (Feature Flagging)** :
+    *   La fonction `license_management.manager.get_allowed_features()` retourne un ensemble de constantes de fonctionnalités (ex: `FEATURE_PROJECT_MANAGEMENT`) autorisées pour le type de licence actif de l'utilisateur. Ceci est basé sur une `LICENSE_FEATURES_MAP` définie dans le manager.
+    *   L'interface principale (`main_window.DocumentManager`) utilise cet ensemble de fonctionnalités autorisées, en combinaison avec les permissions basées sur les rôles, pour afficher/masquer dynamiquement les actions, menus et modules correspondants.
 
 ## Structure du Module
 
-*   **`cruds.py`** : Contient les fonctions d'accès à la base de données (Create, Read, Update, Delete) pour les enregistrements de licences dans la table `Licenses`.
-*   **`manager.py`** : Contient la logique métier de plus haut niveau pour la gestion des licences (génération de clé, identifiant machine, activation, vérification de validité, gestion des fonctionnalités).
-*   **`ui.py`** : Contient la classe `LicenseDialog` (basée sur `QDialog`) qui est l'interface utilisateur pour que l'utilisateur puisse voir l'état de sa licence et en activer une nouvelle.
-*   **`README.md`** : Ce fichier.
+*   **`cruds.py`** (`db/cruds/licenses_crud.py`) : Contient les fonctions d'accès à la base de données (Create, Read, Update, Delete) pour les enregistrements de licences dans la table `Licenses`.
+*   **`__init__.py` (agit comme `manager.py`)** : Contient la classe `LicenseManager` avec la logique métier de plus haut niveau :
+    *   Vérification de validité des licences.
+    *   Activation des licences (gratuites et payantes/signées).
+    *   Gestion des identifiants machine (maintenant via la bibliothèque `machineid`).
+    *   Définition des constantes de fonctionnalités et de la `LICENSE_FEATURES_MAP`.
+    *   Méthode `get_allowed_features()`.
+    *   Chargement de la clé publique pour la vérification des licences signées.
+*   **`ui.py`** (`license_management/ui.py`) : Contient la classe `LicenseDialog` pour l'interaction utilisateur.
+*   **`README.md`** (ce fichier).
+*   **Utilitaire de génération de clés (hors application principale)** : `utils/license_key_generator.py` est utilisé pour créer les clés de licence signées.
 
 ## Intégration
 
@@ -59,12 +70,18 @@ Une fonctionnalité a été ajoutée pour permettre aux utilisateurs de demander
 
 ## Informations Techniques
 
-*   **Identifiant Machine** : La fonction `get_machine_identifier()` dans `manager.py` utilise une combinaison d'informations système (MAC address, nom d'hôte, processeur) hachées pour lier la licence gratuite. Cette méthode est basique et pourrait être renforcée pour des applications commerciales.
-*   **Clés de Licence (Payantes)** : Ce module ne génère ni ne valide l'authenticité des clés payantes par rapport à un serveur externe. Il suppose que si une clé est fournie, sa validité intrinsèque (type, durée) est déterminée par une logique interne (ex: préfixe de la clé) ou qu'elle a été pré-validée. Une clé ne peut pas être activement utilisée par plusieurs utilisateurs simultanément.
+*   **Identifiant Machine** : La fonction `get_machine_identifier()` dans le `LicenseManager` utilise désormais la bibliothèque `machineid` pour tenter d'obtenir un identifiant unique et stable de la machine. Ceci est utilisé pour lier les licences activées à une machine spécifique.
+*   **Clés de Licence (Payantes/Signées)** :
+    *   Les clés de licence payantes sont désormais des **clés signées cryptographiquement (RSA-PSS avec SHA256)**.
+    *   Chaque clé contient des données JSON embarquées (type de licence, date d'expiration, fonctionnalités spécifiques, etc.) et une signature.
+    *   L'application vérifie la signature à l'aide d'une clé publique stockée.
+    *   Un utilitaire `utils/license_key_generator.py` (avec une clé privée correspondante) est utilisé pour générer ces clés.
+    *   Lors de l'activation, la clé signée complète est stockée dans la base de données, et une vérification est faite pour s'assurer que la même clé n'est pas réactivée sur la même machine par un autre utilisateur (selon la politique définie).
+*   **Feature Flagging**: L'accès aux différentes fonctionnalités et modules de l'application est contrôlé dynamiquement par la combinaison du type de licence de l'utilisateur (via `LICENSE_FEATURES_MAP` dans `LicenseManager`) et de ses permissions basées sur son rôle.
 
 ## Pour les Développeurs
 
-*   Lors de l'ajout de nouveaux modules/fonctionnalités soumis à licence, définissez une nouvelle constante `FEATURE_...` dans `license_management.manager.py`.
+*   Lors de l'ajout de nouveaux modules/fonctionnalités soumis à licence, définissez une nouvelle constante `FEATURE_...` dans `license_management/__init__.py`.
 *   Mettez à jour `LICENSE_FEATURES_MAP` dans `license_management.manager.py` pour spécifier quels types de licence donnent accès à cette nouvelle fonctionnalité.
 *   Dans `main_window.py`, mettez à jour `MODULE_TO_LICENSE_FEATURE_MAP` si le nouveau module doit être contrôlé par la licence.
 *   Utilisez `self.allowed_features` dans `DocumentManager` ou passez cette information aux widgets concernés pour conditionner l'affichage ou l'activation de l'interface utilisateur de la fonctionnalité.

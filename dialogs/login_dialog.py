@@ -92,20 +92,73 @@ class LoginDialog(QDialog):
 
         main_layout.addWidget(self.button_box)
 
+        # Forgot Password Link/Button
+        forgot_password_layout = QHBoxLayout()
+        forgot_password_layout.addStretch()
+        self.forgot_password_button = QPushButton(self.tr("Mot de passe oublié ?"))
+        self.forgot_password_button.setObjectName("linkButton") # For link-like styling
+        self.forgot_password_button.setFlat(True)
+        self.forgot_password_button.clicked.connect(self._handle_forgot_password)
+        forgot_password_layout.addWidget(self.forgot_password_button)
+        forgot_password_layout.addStretch()
+        main_layout.addLayout(forgot_password_layout)
+
+
         self.username_input.setFocus() # Set focus to username field initially
-        self._load_remembered_user()
+        self._load_remembered_user_or_token()
 
 
-    def _load_remembered_user(self):
-        """Checks for a remembered user and pre-fills the form."""
-        remembered_username = authentication.get_remembered_user()
-        if remembered_username:
-            self.username_input.setText(remembered_username)
+    def _load_remembered_user_or_token(self):
+        """
+        Checks for a remembered token and pre-fills username if possible.
+        The actual token is not pre-filled for security.
+        """
+        # This function name is a bit of a misnomer now with token-based auth,
+        # as we don't pre-fill username from token directly.
+        # However, if old username-based remember-me was still partially active, this would handle it.
+        # For token-based, QSettings stores the token, not username.
+        # The main.py handles token-based auto-login before this dialog is even shown.
+        # If this dialog is shown, it means token auto-login failed or no token.
+        # So, this function might be simplified or removed if only token-based is used.
+
+        # For now, let's assume it might still be useful if we want to pre-fill username
+        # if a token exists (e.g. by decoding part of it, though not recommended for security).
+        # A simpler approach: if a token exists, maybe just check "Remember Me".
+
+        # Current `authentication.get_remembered_user()` is the old one.
+        # It should be `authentication.get_remembered_token_from_settings()`.
+        # Since `main.py` handles token login, this dialog showing means manual input is needed.
+        # We can check if a token *was* present to pre-check "Remember Me",
+        # but not pre-fill username from it.
+
+        # Let's check if a token was present, to decide if "Remember Me" should be checked.
+        # This is more for UX consistency if user previously chose "Remember Me".
+        if authentication.get_remembered_token_from_settings(): # Using the new function name conceptually
             self.remember_me_checkbox.setChecked(True)
-            self.password_input.setFocus() # Move focus to password if username is filled
-            logger.info(f"Pre-filled login form for remembered user: {remembered_username}")
-        else:
-            self.username_input.setFocus() # Default focus if no user remembered
+            logger.info("A 'Remember Me' token was found; checkbox pre-checked.")
+            # Don't pre-fill username from token for security.
+
+        self.username_input.setFocus() # Always focus username for manual entry.
+
+
+    def _handle_forgot_password(self):
+        logger.info("Forgot password button clicked.")
+        # Import here to avoid circular dependencies if dialogs import each other indirectly
+        from dialogs.request_password_reset_dialog import RequestPasswordResetDialog
+
+        # We can optionally pass the email from the current username input
+        # if the user has already typed something there.
+        # current_email_attempt = self.username_input.text().strip()
+        # if "@" not in current_email_attempt: # Simple check if it looks like an email
+        # current_email_attempt = ""
+
+        reset_dialog = RequestPasswordResetDialog(self)
+        # if current_email_attempt:
+        #     reset_dialog.email_input.setText(current_email_attempt)
+
+        reset_dialog.exec_()
+        # The RequestPasswordResetDialog handles its own logic and user feedback.
+        # No further action needed here after it closes.
 
     def _attempt_login(self):
         username = self.username_input.text().strip()

@@ -413,3 +413,26 @@ def get_biometric_auth_status(user_id: str, conn: sqlite3.Connection = None, log
     except sqlite3.Error as e:
         current_logger.error(f"Database error fetching biometric auth status for user '{user_id}': {e}", exc_info=True)
         return None
+
+@_manage_conn
+def get_user_by_email(email: str, conn: sqlite3.Connection = None, logger_passed: logging.Logger | None = None) -> dict | None:
+    """Fetches a user by email, including their role information."""
+    current_logger = logger_passed if logger_passed else module_logger
+    sql = """SELECT u.*, r.role_name
+             FROM Users u
+             JOIN Roles r ON u.role_id = r.role_id
+             WHERE u.email = ? AND (u.is_deleted = 0 OR u.is_deleted IS NULL)""" # Also check not deleted
+    try:
+        cursor = conn.cursor()
+        cursor.execute(sql, (email,))
+        row = cursor.fetchone()
+        if row:
+            user_data = dict(row)
+            current_logger.debug(f"User with email '{email}' found.")
+            return user_data
+        else:
+            current_logger.debug(f"User with email '{email}' not found.")
+            return None
+    except sqlite3.Error as e:
+        current_logger.error(f"Database error fetching user by email '{email}': {e}", exc_info=True)
+        return None
