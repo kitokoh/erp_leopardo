@@ -218,6 +218,7 @@ class ClientMainWidget(QWidget):
             # self.manage_referent_btn.clicked.connect(self.manage_referent_status_for_selected_client)
             # self.action_buttons_layout.addWidget(self.manage_referent_btn) # Removed, functionality moved to checkbox
 
+
             self.generate_referents_report_btn = QPushButton(QIcon.fromTheme("document-print", QIcon(":/icons/file-text.svg")), self.tr("Rapport Référents"))
             self.generate_referents_report_btn.setToolTip(self.tr("Générer un rapport PDF des référents locaux et globaux pour ce client"))
             self.generate_referents_report_btn.clicked.connect(self.handle_generate_referents_report)
@@ -239,6 +240,7 @@ class ClientMainWidget(QWidget):
             # I will assume the `mark_distributor_btn` that was mentioned in my previous plan for `ClientWidget`
             # is not present in this `ClientMainWidget`'s `action_buttons_layout`.
             # If it was intended to be here, this is where it would be removed.
+
 
             self.create_docs_btn = QPushButton(self.tr("Envoyer Mail"))
             self.create_docs_btn.setIcon(QIcon.fromTheme("mail-send", QIcon(":/icons/bell.svg")))
@@ -277,6 +279,7 @@ class ClientMainWidget(QWidget):
 
             # info_container_layout.addLayout(self.action_buttons_layout) # This layout is added to the tab
 
+
             self.internal_client_info_tabs = QTabWidget()
             info_container_layout.addWidget(self.internal_client_info_tabs) # This remains in info_container_layout
 
@@ -287,6 +290,7 @@ class ClientMainWidget(QWidget):
             # Add the moved elements to the details_tab_layout (top of the first tab)
             # details_tab_layout.addWidget(self.header_label) # Removed as per new request
             details_tab_layout.addWidget(self.referent_status_label) # Keep for now, will be integrated into new status UI
+
             details_tab_layout.addLayout(self.action_buttons_layout) # Add the whole action buttons layout
 
             # Existing QFormLayout for other details
@@ -1127,6 +1131,7 @@ class ClientMainWidget(QWidget):
 
     # def _setup_assignments_tab(self): # Method removed as assignments are now an internal tab within Client Info section
     #     pass
+
 
     # def _setup_commandes_tab(self): # Method removed as it's integrated into _setup_main_tabs_section
     #     pass
