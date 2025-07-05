@@ -281,6 +281,7 @@ class DocumentManager(QMainWindow):
         self.client_controller_instance = ClientController(db_manager=db_manager, config=CONFIG, app_root_dir=self.app_root_dir, notification_manager=None) # Temp notification_manager=None
         # Later, self.notification_manager will be set up and can be passed if ClientController needs it.
 
+
         self.setWindowTitle(self.tr("Gestionnaire de Documents Client")); self.setGeometry(100, 100, 1200, 800)
         self.setWindowIcon(QIcon(":/icons/logo.svg"))
         

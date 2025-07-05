@@ -1,22 +1,37 @@
 [
     {
+        "category": "tip",
         "title": "Astuce du Jour",
         "body": "Saviez-vous que vous pouvez personnaliser l'interface via le menu Paramètres ?"
     },
     {
+        "category": "new_feature",
         "title": "Nouvelle Fonctionnalité",
         "body": "La version 2.1 inclut désormais l'exportation PDF améliorée pour vos rapports."
     },
     {
+        "category": "tip",
         "title": "Le Saviez-vous ?",
         "body": "Utilisez Ctrl+F pour rechercher rapidement dans les listes de documents."
     },
     {
+        "category": "announcement",
         "title": "Promotion Spéciale",
         "body": "Contactez notre support pour découvrir nos offres de formation personnalisées ce mois-ci !"
     },
     {
+        "category": "announcement",
         "title": "Info Maintenance",
         "body": "Une courte maintenance est prévue samedi prochain à 23h00 pour améliorer les performances."
+    },
+    {
+        "category": "tip",
+        "title": "Raccourci Clavier",
+        "body": "Utilisez Ctrl+S pour sauvegarder rapidement votre travail dans la plupart des modules."
+    },
+    {
+        "category": "new_feature",
+        "title": "Intégration Améliorée",
+        "body": "Découvrez la nouvelle intégration avec le calendrier pour une meilleure planification."
     }
 ]
