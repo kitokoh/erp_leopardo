@@ -661,7 +661,7 @@ class SettingsPage(QWidget):
         data_ops_layout.setSpacing(10)
 
         self.import_products_btn = QPushButton(self.tr("Import Products from CSV"))
-        self.import_products_btn.setIcon(QIcon(":/icons/upload.svg")) # Suggest icon
+        self.import_products_btn.setIcon(QIcon(":/icons/file-plus.svg")) # Replaced missing icon
         self.import_products_btn.setToolTip(self.tr("Import product data from a CSV file."))
         self.import_products_btn.clicked.connect(self._handle_import_products)
         data_ops_layout.addWidget(self.import_products_btn)
@@ -717,7 +717,7 @@ class SettingsPage(QWidget):
 
         self.run_backup_button = QPushButton(self.tr("Run Manual Backup Now"))
         self.run_backup_button.setObjectName("primaryButton")
-        self.run_backup_button.setIcon(QIcon(":/icons/upload-cloud.svg")) # Suggest icon
+        self.run_backup_button.setIcon(QIcon(":/icons/save.svg")) # Replaced missing icon
         self.run_backup_button.setToolTip(self.tr("Initiates a manual backup to the configured remote server."))
         self.run_backup_button.clicked.connect(self._handle_run_backup)
         backup_form_layout.addRow(self.run_backup_button) # Add button to the form for alignment

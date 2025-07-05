@@ -190,6 +190,17 @@ from dialogs.role_management_dialog import RoleManagementDialog # Added for Role
 from commande_management.commandes_dashboard_widget import CommandesDashboardWidget # Import CommandesDashboardWidget
 from utils.app_constants import CONFIGURABLE_MODULES # Import from new location
 
+# License Management Imports for feature constants and manager
+from license_management import manager as license_manager # To call get_allowed_features
+from license_management import (
+    FEATURE_BASIC_CLIENT_DOCS, FEATURE_PROJECT_MANAGEMENT, FEATURE_STATISTICS_MODULE,
+    FEATURE_PRODUCT_MANAGEMENT, FEATURE_PARTNER_MANAGEMENT, FEATURE_INVENTORY_MANAGEMENT,
+    FEATURE_RECRUITMENT_MODULE, FEATURE_BOTPRESS_INTEGRATION, FEATURE_CALENDAR_MODULE,
+    FEATURE_EXPERIENCE_MANAGEMENT, FEATURE_ADVANCED_REPORTING, FEATURE_API_ACCESS,
+    FEATURE_USER_MANAGEMENT_FULL, FEATURE_SETTINGS_MANAGEMENT,
+    FEATURE_COMMANDES_MANAGEMENT, FEATURE_CALCULATOR_MODULE
+)
+
 class ClientListItemWidget(QWidget):
     def __init__(self, client_data, parent=None):
         super().__init__(parent)
@@ -275,7 +286,19 @@ class DocumentManager(QMainWindow):
         self.current_license_info = current_license_info # Store license information
         self.current_user_id = self.current_user_info.get('user_id') # Extract user_id for existing usage
 
+        # Extract allowed features from license_info or get them using license_manager
+        if self.current_license_info and 'allowed_features' in self.current_license_info:
+            self.allowed_features = self.current_license_info['allowed_features']
+            logging.info(f"Allowed features loaded from current_license_info: {self.allowed_features}")
+        elif self.current_license_info and self.current_license_info.get('license_type'):
+            self.allowed_features = license_manager.get_allowed_features(self.current_license_info['license_type'])
+            logging.info(f"Allowed features derived using license_manager.get_allowed_features for type '{self.current_license_info['license_type']}': {self.allowed_features}")
+        else:
+            self.allowed_features = set() # Default to no features if license info is missing or incomplete
+            logging.warning("No valid license information to determine allowed features. Defaulting to empty set.")
+
         logging.info(f"DocumentManager initialized for user: {self.current_user_info.get('username')}, Role: {self.current_user_info.get('role_name')}, License active: {self.current_license_info.get('is_active') if self.current_license_info else 'N/A'}")
+        logging.info(f"Effective allowed features for this session: {self.allowed_features}")
 
         # Instantiate ClientController
         self.client_controller_instance = ClientController()
@@ -1139,17 +1162,48 @@ class DocumentManager(QMainWindow):
             action_instance = getattr(self, action_attr_name, None)
 
             if action_instance:
-                # Module activation state (from DB global settings) also needs to be checked.
-                # self.module_states is populated by _load_module_states() in __init__
-                is_module_globally_enabled = self.module_states.get(module_name, True) # Default to True if not in global states for some reason
+                # 1. Check if module is globally enabled by admin settings
+                is_module_globally_enabled = self.module_states.get(module_name, True)
+                if not is_module_globally_enabled:
+                    logging.info(f"Module '{module_name}' globally DISABLED by admin. Action '{action_attr_name}' NOT ADDED to menu.")
+                    continue # Skip adding this module to the menu entirely
 
-                if is_module_globally_enabled:
-                    # Permissions will be applied later by _apply_permissions, which sets action.setVisible()
-                    # Here, we just add it to the menu if user wants it and it's globally enabled.
-                    modules_menu.addAction(action_instance)
-                    logging.info(f"Module '{module_name}' (Action: {action_attr_name}) ADDED to menu based on user config and global state.")
-                else:
-                    logging.info(f"Module '{module_name}' is GLOBALLY DISABLED by admin settings. Action '{action_attr_name}' NOT ADDED to menu, despite user config.")
+                # 2. Check if license permits this feature
+                # Assuming MODULE_TO_LICENSE_FEATURE_MAP is defined and accessible (it is in _apply_permissions, should be consistent here or passed)
+                # For simplicity, let's re-fetch or ensure self.allowed_features is up-to-date.
+                # It's set in __init__ and potentially updated in _handle_roles_changed if license itself changes.
+
+                # Re-using MODULE_TO_LICENSE_FEATURE_MAP as defined in _apply_permissions for consistency
+                # This map should ideally be a class member or globally accessible if used in multiple methods.
+                # For now, duplicating its structure here for clarity, or assuming _apply_permissions has already run
+                # and self.allowed_features is correctly populated.
+                _MODULE_TO_LICENSE_FEATURE_MAP_FOR_MENU = {
+                    'project_management': FEATURE_PROJECT_MANAGEMENT,
+                    'product_management': FEATURE_PRODUCT_MANAGEMENT,
+                    'partner_management': FEATURE_PARTNER_MANAGEMENT,
+                    'statistics': FEATURE_STATISTICS_MODULE,
+                    'inventory_management': FEATURE_INVENTORY_MANAGEMENT,
+                    'experience_management': FEATURE_EXPERIENCE_MANAGEMENT,
+                    'calendar': FEATURE_CALENDAR_MODULE,
+                    'botpress_integration': FEATURE_BOTPRESS_INTEGRATION,
+                    'calculator': FEATURE_CALCULATOR_MODULE,
+                    'commandes_management': FEATURE_COMMANDES_MANAGEMENT,
+                    # carrier_map and camera_management default to None (no specific license feature)
+                }
+                license_feature_key = _MODULE_TO_LICENSE_FEATURE_MAP_FOR_MENU.get(module_name)
+                permitted_by_license = True # Default to true if no specific license feature is mapped
+                if license_feature_key:
+                    permitted_by_license = license_feature_key in self.allowed_features
+
+                if not permitted_by_license:
+                    logging.info(f"Module '{module_name}': Feature '{license_feature_key}' NOT ALLOWED by current license. Action '{action_attr_name}' NOT ADDED to menu.")
+                    continue # Skip adding this module to the menu
+
+                # If globally enabled AND permitted by license, then add to menu.
+                # Role-based visibility will be handled by _apply_permissions.
+                modules_menu.addAction(action_instance)
+                logging.info(f"Module '{module_name}' (Action: {action_attr_name}) ADDED to menu (globally enabled, license permitted, user visible).")
+
             else:
                 logging.warning(f"Action attribute '{action_attr_name}' for module '{module_name}' not found on DocumentManager instance.")
 
@@ -1279,13 +1333,35 @@ class DocumentManager(QMainWindow):
         admin_menu_visible = can_manage_users or can_manage_roles
         self.admin_menu.menuAction().setVisible(admin_menu_visible)
         logging.info(f"  Admin Menu visible: {admin_menu_visible} (P_MANAGE_USERS={can_manage_users}, P_MANAGE_ROLES={can_manage_roles})")
-        self.manage_users_action.setEnabled(can_manage_users) # Should already be visible if menu is
-        self.manage_roles_action.setEnabled(can_manage_roles) # Should already be visible if menu is
 
-        # Module Menu Actions
-        module_permissions = {
+        # Further check for admin menu actions based on license features if applicable
+        # Example: If P_MANAGE_USERS requires a certain license feature beyond role permission
+        can_manage_users_licensed = FEATURE_USER_MANAGEMENT_FULL in self.allowed_features
+        self.manage_users_action.setEnabled(can_manage_users and can_manage_users_licensed)
+        self.manage_roles_action.setEnabled(can_manage_roles and can_manage_users_licensed) # Assuming role management also tied to this feature
+
+        # Module Menu Actions & Feature Mapping
+        # Maps module_name (from CONFIGURABLE_MODULES) to its corresponding license feature constant
+        MODULE_TO_LICENSE_FEATURE_MAP = {
+            'project_management': FEATURE_PROJECT_MANAGEMENT,
+            'product_management': FEATURE_PRODUCT_MANAGEMENT,
+            'partner_management': FEATURE_PARTNER_MANAGEMENT,
+            'statistics': FEATURE_STATISTICS_MODULE,
+            'inventory_management': FEATURE_INVENTORY_MANAGEMENT,
+            'experience_management': FEATURE_EXPERIENCE_MANAGEMENT,
+            'calendar': FEATURE_CALENDAR_MODULE,
+            'botpress_integration': FEATURE_BOTPRESS_INTEGRATION,
+            'carrier_map': None, # Example: Carrier map might not have a specific license feature, always available if role permits
+            'camera_management': None, # Example: Camera might not be license controlled
+            'calculator': FEATURE_CALCULATOR_MODULE,
+            'commandes_management': FEATURE_COMMANDES_MANAGEMENT,
+            # Add other modules from CONFIGURABLE_MODULES here and map to a FEATURE_* constant or None
+        }
+
+        # Role-based permissions for modules (as before)
+        module_role_permissions = {
             'project_management': P_ACCESS_PROJECT_MODULE,
-            'product_management': (P_MANAGE_GLOBAL_PRODUCTS, P_VIEW_GLOBAL_PRODUCTS), # Tuple for OR condition
+            'product_management': (P_MANAGE_GLOBAL_PRODUCTS, P_VIEW_GLOBAL_PRODUCTS),
             'partner_management': P_ACCESS_PARTNER_MODULE,
             'statistics': P_ACCESS_STATISTICS_MODULE,
             'inventory_management': P_ACCESS_INVENTORY_MODULE,
@@ -2449,7 +2525,42 @@ class DocumentManager(QMainWindow):
         # 2. Re-apply permissions for the main window
         # This is important if the current user's role's permissions were changed.
         logging.debug("Re-applying permissions for MainWindow due to role changes.")
-        self._apply_permissions()
+        self._apply_permissions() # This will now also consider license features
+
+        # If user's own license type changed (e.g. admin changed it), re-fetch allowed_features
+        # This is a bit indirect. A more direct way would be if EditUserDialog could signal license change.
+        # For now, re-evaluating on any role change is a safe bet if EditUserDialog could also modify license.
+        # However, EditUserDialog currently does not seem to modify licenses directly.
+        # This is more relevant if the license itself is modified for the current user.
+        if self.current_user_info and self.current_user_info.get('user_id') == self.current_user_id: # Check if current user was affected
+            # Re-fetch license info for the current user, as their license type might have been part of the "role" change
+            # or an admin modified their license in a user management screen that triggered this.
+            conn_lic_refresh = None
+            try:
+                from db.connection import get_db_connection # Local import
+                conn_lic_refresh = get_db_connection()
+                is_valid, _, lic_details = license_manager.check_license_validity(conn_lic_refresh, self.current_user_id)
+                if is_valid and lic_details:
+                    self.current_license_info = lic_details # Update stored license info
+                    self.allowed_features = lic_details.get('allowed_features', set())
+                    logging.info(f"Refreshed license info for current user. New allowed features: {self.allowed_features}")
+                    self._apply_permissions() # Re-apply with potentially new feature set
+                elif lic_details: # License exists but is not valid (e.g., expired)
+                    self.current_license_info = lic_details
+                    self.allowed_features = set() # No features if license became invalid
+                    logging.warning(f"Current user's license is now invalid after role/permission changes. Allowed features set to empty.")
+                    self._apply_permissions()
+                else: # No license found
+                    self.current_license_info = None
+                    self.allowed_features = set()
+                    logging.warning(f"No license found for current user after role/permission changes. Allowed features set to empty.")
+                    self._apply_permissions()
+
+            except Exception as e_lic_refresh:
+                logging.error(f"Error refreshing license info for current user after role change: {e_lic_refresh}", exc_info=True)
+            finally:
+                if conn_lic_refresh:
+                    conn_lic_refresh.close()
 
         # 3. If EditUserDialog instances could be open and non-modal, they'd need updating.
         # For now, assuming EditUserDialog is modal and will fetch fresh roles upon its next opening.
