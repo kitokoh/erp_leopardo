@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (
     QPushButton, QMessageBox, QApplication
 )
 from PyQt5.QtCore import Qt
-from email_service import EmailSenderService
+from services.email_service import EmailSenderService
 import db as db_manager # Import the db module
 
 class CarrierEmailDialog(QDialog):

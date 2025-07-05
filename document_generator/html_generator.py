@@ -9,27 +9,19 @@ from .context_builder import get_document_context
 # For example, if it's a top-level module: from html_to_pdf_util import ...
 # If it's a utility module within document_generator: from .html_to_pdf_util import ...
 try:
-    from ..html_to_pdf_util import render_html_template, convert_html_to_pdf
+    from utils.html_to_pdf_util import render_html_template, convert_html_to_pdf
 except ImportError:
-    # Fallback if running directly or if structure is different, try direct import
-    # This might happen if document_generator is not run as part of a package
-    # or if html_to_pdf_util is in the same directory (though less likely for a util)
-    try:
-        import html_to_pdf_util
-        render_html_template = html_to_pdf_util.render_html_template
-        convert_html_to_pdf = html_to_pdf_util.convert_html_to_pdf
-    except ImportError:
-        logging.error(
-            "Failed to import html_to_pdf_util. Ensure it's accessible. "
-            "render_html_template and convert_html_to_pdf will not be available."
-        )
-        # Define dummy functions if import fails, to allow module to load for other purposes
-        # but these will not work.
-        def render_html_template(template_content, context):
-            raise NotImplementedError("html_to_pdf_util.render_html_template not imported")
+    logging.error(
+        "Failed to import html_to_pdf_util from utils. Ensure it's accessible. "
+        "render_html_template and convert_html_to_pdf will not be available."
+    )
+    # Define dummy functions if import fails, to allow module to load for other purposes
+    # but these will not work.
+    def render_html_template(template_content, context):
+        raise NotImplementedError("html_to_pdf_util.render_html_template not imported")
 
-        def convert_html_to_pdf(html_content, base_url=None):
-            raise NotImplementedError("html_to_pdf_util.convert_html_to_pdf not imported")
+    def convert_html_to_pdf(html_content, base_url=None):
+        raise NotImplementedError("html_to_pdf_util.convert_html_to_pdf not imported")
 
 
 # Setup logging

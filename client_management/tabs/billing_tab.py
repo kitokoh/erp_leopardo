@@ -8,7 +8,7 @@ from PyQt5.QtCore import Qt
 
 import db as db_manager
 from invoicing.final_invoice_data_dialog import FinalInvoiceDataDialog
-from document_manager_logic import create_final_invoice_and_update_db # Assuming this handles PDF generation & DB update
+from utils.document_manager_logic import create_final_invoice_and_update_db # Assuming this handles PDF generation & DB update
 from auth.permissions import has_permission, P_MANAGE_CLIENT_BILLING
 
 class BillingTab(QWidget):
