@@ -49,6 +49,8 @@ from db.cruds import users_crud # Corrected import for users_crud
 # from auth.login_window import LoginWindow # Replaced by LoginDialog
 from dialogs.login_dialog import LoginDialog # New LoginDialog
 from auth import authentication as auth_service # Import the auth service
+from user_profile_management.database_setup import create_tables as create_user_profile_tables
+from user_profile_management.database_setup import seed_data as seed_user_profile_data
 
 from PyQt5.QtWidgets import QDialog # Required for QDialog.Accepted check (already present, but good to note)
 # from initial_setup_dialog import InitialSetupDialog # Redundant import, already imported above
@@ -304,6 +306,18 @@ def main():
         logging.error(f"An unexpected error occurred when calling run_seed(): {e_seed_run}", exc_info=True)
         # Depending on severity, might want to sys.exit(1) here if seeding is critical for app function
     # --- End Coordinated Data Seeding ---
+
+    # --- Initialize User Profile Management Database ---
+    try:
+        logging.info("Attempting to initialize user profile management database...")
+        create_user_profile_tables()
+        seed_user_profile_data()
+        logging.info("User profile management database initialized and seeded successfully.")
+    except Exception as e_user_profile_db:
+        logging.error(f"Error initializing user profile management database: {e_user_profile_db}", exc_info=True)
+        # Depending on severity, you might want to show an error to the user or exit.
+        # For now, just logging the error.
+    # --- End User Profile Management Database Initialization ---
 
     # --- Token Cleanup on Startup ---
     conn_cleanup = None
