@@ -48,7 +48,22 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
             save_remember_me_preference(username, False) # Clear on failure
             return False, "Ce compte utilisateur est désactivé.", None
 
-        if users_crud.verify_password(user['hashed_password'], password):
+        # Corrected function call: users_crud.util_verify_password
+        # The users_crud module imports verify_password as util_verify_password from utils
+        # and then has its own wrapper verify_user_password.
+        # However, the original error indicates a direct call to a function named verify_password
+        # within the users_crud namespace, which was likely the util_verify_password before a potential refactor
+        # or an intended direct call to the utility.
+        # Given the error "Did you mean: 'util_verify_password'?",
+        # the most direct fix is to use users_crud.util_verify_password.
+        #
+        # An alternative would be to use users_crud.verify_user_password(username, password)
+        # but that function does more than just verify the password string (it also gets the user, checks active status).
+        # Since we already have the user object and checked active status,
+        # calling the lower-level password verification directly is more appropriate here.
+        # The users_crud module makes util_verify_password available via:
+        # from utils import verify_password as util_verify_password
+        if users_crud.util_verify_password(password, user['hashed_password'])[0]: # util_verify_password returns (bool, str|None)
             logger.info(f"User '{username}' logged in successfully.")
             users_crud.record_login_time(user['user_id'])
 
@@ -70,18 +85,34 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
                 conn = get_db_connection()
                 is_license_valid, license_msg, license_details = license_manager.check_license_validity(conn, user['user_id'])
 
-                # Le login est réussi, mais la licence peut être invalide.
-                # Le message d'erreur de la licence sera prioritaire s'il y en a un.
-                # La fonction login retourne maintenant aussi license_details pour que main.py puisse agir.
-                if not is_license_valid:
-                    logger.warning(f"Login réussi pour {username} mais licence invalide: {license_msg}")
-                    # On ne retourne pas False pour le login, car l'utilisateur est authentifié.
-                    # C'est à l'appelant (main.py) de gérer le flux de licence.
-                    # Cependant, on peut enrichir le message d'erreur.
-                    # Le `license_details` ici pourrait être None ou contenir les infos de la licence invalide.
-                    return True, license_msg, _current_user_data, license_details # license_details peut être la licence invalide
+                if not is_license_valid and username == license_manager.ADMIN_USERNAME:
+                    logger.warning(f"Admin user '{username}' has an invalid/missing license: {license_msg}. Attempting to create a default 6-month license.")
+                    try:
+                        # Pass the existing connection 'conn'
+                        created_ok, create_msg, new_license_details = license_manager.create_default_admin_license(conn, user['user_id'])
+                        if created_ok:
+                            logger.info(f"Default admin license created successfully for '{username}'. Re-checking validity.")
+                            # Re-check license validity
+                            is_license_valid, license_msg, license_details = license_manager.check_license_validity(conn, user['user_id'])
+                        else:
+                            logger.error(f"Failed to create default admin license for '{username}': {create_msg}")
+                            # Proceed with original invalid license message if creation failed
+                            # The original license_msg and license_details (which might be None) are still in scope
+                            # We return True for login success, but the license_msg will indicate the issue.
+                            return True, create_msg or license_msg, _current_user_data, license_details
 
-                logger.info(f"Login et vérification de licence réussis pour {username}.")
+                    except Exception as e_create_lic:
+                        logger.error(f"Exception during default admin license creation for '{username}': {e_create_lic}", exc_info=True)
+                        # Proceed with original invalid license message
+                        return True, f"Erreur critique lors de la création de la licence admin: {str(e_create_lic)}", _current_user_data, license_details
+
+                # After potential admin license creation, check final status
+                if not is_license_valid:
+                    logger.warning(f"Login for '{username}' successful, but license is invalid: {license_msg}")
+                    # Return True for login success (user authenticated), but include license error message and details
+                    return True, license_msg, _current_user_data, license_details
+
+                logger.info(f"Login and license check successful for {username}.")
                 return True, None, _current_user_data, license_details
 
             except Exception as e_lic:
