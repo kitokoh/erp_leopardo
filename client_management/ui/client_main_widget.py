@@ -28,6 +28,7 @@ from whatsapp.whatsapp_dialog import SendWhatsAppDialog
 import db.cruds.money_transfer_agents_crud as mta_crud
 import db.cruds.client_order_money_transfer_agents_crud as coma_crud
 import db.cruds.projects_crud as projects_crud
+from PyQt5.QtWidgets import QCheckBox
 
 MAIN_MODULE_CONTACT_DIALOG = None
 MAIN_MODULE_PRODUCT_DIALOG = None
@@ -366,10 +367,10 @@ class ClientMainWidget(QWidget):
             self.details_layout.addRow(self.created_by_label_static, self.created_by_value_label)
 
         # Placeholder for client statuses - to be populated by _setup_client_statuses_section
-        self.client_statuses_widget = QWidget()
-        self.client_statuses_layout = QHBoxLayout(self.client_statuses_widget)
-        self.client_statuses_layout.setContentsMargins(0,0,0,0)
-        self.details_layout.addRow(self.tr("Statuts Client:"), self.client_statuses_widget)
+            self.client_statuses_widget = QWidget()
+            self.client_statuses_layout = QHBoxLayout(self.client_statuses_widget)
+            self.client_statuses_layout.setContentsMargins(0,0,0,0)
+            self.details_layout.addRow(self.tr("Statuts Client:"), self.client_statuses_widget)
 
             details_tab_layout.addLayout(self.details_layout)
             self.internal_client_info_tabs.addTab(self.client_details_tab, self.client_info.get('client_name', self.tr("Détails Client")))

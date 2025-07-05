@@ -2,6 +2,7 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QPushButton, QSizePolicy
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QIcon
+from PyQt5.QtCore import QSize
 
 class QuickStatsWidget(QFrame):
     refresh_requested = pyqtSignal()
