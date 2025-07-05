@@ -270,6 +270,7 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
 
             conn = None
             try: # Corrected from try { to try:
+
                 conn = get_db_connection()
                 if remember_me:
                     # Invalidate old tokens for this user on this device (or all devices)
@@ -282,6 +283,7 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
 
                     device_id = None
 
+
                     token_record_id = user_session_tokens_crud.add_session_token(
                         conn, user['user_id'], token_hash, expires_at, device_id
                     )
@@ -290,6 +292,7 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
                         logger.info(f"New session token generated and stored for user {user['user_id']}.")
                         activity_logs_crud.add_activity_log(
                             conn=conn,
+
                             data={
                                 "user_id": user['user_id'],
                                 "action_type": "REMEMBER_ME_TOKEN_GENERATED",
@@ -301,6 +304,7 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
                     else:
                         logger.error(f"Failed to store new session token in DB for user {user['user_id']}.")
                 else:
+
                     deleted_count = user_session_tokens_crud.delete_all_user_session_tokens(conn, user['user_id'])
                     if deleted_count > 0:
                         logger.info(f"Cleared {deleted_count} 'Remember Me' token(s) for user {user['user_id']} as 'Remember Me' was not checked.")
@@ -336,12 +340,14 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
                         logger.info(f"Administrator user '{username}' has an invalid/missing license, but other 'complet' licenses exist. Default license not created.")
                 # --- End Modified Default Admin License Creation Trigger ---
 
+
                 if not is_license_valid:
                     return True, license_msg, _current_user_data, license_details
 
                 return True, None, _current_user_data, license_details
 
             except Exception as e_inner: # Catch exceptions within the 'try with conn'
+
                 logger.error(f"Error during token/license processing for {username}: {e_inner}", exc_info=True)
                 # Decide on return value: if token/license fails, is login still valid?
                 # For now, let's assume if this block fails, login might be compromised or incomplete.
