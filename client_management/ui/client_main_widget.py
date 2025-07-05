@@ -2342,3 +2342,4 @@ class ClientMainWidget(QWidget):
     #                 self.notification_manager.show(self.tr("Erreur"), self.tr("Impossible de mettre à jour le statut du client."), type='ERROR')
     #             # Revert combo to old status?
     #             # For now, just log. A full implementation would handle this better.
+
