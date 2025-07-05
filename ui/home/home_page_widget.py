@@ -12,6 +12,7 @@ import random
 from .promo_content_manager import PromoContentManager
 from .promo_widgets import PromoSectionWidget
 
+
 from .quick_stats_widget import QuickStatsWidget # Import the new widget
 
 
@@ -158,6 +159,7 @@ class HomePageWidget(QWidget):
         center_h_layout.addWidget(self.right_sidebar_container, 1)
 
         return center_h_layout
+
 
     def _setup_bottom_layout(self):
         """Creates and configures the bottom layout with promotional widgets and content area."""
