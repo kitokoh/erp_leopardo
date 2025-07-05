@@ -28,6 +28,7 @@ from whatsapp.whatsapp_dialog import SendWhatsAppDialog
 import db.cruds.money_transfer_agents_crud as mta_crud
 import db.cruds.client_order_money_transfer_agents_crud as coma_crud
 import db.cruds.projects_crud as projects_crud
+from PyQt5.QtWidgets import QCheckBox
 
 MAIN_MODULE_CONTACT_DIALOG = None
 MAIN_MODULE_PRODUCT_DIALOG = None
@@ -218,6 +219,7 @@ class ClientMainWidget(QWidget):
             # self.manage_referent_btn.clicked.connect(self.manage_referent_status_for_selected_client)
             # self.action_buttons_layout.addWidget(self.manage_referent_btn) # Removed, functionality moved to checkbox
 
+
             self.generate_referents_report_btn = QPushButton(QIcon.fromTheme("document-print", QIcon(":/icons/file-text.svg")), self.tr("Rapport Référents"))
             self.generate_referents_report_btn.setToolTip(self.tr("Générer un rapport PDF des référents locaux et globaux pour ce client"))
             self.generate_referents_report_btn.clicked.connect(self.handle_generate_referents_report)
@@ -239,6 +241,7 @@ class ClientMainWidget(QWidget):
             # I will assume the `mark_distributor_btn` that was mentioned in my previous plan for `ClientWidget`
             # is not present in this `ClientMainWidget`'s `action_buttons_layout`.
             # If it was intended to be here, this is where it would be removed.
+
 
             self.create_docs_btn = QPushButton(self.tr("Envoyer Mail"))
             self.create_docs_btn.setIcon(QIcon.fromTheme("mail-send", QIcon(":/icons/bell.svg")))
@@ -277,6 +280,7 @@ class ClientMainWidget(QWidget):
 
             # info_container_layout.addLayout(self.action_buttons_layout) # This layout is added to the tab
 
+
             self.internal_client_info_tabs = QTabWidget()
             info_container_layout.addWidget(self.internal_client_info_tabs) # This remains in info_container_layout
 
@@ -293,6 +297,7 @@ class ClientMainWidget(QWidget):
             # Existing QFormLayout for other details
             self.status_combo = QComboBox()
             self.details_layout = QFormLayout()
+
             self.details_layout.setLabelAlignment(Qt.AlignLeft)
             self.details_layout.setSpacing(10)
 
@@ -363,10 +368,12 @@ class ClientMainWidget(QWidget):
             self.details_layout.addRow(self.created_by_label_static, self.created_by_value_label)
 
         # Placeholder for client statuses - to be populated by _setup_client_statuses_section
-        self.client_statuses_widget = QWidget()
-        self.client_statuses_layout = QHBoxLayout(self.client_statuses_widget)
-        self.client_statuses_layout.setContentsMargins(0,0,0,0)
-        self.details_layout.addRow(self.tr("Statuts Client:"), self.client_statuses_widget)
+
+
+            self.client_statuses_widget = QWidget()
+            self.client_statuses_layout = QHBoxLayout(self.client_statuses_widget)
+            self.client_statuses_layout.setContentsMargins(0,0,0,0)
+            self.details_layout.addRow(self.tr("Statuts Client:"), self.client_statuses_widget)
 
             details_tab_layout.addLayout(self.details_layout)
             self.internal_client_info_tabs.addTab(self.client_details_tab, self.client_info.get('client_name', self.tr("Détails Client")))
@@ -1131,6 +1138,7 @@ class ClientMainWidget(QWidget):
 
     # def _setup_assignments_tab(self): # Method removed as assignments are now an internal tab within Client Info section
     #     pass
+
 
     # def _setup_commandes_tab(self): # Method removed as it's integrated into _setup_main_tabs_section
     #     pass
@@ -2142,6 +2150,7 @@ class ClientMainWidget(QWidget):
 
         # generate_referents_report_btn is kept visible in action_buttons_layout.
 
+
         # --- Distributor Status ---
         self.is_distributor_checkbox = QCheckBox(self.tr("Distributeur"))
         is_currently_distributor = (self.client_info.get('category') == 'Distributeur')
@@ -2221,6 +2230,7 @@ class ClientMainWidget(QWidget):
             self.is_referent_checkbox.setChecked(is_active_after_toggle)
             self.is_referent_checkbox.blockSignals(False)
 
+
             self.notification_manager.show(self.tr("Statut Référent"), self.tr("Statut référent mis à jour."), type='SUCCESS')
 
         except Exception as e:
@@ -2230,6 +2240,7 @@ class ClientMainWidget(QWidget):
             self.is_referent_checkbox.blockSignals(True)
             self.is_referent_checkbox.setChecked(not checked)
             self.is_referent_checkbox.blockSignals(False)
+
 
 
     def on_distributor_status_toggled(self, checked):
