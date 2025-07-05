@@ -156,7 +156,7 @@ class DocumentsTab(QWidget):
         self.add_template_btn.setIcon(QIcon(":/icons/file-text.svg")) # Icon for text/template based generation
         self.add_template_btn.setToolTip(self.tr("Générer un nouveau document pour ce client à partir d'un modèle"))
         self.add_template_btn.setObjectName("primaryButton")
-        self.add_template_btn.clicked.connect(self.open_create_docs_dialog_from_parent)
+        self.add_template_btn.clicked.connect(self.add_document_from_template_action) # Modifié pour appeler la méthode directe
         doc_btn_layout.addWidget(self.add_template_btn)
 
         doc_btn_layout.addStretch() # Push buttons to the left
@@ -406,6 +406,26 @@ class DocumentsTab(QWidget):
         else:
             logging.error("DocumentsTab: Parent widget or open_create_docs_dialog method not found.")
             self.notify(self.tr("Erreur"), self.tr("Impossible d'ouvrir le dialogue de création de document."), type='ERROR')
+
+    def add_document_from_template_action(self):
+        if not self.CreateDocumentDialog:
+            self.notify(self.tr("Erreur"), self.tr("Le composant de création de document n'est pas chargé."), type='CRITICAL')
+            return
+
+        current_order_identifier = self.doc_order_filter_combo.currentData()
+        if current_order_identifier == "ALL" or current_order_identifier == "NONE":
+            current_order_identifier = None # Ne pas passer "ALL" ou "NONE" comme identifiant de commande
+
+        dialog = self.CreateDocumentDialog(
+            client_info=self.client_info,
+            config=self.config,
+            current_user_id=self.current_user_id,
+            order_identifier=current_order_identifier, # Passer l'identifiant de commande
+            parent=self
+        )
+        if dialog.exec_() == QDialog.Accepted:
+            self.populate_doc_table()
+            # Notification de succès gérée dans CreateDocumentDialog ou ici si nécessaire
 
     def open_compile_pdf_dialog_from_parent(self):
         if self.parent_widget and hasattr(self.parent_widget, 'open_compile_pdf_dialog'):

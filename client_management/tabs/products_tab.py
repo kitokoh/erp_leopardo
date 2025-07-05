@@ -68,11 +68,12 @@ class ProductsTab(QWidget):
         self.products_table = QTableWidget()
         self.products_table.setColumnCount(8) # ID, Name, Desc, Weight, Dims, Qty, Unit Price, Total Price
         self.products_table.setHorizontalHeaderLabels([
-            self.tr("ID"), self.tr("Nom Produit"), self.tr("Description"),
-            self.tr("Poids"), self.tr("Dimensions"),
-            self.tr("Qté"), self.tr("Prix Unitaire"), self.tr("Prix Total")
+            self.tr("ID"), self.tr("Nom Produit"), self.tr("Description (Ligne)"), # Nom de colonne modifié pour clarté
+            self.tr("Poids (Ligne)"), self.tr("Dimensions (Ligne)"),
+            self.tr("Qté"), self.tr("Prix Unitaire (Ligne)"), self.tr("Prix Total")
         ])
-        self.products_table.setEditTriggers(QAbstractItemView.DoubleClicked) # Or NoEditTriggers if using dialog for all edits
+        # Permettre l'édition directe pour certaines colonnes
+        # self.products_table.setEditTriggers(QAbstractItemView.DoubleClicked) # Garder, ou affiner avec des delegates
         self.products_table.itemChanged.connect(self.handle_product_item_changed)
         self.products_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.products_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
@@ -150,17 +151,37 @@ class ProductsTab(QWidget):
                     unit_price = price_override if price_override is not None else float(prod.get('unit_price', 0))
                     total_price = qty * unit_price
 
+                    name_item = QTableWidgetItem(prod.get('product_name'))
+                    name_item.setFlags(name_item.flags() & ~Qt.ItemIsEditable) # Non-editable
+                    self.products_table.setItem(row, 1, name_item)
+
+                    desc_item = QTableWidgetItem(prod.get('description')) # Description spécifique à la ligne
+                    desc_item.setFlags(desc_item.flags() | Qt.ItemIsEditable) # Editable
+                    self.products_table.setItem(row, 2, desc_item)
+
+                    weight_item = QTableWidgetItem(str(prod.get('weight', '')))
+                    weight_item.setFlags(weight_item.flags() | Qt.ItemIsEditable) # Editable
+                    self.products_table.setItem(row, 3, weight_item)
+
+                    dims_item = QTableWidgetItem(prod.get('dimensions_notes'))
+                    dims_item.setFlags(dims_item.flags() | Qt.ItemIsEditable) # Editable
+                    self.products_table.setItem(row, 4, dims_item)
+
+                    qty = float(prod.get('quantity', 0))
+                    price_override = prod.get('price_override')
+                    unit_price = price_override if price_override is not None else float(prod.get('unit_price', 0))
+                    total_price = qty * unit_price
+
                     qty_item = QTableWidgetItem(str(qty))
-                    unit_price_item = QTableWidgetItem(f"{unit_price:.2f} €")
-                    total_price_item = QTableWidgetItem(f"{total_price:.2f} €")
-
-                    # Make Qty and Price Override editable if desired, or use dialogs
-                    # For now, assume they are primarily set via EditProductLineDialog
-                    # qty_item.setFlags(qty_item.flags() | Qt.ItemIsEditable)
-                    # unit_price_item.setFlags(unit_price_item.flags() | Qt.ItemIsEditable) # If price_override is directly editable
-
+                    qty_item.setFlags(qty_item.flags() | Qt.ItemIsEditable) # Editable
                     self.products_table.setItem(row, 5, qty_item)
+
+                    unit_price_item = QTableWidgetItem(f"{unit_price:.2f}") # Removed currency symbol for easier float conversion
+                    unit_price_item.setFlags(unit_price_item.flags() | Qt.ItemIsEditable) # Editable
                     self.products_table.setItem(row, 6, unit_price_item)
+
+                    total_price_item = QTableWidgetItem(f"{total_price:.2f} €")
+                    total_price_item.setFlags(total_price_item.flags() & ~Qt.ItemIsEditable) # Non-editable
                     self.products_table.setItem(row, 7, total_price_item)
         except Exception as e:
             logging.error(f"Error loading products: {e}", exc_info=True)
@@ -172,23 +193,94 @@ class ProductsTab(QWidget):
 
 
     def handle_product_item_changed(self, item):
-        # This is called if table cells are directly editable.
-        # If all edits go through EditProductLineDialog, this might not be needed
-        # or could be used for quick updates if direct editing is enabled for some columns.
-        # For now, this is a placeholder. The main editing path is via EditProductLineDialog.
-        logging.debug(f"ProductsTab.handle_product_item_changed: Item {item.row()},{item.column()} changed to {item.text()}")
-        # Example: If quantity (column 5) is directly editable:
-        # if item.column() == 5:
-        #     try:
-        #         new_qty = float(item.text())
-        #         link_id = self.products_table.item(item.row(), 0).data(Qt.UserRole)
-        #         # db_manager.update_client_product_link_quantity(link_id, new_qty)
-        #         # Recalculate total price and update table
-        #         # self.load_products() # Or update row directly
-        #     except ValueError:
-        #         QMessageBox.warning(self, self.tr("Erreur"), self.tr("Quantité invalide."))
-        #         self.load_products() # Revert
-        pass
+        if not item:
+            return
+
+        self.products_table.blockSignals(True) # Block signals to prevent recursion
+
+        row = item.row()
+        col = item.column()
+        new_value_str = item.text()
+        link_id_item = self.products_table.item(row, 0)
+        if not link_id_item:
+            self.products_table.blockSignals(False)
+            return
+
+        link_id = link_id_item.data(Qt.UserRole)
+        if link_id is None:
+            self.products_table.blockSignals(False)
+            logging.warning(f"No link_id found for row {row} during item change.")
+            return
+
+        update_data = {}
+        recalculate_total = False
+
+        try:
+            if col == 2: # Description (Ligne)
+                update_data['description'] = new_value_str
+            elif col == 3: # Poids (Ligne)
+                try:
+                    update_data['weight'] = float(new_value_str.replace(",", ".")) if new_value_str else None
+                except ValueError:
+                    QMessageBox.warning(self, self.tr("Donnée Invalide"), self.tr("Le poids doit être un nombre."))
+                    self.load_products() # Revert
+                    self.products_table.blockSignals(False)
+                    return
+            elif col == 4: # Dimensions (Ligne)
+                update_data['dimensions_notes'] = new_value_str
+            elif col == 5: # Qté
+                try:
+                    update_data['quantity'] = float(new_value_str.replace(",", "."))
+                    if update_data['quantity'] < 0: raise ValueError("Quantity cannot be negative")
+                    recalculate_total = True
+                except ValueError:
+                    QMessageBox.warning(self, self.tr("Donnée Invalide"), self.tr("La quantité doit être un nombre positif."))
+                    self.load_products() # Revert
+                    self.products_table.blockSignals(False)
+                    return
+            elif col == 6: # Prix Unitaire (Ligne)
+                try:
+                    update_data['price_override'] = float(new_value_str.replace("€", "").replace(",", ".").strip())
+                    if update_data['price_override'] < 0: raise ValueError("Price cannot be negative")
+                    recalculate_total = True
+                except ValueError:
+                    QMessageBox.warning(self, self.tr("Donnée Invalide"), self.tr("Le prix unitaire doit être un nombre positif."))
+                    self.load_products() # Revert
+                    self.products_table.blockSignals(False)
+                    return
+            else:
+                self.products_table.blockSignals(False)
+                return # No action for other columns
+
+            if update_data:
+                success = db_manager.update_client_project_product_details(link_id, update_data)
+                if success:
+                    if self.notification_manager:
+                        self.notification_manager.show(self.tr("Succès"), self.tr("Produit mis à jour."), type="SUCCESS")
+                    if recalculate_total:
+                        # Re-fetch the updated item to get all necessary fields for total calculation
+                        updated_item_data = db_manager.get_client_project_product_by_link_id(link_id)
+                        if updated_item_data:
+                            qty = float(updated_item_data.get('quantity', 0))
+                            price_override = updated_item_data.get('price_override')
+                            unit_price = price_override if price_override is not None else float(updated_item_data.get('unit_price', 0))
+                            total_price = qty * unit_price
+                            total_price_item = self.products_table.item(row, 7)
+                            if total_price_item:
+                                total_price_item.setText(f"{total_price:.2f} €")
+                            else: # Should not happen if table is correctly populated
+                                self.products_table.setItem(row, 7, QTableWidgetItem(f"{total_price:.2f} €"))
+                        else:
+                            self.load_products() # Fallback to full reload if fetching updated item fails
+                else:
+                    QMessageBox.warning(self, self.tr("Échec"), self.tr("Impossible de mettre à jour le produit."))
+                    self.load_products() # Revert
+        except Exception as e:
+            logging.error(f"Error in handle_product_item_changed for link_id {link_id}: {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur"), self.tr("Une erreur est survenue lors de la mise à jour."))
+            self.load_products() # Revert to known state
+        finally:
+            self.products_table.blockSignals(False)
 
 
     def add_product(self):

@@ -51,8 +51,9 @@ Une fois un projet créé, vous pouvez accéder à sa vue détaillée pour une g
         *   Options pour **Ajouter un jalon**, **Modifier**, **Supprimer**.
     *   **Documents du Projet**:
         *   Téléchargez et organisez tous les fichiers relatifs au projet (cahier des charges, plans, comptes rendus, livrables, etc.).
-        *   Option pour **Ajouter un document** (télécharger un fichier) ou lier un document existant depuis le [Module Gestion des Documents](./05_gestion_documents.md).
-        *   Vous pourriez aussi y trouver un outil pour créer des **Pages de Garde** spécifiques aux documents de ce projet.
+        *   Option pour **Ajouter un document** (télécharger un fichier). Si le document est déjà dans le système via la **Gestion Client**, vous pourrez le lier.
+        *   La création de documents spécifiques au projet (comme des rapports ou des pages de garde) utilisera les fonctionnalités de génération documentaire désormais intégrées à la **Gestion Client**, en sélectionnant le contexte du projet.
+        *   Vous pourriez aussi y trouver un outil pour créer des **Pages de Garde** spécifiques aux documents de ce projet, utilisant les modèles de la **Gestion Client**.
     *   **Membres de l'Équipe**: Listez ou assignez les utilisateurs qui participent au projet (en plus du chef de projet).
     *   **Journal d'Activité (`Project Logs`)**: Un historique des actions importantes réalisées sur le projet (changements de statut, ajout de documents, tâches complétées).
     *   **Produits/Livrables Associés**: Si le projet implique la livraison de produits spécifiques de votre catalogue, vous pouvez les lier ici.

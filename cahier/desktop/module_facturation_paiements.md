@@ -21,7 +21,7 @@ Le module de Facturation et Paiements de ClientDocManager est crucial pour la ge
     *   **`invoicing/manual_invoice_dialog.py`**: Dialogue pour la création/édition manuelle d'une facture.
     *   **`invoicing/invoice_details_dialog.py`**: Pour afficher les détails complets d'une facture.
     *   **`invoicing/final_invoice_data_dialog.py`**: Potentiellement un dialogue pour confirmer/compléter les informations avant de finaliser une facture.
-    *   **Génération du PDF de la Facture**: Utilise le [Module de Gestion des Documents](./module_gestion_documents.md) avec des modèles spécifiques pour les factures.
+    *   **Génération du PDF de la Facture**: Utilise le [Module de Gestion Client](./module_gestion_clients_v2.md) (pour la partie génération documentaire) avec des modèles spécifiques pour les factures.
 
 *   **Gestion des Factures Proforma**:
     *   Fonctionnalités similaires à la gestion des factures finales, mais pour les documents non comptables que sont les proformas.
@@ -62,7 +62,7 @@ Le module de Facturation et Paiements de ClientDocManager est crucial pour la ge
 3.  L'utilisateur sélectionne un client, ajoute des lignes de produits/services, vérifie les conditions de paiement et la date d'échéance.
 4.  Le système calcule les totaux et les taxes.
 5.  L'utilisateur valide. La facture est enregistrée en base de données (via `invoices_crud.add_invoice()`) avec un statut "Brouillon" ou "Finalisée".
-6.  L'utilisateur choisit de générer le PDF de la facture. Le [Module de Gestion des Documents](./module_gestion_documents.md) est sollicité.
+6.  L'utilisateur choisit de générer le PDF de la facture. Le [Module Gestion Client](./module_gestion_clients_v2.md) (via son composant de génération de documents) est sollicité.
 7.  L'utilisateur peut ensuite marquer la facture comme "Envoyée" et l'envoyer au client (par e-mail via le module concerné).
 
 ### 3.2. Enregistrement d'un Paiement Client
@@ -84,7 +84,7 @@ Le module de Facturation et Paiements de ClientDocManager est crucial pour la ge
 
 *   **Gestion des Clients**: Les factures sont émises pour des clients spécifiques. Le module récupère les informations du client (adresse de facturation, conditions de paiement par défaut).
 *   **Gestion des Produits**: Les lignes de facture sont composées de produits ou services du catalogue, avec leurs prix et descriptions.
-*   **Gestion des Documents**: Utilisé pour générer les représentations PDF des factures et proformas.
+*   **Gestion Client**: Utilisé pour générer les représentations PDF des factures et proformas (via son composant de génération documentaire).
 *   **Paramètres et Configuration**: Configure les taux de TVA par défaut, les formats de numérotation des factures, les modèles de facture, les informations de l'entreprise pour l'en-tête des factures.
 *   **Gestion des E-mails**: Pour envoyer les factures et les rappels de paiement aux clients.
 *   **Rapports et Statistiques**: Les données de facturation et de paiement sont fondamentales pour les rapports financiers (chiffre d'affaires, soldes clients, analyse des revenus et dépenses).
