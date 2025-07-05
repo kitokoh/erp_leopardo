@@ -14,6 +14,10 @@ from .promo_content_manager import PromoContentManager
 from .promo_widgets import PromoSectionWidget
 from .quick_stats_widget import QuickStatsWidget # Import the new widget
 
+
+from .quick_stats_widget import QuickStatsWidget # Import the new widget
+
+
 class HomePageWidget(QWidget):
     def __init__(self, main_window, parent=None):
         super().__init__(parent)
@@ -276,6 +280,7 @@ class HomePageWidget(QWidget):
             {"label": self.tr("Tickets Support Actifs:"), "value": str(random.randint(0,10))}
         ]
         self.quick_stats.update_stats(simulated_data)
+
 
 
     def _setup_bottom_layout(self):

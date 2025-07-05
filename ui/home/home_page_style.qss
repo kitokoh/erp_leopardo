@@ -149,6 +149,7 @@ QPushButton#quickStatsRefreshButton:pressed {
 }
 
 
+
 /* Styling for the right sidebar container itself, if needed */
 QFrame#homePageRightSidebar {
     /* background-color: lightyellow; */ /* For debugging layout */
@@ -192,3 +193,4 @@ QPushButton#homePageSearchButton:pressed {
     background-color: #004085; /* Even darker blue when pressed */
     border-color: #004085;
 }
+
