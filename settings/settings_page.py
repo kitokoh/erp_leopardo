@@ -304,15 +304,15 @@ except ImportError:
 # This requires gui.main_window to be importable.
 # If running settings_page.py standalone, this might need careful handling or mocking.
 try:
-    from gui.main_window import CONFIGURABLE_MODULES
+    from utils.app_constants import CONFIGURABLE_MODULES # Import from new location
 except ImportError as e_configurable_modules:
-    print(f"ERROR settings_page.py: Could not import CONFIGURABLE_MODULES from gui.main_window: {e_configurable_modules}")
+    print(f"ERROR settings_page.py: Could not import CONFIGURABLE_MODULES from utils.app_constants: {e_configurable_modules}")
     CONFIGURABLE_MODULES = [] # Fallback to empty list
 
 from dialogs.transporter_dialog import TransporterDialog
 from dialogs.freight_forwarder_dialog import FreightForwarderDialog
 from company_management import CompanyTabWidget
-from security_settings_page import SecuritySettingsPage # Import de la nouvelle page
+from securite.security_settings_page import SecuritySettingsPage # Import de la nouvelle page
 
 class ImportInstructionsDialog(QDialog):
     def __init__(self, parent=None):

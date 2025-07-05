@@ -150,6 +150,7 @@ from PyQt5.QtWidgets import QDateEdit
 
 # Updated import for the refactored client widget
 from client_management.ui.client_main_widget import ClientMainWidget
+from client_management.client_controller import ClientController # Import ClientController
 from project_management import MainDashboard as ProjectManagementDashboard
 from statistics import StatisticsDashboard, StatisticsSummaryWidget # Updated import
 from statistics.map_widget import HomePageMapWidget # Import HomePageMapWidget
@@ -157,13 +158,13 @@ from statistics.map_widget import HomePageMapWidget # Import HomePageMapWidget
 
 from utils import save_config
 from company_management import CompanyTabWidget
-from settings_page import SettingsPage # Import the new SettingsPage
+from settings.settings_page import SettingsPage # Import the new SettingsPage
 from botpress_integration.ui_components import BotpressIntegrationUI # Import Botpress UI
 from dialogs.carrier_map_dialog import CarrierMapDialog # Import CarrierMapDialog
 from voice_input_service import VoiceInputService # Added import
 
 from partners.partner_main_widget import PartnerMainWidget # Partner Management
-from inventory_browser_widget import InventoryBrowserWidget # Inventory Management
+from gui.widgets.inventory_browser_widget import InventoryBrowserWidget # Inventory Management
 from camera_management.camera_management_widget import CameraManagementWidget # Camera Management
 
 from PyQt5.QtGui import QColor, QPalette # For ClientListItemWidget text color
@@ -171,8 +172,8 @@ from PyQt5.QtGui import QColor, QPalette # For ClientListItemWidget text color
 from recruitment.recruitment_dashboard import RecruitmentDashboard # Import RecruitmentDashboard
 
 from ui.home.home_page_widget import HomePageWidget # Updated import path
-from experience_module_widget import ExperienceModuleWidget # Added
-from download_monitor_service import DownloadMonitorService
+from gui.widgets.experience_module_widget import ExperienceModuleWidget # Added
+from services.download_monitor_service import DownloadMonitorService
 from dialogs.assign_document_dialog import AssignDocumentToClientDialog
 from db.cruds.client_documents_crud import add_client_document # For assign dialog
 import os # For path checks in download monitor init
@@ -187,23 +188,7 @@ from user_management.user_menu_button import UserMenuButton # Import UserMenuBut
 from dialogs.edit_user_dialog import EditUserDialog # For handling edit/add user requests
 from dialogs.role_management_dialog import RoleManagementDialog # Added for Role Management
 from commande_management.commandes_dashboard_widget import CommandesDashboardWidget # Import CommandesDashboardWidget
-
-# Definition of configurable modules
-CONFIGURABLE_MODULES = [
-    {'key': 'module_project_management_enabled', 'name': 'project_management', 'action_attr': 'project_management_action', 'widget_attr': 'project_management_widget_instance'},
-    {'key': 'module_product_management_enabled', 'name': 'product_management', 'action_attr': 'product_list_action', 'widget_attr': 'product_management_page_instance'},
-    {'key': 'module_partner_management_enabled', 'name': 'partner_management', 'action_attr': 'partner_management_action', 'widget_attr': 'partner_management_widget_instance'},
-    {'key': 'module_statistics_enabled', 'name': 'statistics', 'action_attr': 'statistics_action', 'widget_attr': 'statistics_dashboard_instance'},
-    {'key': 'module_inventory_management_enabled', 'name': 'inventory_management', 'action_attr': 'inventory_browser_action', 'widget_attr': 'inventory_browser_widget_instance'},
-    {'key': 'module_experience_management_enabled', 'name': 'experience_management', 'action_attr': 'experience_management_action', 'widget_attr': 'experience_management_widget_instance'}, # Added
-    {'key': 'module_botpress_integration_enabled', 'name': 'botpress_integration', 'action_attr': 'botpress_integration_action', 'widget_attr': 'botpress_integration_ui_instance'},
-    {'key': 'module_carrier_map_enabled', 'name': 'carrier_map', 'action_attr': 'open_carrier_map_action', 'widget_attr': None}, # Carrier map is a dialog
-    # Add Calendar module here - for now, not making it 'configurable' via DB setting, always enabled.
-    # If it needs to be configurable, add a 'key' and handle its state in _load_module_states and settings.
-    {'key': 'module_calendar_enabled', 'name': 'calendar', 'action_attr': 'calendar_module_action', 'widget_attr': 'calendar_module_widget_instance'},
-    {'key': 'module_camera_management_enabled', 'name': 'camera_management', 'action_attr': 'camera_management_action', 'widget_attr': 'camera_management_widget_instance'},
-    {'key': 'module_calculator_enabled', 'name': 'calculator', 'action_attr': 'calculator_module_action', 'widget_attr': 'calculator_module_widget_instance'} # Added Calculator module
-]
+from utils.app_constants import CONFIGURABLE_MODULES # Import from new location
 
 class ClientListItemWidget(QWidget):
     def __init__(self, client_data, parent=None):
@@ -283,14 +268,18 @@ class ClientListItemWidget(QWidget):
 
 
 class DocumentManager(QMainWindow):
-    def __init__(self, app_root_dir, current_user_info: dict): # Changed current_user_id to current_user_info
+    def __init__(self, app_root_dir, current_user_info: dict, current_license_info: dict | None):
         super().__init__()
         self.app_root_dir = app_root_dir
         self.current_user_info = current_user_info # Store the full user info dictionary
-        # self.current_user_id = current_user_id # Kept for compatibility, but new code should use current_user_info
+        self.current_license_info = current_license_info # Store license information
         self.current_user_id = self.current_user_info.get('user_id') # Extract user_id for existing usage
 
-        logging.info(f"DocumentManager initialized for user: {self.current_user_info.get('username')}, Role: {self.current_user_info.get('role_name')}")
+        logging.info(f"DocumentManager initialized for user: {self.current_user_info.get('username')}, Role: {self.current_user_info.get('role_name')}, License active: {self.current_license_info.get('is_active') if self.current_license_info else 'N/A'}")
+
+        # Instantiate ClientController
+        self.client_controller_instance = ClientController(db_manager=db_manager, config=CONFIG, app_root_dir=self.app_root_dir, notification_manager=None) # Temp notification_manager=None
+        # Later, self.notification_manager will be set up and can be passed if ClientController needs it.
 
         self.setWindowTitle(self.tr("Gestionnaire de Documents Client")); self.setGeometry(100, 100, 1200, 800)
         self.setWindowIcon(QIcon(":/icons/logo.svg"))
@@ -1924,7 +1913,8 @@ class DocumentManager(QMainWindow):
                 config=self.config,
                 app_root_dir=self.app_root_dir,
                 notification_manager=notification_manager,
-                current_user_info=self.current_user_info, # Changed to pass current_user_info
+                current_user_info=self.current_user_info,
+                client_controller_instance=self.client_controller_instance, # Pass ClientController instance
                 parent=self
             )
             logging.info(f"main_window.open_client_tab_by_id: Successfully created ClientMainWidget for client_id: {client_id_to_open} with user_info.") # Log updated
