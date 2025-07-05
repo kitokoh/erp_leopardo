@@ -30,7 +30,7 @@ def generate_pdf_for_document(
     Accepts project_id and additional_context to enrich the document context.
     Includes logic to check for product language match for proforma invoices.
     """
-    from html_editor import HtmlEditor # Deferred import
+    from gui.widgets.html_editor import HtmlEditor # Deferred import
 
     if not os.path.exists(source_file_path):
         logging.error(f"Source HTML file not found for PDF generation: {source_file_path}")
