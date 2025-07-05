@@ -313,6 +313,13 @@ from dialogs.transporter_dialog import TransporterDialog
 from dialogs.freight_forwarder_dialog import FreightForwarderDialog
 from company_management import CompanyTabWidget
 from securite.security_settings_page import SecuritySettingsPage # Import de la nouvelle page
+try:
+    from user_profile_management.my_business_widget import MyBusinessWidget
+    USER_PROFILE_MODULE_AVAILABLE = True
+except ImportError as e_user_profile:
+    print(f"WARNING: Could not import MyBusinessWidget: {e_user_profile}. 'My Business' tab will be unavailable.")
+    MyBusinessWidget = None # Placeholder
+    USER_PROFILE_MODULE_AVAILABLE = False
 
 class ImportInstructionsDialog(QDialog):
     def __init__(self, parent=None):
@@ -439,6 +446,7 @@ class SettingsPage(QWidget):
         self._setup_document_customization_tab()
         self._setup_menu_customization_tab() # New tab for menu customization
         self._setup_security_tab()
+        self._setup_my_business_tab() # New tab for "My Business"
 
 
         main_layout.addWidget(self.tabs_widget)
@@ -2082,6 +2090,23 @@ class SettingsPage(QWidget):
         # for its current functionality (testing biometric simulations).
         self.security_test_page = SecuritySettingsPage()
         self.tabs_widget.addTab(self.security_test_page, self.tr("Security (Biometric Test)"))
+
+    def _setup_my_business_tab(self):
+        if USER_PROFILE_MODULE_AVAILABLE and MyBusinessWidget is not None:
+            # Assuming current_user_id is available in self
+            # If MyBusinessWidget needs the main_config or app_root_dir, pass them as well.
+            # For now, it only seems to need user_id.
+            self.my_business_widget_instance = MyBusinessWidget(user_id=self.current_user_id, parent=self)
+            self.tabs_widget.addTab(self.my_business_widget_instance, self.tr("Mon Entreprise (Profil)"))
+        else:
+            # Create a placeholder tab indicating the module is unavailable
+            unavailable_tab = QWidget()
+            layout = QVBoxLayout(unavailable_tab)
+            label = QLabel(self.tr("The 'My Business' module is currently unavailable.\nPlease check the application logs for more details (ImportError)."))
+            label.setAlignment(Qt.AlignCenter)
+            label.setWordWrap(True)
+            layout.addWidget(label)
+            self.tabs_widget.addTab(unavailable_tab, self.tr("Mon Entreprise (Profil) - Erreur"))
 
 
 if __name__ == '__main__':
