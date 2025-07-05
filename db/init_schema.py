@@ -2652,6 +2652,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     print("DEBUG_INIT_DB: Index for UseCases table created or exists.")
     # --- End UseCases Table ---
 
+
     # Commit schema changes made via raw SQLite connection before proceeding to SQLAlchemy part
     try:
         logging.info("DEBUG_INIT_DB: Committing main schema/index changes before accounting module DDL.")

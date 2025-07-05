@@ -249,3 +249,4 @@ def has_any_active_complete_license(conn: sqlite3.Connection) -> bool:
     except sqlite3.Error as e:
         logger.error(f"Error checking for active 'complet' licenses: {e}", exc_info=True)
         return False # Fail safe: assume one might exist if check fails
+
