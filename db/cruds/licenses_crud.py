@@ -222,3 +222,31 @@ def get_license_by_key_and_machine(conn: sqlite3.Connection, license_key: str, m
     except sqlite3.Error as e:
         logger.error(f"Error retrieving license by key '{license_key}' and machine '{machine_info}': {e}", exc_info=True)
         return None
+
+def has_any_active_complete_license(conn: sqlite3.Connection) -> bool:
+    """
+    Checks if there is any active 'complet' license in the system for any user.
+    An active license is one where is_active is TRUE and expiration_date is in the future (or NULL).
+    """
+    sql = """
+        SELECT 1 FROM Licenses
+        WHERE license_type = 'complet'
+          AND is_active = 1
+          AND (expiration_date IS NULL OR expiration_date > ?)
+        LIMIT 1
+    """
+    now_utc_iso = datetime.now(timezone.utc).isoformat()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(sql, (now_utc_iso,))
+        row = cursor.fetchone()
+        if row:
+            logger.debug("Found at least one active 'complet' license in the system.")
+            return True
+        else:
+            logger.debug("No active 'complet' licenses found in the system.")
+            return False
+    except sqlite3.Error as e:
+        logger.error(f"Error checking for active 'complet' licenses: {e}", exc_info=True)
+        return False # Fail safe: assume one might exist if check fails
+

@@ -305,6 +305,31 @@ def main():
         # Depending on severity, might want to sys.exit(1) here if seeding is critical for app function
     # --- End Coordinated Data Seeding ---
 
+    # --- Token Cleanup on Startup ---
+    conn_cleanup = None
+    try:
+        conn_cleanup = get_db_connection() # Get a connection for cleanup tasks
+        if conn_cleanup:
+            from db.cruds import user_session_tokens_crud, password_reset_tokens_crud
+
+            cleaned_session_tokens = user_session_tokens_crud.cleanup_expired_tokens(conn_cleanup)
+            logging.info(f"Cleaned up {cleaned_session_tokens} expired 'Remember Me' session tokens on startup.")
+
+            cleaned_reset_tokens = password_reset_tokens_crud.cleanup_expired_or_used_tokens(conn_cleanup)
+            logging.info(f"Cleaned up {cleaned_reset_tokens} expired/used password reset tokens on startup.")
+
+            conn_cleanup.commit() # Commit changes from cleanup
+        else:
+            logging.error("Could not get DB connection for token cleanup on startup.")
+    except Exception as e_cleanup:
+        logging.error(f"Error during token cleanup on startup: {e_cleanup}", exc_info=True)
+        if conn_cleanup:
+            conn_cleanup.rollback() # Rollback if error during cleanup
+    finally:
+        if conn_cleanup:
+            conn_cleanup.close()
+    # --- End Token Cleanup ---
+
     # Log the configured session timeout value
     logging.info(f"Session timeout is set to: {SESSION_TIMEOUT_SECONDS // 60} minutes ({SESSION_TIMEOUT_SECONDS} seconds).")
 
