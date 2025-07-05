@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from datetime import datetime
 import db as db_manager
-from email_service import EmailSenderService
+from services.email_service import EmailSenderService
 
 class SAVTicketDialog(QDialog):
     def __init__(self, client_id, purchased_products, ticket_data=None, email_service_instance=None, parent=None):
