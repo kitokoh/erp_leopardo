@@ -28,9 +28,14 @@ class ReferentDetailsDialog(QDialog):
             self._populate_fields()
         else:
             # For new referents, try to pre-select client's current country if available
-            client_details = self.controller.clients_crud.get_client_by_id(self.client_id) # Direct CRUD access for simplicity here
-            if client_details and client_details.get('country_id'):
-                self.country_combo.setCurrentData(client_details['country_id'])
+            try:
+                client_details = self.controller.get_client_by_id_for_dialog(self.client_id)
+                if client_details and client_details.get('country_id'):
+                    self.country_combo.setCurrentData(client_details['country_id'])
+            except AttributeError:
+                logger.error(f"Controller missing 'get_client_by_id_for_dialog' or similar method.")
+            except Exception as e:
+                logger.error(f"Error fetching client details for pre-selection: {e}", exc_info=True)
             # is_active_checkbox is True by default for new, not shown until edit.
 
     def _init_ui(self):
