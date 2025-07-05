@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 import math
 
-from carrier_email_dialog import CarrierEmailDialog
+from gui.dialogs.carrier_email_dialog import CarrierEmailDialog
 from client_management.dialogs.referent_details_dialog import ReferentDetailsDialog
 
 from PyQt5.QtWidgets import (
