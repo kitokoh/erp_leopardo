@@ -19,6 +19,7 @@ except ImportError:
         raise ImportError("db.connection module not found. Cannot connect to the database.")
 
 
+
 class MyBusinessWidget(QWidget):
     profile_updated = pyqtSignal()
 
@@ -35,6 +36,7 @@ class MyBusinessWidget(QWidget):
         self._init_ui()
         if DB_CONNECTION_AVAILABLE: # Only load data if DB is connectable
             self._load_initial_data()
+
         self._load_user_profile()
 
     def _init_ui(self):
@@ -111,6 +113,7 @@ class MyBusinessWidget(QWidget):
              # or by the initial check in __init__
             raise ConnectionError("Database connection is not available for MyBusinessWidget.")
         return get_db_connection() # This is the imported function
+
 
     def _load_initial_data(self):
         conn = self._get_db_connection()
@@ -339,6 +342,7 @@ if __name__ == '__main__':
 
     layout.addWidget(my_business_widget)
     main_win.setWindowTitle("Test MyBusinessWidget (Standalone with Main DB Connection)")
+
     main_win.resize(600, 700)
     main_win.show()
     sys.exit(app.exec_())
