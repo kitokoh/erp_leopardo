@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="{{ lang_code | default('fr') }}">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ labels.referents_report_title | default('Rapport des Référents') }}</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300;400;700&display=swap');
+        body {
+            font-family: 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4; /* Should not be visible in PDF */
+            color: #333;
+            font-size: 11px; /* Slightly smaller base font for potentially dense tables */
+            line-height: 1.5;
+        }
+        .container {
+            width: 800px; /* Consistent width */
+            margin: 20px auto; /* Reduced margin for potentially more content */
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px; /* Will not show in PDF but good for HTML view */
+            /* box-shadow: 0 4px 10px rgba(0,0,0,0.1); /* Will not show in PDF */
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #007bff;
+        }
+        .header .logo {
+            max-width: 180px; /* Slightly smaller logo */
+            max-height: 70px;
+        }
+        .header h1 {
+            color: #007bff;
+            font-size: 24px;
+            margin: 0;
+            text-align: right;
+            font-weight: 300;
+            white-space: nowrap;
+        }
+        .report-meta {
+            text-align: right;
+            margin-bottom: 20px;
+            font-size: 10px;
+            color: #555;
+        }
+        .section-title {
+            font-size: 18px;
+            color: #007bff;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        .client-info {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border: 1px solid #e7e7e7;
+        }
+        .client-info p {
+            margin: 4px 0;
+            font-size: 11px;
+        }
+        table.referents-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .referents-table th, .referents-table td {
+            border: 1px solid #ddd;
+            padding: 10px; /* Adjusted padding */
+            text-align: left;
+            font-size: 10px; /* Smaller font for table content */
+            vertical-align: top;
+        }
+        .referents-table th {
+            background-color: #007bff;
+            color: #fff;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .referents-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .no-data {
+            padding: 15px;
+            text-align: center;
+            color: #777;
+            background-color: #f9f9f9;
+            border: 1px dashed #ddd;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+            font-size: 9px;
+            color: #777;
+            /* For page numbers - WeasyPrint specific solution needed if using @page */
+        }
+
+        /* WeasyPrint specific for page numbers and headers/footers */
+        @page {
+            size: A4; /* Définit la taille de la page, peut être utile */
+            margin: 1.5cm; /* Marges de la page */
+
+            @top-center {
+                content: "{{ labels.referents_report_title | default('Rapport des Référents') }}";
+                font-family: 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                font-size: 10px;
+                color: #888;
+                vertical-align: bottom;
+                padding-bottom: 5mm; /* Ajustez selon besoin */
+            }
+
+            @bottom-right {
+                content: "{{ labels.page_label | default('Page') }} " counter(page) " / " counter(pages);
+                font-family: 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                font-size: 9px;
+                color: #555;
+                vertical-align: top;
+                padding-top: 5mm; /* Ajustez selon besoin */
+            }
+        }
+
+        /* L'ancienne classe .page-number et le script JS ne sont plus nécessaires pour la pagination CSS */
+        /* .page-number {
+            text-align: right;
+            font-size: 9px;
+            color: #777;
+        } */
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            {% if company_logo_path %}
+                <img src="{{ company_logo_path }}" alt="{{ labels.logo_alt | default('Logo Entreprise') }}" class="logo"/>
+            {% else %}
+                <div style="width: 180px; height: 70px; background-color: #eee; display: flex; align-items: center; justify-content: center; color: #aaa; font-size:10px;">{{ labels.logo_alt | default('Logo Ets.') }}</div>
+            {% endif %}
+            <h1>{{ labels.referents_report_title | default('Rapport des Référents') }}</h1>
+        </div>
+
+        <div class="report-meta">
+            <p>{{ labels.generation_date_label | default('Date de génération') }}: {{ generation_date }}</p>
+        </div>
+
+        <div class="client-info">
+            <h2 style="font-size: 14px; color: #0056b3; margin-top:0; margin-bottom:10px;">{{ labels.client_information_title | default('Informations du Client') }}</h2>
+            <p><strong>{{ labels.client_name_label | default('Client') }}:</strong> {{ target_client.full_name | default('N/A') }}</p>
+            <p><strong>{{ labels.client_company_label | default('Société') }}:</strong> {{ target_client.company_name | default('N/A') }}</p>
+            <p><strong>{{ labels.client_location_label | default('Localité') }}:</strong> {{ target_client.city | default('') }}{% if target_client.city and target_client.country %}, {% endif %}{{ target_client.country | default('') }}</p>
+        </div>
+
+        <h2 class="section-title">{{ labels.local_referents_title | default('Référents Locaux') }} ({{ target_client.country | default(labels.unknown_country | default('Pays inconnu')) }})</h2>
+        {% if local_referents %}
+            <table class="referents-table">
+                <thead>
+                    <tr>
+                        <th>{{ labels.referent_name_label | default('Nom') }}</th>
+                        <th>{{ labels.referent_company_label | default('Société') }}</th>
+                        <th>{{ labels.referent_city_label | default('Ville') }}</th>
+                        <th>{{ labels.referent_region_label | default('Région') }}</th>
+                        <th>{{ labels.referent_country_label | default('Pays') }}</th>
+                        <!-- Add more columns as needed, e.g., Date de référencement -->
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for referent in local_referents %}
+                    <tr>
+                        <td>{{ referent.full_name | default('N/A') }}</td>
+                        <td>{{ referent.company_name | default('N/A') }}</td>
+                        <td>{{ referent.city | default('N/A') }}</td>
+                        <td>{{ referent.region_name | default('N/A') }}</td>
+                        <td>{{ referent.country | default('N/A') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="no-data">{{ labels.no_local_referents_found | default('Aucun référent local trouvé pour cette localité.') }}</p>
+        {% endif %}
+
+        <h2 class="section-title">{{ labels.global_referents_title | default('Référents Globaux') }}</h2>
+        {% if global_referents %}
+            <table class="referents-table">
+                <thead>
+                    <tr>
+                        <th>{{ labels.referent_name_label | default('Nom') }}</th>
+                        <th>{{ labels.referent_company_label | default('Société') }}</th>
+                        <th>{{ labels.referent_city_label | default('Ville') }}</th>
+                        <th>{{ labels.referent_region_label | default('Région') }}</th>
+                        <th>{{ labels.referent_country_label | default('Pays') }}</th>
+                        <!-- Add more columns as needed -->
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for referent in global_referents %}
+                    <tr>
+                        <td>{{ referent.full_name | default('N/A') }}</td>
+                        <td>{{ referent.company_name | default('N/A') }}</td>
+                        <td>{{ referent.city | default('N/A') }}</td>
+                        <td>{{ referent.region_name | default('N/A') }}</td>
+                        <td>{{ referent.country | default('N/A') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="no-data">{{ labels.no_global_referents_found | default('Aucun référent global trouvé.') }}</p>
+        {% endif %}
+
+        <div class="footer">
+            <p>{{ company_details.name | default('Votre Entreprise') }} - {{ company_details.address | default('Votre Adresse') }}</p>
+        </div>
+    </div>
+    <!-- Script de pagination JS supprimé car géré par CSS @page -->
+</body>
+</html>
