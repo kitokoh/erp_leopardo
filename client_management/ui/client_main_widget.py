@@ -289,14 +289,15 @@ class ClientMainWidget(QWidget):
             details_tab_layout = QVBoxLayout(self.client_details_tab) # This is the layout for the first tab's content
 
             # Add the moved elements to the details_tab_layout (top of the first tab)
-            # details_tab_layout.addWidget(self.header_label) # Removed as per new request
-            details_tab_layout.addWidget(self.referent_status_label) # Keep for now, will be integrated into new status UI
-
-            details_tab_layout.addLayout(self.action_buttons_layout) # Add the whole action buttons layout
+            # details_tab_layout.addWidget(self.header_label) # Removed
+            # self.referent_status_label is also hidden by _setup_client_statuses_section
+            # details_tab_layout.addWidget(self.referent_status_label)
+            details_tab_layout.addLayout(self.action_buttons_layout) # This should be the first visible thing
 
             # Existing QFormLayout for other details
-            self.status_combo = QComboBox() # Keep this initialization if it's specific to this tab
-            self.details_layout = QFormLayout() # This is for the rest of the client fields
+            self.status_combo = QComboBox()
+            self.details_layout = QFormLayout()
+
             self.details_layout.setLabelAlignment(Qt.AlignLeft)
             self.details_layout.setSpacing(10)
 
@@ -367,6 +368,7 @@ class ClientMainWidget(QWidget):
             self.details_layout.addRow(self.created_by_label_static, self.created_by_value_label)
 
         # Placeholder for client statuses - to be populated by _setup_client_statuses_section
+
 
             self.client_statuses_widget = QWidget()
             self.client_statuses_layout = QHBoxLayout(self.client_statuses_widget)
@@ -2141,11 +2143,12 @@ class ClientMainWidget(QWidget):
         self.is_referent_checkbox.toggled.connect(self.on_referent_status_toggled)
         self.client_statuses_layout.addWidget(self.is_referent_checkbox)
 
-        # Hide the old referent status label. The checkbox serves as indicator and control.
+        # Hide the old referent status label and related buttons as the checkbox supersedes their main function.
         if hasattr(self, 'referent_status_label'): self.referent_status_label.setVisible(False)
-        # The manage_referent_btn functionality is now handled by the checkbox toggle.
-        # The generate_referents_report_btn is kept in the main action_buttons_layout.
-        # So, no need to explicitly hide manage_referent_btn here if it's removed from action_buttons_layout later.
+        if hasattr(self, 'manage_referent_btn') and self.manage_referent_btn.parentWidget() is self.action_buttons_layout: # Check if it's still there
+            self.manage_referent_btn.setVisible(False) # Or remove from layout: self.action_buttons_layout.removeWidget(self.manage_referent_btn)
+
+        # generate_referents_report_btn is kept visible in action_buttons_layout.
 
 
         # --- Distributor Status ---
@@ -2178,37 +2181,67 @@ class ClientMainWidget(QWidget):
             return
 
         try:
-            if checked: # User wants to make this client a referent
-                # Check if there's an existing profile, even inactive
-                existing_profile = self.client_controller.get_referent_profile_by_client_id(client_id, include_inactive=True)
-                if existing_profile:
-                    # If exists and inactive, activate it
-                    if not existing_profile.get('is_active'):
-                        self.client_controller.update_referent_profile(existing_profile['profile_id'], {'is_active': True, 'user_id': self.current_user_id})
+            current_referent_profile = self.client_controller.get_referent_profile_by_client_id(client_id, include_inactive=True)
+
+            if checked: # User wants to make this client a referent or activate existing
+                if current_referent_profile:
+                    if not current_referent_profile.get('is_active'):
+                        # Profile exists and is inactive, so activate it
+                        result = self.client_controller.set_referent_status(current_referent_profile['referent_id'], True, self.current_user_id)
+                        if not result.get('success'):
+                            raise Exception(result.get('error', self.tr("Échec de l'activation du référent.")))
+                    # If already active, do nothing more here, state is already correct
                 else:
-                    # No profile exists, create a new active one
-                    self.client_controller.create_referent_profile({
-                        'client_id': client_id,
-                        'user_id': self.current_user_id, # Assuming current user makes them referent
-                        'is_active': True,
-                        'assignment_date': datetime.utcnow().isoformat(),
-                        'notes': self.tr("Statut Référent activé via checkbox.")
-                    })
+                    # No profile exists, need to create one. This requires more info (country, city etc.)
+                    # which the checkbox alone cannot provide.
+                    # Option 1: Open the ReferentDetailsDialog to gather full info.
+                    # Option 2: Create a very basic referent profile (might be problematic if fields are required).
+                    # Option 3: Inform user and revert checkbox (simplest for now if dialog is too much change).
+
+                    # Let's try Option 2: Create with client's primary country (if available)
+                    client_country_id = self.client_info.get('country_id')
+                    if not client_country_id:
+                        QMessageBox.warning(self, self.tr("Données Manquantes"), self.tr("Le pays principal du client n'est pas défini. Impossible de créer un profil référent basique."))
+                        raise Exception(self.tr("Pays du client non défini.")) # Will be caught by general except
+
+                    creation_result = self.client_controller.make_client_referent(
+                        client_id=client_id,
+                        country_id=client_country_id, # Use client's country
+                        region_name=None, # Basic profile
+                        city_name=None,   # Basic profile
+                        notes=self.tr("Profil référent créé via activation par case à cocher."),
+                        user_id=self.current_user_id
+                    )
+                    if not creation_result.get('success'):
+                        raise Exception(creation_result.get('error', self.tr("Échec de la création du profil référent.")))
             else: # User wants to deactivate referent status
-                current_profile = self.client_controller.get_referent_profile_by_client_id(client_id, include_inactive=False) # Get only active
-                if current_profile:
-                    self.client_controller.update_referent_profile(current_profile['profile_id'], {'is_active': False})
+                if current_referent_profile and current_referent_profile.get('is_active'):
+                    result = self.client_controller.set_referent_status(current_referent_profile['referent_id'], False, self.current_user_id)
+                    if not result.get('success'):
+                        raise Exception(result.get('error', self.tr("Échec de la désactivation du référent.")))
+                # If no active profile, do nothing, state is already correct (not active)
 
             # Refresh self.current_referent_details and checkbox state to be sure
             self.current_referent_details = self.client_controller.get_referent_profile_by_client_id(client_id, include_inactive=True)
-            is_active_after_toggle = self.current_referent_details and self.current_referent_details.get('is_active')
+            is_active_after_toggle = bool(self.current_referent_details and self.current_referent_details.get('is_active'))
+
+            # Block signals to prevent re-triggering this handler
+            self.is_referent_checkbox.blockSignals(True)
             self.is_referent_checkbox.setChecked(is_active_after_toggle)
+            self.is_referent_checkbox.blockSignals(False)
+
+
             self.notification_manager.show(self.tr("Statut Référent"), self.tr("Statut référent mis à jour."), type='SUCCESS')
 
         except Exception as e:
             logging.error(f"Error toggling referent status for client {client_id}: {e}", exc_info=True)
             QMessageBox.critical(self, self.tr("Erreur"), self.tr("Impossible de mettre à jour le statut référent: {0}").format(str(e)))
-            self.is_referent_checkbox.setChecked(not checked) # Revert on error
+            # Revert checkbox state carefully
+            self.is_referent_checkbox.blockSignals(True)
+            self.is_referent_checkbox.setChecked(not checked)
+            self.is_referent_checkbox.blockSignals(False)
+
+
 
     def on_distributor_status_toggled(self, checked):
         if not self.client_info or not self.client_info.get('client_id'): return
