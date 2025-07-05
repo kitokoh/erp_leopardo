@@ -370,6 +370,7 @@ class ClientMainWidget(QWidget):
         # Placeholder for client statuses - to be populated by _setup_client_statuses_section
 
 
+
             self.client_statuses_widget = QWidget()
             self.client_statuses_layout = QHBoxLayout(self.client_statuses_widget)
             self.client_statuses_layout.setContentsMargins(0,0,0,0)

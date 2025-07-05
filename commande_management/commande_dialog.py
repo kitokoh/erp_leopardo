@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QTextEdit,
     QComboBox, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
     QAbstractItemView, QMessageBox, QDateEdit, QDialogButtonBox, QLabel,
-    QDoubleSpinBox, QSpinBox
+    QDoubleSpinBox, QSpinBox, QListWidget, QInputDialog, QWidget # Explicitly added QWidget
 )
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QDate

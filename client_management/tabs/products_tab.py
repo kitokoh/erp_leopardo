@@ -195,10 +195,19 @@ class ProductsTab(QWidget):
             QMessageBox.critical(self, self.tr("Erreur"), self.tr("Le composant d'ajout de produit n'est pas chargé."))
             return
 
+        # Get app_root_dir from parent_widget (ClientMainWidget)
+        app_root_dir = None
+        if hasattr(self.parent_widget, 'app_root_dir'):
+            app_root_dir = self.parent_widget.app_root_dir
+        else:
+            QMessageBox.critical(self, self.tr("Erreur Configuration"), self.tr("Le répertoire racine de l'application n'est pas accessible."))
+            return
+
         dialog = self.ProductDialog(client_id=self.client_info.get('client_id'),
-                                    project_id=None, # Or a specific project_id if applicable
+                                    app_root_dir=app_root_dir, # Pass app_root_dir
+                                    # product_data=None, # Not editing an existing one here
                                     parent=self)
-        if dialog.exec_() == QMessageBox.Accepted: # Assuming ProductDialog returns Accepted/Rejected
+        if dialog.exec_() == QDialog.Accepted: # ProductDialog uses QDialog.Accepted
             self.load_products()
             if self.notification_manager:
                 self.notification_manager.show(self.tr("Succès"), self.tr("Produit ajouté/lié avec succès."), type='SUCCESS')
