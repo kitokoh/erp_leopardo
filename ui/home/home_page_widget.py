@@ -161,6 +161,7 @@ class HomePageWidget(QWidget):
         return center_h_layout
 
 
+
     def _setup_bottom_layout(self):
         """Creates and configures the bottom layout with promotional widgets and content area."""
         bottom_h_layout = QHBoxLayout()
