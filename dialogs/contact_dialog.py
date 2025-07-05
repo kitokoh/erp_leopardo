@@ -29,14 +29,9 @@ class ContactDialog(QDialog):
         form_layout.setSpacing(10)
 
         # Contact Fields (from Contacts table)
+        # Essential Fields (Always Visible)
         self.display_name_input = QLineEdit()
         form_layout.addRow(self.tr("Nom affiché*:"), self.display_name_input)
-
-        self.given_name_input = QLineEdit()
-        form_layout.addRow(self.tr("Prénom:"), self.given_name_input)
-
-        self.family_name_input = QLineEdit()
-        form_layout.addRow(self.tr("Nom de famille:"), self.family_name_input)
 
         self.email_input = QLineEdit()
         form_layout.addRow(self.tr("Email:"), self.email_input)
@@ -47,24 +42,33 @@ class ContactDialog(QDialog):
         self.position_input = QLineEdit() # Job title / position
         form_layout.addRow(self.tr("Poste/Fonction:"), self.position_input)
 
-        self.company_name_input = QLineEdit() # Contact's own company, if different from the entity
-        form_layout.addRow(self.tr("Entreprise du contact:"), self.company_name_input)
+
+        # Checkbox to toggle advanced fields
+        self.show_advanced_checkbox = QCheckBox(self.tr("Afficher plus de champs"))
+        self.show_advanced_checkbox.setChecked(False)
+        form_layout.addRow(self.show_advanced_checkbox) # Positioned after essential fields
+
+        self.advanced_fields_widgets = [] # To store widgets that will be toggled
+
+        # --- Fields to be moved to Advanced ---
+        self.given_name_input = QLineEdit()
+        self._add_advanced_field(form_layout, self.tr("Prénom:"), self.given_name_input)
+
+        self.family_name_input = QLineEdit()
+        self._add_advanced_field(form_layout, self.tr("Nom de famille:"), self.family_name_input)
+
+        self.company_name_input = QLineEdit() # Contact's own company
+        self._add_advanced_field(form_layout, self.tr("Entreprise du contact:"), self.company_name_input)
 
         self.employee_status_combo = QComboBox()
         self.employee_status_combo.addItems([self.tr("N/A"), self.tr("Interne"), self.tr("Externe")])
-        form_layout.addRow(self.tr("Statut employé:"), self.employee_status_combo)
+        self._add_advanced_field(form_layout, self.tr("Statut employé:"), self.employee_status_combo)
 
         self.notes_input = QTextEdit() # General notes about the contact
         self.notes_input.setFixedHeight(80)
-        form_layout.addRow(self.tr("Notes (Contact):"), self.notes_input)
+        self._add_advanced_field(form_layout, self.tr("Notes (Contact):"), self.notes_input)
 
-        # Optional advanced fields (could be in a collapsible group)
-        self.show_advanced_checkbox = QCheckBox(self.tr("Afficher les champs avancés"))
-        self.show_advanced_checkbox.setChecked(False)
-        form_layout.addRow(self.show_advanced_checkbox)
-
-        self.advanced_fields_widgets = []
-
+        # Existing advanced fields (already handled by _add_advanced_field)
         self.phone_type_input = QLineEdit()
         self._add_advanced_field(form_layout, self.tr("Type téléphone:"), self.phone_type_input)
 
