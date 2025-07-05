@@ -605,64 +605,45 @@ def main():
     logged_in_user_info = None # To store user details after successful login
     current_license_info = None # Pour stocker les détails de la licence
 
-    # --- Remember Me - Attempt Auto Login ---
-    remembered_username = auth_service.get_remembered_user()
-    if remembered_username:
-        logging.info(f"Attempting auto-login for remembered user: {remembered_username}")
-        # In a real token system, we'd validate the token here.
-        # For this simplified version, we fetch user details directly.
-        # This assumes the user still exists and is active.
-        user_details = users_crud.get_user_by_username(remembered_username)
+    # --- Remember Me - Attempt Auto Login with Token ---
+    remembered_token = auth_service.get_remembered_token_from_settings()
+    if remembered_token:
+        logging.info("Attempting auto-login with session token.")
+        # login_with_session_token returns: (success, message, user_data, license_info)
+        token_auth_success, token_auth_message, token_user_info, token_license_info = auth_service.login_with_session_token(remembered_token)
 
-        if user_details and user_details.get('is_active'):
-            auth_service.set_current_user(user_details)
-            logged_in_user_info = user_details
-            logging.info(f"Auto-login (authentification) successful for user: {remembered_username}")
+        if token_auth_success and token_user_info:
+            logged_in_user_info = token_user_info
+            current_license_info = token_license_info # This now includes allowed_features
+            logging.info(f"Auto-login with token successful for user: {logged_in_user_info.get('username')}")
             SESSION_START_TIME = datetime.datetime.now()
 
-            # Vérification de la licence pour l'auto-connexion
-            conn_lic_auto = None
-            try:
-                conn_lic_auto = get_db_connection()
-                is_license_valid, license_msg, lic_details = license_manager.check_license_validity(conn_lic_auto, logged_in_user_info['user_id'])
-                current_license_info = lic_details # Peut être None ou contenir des infos sur l'invalidité
-
-                if is_license_valid:
-                    logging.info(f"Licence valide pour l'auto-connexion de {remembered_username}.")
-                    proceed_to_main_app = True
-                else:
-                    logging.warning(f"Auto-login pour {remembered_username}, mais licence invalide: {license_msg}")
-                    # Ne pas aller à l'application principale, forcer la boîte de dialogue de licence/login.
-                    proceed_to_main_app = False
-                    # Afficher un message à l'utilisateur avant de retomber sur le login manuel
-                    QMessageBox.warning(None, "Licence Requise", f"Votre session a été restaurée, mais votre licence n'est plus valide : {license_msg}\nVeuillez vous reconnecter.")
-                    auth_service.logout() # Effacer la session auto-logguée pour forcer le login manuel
-                    logged_in_user_info = None # Réinitialiser
-                    current_license_info = None
-                    # La boucle while de login manuel prendra le relais
-            except Exception as e_lic_auto:
-                logging.error(f"Erreur de vérification de licence pendant l'auto-login pour {remembered_username}: {e_lic_auto}", exc_info=True)
-                proceed_to_main_app = False
-                QMessageBox.critical(None, "Erreur de Licence", "Une erreur critique est survenue lors de la vérification de votre licence.")
-                auth_service.logout()
+            if token_license_info and token_license_info.get('is_active'):
+                logging.info(f"License is valid for token auto-login of {logged_in_user_info.get('username')}.")
+                proceed_to_main_app = True
+            else: # License is invalid or missing after token login
+                license_issue_msg = token_auth_message or "Votre licence n'est plus valide."
+                logging.warning(f"Token auto-login for {logged_in_user_info.get('username')} successful, but license is invalid: {license_issue_msg}")
+                QMessageBox.warning(None, "Licence Requise", f"Votre session a été restaurée, mais votre licence n'est plus valide : {license_issue_msg}\nVeuillez vous reconnecter.")
+                auth_service.logout() # This will clear QSettings token and attempt to clear DB token
                 logged_in_user_info = None
                 current_license_info = None
-            finally:
-                if conn_lic_auto:
-                    conn_lic_auto.close()
-        else: # user_details non valides ou inactifs
-            logging.warning(f"Auto-login failed for remembered user: {remembered_username}. User not found or inactive. Clearing preference.")
-            auth_service.clear_remember_me_preference()
+                proceed_to_main_app = False # Fall through to manual login
+        else: # Token login failed (e.g. token invalid, expired, user inactive)
+            logging.warning(f"Auto-login with token failed: {token_auth_message or 'Token invalid/expired'}. Proceeding to manual login.")
+            # auth_service.login_with_session_token should have cleared the invalid token from QSettings.
             proceed_to_main_app = False
-    else: # Pas d'utilisateur mémorisé
+    else: # No token remembered
         proceed_to_main_app = False
 
-    if not proceed_to_main_app: # Si auto-login n'a pas abouti à une licence valide
-        auth_service.logout() # S'assurer que toute session d'auto-login est nettoyée
+    if not proceed_to_main_app:
+        # Ensure any partial session from failed token login is cleared before manual login
+        if auth_service.get_current_user(): # If _current_user_data was set by a failed token login path
+            auth_service.logout()
         logged_in_user_info = None
         current_license_info = None
 
-        while True: # Boucle pour login manuel et gestion de licence
+        while True: # Loop for manual login and license management
             login_dialog = LoginDialog()
             login_dialog_result = login_dialog.exec_()
 
