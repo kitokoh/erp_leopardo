@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QFrame
-from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QPushButton, QSizePolicy
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QIcon
 
 class QuickStatsWidget(QFrame):
+    refresh_requested = pyqtSignal()
+
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("QuickStatsWidget")
@@ -13,29 +17,41 @@ class QuickStatsWidget(QFrame):
         self.main_layout.setContentsMargins(10, 10, 10, 10)
         self.main_layout.setSpacing(8)
 
-        title_label = QLabel(self.tr("Aperçu Rapide"))
-        title_label.setObjectName("quickStatsTitleLabel")
-        title_label.setAlignment(Qt.AlignCenter)
+        # Header layout for title and refresh button
+        header_layout = QHBoxLayout()
 
-        self.main_layout.addWidget(title_label)
+        self.title_label = QLabel(self.tr("Aperçu Rapide"))
+        self.title_label.setObjectName("quickStatsTitleLabel")
+        self.title_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        header_layout.addWidget(self.title_label, 1) # Title takes most space
 
-        # Placeholder stats - these would ideally come from a data source
-        stats_data = [
-            {"label": self.tr("Clients Actifs:"), "value": "157"},
-            {"label": self.tr("Projets en Cours:"), "value": "23"},
-            {"label": self.tr("Tâches Ouvertes:"), "value": "8"},
-            {"label": self.tr("Nouveaux Documents (Mois):"), "value": "78"}
-        ]
+        self.refresh_button = QPushButton()
+        self.refresh_button.setObjectName("quickStatsRefreshButton")
+        # Attempt to load a refresh icon, fallback to text "R"
+        refresh_icon = QIcon.fromTheme("view-refresh", QIcon(":/icons/refresh-cw.svg")) # Common theme icon name
+        if not refresh_icon.isNull():
+            self.refresh_button.setIcon(refresh_icon)
+        else:
+            self.refresh_button.setText("R") # Fallback text
+        self.refresh_button.setToolTip(self.tr("Rafraîchir les statistiques"))
+        self.refresh_button.clicked.connect(self.refresh_requested)
+        self.refresh_button.setFixedSize(24, 24) # Small square button
+        self.refresh_button.setIconSize(QSize(16,16))
+        header_layout.addWidget(self.refresh_button)
 
-        for stat in stats_data:
-            stat_label = QLabel(f"{stat['label']} {stat['value']}")
-            stat_label.setObjectName("quickStatItemLabel")
-            stat_label.setWordWrap(True)
-            self.main_layout.addWidget(stat_label)
+        self.main_layout.addLayout(header_layout)
+
+        # Container for stat items, so we can clear this part specifically
+        self.stats_items_layout = QVBoxLayout()
+        self.stats_items_layout.setSpacing(5) # Spacing between stat items
+        self.main_layout.addLayout(self.stats_items_layout)
 
         self.main_layout.addStretch(1) # Push content to the top
-
         self.setLayout(self.main_layout)
+
+        # Initial placeholder message if no stats loaded yet
+        self.update_stats([])
+
 
     def update_stats(self, new_stats_data):
         """
@@ -43,26 +59,25 @@ class QuickStatsWidget(QFrame):
         new_stats_data should be a list of dicts, e.g.,
         [{"label": "Nouveaux Clients:", "value": "5"}]
         """
-        # Clear old stats first, except title
-        while self.main_layout.count() > 1: # Keep title_label
-            item = self.main_layout.itemAt(1) # Get item below title
+        # Clear old stat items from stats_items_layout
+        while self.stats_items_layout.count() > 0:
+            item = self.stats_items_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
-            else:
-                self.main_layout.removeItem(item) # If it's a spacer or something
 
-        # Remove stretch if it exists
-        if self.main_layout.itemAt(self.main_layout.count()-1).spacerItem():
-             self.main_layout.takeAt(self.main_layout.count()-1)
+        if not new_stats_data:
+            placeholder_label = QLabel(self.tr("Aucune statistique à afficher."))
+            placeholder_label.setObjectName("quickStatItemPlaceholderLabel")
+            placeholder_label.setAlignment(Qt.AlignCenter)
+            self.stats_items_layout.addWidget(placeholder_label)
+            return
 
 
         for stat in new_stats_data:
             stat_label = QLabel(f"{stat['label']} {stat['value']}")
             stat_label.setObjectName("quickStatItemLabel")
             stat_label.setWordWrap(True)
-            self.main_layout.addWidget(stat_label)
-
-        self.main_layout.addStretch(1)
+            self.stats_items_layout.addWidget(stat_label)
 
 
 if __name__ == '__main__':

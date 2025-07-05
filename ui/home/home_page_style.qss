@@ -124,9 +124,73 @@ QLabel#quickStatItemLabel {
     padding-top: 4px; /* Space above each stat item */
 }
 
+QLabel#quickStatItemPlaceholderLabel {
+    font-family: "Open Sans", "Segoe UI", Arial, sans-serif;
+    font-size: 12px;
+    color: #6c757d; /* Grey text for placeholder */
+    font-style: italic;
+    padding: 10px;
+}
+
+QPushButton#quickStatsRefreshButton {
+    background-color: transparent;
+    border: none;
+    padding: 2px;
+    /* color: #007BFF; */ /* Icon color will be from SVG or theme */
+}
+
+QPushButton#quickStatsRefreshButton:hover {
+    background-color: #E9ECEF; /* Light grey on hover */
+    border-radius: 3px;
+}
+
+QPushButton#quickStatsRefreshButton:pressed {
+    background-color: #CED4DA; /* Darker grey on pressed */
+}
+
+
+
 /* Styling for the right sidebar container itself, if needed */
 QFrame#homePageRightSidebar {
     /* background-color: lightyellow; */ /* For debugging layout */
     /* border-left: 1px solid #DDE2E6; */ /* Optional: a line to separate from button grid */
     /* padding: 5px; */ /* If the sidebar itself needs padding around the widget it contains */
 }
+
+/* Search Bar Styling */
+QLineEdit#homePageSearchInput {
+    font-family: "Open Sans", "Segoe UI", Arial, sans-serif;
+    font-size: 13px;
+    padding: 6px 10px;
+    border: 1px solid #CED4DA;
+    border-radius: 15px; /* Rounded corners */
+    background-color: #FFFFFF;
+}
+
+QLineEdit#homePageSearchInput:focus {
+    border-color: #007BFF; /* Highlight color on focus */
+    /* box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25); */ /* QSS doesn't support box-shadow directly like CSS */
+}
+
+QPushButton#homePageSearchButton {
+    background-color: #007BFF; /* Primary button color */
+    border: 1px solid #007BFF;
+    color: white; /* Icon color should ideally be white if it's from a font or styled SVG */
+    border-radius: 15px; /* Match input field's rounding */
+    padding: 6px 8px; /* Adjust padding to make it squarish if icon only */
+    min-width: 30px; /* Ensure button has some width */
+    max-width: 30px; /* Ensure button has some width */
+    min-height: 30px; /* Ensure button has some height */
+    max-height: 30px; /* Ensure button has some height */
+}
+
+QPushButton#homePageSearchButton:hover {
+    background-color: #0056b3; /* Darker blue on hover */
+    border-color: #0056b3;
+}
+
+QPushButton#homePageSearchButton:pressed {
+    background-color: #004085; /* Even darker blue when pressed */
+    border-color: #004085;
+}
+
