@@ -2,7 +2,12 @@
 import logging
 from datetime import datetime, timedelta, timezone # Added timedelta and timezone
 
-from db.cruds import users_crud, activity_logs_crud # Added activity_logs_crud
+# auth/authentication.py
+import logging
+from datetime import datetime, timedelta, timezone # Added timedelta and timezone
+
+from db.cruds import users_crud, activity_logs_crud, licenses_crud # Added licenses_crud
+
 from db.cruds import user_session_tokens_crud # New CRUD for session tokens
 from utils.security_helpers import generate_secure_token, hash_token_for_storage # New helpers
 from license_management import manager as license_manager # Already imported below, moved up for clarity
@@ -323,7 +328,8 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
                 # --- Modified Default Admin License Creation Trigger ---
                 if not is_license_valid and user.get('role_name') == "Administrator": # Check role
                     # Check if any other 'complet' license exists in the system
-                    if not license_manager.cruds.has_any_active_complete_license(conn): # Use the new CRUD
+                    if not licenses_crud.has_any_active_complete_license(conn): # Corrected: Use licenses_crud directly
+
                         logger.warning(f"Administrator user '{username}' has an invalid/missing license and no other active 'complet' license found. Attempting to create a default 6-month license.")
                         try:
                             created_ok, create_msg, new_license_details = license_manager.create_default_admin_license(conn, user['user_id'])
@@ -383,6 +389,7 @@ def login_with_session_token(token_from_qsettings: str) -> tuple[bool, str | Non
 
     token_hash = hash_token_for_storage(token_from_qsettings)
     conn = None
+
     try:
 
         conn = get_db_connection()
@@ -458,6 +465,7 @@ def login_with_session_token(token_from_qsettings: str) -> tuple[bool, str | Non
 
         return True, None, _current_user_data, license_details
 
+
     except Exception as e:
 
         logger.error(f"Error during login with session token: {e}", exc_info=True)
@@ -485,6 +493,7 @@ def logout():
     if token_to_clear:
         conn = None
 
+
         try :
             conn = get_db_connection()
             token_hash = hash_token_for_storage(token_to_clear)
@@ -508,6 +517,7 @@ def logout():
                 )
             else:
                 logger.info("No matching session token found in database to delete during logout.")
+
 
         except Exception as e:
             logger.error(f"Error deleting session token from DB during logout: {e}", exc_info=True)
