@@ -13,9 +13,11 @@ LICENSE_TYPES = {
     "COMPLET": "complet",
 }
 DEFAULT_ADMIN_LICENSE_TYPE = LICENSE_TYPES["COMPLET"]
-ADMIN_USERNAME = "admin" # Assuming the admin username is 'admin'
+# ADMIN_USERNAME = "admin" # Moved to be a class attribute of LicenseManager
 
 class LicenseManager:
+    ADMIN_USERNAME = "admin" # Class attribute
+
     def __init__(self):
         # licenses_crud is a module, not a class to instantiate here usually
         # We'll call its functions directly: licenses_crud.add_license(...) etc.
