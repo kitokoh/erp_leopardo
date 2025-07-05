@@ -15,6 +15,7 @@ from .promo_widgets import PromoSectionWidget
 from .quick_stats_widget import QuickStatsWidget # Import the new widget
 
 
+
 from .quick_stats_widget import QuickStatsWidget # Import the new widget
 
 
@@ -23,6 +24,25 @@ class HomePageWidget(QWidget):
         super().__init__(parent)
         self.main_window = main_window # Store reference to DocumentManager
         self.setObjectName("HomePageWidget")
+        self.animations_enabled = True # Option to toggle animations
+
+        # Initialize fictional data source for QuickStatsWidget
+        self.fictional_data_source = {
+            "clients_actifs": 150,
+            "projets_en_cours": 20,
+            "taches_ouvertes": 12,
+            "nouveaux_documents_mois": 75,
+            "tickets_support_actifs": 5
+        }
+
+        # Fictional searchable items for global search simulation
+        self.searchable_items = [
+            "Rapport Annuel 2023.pdf", "Client: ACME Corp", "Projet: Phoenix",
+            "Note: Réunion Marketing Q3", "Produit: X1000", "Facture #INV-2024-001",
+            "Client: Stark Industries", "Devis #QT-2024-015", "Contact: Jane Doe",
+            "Produit: Y200 Super", "Tâche: Finaliser la présentation client"
+        ]
+
         self._init_ui()
         self._load_styles()
 
@@ -71,6 +91,7 @@ class HomePageWidget(QWidget):
         main_v_layout.addLayout(bottom_layout, 1) # Assign stretch factor to the bottom layout
 
 
+
         # Search Bar Layout (added at the top of main_v_layout)
         search_bar_layout = QHBoxLayout()
         search_bar_layout.setContentsMargins(10, 5, 10, 5) # Adjust margins as needed
@@ -107,60 +128,53 @@ class HomePageWidget(QWidget):
             # QMessageBox.information(self, self.tr("Recherche"), self.tr("Veuillez entrer un terme de recherche."))
             return
 
-        QMessageBox.information(
-            self,
-            self.tr("Recherche Globale (Simulation)"),
-            self.tr("La fonctionnalité de recherche n'est pas encore implémentée.\n"
-                    "Recherche demandée pour : '{0}'").format(query)
-        )
-        # In a real scenario, you would trigger the actual search logic here.
+        # Perform a simple case-insensitive search on self.searchable_items
+        lower_query = query.lower()
+        results = [item for item in self.searchable_items if lower_query in item.lower()]
+
+        if results:
+            results_text = self.tr("Résultats trouvés ({0}):\n\n").format(len(results)) + "\n".join(results)
+            QMessageBox.information(self, self.tr("Résultats de la Recherche"), results_text)
+        else:
+            QMessageBox.information(self, self.tr("Résultats de la Recherche"), self.tr("Aucun résultat trouvé pour '{0}'.").format(query))
 
     def eventFilter(self, obj, event):
-        # Check if the object is a QPushButton (our module buttons)
-        if isinstance(obj, QPushButton) and hasattr(obj, 'animation_group'):
+        # Check if the object is a QPushButton and if it's one of our module buttons
+        # (which have the event filter installed and will have animation attributes added)
+        if isinstance(obj, QPushButton) and obj.property("isModuleButton") == True: # Added a custom property check
+            if not self.animations_enabled: # Check if animations are globally enabled
+                return super().eventFilter(obj, event)
+
+            base_icon_size = QSize(32, 32) # Original icon size
+            enlarged_icon_size = QSize(40, 40) # Enlarged icon size for hover
+
             if event.type() == QEvent.Enter:
-                if not obj.original_geometry: # Initialize geometry on first relevant event
-                    obj.original_geometry = obj.geometry()
+                # Define animations if not already defined for this button
+                # We store them on the button itself to avoid recreating them
+                if not hasattr(obj, 'enter_icon_animation'):
+                    obj.enter_icon_animation = QPropertyAnimation(obj, b"iconSize")
+                    obj.enter_icon_animation.setDuration(150)
+                    obj.enter_icon_animation.setEndValue(enlarged_icon_size)
+                    obj.enter_icon_animation.setEasingCurve(QEasingCurve.InOutQuad)
 
-                    # Define animations if not already defined
-                    if not obj.animation_group:
-                        original_rect = obj.original_geometry
-
-                        # Enlarged rect (e.g., 10% bigger, centered)
-                        new_width = int(original_rect.width() * 1.1)
-                        new_height = int(original_rect.height() * 1.1)
-                        new_x = original_rect.x() - (new_width - original_rect.width()) // 2
-                        new_y = original_rect.y() - (new_height - original_rect.height()) // 2
-                        enlarged_rect = QRect(new_x, new_y, new_width, new_height)
-
-                        enter_anim = QPropertyAnimation(obj, b"geometry")
-                        enter_anim.setDuration(150) # ms
-                        enter_anim.setStartValue(original_rect)
-                        enter_anim.setEndValue(enlarged_rect)
-                        enter_anim.setEasingCurve(QEasingCurve.InOutQuad)
-
-                        leave_anim = QPropertyAnimation(obj, b"geometry")
-                        leave_anim.setDuration(150) # ms
-                        leave_anim.setStartValue(enlarged_rect) # Will be current geometry
-                        leave_anim.setEndValue(original_rect)
-                        leave_anim.setEasingCurve(QEasingCurve.InOutQuad)
-
-                        obj.animation_group = [enter_anim, leave_anim]
+                    obj.leave_icon_animation = QPropertyAnimation(obj, b"iconSize")
+                    obj.leave_icon_animation.setDuration(150)
+                    obj.leave_icon_animation.setEndValue(base_icon_size)
+                    obj.leave_icon_animation.setEasingCurve(QEasingCurve.InOutQuad)
 
                 # Start enter animation
-                if obj.animation_group:
-                    obj.animation_group[1].stop() # Stop leave animation if running
-                    obj.animation_group[0].setStartValue(obj.geometry()) # Start from current geometry
-                    obj.animation_group[0].start()
+                obj.leave_icon_animation.stop()
+                obj.enter_icon_animation.setStartValue(obj.iconSize()) # Start from current icon size
+                obj.enter_icon_animation.start()
                 return True # Event handled
 
             elif event.type() == QEvent.Leave:
-                # Start leave animation
-                if obj.animation_group and obj.original_geometry: # Ensure animations and original_geometry are set
-                    obj.animation_group[0].stop() # Stop enter animation if running
-                    obj.animation_group[1].setStartValue(obj.geometry()) # Start from current geometry
-                    obj.animation_group[1].setEndValue(obj.original_geometry) # Ensure it returns to original
-                    obj.animation_group[1].start()
+                # Start leave animation (only if animations were initialized)
+                if hasattr(obj, 'leave_icon_animation'):
+                    obj.enter_icon_animation.stop()
+                    obj.leave_icon_animation.setStartValue(obj.iconSize()) # Start from current icon size
+                    obj.leave_icon_animation.start()
+
                 return True # Event handled
 
         return super().eventFilter(obj, event)
@@ -230,10 +244,8 @@ class HomePageWidget(QWidget):
             shadow.setYOffset(2)
             shadow.setColor(QColor(0, 0, 0, 60))
             button.setGraphicsEffect(shadow)
+            button.setProperty("isModuleButton", True) # Custom property to identify these buttons
 
-            # Store animations and original geometry on the button object itself for easy access
-            button.original_geometry = None # Will be set once shown
-            button.animation_group = [] # To store enter/leave animations
 
             # Install event filter to handle Enter/Leave for animation
             button.installEventFilter(self)
@@ -266,20 +278,34 @@ class HomePageWidget(QWidget):
 
         return center_h_layout
 
+
     def _refresh_quick_stats_data(self):
         """Generates simulated data and updates the QuickStatsWidget."""
         if not hasattr(self, 'quick_stats') or not self.quick_stats:
             return
 
-        # Simulate fetching new data
-        simulated_data = [
-            {"label": self.tr("Clients Actifs:"), "value": str(random.randint(100, 200))},
-            {"label": self.tr("Projets en Cours:"), "value": str(random.randint(10, 50))},
-            {"label": self.tr("Tâches Ouvertes:"), "value": str(random.randint(5, 30))},
-            {"label": self.tr("Nouveaux Documents (Mois):"), "value": str(random.randint(50, 150))},
-            {"label": self.tr("Tickets Support Actifs:"), "value": str(random.randint(0,10))}
+        # Update fictional data source with some evolution
+        self.fictional_data_source["clients_actifs"] = max(100, self.fictional_data_source["clients_actifs"] + random.randint(-2, 3))
+        self.fictional_data_source["projets_en_cours"] = max(5, self.fictional_data_source["projets_en_cours"] + random.randint(-1, 2))
+
+        # If projects increase, tasks might increase or decrease (some get done, new ones appear)
+        if self.fictional_data_source["projets_en_cours"] > 20:
+             self.fictional_data_source["taches_ouvertes"] = max(0, self.fictional_data_source["taches_ouvertes"] + random.randint(-2, 3))
+        else:
+             self.fictional_data_source["taches_ouvertes"] = max(0, self.fictional_data_source["taches_ouvertes"] + random.randint(-1, 1))
+
+        self.fictional_data_source["nouveaux_documents_mois"] = max(10, self.fictional_data_source["nouveaux_documents_mois"] + random.randint(-5, 10))
+        self.fictional_data_source["tickets_support_actifs"] = max(0, self.fictional_data_source["tickets_support_actifs"] + random.randint(-1, 1))
+
+        # Prepare data for the widget
+        display_data = [
+            {"label": self.tr("Clients Actifs:"), "value": str(self.fictional_data_source["clients_actifs"])},
+            {"label": self.tr("Projets en Cours:"), "value": str(self.fictional_data_source["projets_en_cours"])},
+            {"label": self.tr("Tâches Ouvertes:"), "value": str(self.fictional_data_source["taches_ouvertes"])},
+            {"label": self.tr("Nouveaux Documents (Mois):"), "value": str(self.fictional_data_source["nouveaux_documents_mois"])},
+            {"label": self.tr("Tickets Support Actifs:"), "value": str(self.fictional_data_source["tickets_support_actifs"])}
         ]
-        self.quick_stats.update_stats(simulated_data)
+        self.quick_stats.update_stats(display_data)
 
 
 
