@@ -7,6 +7,7 @@ import logging
 from datetime import datetime, timedelta, timezone # Added timedelta and timezone
 
 from db.cruds import users_crud, activity_logs_crud, licenses_crud # Added licenses_crud
+
 from db.cruds import user_session_tokens_crud # New CRUD for session tokens
 from utils.security_helpers import generate_secure_token, hash_token_for_storage # New helpers
 from license_management import manager as license_manager # Already imported below, moved up for clarity
@@ -274,6 +275,7 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
 
             conn = None
             try: # Corrected from try { to try:
+
                 conn = get_db_connection()
                 if remember_me:
                     # Invalidate old tokens for this user on this device (or all devices)
@@ -286,6 +288,7 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
 
                     device_id = None
 
+
                     token_record_id = user_session_tokens_crud.add_session_token(
                         conn, user['user_id'], token_hash, expires_at, device_id
                     )
@@ -294,6 +297,7 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
                         logger.info(f"New session token generated and stored for user {user['user_id']}.")
                         activity_logs_crud.add_activity_log(
                             conn=conn,
+
                             data={
                                 "user_id": user['user_id'],
                                 "action_type": "REMEMBER_ME_TOKEN_GENERATED",
@@ -305,6 +309,7 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
                     else:
                         logger.error(f"Failed to store new session token in DB for user {user['user_id']}.")
                 else:
+
                     deleted_count = user_session_tokens_crud.delete_all_user_session_tokens(conn, user['user_id'])
                     if deleted_count > 0:
                         logger.info(f"Cleared {deleted_count} 'Remember Me' token(s) for user {user['user_id']} as 'Remember Me' was not checked.")
@@ -324,6 +329,7 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
                 if not is_license_valid and user.get('role_name') == "Administrator": # Check role
                     # Check if any other 'complet' license exists in the system
                     if not licenses_crud.has_any_active_complete_license(conn): # Corrected: Use licenses_crud directly
+
                         logger.warning(f"Administrator user '{username}' has an invalid/missing license and no other active 'complet' license found. Attempting to create a default 6-month license.")
                         try:
                             created_ok, create_msg, new_license_details = license_manager.create_default_admin_license(conn, user['user_id'])
@@ -340,12 +346,14 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
                         logger.info(f"Administrator user '{username}' has an invalid/missing license, but other 'complet' licenses exist. Default license not created.")
                 # --- End Modified Default Admin License Creation Trigger ---
 
+
                 if not is_license_valid:
                     return True, license_msg, _current_user_data, license_details
 
                 return True, None, _current_user_data, license_details
 
             except Exception as e_inner: # Catch exceptions within the 'try with conn'
+
                 logger.error(f"Error during token/license processing for {username}: {e_inner}", exc_info=True)
                 # Decide on return value: if token/license fails, is login still valid?
                 # For now, let's assume if this block fails, login might be compromised or incomplete.
@@ -381,7 +389,9 @@ def login_with_session_token(token_from_qsettings: str) -> tuple[bool, str | Non
 
     token_hash = hash_token_for_storage(token_from_qsettings)
     conn = None
-    try {
+
+    try:
+
         conn = get_db_connection()
         token_data = user_session_tokens_crud.get_session_token_by_hash(conn, token_hash)
 
@@ -455,7 +465,9 @@ def login_with_session_token(token_from_qsettings: str) -> tuple[bool, str | Non
 
         return True, None, _current_user_data, license_details
 
-    } except Exception as e:
+
+    except Exception as e:
+
         logger.error(f"Error during login with session token: {e}", exc_info=True)
         clear_remember_me_token_from_settings() # Clear token on error
         if conn and token_hash: # Attempt to delete token from DB if error occurred after hash was known
@@ -480,7 +492,9 @@ def logout():
 
     if token_to_clear:
         conn = None
-        try {
+
+
+        try :
             conn = get_db_connection()
             token_hash = hash_token_for_storage(token_to_clear)
             token_deleted_from_db = user_session_tokens_crud.delete_session_token(conn, token_hash)
@@ -503,7 +517,9 @@ def logout():
                 )
             else:
                 logger.info("No matching session token found in database to delete during logout.")
-        } except Exception as e:
+
+
+        except Exception as e:
             logger.error(f"Error deleting session token from DB during logout: {e}", exc_info=True)
         finally:
             if conn:
