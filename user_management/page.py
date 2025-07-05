@@ -171,7 +171,7 @@ class UserManagementPage(QWidget):
                                 self.tr("Vous n'avez pas la permission d'ajouter des utilisateurs."))
             return
 
-        add_dialog = EditUserDialog(user_id_to_edit=None, # Indicates 'add' mode
+        add_dialog = EditUserDialog(user_id=None, # Indicates 'add' mode, matches constructor
                                     current_admin_user_info=self.current_user_info,
                                     parent=self)
         if add_dialog.exec_() == QDialog.Accepted:
@@ -277,7 +277,7 @@ class UserManagementPage(QWidget):
 
         from dialogs.edit_user_dialog import EditUserDialog
 
-        edit_dialog = EditUserDialog(user_id_to_edit=selected_user_id,
+        edit_dialog = EditUserDialog(user_id=selected_user_id, # Matches constructor
                                      current_admin_user_info=self.current_user_info,
                                      parent=self)
         if edit_dialog.exec_() == QDialog.Accepted:
