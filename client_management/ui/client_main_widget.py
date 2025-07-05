@@ -367,6 +367,7 @@ class ClientMainWidget(QWidget):
             self.details_layout.addRow(self.created_by_label_static, self.created_by_value_label)
 
         # Placeholder for client statuses - to be populated by _setup_client_statuses_section
+
             self.client_statuses_widget = QWidget()
             self.client_statuses_layout = QHBoxLayout(self.client_statuses_widget)
             self.client_statuses_layout.setContentsMargins(0,0,0,0)
@@ -877,6 +878,9 @@ class ClientMainWidget(QWidget):
             can_manage_assignments = has_permission(role_name, P_MANAGE_CLIENT_ASSIGNMENTS)
             can_manage_billing = has_permission(role_name, P_MANAGE_CLIENT_BILLING)
             can_manage_referents = has_permission(role_name, P_REFERENTS_MANAGE)
+
+        # Define is_client_selected early for broad use in this method
+        is_client_selected = self.client_info is not None and self.client_info.get('client_id') is not None
 
         if hasattr(self, 'create_docs_btn'):
             self.create_docs_btn.setEnabled(can_manage_documents)
