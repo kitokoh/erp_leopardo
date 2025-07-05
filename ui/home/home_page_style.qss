@@ -19,25 +19,21 @@ QLabel#homePageWelcomeLabel {
 /* Ciblé via le conteneur pour spécificité */
 QWidget#homePageButtonGridContainer QPushButton {
     background-color: #FFFFFF;
-    border: 1px solid #DDE2E6; /* Conserver une bordure fine pour la définition de la carte */
-    border-radius: 10px;       /* Coins arrondis */
-    padding: 10px;             /* Padding réduit */
-    font-size: 12px;           /* Police réduite */
-
+    border: 1px solid #DDE2E6; /* Bordure fine pour la définition de la carte */
+    border-radius: 12px;       /* Coins légèrement plus arrondis */
+    padding: 12px;             /* Padding légèrement augmenté */
+    font-size: 12px;
     font-weight: bold;
     color: #333333;
     text-align: center;
-    min-height: 80px;          /* Hauteur réduite */
-    /* min-width n'est pas fixé, la grille s'en chargera avec 4 colonnes */
-    /* Les ombres sont maintenant gérées par QGraphicsDropShadowEffect en Python */
-
+    min-height: 90px;          /* Hauteur légèrement augmentée */
+    /* Les ombres sont gérées par QGraphicsDropShadowEffect en Python */
 }
 
 QWidget#homePageButtonGridContainer QPushButton:hover {
-    background-color: #E3F2FD;
-    border-color: #007BFF;
-    color: #0056B3;
-
+    background-color: #E3F2FD; /* Bleu clair pour survol */
+    border: 1px solid #007BFF; /* Bordure accentuée au survol */
+    color: #0056B3; /* Texte plus foncé au survol */
 }
 
 QWidget#homePageButtonGridContainer QPushButton:pressed {
@@ -100,3 +96,99 @@ QLabel#promoBodyLabel {
 /* Remove old styling for QFrame#leftPromoArea and QFrame#rightPromoArea if they are no longer used directly */
 /* QFrame#leftPromoArea, QFrame#rightPromoArea { ... } */
 /* QFrame#leftPromoArea QLabel, QFrame#rightPromoArea QLabel { ... } */
+
+
+/* Styling for QuickStatsWidget */
+QFrame#QuickStatsWidget {
+    background-color: #FFFFFF; /* Match promo widget background for consistency */
+    border: 1px solid #DEE2E6; /* Consistent border */
+    border-radius: 6px;        /* Consistent border radius */
+    /* min-width: 200px; */ /* Ensure it has some minimum width */
+    /* max-width: 280px; */ /* And not too wide */
+}
+
+QLabel#quickStatsTitleLabel {
+    font-family: "Open Sans", "Segoe UI", Arial, sans-serif;
+    font-size: 15px;
+    font-weight: bold;
+    color: #0056B3; /* Dark Blue, consistent with promo titles */
+    padding-bottom: 8px; /* Space below title */
+    margin-bottom: 5px; /* Space before the first item */
+    border-bottom: 1px solid #E9ECEF; /* Light separator */
+}
+
+QLabel#quickStatItemLabel {
+    font-family: "Open Sans", "Segoe UI", Arial, sans-serif;
+    font-size: 12px;
+    color: #343A40; /* Standard dark grey, consistent with promo body */
+    padding-top: 4px; /* Space above each stat item */
+}
+
+QLabel#quickStatItemPlaceholderLabel {
+    font-family: "Open Sans", "Segoe UI", Arial, sans-serif;
+    font-size: 12px;
+    color: #6c757d; /* Grey text for placeholder */
+    font-style: italic;
+    padding: 10px;
+}
+
+QPushButton#quickStatsRefreshButton {
+    background-color: transparent;
+    border: none;
+    padding: 2px;
+    /* color: #007BFF; */ /* Icon color will be from SVG or theme */
+}
+
+QPushButton#quickStatsRefreshButton:hover {
+    background-color: #E9ECEF; /* Light grey on hover */
+    border-radius: 3px;
+}
+
+QPushButton#quickStatsRefreshButton:pressed {
+    background-color: #CED4DA; /* Darker grey on pressed */
+}
+
+
+/* Styling for the right sidebar container itself, if needed */
+QFrame#homePageRightSidebar {
+    /* background-color: lightyellow; */ /* For debugging layout */
+    /* border-left: 1px solid #DDE2E6; */ /* Optional: a line to separate from button grid */
+    /* padding: 5px; */ /* If the sidebar itself needs padding around the widget it contains */
+}
+
+/* Search Bar Styling */
+QLineEdit#homePageSearchInput {
+    font-family: "Open Sans", "Segoe UI", Arial, sans-serif;
+    font-size: 13px;
+    padding: 6px 10px;
+    border: 1px solid #CED4DA;
+    border-radius: 15px; /* Rounded corners */
+    background-color: #FFFFFF;
+}
+
+QLineEdit#homePageSearchInput:focus {
+    border-color: #007BFF; /* Highlight color on focus */
+    /* box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25); */ /* QSS doesn't support box-shadow directly like CSS */
+}
+
+QPushButton#homePageSearchButton {
+    background-color: #007BFF; /* Primary button color */
+    border: 1px solid #007BFF;
+    color: white; /* Icon color should ideally be white if it's from a font or styled SVG */
+    border-radius: 15px; /* Match input field's rounding */
+    padding: 6px 8px; /* Adjust padding to make it squarish if icon only */
+    min-width: 30px; /* Ensure button has some width */
+    max-width: 30px; /* Ensure button has some width */
+    min-height: 30px; /* Ensure button has some height */
+    max-height: 30px; /* Ensure button has some height */
+}
+
+QPushButton#homePageSearchButton:hover {
+    background-color: #0056b3; /* Darker blue on hover */
+    border-color: #0056b3;
+}
+
+QPushButton#homePageSearchButton:pressed {
+    background-color: #004085; /* Even darker blue when pressed */
+    border-color: #004085;
+}

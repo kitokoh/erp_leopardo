@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 from PyQt5.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QPushButton, QLabel,
-    QSizePolicy, QScrollArea, QStackedWidget, QFrame, QGraphicsDropShadowEffect
+    QSizePolicy, QScrollArea, QStackedWidget, QFrame, QGraphicsDropShadowEffect,
+    QLineEdit, QMessageBox
 )
-from PyQt5.QtCore import Qt, pyqtSlot, QSize, QFile, QTextStream
+from PyQt5.QtCore import Qt, pyqtSlot, QSize, QFile, QTextStream, QPropertyAnimation, QEasingCurve, QRect, QEvent
 from PyQt5.QtGui import QFont, QIcon, QMovie, QColor
 
 import os
@@ -11,6 +12,7 @@ import random
 
 from .promo_content_manager import PromoContentManager
 from .promo_widgets import PromoSectionWidget
+from .quick_stats_widget import QuickStatsWidget # Import the new widget
 
 class HomePageWidget(QWidget):
     def __init__(self, main_window, parent=None):
@@ -36,26 +38,145 @@ class HomePageWidget(QWidget):
 
     def _init_ui(self):
         main_v_layout = QVBoxLayout(self)
-        main_v_layout.setContentsMargins(0,0,0,0)
-        main_v_layout.setSpacing(0)
+        main_v_layout.setContentsMargins(0,0,0,0) # Main layout itself has no outer margins
+        main_v_layout.setSpacing(10) # Add some spacing between major horizontal sections
 
-        # --- Message de bienvenue (Supprimé) ---
+        # Define self.modules here so it's accessible by _setup_center_layout
+        self.modules = [
+            {"name": self.tr("Gestion Documents Client"), "object_name": "btnClientDocuments", "icon": ":/icons/modern/folder-docs.svg", "slot": self.go_to_documents},
+            {"name": self.tr("Gestion de Projet"), "object_name": "btnProjectManagement", "icon": ":/icons/dashboard.svg", "slot": self.go_to_project_management},
+            {"name": self.tr("Statistiques"), "object_name": "btnStatistics", "icon": ":/icons/bar-chart.svg", "slot": self.go_to_statistics},
+            {"name": self.tr("Gestion des Produits"), "object_name": "btnProductManagement", "icon": ":/icons/book.svg", "slot": self.go_to_product_management},
+            {"name": self.tr("Gestion des Partenaires"), "object_name": "btnPartnerManagement", "icon": ":/icons/team.svg", "slot": self.go_to_partner_management},
+            {"name": self.tr("Gestion Stock Atelier"), "object_name": "btnInventoryManagement", "icon": ":/icons/book.svg", "slot": self.go_to_inventory_management},
+            {"name": self.tr("Recrutement"), "object_name": "btnRecruitment", "icon": ":/icons/users.svg", "slot": self.go_to_recruitment},
+            {"name": self.tr("Gestion des Connaissances"), "object_name": "btnExperienceManagement", "icon": ":/icons/book.svg", "slot": self.go_to_experience_management},
+            {"name": self.tr("Intégration Botpress"), "object_name": "btnBotpressIntegration", "icon": ":/icons/placeholder_icon.svg", "slot": self.go_to_botpress_integration},
+            {"name": self.tr("Gestion Caméras"), "object_name": "btnCameraManagement", "icon": ":/icons/video.svg", "slot": self.go_to_camera_management},
+            {"name": self.tr("Paramètres"), "object_name": "btnSettings", "icon": ":/icons/modern/settings.svg", "slot": self.go_to_settings},
+        ]
 
-        # --- Section Centrale: GIF (gauche) et Boutons (droite) ---
+        # Initialize Promo Content Manager here so it's accessible by _setup_bottom_layout
+        self.promo_manager = PromoContentManager()
+
+        # Setup layouts by calling helper methods
+        center_layout = self._setup_center_layout()
+        bottom_layout = self._setup_bottom_layout()
+
+        main_v_layout.addLayout(center_layout)
+        main_v_layout.addLayout(bottom_layout, 1) # Assign stretch factor to the bottom layout
+
+
+        # Search Bar Layout (added at the top of main_v_layout)
+        search_bar_layout = QHBoxLayout()
+        search_bar_layout.setContentsMargins(10, 5, 10, 5) # Adjust margins as needed
+        search_bar_layout.setSpacing(5)
+
+        self.search_input = QLineEdit()
+        self.search_input.setObjectName("homePageSearchInput")
+        self.search_input.setPlaceholderText(self.tr("Rechercher dans l'application..."))
+        self.search_input.returnPressed.connect(self._handle_search_query)
+        search_bar_layout.addWidget(self.search_input, 1) # Input takes most space
+
+        self.search_button = QPushButton()
+        self.search_button.setObjectName("homePageSearchButton")
+        search_icon = QIcon.fromTheme("search", QIcon(":/icons/search.svg")) # Common theme icon name
+        if not search_icon.isNull():
+            self.search_button.setIcon(search_icon)
+        else:
+            self.search_button.setText("🔍") # Fallback emoji/text
+        self.search_button.setToolTip(self.tr("Lancer la recherche"))
+        self.search_button.clicked.connect(self._handle_search_query)
+        # self.search_button.setFixedSize(QSize(30,30)) # Adjust size as needed
+        search_bar_layout.addWidget(self.search_button)
+
+        # Insert search bar at the top of the main layout
+        main_v_layout.insertLayout(0, search_bar_layout)
+
+
+        self.setLayout(main_v_layout)
+
+    def _handle_search_query(self):
+        query = self.search_input.text()
+        if not query.strip():
+            # Optional: Show a message if search query is empty, or just do nothing
+            # QMessageBox.information(self, self.tr("Recherche"), self.tr("Veuillez entrer un terme de recherche."))
+            return
+
+        QMessageBox.information(
+            self,
+            self.tr("Recherche Globale (Simulation)"),
+            self.tr("La fonctionnalité de recherche n'est pas encore implémentée.\n"
+                    "Recherche demandée pour : '{0}'").format(query)
+        )
+        # In a real scenario, you would trigger the actual search logic here.
+
+    def eventFilter(self, obj, event):
+        # Check if the object is a QPushButton (our module buttons)
+        if isinstance(obj, QPushButton) and hasattr(obj, 'animation_group'):
+            if event.type() == QEvent.Enter:
+                if not obj.original_geometry: # Initialize geometry on first relevant event
+                    obj.original_geometry = obj.geometry()
+
+                    # Define animations if not already defined
+                    if not obj.animation_group:
+                        original_rect = obj.original_geometry
+
+                        # Enlarged rect (e.g., 10% bigger, centered)
+                        new_width = int(original_rect.width() * 1.1)
+                        new_height = int(original_rect.height() * 1.1)
+                        new_x = original_rect.x() - (new_width - original_rect.width()) // 2
+                        new_y = original_rect.y() - (new_height - original_rect.height()) // 2
+                        enlarged_rect = QRect(new_x, new_y, new_width, new_height)
+
+                        enter_anim = QPropertyAnimation(obj, b"geometry")
+                        enter_anim.setDuration(150) # ms
+                        enter_anim.setStartValue(original_rect)
+                        enter_anim.setEndValue(enlarged_rect)
+                        enter_anim.setEasingCurve(QEasingCurve.InOutQuad)
+
+                        leave_anim = QPropertyAnimation(obj, b"geometry")
+                        leave_anim.setDuration(150) # ms
+                        leave_anim.setStartValue(enlarged_rect) # Will be current geometry
+                        leave_anim.setEndValue(original_rect)
+                        leave_anim.setEasingCurve(QEasingCurve.InOutQuad)
+
+                        obj.animation_group = [enter_anim, leave_anim]
+
+                # Start enter animation
+                if obj.animation_group:
+                    obj.animation_group[1].stop() # Stop leave animation if running
+                    obj.animation_group[0].setStartValue(obj.geometry()) # Start from current geometry
+                    obj.animation_group[0].start()
+                return True # Event handled
+
+            elif event.type() == QEvent.Leave:
+                # Start leave animation
+                if obj.animation_group and obj.original_geometry: # Ensure animations and original_geometry are set
+                    obj.animation_group[0].stop() # Stop enter animation if running
+                    obj.animation_group[1].setStartValue(obj.geometry()) # Start from current geometry
+                    obj.animation_group[1].setEndValue(obj.original_geometry) # Ensure it returns to original
+                    obj.animation_group[1].start()
+                return True # Event handled
+
+        return super().eventFilter(obj, event)
+
+    def _setup_center_layout(self):
+        """Creates and configures the central layout with GIF, buttons, and right sidebar."""
         center_h_layout = QHBoxLayout()
         center_h_layout.setContentsMargins(10, 10, 10, 10)
         center_h_layout.setSpacing(15)
 
-
+        # GIF Label
         gif_label = QLabel()
         gif_label.setObjectName("homePageGifLabel")
         available_gifs = ["1.gif", "2.gif", "3.gif"]
         chosen_gif_name = random.choice(available_gifs)
         gif_path = os.path.join(os.path.dirname(__file__), "..", "..", "resources", "gifshome", chosen_gif_name)
         if not os.path.exists(gif_path):
-             gif_path_alt_base = os.path.join("resources", "gifshome")
-             if os.path.isdir(gif_path_alt_base): gif_path = os.path.join(gif_path_alt_base, chosen_gif_name)
-             else: gif_path = chosen_gif_name
+            gif_path_alt_base = os.path.join("resources", "gifshome")
+            if os.path.isdir(gif_path_alt_base): gif_path = os.path.join(gif_path_alt_base, chosen_gif_name)
+            else: gif_path = chosen_gif_name
 
         if os.path.exists(gif_path):
             self.movie = QMovie(gif_path)
@@ -64,15 +185,13 @@ class HomePageWidget(QWidget):
             gif_label.setScaledContents(True)
             self.movie.start()
             gif_label.setAlignment(Qt.AlignCenter)
-
         else:
             gif_label.setText(self.tr("GIF '{0}' non trouvé.").format(chosen_gif_name))
             gif_label.setStyleSheet("color: red;")
             gif_label.setAlignment(Qt.AlignCenter)
+        center_h_layout.addWidget(gif_label, 1)
 
-        center_h_layout.addWidget(gif_label, 1) # GIF on the left, stretch factor 1
-
-        # Button Grid in the Center
+        # Button Grid
         button_scroll_area = QScrollArea()
         button_scroll_area.setWidgetResizable(True)
         button_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -87,135 +206,173 @@ class HomePageWidget(QWidget):
         grid_layout.setContentsMargins(5, 5, 5, 5)
         grid_layout.setSpacing(10)
 
-        self.modules = [
-            {"name": self.tr("Gestion Documents Client"), "object_name": "btnClientDocuments", "icon": ":/icons/modern/folder-docs.svg", "slot": self.go_to_documents},
-            {"name": self.tr("Gestion de Projet"), "object_name": "btnProjectManagement", "icon": ":/icons/dashboard.svg", "slot": self.go_to_project_management},
-            {"name": self.tr("Statistiques"), "object_name": "btnStatistics", "icon": ":/icons/bar-chart.svg", "slot": self.go_to_statistics},
-            {"name": self.tr("Gestion des Produits"), "object_name": "btnProductManagement", "icon": ":/icons/book.svg", "slot": self.go_to_product_management},
-            {"name": self.tr("Gestion des Partenaires"), "object_name": "btnPartnerManagement", "icon": ":/icons/team.svg", "slot": self.go_to_partner_management},
-            {"name": self.tr("Gestion Stock Atelier"), "object_name": "btnInventoryManagement", "icon": ":/icons/book.svg", "slot": self.go_to_inventory_management},
-            {"name": self.tr("Recrutement"), "object_name": "btnRecruitment", "icon": ":/icons/users.svg", "slot": self.go_to_recruitment},
-            {"name": self.tr("Gestion des Connaissances"), "object_name": "btnExperienceManagement", "icon": ":/icons/book.svg", "slot": self.go_to_experience_management},
-            {"name": self.tr("Intégration Botpress"), "object_name": "btnBotpressIntegration", "icon": ":/icons/placeholder_icon.svg", "slot": self.go_to_botpress_integration},
-            {"name": self.tr("Gestion Caméras"), "object_name": "btnCameraManagement", "icon": ":/icons/video.svg", "slot": self.go_to_camera_management},
-            {"name": self.tr("Paramètres"), "object_name": "btnSettings", "icon": ":/icons/modern/settings.svg", "slot": self.go_to_settings},
-            # {"name": self.tr("Module X"), "object_name": "btnModuleX", "icon": ":/icons/placeholder_icon.svg", "slot": self.go_to_settings} # Example, can be removed
-        ]
+        # self.modules is defined in _init_ui or constructor
         row, col = 0, 0
-        num_columns = 4 # Changed from 3 to 4 to ensure max 3 rows for 11 buttons (4-4-3)
-
-
-        for i, module_data in enumerate(self.modules):
+        num_columns = 4
+        for i, module_data in enumerate(self.modules): # self.modules needs to be accessible
             button = QPushButton(module_data["name"])
             button.setObjectName(module_data["object_name"])
-            if module_data["icon"] and QIcon.hasThemeIcon(module_data["icon"]): # Check if icon exists
+            if module_data["icon"] and QIcon.hasThemeIcon(module_data["icon"]):
                 button.setIcon(QIcon(module_data["icon"]))
-            else: # Fallback icon
+            else:
                 button.setIcon(QIcon(":/icons/placeholder_icon.svg"))
             button.setIconSize(QSize(32, 32))
             button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             button.clicked.connect(module_data["slot"])
+
+            shadow = QGraphicsDropShadowEffect(self)
+            shadow.setBlurRadius(15)
+            shadow.setXOffset(0)
+            shadow.setYOffset(2)
+            shadow.setColor(QColor(0, 0, 0, 60))
+            button.setGraphicsEffect(shadow)
+
+            # Store animations and original geometry on the button object itself for easy access
+            button.original_geometry = None # Will be set once shown
+            button.animation_group = [] # To store enter/leave animations
+
+            # Install event filter to handle Enter/Leave for animation
+            button.installEventFilter(self)
+
             grid_layout.addWidget(button, row, col)
             col += 1
             if col >= num_columns:
                 col = 0
                 row += 1
-
-        grid_layout.setRowStretch(row + 1, 1) # Ensure remaining rows/cols don't take extra space
+        grid_layout.setRowStretch(row + 1, 1)
         grid_layout.setColumnStretch(num_columns, 1)
-
         button_container_widget.setLayout(grid_layout)
         button_scroll_area.setWidget(button_container_widget)
-        center_h_layout.addWidget(button_scroll_area, 2) # Buttons in center, stretch factor 2
+        center_h_layout.addWidget(button_scroll_area, 2)
 
-        # Right Sidebar for Statistics Summary
-        self.right_sidebar_container = QFrame() # Use QFrame for potential styling (e.g., border)
+        # Right Sidebar
+        self.right_sidebar_container = QFrame()
         self.right_sidebar_container.setObjectName("homePageRightSidebar")
         self.right_sidebar_container.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-        # self.right_sidebar_container.setFixedWidth(250) # Example fixed width, adjust as needed
         self.right_sidebar_layout = QVBoxLayout(self.right_sidebar_container)
-        self.right_sidebar_layout.setContentsMargins(5,5,5,5)
+        self.right_sidebar_layout.setContentsMargins(0,0,0,0)
         self.right_sidebar_container.setLayout(self.right_sidebar_layout)
-        self.right_sidebar_container.setVisible(False) # Initially hidden until content is set
-        center_h_layout.addWidget(self.right_sidebar_container, 1) # Summary on right, stretch factor 1
 
-        main_v_layout.addLayout(center_h_layout)
+        self.quick_stats = QuickStatsWidget(self)
+        self.quick_stats.refresh_requested.connect(self._refresh_quick_stats_data)
+        self.set_right_sidebar_widget(self.quick_stats)
+        self._refresh_quick_stats_data() # Initial data load
 
-        # Bottom Area for Map and Promotional Sections
+        center_h_layout.addWidget(self.right_sidebar_container, 1)
+
+        return center_h_layout
+
+    def _refresh_quick_stats_data(self):
+        """Generates simulated data and updates the QuickStatsWidget."""
+        if not hasattr(self, 'quick_stats') or not self.quick_stats:
+            return
+
+        # Simulate fetching new data
+        simulated_data = [
+            {"label": self.tr("Clients Actifs:"), "value": str(random.randint(100, 200))},
+            {"label": self.tr("Projets en Cours:"), "value": str(random.randint(10, 50))},
+            {"label": self.tr("Tâches Ouvertes:"), "value": str(random.randint(5, 30))},
+            {"label": self.tr("Nouveaux Documents (Mois):"), "value": str(random.randint(50, 150))},
+            {"label": self.tr("Tickets Support Actifs:"), "value": str(random.randint(0,10))}
+        ]
+        self.quick_stats.update_stats(simulated_data)
+
+
+    def _setup_bottom_layout(self):
+        """Creates and configures the bottom layout with promotional widgets and content area."""
         bottom_h_layout = QHBoxLayout()
-        bottom_h_layout.setContentsMargins(10, 5, 10, 10) # Added some margins
-        bottom_h_layout.setSpacing(10) # Added spacing between sections
+        bottom_h_layout.setContentsMargins(10, 5, 10, 10)
+        bottom_h_layout.setSpacing(10)
 
-        # --- Initialize Promo Content Manager ---
-        self.promo_manager = PromoContentManager()
+        # Promo Content Manager - self.promo_manager needs to be accessible
+        # self.promo_manager is initialized in _init_ui or constructor
 
         # Left Promotional Area
-        self.left_promo_widget = PromoSectionWidget()
-        # self.left_promo_widget.setFixedWidth(200) # Example fixed width
+        self.left_promo_widget = PromoSectionWidget() # self.left_promo_widget needs to be accessible
         self.left_promo_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-
         left_message = self.promo_manager.get_random_message()
         if left_message:
-            self.left_promo_widget.set_content(left_message.get("title", ""), left_message.get("body", ""))
+            self.left_promo_widget.set_content(
+                left_message.get("title", ""),
+                left_message.get("body", ""),
+                left_message.get("category", "generic")
+            )
         else:
-            self.left_promo_widget.set_content(self.tr("Info"), self.tr("Aucun message promotionnel disponible."))
-
-        # Connect click to refresh content (example)
+            self.left_promo_widget.set_content(self.tr("Info"), self.tr("Aucun message promotionnel disponible."), "generic")
         self.left_promo_widget.clicked.connect(lambda: self.update_promo_widget_content(self.left_promo_widget))
 
-
-
-        # Center Map Area
-        self.bottom_content_area = QStackedWidget()
+        # Center Map Area / Bottom Content Area
+        self.bottom_content_area = QStackedWidget() # self.bottom_content_area needs to be accessible
         self.bottom_content_area.setObjectName("homePageBottomContentArea")
         self.bottom_content_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         # Right Promotional Area
-        self.right_promo_widget = PromoSectionWidget()
-        # self.right_promo_widget.setFixedWidth(200) # Example fixed width
+        self.right_promo_widget = PromoSectionWidget() # self.right_promo_widget needs to be accessible
         self.right_promo_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-
         right_message = self.promo_manager.get_random_message()
-        # Ensure the right message is different from the left one if possible
         if self.promo_manager.messages and len(self.promo_manager.messages) > 1:
-            while right_message == left_message: # left_message is defined in the previous block for left_promo_widget
+            current_left_title = self.left_promo_widget.title_label.text() # Need a way to get original title if prefixed
+            current_left_body = self.left_promo_widget.body_label.text()
+            # This comparison might be tricky if titles are prefixed.
+            # For simplicity, we assume left_message holds the original chosen message.
+            while right_message == left_message:
                 right_message = self.promo_manager.get_random_message()
 
         if right_message:
-            self.right_promo_widget.set_content(right_message.get("title", ""), right_message.get("body", ""))
+            self.right_promo_widget.set_content(
+                right_message.get("title", ""),
+                right_message.get("body", ""),
+                right_message.get("category", "generic")
+            )
         else:
-            # Fallback if only one or no message, or if left_message itself was None
-            self.right_promo_widget.set_content(self.tr("Avis"), self.tr("Consultez nos dernières mises à jour."))
-
-        # Connect click to refresh content (example)
+            self.right_promo_widget.set_content(self.tr("Avis"), self.tr("Consultez nos dernières mises à jour."), "generic")
         self.right_promo_widget.clicked.connect(lambda: self.update_promo_widget_content(self.right_promo_widget))
 
-        bottom_h_layout.addWidget(self.left_promo_widget, 1) # Stretch factor 1 for left promo
-        bottom_h_layout.addWidget(self.bottom_content_area, 3) # Stretch factor 3 for map (larger)
-        bottom_h_layout.addWidget(self.right_promo_widget, 1) # Stretch factor 1 for right promo
+        bottom_h_layout.addWidget(self.left_promo_widget, 1)
+        bottom_h_layout.addWidget(self.bottom_content_area, 3)
+        bottom_h_layout.addWidget(self.right_promo_widget, 1)
 
-
-        main_v_layout.addLayout(bottom_h_layout, 1) # Add the horizontal layout to the main vertical layout
-
-        self.setLayout(main_v_layout)
+        return bottom_h_layout
 
     def update_promo_widget_content(self, promo_widget_instance):
         """Fetches a new random message and updates the given PromoSectionWidget."""
         message = self.promo_manager.get_random_message()
         if message:
             # Simple logic to try not to show the exact same message immediately
-            current_title = promo_widget_instance.title_label.text()
-            current_body = promo_widget_instance.body_label.text()
-            if message.get("title") == current_title and message.get("body") == current_body and len(self.promo_manager.messages) > 1:
-                new_message = self.promo_manager.get_random_message()
-                # Try one more time to get a different one
-                while new_message == message and len(self.promo_manager.messages) > 1:
-                    new_message = self.promo_manager.get_random_message()
-                message = new_message
+            # Compare with the raw data of the currently displayed message
+            current_message_data = promo_widget_instance.current_message_data
+            if current_message_data and \
+               message.get("title") == current_message_data.get("title") and \
+               message.get("body") == current_message_data.get("body") and \
+               len(self.promo_manager.messages) > 1:
 
-            promo_widget_instance.set_content(message.get("title", ""), message.get("body", ""))
-        else:
-            promo_widget_instance.set_content(self.tr("Info"), self.tr("Contenu non disponible pour le moment."))
+                new_message = message # Initialize new_message to the current message
+                # Try to get a different message
+                attempts = 0
+                max_attempts = len(self.promo_manager.messages) * 2 # Avoid infinite loop if all messages are same (unlikely)
+                while new_message == message and attempts < max_attempts:
+                    new_message = self.promo_manager.get_random_message()
+                    attempts += 1
+                message = new_message # This could be None if get_random_message returns None
+
+            if message: # Ensure message is not None before trying to access its content
+                promo_widget_instance.set_content(
+                    message.get("title", ""),
+                    message.get("body", ""),
+                    message.get("category", "generic")
+                )
+            else: # Fallback if no message could be retrieved or all are duplicates of None
+                promo_widget_instance.set_content(
+                    self.tr("Info"),
+                    self.tr("Contenu non disponible pour le moment."),
+                    "generic"
+                )
+        else: # Original message was None
+            promo_widget_instance.set_content(
+                self.tr("Info"),
+                self.tr("Contenu non disponible pour le moment."),
+                "generic"
+            )
 
 
     def set_bottom_widget(self, widget_to_display):

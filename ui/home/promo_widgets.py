@@ -10,17 +10,19 @@ class PromoSectionWidget(QFrame):
     # Signal to indicate the widget was clicked, could be used to cycle content or open a link
     clicked = pyqtSignal()
 
-    def __init__(self, title="", body="", parent=None):
+    def __init__(self, title="", body="", category="generic", parent=None):
         super().__init__(parent)
         self.setObjectName("PromoSectionWidget") # For QSS styling
-        self._init_ui(title, body)
+        self.current_category = category
+        self.current_message_data = {"title": title, "body": body, "category": category} # Store initial message
+        self._init_ui(title, body, category)
 
-    def _init_ui(self, title, body):
+    def _init_ui(self, title, body, category):
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(10, 10, 10, 10) # Padding inside the frame
         self.main_layout.setSpacing(5)
 
-        self.title_label = QLabel(title)
+        self.title_label = QLabel()
         self.title_label.setObjectName("promoTitleLabel") # For QSS styling
         self.title_label.setAlignment(Qt.AlignCenter | Qt.AlignTop) # Align title to top
         self.title_label.setWordWrap(True)
@@ -29,6 +31,8 @@ class PromoSectionWidget(QFrame):
         self.body_label.setObjectName("promoBodyLabel") # For QSS styling
         self.body_label.setAlignment(Qt.AlignJustify | Qt.AlignTop) # Align body to top, justify text
         self.body_label.setWordWrap(True)
+
+        self._update_title_display(title, category) # Set initial title with category prefix
 
         self.main_layout.addWidget(self.title_label)
         self.main_layout.addWidget(self.body_label)
@@ -40,10 +44,26 @@ class PromoSectionWidget(QFrame):
         # self.setMinimumHeight(100)
         # self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.MinimumExpanding)
 
+    def _get_category_prefix(self, category):
+        if category == "tip":
+            return "💡 " # Light bulb emoji
+        elif category == "new_feature":
+            return "✨ " # Sparkles emoji
+        elif category == "announcement":
+            return "📢 " # Loudspeaker emoji
+        return "" # No prefix for generic or unknown categories
 
-    def set_content(self, title, body):
-        """Updates the title and body of the promotional message."""
-        self.title_label.setText(title)
+    def _update_title_display(self, title, category):
+        prefix = self._get_category_prefix(category)
+        self.title_label.setText(f"{prefix}{title}")
+        # Here you could also change styling based on category, e.g.
+        # self.title_label.setStyleSheet("color: blue;") for "new_feature"
+
+    def set_content(self, title, body, category="generic"):
+        """Updates the title, body, and category of the promotional message."""
+        self.current_category = category
+        self.current_message_data = {"title": title, "body": body, "category": category}
+        self._update_title_display(title, category)
         self.body_label.setText(body)
 
     def mousePressEvent(self, event):
