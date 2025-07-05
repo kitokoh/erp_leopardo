@@ -1,8 +1,8 @@
-# Module : Gestion des Documents (Desktop)
+# Module : Gestion Client (Desktop)
 
 ## 1. Objectif Principal
 
-Le module de Gestion des Documents est au cœur de l'application ClientDocManager. Son objectif principal est de permettre aux utilisateurs de créer, gérer, organiser, et générer une variété de documents commerciaux et administratifs de manière efficace et centralisée. Il vise à standardiser la production documentaire et à faciliter l'accès et le suivi des documents importants.
+Le module de Gestion Client est une interface unifiée pour gérer toutes les interactions et informations relatives aux clients. Son objectif principal est de permettre aux utilisateurs de consulter les informations du client, de gérer ses commandes, les produits associés, les documents et les notes. Il vise à centraliser la gestion de la relation client et à faciliter le suivi des activités commerciales.
 
 ## 2. Composants Clés et Fonctionnalités
 

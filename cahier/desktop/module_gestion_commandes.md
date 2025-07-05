@@ -80,7 +80,7 @@ Le module de Gestion des Commandes permet de gérer le cycle de vie complet des 
 *   **Gestion des Clients**: Le module de commandes est principalement accessible via la fiche client. Les informations du client (adresses, etc.) peuvent pré-remplir certains champs de la commande.
 *   **Gestion des Produits**: Le dialogue de commande interagit avec le catalogue de produits pour ajouter des articles aux lignes de commande.
 *   **Gestion de Projet**: Chaque commande est liée à un projet. Le module de gestion de projet utilise ce projet pour le suivi des tâches et de l'avancement administratif lié à l'exécution de la commande.
-*   **Gestion des Documents**: Des documents tels que les factures proforma, les confirmations de commande, ou les bons de livraison sont générés en lien avec une commande spécifique. La table `ClientDocuments` peut être étendue pour inclure un `commande_id`.
+*   **Gestion Client (pour la partie documents)**: Des documents tels que les factures proforma, les confirmations de commande, ou les bons de livraison sont générés en lien avec une commande spécifique et gérés via le module "Gestion Client". La table `ClientDocuments` peut être étendue pour inclure un `commande_id`.
 *   **Facturation**: Les factures finales sont générées sur la base des informations de la commande.
 *   **Base de Données**: Stockage et récupération des données des commandes et des articles.
 
