@@ -6,6 +6,7 @@ from PyQt5.QtGui import QIcon
 class QuickStatsWidget(QFrame):
     refresh_requested = pyqtSignal()
 
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("QuickStatsWidget")
@@ -71,11 +72,13 @@ class QuickStatsWidget(QFrame):
             self.stats_items_layout.addWidget(placeholder_label)
             return
 
+
         for stat in new_stats_data:
             stat_label = QLabel(f"{stat['label']} {stat['value']}")
             stat_label.setObjectName("quickStatItemLabel")
             stat_label.setWordWrap(True)
             self.stats_items_layout.addWidget(stat_label)
+
 
 if __name__ == '__main__':
     from PyQt5.QtWidgets import QApplication

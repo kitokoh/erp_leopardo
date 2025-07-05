@@ -14,6 +14,11 @@ from .promo_content_manager import PromoContentManager
 from .promo_widgets import PromoSectionWidget
 from .quick_stats_widget import QuickStatsWidget # Import the new widget
 
+
+
+from .quick_stats_widget import QuickStatsWidget # Import the new widget
+
+
 class HomePageWidget(QWidget):
     def __init__(self, main_window, parent=None):
         super().__init__(parent)
@@ -84,6 +89,7 @@ class HomePageWidget(QWidget):
 
         main_v_layout.addLayout(center_layout)
         main_v_layout.addLayout(bottom_layout, 1) # Assign stretch factor to the bottom layout
+
 
 
         # Search Bar Layout (added at the top of main_v_layout)
@@ -168,6 +174,7 @@ class HomePageWidget(QWidget):
                     obj.enter_icon_animation.stop()
                     obj.leave_icon_animation.setStartValue(obj.iconSize()) # Start from current icon size
                     obj.leave_icon_animation.start()
+
                 return True # Event handled
 
         return super().eventFilter(obj, event)
@@ -239,6 +246,7 @@ class HomePageWidget(QWidget):
             button.setGraphicsEffect(shadow)
             button.setProperty("isModuleButton", True) # Custom property to identify these buttons
 
+
             # Install event filter to handle Enter/Leave for animation
             button.installEventFilter(self)
 
@@ -270,6 +278,7 @@ class HomePageWidget(QWidget):
 
         return center_h_layout
 
+
     def _refresh_quick_stats_data(self):
         """Generates simulated data and updates the QuickStatsWidget."""
         if not hasattr(self, 'quick_stats') or not self.quick_stats:
@@ -297,6 +306,7 @@ class HomePageWidget(QWidget):
             {"label": self.tr("Tickets Support Actifs:"), "value": str(self.fictional_data_source["tickets_support_actifs"])}
         ]
         self.quick_stats.update_stats(display_data)
+
 
 
     def _setup_bottom_layout(self):

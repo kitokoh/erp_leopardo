@@ -150,6 +150,7 @@ from PyQt5.QtWidgets import QDateEdit
 
 # Updated import for the refactored client widget
 from client_management.ui.client_main_widget import ClientMainWidget
+from client_management.client_controller import ClientController # Import ClientController
 from project_management import MainDashboard as ProjectManagementDashboard
 from statistics import StatisticsDashboard, StatisticsSummaryWidget # Updated import
 from statistics.map_widget import HomePageMapWidget # Import HomePageMapWidget
@@ -275,6 +276,11 @@ class DocumentManager(QMainWindow):
         self.current_user_id = self.current_user_info.get('user_id') # Extract user_id for existing usage
 
         logging.info(f"DocumentManager initialized for user: {self.current_user_info.get('username')}, Role: {self.current_user_info.get('role_name')}, License active: {self.current_license_info.get('is_active') if self.current_license_info else 'N/A'}")
+
+        # Instantiate ClientController
+        self.client_controller_instance = ClientController()
+        # Later, self.notification_manager will be set up and can be passed if ClientController needs it.
+
 
         self.setWindowTitle(self.tr("Gestionnaire de Documents Client")); self.setGeometry(100, 100, 1200, 800)
         self.setWindowIcon(QIcon(":/icons/logo.svg"))
@@ -1908,7 +1914,8 @@ class DocumentManager(QMainWindow):
                 config=self.config,
                 app_root_dir=self.app_root_dir,
                 notification_manager=notification_manager,
-                current_user_info=self.current_user_info, # Changed to pass current_user_info
+                current_user_info=self.current_user_info,
+                client_controller_instance=self.client_controller_instance, # Pass ClientController instance
                 parent=self
             )
             logging.info(f"main_window.open_client_tab_by_id: Successfully created ClientMainWidget for client_id: {client_id_to_open} with user_info.") # Log updated
