@@ -1,5 +1,6 @@
 # dialogs/edit_user_dialog.py
 import logging
+import re # For email validation
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QLineEdit,
     QComboBox, QPushButton, QMessageBox, QDialogButtonBox, QLabel
@@ -53,18 +54,16 @@ class EditUserDialog(QDialog):
         main_layout = QVBoxLayout(self)
         self.form_layout = QFormLayout() # Make it an instance variable to modify later
 
-        # Username field: QLineEdit for add mode, QLabel for edit mode
-        if self.add_mode:
-            self.username_input = QLineEdit()
-            self.form_layout.addRow(self.tr("Nom d'utilisateur:"), self.username_input)
-        else:
-            # Display User ID (non-editable) in edit mode
+        # Username field: QLineEdit for both add and edit mode
+        # In edit mode, it will be pre-filled.
+        # Display User ID (non-editable) first in edit mode for clarity
+        if not self.add_mode:
             self.user_id_label_display = QLabel(self.user_data_to_edit.get('user_id', self.tr("N/A")))
             self.user_id_label_display.setTextInteractionFlags(Qt.TextSelectableByMouse) # Allow copying
             self.form_layout.addRow(self.tr("ID Utilisateur:"), self.user_id_label_display)
 
-            self.username_label = QLabel(self.user_data_to_edit.get('username', ''))
-            self.form_layout.addRow(self.tr("Nom d'utilisateur:"), self.username_label)
+        self.username_input = QLineEdit() # Used for both add and edit
+        self.form_layout.addRow(self.tr("Nom d'utilisateur:"), self.username_input)
 
         self.full_name_input = QLineEdit()
         self.form_layout.addRow(self.tr("Nom Complet:"), self.full_name_input)

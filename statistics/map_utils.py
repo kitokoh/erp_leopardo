@@ -5,13 +5,58 @@ import json
 import folium
 from branca.colormap import StepColormap
 
-# These DB access functions are problematic if map_utils is to be generic.
-# Ideally, the data should be fetched by the caller and passed into the map generation function.
-from db import get_country_by_name # Used for popups
-from db.cruds.clients_crud import clients_crud_instance # Used for popups
 # It's better to get country details like coordinates from the geojson data if possible,
-# or pass them explicitly, rather than another DB call in this util.
+# or pass them explicitly.
 # For now, assuming geojson has 'iso_a2' and 'name' properties.
+
+def _calculate_bounds_from_geometry(geometry: dict):
+    """
+    Calculates the bounding box [[min_lat, min_lon], [max_lat, max_lon]]
+    from a GeoJSON geometry. Returns None if bounds cannot be determined.
+    """
+    if not geometry or 'type' not in geometry or 'coordinates' not in geometry:
+        return None
+
+    coords_list = []
+    geom_type = geometry['type']
+    raw_coords = geometry['coordinates']
+
+    if geom_type == 'Point':
+        # For a point, fit_bounds might not work well without a small area.
+        # We can return a small box around the point or let caller handle fixed zoom.
+        # For now, let's return a very small bounding box.
+        lon, lat = raw_coords
+        delta = 0.001 # A small delta to create a tiny box
+        return [[lat - delta, lon - delta], [lat + delta, lon + delta]]
+    elif geom_type == 'Polygon':
+        # raw_coords is a list of linear rings (first is exterior)
+        # A linear ring is a list of [lon, lat] points
+        for ring in raw_coords:
+            for lon, lat in ring:
+                coords_list.append((lon, lat))
+    elif geom_type == 'MultiPolygon':
+        # raw_coords is a list of Polygons
+        # Each Polygon is a list of linear rings
+        for polygon in raw_coords:
+            for ring in polygon:
+                for lon, lat in ring:
+                    coords_list.append((lon, lat))
+    else:
+        # Other types like LineString, MultiLineString, GeometryCollection not handled for simplicity
+        logging.warning(f"map_utils: Bounding box calculation not implemented for geometry type: {geom_type}")
+        return None
+
+    if not coords_list:
+        return None
+
+    min_lon = min(c[0] for c in coords_list)
+    max_lon = max(c[0] for c in coords_list)
+    min_lat = min(c[1] for c in coords_list)
+    max_lat = max(c[1] for c in coords_list)
+
+    # Folium fit_bounds expects [[south, west], [north, east]] which is [[min_lat, min_lon], [max_lat, max_lon]]
+    return [[min_lat, min_lon], [max_lat, max_lon]]
+
 
 def generate_folium_map_html(
     geojson_path: str,
@@ -97,6 +142,7 @@ def generate_folium_map_html(
 
 
     try:
+
         m = folium.Map(location=map_location, zoom_start=map_zoom, tiles="CartoDB positron", no_wrap=True)
         logging.info(f"map_utils: folium.Map object created: {m}")
 
