@@ -9,6 +9,9 @@ from PyQt5.QtGui import QFont, QIcon, QMovie, QColor
 import os
 import random
 
+from .promo_content_manager import PromoContentManager
+from .promo_widgets import PromoSectionWidget
+
 class HomePageWidget(QWidget):
     def __init__(self, main_window, parent=None):
         super().__init__(parent)
@@ -142,9 +145,6 @@ class HomePageWidget(QWidget):
         bottom_h_layout = QHBoxLayout()
         bottom_h_layout.setContentsMargins(10, 5, 10, 10) # Added some margins
         bottom_h_layout.setSpacing(10) # Added spacing between sections
-
-from .promo_content_manager import PromoContentManager
-from .promo_widgets import PromoSectionWidget
 
         # --- Initialize Promo Content Manager ---
         self.promo_manager = PromoContentManager()

@@ -17,7 +17,7 @@ import db as db_manager
 from db.cruds import client_documents_crud, projects_crud
 
 from excel_editor import ExcelEditor
-from html_editor import HtmlEditor
+from gui.widgets.html_editor import HtmlEditor
 # Other necessary dialogs and modules will be imported as needed, or passed from parent
 
 SUPPORTED_LANGUAGES = ["en", "fr", "ar", "tr", "pt", "ru"]

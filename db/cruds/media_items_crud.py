@@ -43,11 +43,47 @@ def get_media_item_by_id(media_item_id: str, conn: sqlite3.Connection = None) ->
     logger.info(f"media_items_crud.get_media_item_by_id called with ID: {media_item_id}. (Placeholder - returning None)")
     return None
 
+def add_media_item(*args, **kwargs):
+    logger = logging.getLogger(__name__)
+    logger.info("media_items_crud.add_media_item called (Placeholder)")
+    return None
+
+def get_media_items_by_entity(*args, **kwargs):
+    logger = logging.getLogger(__name__)
+    logger.info("media_items_crud.get_media_items_by_entity called (Placeholder)")
+    return []
+
+def update_media_item(*args, **kwargs):
+    logger = logging.getLogger(__name__)
+    logger.info("media_items_crud.update_media_item called (Placeholder)")
+    return None
+
+def delete_media_item(*args, **kwargs):
+    logger = logging.getLogger(__name__)
+    logger.info("media_items_crud.delete_media_item called (Placeholder)")
+    return None
+
+def link_media_item_to_entity(*args, **kwargs):
+    logger = logging.getLogger(__name__)
+    logger.info("media_items_crud.link_media_item_to_entity called (Placeholder)")
+    return None
+
+def unlink_media_item_from_entity(*args, **kwargs):
+    logger = logging.getLogger(__name__)
+    logger.info("media_items_crud.unlink_media_item_from_entity called (Placeholder)")
+    return None
+
 # Add other placeholder CRUD functions as needed by the application if their absence causes errors.
 # For example, if add_media_item, update_media_item, delete_media_item are called elsewhere.
 # Based on experience_module_widget.py, get_all_media_items is the primary one needed for SelectMediaDialog.
 
 __all__ = [
     "get_all_media_items",
-    "get_media_item_by_id"
+    "get_media_item_by_id",
+    "add_media_item",
+    "get_media_items_by_entity",
+    "update_media_item",
+    "delete_media_item",
+    "link_media_item_to_entity",
+    "unlink_media_item_from_entity",
 ]
