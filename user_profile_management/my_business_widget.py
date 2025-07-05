@@ -6,24 +6,37 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 
-# Assuming database_setup.py is in the same directory or accessible in PYTHONPATH
-# For direct execution or testing, adjust path if necessary:
+# Assuming db.connection is accessible in PYTHONPATH
+# This is the main way to get DB connection for the application
 try:
-    from .database_setup import get_db_connection, DB_NAME
-except ImportError: # Fallback for direct execution
-    from database_setup import get_db_connection, DB_NAME
+    from db.connection import get_db_connection
+    DB_CONNECTION_AVAILABLE = True
+except ImportError:
+    # Fallback for environments where db.connection might not be setup,
+    # though this widget is unlikely to function correctly without it.
+    DB_CONNECTION_AVAILABLE = False
+    def get_db_connection(): # Mock function
+        raise ImportError("db.connection module not found. Cannot connect to the database.")
+
 
 
 class MyBusinessWidget(QWidget):
     profile_updated = pyqtSignal()
 
-    def __init__(self, user_id=1, parent=None): # user_id is hardcoded for now
+    def __init__(self, user_id=1, parent=None): # user_id can be passed dynamically
         super().__init__(parent)
         self.user_id = user_id
-        self.db_path = DB_NAME # Use DB_NAME directly from database_setup
+        # self.db_path is no longer needed as get_db_connection handles it globally
+
+        if not DB_CONNECTION_AVAILABLE:
+            self._show_db_error()
+            # Optionally disable the widget or parts of it
+            # For now, methods will raise errors if get_db_connection fails.
 
         self._init_ui()
-        self._load_initial_data()
+        if DB_CONNECTION_AVAILABLE: # Only load data if DB is connectable
+            self._load_initial_data()
+
         self._load_user_profile()
 
     def _init_ui(self):
@@ -84,11 +97,23 @@ class MyBusinessWidget(QWidget):
         self.setLayout(main_layout)
         self.setWindowTitle("Mon Profil d'Entreprise")
 
+    def _show_db_error(self):
+        error_label = QLabel("ERREUR: Connexion à la base de données non disponible.\nLe module 'db.connection' n'a pas pu être chargé ou configuré.\nCe widget ne fonctionnera pas correctement.")
+        error_label.setAlignment(Qt.AlignCenter)
+        error_label.setStyleSheet("color: red; font-weight: bold;")
+        layout = QVBoxLayout(self) # Create a layout if one doesn't exist
+        layout.addWidget(error_label)
+        self.setLayout(layout)
+
+
     def _get_db_connection(self):
-        # Overriding to use self.db_path which is set from imported DB_NAME
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
+        # Uses the globally available get_db_connection from db.connection
+        if not DB_CONNECTION_AVAILABLE:
+             # This case should ideally be handled by disabling UI elements
+             # or by the initial check in __init__
+            raise ConnectionError("Database connection is not available for MyBusinessWidget.")
+        return get_db_connection() # This is the imported function
+
 
     def _load_initial_data(self):
         conn = self._get_db_connection()
@@ -241,63 +266,83 @@ class MyBusinessWidget(QWidget):
 
 if __name__ == '__main__':
     import sys
-    # Ensure the DB exists for the test
-    # conn = sqlite3.connect(DB_NAME) # This will create the file if it doesn't exist
-    # conn.close()
-    # from database_setup import create_tables, seed_data # Create and seed if running standalone
-    # create_tables() # Make sure tables are created
-    # seed_data() # Make sure seed data is available
+    import os
+
+    # For standalone testing, we need to ensure db.connection can be found
+    # and that its configuration is set (or use a test DB path).
+    # This setup is more involved than when running within the main application.
+
+    # Add project root to sys.path to allow finding 'db' module
+    current_script_path = os.path.abspath(__file__)
+    project_root_for_test = os.path.dirname(os.path.dirname(current_script_path))
+    if project_root_for_test not in sys.path:
+        sys.path.insert(0, project_root_for_test)
+
+    # Now try to import db.connection components again, as they might be available
+    try:
+        from db.connection import set_db_config, get_db_connection, initialize_engine_and_session
+        from db.init_schema import initialize_database # To create schema if needed
+        DB_CONNECTION_AVAILABLE_FOR_TEST = True
+    except ImportError as e:
+        print(f"ERROR in __main__: Could not import db modules for testing: {e}")
+        DB_CONNECTION_AVAILABLE_FOR_TEST = False
 
     app = QApplication(sys.argv)
 
-    # It's better to ensure DB is set up before launching the widget
-    # For this standalone test, let's assume database_setup.py can be run or has been run
-    # If not, we might need to call its main functions here.
-    # For simplicity, we'll assume it's ready. If you get "no such table" errors,
-    # ensure user_profile_data.db is created and populated by running database_setup.py first.
+    if not DB_CONNECTION_AVAILABLE_FOR_TEST:
+        error_dialog = QMessageBox()
+        error_dialog.setIcon(QMessageBox.Critical)
+        error_dialog.setText("Erreur de Configuration de la Base de Données")
+        error_dialog.setInformativeText(
+            "Le module db.connection ou ses dépendances n'ont pas pu être importés. "
+            "Assurez-vous que le PYTHONPATH est correct et que la base de données principale "
+            "de l'application est accessible et initialisée.\n\n"
+            "Ce widget ne peut pas fonctionner sans une connexion valide à la base de données."
+        )
+        error_dialog.setWindowTitle("Erreur Démarrage Widget")
+        error_dialog.exec_()
+        sys.exit(1)
 
-    # Check if DB exists, if not, create and seed it
+    # --- Mock or use a real test database for standalone execution ---
+    # Option 1: Use a dedicated test database file
+    test_db_name = "my_business_widget_test.db"
+    test_db_path = os.path.join(project_root_for_test, test_db_name) # Place it in project root
+
+    # Mock application configuration for db.connection
+    mock_app_config = {
+        'database_path': test_db_path,
+        'database_type': 'sqlite'
+        # Add any other config keys db.connection or init_schema might expect
+    }
+
+    print(f"INFO in __main__: Using test database at: {test_db_path}")
+
+    # Initialize db.connection with the mock config
+    set_db_config(mock_app_config)
+    initialize_engine_and_session(mock_app_config) # For SQLAlchemy if used by db.connection
+
+    # Ensure the schema exists in the test database
     try:
-        with open(DB_NAME, 'r') as f: # Simple check if file exists
-            pass
-        # Further check: ensure tables exist (optional, can be complex)
-        temp_conn = sqlite3.connect(DB_NAME)
-        temp_cursor = temp_conn.cursor()
-        temp_cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='BusinessProfile';")
-        if not temp_cursor.fetchone():
-            raise FileNotFoundError # Table not found, treat as if DB not set up
-        temp_conn.close()
-
-    except FileNotFoundError:
-        print(f"Database {DB_NAME} not found or not initialized. Running setup...")
-        try:
-            # Attempt to import and run setup functions
-            # This relative import might be tricky if the CWD isn't the project root
-            # For robust standalone testing, it's better to run database_setup.py directly first
-            # or adjust sys.path
-            import os, sys
-            # Add parent directory to sys.path to find database_setup if running from user_profile_management
-            # current_dir = os.path.dirname(os.path.abspath(__file__))
-            # project_root = os.path.dirname(current_dir) # Assuming this file is in user_profile_management
-            # sys.path.insert(0, project_root)
-
-            # Simpler: just assume it's in the same dir for this __main__ block
-            from database_setup import create_tables, seed_data
-            print("Creating tables and seeding data for standalone test...")
-            create_tables()
-            seed_data()
-            print("Database setup complete for standalone test.")
-        except Exception as e:
-            print(f"Could not automatically set up database for test: {e}")
-            print("Please ensure user_profile_data.db is correctly set up by running database_setup.py.")
-            sys.exit(1)
-
+        print(f"INFO in __main__: Initializing schema for test database: {test_db_path}...")
+        initialize_database(mock_app_config) # This creates all tables including new ones
+        print(f"INFO in __main__: Schema initialization complete for {test_db_path}.")
+    except Exception as e_init_db:
+        print(f"ERROR in __main__: Failed to initialize test database schema: {e_init_db}")
+        # Depending on the error, you might want to exit or inform the user differently.
+        # For now, we'll proceed, but the widget might fail if tables are missing.
+        QMessageBox.critical(None, "Erreur Initialisation BD (Test)",
+                             f"Impossible d'initialiser le schéma de la base de données de test:\n{e_init_db}")
+        # sys.exit(1) # Might be too aggressive if some tables exist
 
     main_win = QWidget()
     layout = QVBoxLayout(main_win)
+
+    # Instantiate the widget. It should now use the globally configured db.connection
     my_business_widget = MyBusinessWidget(user_id=1) # Example user_id
+
     layout.addWidget(my_business_widget)
-    main_win.setWindowTitle("Test MyBusinessWidget")
+    main_win.setWindowTitle("Test MyBusinessWidget (Standalone with Main DB Connection)")
+
     main_win.resize(600, 700)
     main_win.show()
     sys.exit(app.exec_())
