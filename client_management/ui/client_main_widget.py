@@ -515,6 +515,198 @@ class ClientMainWidget(QWidget):
 
         self._show_client_details_state() # Ensure initial state is correct if client_info is valid
 
+    def open_send_email_dialog(self):
+        if not self.client_info or not self.client_info.get("client_id"):
+            QMessageBox.warning(self, self.tr("Erreur Client"), self.tr("Informations client non disponibles pour envoyer un email."))
+            return
+
+        client_id = self.client_info.get("client_id")
+        determined_client_email = self.client_info.get("email") # Default to client's own email field if present
+
+        # Try to get a primary contact's email
+        try:
+            # Assuming get_contacts_for_client can filter by is_primary or returns data allowing it
+            contacts = db_manager.get_contacts_for_client(client_id, limit=5, is_primary=True) # Hypothetical is_primary filter
+            if contacts:
+                primary_contact_with_email = next((c for c in contacts if c.get('email') and c.get('is_primary_for_client')), None)
+                if primary_contact_with_email:
+                    determined_client_email = primary_contact_with_email['email']
+                else: # Fallback to first contact with email if no primary with email
+                    first_contact_with_email = next((c for c in contacts if c.get('email')), None)
+                    if first_contact_with_email:
+                        determined_client_email = first_contact_with_email['email']
+
+            if not determined_client_email: # If still no email, re-fetch all contacts and try again without primary filter
+                all_contacts = db_manager.get_contacts_for_client(client_id, limit=10)
+                if all_contacts:
+                    first_contact_with_email_any = next((c for c in all_contacts if c.get('email')), None)
+                    if first_contact_with_email_any:
+                        determined_client_email = first_contact_with_email_any['email']
+
+        except Exception as e:
+            logging.error(f"Error fetching contact emails for SendEmailDialog: {e}", exc_info=True)
+            # Proceed with client_info.email or None
+
+        if not determined_client_email:
+            # Prompt user if no email could be found automatically
+            email_text, ok = QInputDialog.getText(self, self.tr("Email Destinataire"),
+                                                  self.tr("Aucun email principal trouvé pour ce client. Veuillez saisir l'email du destinataire :"))
+            if ok and email_text.strip():
+                determined_client_email = email_text.strip()
+            else:
+                QMessageBox.information(self, self.tr("Annulé"), self.tr("Envoi d'email annulé car aucun destinataire n'a été spécifié."))
+                return
+
+        if not hasattr(self, 'SendEmailDialog') or self.SendEmailDialog is None:
+            logging.error("SendEmailDialog component not available in ClientMainWidget.")
+            QMessageBox.critical(self, self.tr("Erreur Composant"), self.tr("Le composant d'envoi d'email n'est pas chargé."))
+            return
+
+        dialog = self.SendEmailDialog(
+            client_email=determined_client_email,
+            config=self.config, # self.config should be set in __init__
+            client_id=client_id,
+            parent=self
+        )
+        dialog.exec_()
+
+    def load_contacts(self):
+        logging.info(f"ClientMainWidget.load_contacts called for client ID: {self.client_info.get('client_id')}")
+        if not hasattr(self, 'contacts_table'):
+            logging.warning("load_contacts: contacts_table not initialized.")
+            return
+
+        self.contacts_table.setRowCount(0) # Clear table
+        client_id = self.client_info.get("client_id")
+        if not client_id:
+            self.contacts_empty_label.setVisible(True)
+            self.contacts_table.setVisible(False)
+            self.total_contacts_count = 0
+            self.update_contact_pagination_controls()
+            return
+
+        try:
+            # This is a simplified load. A full implementation would handle pagination,
+            # fetching total count, and more robust error checking.
+            contacts_data = db_manager.get_contacts_for_client(
+                client_id,
+                limit=self.CONTACT_PAGE_LIMIT,
+                offset=self.current_contact_offset
+            )
+            # Assuming get_contacts_for_client_count exists or is added to db_manager
+            if hasattr(db_manager, 'get_contacts_for_client_count'):
+                 self.total_contacts_count = db_manager.get_contacts_for_client_count(client_id)
+            else: # Estimate total count if specific count function is missing
+                 self.total_contacts_count = len(contacts_data) if self.current_contact_offset == 0 else self.current_contact_offset + len(contacts_data)
+                 if len(contacts_data) < self.CONTACT_PAGE_LIMIT and self.current_contact_offset > 0 : # If on a later page and less than full page, this is the end
+                    pass # total_contacts_count is likely correct
+                 elif len(contacts_data) == self.CONTACT_PAGE_LIMIT:
+                    logging.warning("Missing get_contacts_for_client_count; pagination might be inaccurate if there are more pages.")
+
+
+            if not contacts_data:
+                self.contacts_empty_label.setVisible(True)
+                self.contacts_table.setVisible(False)
+            else:
+                self.contacts_empty_label.setVisible(False)
+                self.contacts_table.setVisible(True)
+                self.contacts_table.setRowCount(len(contacts_data))
+                for row, contact in enumerate(contacts_data):
+                    # Populate table rows - simplified
+                    name_item = QTableWidgetItem(contact.get("contact_name", "N/A"))
+                    name_item.setData(Qt.UserRole, contact.get("contact_id")) # Store contact_id
+                    self.contacts_table.setItem(row, 0, name_item)
+                    self.contacts_table.setItem(row, 1, QTableWidgetItem(contact.get("email", "N/A")))
+                    self.contacts_table.setItem(row, 2, QTableWidgetItem(contact.get("phone", "N/A")))
+                    self.contacts_table.setItem(row, 3, QTableWidgetItem(contact.get("position", "N/A")))
+                    primary_text = self.tr("Oui") if contact.get("is_primary_for_client") else self.tr("Non")
+                    primary_item = QTableWidgetItem(primary_text)
+                    primary_item.setTextAlignment(Qt.AlignCenter)
+                    self.contacts_table.setItem(row, 4, primary_item)
+
+        except Exception as e:
+            logging.error(f"Error loading contacts into table: {e}", exc_info=True)
+            QMessageBox.warning(self, self.tr("Erreur Chargement Contacts"), self.tr("Impossible de charger les contacts: {0}").format(str(e)))
+            self.contacts_empty_label.setVisible(True)
+            self.contacts_table.setVisible(False)
+            self.total_contacts_count = 0
+
+        self.update_contact_pagination_controls()
+        self._apply_permissions() # Re-apply permissions that might depend on selection state
+
+    def add_contact(self):
+        logging.warning("ClientMainWidget.add_contact: Placeholder method called.")
+        QMessageBox.information(self, self.tr("Fonctionnalité en cours"), self.tr("L'ajout de contact n'est pas encore complètement implémenté ici."))
+        # Implementation would involve:
+        # 1. Opening a ContactDialog (self.ContactDialog).
+        # 2. If dialog accepted, get data.
+        # 3. Call db_manager.add_contact_to_client (or similar).
+        # 4. Refresh self.load_contacts().
+
+    def open_compile_pdf_dialog(self):
+        if not self.client_info or not self.client_info.get("client_id"):
+            QMessageBox.warning(self, self.tr("Erreur Client"), self.tr("Informations client non disponibles pour compiler un PDF."))
+            return
+
+        if not hasattr(self, 'CompilePdfDialog') or self.CompilePdfDialog is None:
+            logging.error("CompilePdfDialog component not available in ClientMainWidget.")
+            QMessageBox.critical(self, self.tr("Erreur Composant"), self.tr("Le composant de compilation PDF n'est pas chargé."))
+            return
+
+        dialog = self.CompilePdfDialog(
+            client_info=self.client_info,
+            config=self.config,
+            app_root_dir=self.app_root_dir,
+            parent=self
+        )
+        dialog.exec_()
+        # After the dialog closes, you might want to refresh parts of the UI,
+        # for example, if the compiled PDF is added to the client's document list.
+        # This depends on how CompilePdfDialog signals its outcome or where it saves files.
+        # For now, just executing the dialog.
+        if hasattr(self, 'documents_tab_widget_ref') and hasattr(self.documents_tab_widget_ref, 'populate_doc_table'):
+             self.documents_tab_widget_ref.populate_doc_table()
+
+
+    def edit_contact(self, row=None, col=None):
+        logging.warning("ClientMainWidget.edit_contact: Placeholder method called.")
+        selected_items = self.contacts_table.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, self.tr("Sélection Requise"), self.tr("Veuillez sélectionner un contact à modifier."))
+            return
+        contact_id = self.contacts_table.item(selected_items[0].row(), 0).data(Qt.UserRole)
+        QMessageBox.information(self, self.tr("Fonctionnalité en cours"), self.tr("La modification du contact (ID: {0}) n'est pas encore complètement implémentée ici.").format(contact_id))
+        # Implementation:
+        # 1. Fetch contact details using contact_id.
+        # 2. Open ContactDialog pre-filled with data.
+        # 3. If accepted, update contact in DB.
+        # 4. Refresh self.load_contacts().
+
+    def remove_contact(self):
+        logging.warning("ClientMainWidget.remove_contact: Placeholder method called.")
+        selected_items = self.contacts_table.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, self.tr("Sélection Requise"), self.tr("Veuillez sélectionner un contact à supprimer."))
+            return
+        contact_id = self.contacts_table.item(selected_items[0].row(), 0).data(Qt.UserRole)
+        QMessageBox.information(self, self.tr("Fonctionnalité en cours"), self.tr("La suppression du contact (ID: {0}) n'est pas encore complètement implémentée ici.").format(contact_id))
+        # Implementation:
+        # 1. Confirm deletion.
+        # 2. Call db_manager.remove_contact_from_client (or similar).
+        # 3. Refresh self.load_contacts().
+
+    def prev_contact_page(self):
+        logging.warning("ClientMainWidget.prev_contact_page: Placeholder method called.")
+        if self.current_contact_offset > 0:
+            self.current_contact_offset -= self.CONTACT_PAGE_LIMIT
+            self.load_contacts() # This will call the basic load_contacts for now
+
+    def next_contact_page(self):
+        logging.warning("ClientMainWidget.next_contact_page: Placeholder method called.")
+        if (self.current_contact_offset + self.CONTACT_PAGE_LIMIT) < self.total_contacts_count:
+            self.current_contact_offset += self.CONTACT_PAGE_LIMIT
+            self.load_contacts() # This will call the basic load_contacts for now
+
     def handle_archive_client(self):
         client_id = self.client_info.get("client_id")
         if not client_id:
