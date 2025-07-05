@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 from PyQt5.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QPushButton, QLabel,
-    QSizePolicy, QScrollArea, QStackedWidget, QFrame, QGraphicsDropShadowEffect
+    QSizePolicy, QScrollArea, QStackedWidget, QFrame, QGraphicsDropShadowEffect,
+    QLineEdit, QMessageBox
 )
-from PyQt5.QtCore import Qt, pyqtSlot, QSize, QFile, QTextStream
+from PyQt5.QtCore import Qt, pyqtSlot, QSize, QFile, QTextStream, QPropertyAnimation, QEasingCurve, QRect, QEvent
 from PyQt5.QtGui import QFont, QIcon, QMovie, QColor
 
 import os
@@ -11,6 +12,7 @@ import random
 
 from .promo_content_manager import PromoContentManager
 from .promo_widgets import PromoSectionWidget
+from .quick_stats_widget import QuickStatsWidget # Import the new widget
 
 
 from .quick_stats_widget import QuickStatsWidget # Import the new widget
@@ -68,7 +70,100 @@ class HomePageWidget(QWidget):
         main_v_layout.addLayout(center_layout)
         main_v_layout.addLayout(bottom_layout, 1) # Assign stretch factor to the bottom layout
 
+
+        # Search Bar Layout (added at the top of main_v_layout)
+        search_bar_layout = QHBoxLayout()
+        search_bar_layout.setContentsMargins(10, 5, 10, 5) # Adjust margins as needed
+        search_bar_layout.setSpacing(5)
+
+        self.search_input = QLineEdit()
+        self.search_input.setObjectName("homePageSearchInput")
+        self.search_input.setPlaceholderText(self.tr("Rechercher dans l'application..."))
+        self.search_input.returnPressed.connect(self._handle_search_query)
+        search_bar_layout.addWidget(self.search_input, 1) # Input takes most space
+
+        self.search_button = QPushButton()
+        self.search_button.setObjectName("homePageSearchButton")
+        search_icon = QIcon.fromTheme("search", QIcon(":/icons/search.svg")) # Common theme icon name
+        if not search_icon.isNull():
+            self.search_button.setIcon(search_icon)
+        else:
+            self.search_button.setText("🔍") # Fallback emoji/text
+        self.search_button.setToolTip(self.tr("Lancer la recherche"))
+        self.search_button.clicked.connect(self._handle_search_query)
+        # self.search_button.setFixedSize(QSize(30,30)) # Adjust size as needed
+        search_bar_layout.addWidget(self.search_button)
+
+        # Insert search bar at the top of the main layout
+        main_v_layout.insertLayout(0, search_bar_layout)
+
+
         self.setLayout(main_v_layout)
+
+    def _handle_search_query(self):
+        query = self.search_input.text()
+        if not query.strip():
+            # Optional: Show a message if search query is empty, or just do nothing
+            # QMessageBox.information(self, self.tr("Recherche"), self.tr("Veuillez entrer un terme de recherche."))
+            return
+
+        QMessageBox.information(
+            self,
+            self.tr("Recherche Globale (Simulation)"),
+            self.tr("La fonctionnalité de recherche n'est pas encore implémentée.\n"
+                    "Recherche demandée pour : '{0}'").format(query)
+        )
+        # In a real scenario, you would trigger the actual search logic here.
+
+    def eventFilter(self, obj, event):
+        # Check if the object is a QPushButton (our module buttons)
+        if isinstance(obj, QPushButton) and hasattr(obj, 'animation_group'):
+            if event.type() == QEvent.Enter:
+                if not obj.original_geometry: # Initialize geometry on first relevant event
+                    obj.original_geometry = obj.geometry()
+
+                    # Define animations if not already defined
+                    if not obj.animation_group:
+                        original_rect = obj.original_geometry
+
+                        # Enlarged rect (e.g., 10% bigger, centered)
+                        new_width = int(original_rect.width() * 1.1)
+                        new_height = int(original_rect.height() * 1.1)
+                        new_x = original_rect.x() - (new_width - original_rect.width()) // 2
+                        new_y = original_rect.y() - (new_height - original_rect.height()) // 2
+                        enlarged_rect = QRect(new_x, new_y, new_width, new_height)
+
+                        enter_anim = QPropertyAnimation(obj, b"geometry")
+                        enter_anim.setDuration(150) # ms
+                        enter_anim.setStartValue(original_rect)
+                        enter_anim.setEndValue(enlarged_rect)
+                        enter_anim.setEasingCurve(QEasingCurve.InOutQuad)
+
+                        leave_anim = QPropertyAnimation(obj, b"geometry")
+                        leave_anim.setDuration(150) # ms
+                        leave_anim.setStartValue(enlarged_rect) # Will be current geometry
+                        leave_anim.setEndValue(original_rect)
+                        leave_anim.setEasingCurve(QEasingCurve.InOutQuad)
+
+                        obj.animation_group = [enter_anim, leave_anim]
+
+                # Start enter animation
+                if obj.animation_group:
+                    obj.animation_group[1].stop() # Stop leave animation if running
+                    obj.animation_group[0].setStartValue(obj.geometry()) # Start from current geometry
+                    obj.animation_group[0].start()
+                return True # Event handled
+
+            elif event.type() == QEvent.Leave:
+                # Start leave animation
+                if obj.animation_group and obj.original_geometry: # Ensure animations and original_geometry are set
+                    obj.animation_group[0].stop() # Stop enter animation if running
+                    obj.animation_group[1].setStartValue(obj.geometry()) # Start from current geometry
+                    obj.animation_group[1].setEndValue(obj.original_geometry) # Ensure it returns to original
+                    obj.animation_group[1].start()
+                return True # Event handled
+
+        return super().eventFilter(obj, event)
 
     def _setup_center_layout(self):
         """Creates and configures the central layout with GIF, buttons, and right sidebar."""
@@ -135,6 +230,14 @@ class HomePageWidget(QWidget):
             shadow.setYOffset(2)
             shadow.setColor(QColor(0, 0, 0, 60))
             button.setGraphicsEffect(shadow)
+
+            # Store animations and original geometry on the button object itself for easy access
+            button.original_geometry = None # Will be set once shown
+            button.animation_group = [] # To store enter/leave animations
+
+            # Install event filter to handle Enter/Leave for animation
+            button.installEventFilter(self)
+
             grid_layout.addWidget(button, row, col)
             col += 1
             if col >= num_columns:
@@ -154,11 +257,30 @@ class HomePageWidget(QWidget):
         self.right_sidebar_layout.setContentsMargins(0,0,0,0)
         self.right_sidebar_container.setLayout(self.right_sidebar_layout)
 
-        self.quick_stats = QuickStatsWidget(self) # self.quick_stats needs to be accessible
+        self.quick_stats = QuickStatsWidget(self)
+        self.quick_stats.refresh_requested.connect(self._refresh_quick_stats_data)
         self.set_right_sidebar_widget(self.quick_stats)
+        self._refresh_quick_stats_data() # Initial data load
+
         center_h_layout.addWidget(self.right_sidebar_container, 1)
 
         return center_h_layout
+
+    def _refresh_quick_stats_data(self):
+        """Generates simulated data and updates the QuickStatsWidget."""
+        if not hasattr(self, 'quick_stats') or not self.quick_stats:
+            return
+
+        # Simulate fetching new data
+        simulated_data = [
+            {"label": self.tr("Clients Actifs:"), "value": str(random.randint(100, 200))},
+            {"label": self.tr("Projets en Cours:"), "value": str(random.randint(10, 50))},
+            {"label": self.tr("Tâches Ouvertes:"), "value": str(random.randint(5, 30))},
+            {"label": self.tr("Nouveaux Documents (Mois):"), "value": str(random.randint(50, 150))},
+            {"label": self.tr("Tickets Support Actifs:"), "value": str(random.randint(0,10))}
+        ]
+        self.quick_stats.update_stats(simulated_data)
+
 
 
     def _setup_bottom_layout(self):
