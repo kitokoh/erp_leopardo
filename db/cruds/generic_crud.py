@@ -252,6 +252,44 @@ class GenericCRUD:
         rows = cursor.fetchall()
         return [self._object_to_dict(row) for row in rows]
 
+    @_manage_conn
+    def update(self, item_id: Any, data: Dict, conn: sqlite3.Connection, table_name: str = None, id_column: str = None) -> bool:
+        """
+        Updates an existing record in the specified table.
+
+        Args:
+            item_id (any): The ID of the item to update.
+            data (dict): A dictionary where keys are column names and values are the new values.
+            conn (sqlite3.Connection): The database connection object.
+            table_name (str, optional): The name of the table. If None, uses self.table_name.
+            id_column (str, optional): The name of the ID column. If None, uses self.primary_key.
+
+        Returns:
+            bool: True if the record was updated successfully (at least one row affected), False otherwise.
+        """
+        _table_name = table_name if table_name else self.table_name
+        _id_column = id_column if id_column else self.primary_key
+
+        if not _table_name or not _id_column:
+            logging.error("Table name or primary key not specified for update operation.")
+            return False
+        if not data:
+            logging.warning(f"No data provided for update on table {_table_name}, ID {item_id}.")
+            return False # No operation performed, arguably not a "success" in terms of changing data
+
+        set_clause = ", ".join([f"{key} = ?" for key in data.keys()])
+        values = list(data.values())
+        values.append(item_id)
+
+        query = f"UPDATE {_table_name} SET {set_clause} WHERE {_id_column} = ?"
+
+        try:
+            cursor = conn.execute(query, values)
+            return cursor.rowcount > 0
+        except sqlite3.Error as e:
+            logging.error(f"Error updating record in {_table_name} with ID {item_id}: {e} using data {data}")
+            raise # Re-raise to be caught by _manage_conn or caller
+
 # Utility function, can be outside the class if preferred, or static.
 # Making it a top-level function for easier import/use by other modules if needed.
 def object_to_dict(db_row: sqlite3.Row) -> Union[Dict, None]:

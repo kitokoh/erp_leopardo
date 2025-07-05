@@ -205,7 +205,7 @@ class ReferentsCRUD(GenericCRUD):
 
         update_fields['updated_at'] = datetime.utcnow().isoformat() + "Z"
 
-        return self._update(referent_id, update_fields, conn=conn)
+        return self.update(item_id=referent_id, data=update_fields, conn=conn) # Uses self.table_name and self.primary_key by default
 
     @_manage_conn
     def set_referent_active_status(self, referent_id: str, is_active: bool, conn: sqlite3.Connection = None) -> bool:

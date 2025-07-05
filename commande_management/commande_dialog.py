@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QTextEdit,
     QComboBox, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
     QAbstractItemView, QMessageBox, QDateEdit, QDialogButtonBox, QLabel,
-    QDoubleSpinBox, QSpinBox
+    QDoubleSpinBox, QSpinBox, QListWidget, QInputDialog, QWidget # Explicitly added QWidget
 )
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QDate
@@ -27,21 +27,47 @@ class CommandeDialog(QDialog):
         self.logger = logging.getLogger(__name__)
 
         self.setWindowTitle("Nouvelle Commande" if not commande_id_to_edit else "Modifier Commande")
-        self.setMinimumSize(700, 500)
+        self.setMinimumSize(900, 600) # Increased size for product list
 
         self.setup_ui()
 
         if not self.commande_id_to_edit: # New Commande
             self.commande_reference_edit.setText(commandes_crud.get_next_commande_reference())
-            # self.commande_reference_edit.setReadOnly(True) # Optional: make it read-only
 
         self.populate_combos()
+        self._populate_product_selection_list() # Populate the new product list
 
         if self.commande_id_to_edit:
             self.load_commande_data_for_edit()
 
     def setup_ui(self):
-        main_layout = QVBoxLayout(self)
+        overall_layout = QHBoxLayout(self) # Main layout is now horizontal
+
+        # --- Left Panel: Product Selection ---
+        left_panel_widget = QWidget()
+        left_panel_layout = QVBoxLayout(left_panel_widget)
+        left_panel_layout.addWidget(QLabel(self.tr("Produits Disponibles:")))
+
+        self.product_search_input = QLineEdit()
+        self.product_search_input.setPlaceholderText(self.tr("Rechercher produit..."))
+        self.product_search_input.textChanged.connect(self._filter_product_selection_list)
+        left_panel_layout.addWidget(self.product_search_input)
+
+        self.product_selection_list = QListWidget() # Using QListWidget for simplicity
+        self.product_selection_list.itemDoubleClicked.connect(self.add_selected_product_from_list_to_table)
+        left_panel_layout.addWidget(self.product_selection_list)
+
+        add_selected_product_button = QPushButton(self.tr("Ajouter Produit Sélectionné"))
+        add_selected_product_button.clicked.connect(self.add_selected_product_from_list_to_table)
+        left_panel_layout.addWidget(add_selected_product_button)
+
+        left_panel_widget.setMinimumWidth(250)
+        left_panel_widget.setMaximumWidth(350)
+        overall_layout.addWidget(left_panel_widget)
+
+        # --- Right Panel: Commande Details and Items ---
+        right_panel_widget = QWidget()
+        main_layout = QVBoxLayout(right_panel_widget) # This was the original main_layout
 
         # Form for Commande Details
         form_layout = QFormLayout()
@@ -92,8 +118,9 @@ class CommandeDialog(QDialog):
         main_layout.addWidget(self.items_table)
 
         items_actions_layout = QHBoxLayout()
-        self.add_item_btn = QPushButton(QIcon.fromTheme("list-add"), "Ajouter Article")
-        self.add_item_btn.clicked.connect(self.add_item_to_table)
+        self.add_item_btn = QPushButton(QIcon.fromTheme("list-add"), "Ajouter Article Sélectionné") # Text updated
+        self.add_item_btn.setToolTip(self.tr("Ajoute le produit actuellement sélectionné dans la liste de gauche à la commande."))
+        self.add_item_btn.clicked.connect(self.add_selected_product_from_list_to_table) # Connect to new method
         items_actions_layout.addWidget(self.add_item_btn)
         self.remove_item_btn = QPushButton(QIcon.fromTheme("list-remove"), "Supprimer Article")
         self.remove_item_btn.clicked.connect(self.remove_selected_item)
@@ -116,6 +143,42 @@ class CommandeDialog(QDialog):
         self.button_box.accepted.connect(self.accept_dialog)
         self.button_box.rejected.connect(self.reject)
         main_layout.addWidget(self.button_box)
+
+        overall_layout.addWidget(right_panel_widget) # Add right panel to the main horizontal layout
+
+    def _populate_product_selection_list(self):
+        self.product_selection_list.clear()
+        try:
+            # Fetch all active global products
+            all_products = products_crud.get_all_products(filters={'is_active': True})
+            if all_products:
+                for prod in sorted(all_products, key=lambda p: p.get('product_name', '').lower()):
+                    item_text = f"{prod.get('product_name', 'N/A')} ({prod.get('product_code', 'N/A')})"
+                    item = QListWidgetItem(item_text)
+                    item.setData(Qt.UserRole, prod) # Store full product dict
+                    self.product_selection_list.addItem(item)
+            else:
+                self.product_selection_list.addItem(self.tr("Aucun produit global trouvé."))
+        except Exception as e:
+            self.logger.error(f"Error populating product selection list: {e}", exc_info=True)
+            self.product_selection_list.addItem(self.tr("Erreur chargement produits."))
+
+    def _filter_product_selection_list(self, text):
+        search_term = text.lower()
+        for i in range(self.product_selection_list.count()):
+            item = self.product_selection_list.item(i)
+            if item:
+                item_text = item.text().lower()
+                # Also check product_code if available in UserRole data (more robust search)
+                product_data = item.data(Qt.UserRole)
+                code_match = False
+                if isinstance(product_data, dict) and product_data.get('product_code','').lower().startswith(search_term):
+                    code_match = True
+
+                if search_term in item_text or code_match:
+                    item.setHidden(False)
+                else:
+                    item.setHidden(True)
 
     def populate_combos(self):
         # Statuses
@@ -191,94 +254,60 @@ class CommandeDialog(QDialog):
         self.update_totals_display()
 
 
-    def add_item_to_table(self, item_data_to_load=None, is_loading=False):
-        if not is_loading:
-            # Use ProductDialog for selecting/defining products
-            # The ProductDialog needs client_id and app_root_dir.
-            # Assuming self.parent() is DocumentManager or similar that has app_root_dir
-            app_root_dir_for_product_dialog = ""
-            if hasattr(self.parent(), 'app_root_dir'):
-                app_root_dir_for_product_dialog = self.parent().app_root_dir
-            elif hasattr(self.parent(), 'parent') and hasattr(self.parent().parent(), 'app_root_dir'): # Check grandparent if parent is ClientWidget
-                app_root_dir_for_product_dialog = self.parent().parent().app_root_dir
+    def add_selected_product_from_list_to_table(self, list_item=None):
+        """Adds the currently selected product from self.product_selection_list to the items_table."""
+        selected_items = self.product_selection_list.selectedItems()
+        if not selected_items:
+            # If called by button click and nothing is selected, or if list_item is None (from double click on empty area)
+            if list_item is None: # list_item is None if called by button and no selection
+                 QMessageBox.information(self, self.tr("Sélection Requise"), self.tr("Veuillez sélectionner un produit dans la liste de gauche."))
+                 return
+            # If list_item is provided (from double click), use that directly
+            product_data_global = list_item.data(Qt.UserRole) if list_item else None
+        else: # Item selected and button clicked
+            product_data_global = selected_items[0].data(Qt.UserRole)
+
+        if not product_data_global or not isinstance(product_data_global, dict):
+            self.logger.warning("No valid product data found for selected item in product_selection_list.")
+            return
+
+        # Prompt for quantity
+        quantity, ok = QInputDialog.getDouble(self, self.tr("Quantité"), self.tr("Entrez la quantité pour '{0}':").format(product_data_global.get('product_name', 'N/A')), 1.0, 0.01, 10000, 2)
+        if not ok or quantity <= 0:
+            return # User cancelled or entered invalid quantity
+
+        # Prepare item_data similar to what ProductDialog would return, but based on global product
+        # This is for adding a *new* line item to the commande.
+        item_data_for_table = {
+            # Fields from the global product
+            'product_id': product_data_global.get('product_id'),
+            'product_code': product_data_global.get('product_code'),
+            'name': product_data_global.get('product_name'), # This will be displayed in table's "Produit" column
+            'description': product_data_global.get('description',''), # Global product description
+            'weight': product_data_global.get('weight'),
+            'dimensions': product_data_global.get('dimensions'),
+            'language_code': product_data_global.get('language_code'),
+            'base_unit_price': product_data_global.get('base_unit_price', 0.0), # Global base price
+
+            # Fields specific to this commande line item
+            'quantity': quantity,
+            'unit_price': product_data_global.get('base_unit_price', 0.0), # Default to global base price for this line item
+            # 'item_id' will be None for new items, set by DB later.
+            # 'description_item' (specific desc for this line) can be same as global or edited later.
+        }
+        self.add_item_to_table(item_data_to_load=item_data_for_table, is_loading=False, from_product_list=True)
 
 
-            if not app_root_dir_for_product_dialog:
-                self.logger.error("app_root_dir not found for ProductDialog instantiation.")
-                QMessageBox.critical(self, "Erreur Configuration", "Chemin racine de l'application non trouvé.")
-                return
+    def add_item_to_table(self, item_data_to_load=None, is_loading=False, from_product_list=False):
+        # If from_product_list is True, item_data_to_load is already prepared by add_selected_product_from_list_to_table
+        if not is_loading and not from_product_list:
+            # This was the old path using ProductDialog. Now, directly use add_selected_product_from_list_to_table
+            # or if the "Ajouter Article" button is kept, it should trigger selection from the list or a simplified input.
+            # For now, let's assume "Ajouter Article" button will also use the selected product from the list.
+            self.add_selected_product_from_list_to_table()
+            return
 
-            product_dialog = ProductDialog(client_id=self.client_id,
-                                           app_root_dir=app_root_dir_for_product_dialog,
-                                           parent=self)
-
-            if product_dialog.exec_() == QDialog.Accepted:
-                products_from_dialog = product_dialog.get_data()
-                if not products_from_dialog:
-                    return # No products were added/selected in ProductDialog
-
-                for product_data in products_from_dialog:
-                    # This product_data already contains name, desc, qty, price, product_id (if existing global), product_code
-                    # We need to adapt this to fit CommandeItem structure for our table
-
-                    # If product_id is None, it means a new global product was defined in ProductDialog.
-                    # We need to ensure this global product is created in the DB first.
-                    # This logic will be handled in `accept_dialog` when the commande is saved.
-                    # For now, we store all info from ProductDialog in the UserRole of the first cell.
-                    # The `_get_payload_from_table_row` will use this stored data.
-
-                    row_pos = self.items_table.rowCount()
-                    self.items_table.insertRow(row_pos)
-
-                    # Store the raw product_data from ProductDialog. It contains global product_id if existing, or None if new.
-                    # It also contains product_code, name, description, quantity, unit_price from ProductDialog's form.
-                    name_cell_item = QTableWidgetItem(product_data.get("name", "N/A"))
-                    name_cell_item.setData(Qt.UserRole, product_data)
-                    self.items_table.setItem(row_pos, 0, name_cell_item) # Product Name (from ProductDialog)
-
-                    self.items_table.setItem(row_pos, 1, QTableWidgetItem(product_data.get("description", "")))
-
-                    qty_item = QTableWidgetItem(str(product_data.get("quantity", 1.0))) # Default to 1 if not specified
-                    qty_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                    self.items_table.setItem(row_pos, 2, qty_item)
-
-                    unit_price_ht_item = QTableWidgetItem(f"{float(product_data.get('unit_price', 0.0)):.2f}")
-                    unit_price_ht_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                    self.items_table.setItem(row_pos, 3, unit_price_ht_item)
-
-                    # VAT Rate - default to 0 for now, user can edit this cell if made editable
-                    vat_item = QTableWidgetItem("0") # Default 0% VAT
-                    vat_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                    self.items_table.setItem(row_pos, 4, vat_item)
-
-                    # Calculate totals for display - this part will be refined
-                    current_qty = float(product_data.get("quantity", 1.0))
-                    current_price_ht = float(product_data.get('unit_price', 0.0))
-                    current_vat_rate = 0.0 # as per default above
-
-                    total_ht = current_qty * current_price_ht
-                    total_ttc = total_ht * (1 + current_vat_rate)
-
-                    self.items_table.setItem(row_pos, 5, QTableWidgetItem(str(product_data.get("weight", "")))) # Poids (converted to string)
-                    self.items_table.setItem(row_pos, 6, QTableWidgetItem(product_data.get("dimensions", ""))) # Dimensions
-                    self.items_table.setItem(row_pos, 7, QTableWidgetItem(product_data.get("language_code", "fr"))) # Langue Article (default fr)
-
-                    self.items_table.setItem(row_pos, 8, QTableWidgetItem(f"{total_ht:.2f}")) # Total HT
-                    self.items_table.setItem(row_pos, 9, QTableWidgetItem(f"{total_ttc:.2f}")) # Total TTC
-
-                    # Make relevant cells editable
-                    self.items_table.item(row_pos, 2).setFlags(self.items_table.item(row_pos, 2).flags() | Qt.ItemIsEditable) # Qty
-                    self.items_table.item(row_pos, 3).setFlags(self.items_table.item(row_pos, 3).flags() | Qt.ItemIsEditable) # Price HT
-                    self.items_table.item(row_pos, 4).setFlags(self.items_table.item(row_pos, 4).flags() | Qt.ItemIsEditable) # TVA
-                    self.items_table.item(row_pos, 5).setFlags(self.items_table.item(row_pos, 5).flags() | Qt.ItemIsEditable) # Poids
-                    self.items_table.item(row_pos, 6).setFlags(self.items_table.item(row_pos, 6).flags() | Qt.ItemIsEditable) # Dimensions
-                    self.items_table.item(row_pos, 7).setFlags(self.items_table.item(row_pos, 7).flags() | Qt.ItemIsEditable) # Langue Article
-
-
-                self.update_totals_display()
-            return # Return after handling ProductDialog
-
-        # If item_data_to_load is provided (e.g., when editing an existing commande)
+        # If item_data_to_load is provided (either from DB load or from product_selection_list)
         if item_data_to_load:
             row_pos = self.items_table.rowCount()
             self.items_table.insertRow(row_pos)
