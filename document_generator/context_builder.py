@@ -508,16 +508,16 @@ def get_document_context(
         vat_amount = subtotal_after_discount * context["doc"]["vat_rate"]
         grand_total = subtotal_after_discount + vat_amount
 
-        context["doc"]["subtotal_amount_raw"] = subtotal
+        context["doc"]["subtotal_amount_raw"] = subtotal_ht # Corrected: was subtotal
         context["doc"]["discount_amount_raw"] = discount_amount
         context["doc"]["vat_amount_raw"] = vat_amount
         context["doc"]["grand_total_amount_raw"] = grand_total
 
         cs = context["doc"]["currency_symbol"]
-        context["doc"]["subtotal_amount"] = format_currency(subtotal, cs)
-        context["doc"]["discount_amount"] = format_currency(discount_amount, cs)
-        context["doc"]["vat_amount"] = format_currency(vat_amount, cs)
-        context["doc"]["grand_total_amount"] = format_currency(grand_total, cs)
+        context["doc"]["subtotal_amount"] = format_currency(subtotal_ht, cs, language_code=language_code) # Corrected: was subtotal, added language_code
+        context["doc"]["discount_amount"] = format_currency(discount_amount, cs, language_code=language_code)
+        context["doc"]["vat_amount"] = format_currency(vat_amount, cs, language_code=language_code)
+        context["doc"]["grand_total_amount"] = format_currency(grand_total, cs, language_code=language_code)
 
         doc_type_for_notes = additional_data.get("current_document_type_for_notes", document_type) # Use the key passed from create_document_dialog
         if doc_type_for_notes and client_id and language_code:

@@ -278,8 +278,6 @@ class ClientMainWidget(QWidget):
             # It's removed as its functionality is now with the checkbox.
             # No need to add a line here if it's not being created and added.
 
-            # info_container_layout.addLayout(self.action_buttons_layout) # This layout is added to the tab
-
 
             self.internal_client_info_tabs = QTabWidget()
             info_container_layout.addWidget(self.internal_client_info_tabs) # This remains in info_container_layout
@@ -368,6 +366,7 @@ class ClientMainWidget(QWidget):
             self.details_layout.addRow(self.created_by_label_static, self.created_by_value_label)
 
         # Placeholder for client statuses - to be populated by _setup_client_statuses_section
+
 
 
 
@@ -746,9 +745,18 @@ class ClientMainWidget(QWidget):
                     if link_payload['is_primary_for_client']:
                         db_manager.clear_primary_contact_for_client(client_id, except_contact_id=contact_id_to_link)
 
-                    link_success = db_manager.link_contact_to_client(link_payload)
+                    # Corrected call to link_contact_to_client
+                    link_success = db_manager.link_contact_to_client(
+                        client_id=link_payload['client_id'],
+                        contact_id=link_payload['contact_id'],
+                        is_primary=link_payload.get('is_primary_for_client', False), # Use .get for safety
+                        can_receive_documents=link_payload.get('can_receive_documents', True),
+                        role_in_client=link_payload.get('role_in_project'), # Map key
+                        notes=link_payload.get('notes')
+                    )
 
-                    if link_success:
+                    if link_success: # link_contact_to_client returns link_id (int) or None
+
                         self.notification_manager.show(self.tr("Succès"), self.tr("Contact ajouté et lié au client avec succès."), type='SUCCESS')
                         self.load_contacts() # Refresh the contacts table
                     else:
