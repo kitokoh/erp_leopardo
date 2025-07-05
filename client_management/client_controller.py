@@ -506,6 +506,23 @@ class ClientController:
             logging.error(f"Error fetching referent profile for client_id {client_id}: {e}", exc_info=True)
             return None
 
+    def get_client_by_id_for_dialog(self, client_id: str):
+        """
+        Wrapper to get client details, typically for dialogs.
+        This helps avoid direct CRUD access from dialogs if controller is available.
+        """
+        if not client_id:
+            logging.warning("ClientController.get_client_by_id_for_dialog: client_id is required.")
+            return None
+        try:
+            # Assuming clients_crud is an instance like clients_crud.clients_crud_instance
+            # or a module with a get_client_by_id function.
+            # Based on other parts of ClientController, it seems to use module-level CRUDs.
+            return clients_crud.get_client_by_id(client_id)
+        except Exception as e:
+            logging.error(f"Error in ClientController.get_client_by_id_for_dialog for client ID {client_id}: {e}", exc_info=True)
+            return None
+
 # controllers/client_controller.py
 import db as db_manager # Assuming db_manager is the existing module for DB interactions
 from db.cruds import clients_crud, products_crud, client_project_products_crud

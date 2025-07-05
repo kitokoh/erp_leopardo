@@ -142,6 +142,7 @@ def generate_folium_map_html(
 
 
     try:
+
         m = folium.Map(location=map_location, zoom_start=map_zoom, tiles="CartoDB positron", no_wrap=True)
         logging.info(f"map_utils: folium.Map object created: {m}")
 
