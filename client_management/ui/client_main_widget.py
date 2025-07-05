@@ -123,6 +123,7 @@ class ClientMainWidget(QWidget):
         self.edit_widgets = {}
         self.default_company_id = None
         self.current_referent_details = None
+        self.is_editing_client = False # Added for edit mode state
 
         try:
             default_company = db_manager.get_default_company()
@@ -514,6 +515,198 @@ class ClientMainWidget(QWidget):
         logging.info(f"ClientMainWidget.setup_ui: FULL UI SETUP COMPLETED for client_id={self.client_info.get('client_id')}")
 
         self._show_client_details_state() # Ensure initial state is correct if client_info is valid
+
+    def open_send_email_dialog(self):
+        if not self.client_info or not self.client_info.get("client_id"):
+            QMessageBox.warning(self, self.tr("Erreur Client"), self.tr("Informations client non disponibles pour envoyer un email."))
+            return
+
+        client_id = self.client_info.get("client_id")
+        determined_client_email = self.client_info.get("email") # Default to client's own email field if present
+
+        # Try to get a primary contact's email
+        try:
+            # Assuming get_contacts_for_client can filter by is_primary or returns data allowing it
+            contacts = db_manager.get_contacts_for_client(client_id, limit=5, is_primary=True) # Hypothetical is_primary filter
+            if contacts:
+                primary_contact_with_email = next((c for c in contacts if c.get('email') and c.get('is_primary_for_client')), None)
+                if primary_contact_with_email:
+                    determined_client_email = primary_contact_with_email['email']
+                else: # Fallback to first contact with email if no primary with email
+                    first_contact_with_email = next((c for c in contacts if c.get('email')), None)
+                    if first_contact_with_email:
+                        determined_client_email = first_contact_with_email['email']
+
+            if not determined_client_email: # If still no email, re-fetch all contacts and try again without primary filter
+                all_contacts = db_manager.get_contacts_for_client(client_id, limit=10)
+                if all_contacts:
+                    first_contact_with_email_any = next((c for c in all_contacts if c.get('email')), None)
+                    if first_contact_with_email_any:
+                        determined_client_email = first_contact_with_email_any['email']
+
+        except Exception as e:
+            logging.error(f"Error fetching contact emails for SendEmailDialog: {e}", exc_info=True)
+            # Proceed with client_info.email or None
+
+        if not determined_client_email:
+            # Prompt user if no email could be found automatically
+            email_text, ok = QInputDialog.getText(self, self.tr("Email Destinataire"),
+                                                  self.tr("Aucun email principal trouvé pour ce client. Veuillez saisir l'email du destinataire :"))
+            if ok and email_text.strip():
+                determined_client_email = email_text.strip()
+            else:
+                QMessageBox.information(self, self.tr("Annulé"), self.tr("Envoi d'email annulé car aucun destinataire n'a été spécifié."))
+                return
+
+        if not hasattr(self, 'SendEmailDialog') or self.SendEmailDialog is None:
+            logging.error("SendEmailDialog component not available in ClientMainWidget.")
+            QMessageBox.critical(self, self.tr("Erreur Composant"), self.tr("Le composant d'envoi d'email n'est pas chargé."))
+            return
+
+        dialog = self.SendEmailDialog(
+            client_email=determined_client_email,
+            config=self.config, # self.config should be set in __init__
+            client_id=client_id,
+            parent=self
+        )
+        dialog.exec_()
+
+    def load_contacts(self):
+        logging.info(f"ClientMainWidget.load_contacts called for client ID: {self.client_info.get('client_id')}")
+        if not hasattr(self, 'contacts_table'):
+            logging.warning("load_contacts: contacts_table not initialized.")
+            return
+
+        self.contacts_table.setRowCount(0) # Clear table
+        client_id = self.client_info.get("client_id")
+        if not client_id:
+            self.contacts_empty_label.setVisible(True)
+            self.contacts_table.setVisible(False)
+            self.total_contacts_count = 0
+            self.update_contact_pagination_controls()
+            return
+
+        try:
+            # This is a simplified load. A full implementation would handle pagination,
+            # fetching total count, and more robust error checking.
+            contacts_data = db_manager.get_contacts_for_client(
+                client_id,
+                limit=self.CONTACT_PAGE_LIMIT,
+                offset=self.current_contact_offset
+            )
+            # Assuming get_contacts_for_client_count exists or is added to db_manager
+            if hasattr(db_manager, 'get_contacts_for_client_count'):
+                 self.total_contacts_count = db_manager.get_contacts_for_client_count(client_id)
+            else: # Estimate total count if specific count function is missing
+                 self.total_contacts_count = len(contacts_data) if self.current_contact_offset == 0 else self.current_contact_offset + len(contacts_data)
+                 if len(contacts_data) < self.CONTACT_PAGE_LIMIT and self.current_contact_offset > 0 : # If on a later page and less than full page, this is the end
+                    pass # total_contacts_count is likely correct
+                 elif len(contacts_data) == self.CONTACT_PAGE_LIMIT:
+                    logging.warning("Missing get_contacts_for_client_count; pagination might be inaccurate if there are more pages.")
+
+
+            if not contacts_data:
+                self.contacts_empty_label.setVisible(True)
+                self.contacts_table.setVisible(False)
+            else:
+                self.contacts_empty_label.setVisible(False)
+                self.contacts_table.setVisible(True)
+                self.contacts_table.setRowCount(len(contacts_data))
+                for row, contact in enumerate(contacts_data):
+                    # Populate table rows - simplified
+                    name_item = QTableWidgetItem(contact.get("contact_name", "N/A"))
+                    name_item.setData(Qt.UserRole, contact.get("contact_id")) # Store contact_id
+                    self.contacts_table.setItem(row, 0, name_item)
+                    self.contacts_table.setItem(row, 1, QTableWidgetItem(contact.get("email", "N/A")))
+                    self.contacts_table.setItem(row, 2, QTableWidgetItem(contact.get("phone", "N/A")))
+                    self.contacts_table.setItem(row, 3, QTableWidgetItem(contact.get("position", "N/A")))
+                    primary_text = self.tr("Oui") if contact.get("is_primary_for_client") else self.tr("Non")
+                    primary_item = QTableWidgetItem(primary_text)
+                    primary_item.setTextAlignment(Qt.AlignCenter)
+                    self.contacts_table.setItem(row, 4, primary_item)
+
+        except Exception as e:
+            logging.error(f"Error loading contacts into table: {e}", exc_info=True)
+            QMessageBox.warning(self, self.tr("Erreur Chargement Contacts"), self.tr("Impossible de charger les contacts: {0}").format(str(e)))
+            self.contacts_empty_label.setVisible(True)
+            self.contacts_table.setVisible(False)
+            self.total_contacts_count = 0
+
+        self.update_contact_pagination_controls()
+        self._apply_permissions() # Re-apply permissions that might depend on selection state
+
+    def add_contact(self):
+        logging.warning("ClientMainWidget.add_contact: Placeholder method called.")
+        QMessageBox.information(self, self.tr("Fonctionnalité en cours"), self.tr("L'ajout de contact n'est pas encore complètement implémenté ici."))
+        # Implementation would involve:
+        # 1. Opening a ContactDialog (self.ContactDialog).
+        # 2. If dialog accepted, get data.
+        # 3. Call db_manager.add_contact_to_client (or similar).
+        # 4. Refresh self.load_contacts().
+
+    def open_compile_pdf_dialog(self):
+        if not self.client_info or not self.client_info.get("client_id"):
+            QMessageBox.warning(self, self.tr("Erreur Client"), self.tr("Informations client non disponibles pour compiler un PDF."))
+            return
+
+        if not hasattr(self, 'CompilePdfDialog') or self.CompilePdfDialog is None:
+            logging.error("CompilePdfDialog component not available in ClientMainWidget.")
+            QMessageBox.critical(self, self.tr("Erreur Composant"), self.tr("Le composant de compilation PDF n'est pas chargé."))
+            return
+
+        dialog = self.CompilePdfDialog(
+            client_info=self.client_info,
+            config=self.config,
+            app_root_dir=self.app_root_dir,
+            parent=self
+        )
+        dialog.exec_()
+        # After the dialog closes, you might want to refresh parts of the UI,
+        # for example, if the compiled PDF is added to the client's document list.
+        # This depends on how CompilePdfDialog signals its outcome or where it saves files.
+        # For now, just executing the dialog.
+        if hasattr(self, 'documents_tab_widget_ref') and hasattr(self.documents_tab_widget_ref, 'populate_doc_table'):
+             self.documents_tab_widget_ref.populate_doc_table()
+
+
+    def edit_contact(self, row=None, col=None):
+        logging.warning("ClientMainWidget.edit_contact: Placeholder method called.")
+        selected_items = self.contacts_table.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, self.tr("Sélection Requise"), self.tr("Veuillez sélectionner un contact à modifier."))
+            return
+        contact_id = self.contacts_table.item(selected_items[0].row(), 0).data(Qt.UserRole)
+        QMessageBox.information(self, self.tr("Fonctionnalité en cours"), self.tr("La modification du contact (ID: {0}) n'est pas encore complètement implémentée ici.").format(contact_id))
+        # Implementation:
+        # 1. Fetch contact details using contact_id.
+        # 2. Open ContactDialog pre-filled with data.
+        # 3. If accepted, update contact in DB.
+        # 4. Refresh self.load_contacts().
+
+    def remove_contact(self):
+        logging.warning("ClientMainWidget.remove_contact: Placeholder method called.")
+        selected_items = self.contacts_table.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, self.tr("Sélection Requise"), self.tr("Veuillez sélectionner un contact à supprimer."))
+            return
+        contact_id = self.contacts_table.item(selected_items[0].row(), 0).data(Qt.UserRole)
+        QMessageBox.information(self, self.tr("Fonctionnalité en cours"), self.tr("La suppression du contact (ID: {0}) n'est pas encore complètement implémentée ici.").format(contact_id))
+        # Implementation:
+        # 1. Confirm deletion.
+        # 2. Call db_manager.remove_contact_from_client (or similar).
+        # 3. Refresh self.load_contacts().
+
+    def prev_contact_page(self):
+        logging.warning("ClientMainWidget.prev_contact_page: Placeholder method called.")
+        if self.current_contact_offset > 0:
+            self.current_contact_offset -= self.CONTACT_PAGE_LIMIT
+            self.load_contacts() # This will call the basic load_contacts for now
+
+    def next_contact_page(self):
+        logging.warning("ClientMainWidget.next_contact_page: Placeholder method called.")
+        if (self.current_contact_offset + self.CONTACT_PAGE_LIMIT) < self.total_contacts_count:
+            self.current_contact_offset += self.CONTACT_PAGE_LIMIT
+            self.load_contacts() # This will call the basic load_contacts for now
 
     def handle_archive_client(self):
         client_id = self.client_info.get("client_id")
@@ -1813,3 +2006,339 @@ class ClientMainWidget(QWidget):
         elif not pdf_path: # Generation explicitly failed and returned None
             QMessageBox.critical(self, self.tr("Échec de la Génération"), self.tr("La génération du rapport des référents a échoué. Veuillez consulter les logs pour plus de détails."))
         # No else needed if pdf_path is None and an error was already shown by the controller or above.
+
+    def toggle_client_edit_mode(self):
+        self.is_editing_client = not self.is_editing_client
+        if self.is_editing_client:
+            self.edit_save_client_btn.setText(self.tr("Sauvegarder Client"))
+            self.edit_save_client_btn.setIcon(QIcon.fromTheme("document-save", QIcon(":/icons/save.svg")))
+            # Future: Enable editing of specific fields
+            logging.info(f"ClientMainWidget: Entered edit mode for client {self.client_info.get('client_id')}.")
+            # Example: self.client_name_edit.setReadOnly(False)
+            # For now, just log and change button
+        else:
+            # Future: Call a method to save changes if any
+            # For now, just revert button and log
+            self.edit_save_client_btn.setText(self.tr("Modifier Client"))
+            self.edit_save_client_btn.setIcon(QIcon.fromTheme("document-edit", QIcon(":/icons/pencil.svg")))
+            logging.info(f"ClientMainWidget: Exited edit mode for client {self.client_info.get('client_id')}. Save logic pending.")
+            # Example: self.client_name_edit.setReadOnly(True)
+            # Potentially reload client_info to discard non-saved changes: self.refresh_display(self.client_info)
+        # After toggling, re-apply permissions if some actions should be disabled during edit mode
+        self._apply_permissions()
+
+    def populate_details_layout(self):
+        logging.info(f"Populating details layout for client: {self.client_info.get('client_name', 'N/A')}")
+        if not self.client_info:
+            logging.warning("populate_details_layout: No client_info available.")
+            # Optionally clear all labels or set to "N/A"
+            self.project_id_value_label.setText(self.tr("N/A"))
+            self.country_value_label.setText(self.tr("N/A"))
+            self.city_value_label.setText(self.tr("N/A"))
+            self.price_value_label.setText(self.tr("N/A"))
+            self.date_value_label.setText(self.tr("N/A"))
+            self.category_value_label.setText(self.tr("N/A"))
+            self.distributor_info_value_label.setText(self.tr("N/A"))
+            self.need_value_label.setText(self.tr("N/A"))
+            self.folder_value_label.setText(self.tr("N/A"))
+            self.created_by_value_label.setText(self.tr("N/A"))
+            self.status_combo.clear()
+            return
+
+        self.project_id_value_label.setText(self.client_info.get('project_identifier', self.tr('N/A')))
+
+        country_name = self.client_info.get('country', self.tr('N/A'))
+        if isinstance(country_name, dict): # If full country object was passed
+            country_name = country_name.get('country_name', self.tr('N/A'))
+        self.country_value_label.setText(country_name)
+
+        city_name = self.client_info.get('city', self.tr('N/A'))
+        if isinstance(city_name, dict): # If full city object was passed
+            city_name = city_name.get('city_name', self.tr('N/A'))
+        self.city_value_label.setText(city_name)
+
+        price = self.client_info.get('price', 0.0)
+        self.price_value_label.setText(f"{price:.2f} €" if price is not None else self.tr('N/A'))
+
+        created_at_str = self.client_info.get('creation_date', self.client_info.get('created_at'))
+        date_display = self.tr('N/A')
+        if created_at_str:
+            try:
+                # Handle both pre-formatted 'YYYY-MM-DD' and ISO datetime strings
+                if 'T' in created_at_str: # Likely ISO format
+                    dt_obj = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
+                    date_display = dt_obj.strftime('%Y-%m-%d')
+                else: # Assume 'YYYY-MM-DD'
+                    datetime.strptime(created_at_str, '%Y-%m-%d') # Validate format
+                    date_display = created_at_str
+            except ValueError:
+                logging.warning(f"Invalid date format for created_at: {created_at_str}")
+                date_display = created_at_str # Show raw if parsing fails
+        self.date_value_label.setText(date_display)
+
+        self.category_value_label.setText(self.client_info.get('category', self.tr('N/A')))
+        self.distributor_info_value_label.setText(self.client_info.get('distributor_info', self.tr('N/A')))
+        self.need_value_label.setText(self.client_info.get('primary_need_description', self.tr('N/A')))
+
+        folder_path_relative = self.client_info.get('base_folder_path', self.client_info.get('default_base_folder_path', self.tr('N/A')))
+        if folder_path_relative != self.tr('N/A') and self.app_root_dir:
+            abs_folder_path = os.path.join(self.app_root_dir, folder_path_relative)
+            self.folder_value_label.setText(f"<a href='file:///{abs_folder_path}'>{folder_path_relative}</a>")
+        else:
+            self.folder_value_label.setText(folder_path_relative)
+
+        created_by_user_id = self.client_info.get('created_by_user_id')
+        creator_name = self.tr("N/A")
+        if created_by_user_id:
+            try:
+                user = users_crud.get_user_by_id(created_by_user_id)
+                if user:
+                    creator_name = user.get('full_name', user.get('username', self.tr("Inconnu")))
+            except Exception as e:
+                logging.error(f"Error fetching creator's name: {e}")
+        self.created_by_value_label.setText(creator_name)
+
+        # Populate status combo
+        self.status_combo.blockSignals(True)
+        self.status_combo.clear()
+        current_client_status_id = self.client_info.get('status_id')
+        selected_index = 0
+        try:
+            statuses = db_manager.get_all_status_settings(type_filter='Client')
+            if statuses:
+                for i, status_dict in enumerate(statuses):
+                    self.status_combo.addItem(status_dict['status_name'], status_dict['status_id'])
+                    if status_dict['status_id'] == current_client_status_id:
+                        selected_index = i
+            else:
+                self.status_combo.addItem(self.tr("Aucun statut défini"), None)
+        except Exception as e:
+            logging.error(f"Error loading statuses for client details: {e}")
+            self.status_combo.addItem(self.tr("Erreur chargement statuts"), None)
+
+        self.status_combo.setCurrentIndex(selected_index)
+        self.status_combo.blockSignals(False)
+
+        # Connect status change if not already connected or if logic requires it here
+        # self.status_combo.currentIndexChanged.connect(self.on_status_changed_slot) # Assuming such a slot exists
+        logging.info("Client details layout populated.")
+
+    def refresh_display(self, client_data_to_show):
+        logging.info(f"ClientMainWidget.refresh_display called for client: {client_data_to_show.get('client_name')}")
+        self.client_info = client_data_to_show
+
+        # Update header label
+        if hasattr(self, 'header_label'):
+            self.header_label.setText(f"<h2>{self.client_info.get('client_name', self.tr('Client Inconnu'))}</h2>")
+        if hasattr(self, 'client_info_group_box'):
+             self.client_info_group_box.setTitle(self.client_info.get('client_name', self.tr("Client Information")))
+
+
+        # Repopulate details
+        if hasattr(self, 'populate_details_layout'):
+            self.populate_details_layout()
+
+        # Refresh referent status
+        if self.client_info and self.client_info.get('client_id') and self.client_controller:
+            self.current_referent_details = self.client_controller.get_referent_profile_by_client_id(
+                self.client_info.get('client_id'), include_inactive=True
+            )
+            if hasattr(self, '_update_referent_status_display'):
+                self._update_referent_status_display()
+
+        # Reload data for all relevant tabs
+        if hasattr(self, 'load_contacts'):
+            self.load_contacts()
+        if hasattr(self, 'documents_tab_widget_ref') and hasattr(self.documents_tab_widget_ref, 'refresh_tab_data'):
+            self.documents_tab_widget_ref.client_info = self.client_info # Ensure tab has latest client_info
+            self.documents_tab_widget_ref.refresh_tab_data()
+        if hasattr(self, 'products_tab_widget_ref') and hasattr(self.products_tab_widget_ref, 'refresh_tab_data'):
+            self.products_tab_widget_ref.client_info = self.client_info
+            self.products_tab_widget_ref.refresh_tab_data()
+        if hasattr(self, 'document_notes_tab_widget_ref') and hasattr(self.document_notes_tab_widget_ref, 'refresh_tab_data'):
+            self.document_notes_tab_widget_ref.client_info = self.client_info
+            self.document_notes_tab_widget_ref.refresh_tab_data()
+        if hasattr(self, 'product_dimensions_tab_widget_ref') and hasattr(self.product_dimensions_tab_widget_ref, 'refresh_tab_data'):
+            self.product_dimensions_tab_widget_ref.client_info = self.client_info
+            self.product_dimensions_tab_widget_ref.refresh_tab_data()
+        if hasattr(self, 'sav_tab_widget_ref') and hasattr(self.sav_tab_widget_ref, 'refresh_tab_data'):
+            self.sav_tab_widget_ref.client_info = self.client_info
+            self.sav_tab_widget_ref.refresh_tab_data()
+        if hasattr(self, 'billing_tab_widget_ref') and hasattr(self.billing_tab_widget_ref, 'refresh_data'):
+            self.billing_tab_widget_ref.client_info = self.client_info
+            self.billing_tab_widget_ref.refresh_data()
+
+        # Assignments related refreshes (if these methods exist, otherwise they are part of the stubbing below)
+        if hasattr(self, 'load_assigned_vendors_personnel'): self.load_assigned_vendors_personnel()
+        if hasattr(self, 'load_assigned_technicians'): self.load_assigned_technicians()
+        if hasattr(self, 'load_assigned_transporters'): self.load_assigned_transporters()
+        if hasattr(self, 'load_assigned_freight_forwarders'): self.load_assigned_freight_forwarders()
+        if hasattr(self, 'load_projects_for_mta_combo'): self.load_projects_for_mta_combo() # This will trigger MTA table refresh if connected
+
+        if hasattr(self, '_apply_permissions'):
+            self._apply_permissions()
+        logging.info("ClientMainWidget display refreshed.")
+
+    # --- Stubs for potentially missing methods ---
+    def update_sav_tab_visibility(self):
+        logging.debug("ClientMainWidget.update_sav_tab_visibility (stub) called.")
+        if hasattr(self, 'sav_tab_widget_ref') and hasattr(self.sav_tab_widget_ref, 'update_sav_tab_visibility_and_load_data'):
+            self.sav_tab_widget_ref.update_sav_tab_visibility_and_load_data()
+        else:
+            logging.warning("SAV tab or its update method not found.")
+
+    def load_assigned_vendors_personnel(self):
+        logging.debug("ClientMainWidget.load_assigned_vendors_personnel (stub) called.")
+        if hasattr(self, 'assigned_vendors_table'):
+            self.assigned_vendors_table.setRowCount(0) # Clear table
+        # Add actual data loading logic here in future
+
+    def load_assigned_technicians(self):
+        logging.debug("ClientMainWidget.load_assigned_technicians (stub) called.")
+        if hasattr(self, 'assigned_technicians_table'):
+            self.assigned_technicians_table.setRowCount(0)
+
+    def load_assigned_transporters(self):
+        logging.debug("ClientMainWidget.load_assigned_transporters (stub) called.")
+        if hasattr(self, 'assigned_transporters_table'):
+            self.assigned_transporters_table.setRowCount(0)
+
+    def load_assigned_freight_forwarders(self):
+        logging.debug("ClientMainWidget.load_assigned_freight_forwarders (stub) called.")
+        if hasattr(self, 'assigned_forwarders_table'):
+            self.assigned_forwarders_table.setRowCount(0)
+
+    def update_assigned_vendors_buttons_state(self):
+        logging.debug("ClientMainWidget.update_assigned_vendors_buttons_state (stub) called.")
+        if hasattr(self, 'remove_assigned_vendor_btn') and hasattr(self, 'assigned_vendors_table'):
+            has_selection = bool(self.assigned_vendors_table.selectedItems())
+            self.remove_assigned_vendor_btn.setEnabled(has_selection and self.can_manage_assignments_permission)
+
+
+    def update_assigned_technicians_buttons_state(self):
+        logging.debug("ClientMainWidget.update_assigned_technicians_buttons_state (stub) called.")
+        if hasattr(self, 'remove_assigned_technician_btn') and hasattr(self, 'assigned_technicians_table'):
+            has_selection = bool(self.assigned_technicians_table.selectedItems())
+            self.remove_assigned_technician_btn.setEnabled(has_selection and self.can_manage_assignments_permission)
+
+    def update_assigned_transporters_buttons_state(self):
+        logging.debug("ClientMainWidget.update_assigned_transporters_buttons_state (stub) called.")
+        if hasattr(self, 'remove_assigned_transporter_btn') and hasattr(self, 'assigned_transporters_table'):
+            has_selection = bool(self.assigned_transporters_table.selectedItems())
+            self.remove_assigned_transporter_btn.setEnabled(has_selection and self.can_manage_assignments_permission)
+
+    def update_assigned_forwarders_buttons_state(self):
+        logging.debug("ClientMainWidget.update_assigned_forwarders_buttons_state (stub) called.")
+        if hasattr(self, 'remove_assigned_forwarder_btn') and hasattr(self, 'assigned_forwarders_table'):
+            has_selection = bool(self.assigned_forwarders_table.selectedItems())
+            self.remove_assigned_forwarder_btn.setEnabled(has_selection and self.can_manage_assignments_permission)
+
+    def load_projects_for_mta_combo(self):
+        logging.debug("ClientMainWidget.load_projects_for_mta_combo (stub) called.")
+        if hasattr(self, 'mta_project_selector_combo'):
+            self.mta_project_selector_combo.clear()
+            self.mta_project_selector_combo.addItem(self.tr("-- Sélectionner Commande/Projet --"), None)
+            # Add actual project/order loading logic here
+            client_id = self.client_info.get('client_id')
+            if client_id:
+                try:
+                    # Assuming projects_crud.get_projects_for_client returns a list of dicts with 'project_id' and 'project_name' or 'project_identifier'
+                    orders = projects_crud.get_projects_by_client_id(client_id) # Or a specific "orders" CRUD
+                    if orders:
+                        for order in orders:
+                            # Use project_identifier if available, else project_name
+                            display_name = order.get('project_identifier') or order.get('project_name', f"ID: {order.get('project_id')}")
+                            self.mta_project_selector_combo.addItem(display_name, order.get('project_id'))
+                except Exception as e:
+                    logging.error(f"Error loading projects/orders for MTA combo: {e}", exc_info=True)
+        self.handle_mta_project_selection_changed() # Refresh table based on (possibly empty) combo
+
+    def handle_mta_project_selection_changed(self):
+        logging.debug("ClientMainWidget.handle_mta_project_selection_changed (stub) called.")
+        if hasattr(self, 'assigned_mta_table'):
+             self.assigned_mta_table.setRowCount(0) # Clear MTA table
+        # Add logic to load MTAs for selected project/order
+        selected_project_id = None
+        if hasattr(self, 'mta_project_selector_combo'):
+            selected_project_id = self.mta_project_selector_combo.currentData()
+
+        if hasattr(self, 'add_assigned_mta_btn'):
+            self.add_assigned_mta_btn.setEnabled(selected_project_id is not None and self.can_manage_assignments_permission)
+
+        if selected_project_id:
+            # TODO: Implement self.load_assigned_money_transfer_agents(selected_project_id)
+            logging.info(f"MTA project selected: {selected_project_id}. Actual loading of MTAs is pending.")
+            pass
+        self.update_mta_buttons_state()
+
+
+    def update_mta_buttons_state(self):
+        logging.debug("ClientMainWidget.update_mta_buttons_state (stub) called.")
+        project_selected = False
+        if hasattr(self, 'mta_project_selector_combo'):
+            project_selected = self.mta_project_selector_combo.currentData() is not None
+
+        mta_selected = False
+        if hasattr(self, 'assigned_mta_table'):
+            mta_selected = bool(self.assigned_mta_table.selectedItems())
+
+        if hasattr(self, 'add_assigned_mta_btn'):
+            self.add_assigned_mta_btn.setEnabled(project_selected and self.can_manage_assignments_permission)
+        if hasattr(self, 'remove_assigned_mta_btn'):
+            self.remove_assigned_mta_btn.setEnabled(project_selected and mta_selected and self.can_manage_assignments_permission)
+
+    def handle_add_assigned_vendor(self):
+        logging.warning("ClientMainWidget.handle_add_assigned_vendor (stub) called.")
+        QMessageBox.information(self, "Info", "handle_add_assigned_vendor (stub)")
+    def handle_remove_assigned_vendor(self):
+        logging.warning("ClientMainWidget.handle_remove_assigned_vendor (stub) called.")
+        QMessageBox.information(self, "Info", "handle_remove_assigned_vendor (stub)")
+    def handle_add_assigned_technician(self):
+        logging.warning("ClientMainWidget.handle_add_assigned_technician (stub) called.")
+        QMessageBox.information(self, "Info", "handle_add_assigned_technician (stub)")
+    def handle_remove_assigned_technician(self):
+        logging.warning("ClientMainWidget.handle_remove_assigned_technician (stub) called.")
+        QMessageBox.information(self, "Info", "handle_remove_assigned_technician (stub)")
+    def handle_add_assigned_transporter(self):
+        logging.warning("ClientMainWidget.handle_add_assigned_transporter (stub) called.")
+        QMessageBox.information(self, "Info", "handle_add_assigned_transporter (stub)")
+    def handle_remove_assigned_transporter(self):
+        logging.warning("ClientMainWidget.handle_remove_assigned_transporter (stub) called.")
+        QMessageBox.information(self, "Info", "handle_remove_assigned_transporter (stub)")
+    def handle_add_assigned_forwarder(self):
+        logging.warning("ClientMainWidget.handle_add_assigned_forwarder (stub) called.")
+        QMessageBox.information(self, "Info", "handle_add_assigned_forwarder (stub)")
+    def handle_remove_assigned_forwarder(self):
+        logging.warning("ClientMainWidget.handle_remove_assigned_forwarder (stub) called.")
+        QMessageBox.information(self, "Info", "handle_remove_assigned_forwarder (stub)")
+    def handle_add_assigned_mta(self):
+        logging.warning("ClientMainWidget.handle_add_assigned_mta (stub) called.")
+        QMessageBox.information(self, "Info", "handle_add_assigned_mta (stub)")
+    def handle_remove_assigned_mta(self):
+        logging.warning("ClientMainWidget.handle_remove_assigned_mta (stub) called.")
+        QMessageBox.information(self, "Info", "handle_remove_assigned_mta (stub)")
+
+    def populate_doc_table(self): # This is a call to the DocumentsTab's method
+        if hasattr(self, 'documents_tab_widget_ref') and hasattr(self.documents_tab_widget_ref, 'populate_doc_table'):
+            self.documents_tab_widget_ref.populate_doc_table()
+        else:
+            logging.warning("ClientMainWidget: documents_tab_widget_ref or its populate_doc_table method not found.")
+
+    # Add on_status_changed_slot if it's intended to be part of ClientMainWidget
+    # def on_status_changed_slot(self, index):
+    #     logging.debug(f"ClientMainWidget.on_status_changed_slot (stub) called with index {index}.")
+    #     # Add logic to update client status in DB
+    #     status_id = self.status_combo.itemData(index)
+    #     if status_id and self.client_info.get('client_id'):
+    #         try:
+    #             clients_crud_instance.update_client(self.client_info['client_id'], {'status_id': status_id})
+    #             self.client_info['status_id'] = status_id # Update local copy
+    #             # Notify parent or refresh main client list if necessary
+    #             if self.notification_manager:
+    #                 self.notification_manager.show(self.tr("Statut Modifié"), self.tr("Le statut du client a été mis à jour."), type='SUCCESS')
+    #         except Exception as e:
+    #             logging.error(f"Error updating client status: {e}", exc_info=True)
+    #             if self.notification_manager:
+    #                 self.notification_manager.show(self.tr("Erreur"), self.tr("Impossible de mettre à jour le statut du client."), type='ERROR')
+    #             # Revert combo to old status?
+    #             # For now, just log. A full implementation would handle this better.

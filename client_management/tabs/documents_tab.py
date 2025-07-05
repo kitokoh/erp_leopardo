@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (
     QInputDialog, QMessageBox, QFileDialog, QApplication, QSizePolicy
 )
 from PyQt5.QtGui import QIcon, QDesktopServices, QFont
-from PyQt5.QtCore import Qt, QUrl
+from PyQt5.QtCore import Qt, QUrl, QStandardPaths
 
 import db as db_manager
 from db.cruds import client_documents_crud, projects_crud
