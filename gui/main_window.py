@@ -278,7 +278,9 @@ class DocumentManager(QMainWindow):
         logging.info(f"DocumentManager initialized for user: {self.current_user_info.get('username')}, Role: {self.current_user_info.get('role_name')}, License active: {self.current_license_info.get('is_active') if self.current_license_info else 'N/A'}")
 
         # Instantiate ClientController
-        self.client_controller_instance = ClientController(db_manager=db_manager, config=CONFIG, app_root_dir=self.app_root_dir, notification_manager=None) # Temp notification_manager=None
+#        self.client_controller_instance = ClientController(db_manager=db_manager, config=CONFIG, app_root_dir=self.app_root_dir, notification_manager=None) # Temp notification_manager=None
+        self.client_controller_instance = ClientController()
+
         # Later, self.notification_manager will be set up and can be passed if ClientController needs it.
 
 
