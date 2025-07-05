@@ -383,7 +383,7 @@ def login_with_session_token(token_from_qsettings: str) -> tuple[bool, str | Non
 
     token_hash = hash_token_for_storage(token_from_qsettings)
     conn = None
-    try {
+    try:
 
         conn = get_db_connection()
         token_data = user_session_tokens_crud.get_session_token_by_hash(conn, token_hash)
@@ -458,7 +458,7 @@ def login_with_session_token(token_from_qsettings: str) -> tuple[bool, str | Non
 
         return True, None, _current_user_data, license_details
 
-    } except Exception as e:
+    except Exception as e:
 
         logger.error(f"Error during login with session token: {e}", exc_info=True)
         clear_remember_me_token_from_settings() # Clear token on error
