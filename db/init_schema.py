@@ -2637,6 +2637,22 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     print("DEBUG_INIT_DB: Indexes for PasswordResetTokens table created or exists.")
     # --- End Password Reset Tokens Table ---
 
+    # --- UseCases Table (for MyBusinessWidget) ---
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS UseCases (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    print("DEBUG_INIT_DB: Table UseCases created or exists.")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usecases_name ON UseCases(name)")
+    print("DEBUG_INIT_DB: Index for UseCases table created or exists.")
+    # --- End UseCases Table ---
+
+
     # Commit schema changes made via raw SQLite connection before proceeding to SQLAlchemy part
     try:
         logging.info("DEBUG_INIT_DB: Committing main schema/index changes before accounting module DDL.")
