@@ -643,6 +643,31 @@ class ClientMainWidget(QWidget):
         # 3. Call db_manager.add_contact_to_client (or similar).
         # 4. Refresh self.load_contacts().
 
+    def open_compile_pdf_dialog(self):
+        if not self.client_info or not self.client_info.get("client_id"):
+            QMessageBox.warning(self, self.tr("Erreur Client"), self.tr("Informations client non disponibles pour compiler un PDF."))
+            return
+
+        if not hasattr(self, 'CompilePdfDialog') or self.CompilePdfDialog is None:
+            logging.error("CompilePdfDialog component not available in ClientMainWidget.")
+            QMessageBox.critical(self, self.tr("Erreur Composant"), self.tr("Le composant de compilation PDF n'est pas chargé."))
+            return
+
+        dialog = self.CompilePdfDialog(
+            client_info=self.client_info,
+            config=self.config,
+            app_root_dir=self.app_root_dir,
+            parent=self
+        )
+        dialog.exec_()
+        # After the dialog closes, you might want to refresh parts of the UI,
+        # for example, if the compiled PDF is added to the client's document list.
+        # This depends on how CompilePdfDialog signals its outcome or where it saves files.
+        # For now, just executing the dialog.
+        if hasattr(self, 'documents_tab_widget_ref') and hasattr(self.documents_tab_widget_ref, 'populate_doc_table'):
+             self.documents_tab_widget_ref.populate_doc_table()
+
+
     def edit_contact(self, row=None, col=None):
         logging.warning("ClientMainWidget.edit_contact: Placeholder method called.")
         selected_items = self.contacts_table.selectedItems()
