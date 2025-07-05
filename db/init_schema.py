@@ -2360,6 +2360,19 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_exp_tags_tag_id ON ExperienceTags(tag_id)")
     # --- End Experience Module Indexes ---
 
+    # --- User Profile Management Indexes ---
+    print("DEBUG_INIT_DB: Creating User Profile Management Indexes...")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessprofile_user_id ON BusinessProfile(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessprofile_sector_id ON BusinessProfile(sector_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessusecases_profile_id ON BusinessUseCases(business_profile_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessusecases_case_id ON BusinessUseCases(use_case_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessselecteddocs_profile_id ON BusinessSelectedDocuments(business_profile_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessselecteddocs_doc_id ON BusinessSelectedDocuments(document_type_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_menuconfiguration_user_id ON MenuConfiguration(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_menuconfiguration_parent_id ON MenuConfiguration(parent_id)")
+    print("DEBUG_INIT_DB: User Profile Management Indexes created or exist.")
+    # --- End User Profile Management Indexes ---
+
     # EntityContacts Table (New)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS EntityContacts (
@@ -2593,6 +2606,103 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_licenses_is_active ON Licenses(is_active)")
     print("DEBUG_INIT_DB: Indexes for Licenses table created or exists.")
     # --- End License Management Table ---
+
+    # --- User Profile Management Tables (Business Profile, Menu Config, etc.) ---
+    print("DEBUG_INIT_DB: Creating User Profile Management Tables...")
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Sectors (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        type_association TEXT CHECK(type_association IN ('B2B', 'B2C', 'BOTH')) NOT NULL
+    )
+    """)
+    print("DEBUG_INIT_DB: Table Sectors created or exists.")
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS UseCases (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        description TEXT
+    )
+    """)
+    print("DEBUG_INIT_DB: Table UseCases created or exists.")
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS DocumentTypes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        description TEXT
+    )
+    """)
+    print("DEBUG_INIT_DB: Table DocumentTypes created or exists.")
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS BusinessProfile (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL, -- Corresponds to Users.user_id (TEXT)
+        name TEXT,
+        business_type TEXT CHECK(business_type IN ('B2B', 'B2C')),
+        sector_id INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE,
+        FOREIGN KEY (sector_id) REFERENCES Sectors(id) ON DELETE SET NULL
+    )
+    """)
+    print("DEBUG_INIT_DB: Table BusinessProfile created or exists.")
+
+    # Trigger to update 'updated_at' timestamp on BusinessProfile update
+    cursor.execute("""
+    CREATE TRIGGER IF NOT EXISTS update_business_profile_updated_at
+    AFTER UPDATE ON BusinessProfile
+    FOR EACH ROW
+    BEGIN
+        UPDATE BusinessProfile
+        SET updated_at = CURRENT_TIMESTAMP
+        WHERE id = OLD.id;
+    END;
+    """)
+    print("DEBUG_INIT_DB: Trigger update_business_profile_updated_at created or exists.")
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS BusinessUseCases (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_profile_id INTEGER NOT NULL,
+        use_case_id INTEGER NOT NULL,
+        FOREIGN KEY (business_profile_id) REFERENCES BusinessProfile(id) ON DELETE CASCADE,
+        FOREIGN KEY (use_case_id) REFERENCES UseCases(id) ON DELETE CASCADE,
+        UNIQUE(business_profile_id, use_case_id)
+    )
+    """)
+    print("DEBUG_INIT_DB: Table BusinessUseCases created or exists.")
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS BusinessSelectedDocuments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_profile_id INTEGER NOT NULL,
+        document_type_id INTEGER NOT NULL,
+        FOREIGN KEY (business_profile_id) REFERENCES BusinessProfile(id) ON DELETE CASCADE,
+        FOREIGN KEY (document_type_id) REFERENCES DocumentTypes(id) ON DELETE CASCADE,
+        UNIQUE(business_profile_id, document_type_id)
+    )
+    """)
+    print("DEBUG_INIT_DB: Table BusinessSelectedDocuments created or exists.")
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS MenuConfiguration (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL, -- Corresponds to Users.user_id (TEXT)
+        item_name TEXT NOT NULL,
+        item_order INTEGER NOT NULL,
+        is_visible BOOLEAN DEFAULT TRUE,
+        module_identifier TEXT,
+        parent_id INTEGER,
+        FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE,
+        FOREIGN KEY (parent_id) REFERENCES MenuConfiguration(id) ON DELETE CASCADE
+    )
+    """)
+    print("DEBUG_INIT_DB: Table MenuConfiguration created or exists.")
+    # --- End User Profile Management Tables (Initial Set) ---
 
     # Commit schema changes made via raw SQLite connection before proceeding to SQLAlchemy part
     try:
@@ -2948,6 +3058,54 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         print(f"DEBUG_INIT_DB: Total of {seeded_other_role_permissions_count} role-permission links added/verified for non-Admin roles from PERMISSION_MAP.")
         # --- End Seed Permissions and RolePermissions ---
 
+        # --- Seed Data for User Profile Management ---
+        print("DEBUG_INIT_DB: Seeding User Profile Management Data (Sectors, UseCases, DocumentTypes)...")
+        # Seed DocumentTypes
+        document_types_seed = [
+            ('Facture', 'Document de facturation standard'),
+            ('Devis', 'Proposition commerciale détaillée'),
+            ('Bon de Commande', 'Document officiel d\'achat par un client'),
+            ('Reçu', 'Preuve de paiement'),
+            ('Bon de Livraison', 'Document attestant la livraison de marchandises'),
+            ('Avoir', 'Note de crédit'),
+            ('Facture Proforma', 'Facture préliminaire sans valeur comptable')
+        ]
+        cursor.executemany("INSERT OR IGNORE INTO DocumentTypes (name, description) VALUES (?, ?)", document_types_seed)
+        print(f"DEBUG_INIT_DB: {len(document_types_seed)} DocumentTypes seeded or ignored.")
+
+        # Seed Sectors
+        sectors_seed = [
+            ('Import/Export', 'B2B'), ('Fabrication Industrielle', 'B2B'),
+            ('Services aux Entreprises', 'B2B'), ('Grossiste et Distribution', 'B2B'),
+            ('Technologie et Informatique (B2B)', 'B2B'), ('Construction (Grands Projets)', 'B2B'),
+            ('Logistique et Transport de Marchandises', 'B2B'),
+            ('Commerce de Détail (Physique)', 'B2C'), ('Restauration et Hôtellerie', 'B2C'),
+            ('Services à la Personne (Coiffure, Esthétique, etc.)', 'B2C'),
+            ('E-commerce (Vente en ligne aux particuliers)', 'B2C'), ('Artisanat (Vente directe)', 'B2C'),
+            ('Santé et Bien-être (Praticiens indépendants)', 'B2C'),
+            ('Éducation et Formation (Cours particuliers, écoles privées)', 'B2C'),
+            ('Automobile (Vente et Réparation)', 'BOTH'), ('Immobilier (Agences)', 'BOTH'),
+            ('Conseil (Petites entreprises et Particuliers)', 'BOTH')
+        ]
+        cursor.executemany("INSERT OR IGNORE INTO Sectors (name, type_association) VALUES (?, ?)", sectors_seed)
+        print(f"DEBUG_INIT_DB: {len(sectors_seed)} Sectors seeded or ignored.")
+
+        # Seed UseCases
+        use_cases_seed = [
+            ('Gestion des Clients (CRM)', 'Suivi des interactions, historique, segmentation.'),
+            ('Gestion des Commandes', 'Création, suivi, et gestion du cycle de vie des commandes.'),
+            ('Facturation et Paiements', 'Émission de factures, suivi des paiements, relances.'),
+            ('Gestion des Produits/Services', 'Catalogue produits, gestion des prix, descriptions.'),
+            ('Gestion des Stocks', 'Suivi des niveaux de stock, alertes de réapprovisionnement.'),
+            ('Production de Documents Commerciaux', 'Génération de devis, bons de commande, factures, etc.'),
+            ('Rapports et Analyses de Vente', 'Tableaux de bord, analyse des performances.'),
+            ('Gestion de Projet Simplifiée', 'Suivi des tâches et des échéances pour des petits projets.'),
+            ('SAV et Support Client', 'Gestion des tickets de support, base de connaissances.'),
+            ('Gestion des Fournisseurs', 'Base de données fournisseurs, suivi des achats.')
+        ]
+        cursor.executemany("INSERT OR IGNORE INTO UseCases (name, description) VALUES (?, ?)", use_cases_seed)
+        print(f"DEBUG_INIT_DB: {len(use_cases_seed)} UseCases seeded or ignored.")
+        # --- End Seed Data for User Profile Management ---
 
         # Accounting Module Seeding (example: base currency, default fiscal year)
         try:
