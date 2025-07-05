@@ -42,7 +42,7 @@ Le module de Gestion de Projet dans ClientDocManager vise à fournir des outils 
 *   **Gestion des Documents de Projet**:
     *   Téléchargement et organisation des fichiers pertinents pour chaque projet (cahiers des charges, plans, rapports, contrats, etc.).
     *   Liaison avec `db/cruds/project_files_crud.py`.
-    *   **Pages de Garde pour Projets (`project_management/dialogs/cover_page_editor_dialog.py`)**: Outil pour créer ou personnaliser des pages de garde pour les documents de projet.
+    *   **Pages de Garde pour Projets (`project_management/dialogs/cover_page_editor_dialog.py`)**: Outil pour créer ou personnaliser des pages de garde pour les documents de projet. Cela pourrait interagir avec le [Module Gestion Client](./module_gestion_clients_v2.md) si les modèles de pages de garde sont centralisés.
     *   Interaction avec `db/cruds/cover_pages_crud.py` et `db/cruds/cover_page_templates_crud.py`.
 
 *   **Gestion des Ordres de Production (si applicable, `project_management/dialogs/add_production_order_dialog.py`, etc.)**:
@@ -86,7 +86,7 @@ Le module de Gestion de Projet dans ClientDocManager vise à fournir des outils 
 ## 4. Interactions avec d'Autres Modules
 
 *   **Gestion des Clients**: Les projets sont généralement associés à un client. Les informations du client sont affichées dans le contexte du projet.
-*   **Gestion des Documents**: De nombreux documents (contrats, spécifications, rapports) sont générés ou stockés dans le cadre d'un projet. Le module de gestion de projet offre un contexte pour organiser ces documents.
+*   **Gestion Client (pour la partie documents)**: De nombreux documents (contrats, spécifications, rapports) sont générés ou stockés dans le cadre d'un projet. Le module de gestion de projet offre un contexte pour organiser ces documents, en lien avec le module "Gestion Client" pour la génération et le stockage centralisé.
 *   **Gestion des Produits**: Si le projet concerne la livraison de produits spécifiques, ceux-ci peuvent être liés au projet.
 *   **Authentification et Gestion des Utilisateurs**: Les chefs de projet et les membres de l'équipe sont des utilisateurs de l'application. Leurs rôles et permissions peuvent déterminer leur accès et leurs actions possibles sur les projets.
 *   **Calendrier/Agenda**: Les dates clés des projets (début, fin, jalons, échéances des tâches) peuvent être intégrées au module calendrier.

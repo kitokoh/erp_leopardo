@@ -42,6 +42,9 @@ MAIN_MODULE_SEND_EMAIL_DIALOG = None
 MAIN_MODULE_CLIENT_DOCUMENT_NOTE_DIALOG = None
 MAIN_MODULE_SEND_WHATSAPP_DIALOG = None
 
+# Variable globale pour mémoriser le dernier onglet principal sélectionné à travers les instances
+LAST_SELECTED_MAIN_TAB_INDEX = 0 # Default to first tab
+
 # It seems ClientController is not directly passed or stored in this widget in the provided code.
 # For referent functionality, we'll need access to it.
 # Assuming it might be available through db_manager or needs to be passed.
@@ -125,6 +128,7 @@ class ClientMainWidget(QWidget):
         self.default_company_id = None
         self.current_referent_details = None
         self.is_editing_client = False # Added for edit mode state
+        # self.last_selected_main_tab_index is no longer an instance variable for this specific behavior
 
         try:
             default_company = db_manager.get_default_company()
@@ -1046,15 +1050,40 @@ class ClientMainWidget(QWidget):
 
     def _setup_main_tabs_section(self, main_layout):
         try:
-            logging.info("ClientMainWidget.setup_ui: Starting setup for Tabs Section...")
-            self.tabs_group_box = QGroupBox(self.tr("Commandes")) # Renamed
+            logging.info("ClientMainWidget.setup_ui: Starting setup for Main Tabs Section...")
+            # Le QGroupBox "Dossier Client" (anciennement "Commandes") contiendra le QTabWidget principal
+            self.tabs_group_box = QGroupBox(self.tr("Dossier Client"))
             self.tabs_group_box.setCheckable(True)
             tabs_group_layout = QVBoxLayout(self.tabs_group_box)
-            self.tab_widget = QTabWidget()
+            self.tab_widget = QTabWidget() # Ce QTabWidget affichera "Aperçu", "Commandes", "Documents", etc.
             tabs_group_layout.addWidget(self.tab_widget)
-            self.tabs_group_box.setChecked(False)
+            self.tabs_group_box.setChecked(True)
             main_layout.addWidget(self.tabs_group_box)
 
+            # --- Initialisation de tous les widgets d'onglet ---
+            # 1. Onglet Aperçu
+            self.apercu_tab_widget = QWidget()
+            apercu_layout = QVBoxLayout(self.apercu_tab_widget)
+            apercu_label = QLabel(self.tr("Contenu de l'aperçu global du client et de ses commandes.\n(Détails à implémenter)"))
+            apercu_label.setAlignment(Qt.AlignCenter)
+            apercu_layout.addWidget(apercu_label)
+
+            # 2. Onglet Commandes
+            try:
+                self.commandes_content_widget = CommandeWidget(
+                    client_info=self.client_info,
+                    current_user_info=self.current_user_info,
+                    parent=self
+                )
+                self.tab_widget.addTab(self.commandes_content_widget, self.tr("Commandes"))
+                logging.info("ClientMainWidget._setup_main_tabs_section: Commandes tab added to self.tab_widget.")
+            except Exception as e_cmd:
+                logging.error(f"Error creating or adding Commandes tab: {e_cmd}", exc_info=True)
+                error_placeholder_commandes = QLabel(self.tr("Erreur chargement onglet Commandes."))
+                error_placeholder_commandes.setAlignment(Qt.AlignCenter)
+                self.tab_widget.addTab(error_placeholder_commandes, self.tr("Commandes (Erreur)"))
+
+            # 3. Onglet Documents
             self.documents_tab_widget_ref = DocumentsTab(
                 client_info=self.client_info,
                 config=self.config,
@@ -1137,6 +1166,32 @@ class ClientMainWidget(QWidget):
                 error_placeholder_commandes.setAlignment(Qt.AlignCenter)
                 self.tab_widget.addTab(error_placeholder_commandes, self.tr("Commandes (Erreur)"))
 
+            # Définir l'onglet "Commandes" comme onglet par défaut
+            if hasattr(self, 'commandes_content_widget') and self.commandes_content_widget is not None:
+                # Store the index of the Commandes tab if we want it as a default
+                commandes_tab_index = -1
+                for i in range(self.tab_widget.count()):
+                    if self.tab_widget.widget(i) == self.commandes_content_widget:
+                        commandes_tab_index = i
+                        break
+
+                if LAST_SELECTED_MAIN_TAB_INDEX is not None and 0 <= LAST_SELECTED_MAIN_TAB_INDEX < self.tab_widget.count():
+                    self.tab_widget.setCurrentIndex(LAST_SELECTED_MAIN_TAB_INDEX)
+                elif commandes_tab_index != -1:
+                    self.tab_widget.setCurrentIndex(commandes_tab_index)
+                    LAST_SELECTED_MAIN_TAB_INDEX = commandes_tab_index
+                elif self.tab_widget.count() > 0: # Fallback to first tab
+                    self.tab_widget.setCurrentIndex(0)
+                    LAST_SELECTED_MAIN_TAB_INDEX = 0
+
+            else: # Fallback if Commandes tab doesn't exist
+                if LAST_SELECTED_MAIN_TAB_INDEX is not None and 0 <= LAST_SELECTED_MAIN_TAB_INDEX < self.tab_widget.count():
+                    self.tab_widget.setCurrentIndex(LAST_SELECTED_MAIN_TAB_INDEX)
+                elif self.tab_widget.count() > 0:
+                    self.tab_widget.setCurrentIndex(0)
+                    LAST_SELECTED_MAIN_TAB_INDEX = 0
+
+            self.tab_widget.currentChanged.connect(self._on_main_tab_changed)
 
         except Exception as e:
             logging.error(f"Error in _setup_main_tabs_section: {e}", exc_info=True)
@@ -1151,6 +1206,15 @@ class ClientMainWidget(QWidget):
 
     # def _setup_commandes_tab(self): # Method removed as it's integrated into _setup_main_tabs_section
     #     pass
+
+    def _on_main_tab_changed(self, index):
+        """Slot to capture the current main tab index when changed by the user."""
+        global LAST_SELECTED_MAIN_TAB_INDEX
+        if 0 <= index < self.tab_widget.count():
+            LAST_SELECTED_MAIN_TAB_INDEX = index
+            logging.debug(f"ClientMainWidget: Global LAST_SELECTED_MAIN_TAB_INDEX updated to {index} ({self.tab_widget.tabText(index)})")
+        else:
+            logging.warning(f"ClientMainWidget: _on_main_tab_changed received invalid index {index}, global not updated.")
 
     def handle_create_new_version_clicked(self, old_document_id, source_template_id):
         if not self.client_info or not self.client_info.get('client_id'):

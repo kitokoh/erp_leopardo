@@ -1,4 +1,4 @@
-# Chapitre 5 : Création et Gestion de Documents
+# Chapitre 5 : Création et Gestion de Documents (désormais partie intégrante de la Gestion Client)
 
 ClientDocManager est conçu pour simplifier la création et la gestion de vos documents commerciaux et administratifs. Ce chapitre vous montrera comment générer de nouveaux documents à partir de modèles, les organiser et les retrouver.
 
@@ -21,12 +21,12 @@ L'application vous permet de générer divers types de documents, tels que (list
 
 La liste exacte des documents que vous pouvez générer dépend des modèles configurés dans votre application (voir [Module Paramètres et Configuration](../cahier/desktop/module_parametres_configuration.md) pour les aspects techniques, ou demandez à votre administrateur).
 
-## 5.2. Accéder à la Gestion des Documents
+## 5.2. Accéder à la Gestion des Documents (via la Gestion Client)
 
-Il peut y avoir plusieurs manières d'accéder aux fonctionnalités de gestion documentaire :
+Les fonctionnalités de gestion documentaire sont maintenant principalement accessibles via la **Gestion Client**:
 
-*   **Module "Documents" dédié**: Un module spécifique dans le volet de navigation principal peut lister tous les documents, avec des options de filtrage par type, client, date, etc.
-*   **Depuis la Fiche Client**: En consultant un client ([Chapitre 3](./03_gestion_clients.md)), vous trouverez souvent un onglet ou une section listant tous les documents associés à ce client, avec un bouton pour créer un nouveau document pour lui.
+*   **Depuis la Fiche Client**: En consultant un client ([Chapitre 3](./03_gestion_clients.md)), vous trouverez un onglet ou une section "Documents" listant tous les documents associés à ce client. C'est ici que vous pourrez créer un nouveau document pour lui.
+*   Un module "Documents" global (s'il existait) est désormais intégré ou remplacé par la vue centrée sur le client.
 *   **Depuis la Fenêtre Principale**: Le menu **Fichier > Nouveau > Document** (ou un type de document spécifique) peut être disponible.
 
 ## 5.3. Créer un Nouveau Document (Exemple : une Facture Proforma)

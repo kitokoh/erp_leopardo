@@ -78,7 +78,7 @@ Le module de Paramètres et Configuration de ClientDocManager a pour but de perm
 ## 4. Interactions avec d'Autres Modules
 
 *   **Tous les modules**: De nombreux modules dépendent des paramètres configurés ici.
-    *   **Gestion des Documents**: Utilise les informations de l'entreprise, les modèles de documents, les paramètres de langue pour le contenu.
+    *   **Gestion Client (pour la partie documents)**: Utilise les informations de l'entreprise, les modèles de documents (gérés ici ou dans "Gestion Client"), les paramètres de langue pour le contenu.
     *   **Facturation et Paiements**: Utilise les informations de l'entreprise, les taux de TVA par défaut, les modèles de facture.
     *   **Gestion des E-mails**: Utilise la configuration SMTP (si elle est gérée ici).
     *   **Authentification**: La durée de session ou les politiques de mot de passe peuvent être configurées ici.

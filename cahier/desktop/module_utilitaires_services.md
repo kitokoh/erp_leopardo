@@ -20,7 +20,7 @@ Ce document décrit un ensemble de modules et de fichiers qui fournissent des fo
     *   Le `EmailSenderService` peut utiliser ces modèles et les remplir avec des données contextuelles avant l'envoi.
     *   `populate_email_templates.py` pourrait être un script pour initialiser ou gérer ces modèles en base de données s'ils y sont stockés ou référencés.
 *   **Interactions**:
-    *   Utilisé par le [Module de Gestion des Documents](./module_gestion_documents.md) pour envoyer des devis, factures.
+    *   Utilisé par le [Module Gestion Client](./module_gestion_clients_v2.md) pour envoyer des devis, factures et autres documents clients.
     *   Utilisé par le [Module de Facturation et Paiements](./module_facturation_paiements.md) pour envoyer des rappels.
     *   Utilisé par le [Module d'Authentification](./module_auth_utilisateurs.md) pour la réinitialisation de mot de passe.
     *   Utilisé par le [Module Recrutement](./module_recrutement.md) pour communiquer avec les candidats (potentiellement).

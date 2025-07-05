@@ -34,8 +34,8 @@ Ce document décrit les aspects de l'interface utilisateur (UI) du ClientDocMana
 
 *   **Intégration dans les Flux de Travail**:
     *   Le dialogue d'envoi d'e-mail est typiquement invoqué depuis d'autres modules :
-        *   Depuis la [Gestion des Documents](./module_gestion_documents.md) après avoir généré un devis ou une facture, avec le PDF automatiquement attaché.
-        *   Depuis la [Gestion des Clients](./module_gestion_clients.md) ou la [Gestion des Contacts](./module_gestion_contacts.md) pour envoyer un message direct à un client/contact.
+        *   Depuis le [Module Gestion Client](./module_gestion_clients_v2.md) après avoir généré un devis ou une facture, avec le PDF automatiquement attaché.
+        *   Depuis la [Gestion des Clients](./module_gestion_clients.md) (pour la gestion des données de base client) ou la [Gestion des Contacts](./module_gestion_contacts.md) pour envoyer un message direct à un client/contact.
         *   Depuis la [Facturation et Paiements](./module_facturation_paiements.md) pour envoyer des rappels de paiement.
 
 *   **Interaction avec `email_service.py`**:
@@ -72,7 +72,7 @@ Ce document décrit les aspects de l'interface utilisateur (UI) du ClientDocMana
 *   **`email_service.py` ([Module Utilitaires et Services Transverses](./module_utilitaires_services.md))**: La logique backend pour l'envoi effectif des e-mails.
 *   **Gestion des Contacts**: Pour la sélection des destinataires.
 *   **Gestion des Clients**: Pour pré-remplir les informations du destinataire et le contexte pour les placeholders des modèles.
-*   **Gestion des Documents / Facturation / Recrutement etc.**: Comme points d'initiation pour l'envoi d'e-mails contextuels avec pièces jointes.
+*   **Gestion Client / Facturation / Recrutement etc.**: Comme points d'initiation pour l'envoi d'e-mails contextuels avec pièces jointes, où "Gestion Client" est le module principal pour les documents liés aux clients.
 *   **Paramètres et Configuration**: Pour la configuration du compte SMTP d'envoi et potentiellement pour la gestion centralisée des modèles d'e-mails.
 *   **Base de Données**: Peut stocker les modèles d'e-mails (via `populate_email_templates.py` et un CRUD associé si les modèles sont en base de données) et potentiellement un historique/log des e-mails envoyés.
 
