@@ -107,22 +107,37 @@
             /* For page numbers - WeasyPrint specific solution needed if using @page */
         }
 
-        /* WeasyPrint specific for page numbers - basic example */
-        /* This needs to be adapted if a more complex header/footer is desired via @page */
-        /*
+        /* WeasyPrint specific for page numbers and headers/footers */
         @page {
+            size: A4; /* Définit la taille de la page, peut être utile */
+            margin: 1.5cm; /* Marges de la page */
+
+            @top-center {
+                content: "{{ labels.referents_report_title | default('Rapport des Référents') }}";
+                font-family: 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                font-size: 10px;
+                color: #888;
+                vertical-align: bottom;
+                padding-bottom: 5mm; /* Ajustez selon besoin */
+            }
+
             @bottom-right {
-                content: "Page " counter(page) " of " counter(pages);
+                content: "{{ labels.page_label | default('Page') }} " counter(page) " / " counter(pages);
+                font-family: 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
                 font-size: 9px;
-                color: #777;
+                color: #555;
+                vertical-align: top;
+                padding-top: 5mm; /* Ajustez selon besoin */
             }
         }
-        */
-        .page-number {
+
+        /* L'ancienne classe .page-number et le script JS ne sont plus nécessaires pour la pagination CSS */
+        /* .page-number {
             text-align: right;
             font-size: 9px;
             color: #777;
-        }
+        } */
+
 
     </style>
 </head>
@@ -207,29 +222,10 @@
         {% endif %}
 
         <div class="footer">
-            <p class="page-number">{{ labels.page_label | default('Page') }}: <span class="page"><!-- Weasyprint specific JS might be needed for page number if not using @page, or server-side fill --></span> / <span class="topage"></span></p>
             <p>{{ company_details.name | default('Votre Entreprise') }} - {{ company_details.address | default('Votre Adresse') }}</p>
         </div>
     </div>
+    <!-- Script de pagination JS supprimé car géré par CSS @page -->
 
-    <!-- Script for page numbers if not handled by @page CSS (WeasyPrint might need specific handling) -->
-    <!-- This is a common way for browsers, might not directly work in WeasyPrint -->
-    <!-- <script type="text/javascript">
-        function subst() {
-            var vars = {};
-            var x = document.location.search.substring(1).split('&');
-            for (var i in x) { var z = x[i].split('=', 2); vars[z[0]] = unescape(z[1]); }
-            var x = ['frompage', 'topage', 'page', 'webpage', 'section', 'subsection', 'subsubsection'];
-            for (var i in x) {
-                var y = document.getElementsByClassName(x[i]);
-                for (var j = 0; j < y.length; ++j) y[j].textContent = vars[x[i]];
-            }
-        }
-        // Call subst() if rendering in a browser context that supports it (e.g., wkhtmltopdf footer options)
-        // For WeasyPrint, page numbers are typically handled via CSS @page context or by passing them in the HTML content if generated.
-        // For simplicity, if WeasyPrint's CSS counter solution is complex to set up now,
-        // we might omit page numbers or use a simpler placeholder that the server could fill if aware of page count.
-        // For now, I'll leave the placeholders; WeasyPrint often handles `counter(page)` and `counter(pages)` in CSS.
-    </script> -->
 </body>
 </html>
