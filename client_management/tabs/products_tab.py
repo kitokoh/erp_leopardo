@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QDialog
 
 import db as db_manager
 # Import SUPPORTED_LANGUAGES, assuming documents_tab is a sibling
