@@ -567,7 +567,21 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                            message=doc_manager.tr("Le client '{0}' (ID: {1}) a été créé avec succès.").format(created_client_info.get('client_name', client_name_val), actual_new_client_id),
                            type='SUCCESS')
         doc_manager.open_client_tab_by_id(actual_new_client_id)
-        doc_manager.stats_widget.update_stats()
+
+        # Update statistics dashboard
+        stats_dashboard = doc_manager.get_statistics_widget_instance() # This gets/creates StatisticsDashboard
+        if stats_dashboard:
+            if hasattr(stats_dashboard, 'refresh_all_dashboard_content'):
+                stats_dashboard.refresh_all_dashboard_content()
+                logging.info("Called refresh_all_dashboard_content on StatisticsDashboard.")
+            elif hasattr(stats_dashboard, 'update_stats'): # Fallback
+                stats_dashboard.update_stats()
+                logging.info("Called update_stats on StatisticsDashboard.")
+            else:
+                logging.warning("StatisticsDashboard instance does not have a known method to refresh stats.")
+        else:
+            logging.info("Statistics module/dashboard not available, skipping stats update after client creation.")
+
 
     except sqlite3.IntegrityError as e_sqlite_integrity: # This might be caught by controller now
         logging.error(f"Database integrity error: {client_name_val}", exc_info=True)

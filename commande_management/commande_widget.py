@@ -122,7 +122,8 @@ class CommandeWidget(QWidget):
                 date_str = commande_data.get("commande_date", "")
                 if date_str:
                     try:
-                        dt_obj = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                        # Ensure datetime.datetime is used for fromisoformat
+                        dt_obj = datetime.datetime.fromisoformat(date_str.replace('Z', '+00:00'))
                         date_formatted = dt_obj.strftime('%Y-%m-%d %H:%M')
                     except ValueError:
                         date_formatted = date_str
