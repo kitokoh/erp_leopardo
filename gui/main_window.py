@@ -157,13 +157,13 @@ from statistics.map_widget import HomePageMapWidget # Import HomePageMapWidget
 
 from utils import save_config
 from company_management import CompanyTabWidget
-from settings_page import SettingsPage # Import the new SettingsPage
+from settings.settings_page import SettingsPage # Import the new SettingsPage
 from botpress_integration.ui_components import BotpressIntegrationUI # Import Botpress UI
 from dialogs.carrier_map_dialog import CarrierMapDialog # Import CarrierMapDialog
 from voice_input_service import VoiceInputService # Added import
 
 from partners.partner_main_widget import PartnerMainWidget # Partner Management
-from inventory_browser_widget import InventoryBrowserWidget # Inventory Management
+from gui.widgets.inventory_browser_widget import InventoryBrowserWidget # Inventory Management
 from camera_management.camera_management_widget import CameraManagementWidget # Camera Management
 
 from PyQt5.QtGui import QColor, QPalette # For ClientListItemWidget text color
@@ -171,8 +171,8 @@ from PyQt5.QtGui import QColor, QPalette # For ClientListItemWidget text color
 from recruitment.recruitment_dashboard import RecruitmentDashboard # Import RecruitmentDashboard
 
 from ui.home.home_page_widget import HomePageWidget # Updated import path
-from experience_module_widget import ExperienceModuleWidget # Added
-from download_monitor_service import DownloadMonitorService
+from gui.widgets.experience_module_widget import ExperienceModuleWidget # Added
+from services.download_monitor_service import DownloadMonitorService
 from dialogs.assign_document_dialog import AssignDocumentToClientDialog
 from db.cruds.client_documents_crud import add_client_document # For assign dialog
 import os # For path checks in download monitor init
@@ -187,23 +187,7 @@ from user_management.user_menu_button import UserMenuButton # Import UserMenuBut
 from dialogs.edit_user_dialog import EditUserDialog # For handling edit/add user requests
 from dialogs.role_management_dialog import RoleManagementDialog # Added for Role Management
 from commande_management.commandes_dashboard_widget import CommandesDashboardWidget # Import CommandesDashboardWidget
-
-# Definition of configurable modules
-CONFIGURABLE_MODULES = [
-    {'key': 'module_project_management_enabled', 'name': 'project_management', 'action_attr': 'project_management_action', 'widget_attr': 'project_management_widget_instance'},
-    {'key': 'module_product_management_enabled', 'name': 'product_management', 'action_attr': 'product_list_action', 'widget_attr': 'product_management_page_instance'},
-    {'key': 'module_partner_management_enabled', 'name': 'partner_management', 'action_attr': 'partner_management_action', 'widget_attr': 'partner_management_widget_instance'},
-    {'key': 'module_statistics_enabled', 'name': 'statistics', 'action_attr': 'statistics_action', 'widget_attr': 'statistics_dashboard_instance'},
-    {'key': 'module_inventory_management_enabled', 'name': 'inventory_management', 'action_attr': 'inventory_browser_action', 'widget_attr': 'inventory_browser_widget_instance'},
-    {'key': 'module_experience_management_enabled', 'name': 'experience_management', 'action_attr': 'experience_management_action', 'widget_attr': 'experience_management_widget_instance'}, # Added
-    {'key': 'module_botpress_integration_enabled', 'name': 'botpress_integration', 'action_attr': 'botpress_integration_action', 'widget_attr': 'botpress_integration_ui_instance'},
-    {'key': 'module_carrier_map_enabled', 'name': 'carrier_map', 'action_attr': 'open_carrier_map_action', 'widget_attr': None}, # Carrier map is a dialog
-    # Add Calendar module here - for now, not making it 'configurable' via DB setting, always enabled.
-    # If it needs to be configurable, add a 'key' and handle its state in _load_module_states and settings.
-    {'key': 'module_calendar_enabled', 'name': 'calendar', 'action_attr': 'calendar_module_action', 'widget_attr': 'calendar_module_widget_instance'},
-    {'key': 'module_camera_management_enabled', 'name': 'camera_management', 'action_attr': 'camera_management_action', 'widget_attr': 'camera_management_widget_instance'},
-    {'key': 'module_calculator_enabled', 'name': 'calculator', 'action_attr': 'calculator_module_action', 'widget_attr': 'calculator_module_widget_instance'} # Added Calculator module
-]
+from utils.app_constants import CONFIGURABLE_MODULES # Import from new location
 
 class ClientListItemWidget(QWidget):
     def __init__(self, client_data, parent=None):
