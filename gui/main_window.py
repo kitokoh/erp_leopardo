@@ -267,14 +267,14 @@ class ClientListItemWidget(QWidget):
 
 
 class DocumentManager(QMainWindow):
-    def __init__(self, app_root_dir, current_user_info: dict): # Changed current_user_id to current_user_info
+    def __init__(self, app_root_dir, current_user_info: dict, current_license_info: dict | None):
         super().__init__()
         self.app_root_dir = app_root_dir
         self.current_user_info = current_user_info # Store the full user info dictionary
-        # self.current_user_id = current_user_id # Kept for compatibility, but new code should use current_user_info
+        self.current_license_info = current_license_info # Store license information
         self.current_user_id = self.current_user_info.get('user_id') # Extract user_id for existing usage
 
-        logging.info(f"DocumentManager initialized for user: {self.current_user_info.get('username')}, Role: {self.current_user_info.get('role_name')}")
+        logging.info(f"DocumentManager initialized for user: {self.current_user_info.get('username')}, Role: {self.current_user_info.get('role_name')}, License active: {self.current_license_info.get('is_active') if self.current_license_info else 'N/A'}")
 
         self.setWindowTitle(self.tr("Gestionnaire de Documents Client")); self.setGeometry(100, 100, 1200, 800)
         self.setWindowIcon(QIcon(":/icons/logo.svg"))
