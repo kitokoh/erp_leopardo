@@ -2594,6 +2594,64 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     print("DEBUG_INIT_DB: Indexes for Licenses table created or exists.")
     # --- End License Management Table ---
 
+    # --- User Session Tokens Table (for Secure Remember Me) ---
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS UserSessionTokens (
+        token_id TEXT PRIMARY KEY, -- UUID for the record itself
+        user_id TEXT NOT NULL,
+        token_hash TEXT NOT NULL UNIQUE, -- Hash of the actual token stored on client
+        device_identifier TEXT, -- Optional, for scoping token to a device
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_used_at TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
+    )
+    """)
+    print("DEBUG_INIT_DB: Table UserSessionTokens created or exists.")
+
+    # Indexes for UserSessionTokens Table
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usersessiontokens_user_id ON UserSessionTokens(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usersessiontokens_token_hash ON UserSessionTokens(token_hash)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usersessiontokens_expires_at ON UserSessionTokens(expires_at)")
+    print("DEBUG_INIT_DB: Indexes for UserSessionTokens table created or exists.")
+    # --- End User Session Tokens Table ---
+
+    # --- Password Reset Tokens Table ---
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS PasswordResetTokens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        token_hash TEXT NOT NULL UNIQUE, -- Hash of the actual reset token
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        used_at TIMESTAMP, -- Timestamp when the token was used
+        FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
+    )
+    """)
+    print("DEBUG_INIT_DB: Table PasswordResetTokens created or exists.")
+
+    # Indexes for PasswordResetTokens Table
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_passwordresettokens_user_id ON PasswordResetTokens(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_passwordresettokens_token_hash ON PasswordResetTokens(token_hash)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_passwordresettokens_expires_at ON PasswordResetTokens(expires_at)")
+    print("DEBUG_INIT_DB: Indexes for PasswordResetTokens table created or exists.")
+    # --- End Password Reset Tokens Table ---
+
+    # --- UseCases Table (for MyBusinessWidget) ---
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS UseCases (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    print("DEBUG_INIT_DB: Table UseCases created or exists.")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usecases_name ON UseCases(name)")
+    print("DEBUG_INIT_DB: Index for UseCases table created or exists.")
+    # --- End UseCases Table ---
+
     # Commit schema changes made via raw SQLite connection before proceeding to SQLAlchemy part
     try:
         logging.info("DEBUG_INIT_DB: Committing main schema/index changes before accounting module DDL.")
