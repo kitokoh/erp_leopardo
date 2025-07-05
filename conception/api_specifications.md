@@ -90,7 +90,7 @@ La liste suivante est une estimation des endpoints probables basée sur la struc
 
 ---
 
-### 5.3. Gestion des Documents (`api/documents.py`, `api/proformas.py`, etc.)
+### 5.3. Gestion des Documents (`api/documents.py` - à évaluer pour intégration "Gestion Client", `api/proformas.py`, etc.)
 
 *   **`POST /documents/generate-proforma`** (Exemple, le nom exact peut varier)
     *   **Description**: Génère une facture proforma.

@@ -82,7 +82,7 @@ Le module de Gestion des Clients est une composante essentielle de ClientDocMana
 
 ## 4. Interactions avec d'Autres Modules
 
-*   **Gestion des Documents**: Essentiel pour lier les documents (devis, factures, contrats) aux clients et potentiellement à leurs commandes spécifiques.
+*   **Gestion Client (le nouveau module centralisant la vue client)**: Ce module (Gestion des Clients actuel) sera une source de données pour le nouveau module "Gestion Client" qui offrira la vue d'ensemble. Les documents seront gérés via ce nouveau module.
 *   **Gestion des Commandes**: Le module de gestion des clients est le point d'entrée pour créer et visualiser les commandes associées à un client. Chaque client peut avoir plusieurs commandes.
 *   **Facturation et Paiements**: Les factures sont émises pour des clients spécifiques, souvent en lien avec une commande.
 *   **Gestion de Projet**: Chaque commande est associée à un projet pour le suivi administratif et des tâches. Le module de gestion de projet interagit donc étroitement.

@@ -76,7 +76,7 @@ Le module de Rapports et Statistiques de ClientDocManager a pour but de fournir 
     *   Module RH (Employés, Congés, Performance - si ces données sont incluses dans les rapports).
 *   **Base de Données**: Source principale de toutes les données pour les rapports.
 *   **API Backend (`api/reports.py`)**: Fournit les services de traitement et d'agrégation des données pour les rapports.
-*   **Gestion des Documents**: Pour l'exportation des rapports au format PDF.
+*   **Gestion Client**: Pour l'exportation des rapports au format PDF (si la génération documentaire du module Gestion Client est utilisée).
 *   **Gestion des E-mails**: Potentiellement pour l'envoi planifié de rapports.
 
 ## 5. Points d'Attention

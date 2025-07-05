@@ -75,7 +75,7 @@ Le module de Gestion des Produits de ClientDocManager a pour but de permettre un
 
 ## 4. Interactions avec d'Autres Modules
 
-*   **Gestion des Documents**: Les produits sont sélectionnés et ajoutés aux documents commerciaux (devis, factures proforma, factures, bons de commande). Les informations du produit (description, prix) sont utilisées pour remplir ces documents.
+*   **Gestion Client (pour la partie documents)**: Les produits sont sélectionnés et ajoutés aux documents commerciaux (devis, factures proforma, factures, bons de commande) gérés via le module "Gestion Client". Les informations du produit (description, prix) sont utilisées pour remplir ces documents.
 *   **Facturation et Paiements**: Les lignes de facture sont basées sur les produits/services vendus.
 *   **Gestion de Projet**: Les produits ou services peuvent être des livrables ou des composants d'un projet. `client_project_products_crud.py` suggère une liaison directe.
 *   **Gestion des Actifs/Inventaire**: Si les produits sont des actifs suivis, ce module interagit étroitement. La gestion de stock est une composante de cela.

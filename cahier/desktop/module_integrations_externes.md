@@ -79,7 +79,7 @@ Le module d'Intégrations Externes de ClientDocManager vise à connecter l'appli
 *   **Paramètres et Configuration**: Chaque intégration nécessitera une section de configuration pour les URLs d'API, les tokens d'authentification, les options de synchronisation, etc.
 *   **Gestion des Clients / Contacts**: Les intégrations peuvent utiliser les données clients/contacts pour la communication (WhatsApp) ou la synchronisation (WooCommerce).
 *   **Gestion des Produits**: L'intégration WooCommerce interagit fortement avec le catalogue de produits.
-*   **Facturation et Paiements / Gestion des Documents**: Les commandes de WooCommerce peuvent devenir des factures. Des documents peuvent être envoyés via WhatsApp.
+*   **Facturation et Paiements / Gestion Client**: Les commandes de WooCommerce peuvent devenir des factures. Des documents (gérés via "Gestion Client") peuvent être envoyés via WhatsApp.
 *   **Notifications**: Les événements de synchronisation ou les messages reçus via les intégrations pourraient générer des notifications internes.
 *   **Base de Données**: Pour stocker les configurations d'intégration, les logs, ou les données synchronisées (via les CRUDs spécifiques à chaque intégration comme `botpress_integration/crud.py`).
 

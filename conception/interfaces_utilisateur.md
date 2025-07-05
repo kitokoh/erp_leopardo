@@ -28,16 +28,16 @@ L'interface utilisateur de l'application de bureau est conçue pour être riche 
     *   Affiche un résumé des informations importantes, des statistiques clés, des raccourcis vers les actions fréquentes.
 *   **Gestion des Clients (`client_widget.py`, `dialogs/add_new_client_dialog.py`, `dialogs/edit_client_dialog.py`)**:
     *   Liste des clients avec recherche et filtres.
-    *   Vue détaillée d'un client affichant ses informations, projets, documents, contacts.
+    *   Vue détaillée d'un client affichant ses informations, projets, commandes, documents, contacts. (Ceci deviendra le coeur du module "Gestion Client")
     *   Dialogues pour ajouter ou modifier un client.
 *   **Gestion des Produits (`product_management/page.py`, `product_management/list_dialog.py`, `product_management/edit_dialog.py`)**:
     *   Liste des produits avec recherche et filtres.
     *   Dialogues pour ajouter ou modifier des produits.
-*   **Gestion des Documents (Intégrée dans les modules clients, projets, etc.)**:
-    *   Listes de documents associés à un client ou un projet.
-    *   `dialogs/create_document_dialog.py`: Dialogue pour sélectionner un type de document à générer, choisir un modèle, une langue.
-    *   `document_generator/` et `pagedegrde.py`: Bien que principalement logiques, ils ont des implications sur l'UI pour la prévisualisation ou la sélection d'options de page de garde.
-    *   `excel_editor.py`: Interface pour l'édition basique de fichiers Excel.
+*   **Gestion Client (Module principal pour la vue client, incluant les documents)**:
+    *   Listes de documents associés à un client, une commande ou un projet, accessibles depuis la vue client.
+    *   `dialogs/create_document_dialog.py`: Dialogue pour sélectionner un type de document à générer, choisir un modèle, une langue (réutilisé dans le contexte de la Gestion Client).
+    *   `document_generator/` et `pagedegrde.py`: Logique de génération documentaire, utilisée par la Gestion Client.
+    *   `excel_editor.py`: Interface pour l'édition basique de fichiers Excel (peut être invoquée depuis la Gestion Client pour certains types de documents).
 *   **Gestion des Factures et Proformas (`invoicing/invoice_management_widget.py`, `dialogs/proforma_invoice_utils.py`)**:
     *   Listes de factures et proformas.
     *   Dialogues pour créer/éditer des factures, enregistrer des paiements.
