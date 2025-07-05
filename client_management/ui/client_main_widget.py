@@ -123,6 +123,7 @@ class ClientMainWidget(QWidget):
         self.edit_widgets = {}
         self.default_company_id = None
         self.current_referent_details = None
+        self.is_editing_client = False # Added for edit mode state
 
         try:
             default_company = db_manager.get_default_company()
@@ -2005,3 +2006,23 @@ class ClientMainWidget(QWidget):
         elif not pdf_path: # Generation explicitly failed and returned None
             QMessageBox.critical(self, self.tr("Échec de la Génération"), self.tr("La génération du rapport des référents a échoué. Veuillez consulter les logs pour plus de détails."))
         # No else needed if pdf_path is None and an error was already shown by the controller or above.
+
+    def toggle_client_edit_mode(self):
+        self.is_editing_client = not self.is_editing_client
+        if self.is_editing_client:
+            self.edit_save_client_btn.setText(self.tr("Sauvegarder Client"))
+            self.edit_save_client_btn.setIcon(QIcon.fromTheme("document-save", QIcon(":/icons/save.svg")))
+            # Future: Enable editing of specific fields
+            logging.info(f"ClientMainWidget: Entered edit mode for client {self.client_info.get('client_id')}.")
+            # Example: self.client_name_edit.setReadOnly(False)
+            # For now, just log and change button
+        else:
+            # Future: Call a method to save changes if any
+            # For now, just revert button and log
+            self.edit_save_client_btn.setText(self.tr("Modifier Client"))
+            self.edit_save_client_btn.setIcon(QIcon.fromTheme("document-edit", QIcon(":/icons/pencil.svg")))
+            logging.info(f"ClientMainWidget: Exited edit mode for client {self.client_info.get('client_id')}. Save logic pending.")
+            # Example: self.client_name_edit.setReadOnly(True)
+            # Potentially reload client_info to discard non-saved changes: self.refresh_display(self.client_info)
+        # After toggling, re-apply permissions if some actions should be disabled during edit mode
+        self._apply_permissions()
