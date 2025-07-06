@@ -170,27 +170,28 @@ def update_commande(commande_id: str, data: dict, conn: sqlite3.Connection = Non
 @_manage_conn
 def delete_commande(commande_id: str, conn: sqlite3.Connection = None) -> bool:
     """
-    Soft deletes a commande by its ID.
-    Sets is_deleted = 1 and updates deleted_at.
-    Associated CommandeItems are NOT deleted due to ON DELETE CASCADE not firing on soft delete.
+    Soft "deletes" a commande by its ID by setting the `deleted_at` timestamp.
+    The `is_deleted` column does not exist in the `Commandes` table.
+    Associated CommandeItems are NOT deleted.
     """
     cursor = conn.cursor()
     now_utc_iso = datetime.now(timezone.utc).isoformat()
-    sql = "UPDATE Commandes SET is_deleted = 1, deleted_at = ? WHERE commande_id = ?"
+    # Removed "is_deleted = 1" from the query as the column does not exist.
+    sql = "UPDATE Commandes SET deleted_at = ? WHERE commande_id = ?"
     try:
         cursor.execute(sql, (now_utc_iso, commande_id))
         if cursor.rowcount > 0:
-            logger.info(f"Commande {commande_id} soft deleted successfully.")
+            logger.info(f"Commande {commande_id} marked as deleted (deleted_at set).")
             # Optionally, one might want to soft-delete related CommandeItems here if business logic requires,
             # but typically they remain associated with the soft-deleted order.
-            # If CommandeItems also had an is_deleted flag:
-            # cursor.execute("UPDATE CommandeItems SET is_deleted = 1, deleted_at = ? WHERE commande_id = ?", (now_utc_iso, commande_id))
-            # logger.info(f"Associated CommandeItems for {commande_id} also soft-deleted.")
+            # If CommandeItems also had an is_deleted/deleted_at flag:
+            # cursor.execute("UPDATE CommandeItems SET deleted_at = ? WHERE commande_id = ?", (now_utc_iso, commande_id))
+            # logger.info(f"Associated CommandeItems for {commande_id} also marked as deleted.")
             return True
-        logger.warning(f"No commande found with ID {commande_id} to soft delete, or already soft-deleted.")
+        logger.warning(f"No commande found with ID {commande_id} to mark as deleted, or already marked.")
         return False
     except sqlite3.Error as e:
-        logger.error(f"Database error soft deleting commande {commande_id}: {e}", exc_info=True)
+        logger.error(f"Database error marking commande {commande_id} as deleted: {e}", exc_info=True)
         return False
 
 # --- CommandeItems (Order Items) CRUD ---
@@ -394,8 +395,8 @@ def get_all_commandes_with_details(filters: dict = None, limit: int = None, offs
     q_params = []
     conditions = []
 
-    # Ensure soft-deleted orders are not retrieved by default
-    conditions.append("cmd.is_deleted = 0")
+    # The problematic line `conditions.append("cmd.is_deleted = 0")` is removed.
+    # The Commandes table does not have an is_deleted column.
 
     if filters:
         if filters.get('status_commande_id'):
