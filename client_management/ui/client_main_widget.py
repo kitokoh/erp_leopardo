@@ -234,18 +234,21 @@ class ClientMainWidget(QWidget):
 
             self.create_docs_btn = QPushButton(QIcon(":/icons/mail.svg"), self.tr("Envoyer Mail")) # Corrected icon path if mail.svg exists
             self.create_docs_btn.setObjectName("actionButton")
+
             self.create_docs_btn.setToolTip(self.tr("Envoyer un email au client"))
             self.create_docs_btn.clicked.connect(self.open_send_email_dialog)
             self.action_buttons_layout.addWidget(self.create_docs_btn)
 
             self.edit_save_client_btn = QPushButton(QIcon(":/icons/edit-2.svg"), self.tr("Modifier Client"))
             self.edit_save_client_btn.setObjectName("primaryButton")
+
             self.edit_save_client_btn.setToolTip(self.tr("Modifier les informations du client"))
             self.edit_save_client_btn.clicked.connect(self.toggle_client_edit_mode)
             self.action_buttons_layout.addWidget(self.edit_save_client_btn)
 
             self.archive_client_btn = QPushButton(QIcon(":/icons/archive.svg"), self.tr("Archiver Client")) # Corrected icon path if archive.svg exists
             self.archive_client_btn.setObjectName("dangerButton")
+
             self.archive_client_btn.setToolTip(self.tr("Archiver ce client (soft delete)"))
             self.archive_client_btn.clicked.connect(self.handle_archive_client)
             self.action_buttons_layout.addWidget(self.archive_client_btn)

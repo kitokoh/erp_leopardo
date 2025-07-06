@@ -1114,7 +1114,7 @@ class DocumentManager(QMainWindow):
         # Core, non-configurable actions first
         modules_menu.addAction(self.home_action)
         modules_menu.addAction(self.documents_view_action)
-        modules_menu.addAction(self.commande_management_action)
+        # modules_menu.addAction(self.commande_management_action) # Removed: Now part of CONFIGURABLE_MODULES
         modules_menu.addSeparator()
 
         # Load user's menu configuration
