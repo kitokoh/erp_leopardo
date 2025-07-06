@@ -201,6 +201,12 @@ from license_management import (
     FEATURE_COMMANDES_MANAGEMENT, FEATURE_CALCULATOR_MODULE
 )
 
+# Import for menu customization
+from dialogs.menu_customization_dialog import MenuCustomizationDialog
+from utils.app_constants import CONFIGURABLE_MODULES # For menu customization and default order
+import json # For handling menu config storage
+
+
 class ClientListItemWidget(QWidget):
     def __init__(self, client_data, parent=None):
         super().__init__(parent)
@@ -1072,6 +1078,11 @@ class DocumentManager(QMainWindow):
         self.searchable_actions_map[self.tr("Gestion des Commandes")] = self.commande_management_action
         self.searchable_actions_map[self.tr("Gérer les Rôles")] = self.manage_roles_action
 
+        # Action for menu customization
+        self.customize_menu_action = QAction(QIcon(":/icons/edit.svg"), self.tr("Personnaliser le Menu Modules"), self)
+        self.customize_menu_action.triggered.connect(self.open_menu_customization_dialog)
+        self.searchable_actions_map[self.tr("Personnaliser le Menu Modules")] = self.customize_menu_action
+
 
     def _placeholder_manage_users(self):
         # This is a placeholder. Actual user management UI would be complex.
@@ -1087,9 +1098,8 @@ class DocumentManager(QMainWindow):
         # File Menu
         file_menu = menu_bar.addMenu(self.tr("Fichier"))
         file_menu.addAction(self.settings_action) # Will be controlled by _apply_permissions
-        # self.status_action was disabled with a tooltip, consider if it should be permission-based too
-        # For now, keeping its original behavior. If it becomes a real feature, add P_MANAGE_STATUSES.
-        file_menu.addAction(self.status_action)
+        file_menu.addAction(self.status_action) # Controlled by P_MANAGE_STATUSES
+        file_menu.addAction(self.customize_menu_action) # Add customization action
         file_menu.addSeparator()
         file_menu.addAction(self.exit_action) # Exit is always available
 
@@ -2570,5 +2580,97 @@ class DocumentManager(QMainWindow):
         # If any other part of MainWindow directly displays role names or uses a role combo,
         # it should be refreshed here as well.
         # Example: If a ClientWidget had a role dropdown (it doesn't currently), it would need refresh.
+
+    def open_menu_customization_dialog(self):
+        if not self.current_user_id:
+            QMessageBox.warning(self, self.tr("Accès Refusé"), self.tr("Vous devez être connecté pour personnaliser le menu."))
+            return
+
+        available_modules_for_customization = []
+        for module_info_const in CONFIGURABLE_MODULES:
+            module_name = module_info_const['name']
+
+            if not self.module_states.get(module_name, True):
+                continue
+
+            # Using the more complete license feature map from _apply_permissions
+            # This map should ideally be a class member or a shared utility if used in multiple places.
+            _MODULE_TO_LICENSE_FEATURE_MAP = {
+                'project_management': FEATURE_PROJECT_MANAGEMENT,
+                'product_management': FEATURE_PRODUCT_MANAGEMENT,
+                'partner_management': FEATURE_PARTNER_MANAGEMENT,
+                'statistics': FEATURE_STATISTICS_MODULE,
+                'inventory_management': FEATURE_INVENTORY_MANAGEMENT,
+                'experience_management': FEATURE_EXPERIENCE_MANAGEMENT,
+                'calendar': FEATURE_CALENDAR_MODULE,
+                'botpress_integration': FEATURE_BOTPRESS_INTEGRATION,
+                'carrier_map': None,
+                'camera_management': None,
+                'calculator': FEATURE_CALCULATOR_MODULE,
+                'commandes_management': FEATURE_COMMANDES_MANAGEMENT
+            }
+            license_feature_key = _MODULE_TO_LICENSE_FEATURE_MAP.get(module_name)
+            if license_feature_key and license_feature_key not in self.allowed_features:
+                continue
+
+            available_modules_for_customization.append(module_info_const)
+
+        if not available_modules_for_customization:
+            QMessageBox.information(self, self.tr("Aucun Module Configurable"),
+                                    self.tr("Il n'y a actuellement aucun module que vous êtes autorisé à configurer."))
+            return
+
+        dialog = MenuCustomizationDialog(
+            current_user_id=self.current_user_id,
+            configurable_modules=available_modules_for_customization,
+            module_states=self.module_states,
+            license_features=self.allowed_features,
+            parent=self
+        )
+
+        # Pass the actual database access functions to the dialog
+        # db_manager should be available as an import in main_window.py (e.g., import db as db_manager)
+        if not db_manager: # Ensure db_manager is imported and available
+             logging.error("db_manager not available in DocumentManager. Cannot open MenuCustomizationDialog.")
+             QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("Le gestionnaire de base de données n'est pas disponible."))
+             return
+
+        dialog.get_user_menu_config_func = lambda user_id: db_manager.get_setting(f"user_menu_config_{user_id}")
+
+        # Ensure set_setting expects a string for JSON, so dump it here.
+        dialog.set_user_menu_config_func = lambda user_id, data: db_manager.set_setting(f"user_menu_config_{user_id}", json.dumps(data))
+
+        dialog.menu_config_changed.connect(self._handle_menu_config_changed)
+        if dialog.exec_() == QDialog.Accepted:
+            # _handle_menu_config_changed is already connected to the signal,
+            # so it will be called if the dialog emits it upon successful save.
+            pass
+
+    def _handle_menu_config_changed(self):
+        logging.info("Configuration du menu utilisateur modifiée. Reconstruction des menus...")
+
+        # Store the corner widget (search bar and user button) to restore it later
+        corner_widget = self.menuBar().cornerWidget(Qt.TopRightCorner)
+        # Temporarily remove it from the menu bar to prevent it from being deleted by clear()
+        if corner_widget:
+            self.menuBar().setCornerWidget(None)
+            corner_widget.setParent(None) # Ensure it's not deleted with the old menubar
+
+        self.menuBar().clear() # This clears all menus and actions within them.
+
+        # Re-create actions and menus
+        # create_actions_main() generally doesn't need to be recalled unless action properties change.
+        # However, if action texts (used by dialog) or icons were part of user config, it might be needed.
+        # For now, assume only menu structure changes.
+        # self.create_actions_main() # Uncomment if actions themselves might change based on new config.
+
+        self.create_menus_main() # This will use the new configuration from the database.
+        self._apply_permissions() # Re-apply permissions to the new menu structure.
+
+        # Restore the corner widget
+        if corner_widget:
+            self.menuBar().setCornerWidget(corner_widget, Qt.TopRightCorner)
+
+        self.notify(self.tr("Menu Mis à Jour"), self.tr("Le menu principal a été mis à jour selon vos préférences."), type='INFO')
 
 # [end of main_window.py]
