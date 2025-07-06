@@ -43,3 +43,22 @@ LICENSE_REQUEST_SERVER_URL = "http://127.0.0.1:5678/api/license/request"
 # print(f"Config loaded. Database Path: {DATABASE_PATH}")
 # print(f"Root app dir: {APP_ROOT_DIR}")
 
+# Central CONFIG dictionary
+CONFIG = {
+    "app_root_dir": APP_ROOT_DIR,
+    "database_name": DATABASE_NAME,
+    "database_path": DATABASE_PATH,
+    "default_admin_username": DEFAULT_ADMIN_USERNAME,
+    "default_admin_password": DEFAULT_ADMIN_PASSWORD,
+    "logo_dir": LOGO_DIR_PATH,
+    "partners_documents_dir": PARTNERS_DOCUMENTS_DIR,
+    "media_files_base_path": MEDIA_FILES_BASE_PATH,
+    "default_download_path": DEFAULT_DOWNLOAD_PATH,
+    "company_factures_dir": COMPANY_FACTURES_DIR_PATH,
+    "license_request_server_url": LICENSE_REQUEST_SERVER_URL,
+    # Add other relevant paths or settings that modules might expect from a CONFIG dict
+    "clients_dir": os.path.join(APP_ROOT_DIR, "clients"), # As used in commande_widget.py
+    "templates_dir": os.path.join(APP_ROOT_DIR, "resources", "templates"), # As used in create_document_dialog.py & commande_widget.py
+    "default_document_language": "fr", # Example, used in document_manager_logic.py
+    "default_reminder_days": 30, # Example, used in document_manager_logic.py
+}

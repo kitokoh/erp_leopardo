@@ -17,6 +17,7 @@ from PyQt5.QtWidgets import QDialog
 
 import db
 from db.cruds import commandes_crud # Assuming this will be created with necessary functions
+from config import CONFIG
 
 # Placeholder for CommandeDialog - will be in commande_dialog.py
 # from .commande_dialog import CommandeDialog
@@ -298,7 +299,7 @@ class CommandeWidget(QWidget):
             # client_info for proforma generation should be fetched fresh
             # It's available in self.client_info if this widget is for a single client,
             # but it's better to fetch to ensure it's the most up-to-date for the document.
-            client_info_for_doc = db.clients_crud_instance.get_client_by_id(client_id)
+            client_info_for_doc = db.get_client_by_id(client_id) # Use direct import from db
             if not client_info_for_doc:
                 QMessageBox.warning(self, "Erreur", f"Impossible de trouver les détails du client ID: {client_id}")
                 return
@@ -322,7 +323,7 @@ class CommandeWidget(QWidget):
                     QMessageBox.critical(self, "Erreur Configuration", "Chemin racine de l'application non défini.")
                     return
 
-                clients_base_subdir = db_manager.CONFIG.get('clients_dir', 'clients')
+                clients_base_subdir = CONFIG.get('clients_dir', 'clients')
                 relative_folder = os.path.join(clients_base_subdir, f"{sane_client_name}_{client_id_for_folder[:8]}")
                 client_info_for_doc["default_base_folder_path"] = os.path.join(app_root_dir, relative_folder)
                 # We also need the relative path for DB storage later
