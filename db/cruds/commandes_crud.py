@@ -169,22 +169,28 @@ def update_commande(commande_id: str, data: dict, conn: sqlite3.Connection = Non
 
 @_manage_conn
 def delete_commande(commande_id: str, conn: sqlite3.Connection = None) -> bool:
-    """Deletes a commande by its ID (hard delete for now). Also deletes associated CommandeItems."""
+    """
+    Soft deletes a commande by its ID.
+    Sets is_deleted = 1 and updates deleted_at.
+    Associated CommandeItems are NOT deleted due to ON DELETE CASCADE not firing on soft delete.
+    """
     cursor = conn.cursor()
+    now_utc_iso = datetime.now(timezone.utc).isoformat()
+    sql = "UPDATE Commandes SET is_deleted = 1, deleted_at = ? WHERE commande_id = ?"
     try:
-        # First delete associated items
-        cursor.execute("DELETE FROM CommandeItems WHERE commande_id = ?", (commande_id,))
-        logger.info(f"Deleted items for commande_id {commande_id}")
-
-        # Then delete the commande itself
-        cursor.execute("DELETE FROM Commandes WHERE commande_id = ?", (commande_id,))
+        cursor.execute(sql, (now_utc_iso, commande_id))
         if cursor.rowcount > 0:
-            logger.info(f"Commande {commande_id} deleted successfully.")
+            logger.info(f"Commande {commande_id} soft deleted successfully.")
+            # Optionally, one might want to soft-delete related CommandeItems here if business logic requires,
+            # but typically they remain associated with the soft-deleted order.
+            # If CommandeItems also had an is_deleted flag:
+            # cursor.execute("UPDATE CommandeItems SET is_deleted = 1, deleted_at = ? WHERE commande_id = ?", (now_utc_iso, commande_id))
+            # logger.info(f"Associated CommandeItems for {commande_id} also soft-deleted.")
             return True
-        logger.warning(f"No commande found with ID {commande_id} to delete.")
+        logger.warning(f"No commande found with ID {commande_id} to soft delete, or already soft-deleted.")
         return False
     except sqlite3.Error as e:
-        logger.error(f"Database error deleting commande {commande_id}: {e}", exc_info=True)
+        logger.error(f"Database error soft deleting commande {commande_id}: {e}", exc_info=True)
         return False
 
 # --- CommandeItems (Order Items) CRUD ---
@@ -387,6 +393,9 @@ def get_all_commandes_with_details(filters: dict = None, limit: int = None, offs
     """
     q_params = []
     conditions = []
+
+    # Ensure soft-deleted orders are not retrieved by default
+    conditions.append("cmd.is_deleted = 0")
 
     if filters:
         if filters.get('status_commande_id'):
