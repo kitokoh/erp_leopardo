@@ -55,7 +55,35 @@ def get_db_connection(db_path_override=None):
         conn.execute("PRAGMA foreign_keys = ON;")
         return conn
     elif database_type == 'postgresql':
-        raise NotImplementedError("PostgreSQL connection not yet implemented.")
+        try:
+            import psycopg2
+        except ImportError:
+            logging.critical("The 'psycopg2' library is required for PostgreSQL connections. Please install it (e.g., pip install psycopg2-binary).")
+            raise ImportError("psycopg2 library not found. Needed for PostgreSQL connection.")
+
+        pg_host = current_app_config_to_use.get('postgresql_host', 'localhost')
+        pg_port = current_app_config_to_use.get('postgresql_port', 5432)
+        pg_user = current_app_config_to_use.get('postgresql_user')
+        pg_password = current_app_config_to_use.get('postgresql_password')
+        pg_dbname = current_app_config_to_use.get('postgresql_dbname')
+
+        if not pg_user or not pg_dbname:
+            logging.critical("PostgreSQL connection requires at least 'postgresql_user' and 'postgresql_dbname' in configuration.")
+            raise ValueError("Missing PostgreSQL user or database name in configuration.")
+
+        try:
+            conn = psycopg2.connect(
+                dbname=pg_dbname,
+                user=pg_user,
+                password=pg_password,
+                host=pg_host,
+                port=pg_port
+            )
+            logging.info(f"Successfully connected to PostgreSQL database '{pg_dbname}' on {pg_host}:{pg_port}")
+            return conn
+        except psycopg2.Error as e:
+            logging.error(f"Unable to connect to PostgreSQL database: {e}")
+            raise  # Re-raise the exception after logging
     elif database_type == 'mysql':
         raise NotImplementedError("MySQL connection not yet implemented.")
     else:
@@ -101,11 +129,34 @@ def initialize_engine_and_session(app_config_param):
                 logging.info("db.connection: SQLAlchemy engine and SessionLocal created successfully for SQLite.")
             except Exception as e:
                 logging.error(f"db.connection: Failed to create SQLAlchemy engine or SessionLocal: {e}", exc_info=True)
-                engine = None
-                SessionLocal = None
-        else:
-            logging.error("db.connection: 'database_path' not found in config for SQLAlchemy SQLite engine setup. ORM features unavailable.")
+            engine = None
+            SessionLocal = None
+    elif database_type_for_engine == 'postgresql':
+        pg_host = app_config_param.get('postgresql_host', 'localhost')
+        pg_port = app_config_param.get('postgresql_port', 5432)
+        pg_user = app_config_param.get('postgresql_user')
+        pg_password = app_config_param.get('postgresql_password')
+        pg_dbname = app_config_param.get('postgresql_dbname')
+
+        if not all([pg_user, pg_password, pg_dbname]): # Password might be optional for some local setups, but generally good to check
+            logging.error("db.connection: Missing one or more PostgreSQL connection parameters (user, password, dbname) for SQLAlchemy engine setup.")
+            return
+
+        engine_url = f"postgresql://{pg_user}:{pg_password}@{pg_host}:{pg_port}/{pg_dbname}"
+        logging.info(f"db.connection: SQLAlchemy engine connecting to PostgreSQL: {pg_user}@{pg_host}:{pg_port}/{pg_dbname}") # Mask password in log
+        try:
+            engine = create_engine(engine_url)
+            SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+            logging.info("db.connection: SQLAlchemy engine and SessionLocal created successfully for PostgreSQL.")
+        except Exception as e:
+            logging.error(f"db.connection: Failed to create SQLAlchemy engine or SessionLocal for PostgreSQL: {e}", exc_info=True)
+            engine = None
+            SessionLocal = None
+    elif database_type_for_engine == 'sqlite' and not database_path_for_engine: # Ensure this else is for the sqlite condition
+        logging.error("db.connection: 'database_path' not found in config for SQLAlchemy SQLite engine setup. ORM features unavailable.")
     else:
-        logging.warning(f"db.connection: SQLAlchemy engine setup not configured for database_type '{database_type_for_engine}'. ORM features might be limited.")
+        # This 'else' now correctly pairs with the initial 'if/elif' for database_type_for_engine
+        if database_type_for_engine not in ['sqlite', 'postgresql']:
+            logging.warning(f"db.connection: SQLAlchemy engine setup not configured for database_type '{database_type_for_engine}'. ORM features might be limited.")
 
 __all__ = ["get_db_connection", "engine", "SessionLocal", "Base", "initialize_engine_and_session"]

@@ -657,11 +657,45 @@ class SettingsPage(QWidget):
         self.db_type_combo.addItem("SQLite", "sqlite")
         # Add future options as disabled for now
         self.db_type_combo.addItem("PostgreSQL (experimental)", "postgresql")
-        self.db_type_combo.model().item(self.db_type_combo.count() - 1).setEnabled(False)
+        # self.db_type_combo.model().item(self.db_type_combo.count() - 1).setEnabled(False) # Temporarily enable for development
         self.db_type_combo.addItem("MySQL (experimental)", "mysql")
         self.db_type_combo.model().item(self.db_type_combo.count() - 1).setEnabled(False)
         db_form_layout.addRow(self.tr("Database Type:"), self.db_type_combo)
+
+        # --- PostgreSQL Specific Settings (initially hidden) ---
+        self.pg_settings_group = QGroupBox(self.tr("PostgreSQL Connection Details"))
+        pg_settings_layout = QFormLayout(self.pg_settings_group)
+        pg_settings_layout.setSpacing(10)
+
+        self.pg_host_input = QLineEdit()
+        self.pg_host_input.setPlaceholderText(self.tr("e.g., localhost or IP address"))
+        pg_settings_layout.addRow(self.tr("PostgreSQL Host:"), self.pg_host_input)
+
+        self.pg_port_spinbox = QSpinBox()
+        self.pg_port_spinbox.setRange(1, 65535)
+        self.pg_port_spinbox.setToolTip(self.tr("Default PostgreSQL port is 5432."))
+        pg_settings_layout.addRow(self.tr("PostgreSQL Port:"), self.pg_port_spinbox)
+
+        self.pg_user_input = QLineEdit()
+        self.pg_user_input.setPlaceholderText(self.tr("Your PostgreSQL username"))
+        pg_settings_layout.addRow(self.tr("PostgreSQL User:"), self.pg_user_input)
+
+        self.pg_password_input = QLineEdit()
+        self.pg_password_input.setEchoMode(QLineEdit.Password)
+        self.pg_password_input.setPlaceholderText(self.tr("Your PostgreSQL password"))
+        pg_settings_layout.addRow(self.tr("PostgreSQL Password:"), self.pg_password_input)
+
+        self.pg_dbname_input = QLineEdit()
+        self.pg_dbname_input.setPlaceholderText(self.tr("Name of the PostgreSQL database"))
+        pg_settings_layout.addRow(self.tr("PostgreSQL Database Name:"), self.pg_dbname_input)
+
+        db_form_layout.addRow(self.pg_settings_group) # Add the group to the main DB form layout
+        self.pg_settings_group.setVisible(False) # Initially hidden
+
+        self.db_type_combo.currentIndexChanged.connect(self._toggle_pg_settings_visibility) # Connect signal
+
         main_layout.addWidget(db_group)
+
 
         # --- Data Import/Export Group ---
         data_ops_group = QGroupBox(self.tr("Data Import & Export"))
@@ -1479,7 +1513,24 @@ class SettingsPage(QWidget):
         self.backup_port_input.setText(self.main_config.get("backup_port", "")) # Port is QLineEdit
         self.backup_username_input.setText(self.main_config.get("backup_username", ""))
         self.backup_password_input.setText(self.main_config.get("backup_password", ""))
+
+        # Load PostgreSQL specific settings
+        self.pg_host_input.setText(self.main_config.get("postgresql_host", "localhost"))
+        self.pg_port_spinbox.setValue(self.main_config.get("postgresql_port", 5432))
+        self.pg_user_input.setText(self.main_config.get("postgresql_user", ""))
+        self.pg_password_input.setText(self.main_config.get("postgresql_password", ""))
+        self.pg_dbname_input.setText(self.main_config.get("postgresql_dbname", ""))
+
+        self._toggle_pg_settings_visibility() # Ensure correct visibility on load
         print("Data & Backup tab settings loaded.")
+
+    def _toggle_pg_settings_visibility(self):
+        selected_db_type = self.db_type_combo.currentData()
+        is_pg_selected = selected_db_type == "postgresql"
+        self.pg_settings_group.setVisible(is_pg_selected)
+        # Adjust dialog size if necessary, though often Qt handles this
+        # if self.pg_settings_group.isVisible():
+        #     self.parentWidget().parentWidget().adjustSize() # May need to find the top-level dialog/window
 
     def _load_document_templates_tab_data(self):
         self.templates_dir_input.setText(self.main_config.get("templates_dir", ""))
@@ -1533,7 +1584,14 @@ class SettingsPage(QWidget):
             "backup_server_address": self.backup_server_address_input.text().strip(),
             "backup_port": self.backup_port_input.text().strip(), # Port is QLineEdit
             "backup_username": self.backup_username_input.text().strip(),
-            "backup_password": self.backup_password_input.text() # Password not stripped
+            "backup_password": self.backup_password_input.text(), # Password not stripped
+
+            # PostgreSQL specific settings
+            "postgresql_host": self.pg_host_input.text().strip(),
+            "postgresql_port": self.pg_port_spinbox.value(),
+            "postgresql_user": self.pg_user_input.text().strip(),
+            "postgresql_password": self.pg_password_input.text(), # Password not stripped
+            "postgresql_dbname": self.pg_dbname_input.text().strip()
         }
 
     def get_document_templates_settings_data(self):

@@ -61,4 +61,11 @@ CONFIG = {
     "templates_dir": os.path.join(APP_ROOT_DIR, "resources", "templates"), # As used in create_document_dialog.py & commande_widget.py
     "default_document_language": "fr", # Example, used in document_manager_logic.py
     "default_reminder_days": 30, # Example, used in document_manager_logic.py
+
+    # --- PostgreSQL Settings (add sensible defaults or placeholders) ---
+    "postgresql_host": "localhost",
+    "postgresql_port": 5432,
+    "postgresql_user": "your_pg_user", # Placeholder - user should configure
+    "postgresql_password": "your_pg_password", # Placeholder - user should configure
+    "postgresql_dbname": "app_data_pg", # Placeholder - user should configure
 }
