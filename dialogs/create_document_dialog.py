@@ -452,7 +452,7 @@ class CreateDocumentDialog(QDialog):
 
 
                 # Convert HTML to PDF
-                from html_to_pdf_util import convert_html_to_pdf # Local import
+                from utils.html_to_pdf_util import convert_html_to_pdf # Corrected import
                 pdf_output_filename = f"{output_filename_base}.pdf"
                 pdf_output_path = os.path.join(target_doc_folder, pdf_output_filename)
                 base_url_for_pdf = QUrl.fromLocalFile(os.path.dirname(template_file_on_disk_abs)).toString() # Base URL from original template location for relative assets
