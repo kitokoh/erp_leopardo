@@ -15,7 +15,7 @@ from db.cruds import proforma_invoices_crud
 from db import get_client_by_id as get_client_by_id_sqlite
 from db import add_client_document as add_client_document_sqlite
 from db import get_company_by_id as get_company_by_id_sqlite
-from db.utils import get_proforma_invoice_context_data # Assuming this is sqlite based
+from utils.proforma_invoice_utils import get_proforma_invoice_context_data # Assuming this is sqlite based
 from api.models import ProformaInvoiceStatusEnum, User # Assuming User model for auth
 # from api import models as api_models # Not explicitly used, can be removed if ProformaInvoice Pydantic models are self-contained here
 # Assuming proforma_invoice_utils.py will exist or be created later
