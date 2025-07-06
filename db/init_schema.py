@@ -914,20 +914,58 @@ def initialize_database(app_config):
         added_by_user_id TEXT, -- Added column
         FOREIGN KEY (client_id) REFERENCES Clients (client_id) ON DELETE CASCADE,
         FOREIGN KEY (project_id) REFERENCES Projects (project_id) ON DELETE CASCADE,
+        product_id INTEGER NOT NULL,
+        quantity INTEGER NOT NULL DEFAULT 1,
+        unit_price_override REAL,
+        total_price_calculated REAL,
+        serial_number TEXT,
+        purchase_confirmed_at TIMESTAMP,
+        added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        added_by_user_id TEXT, -- Added column
+        client_specific_product_name TEXT, -- New field
+        line_description TEXT, -- New field
+        line_weight REAL, -- New field
+        line_dimensions_notes TEXT, -- New field
+        FOREIGN KEY (client_id) REFERENCES Clients (client_id) ON DELETE CASCADE,
+        FOREIGN KEY (project_id) REFERENCES Projects (project_id) ON DELETE CASCADE,
         FOREIGN KEY (product_id) REFERENCES Products (product_id) ON DELETE CASCADE,
         FOREIGN KEY (added_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL, -- Added FK
         UNIQUE (client_id, project_id, product_id)
     )
     """)
 
-    # Ensure serial_number, purchase_confirmed_at, and added_by_user_id columns exist in ClientProjectProducts table
+    # Ensure serial_number, purchase_confirmed_at, added_by_user_id, and new columns exist in ClientProjectProducts table
     logging.info("DEBUG_INIT_DB: Verifying/Updating schema for ClientProjectProducts...")
     cursor.execute("PRAGMA table_info(ClientProjectProducts)")
     cpp_columns_info_before_alter = cursor.fetchall()
     cpp_column_names_before_alter = [info['name'] for info in cpp_columns_info_before_alter]
     logging.info(f"DEBUG_INIT_DB: ClientProjectProducts schema BEFORE alter: {cpp_column_names_before_alter}")
 
-    if 'serial_number' not in cpp_column_names_before_alter:
+    # Columns to check and add
+    columns_to_ensure = {
+        "client_specific_product_name": "TEXT",
+        "line_description": "TEXT",
+        "line_weight": "REAL",
+        "line_dimensions_notes": "TEXT",
+        "serial_number": "TEXT", # Existing check
+        "purchase_confirmed_at": "TIMESTAMP", # Existing check
+        "added_by_user_id": "TEXT REFERENCES Users(user_id) ON DELETE SET NULL" # Existing check
+    }
+
+    for col_name, col_type in columns_to_ensure.items():
+        if col_name not in cpp_column_names_before_alter:
+            try:
+                logging.info(f"DEBUG_INIT_DB: '{col_name}' column missing in ClientProjectProducts. Attempting to add...")
+                cursor.execute(f"ALTER TABLE ClientProjectProducts ADD COLUMN {col_name} {col_type}")
+                logging.info(f"DEBUG_INIT_DB: Successfully ADDED '{col_name}' column to ClientProjectProducts.")
+            except sqlite3.Error as e_alter_cpp:
+                logging.error(f"DEBUG_INIT_DB: FAILED to add '{col_name}' column to ClientProjectProducts: {e_alter_cpp}")
+        else:
+            logging.info(f"DEBUG_INIT_DB: '{col_name}' column already exists in ClientProjectProducts.")
+
+    # Original checks for serial_number, purchase_confirmed_at, added_by_user_id are now part of the loop above.
+    # Kept the structure below for reference but the actual add operations are done in the loop.
+    # if 'serial_number' not in cpp_column_names_before_alter:
         try:
             logging.info("DEBUG_INIT_DB: 'serial_number' column missing in ClientProjectProducts. Attempting to add...")
             cursor.execute("ALTER TABLE ClientProjectProducts ADD COLUMN serial_number TEXT")
