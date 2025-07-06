@@ -13,6 +13,7 @@ from PyQt5.QtCore import Qt, QDate
 
 import db # Assuming db.__init__ exposes necessary cruds
 from db.cruds import commandes_crud, products_crud, projects_crud, status_settings_crud
+from db.cruds import client_project_products_crud # Added for linking products to client
 from dialogs.product_dialog import ProductDialog # Import ProductDialog
 
 
@@ -285,7 +286,7 @@ class CommandeDialog(QDialog):
             # Fields from the global product
             'product_id': product_data_global.get('product_id'),
             'product_code': product_data_global.get('product_code'),
-            'name': product_data_global.get('product_name'), # This will be displayed in table's "Produit" column
+            'product_name': product_data_global.get('product_name'), # Use 'product_name' consistently
             'description': product_data_global.get('description',''), # Global product description
             'weight': product_data_global.get('weight'),
             'dimensions': product_data_global.get('dimensions'),
@@ -584,9 +585,94 @@ class CommandeDialog(QDialog):
                 self._created_commande_ref = commande_data_payload.get("commande_reference")
 
                 self._sync_commande_items(new_cmd_id)
+                self._ensure_products_linked_to_client(new_cmd_id, commande_data_payload.get("project_id")) # Ensure link
                 super().accept()
             else:
                 QMessageBox.critical(self, "Erreur", "Impossible de créer la commande.")
+        elif self.commande_id_to_edit: # Check if it's an update
+            # This part was missing in the original structure for updates, adding it for completeness
+            # Assuming `success` was defined from `commandes_crud.update_commande`
+            if success: # if update_commande was successful
+                 self._sync_commande_items(self.commande_id_to_edit)
+                 self._ensure_products_linked_to_client(self.commande_id_to_edit, commande_data_payload.get("project_id")) # Ensure link
+                 super().accept()
+            else:
+                QMessageBox.critical(self, "Erreur", "Impossible de mettre à jour la commande.")
+
+    def _ensure_products_linked_to_client(self, commande_id, project_id_for_link=None):
+        """
+        Ensures that all products in the given commande are also linked in ClientProjectProducts.
+        """
+        if not self.client_id:
+            self.logger.error("_ensure_products_linked_to_client: client_id is not set.")
+            return
+
+        commande_items = commandes_crud.get_items_for_commande(commande_id)
+        if not commande_items:
+            self.logger.info(f"No items found for commande {commande_id} to link to client.")
+            return
+
+        try:
+            # Fetch existing client-product links once to avoid multiple DB calls in the loop
+            existing_client_products_links = client_project_products_crud.get_products_for_client_or_project(
+                client_id=self.client_id,
+                project_id=project_id_for_link # Check for this specific project or general if None
+            )
+            existing_product_ids_in_cpp = {
+                link['product_id'] for link in existing_client_products_links
+                if (project_id_for_link is None and link.get('project_id') is None) or \
+                   (project_id_for_link is not None and link.get('project_id') == project_id_for_link)
+            }
+            # If project_id_for_link is None, we are interested in general (null project_id) links.
+            # If project_id_for_link is specified, we are interested in links for that specific project.
+
+            for item in commande_items:
+                product_id = item.get('product_id')
+                if not product_id:
+                    self.logger.warning(f"CommandeItem {item.get('item_id')} has no product_id. Cannot link to client.")
+                    continue
+
+                # Check if this product (for this specific project context or general) is already linked
+                is_already_linked = False
+                # More precise check: Iterate through existing_client_products_links
+                # This check needs to be careful: if project_id_for_link is None, we only care about general links.
+                # If project_id_for_link is set, we care about links to that specific project.
+
+                # Simplified check: if this product_id is among those fetched with the relevant project_id context
+                if product_id in existing_product_ids_in_cpp:
+                    is_already_linked = True # Already linked in the correct context (specific project or general)
+
+
+                # Fallback: A more direct check if the above is too broad or complex due to project_id nuances
+                # This is a bit redundant if existing_product_ids_in_cpp is correctly filtered,
+                # but can serve as a more targeted check if needed.
+                # For now, relying on the pre-filtered existing_product_ids_in_cpp.
+                # Example of a more direct check (would be another DB call per item):
+                # specific_link = client_project_products_crud.get_specific_client_project_product(
+                # client_id=self.client_id, product_id=product_id, project_id=project_id_for_link)
+                # if specific_link: is_already_linked = True
+
+                if not is_already_linked:
+                    link_data = {
+                        'client_id': self.client_id,
+                        'product_id': product_id,
+                        'quantity': item.get('quantity', 1), # Use quantity from commande item
+                        'unit_price_override': None, # Let ProductsTab handle specific pricing for the client link
+                        'added_by_user_id': self.current_user_id,
+                        'project_id': project_id_for_link # Link to the same project as the commande, or None
+                    }
+                    cpp_id = client_project_products_crud.add_product_to_client_or_project(link_data)
+                    if cpp_id:
+                        self.logger.info(f"Product {product_id} from commande {commande_id} "
+                                         f"also linked to client {self.client_id} (Project: {project_id_for_link if project_id_for_link else 'General'}) "
+                                         f"with ClientProjectProductID: {cpp_id}.")
+                    else:
+                        self.logger.error(f"Failed to link product {product_id} from commande {commande_id} "
+                                          f"to client {self.client_id} (Project: {project_id_for_link if project_id_for_link else 'General'}).")
+        except Exception as e:
+            self.logger.error(f"Error in _ensure_products_linked_to_client for commande {commande_id}: {e}", exc_info=True)
+            QMessageBox.warning(self, self.tr("Erreur Liaison Produit-Client"),
+                                self.tr("Une erreur est survenue lors de la tentative de liaison des produits de la commande au profil client."))
 
     def _sync_commande_items(self, commande_id):
         """
