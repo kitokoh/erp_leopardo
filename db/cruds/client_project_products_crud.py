@@ -34,7 +34,8 @@ def add_product_to_client_or_project(link_data: dict, conn: sqlite3.Connection =
 
     total_price = qty * float(eff_price) # Ensure eff_price is float for calculation
 
-    # Nouveaux champs optionnels
+    # Client-specific override fields
+    client_specific_product_name = link_data.get('client_specific_product_name')
     line_description = link_data.get('line_description')
     line_weight = link_data.get('line_weight')
     line_dimensions_notes = link_data.get('line_dimensions_notes')
@@ -42,13 +43,13 @@ def add_product_to_client_or_project(link_data: dict, conn: sqlite3.Connection =
     sql="""INSERT INTO ClientProjectProducts
              (client_id, project_id, product_id, quantity, unit_price_override,
               total_price_calculated, serial_number, purchase_confirmed_at, added_at, added_by_user_id,
-              line_description, line_weight, line_dimensions_notes)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""" # Ajout de 3 placeholders
+              client_specific_product_name, line_description, line_weight, line_dimensions_notes)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""" # Added 4 placeholders
     params=(client_id, link_data.get('project_id'), product_id, qty, override_price,
             total_price, link_data.get('serial_number'),
             link_data.get('purchase_confirmed_at'), datetime.utcnow().isoformat()+"Z",
             link_data.get('added_by_user_id'),
-            line_description, line_weight, line_dimensions_notes) # Ajout des nouveaux paramètres
+            client_specific_product_name, line_description, line_weight, line_dimensions_notes)
 
     # Enhanced logging for diagnostics
     logger.info(f"Executing SQL for add_product_to_client_or_project: {sql}")
@@ -97,7 +98,7 @@ def update_client_project_product(link_id: int, data: dict, conn: sqlite3.Connec
     # Mise à jour des colonnes valides
     valid_cols = ['quantity', 'unit_price_override', 'total_price_calculated', 'serial_number',
                   'purchase_confirmed_at',
-                  'line_description', 'line_weight', 'line_dimensions_notes'] # Nouveaux champs ajoutés
+                  'client_specific_product_name', 'line_description', 'line_weight', 'line_dimensions_notes']
 
     to_set = {k: v for k, v in data.items() if k in valid_cols}
 
