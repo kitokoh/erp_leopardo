@@ -2360,19 +2360,6 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_exp_tags_tag_id ON ExperienceTags(tag_id)")
     # --- End Experience Module Indexes ---
 
-    # --- User Profile Management Indexes ---
-    print("DEBUG_INIT_DB: Creating User Profile Management Indexes...")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessprofile_user_id ON BusinessProfile(user_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessprofile_sector_id ON BusinessProfile(sector_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessusecases_profile_id ON BusinessUseCases(business_profile_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessusecases_case_id ON BusinessUseCases(use_case_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessselecteddocs_profile_id ON BusinessSelectedDocuments(business_profile_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessselecteddocs_doc_id ON BusinessSelectedDocuments(document_type_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_menuconfiguration_user_id ON MenuConfiguration(user_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_menuconfiguration_parent_id ON MenuConfiguration(parent_id)")
-    print("DEBUG_INIT_DB: User Profile Management Indexes created or exist.")
-    # --- End User Profile Management Indexes ---
-
     # EntityContacts Table (New)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS EntityContacts (
@@ -2702,6 +2689,19 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     )
     """)
     print("DEBUG_INIT_DB: Table MenuConfiguration created or exists.")
+
+    # --- User Profile Management Indexes ---
+    print("DEBUG_INIT_DB: Creating User Profile Management Indexes...")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessprofile_user_id ON BusinessProfile(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessprofile_sector_id ON BusinessProfile(sector_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessusecases_profile_id ON BusinessUseCases(business_profile_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessusecases_case_id ON BusinessUseCases(use_case_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessselecteddocs_profile_id ON BusinessSelectedDocuments(business_profile_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessselecteddocs_doc_id ON BusinessSelectedDocuments(document_type_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_menuconfiguration_user_id ON MenuConfiguration(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_menuconfiguration_parent_id ON MenuConfiguration(parent_id)")
+    print("DEBUG_INIT_DB: User Profile Management Indexes created or exist.")
+    # --- End User Profile Management Indexes ---
     # --- End User Profile Management Tables (Initial Set) ---
     # --- User Session Tokens Table (for Secure Remember Me) ---
     cursor.execute("""

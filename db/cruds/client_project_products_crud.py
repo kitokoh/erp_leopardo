@@ -51,6 +51,7 @@ def add_product_to_client_or_project(link_data: dict, conn: sqlite3.Connection =
             link_data.get('added_by_user_id'),
             client_specific_product_name, line_description, line_weight, line_dimensions_notes)
 
+
     # Enhanced logging for diagnostics
     logger.info(f"Executing SQL for add_product_to_client_or_project: {sql}")
     logger.info(f"With parameters: {params}")
@@ -99,6 +100,7 @@ def update_client_project_product(link_id: int, data: dict, conn: sqlite3.Connec
     valid_cols = ['quantity', 'unit_price_override', 'total_price_calculated', 'serial_number',
                   'purchase_confirmed_at',
                   'client_specific_product_name', 'line_description', 'line_weight', 'line_dimensions_notes']
+
 
     to_set = {k: v for k, v in data.items() if k in valid_cols}
 

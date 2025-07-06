@@ -285,6 +285,7 @@ class ProductsTab(QWidget):
                 return
 
             if update_data:
+
                 success = db_manager.update_client_project_product(link_id, update_data) # Corrected call
                 if success:
                     if self.notification_manager:
