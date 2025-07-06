@@ -274,7 +274,7 @@ def main():
     try:
         from alembic.config import Config as AlembicConfig
         from alembic import command as alembic_command
-        import os # Ensure os is imported if not already
+        # os is imported globally, no need for local import here.
 
         # Construct the path to alembic.ini relative to the project root
         # PROJECT_ROOT is defined at the top of main.py
