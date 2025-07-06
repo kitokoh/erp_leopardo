@@ -8,11 +8,7 @@ import datetime
 # This path might need adjustment based on your project structure.
 # If 'db.connection.Base' is standard, this should work.
 # Otherwise, we might need to define a local Base or get it passed.
-try:
-    from db.connection import Base # Assuming your project uses a Base like this
-except ImportError:
-    print("WARNING (calculator.models): Could not import Base from db.connection. Falling back to local Base for calculator history.")
-    Base = declarative_base()
+from db.connection import Base # Assuming your project uses a Base like this
 
 
 class CalculationHistory(Base):
@@ -44,25 +40,5 @@ class CalculationHistory(Base):
 # if __name__ == "__main__":
 #     init_db()
 
-# If running this file directly for testing (not typical for models):
-if __name__ == '__main__':
-    # This is just for a quick check if the model definition is okay.
-    # It does not interact with a real database here.
-    entry = CalculationHistory(
-        user_id="test_user",
-        calculator_type="Commercial",
-        expression="10+5",
-        result="15"
-    )
-    print(entry)
-    # To test with a real in-memory DB:
-    # from sqlalchemy import create_engine
-    # from sqlalchemy.orm import sessionmaker
-    # engine = create_engine('sqlite:///:memory:')
-    # Base.metadata.create_all(engine)
-    # SessionLocalTest = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    # db = SessionLocalTest()
-    # db.add(entry)
-    # db.commit()
-    # print(db.query(CalculationHistory).first())
-    # db.close()
+# Removed __main__ block for model testing from this file.
+# Model testing should be done in dedicated test files or via application context.
