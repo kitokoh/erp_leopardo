@@ -14,7 +14,7 @@ import uuid # For unique filenames
 import db as db_manager
 from db.cruds import commandes_crud
 from db.cruds import proforma_invoices_crud # If creating a proforma DB record
-from db.utils import get_proforma_invoice_context_data # For context
+from utils.proforma_invoice_utils import get_proforma_invoice_context_data # For context
 from utils.html_to_pdf_util import render_html_template, convert_html_to_pdf, WeasyPrintError # For PDF generation
 # Import SUPPORTED_LANGUAGES, assuming documents_tab is a sibling
 from .documents_tab import SUPPORTED_LANGUAGES
