@@ -223,12 +223,28 @@ class CommandeDialog(QDialog):
         commande_date_str = self.commande_data.get("commande_date")
         if commande_date_str:
             try:
-                # Assuming ISO format from DB
-                q_date = QDate.fromString(datetime.fromisoformat(commande_date_str.replace('Z', '')).strftime('%Y-%m-%d'), "yyyy-MM-dd")
+                # Assuming ISO format from DB (e.g., "2023-10-26T14:30:00Z" or "2023-10-26T14:30:00.123Z")
+                # Replace datetime.fromisoformat for broader Python compatibility (Python < 3.7)
+
+                # Remove 'Z' if present (for UTC timezone indicator)
+                if commande_date_str.endswith('Z'):
+                    commande_date_str = commande_date_str[:-1]
+
+                # Handle potential microseconds, which strptime %S doesn't like directly if there's a fractional part.
+                # We only need the date part for QDate, so we can split at 'T'
+                date_part = commande_date_str.split('T')[0]
+
+                # Now date_part should be "YYYY-MM-DD"
+                q_date = QDate.fromString(date_part, "yyyy-MM-dd")
+
                 if q_date.isValid():
                     self.commande_date_edit.setDate(q_date)
-            except ValueError:
-                self.logger.warning(f"Invalid date format for commande_date: {commande_date_str}")
+                else:
+                    self.logger.warning(f"QDate.fromString failed for date_part: {date_part} from original: {self.commande_data.get('commande_date')}")
+            except Exception as e: # Catch any parsing error
+                self.logger.error(f"Error parsing commande_date: {self.commande_data.get('commande_date')}. Error: {e}", exc_info=True)
+                # Optionally, inform the user or set a default date
+                # For now, just log and continue; QDateEdit might remain empty or default.
 
         status_id = self.commande_data.get("status_commande_id")
         if status_id:
