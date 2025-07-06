@@ -178,7 +178,7 @@ def update_sav_ticket(ticket_id: str, update_data: dict, conn: sqlite3.Connectio
 
     # Handle closed_at if status is being updated to a completion status
     if 'status_id' in update_data:
-        try:
+        # try:
             # Need to fetch the status_type properties (is_completion_status)
             # Assuming a function get_status_setting_by_id exists and returns a dict or object
             # from .status_settings_crud import get_status_setting_by_id # Local import to avoid issues

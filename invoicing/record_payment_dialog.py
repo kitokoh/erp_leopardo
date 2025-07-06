@@ -254,4 +254,4 @@ if __name__ == '__main__':
     main_window_placeholder.show()
 
     sys.exit(app.exec_())
-```
+# ```
