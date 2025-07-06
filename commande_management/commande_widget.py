@@ -38,23 +38,32 @@ class CommandeWidget(QWidget):
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(10)
 
-        # Header
-        header_layout = QHBoxLayout()
-        title_label = QLabel(f"Commandes pour {self.client_info.get('client_name', 'N/A')}")
-        title_label.setStyleSheet("font-size: 16pt; font-weight: bold;")
-        header_layout.addWidget(title_label)
-        header_layout.addStretch()
-        main_layout.addLayout(header_layout)
+        # Header (Titre "Commandes pour..." supprimé)
+        # header_layout = QHBoxLayout()
+        # title_label = QLabel(f"Commandes pour {self.client_info.get('client_name', 'N/A')}")
+        # title_label.setStyleSheet("font-size: 16pt; font-weight: bold;")
+        # header_layout.addWidget(title_label)
+        # header_layout.addStretch()
+        # main_layout.addLayout(header_layout)
 
-        # Filters (Placeholder)
-        filter_layout = QHBoxLayout()
-        filter_layout.addWidget(QLabel("Filtrer par Statut:"))
+        # Filters and Action Buttons on the same line
+        filter_actions_layout = QHBoxLayout()
+        filter_actions_layout.addWidget(QLabel("Filtrer par Statut:"))
         self.status_filter_combo = QComboBox()
         self.populate_status_filters() # Populate statuses
         self.status_filter_combo.currentIndexChanged.connect(self.load_commandes) # Connect filter
-        filter_layout.addWidget(self.status_filter_combo)
-        filter_layout.addStretch()
-        main_layout.addLayout(filter_layout)
+        filter_actions_layout.addWidget(self.status_filter_combo)
+        filter_actions_layout.addStretch() # Pushes filter to left, buttons to right
+
+        self.add_commande_btn = QPushButton(QIcon.fromTheme("document-new"), "Nouvelle Commande")
+        self.add_commande_btn.clicked.connect(self.add_new_commande)
+        filter_actions_layout.addWidget(self.add_commande_btn)
+
+        self.refresh_btn = QPushButton(QIcon.fromTheme("view-refresh"), "Actualiser")
+        self.refresh_btn.clicked.connect(self.load_commandes)
+        filter_actions_layout.addWidget(self.refresh_btn)
+
+        main_layout.addLayout(filter_actions_layout)
 
         # Table for Commandes
         self.commandes_table = QTableWidget()
