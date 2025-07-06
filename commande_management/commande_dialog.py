@@ -572,6 +572,7 @@ class CommandeDialog(QDialog):
                 self._last_processed_project_id = commande_data_payload.get("project_id") # Store project_id
 
                 self._sync_commande_items(self.commande_id_to_edit)
+                self._ensure_products_linked_to_client(self.commande_id_to_edit, commande_data_payload.get("project_id")) # Ensure link
                 super().accept()
             else:
                 QMessageBox.critical(self, "Erreur", "Impossible de mettre à jour la commande.")
@@ -589,15 +590,6 @@ class CommandeDialog(QDialog):
                 super().accept()
             else:
                 QMessageBox.critical(self, "Erreur", "Impossible de créer la commande.")
-        elif self.commande_id_to_edit: # Check if it's an update
-            # This part was missing in the original structure for updates, adding it for completeness
-            # Assuming `success` was defined from `commandes_crud.update_commande`
-            if success: # if update_commande was successful
-                 self._sync_commande_items(self.commande_id_to_edit)
-                 self._ensure_products_linked_to_client(self.commande_id_to_edit, commande_data_payload.get("project_id")) # Ensure link
-                 super().accept()
-            else:
-                QMessageBox.critical(self, "Erreur", "Impossible de mettre à jour la commande.")
 
     def _ensure_products_linked_to_client(self, commande_id, project_id_for_link=None):
         """
