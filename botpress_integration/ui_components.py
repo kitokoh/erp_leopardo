@@ -17,7 +17,8 @@ from .crud import (
     get_or_create_conversation, add_message, get_messages_for_conversation, # Added Conversation/Message CRUD
     update_conversation_timestamp, get_conversation_by_botpress_id # For potential future use
 )
-from .models import SessionLocal, create_db_and_tables, UserPrompt, Conversation, Message # Added Conversation/Message models
+from db.connection import SessionLocal # Corrected import for SessionLocal
+from .models import UserPrompt, Conversation, Message # Models for UI component
 from sqlalchemy.exc import SQLAlchemyError
 
 # Setup basic logging if not already configured by the main application
@@ -48,9 +49,9 @@ class BotpressIntegrationUI(QWidget):
 
         try:
             # Ensure DB schema is created (idempotent)
-            create_db_and_tables()
+            # create_db_and_tables() # Table creation is handled centrally
             self.db_session = SessionLocal()
-            self.logger.info("Database session created and tables ensured.")
+            self.logger.info("Database session created.") # Removed "and tables ensured"
         except SQLAlchemyError as e:
             self.logger.critical(f"Failed to connect to database or create tables: {e}", exc_info=True)
             QMessageBox.critical(self, "Database Error",
