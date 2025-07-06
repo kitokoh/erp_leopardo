@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 import logging
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QPushButton, QComboBox, QMessageBox, QApplication
+    QWidget, QVBoxLayout, QPushButton, QComboBox, QMessageBox, QApplication,
+    QGroupBox, QLabel, QHBoxLayout # Added missing imports
 )
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
@@ -89,7 +90,8 @@ class ProductDimensionsTab(QWidget):
 
                     display_text = f"{product_name}"
                     if product_code:
-                        display_text += f" (Code: {product_code})"
+                        display_text += self.tr(" (Code: {0})").format(product_code)
+
                     if lang_code:
                         display_text += f" [{lang_code.upper()}]"
                     # display_text += f" - ID: {global_product_id}" # Keep ID for debugging if needed, but can be long for UI
@@ -119,10 +121,11 @@ class ProductDimensionsTab(QWidget):
         # Example: Use a permission like P_MANAGE_GLOBAL_PRODUCTS if it exists
         # For now, using P_LINK_PRODUCTS_TO_CLIENT as a proxy, assuming it implies some level of product data management.
         if hasattr(self.parent_widget, 'current_user_info'):
-            from auth.permissions import has_permission, P_LINK_PRODUCTS_TO_CLIENT
+            from auth.permissions import has_permission, P_MANAGE_GLOBAL_PRODUCTS
             role_name = self.parent_widget.current_user_info.get('role_name')
             if role_name:
-                can_manage_product_data = has_permission(role_name, P_LINK_PRODUCTS_TO_CLIENT)
+                can_manage_product_data = has_permission(role_name, P_MANAGE_GLOBAL_PRODUCTS) # Changed permission
+
 
         self.edit_client_product_dimensions_button.setEnabled(selected_global_product_id is not None and can_manage_product_data)
 
@@ -160,16 +163,37 @@ class ProductDimensionsTab(QWidget):
             if hasattr(self.parent_widget, 'notification_manager'):
                  self.parent_widget.notification_manager.show(self.tr("Succès"), self.tr("Dimensions produit mises à jour."), type='SUCCESS')
 
-    def apply_permissions_to_tab(self, can_link_products: bool):
+    def apply_permissions_to_tab(self, can_manage_global_products_permission: bool): # Parameter name changed for clarity
         """Applies permissions to UI elements within this tab."""
         # The main button's enabled state is also controlled by product selection in on_dim_product_selected
         # This ensures the permission is the overarching factor.
         current_product_selected = self.dim_product_selector_combo.currentData() is not None
-        self.edit_client_product_dimensions_button.setEnabled(can_link_products and current_product_selected)
-        self.dim_product_selector_combo.setEnabled(can_link_products) # Disable selector if no permission
+
+        # Use the specific permission for managing global products
+        self.edit_client_product_dimensions_button.setEnabled(can_manage_global_products_permission and current_product_selected)
+        self.dim_product_selector_combo.setEnabled(can_manage_global_products_permission) # Or view permission if separate
 
     def refresh_tab_data(self):
         """Public method to refresh data, callable from parent."""
         self.load_products_for_dimension_tab()
 
+    def select_product_in_combo(self, global_product_id_to_select: int = None):
+        """
+        Selects a product in the dim_product_selector_combo based on its global_product_id.
+        If global_product_id_to_select is None, it selects the placeholder item.
+        """
+        self.dim_product_selector_combo.blockSignals(True)
+        if global_product_id_to_select is None:
+            self.dim_product_selector_combo.setCurrentIndex(0) # Index 0 is "Sélectionner un produit..."
+        else:
+            found_index = self.dim_product_selector_combo.findData(global_product_id_to_select)
+            if found_index != -1:
+                self.dim_product_selector_combo.setCurrentIndex(found_index)
+            else:
+                logging.warning(f"ProductDimensionsTab: Product with global_id {global_product_id_to_select} not found in selector combo.")
+                self.dim_product_selector_combo.setCurrentIndex(0) # Fallback to placeholder
+
+        self.dim_product_selector_combo.blockSignals(False)
+        # Manually trigger the handler for the selection change, as signals were blocked
+        self.on_dim_product_selected(self.dim_product_selector_combo.currentIndex())
 

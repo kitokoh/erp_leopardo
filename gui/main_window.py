@@ -190,6 +190,10 @@ from dialogs.role_management_dialog import RoleManagementDialog # Added for Role
 from commande_management.commandes_dashboard_widget import CommandesDashboardWidget # Import CommandesDashboardWidget
 from utils.app_constants import CONFIGURABLE_MODULES # Import from new location
 
+# B2C Restaurant Module Import
+from b2c.ges_restaurant.ui.main_widget import RestaurantMainWidget
+
+
 # License Management Imports for feature constants and manager
 from license_management import manager as license_manager # To call get_allowed_features
 from license_management import (
@@ -369,6 +373,7 @@ class DocumentManager(QMainWindow):
         self.experience_management_widget_instance = None
         self.calendar_module_widget_instance = None
         self.calculator_module_widget_instance = None
+        self.restaurant_widget_instance = None # For B2C Restaurant Module
         
         # For HomePage related widgets that might depend on other modules (like statistics)
         self.statistics_summary_widget_instance = None
@@ -491,38 +496,53 @@ class DocumentManager(QMainWindow):
 
     @pyqtSlot(str)
     def handle_add_client_from_stats_map(self, country_name_str):
-        logging.info(f"Received request to add client for country: {country_name_str} from statistics map using new dialog.")
+        logging.info(f"Received request to add client for country: {country_name_str} from statistics map.")
         try:
-            dialog = StatisticsAddClientDialog(initial_country_name=country_name_str, parent=self)
+            # Utiliser AddNewClientDialog au lieu de StatisticsAddClientDialog
+            dialog = AddNewClientDialog(parent=self, initial_country_name=country_name_str)
 
             if dialog.exec_() == QDialog.Accepted:
-                new_client_data = dialog.get_data()
-                logging.info(f"StatisticsAddClientDialog accepted. Data: {new_client_data}")
+                client_data_from_dialog = dialog.get_data()
+                logging.info(f"AddNewClientDialog accepted. Data: {client_data_from_dialog}")
 
-                if not new_client_data.get('country_id'):
-                    QMessageBox.critical(self, self.tr("Erreur Pays"), self.tr("ID du pays non obtenu depuis le dialogue. Impossible de continuer."))
+                # AddNewClientDialog.get_data() retourne déjà created_by_user_id
+                # et les noms de pays/ville qui seront résolus par client_controller.
+                # Le client_controller s'attend à country_name et city_name, pas IDs.
+
+                if not client_data_from_dialog.get('client_name'):
+                    QMessageBox.critical(self, self.tr("Erreur Données"), self.tr("Le nom du client est requis."))
                     return
 
-                client_data_for_db = {
-                    "client_name": new_client_data["client_name"],
-                    "company_name": new_client_data.get("company_name"),
-                    "country_id": new_client_data["country_id"],
-                    "city_id": new_client_data.get("city_id"),
-                    "project_identifier": new_client_data.get("project_identifier"),
-                    "primary_need_description": new_client_data.get("primary_need_description"),
-                    "selected_languages": new_client_data.get("selected_languages"),
-                    "created_by_user_id": self.current_user_id
-                }
+                if not client_data_from_dialog.get('country_name'):
+                    QMessageBox.critical(self, self.tr("Erreur Données"), self.tr("Le nom du pays est requis."))
+                    return
 
-                logging.info(f"Proceeding to call handle_create_client_execution with data from new dialog: {client_data_for_db}")
-                handle_create_client_execution(self, client_data_dict=client_data_for_db)
+                # Appeler directement le client_controller pour créer le client
+                created_client_info = self.client_controller_instance.create_client(client_data_from_dialog)
+
+                if created_client_info and created_client_info.get('success'):
+                    new_client_id = created_client_info.get('client_id')
+                    if new_client_id:
+                        self.notify(self.tr("Client Créé"),
+                                    self.tr("Le client '{0}' a été créé avec succès.").format(created_client_info.get('client_name')),
+                                    type='SUCCESS')
+                        self.load_clients_from_db_slot() # Recharger la liste des clients
+                        self.open_client_tab_by_id(new_client_id) # Ouvrir l'onglet du nouveau client
+                    else:
+                        QMessageBox.critical(self, self.tr("Erreur Création Client"),
+                                             self.tr("Le client a été créé mais son ID n'a pas été retourné."))
+                else:
+                    error_msg = created_client_info.get('error', self.tr("Erreur inconnue lors de la création du client."))
+                    QMessageBox.critical(self, self.tr("Erreur Création Client"), error_msg)
+                    # Pas besoin de recharger la liste des clients ici car la création a échoué
             else:
-                logging.info("StatisticsAddClientDialog cancelled by user.")
+                logging.info("AddNewClientDialog cancelled by user.")
         except Exception as e:
-            logging.error(f"Error opening or executing StatisticsAddClientDialog for country {country_name_str}: {e}", exc_info=True)
+            logging.error(f"Error opening or executing AddNewClientDialog for country {country_name_str}: {e}", exc_info=True)
             QMessageBox.critical(self,
                                  self.tr("Erreur Dialogue"),
-                                 self.tr("Impossible d'ouvrir le dialogue 'Ajouter Client'. Veuillez consulter les logs de l'application pour plus de détails."))
+                                 self.tr("Impossible d'ouvrir le dialogue 'Ajouter Nouveau Client'. Veuillez consulter les logs pour plus de détails."))
+
     def handle_new_document_detected(self, file_path):
         logging.info(f"Main_window: New document detected by service: {file_path}")
         try:
@@ -660,16 +680,13 @@ class DocumentManager(QMainWindow):
         top_filter_line_layout = QHBoxLayout()
 
         # Status Filter
-        # status_filter_layout_group = QWidget() # Use a QWidget as a container for label and combo
-        # status_filter_v_layout = QVBoxLayout(status_filter_layout_group)
-        # status_filter_v_layout.setContentsMargins(0,0,0,0)
-        # status_label = QLabel(self.tr("Statut:")) # Label for status
-        self.status_filter_combo = QComboBox(); self.status_filter_combo.addItem(self.tr("Tous les statuts"), None)
-        self.load_statuses_into_filter_combo(); self.status_filter_combo.currentIndexChanged.connect(self.filter_client_list_display_slot)
-        self.status_filter_combo.setToolTip(self.tr("Filtrer par statut"))
-        # status_filter_v_layout.addWidget(status_label)
-        # status_filter_v_layout.addWidget(self.status_filter_combo)
-        top_filter_line_layout.addWidget(self.status_filter_combo) # Add combo directly
+        self.status_filter_button = QPushButton(self.tr("Statut: Tous")) # Button text will be updated
+        self.status_filter_button.setObjectName("filterButton") # For styling
+        self.status_filter_button.setToolTip(self.tr("Sélectionner plusieurs statuts client"))
+        self.status_filter_button.clicked.connect(self.open_multi_select_status_dialog)
+        self.selected_status_ids_filter = [] # Store selected status IDs
+        top_filter_line_layout.addWidget(self.status_filter_button)
+
 
         # Search Input
         # search_input_layout_group = QWidget() # Container for label and input
@@ -769,6 +786,18 @@ class DocumentManager(QMainWindow):
 
         self.collapsible_filter_widget.setVisible(False) # Initially hidden
         filter_search_main_layout.addWidget(self.collapsible_filter_widget)
+
+        # --- Category Filter (moved into collapsible area) ---
+        category_filter_layout_group = QWidget()
+        category_filter_h_layout = QHBoxLayout(category_filter_layout_group) # Horizontal for label + input
+        category_filter_h_layout.setContentsMargins(0,0,0,0)
+        category_label = QLabel(self.tr("Catégorie:"))
+        self.category_filter_input = QLineEdit()
+        self.category_filter_input.setPlaceholderText(self.tr("Filtrer par catégorie..."))
+        self.category_filter_input.textChanged.connect(self.filter_client_list_display_slot)
+        category_filter_h_layout.addWidget(category_label)
+        category_filter_h_layout.addWidget(self.category_filter_input)
+        collapsible_layout.addWidget(category_filter_layout_group) # Add to collapsible
 
         # --- Saved Filters UI ---
         saved_filters_group = QGroupBox(self.tr("Filtres Sauvegardés")) # Optional: GroupBox for clarity
@@ -901,19 +930,26 @@ class DocumentManager(QMainWindow):
         """Resets all filter inputs to their default states and refreshes the client list."""
         logging.info("Resetting all filters.")
 
-        # Reset ComboBoxes to their first item (index 0)
-        self.status_filter_combo.setCurrentIndex(0)
+        # Reset Status Filter Button and selected IDs
+        self.selected_status_ids_filter = []
+        self.status_filter_button.setText(self.tr("Statut: Tous"))
+
+        # Reset other ComboBoxes
         self.client_archive_filter_combo.setCurrentIndex(0)
         self.country_filter_combo.setCurrentIndex(0)
+
+        # Reset Category Input
+        if hasattr(self, 'category_filter_input'):
+            self.category_filter_input.setText("")
 
         # Clear the search input field
         self.search_input_field.setText("")
 
         # Clear date filters
-        if hasattr(self, 'date_filter_start'): # Check if attributes exist (they should)
-            self.date_filter_start.setDate(QDate())
+        if hasattr(self, 'date_filter_start'):
+            self.date_filter_start.setDate(QDate()) # Set to null QDate
         if hasattr(self, 'date_filter_end'):
-            self.date_filter_end.setDate(QDate())
+            self.date_filter_end.setDate(QDate()) # Set to null QDate
 
 
         # Collapse the "More Filters" section if it's open
@@ -921,7 +957,6 @@ class DocumentManager(QMainWindow):
             self.more_filters_button.setChecked(False) # This will trigger toggle_more_filters_visibility
 
         # Refresh the client list
-        # Calling filter_client_list_display_slot will also reset pagination and load from DB
         self.filter_client_list_display_slot()
 
         self.notify(self.tr("Filtres Réinitialisés"), self.tr("Tous les filtres ont été réinitialisés."), type='INFO')
@@ -1083,6 +1118,12 @@ class DocumentManager(QMainWindow):
         self.customize_menu_action.triggered.connect(self.open_menu_customization_dialog)
         self.searchable_actions_map[self.tr("Personnaliser le Menu Modules")] = self.customize_menu_action
 
+        # B2C Restaurant Module Action
+        # TODO: Find or create a suitable icon e.g., :/icons/restaurant.svg or :/icons/utensils.svg
+        self.restaurant_module_action = QAction(QIcon(":/icons/placeholder_icon.svg"), self.tr("Service Restaurant (B2C)"), self)
+        self.restaurant_module_action.triggered.connect(self.show_restaurant_module_view)
+        self.searchable_actions_map[self.tr("Service Restaurant (B2C)")] = self.restaurant_module_action
+
 
     def _placeholder_manage_users(self):
         # This is a placeholder. Actual user management UI would be complex.
@@ -1116,6 +1157,8 @@ class DocumentManager(QMainWindow):
         modules_menu.addAction(self.documents_view_action)
         # modules_menu.addAction(self.commande_management_action) # Removed: Now part of CONFIGURABLE_MODULES
         modules_menu.addSeparator()
+        modules_menu.addAction(self.restaurant_module_action) # Added B2C Restaurant module action
+        modules_menu.addSeparator() # Separator after B2C module fixed entry
 
         # Load user's menu configuration
         user_menu_config = None
@@ -1735,15 +1778,23 @@ class DocumentManager(QMainWindow):
         self.load_clients_from_db_slot()
 
     def load_clients_from_db_slot(self):
-        status_id_filter = self.status_filter_combo.currentData()
-        country_id_filter = self.country_filter_combo.currentData() # Get country filter
+        # status_id_filter = self.status_filter_combo.currentData() # Old single status filter
+        country_id_filter = self.country_filter_combo.currentData()
+        category_filter_text = self.category_filter_input.text().strip() if hasattr(self, 'category_filter_input') else None
+
         archive_filter_data = self.client_archive_filter_combo.currentData()
         include_deleted_filter = False
         if archive_filter_data == "all_status_types": include_deleted_filter = True
         elif isinstance(archive_filter_data, bool): include_deleted_filter = archive_filter_data
-        filters_for_crud = {};
-        if status_id_filter is not None: filters_for_crud['status_id'] = status_id_filter
+
+        filters_for_crud = {}
+        if self.selected_status_ids_filter: # Use the list of selected status IDs
+            filters_for_crud['status_ids'] = self.selected_status_ids_filter
+        # If self.selected_status_ids_filter is empty, no status_ids filter is applied (shows all, respecting archive filter)
+
         if country_id_filter is not None: filters_for_crud['country_id'] = country_id_filter
+        if category_filter_text: filters_for_crud['category'] = category_filter_text
+
 
         # Add date filters if they are set
         if hasattr(self, 'date_filter_start') and self.date_filter_start.date().isValid() and not self.date_filter_start.date().isNull():
@@ -1855,19 +1906,7 @@ class DocumentManager(QMainWindow):
             logging.error(self.tr("Erreur chargement pays pour filtre: {0}").format(str(e)))
             # self.country_filter_combo.setEnabled(False)
 
-    def load_statuses_into_filter_combo(self): 
-        current_selection_data = self.status_filter_combo.currentData()
-        self.status_filter_combo.clear()
-        self.status_filter_combo.addItem(self.tr("Tous les statuts"), None)
-        try:
-            client_statuses = db_manager.get_all_status_settings(type_filter='Client')
-            if client_statuses is None: client_statuses = []
-            for status_dict in client_statuses:
-                self.status_filter_combo.addItem(status_dict['status_name'], status_dict.get('status_id'))
-            index = self.status_filter_combo.findData(current_selection_data)
-            if index != -1: self.status_filter_combo.setCurrentIndex(index)
-        except Exception as e:
-            print(self.tr("Erreur chargement statuts pour filtre: {0}").format(str(e)))
+    # load_statuses_into_filter_combo is no longer needed as statuses are loaded in MultiSelectStatusDialog
             
     def handle_client_list_click(self, item):
         logging.info(f"handle_client_list_click entered. Item text: {item.text()}, Item data: {item.data(Qt.UserRole)}")
@@ -2057,10 +2096,35 @@ class DocumentManager(QMainWindow):
         # Ensure the save button signal is connected
         try:
             self.settings_page_instance.save_settings_button.clicked.disconnect(self._handle_settings_saved)
-        except TypeError:
-            pass
+        except TypeError: # This happens if it was not connected before
+            pass # No need to disconnect if not connected
         self.settings_page_instance.save_settings_button.clicked.connect(self._handle_settings_saved)
         logging.info("Switched to Settings Page and refreshed its data.")
+
+    def open_multi_select_status_dialog(self):
+        from dialogs.multi_select_status_dialog import MultiSelectStatusDialog # Local import
+
+        dialog = MultiSelectStatusDialog(pre_selected_status_ids=self.selected_status_ids_filter, parent=self)
+        if dialog.exec_() == QDialog.Accepted:
+            self.selected_status_ids_filter = dialog.get_selected_status_ids()
+            if not self.selected_status_ids_filter: # Empty list means "All"
+                self.status_filter_button.setText(self.tr("Statut: Tous"))
+            elif len(self.selected_status_ids_filter) == 1:
+                # Try to get status name for single selection display
+                status_name = self.tr("Statut: Inconnu")
+                try:
+                    status_info = db_manager.get_status_setting_by_id(self.selected_status_ids_filter[0])
+                    if status_info:
+                        status_name = status_info.get('status_name', self.tr("Inconnu"))
+                    self.status_filter_button.setText(self.tr("Statut: {0}").format(status_name))
+                except Exception as e_status_name:
+                    logging.error(f"Error fetching status name for ID {self.selected_status_ids_filter[0]}: {e_status_name}")
+                    self.status_filter_button.setText(self.tr("Statut: ID {0}").format(self.selected_status_ids_filter[0]))
+            else:
+                self.status_filter_button.setText(self.tr("Statut: {0} sélectionnés").format(len(self.selected_status_ids_filter)))
+
+            self.filter_client_list_display_slot() # Trigger refresh
+        # If dialog is cancelled, self.selected_status_ids_filter remains unchanged.
 
     def _handle_settings_saved(self):
         """Called when 'Save All Settings' in SettingsPage is clicked."""
@@ -2300,9 +2364,23 @@ class DocumentManager(QMainWindow):
             if hasattr(self, 'more_filters_button'): self.more_filters_button.blockSignals(True)
 
 
-            # Apply status filter
-            status_idx = self.status_filter_combo.findData(params.get('status_id'))
-            self.status_filter_combo.setCurrentIndex(status_idx if status_idx != -1 else 0)
+            # Apply status filter (now multi-select)
+            self.selected_status_ids_filter = params.get('status_ids', [])
+            if not self.selected_status_ids_filter:
+                self.status_filter_button.setText(self.tr("Statut: Tous"))
+            elif len(self.selected_status_ids_filter) == 1:
+                 # Try to get status name for single selection display
+                status_name_display = self.tr("Statut: Inconnu")
+                try:
+                    status_info = db_manager.get_status_setting_by_id(self.selected_status_ids_filter[0])
+                    if status_info: status_name_display = status_info.get('status_name', self.tr("Inconnu"))
+                    self.status_filter_button.setText(self.tr("Statut: {0}").format(status_name_display))
+                except Exception as e_status_name_saved:
+                    logging.error(f"Error fetching status name for saved ID {self.selected_status_ids_filter[0]}: {e_status_name_saved}")
+                    self.status_filter_button.setText(self.tr("Statut: ID {0}").format(self.selected_status_ids_filter[0]))
+            else:
+                self.status_filter_button.setText(self.tr("Statut: {0} sélectionnés").format(len(self.selected_status_ids_filter)))
+
 
             # Apply archive filter
             archive_idx = self.client_archive_filter_combo.findData(params.get('archive_filter'))
@@ -2312,11 +2390,16 @@ class DocumentManager(QMainWindow):
             country_idx = self.country_filter_combo.findData(params.get('country_id'))
             self.country_filter_combo.setCurrentIndex(country_idx if country_idx != -1 else 0)
 
+            # Apply category filter
+            if hasattr(self, 'category_filter_input'):
+                self.category_filter_input.setText(params.get('category', ''))
+
+
             # Apply search term
             self.search_input_field.setText(params.get('search_term', ''))
 
             # Apply date filters
-            show_collapsible = False
+            show_collapsible = False # Flag to determine if advanced filter section should be visible
             if hasattr(self, 'date_filter_start'):
                 date_start_str = params.get('created_at_start')
                 if date_start_str:
@@ -2390,10 +2473,9 @@ class DocumentManager(QMainWindow):
 
         parameters_dict = {}
 
-        # Status Filter
-        status_data = self.status_filter_combo.currentData()
-        if status_data is not None: # Only save if not "All Statuses" (which is None)
-            parameters_dict['status_id'] = status_data
+        # Status Filter (now multi-select)
+        if self.selected_status_ids_filter: # Save if list is not empty
+            parameters_dict['status_ids'] = self.selected_status_ids_filter
 
         # Archive Filter
         archive_data = self.client_archive_filter_combo.currentData()
@@ -2404,6 +2486,12 @@ class DocumentManager(QMainWindow):
         country_data = self.country_filter_combo.currentData()
         if country_data is not None: # Only save if not "All Countries"
             parameters_dict['country_id'] = country_data
+
+        # Category Filter
+        if hasattr(self, 'category_filter_input'):
+            category_text = self.category_filter_input.text().strip()
+            if category_text:
+                parameters_dict['category'] = category_text
 
         # Search Term
         search_text = self.search_input_field.text().strip()
@@ -2562,6 +2650,47 @@ class DocumentManager(QMainWindow):
         # If any other part of MainWindow directly displays role names or uses a role combo,
         # it should be refreshed here as well.
         # Example: If a ClientWidget had a role dropdown (it doesn't currently), it would need refresh.
+
+    def show_restaurant_module_view(self):
+        """Shows the B2C Restaurant Management module."""
+        # Optional: Check module state if it's made configurable
+        # if not self.module_states.get('b2c_restaurant', True): # Example key
+        #     QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Service Restaurant est désactivé."))
+        #     return
+
+        # Optional: Check license feature if applicable
+        # RESTAURANT_FEATURE_KEY = "FEATURE_B2C_RESTAURANT" # Define this constant
+        # if RESTAURANT_FEATURE_KEY not in self.allowed_features:
+        #    QMessageBox.warning(self, self.tr("Licence Requise"), self.tr("Votre licence actuelle ne permet pas d'accéder à ce module."))
+        #    return
+
+        if self.restaurant_widget_instance is None:
+            logging.info("DocumentManager: Lazily creating RestaurantMainWidget...")
+            try:
+                self.restaurant_widget_instance = RestaurantMainWidget(
+                    parent=self,
+                    current_user_info=self.current_user_info
+                )
+                self.main_area_stack.addWidget(self.restaurant_widget_instance)
+                logging.info("DocumentManager: RestaurantMainWidget instance created and added to stack.")
+            except Exception as e:
+                logging.error(f"Failed to create RestaurantMainWidget: {e}", exc_info=True)
+                QMessageBox.critical(self, self.tr("Erreur Module"),
+                                     self.tr("Le module Service Restaurant n'a pas pu être chargé : {0}").format(str(e)))
+                self.restaurant_widget_instance = None # Ensure it's None on failure
+                return # Don't proceed to show if creation failed
+
+        if self.restaurant_widget_instance: # Check again in case creation failed
+            if hasattr(self.restaurant_widget_instance, 'refresh_all_data'):
+                self.restaurant_widget_instance.refresh_all_data()
+            self.main_area_stack.setCurrentWidget(self.restaurant_widget_instance)
+            logging.info("Switched to B2C Restaurant Management view.")
+        else:
+            # This case should be covered by the try-except above, but as a safeguard:
+            logging.error("RestaurantMainWidget instance is None after attempting creation. Cannot show view.")
+            QMessageBox.critical(self, self.tr("Erreur Critique"),
+                                 self.tr("La page du Service Restaurant n'a pas pu être chargée."))
+
 
     def open_menu_customization_dialog(self):
         if not self.current_user_id:

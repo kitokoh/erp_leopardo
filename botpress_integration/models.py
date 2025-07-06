@@ -3,9 +3,9 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
 
-DATABASE_URL = "sqlite:///./botpress_integration.db"  # Example SQLite URL
+# DATABASE_URL = "sqlite:///./botpress_integration.db"  # Example SQLite URL - Should be managed centrally
 
-Base = declarative_base()
+from db.connection import Base # Use the central Base
 
 class UserBotpressSettings(Base):
     __tablename__ = "user_botpress_settings"
@@ -37,17 +37,20 @@ class UserPrompt(Base):
     def __repr__(self):
         return f"<UserPrompt(prompt_name='{self.prompt_name}')>"
 
-# Engine and session setup (can be moved to a central db management file later)
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False}) # check_same_thread for SQLite
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Engine and session setup should be managed centrally.
+# Remove local engine, SessionLocal, and create_db_and_tables.
 
-def create_db_and_tables():
-    Base.metadata.create_all(bind=engine)
+# def create_db_and_tables():
+#     Base.metadata.create_all(bind=engine) # engine would come from db.connection
 
-if __name__ == "__main__":
+# The __main__ block below was for testing this module's DB setup independently.
+# It should be removed or adapted if specific testing for these models is needed
+# using the central DB connection. For now, removing it to avoid confusion.
+
+# if __name__ == "__main__":
     # This will create the database and tables when models.py is run directly
-    create_db_and_tables()
-    print("Database and tables created (if they didn't exist).")
+    # create_db_and_tables()
+    # print("Database and tables created (if they didn't exist).")
 
     # Example of how to use the models (optional, for testing)
     # from sqlalchemy.orm import Session

@@ -2147,6 +2147,10 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_company_name ON Clients(company_name)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_category ON Clients(category)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_created_by_user_id ON Clients(created_by_user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_client_name ON Clients(client_name)") # Added
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_is_deleted ON Clients(is_deleted)") # Added
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_created_at ON Clients(created_at)") # Added
+
 
     # ReportConfigurations Indexes
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_reportconfigurations_report_name ON ReportConfigurations(report_name)")
@@ -2192,6 +2196,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_invoices_document_id ON Invoices(document_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_invoices_payment_status ON Invoices(payment_status)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_invoices_invoice_number ON Invoices(invoice_number)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_invoices_issue_date ON Invoices(issue_date)") # Added
     # TeamMembers
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_teammembers_user_id ON TeamMembers(user_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_teammembers_is_active ON TeamMembers(is_active)")
@@ -2208,6 +2213,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     # ClientProjectProducts
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientprojectproducts_product_id ON ClientProjectProducts(product_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientprojectproducts_client_project ON ClientProjectProducts(client_id, project_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_cpp_purchase_confirmed_at ON ClientProjectProducts(purchase_confirmed_at)") # Added
     # ActivityLog
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_activitylog_user_id ON ActivityLog(user_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_activitylog_created_at ON ActivityLog(created_at)")
@@ -2223,6 +2229,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_savtickets_client_id ON SAVTickets(client_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_savtickets_status_id ON SAVTickets(status_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_savtickets_assigned_technician_id ON SAVTickets(assigned_technician_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_savtickets_opened_at ON SAVTickets(opened_at)") # Added
     # ImportantDates
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_importantdates_date_value ON ImportantDates(date_value)")
     # Transporters
@@ -3007,15 +3014,24 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
 
     # --- Create tables for MainBase (e.g., CalculatorHistory) ---
     # This needs to happen after the main 'conn' is closed if 'actual_main_engine' uses a new connection.
-    if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None and actual_main_engine is not None: # Intentionally same for testing save
+    if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None and actual_main_engine is not None:
         try:
-            logging.info("DEBUG_INIT_DB: Creating tables for MainBase (e.g., CalculatorHistory) using SQLAlchemy actual_main_engine.")
-            MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True) # Intentionally same
+            # Import B2C restaurant models to register them with MainBase before create_all
+            # This ensures that if b2c.ges_restaurant.models uses the same MainBase, its tables are included.
+            import b2c.ges_restaurant.models
+            logging.info("DEBUG_INIT_DB: Imported b2c.ges_restaurant.models for schema creation with MainBase.")
+        except ImportError as e_import_b2c_for_mainbase:
+            logging.error(f"DEBUG_INIT_DB: Failed to import b2c.ges_restaurant.models for MainBase, restaurant tables might not be created if they share MainBase: {e_import_b2c_for_mainbase}")
+        except Exception as e_b2c_generic_for_mainbase:
+            logging.error(f"DEBUG_INIT_DB: An unexpected error occurred during import of b2c.ges_restaurant.models for MainBase: {e_b2c_generic_for_mainbase}", exc_info=True)
+
+        try:
+            logging.info("DEBUG_INIT_DB: Creating tables for MainBase (e.g., CalculatorHistory, Restaurant*) using SQLAlchemy actual_main_engine.")
+            MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True)
 
             logging.info("DEBUG_INIT_DB: Tables for MainBase created successfully.")
         except Exception as e_main_base_create:
             logging.error(f"DEBUG_INIT_DB: Error creating tables for MainBase: {e_main_base_create}", exc_info=True)
-            # Decide if this is critical enough to rollback or raise. For now, logging error.
     else:
         logging.warning("DEBUG_INIT_DB: Main SQLAlchemy components (MainBase, actual_main_engine) not loaded or actual_main_engine is None. Skipping MainBase.metadata.create_all().")
 
