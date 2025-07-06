@@ -45,7 +45,15 @@ class ClientsCRUD(GenericCRUD):
         """
         from . import commandes_crud # Local import to avoid circular dependency at module level
         from . import projects_crud # Local import
-        from . import status_settings_crud # For fetching default status IDs
+        # from . import status_settings_crud # No longer directly needed here for status fetching
+        # Import the new status_manager service
+        try:
+            from status_manager import status_service, status_models # Attempt direct import
+        except ImportError:
+            self.logger.error("Failed to import status_manager.status_service in clients_crud. Default status logic will be impaired.")
+            status_service = None # Fallback if import fails
+            status_models = None
+
 
         self.logger.info(f"Attempting to add client with data: {data}") # Log incoming data
 
@@ -86,29 +94,32 @@ class ClientsCRUD(GenericCRUD):
             client_name_for_defaults = data.get('client_name', 'N/A')
             user_id_for_defaults = data.get('created_by_user_id', None)
 
-            # --- Create Default Order and Project ---
-            # 1. Fetch default status for 'Commande' (e.g., 'Brouillon')
-            default_order_status_list = status_settings_crud.get_all_status_settings(type_filter='Commande', conn=conn)
+            # --- Create Default Order and Project using status_service ---
             default_order_status_id = None
-            if default_order_status_list:
-                # Try to find 'Brouillon' or take the first one with lowest sort_order
-                brouillon_status = next((s['status_id'] for s in default_order_status_list if s['status_name'].lower() == 'brouillon'), None)
-                if brouillon_status:
-                    default_order_status_id = brouillon_status
-                else:
-                    # Sort by sort_order and pick the first if available
-                    sorted_statuses = sorted(default_order_status_list, key=lambda x: x.get('sort_order', 0))
-                    if sorted_statuses:
-                        default_order_status_id = sorted_statuses[0]['status_id']
+            default_project_status_id = None
 
-            if not default_order_status_id:
-                self.logger.warning(f"Could not determine a default status_id for Commande for client {new_id}. Default order/project creation might be incomplete.")
-                # Proceed with client creation, but log this issue.
+            if status_service and status_models:
+                # 1. Fetch default status for 'Commande'
+                default_commande_status_obj = status_service.get_default_status_for_commande_creation() # Prefers 'Brouillon'
+                if default_commande_status_obj:
+                    default_order_status_id = default_commande_status_obj.status_id
+                else:
+                    self.logger.warning(f"Could not determine a default status_id for Commande via status_service for client {new_id}.")
+
+                # 2. Fetch default status for 'Project'
+                default_project_status_obj = status_service.get_default_status_for_type(status_models.StatusType.PROJECT, preferred_name="Planning")
+                if default_project_status_obj:
+                    default_project_status_id = default_project_status_obj.status_id
+                else:
+                    self.logger.warning(f"Could not determine a default status_id for Project via status_service for client {new_id}.")
+            else:
+                self.logger.error("status_service not available. Cannot determine default statuses for order/project.")
+
 
             if default_order_status_id:
                 default_order_data = {
                     'client_id': new_id,
-                    'commande_reference': f"DEF-ORD-{new_id[:8]}", # Example reference
+                    'commande_reference': f"DEF-ORD-{new_id[:8]}",
                     'status_commande_id': default_order_status_id,
                     'created_by_user_id': user_id_for_defaults,
                     'notes': f"Default order automatically created for {client_name_for_defaults}.",
@@ -119,34 +130,18 @@ class ClientsCRUD(GenericCRUD):
 
                 if default_commande_id:
                     self.logger.info(f"Successfully created default order {default_commande_id} for client {new_id}.")
-                    # 2. Fetch default status for 'Project' (e.g., 'Planning')
-                    default_project_status_list = status_settings_crud.get_all_status_settings(type_filter='Project', conn=conn)
-                    default_project_status_id = None
-                    if default_project_status_list:
-                        planning_status = next((s['status_id'] for s in default_project_status_list if s['status_name'].lower() == 'planning'), None)
-                        if planning_status:
-                            default_project_status_id = planning_status
-                        else:
-                            sorted_project_statuses = sorted(default_project_status_list, key=lambda x: x.get('sort_order', 0))
-                            if sorted_project_statuses:
-                                default_project_status_id = sorted_project_statuses[0]['status_id']
-
-                    if not default_project_status_id:
-                        self.logger.warning(f"Could not determine a default status_id for Project for client {new_id}. Default project creation might be incomplete.")
-
-                    if default_project_status_id:
+                    if default_project_status_id: # Only proceed if we have a project status
                         default_project_data = {
                             'client_id': new_id,
                             'project_name': f"Default Project for {client_name_for_defaults}",
                             'status_id': default_project_status_id,
                             'description': f"Default project automatically created for order {default_order_data['commande_reference']}.",
-                            'manager_team_member_id': user_id_for_defaults # Or assign to a default project manager if applicable
+                            'manager_team_member_id': user_id_for_defaults
                         }
                         default_project_id = projects_crud.add_project(default_project_data, conn=conn)
 
                         if default_project_id:
                             self.logger.info(f"Successfully created default project {default_project_id} for client {new_id}.")
-                            # Link project to the default order
                             update_payload = {'project_id': default_project_id}
                             if commandes_crud.update_commande(default_commande_id, update_payload, conn=conn):
                                 self.logger.info(f"Successfully linked default project {default_project_id} to default order {default_commande_id}.")
@@ -154,12 +149,12 @@ class ClientsCRUD(GenericCRUD):
                                 self.logger.error(f"Failed to link default project {default_project_id} to default order {default_commande_id} for client {new_id}.")
                         else:
                             self.logger.error(f"Failed to create default project for client {new_id} after creating default order {default_commande_id}.")
-                    else: # No default project status
-                        self.logger.warning(f"Skipping default project creation for client {new_id} as no default project status ID could be determined.")
+                    else:
+                        self.logger.warning(f"Skipping default project creation for client {new_id} as no default project status ID was found via status_service.")
                 else:
                     self.logger.error(f"Failed to create default order for client {new_id}.")
-            else: # No default order status
-                 self.logger.warning(f"Skipping default order and project creation for client {new_id} as no default order status ID could be determined.")
+            else:
+                 self.logger.warning(f"Skipping default order and project creation for client {new_id} as no default order status ID was found via status_service.")
             # --- End Default Order and Project ---
 
             return {'success': True, 'client_id': new_id}
@@ -319,7 +314,13 @@ class ClientsCRUD(GenericCRUD):
             dict: {'success': True, 'message': 'Client soft deleted and status updated.'} on success,
                   {'success': False, 'error': 'Reason for failure.'} on failure.
         """
-        from . import status_settings_crud # Local import for status operations
+        # from . import status_settings_crud # No longer directly needed here
+        # Import the new status_manager service
+        try:
+            from status_manager import status_service
+        except ImportError:
+            self.logger.error("Failed to import status_manager.status_service in clients_crud (delete_client). Status update during delete will fail.")
+            status_service = None
 
         if not client_id:
             self.logger.warning("delete_client called with no client_id.")
@@ -328,23 +329,20 @@ class ClientsCRUD(GenericCRUD):
         now_utc_iso = datetime.utcnow().isoformat() + "Z"
 
         archived_status_id = None
-        try:
-            status_archived_obj = status_settings_crud.get_status_setting_by_name('Archivé', 'Client', conn=conn)
-            if status_archived_obj and 'status_id' in status_archived_obj:
-                archived_status_id = status_archived_obj['status_id']
+        if status_service:
+            archived_status_obj = status_service.get_archived_status_for_client()
+            if archived_status_obj:
+                archived_status_id = archived_status_obj.status_id
             else:
-                self.logger.error(f"Could not find 'Archivé' status for Client type. Cannot update status for client {client_id} during soft delete.")
-                # Proceed with soft delete flags, but status won't be changed to Archived.
-                # Consider if this should be a hard failure for the operation. For now, log and proceed.
-        except Exception as e_status:
-            self.logger.error(f"Error fetching 'Archivé' status_id for client {client_id}: {e_status}", exc_info=True)
-            # Similar to above, proceed with soft delete flags.
+                self.logger.error(f"Could not find 'Archivé' status for Client type via status_service. Client {client_id} status will not be updated to 'Archivé' during soft delete.")
+        else:
+            self.logger.error("status_service not available in delete_client. Cannot set client status to 'Archivé'.")
 
         update_fields = {
             'is_deleted': 1,
             'deleted_at': now_utc_iso
         }
-        if archived_status_id:
+        if archived_status_id: # Only add status_id to update_fields if found
             update_fields['status_id'] = archived_status_id
 
         set_clauses = [f"{key} = ?" for key in update_fields.keys()]
