@@ -22,6 +22,7 @@ aiofiles==24.1.0 # For async file operations, often with FastAPI
 psycopg2-binary>=2.9.9 # For PostgreSQL support
 alembic>=1.7.0 # For database migrations
 
+
 # Authentication & Security
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4

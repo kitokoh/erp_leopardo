@@ -71,6 +71,7 @@ def get_db_connection(db_path_override=None):
         pg_ssl_clientcert = current_app_config_to_use.get('postgresql_ssl_clientcert')
         pg_ssl_clientkey = current_app_config_to_use.get('postgresql_ssl_clientkey')
 
+
         if not pg_user or not pg_dbname:
             logging.critical("PostgreSQL connection requires at least 'postgresql_user' and 'postgresql_dbname' in configuration.")
             raise ValueError("Missing PostgreSQL user or database name in configuration.")
@@ -103,6 +104,7 @@ def get_db_connection(db_path_override=None):
         except psycopg2.Error as e: # Catch other psycopg2 errors
             logging.error(f"Unable to connect to PostgreSQL database (psycopg2.Error): {e}")
             raise Exception(f"Erreur de connexion PostgreSQL générique: {e}") from e # Re-raise as a generic Exception or custom one
+
     elif database_type == 'mysql':
         raise NotImplementedError("MySQL connection not yet implemented.")
     else:
@@ -150,6 +152,7 @@ def initialize_engine_and_session(app_config_param):
                 logging.error(f"db.connection: Failed to create SQLAlchemy engine or SessionLocal: {e}", exc_info=True)
             engine = None
             SessionLocal = None
+
     elif database_type_for_engine == 'postgresql':
         pg_host = app_config_param.get('postgresql_host', 'localhost')
         pg_port = app_config_param.get('postgresql_port', 5432)
@@ -181,6 +184,7 @@ def initialize_engine_and_session(app_config_param):
         logging.info(f"db.connection: SQLAlchemy engine connecting to PostgreSQL: {pg_user}@{pg_host}:{pg_port}/{pg_dbname} (SSL: {pg_ssl_mode})")
         try:
             engine = create_engine(engine_url, connect_args=connect_args)
+
             SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
             logging.info("db.connection: SQLAlchemy engine and SessionLocal created successfully for PostgreSQL.")
         except Exception as e:

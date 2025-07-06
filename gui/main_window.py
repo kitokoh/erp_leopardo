@@ -190,6 +190,10 @@ from dialogs.role_management_dialog import RoleManagementDialog # Added for Role
 from commande_management.commandes_dashboard_widget import CommandesDashboardWidget # Import CommandesDashboardWidget
 from utils.app_constants import CONFIGURABLE_MODULES # Import from new location
 
+# B2C Restaurant Module Import
+from b2c.ges_restaurant.ui.main_widget import RestaurantMainWidget
+
+
 # License Management Imports for feature constants and manager
 from license_management import manager as license_manager # To call get_allowed_features
 from license_management import (
@@ -369,6 +373,7 @@ class DocumentManager(QMainWindow):
         self.experience_management_widget_instance = None
         self.calendar_module_widget_instance = None
         self.calculator_module_widget_instance = None
+        self.restaurant_widget_instance = None # For B2C Restaurant Module
         
         # For HomePage related widgets that might depend on other modules (like statistics)
         self.statistics_summary_widget_instance = None
@@ -491,38 +496,53 @@ class DocumentManager(QMainWindow):
 
     @pyqtSlot(str)
     def handle_add_client_from_stats_map(self, country_name_str):
-        logging.info(f"Received request to add client for country: {country_name_str} from statistics map using new dialog.")
+        logging.info(f"Received request to add client for country: {country_name_str} from statistics map.")
         try:
-            dialog = StatisticsAddClientDialog(initial_country_name=country_name_str, parent=self)
+            # Utiliser AddNewClientDialog au lieu de StatisticsAddClientDialog
+            dialog = AddNewClientDialog(parent=self, initial_country_name=country_name_str)
 
             if dialog.exec_() == QDialog.Accepted:
-                new_client_data = dialog.get_data()
-                logging.info(f"StatisticsAddClientDialog accepted. Data: {new_client_data}")
+                client_data_from_dialog = dialog.get_data()
+                logging.info(f"AddNewClientDialog accepted. Data: {client_data_from_dialog}")
 
-                if not new_client_data.get('country_id'):
-                    QMessageBox.critical(self, self.tr("Erreur Pays"), self.tr("ID du pays non obtenu depuis le dialogue. Impossible de continuer."))
+                # AddNewClientDialog.get_data() retourne déjà created_by_user_id
+                # et les noms de pays/ville qui seront résolus par client_controller.
+                # Le client_controller s'attend à country_name et city_name, pas IDs.
+
+                if not client_data_from_dialog.get('client_name'):
+                    QMessageBox.critical(self, self.tr("Erreur Données"), self.tr("Le nom du client est requis."))
                     return
 
-                client_data_for_db = {
-                    "client_name": new_client_data["client_name"],
-                    "company_name": new_client_data.get("company_name"),
-                    "country_id": new_client_data["country_id"],
-                    "city_id": new_client_data.get("city_id"),
-                    "project_identifier": new_client_data.get("project_identifier"),
-                    "primary_need_description": new_client_data.get("primary_need_description"),
-                    "selected_languages": new_client_data.get("selected_languages"),
-                    "created_by_user_id": self.current_user_id
-                }
+                if not client_data_from_dialog.get('country_name'):
+                    QMessageBox.critical(self, self.tr("Erreur Données"), self.tr("Le nom du pays est requis."))
+                    return
 
-                logging.info(f"Proceeding to call handle_create_client_execution with data from new dialog: {client_data_for_db}")
-                handle_create_client_execution(self, client_data_dict=client_data_for_db)
+                # Appeler directement le client_controller pour créer le client
+                created_client_info = self.client_controller_instance.create_client(client_data_from_dialog)
+
+                if created_client_info and created_client_info.get('success'):
+                    new_client_id = created_client_info.get('client_id')
+                    if new_client_id:
+                        self.notify(self.tr("Client Créé"),
+                                    self.tr("Le client '{0}' a été créé avec succès.").format(created_client_info.get('client_name')),
+                                    type='SUCCESS')
+                        self.load_clients_from_db_slot() # Recharger la liste des clients
+                        self.open_client_tab_by_id(new_client_id) # Ouvrir l'onglet du nouveau client
+                    else:
+                        QMessageBox.critical(self, self.tr("Erreur Création Client"),
+                                             self.tr("Le client a été créé mais son ID n'a pas été retourné."))
+                else:
+                    error_msg = created_client_info.get('error', self.tr("Erreur inconnue lors de la création du client."))
+                    QMessageBox.critical(self, self.tr("Erreur Création Client"), error_msg)
+                    # Pas besoin de recharger la liste des clients ici car la création a échoué
             else:
-                logging.info("StatisticsAddClientDialog cancelled by user.")
+                logging.info("AddNewClientDialog cancelled by user.")
         except Exception as e:
-            logging.error(f"Error opening or executing StatisticsAddClientDialog for country {country_name_str}: {e}", exc_info=True)
+            logging.error(f"Error opening or executing AddNewClientDialog for country {country_name_str}: {e}", exc_info=True)
             QMessageBox.critical(self,
                                  self.tr("Erreur Dialogue"),
-                                 self.tr("Impossible d'ouvrir le dialogue 'Ajouter Client'. Veuillez consulter les logs de l'application pour plus de détails."))
+                                 self.tr("Impossible d'ouvrir le dialogue 'Ajouter Nouveau Client'. Veuillez consulter les logs pour plus de détails."))
+
     def handle_new_document_detected(self, file_path):
         logging.info(f"Main_window: New document detected by service: {file_path}")
         try:
@@ -1083,6 +1103,12 @@ class DocumentManager(QMainWindow):
         self.customize_menu_action.triggered.connect(self.open_menu_customization_dialog)
         self.searchable_actions_map[self.tr("Personnaliser le Menu Modules")] = self.customize_menu_action
 
+        # B2C Restaurant Module Action
+        # TODO: Find or create a suitable icon e.g., :/icons/restaurant.svg or :/icons/utensils.svg
+        self.restaurant_module_action = QAction(QIcon(":/icons/placeholder_icon.svg"), self.tr("Service Restaurant (B2C)"), self)
+        self.restaurant_module_action.triggered.connect(self.show_restaurant_module_view)
+        self.searchable_actions_map[self.tr("Service Restaurant (B2C)")] = self.restaurant_module_action
+
 
     def _placeholder_manage_users(self):
         # This is a placeholder. Actual user management UI would be complex.
@@ -1114,8 +1140,10 @@ class DocumentManager(QMainWindow):
         # Core, non-configurable actions first
         modules_menu.addAction(self.home_action)
         modules_menu.addAction(self.documents_view_action)
-        modules_menu.addAction(self.commande_management_action)
+        # modules_menu.addAction(self.commande_management_action) # Removed: Now part of CONFIGURABLE_MODULES
         modules_menu.addSeparator()
+        modules_menu.addAction(self.restaurant_module_action) # Added B2C Restaurant module action
+        modules_menu.addSeparator() # Separator after B2C module fixed entry
 
         # Load user's menu configuration
         user_menu_config = None
@@ -2562,6 +2590,47 @@ class DocumentManager(QMainWindow):
         # If any other part of MainWindow directly displays role names or uses a role combo,
         # it should be refreshed here as well.
         # Example: If a ClientWidget had a role dropdown (it doesn't currently), it would need refresh.
+
+    def show_restaurant_module_view(self):
+        """Shows the B2C Restaurant Management module."""
+        # Optional: Check module state if it's made configurable
+        # if not self.module_states.get('b2c_restaurant', True): # Example key
+        #     QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Service Restaurant est désactivé."))
+        #     return
+
+        # Optional: Check license feature if applicable
+        # RESTAURANT_FEATURE_KEY = "FEATURE_B2C_RESTAURANT" # Define this constant
+        # if RESTAURANT_FEATURE_KEY not in self.allowed_features:
+        #    QMessageBox.warning(self, self.tr("Licence Requise"), self.tr("Votre licence actuelle ne permet pas d'accéder à ce module."))
+        #    return
+
+        if self.restaurant_widget_instance is None:
+            logging.info("DocumentManager: Lazily creating RestaurantMainWidget...")
+            try:
+                self.restaurant_widget_instance = RestaurantMainWidget(
+                    parent=self,
+                    current_user_info=self.current_user_info
+                )
+                self.main_area_stack.addWidget(self.restaurant_widget_instance)
+                logging.info("DocumentManager: RestaurantMainWidget instance created and added to stack.")
+            except Exception as e:
+                logging.error(f"Failed to create RestaurantMainWidget: {e}", exc_info=True)
+                QMessageBox.critical(self, self.tr("Erreur Module"),
+                                     self.tr("Le module Service Restaurant n'a pas pu être chargé : {0}").format(str(e)))
+                self.restaurant_widget_instance = None # Ensure it's None on failure
+                return # Don't proceed to show if creation failed
+
+        if self.restaurant_widget_instance: # Check again in case creation failed
+            if hasattr(self.restaurant_widget_instance, 'refresh_all_data'):
+                self.restaurant_widget_instance.refresh_all_data()
+            self.main_area_stack.setCurrentWidget(self.restaurant_widget_instance)
+            logging.info("Switched to B2C Restaurant Management view.")
+        else:
+            # This case should be covered by the try-except above, but as a safeguard:
+            logging.error("RestaurantMainWidget instance is None after attempting creation. Cannot show view.")
+            QMessageBox.critical(self, self.tr("Erreur Critique"),
+                                 self.tr("La page du Service Restaurant n'a pas pu être chargée."))
+
 
     def open_menu_customization_dialog(self):
         if not self.current_user_id:

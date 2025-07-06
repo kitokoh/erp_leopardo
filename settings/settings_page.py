@@ -726,6 +726,7 @@ class SettingsPage(QWidget):
         pg_settings_layout.addRow(self.tr("PostgreSQL SSL Client Key:"), pg_ssl_clientkey_layout)
 
 
+
         db_form_layout.addRow(self.pg_settings_group) # Add the group to the main DB form layout
         self.pg_settings_group.setVisible(False) # Initially hidden
 
@@ -1564,6 +1565,7 @@ class SettingsPage(QWidget):
         self.pg_ssl_clientcert_input.setText(self.main_config.get("postgresql_ssl_clientcert", ""))
         self.pg_ssl_clientkey_input.setText(self.main_config.get("postgresql_ssl_clientkey", ""))
 
+
         self._toggle_pg_settings_visibility() # Ensure correct visibility on load
         print("Data & Backup tab settings loaded.")
 
@@ -1647,6 +1649,7 @@ class SettingsPage(QWidget):
             "postgresql_ssl_rootcert": self.pg_ssl_rootcert_input.text().strip(),
             "postgresql_ssl_clientcert": self.pg_ssl_clientcert_input.text().strip(),
             "postgresql_ssl_clientkey": self.pg_ssl_clientkey_input.text().strip()
+
         }
 
     def get_document_templates_settings_data(self):

@@ -43,44 +43,73 @@ class DocumentNotesTab(QWidget):
         logging.info("DocumentNotesTab._setup_ui: Starting setup...")
         doc_notes_layout = QVBoxLayout(self)
 
-        # Filters
-        doc_notes_filters_layout = QHBoxLayout()
-        doc_notes_filters_layout.addWidget(QLabel(self.tr("Type de Document:")))
-        self.doc_notes_type_filter_combo = QComboBox()
-        doc_notes_filters_layout.addWidget(self.doc_notes_type_filter_combo)
+        doc_notes_layout.setSpacing(10)
 
-        doc_notes_filters_layout.addWidget(QLabel(self.tr("Langue:")))
+        # Filters and Action Buttons Bar
+        top_bar_layout = QHBoxLayout()
+        top_bar_layout.setSpacing(8)
+
+        filter_type_label = QLabel(self.tr("Type Document:"))
+        filter_type_label.setStyleSheet("font-weight: bold;")
+        top_bar_layout.addWidget(filter_type_label)
+        self.doc_notes_type_filter_combo = QComboBox()
+        self.doc_notes_type_filter_combo.setMinimumWidth(150)
+        self.doc_notes_type_filter_combo.setStyleSheet("QComboBox { padding: 4px; }")
+        top_bar_layout.addWidget(self.doc_notes_type_filter_combo)
+
+        filter_lang_label = QLabel(self.tr("Langue:"))
+        filter_lang_label.setStyleSheet("font-weight: bold;")
+        top_bar_layout.addWidget(filter_lang_label)
         self.doc_notes_lang_filter_combo = QComboBox()
-        doc_notes_filters_layout.addWidget(self.doc_notes_lang_filter_combo)
-        doc_notes_filters_layout.addStretch()
-        doc_notes_layout.addLayout(doc_notes_filters_layout)
+        self.doc_notes_lang_filter_combo.setMinimumWidth(100)
+        self.doc_notes_lang_filter_combo.setStyleSheet("QComboBox { padding: 4px; }")
+        top_bar_layout.addWidget(self.doc_notes_lang_filter_combo)
+
+        top_bar_layout.addStretch(1)
+
+        self.add_doc_note_button = QPushButton(QIcon(":/icons/plus-circle.svg"), self.tr("Ajouter Note"))
+        self.add_doc_note_button.setObjectName("primaryButton")
+        self.add_doc_note_button.setToolTip(self.tr("Ajouter une nouvelle note de document pour ce client"))
+        top_bar_layout.addWidget(self.add_doc_note_button)
+
+        self.refresh_doc_notes_button = QPushButton(QIcon(":/icons/refresh-cw.svg"), self.tr("Actualiser"))
+        self.refresh_doc_notes_button.setObjectName("secondaryButton")
+        self.refresh_doc_notes_button.setToolTip(self.tr("Actualiser la liste des notes de document"))
+        top_bar_layout.addWidget(self.refresh_doc_notes_button)
+
+        doc_notes_layout.addLayout(top_bar_layout)
 
         # Table
         self.document_notes_table = QTableWidget()
-        self.document_notes_table.setColumnCount(6) # Type, Lang, Content, Standard, Active, Actions
+        self.document_notes_table.setObjectName("documentNotesTable")
+        self.document_notes_table.setColumnCount(6)
         self.document_notes_table.setHorizontalHeaderLabels([
             self.tr("Type Document"), self.tr("Langue"),
             self.tr("Contenu de la Note"), self.tr("Standard"), self.tr("Actif"), self.tr("Actions")
         ])
+        header_style = """
+            QHeaderView::section {
+                background-color: #4a5568; color: white; padding: 6px;
+                border: 1px solid #ddd; font-weight: bold; font-size: 9pt;
+            }
+        """
+        self.document_notes_table.horizontalHeader().setStyleSheet(header_style)
+        self.document_notes_table.verticalHeader().setVisible(False)
+        self.document_notes_table.setAlternatingRowColors(True)
+        self.document_notes_table.setSortingEnabled(True)
+
+        self.document_notes_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents) # Type
+        self.document_notes_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents) # Langue
         self.document_notes_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch) # Content
         self.document_notes_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents) # Standard
         self.document_notes_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents) # Active
         self.document_notes_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents) # Actions
+
         self.document_notes_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.document_notes_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.document_notes_table.setEditTriggers(QAbstractItemView.NoEditTriggers) # Content is shown in QLabel, not edited in table
         doc_notes_layout.addWidget(self.document_notes_table)
 
-        # Buttons
-        doc_notes_buttons_layout = QHBoxLayout()
-        self.add_doc_note_button = QPushButton(self.tr("Ajouter Note"))
-        self.add_doc_note_button.setIcon(QIcon.fromTheme("document-new"))
-        doc_notes_buttons_layout.addWidget(self.add_doc_note_button)
-
-        self.refresh_doc_notes_button = QPushButton(self.tr("Actualiser Liste"))
-        self.refresh_doc_notes_button.setIcon(QIcon.fromTheme("view-refresh"))
-        doc_notes_buttons_layout.addWidget(self.refresh_doc_notes_button)
-        doc_notes_buttons_layout.addStretch()
-        doc_notes_layout.addLayout(doc_notes_buttons_layout)
+        # Buttons layout removed as buttons are now in top_bar_layout
 
         # Connections
         self.doc_notes_type_filter_combo.currentIndexChanged.connect(self.load_document_notes_table)
@@ -159,19 +188,23 @@ class DocumentNotesTab(QWidget):
                 can_manage = has_permission(role_name, P_MANAGE_CLIENT_DOCUMENTS) # Or a more specific permission
 
                 if can_manage:
-                    edit_btn = QPushButton(QIcon(":/icons/pencil.svg"), ""); edit_btn.setToolTip(self.tr("Modifier"))
+                    edit_btn = QPushButton(QIcon(":/icons/edit-2.svg"), "")
+                    edit_btn.setToolTip(self.tr("Modifier cette note"))
+                    edit_btn.setProperty("class", "tableActionButton")
                     edit_btn.clicked.connect(lambda ch, nid=note_id: self.on_edit_document_note_clicked(nid))
                     actions_layout.addWidget(edit_btn)
 
-                    delete_btn = QPushButton(QIcon(":/icons/trash.svg"), ""); delete_btn.setToolTip(self.tr("Supprimer"))
-                    delete_btn.setObjectName("dangerButton")
+                    delete_btn = QPushButton(QIcon(":/icons/trash-2.svg"), "")
+                    delete_btn.setToolTip(self.tr("Supprimer cette note"))
+                    delete_btn.setProperty("class", "dangerButtonTable")
                     delete_btn.clicked.connect(lambda ch, nid=note_id: self.on_delete_document_note_clicked(nid))
                     actions_layout.addWidget(delete_btn)
 
                 actions_layout.addStretch()
                 self.document_notes_table.setCellWidget(row_idx, 5, actions_widget)
 
-            for i in [0,1,3,4,5]: self.document_notes_table.resizeColumnToContents(i)
+            self.document_notes_table.resizeRowsToContents()
+            for i in [0,1,3,4,5]: self.document_notes_table.resizeColumnToContents(i) # Keep specific column resize
 
         except Exception as e:
             logging.error(f"Error loading document notes: {e}", exc_info=True)

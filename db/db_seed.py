@@ -1,6 +1,13 @@
 import os
 import sys
 import sqlite3
+
+# Adjust sys.path to allow finding 'config' module from project root
+# This needs to be at the very top before any project-level imports like 'config'
+PROJECT_ROOT_FOR_SEED = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT_FOR_SEED not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT_FOR_SEED)
+
 import uuid
 import hashlib
 from datetime import datetime
@@ -315,7 +322,19 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
 
         # Seed default hydraulic presses
         # _seed_default_hydraulic_presses(cursor, conn, logger_passed=logger) # Function definition not found
-        
+        try:
+            # Changed to absolute import based on PROJECT_ROOT being in sys.path
+            from db.hidroguc_product_seeder import seed_hidroguc_products
+            logger.info("Attempting to seed HİDROGÜÇ PRES products...")
+            seed_hidroguc_products(conn, cursor, logger_passed=logger)
+            logger.info("HİDROGÜÇ PRES products seeding attempt finished.")
+        except ImportError as e_import_hp:
+            logger.error(f"Could not import seed_hidroguc_products. Error: {e_import_hp}. Skipping HİDROGÜÇ PRES products seeding.", exc_info=True)
+        except Exception as e_hp_seed:
+            logger.error(f"An error occurred during HİDROGÜÇ PRES products seeding: {e_hp_seed}", exc_info=True)
+            # Ne pas laisser une erreur ici arrêter le reste du seeding, sauf si critique.
+            # conn.rollback() # Peut-être pas souhaitable de rollback tout le seeding pour ça.
+
         # 11. SmtpConfigs
         logger.info("Seeding placeholder SMTP config...")
         cursor.execute("SELECT COUNT(*) FROM SmtpConfigs")
@@ -879,12 +898,64 @@ def run_seed():
         logger.info("Database connection closed after seeding attempt.")
 
 if __name__ == '__main__':
+    # Adjust sys.path to allow finding 'config' module from project root
+    import sys
+    import os
+    PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # This gets the project root from db/
+    if PROJECT_ROOT not in sys.path:
+        sys.path.insert(0, PROJECT_ROOT)
+
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
     main_logger = logging.getLogger(__name__)
+
+    # Now that sys.path is adjusted, config should be importable.
+    # Load APP_CONFIG and then set it for db.connection
+    # We need to load config here and pass it.
+    try:
+        from config import load_config # Assuming config.py has a load_config() or similar
+        APP_CONFIG = load_config() # Or however your config is loaded
+        # If config is just a dict defined in config.py, then:
+        # import config as app_config_module
+        # APP_CONFIG = {key: getattr(app_config_module, key) for key in dir(app_config_module) if not key.startswith('_')}
+        # For simplicity, let's assume APP_CONFIG can be derived or config.py makes it available directly
+        # Fallback: if load_config() doesn't exist, try importing the dict.
+    except ImportError: # No load_config, try direct import of a dict or module attributes
+        try:
+            import config as app_config_module
+            # Construct a dictionary from the config module's attributes
+            # This is a common pattern if config.py defines variables directly.
+            APP_CONFIG = {
+                "database_path": app_config_module.DATABASE_PATH,
+                "default_admin_username": app_config_module.DEFAULT_ADMIN_USERNAME,
+                # Add any other necessary config variables that init_schema might use
+                # or that are part of the CONFIG dict used in the app.
+                # For init_schema, 'database_path' is critical.
+            }
+            # If your config.py actually defines a dictionary named CONFIG:
+            # from config import CONFIG as APP_CONFIG
+        except ImportError as e_cfg_import:
+            main_logger.critical(f"Failed to import or load configuration: {e_cfg_import}. Seeding cannot proceed without DB path.")
+            sys.exit(1)
+        except AttributeError as e_cfg_attr:
+             main_logger.critical(f"Config module is missing expected attributes (e.g., DATABASE_PATH): {e_cfg_attr}. Seeding cannot proceed.")
+             sys.exit(1)
+
+    # Set the DB_CONFIG in db.connection module
+    # This must be done BEFORE initialize_database is called if get_db_connection is used within it,
+    # or before run_seed() which definitely uses get_db_connection.
+    try:
+        from db import connection as db_connection_module
+        db_connection_module.set_db_config(APP_CONFIG)
+        main_logger.info("db.connection.DB_CONFIG has been set.")
+    except Exception as e_set_conf:
+        main_logger.critical(f"Failed to set DB_CONFIG in db.connection: {e_set_conf}. Seeding may fail.", exc_info=True)
+        # Depending on how critical this is, you might sys.exit(1)
+
     main_logger.info("Ensuring database schema is initialized before seeding...")
     from db.init_schema import initialize_database
     try:
-        initialize_database()
+        # initialize_database now expects app_config
+        initialize_database(APP_CONFIG) # Pass the loaded config
         main_logger.info("Database schema initialization check complete.")
         run_seed()
     except Exception as e_main:

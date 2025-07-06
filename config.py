@@ -72,4 +72,5 @@ CONFIG = {
     "postgresql_ssl_rootcert": "",   # Path to SSL root CA certificate
     "postgresql_ssl_clientcert": "", # Path to SSL client certificate
     "postgresql_ssl_clientkey": "",  # Path to SSL client key
+
 }
