@@ -66,24 +66,45 @@ def get_db_connection(db_path_override=None):
         pg_user = current_app_config_to_use.get('postgresql_user')
         pg_password = current_app_config_to_use.get('postgresql_password')
         pg_dbname = current_app_config_to_use.get('postgresql_dbname')
+        pg_ssl_mode = current_app_config_to_use.get('postgresql_ssl_mode', 'prefer')
+        pg_ssl_rootcert = current_app_config_to_use.get('postgresql_ssl_rootcert')
+        pg_ssl_clientcert = current_app_config_to_use.get('postgresql_ssl_clientcert')
+        pg_ssl_clientkey = current_app_config_to_use.get('postgresql_ssl_clientkey')
+
 
         if not pg_user or not pg_dbname:
             logging.critical("PostgreSQL connection requires at least 'postgresql_user' and 'postgresql_dbname' in configuration.")
             raise ValueError("Missing PostgreSQL user or database name in configuration.")
 
         try:
-            conn = psycopg2.connect(
-                dbname=pg_dbname,
-                user=pg_user,
-                password=pg_password,
-                host=pg_host,
-                port=pg_port
-            )
-            logging.info(f"Successfully connected to PostgreSQL database '{pg_dbname}' on {pg_host}:{pg_port}")
+            conn_params = {
+                "dbname": pg_dbname,
+                "user": pg_user,
+                "password": pg_password,
+                "host": pg_host,
+                "port": pg_port,
+                "sslmode": pg_ssl_mode
+            }
+            if pg_ssl_mode not in ['disable', 'allow', 'prefer']: # Modes that might need certs
+                if pg_ssl_rootcert:
+                    conn_params["sslrootcert"] = pg_ssl_rootcert
+                if pg_ssl_clientcert:
+                    conn_params["sslcert"] = pg_ssl_clientcert
+                if pg_ssl_clientkey:
+                    conn_params["sslkey"] = pg_ssl_clientkey
+
+            logging.info(f"Attempting PostgreSQL connection to {pg_host}:{pg_port}/{pg_dbname} with SSL mode: {pg_ssl_mode}")
+            conn = psycopg2.connect(**conn_params)
+            logging.info(f"Successfully connected to PostgreSQL database '{pg_dbname}' on {pg_host}:{pg_port} (SSL: {pg_ssl_mode})")
             return conn
-        except psycopg2.Error as e:
-            logging.error(f"Unable to connect to PostgreSQL database: {e}")
-            raise  # Re-raise the exception after logging
+        except psycopg2.OperationalError as op_err:
+            logging.error(f"PostgreSQL OperationalError during connection: {op_err}")
+            # Consider raising a custom, more user-friendly exception or returning None/False
+            raise ConnectionError(f"Erreur opérationnelle PostgreSQL: {op_err}") from op_err
+        except psycopg2.Error as e: # Catch other psycopg2 errors
+            logging.error(f"Unable to connect to PostgreSQL database (psycopg2.Error): {e}")
+            raise Exception(f"Erreur de connexion PostgreSQL générique: {e}") from e # Re-raise as a generic Exception or custom one
+
     elif database_type == 'mysql':
         raise NotImplementedError("MySQL connection not yet implemented.")
     else:
@@ -129,23 +150,41 @@ def initialize_engine_and_session(app_config_param):
                 logging.info("db.connection: SQLAlchemy engine and SessionLocal created successfully for SQLite.")
             except Exception as e:
                 logging.error(f"db.connection: Failed to create SQLAlchemy engine or SessionLocal: {e}", exc_info=True)
-                engine = None      # Set to None only on failure
-                SessionLocal = None # Set to None only on failure
+            engine = None
+            SessionLocal = None
+
     elif database_type_for_engine == 'postgresql':
         pg_host = app_config_param.get('postgresql_host', 'localhost')
         pg_port = app_config_param.get('postgresql_port', 5432)
         pg_user = app_config_param.get('postgresql_user')
         pg_password = app_config_param.get('postgresql_password')
         pg_dbname = app_config_param.get('postgresql_dbname')
+        pg_ssl_mode = app_config_param.get('postgresql_ssl_mode', 'prefer')
+        pg_ssl_rootcert = app_config_param.get('postgresql_ssl_rootcert')
+        pg_ssl_clientcert = app_config_param.get('postgresql_ssl_clientcert')
+        pg_ssl_clientkey = app_config_param.get('postgresql_ssl_clientkey')
 
-        if not all([pg_user, pg_password, pg_dbname]): # Password might be optional for some local setups, but generally good to check
-            logging.error("db.connection: Missing one or more PostgreSQL connection parameters (user, password, dbname) for SQLAlchemy engine setup.")
+
+        if not all([pg_user, pg_dbname]): # Password can be optional for some auth methods
+            logging.error("db.connection: Missing PostgreSQL user or database name for SQLAlchemy engine setup.")
             return
 
-        engine_url = f"postgresql://{pg_user}:{pg_password}@{pg_host}:{pg_port}/{pg_dbname}"
-        logging.info(f"db.connection: SQLAlchemy engine connecting to PostgreSQL: {pg_user}@{pg_host}:{pg_port}/{pg_dbname}") # Mask password in log
+        engine_url = f"postgresql+psycopg2://{pg_user}:{pg_password}@{pg_host}:{pg_port}/{pg_dbname}"
+
+        connect_args = {}
+        if pg_ssl_mode and pg_ssl_mode != 'disable':
+            connect_args['sslmode'] = pg_ssl_mode
+            if pg_ssl_rootcert:
+                connect_args['sslrootcert'] = pg_ssl_rootcert
+            if pg_ssl_clientcert:
+                connect_args['sslcert'] = pg_ssl_clientcert
+            if pg_ssl_clientkey:
+                connect_args['sslkey'] = pg_ssl_clientkey
+
+        logging.info(f"db.connection: SQLAlchemy engine connecting to PostgreSQL: {pg_user}@{pg_host}:{pg_port}/{pg_dbname} (SSL: {pg_ssl_mode})")
         try:
-            engine = create_engine(engine_url)
+            engine = create_engine(engine_url, connect_args=connect_args)
+
             SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
             logging.info("db.connection: SQLAlchemy engine and SessionLocal created successfully for PostgreSQL.")
         except Exception as e:

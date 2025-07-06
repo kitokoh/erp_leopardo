@@ -68,4 +68,9 @@ CONFIG = {
     "postgresql_user": "your_pg_user", # Placeholder - user should configure
     "postgresql_password": "your_pg_password", # Placeholder - user should configure
     "postgresql_dbname": "app_data_pg", # Placeholder - user should configure
+    "postgresql_ssl_mode": "prefer", # Default SSL mode: prefer, allow, require, verify-ca, verify-full
+    "postgresql_ssl_rootcert": "",   # Path to SSL root CA certificate
+    "postgresql_ssl_clientcert": "", # Path to SSL client certificate
+    "postgresql_ssl_clientkey": "",  # Path to SSL client key
+
 }

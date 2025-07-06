@@ -10,7 +10,7 @@ from datetime import date, datetime
 from typing import Optional, List, Dict, Any # Keep existing Pydantic imports for now
 
 # SQLAlchemy Base
-Base = declarative_base()
+from db.connection import Base # Use the central Base
 
 # Placeholder SQLAlchemy models for existing entities
 # These should be replaced with actual definitions if they exist elsewhere
