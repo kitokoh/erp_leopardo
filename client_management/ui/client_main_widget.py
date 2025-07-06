@@ -224,59 +224,45 @@ class ClientMainWidget(QWidget):
             # self.action_buttons_layout.addWidget(self.manage_referent_btn) # Removed, functionality moved to checkbox
 
 
-            self.generate_referents_report_btn = QPushButton(QIcon.fromTheme("document-print", QIcon(":/icons/file-text.svg")), self.tr("Rapport Référents"))
+            self.generate_referents_report_btn = QPushButton(QIcon(":/icons/file-text.svg"), self.tr("Rapport Référents"))
+            self.generate_referents_report_btn.setObjectName("secondaryButton")
             self.generate_referents_report_btn.setToolTip(self.tr("Générer un rapport PDF des référents locaux et globaux pour ce client"))
             self.generate_referents_report_btn.clicked.connect(self.handle_generate_referents_report)
-            self.action_buttons_layout.addWidget(self.generate_referents_report_btn) # Kept
+            self.action_buttons_layout.addWidget(self.generate_referents_report_btn)
 
             self.action_buttons_layout.addStretch(1)
 
-            # The mark_distributor_btn was previously in a different action_layout in ClientWidget (autrewidget.py)
-            # It's not in this specific action_buttons_layout in ClientMainWidget.
-            # However, if it were, it would be removed here.
-            # For safety, ensure it's not added if ClientMainWidget is ClientWidget from autrewidget.py
-            # The ClientMainWidget's action_layout (originally from ClientWidget in autrewidget.py)
-            # had: Envoyer Mail, Compiler PDF (commented), Modifier Client, Send WhatsApp (commented), Archiver Client
-            # And I added mark_distributor_btn to autrewidget.py's action_layout previously.
-            # So, if this ClientMainWidget is the evolution of autrewidget.py's ClientWidget,
-            # I need to check if mark_distributor_btn was part of its setup.
-            # Based on the current code, it's not directly here.
-            # The `handle_mark_distributor` method and its button were in `autrewidget.py`.
-            # I will assume the `mark_distributor_btn` that was mentioned in my previous plan for `ClientWidget`
-            # is not present in this `ClientMainWidget`'s `action_buttons_layout`.
-            # If it was intended to be here, this is where it would be removed.
-
-
-            self.create_docs_btn = QPushButton(self.tr("Envoyer Mail"))
-            self.create_docs_btn.setIcon(QIcon.fromTheme("mail-send", QIcon(":/icons/bell.svg")))
+            self.create_docs_btn = QPushButton(QIcon(":/icons/mail.svg"), self.tr("Envoyer Mail"))
+            self.create_docs_btn.setObjectName("actionButton") # Using a more generic name for QSS if not primary
             self.create_docs_btn.setToolTip(self.tr("Envoyer un email au client"))
-            self.create_docs_btn.setObjectName("primaryButton")
             self.create_docs_btn.clicked.connect(self.open_send_email_dialog)
-            self.action_buttons_layout.addWidget(self.create_docs_btn) # Moved
+            self.action_buttons_layout.addWidget(self.create_docs_btn)
 
-            self.compile_pdf_btn = QPushButton(self.tr("Compiler PDF"))
-            self.compile_pdf_btn.setIcon(QIcon.fromTheme("document-export"))
-            self.compile_pdf_btn.setProperty("primary", True)
-            self.compile_pdf_btn.clicked.connect(self.open_compile_pdf_dialog)
-            # self.action_buttons_layout.addWidget(self.compile_pdf_btn) # This one remains commented out as per original
+            # compile_pdf_btn is not currently added to layout, but if it were:
+            # self.compile_pdf_btn = QPushButton(QIcon(":/icons/file-plus.svg"), self.tr("Compiler PDF"))
+            # self.compile_pdf_btn.setObjectName("actionButton")
+            # self.compile_pdf_btn.setToolTip(self.tr("Compiler plusieurs documents PDF en un seul"))
+            # self.compile_pdf_btn.clicked.connect(self.open_compile_pdf_dialog)
+            # self.action_buttons_layout.addWidget(self.compile_pdf_btn)
 
-            self.edit_save_client_btn = QPushButton(self.tr("Modifier Client"))
-            self.edit_save_client_btn.setIcon(QIcon.fromTheme("document-edit", QIcon(":/icons/pencil.svg")))
+            self.edit_save_client_btn = QPushButton(QIcon(":/icons/edit-2.svg"), self.tr("Modifier Client"))
+            self.edit_save_client_btn.setObjectName("primaryButton") # Main action for client details
             self.edit_save_client_btn.setToolTip(self.tr("Modifier les informations du client"))
             self.edit_save_client_btn.clicked.connect(self.toggle_client_edit_mode)
-            self.action_buttons_layout.addWidget(self.edit_save_client_btn) # Moved
+            self.action_buttons_layout.addWidget(self.edit_save_client_btn)
 
-            self.send_whatsapp_btn = QPushButton(self.tr("Send WhatsApp"))
-            self.send_whatsapp_btn.setIcon(QIcon.fromTheme("contact-new", QIcon(":/icons/user.svg")))
-            self.send_whatsapp_btn.setToolTip(self.tr("Send a WhatsApp message to the client"))
-            self.send_whatsapp_btn.clicked.connect(self.open_send_whatsapp_dialog)
-            # self.action_buttons_layout.addWidget(self.send_whatsapp_btn) # This one remains commented out
+            # send_whatsapp_btn is not currently added, but if it were:
+            # self.send_whatsapp_btn = QPushButton(QIcon(":/icons/message-square.svg"), self.tr("Send WhatsApp")) # Example icon
+            # self.send_whatsapp_btn.setObjectName("actionButton")
+            # self.send_whatsapp_btn.setToolTip(self.tr("Send a WhatsApp message to the client"))
+            # self.send_whatsapp_btn.clicked.connect(self.open_send_whatsapp_dialog)
+            # self.action_buttons_layout.addWidget(self.send_whatsapp_btn)
 
-            self.archive_client_btn = QPushButton(self.tr("Archiver Client"))
-            self.archive_client_btn.setIcon(QIcon(":/icons/folder.svg"))
+            self.archive_client_btn = QPushButton(QIcon(":/icons/archive.svg"), self.tr("Archiver Client"))
+            self.archive_client_btn.setObjectName("dangerButton") # Archiving is a significant (semi-destructive) action
             self.archive_client_btn.setToolTip(self.tr("Archiver ce client (soft delete)"))
             self.archive_client_btn.clicked.connect(self.handle_archive_client)
-            self.action_buttons_layout.addWidget(self.archive_client_btn) # Kept
+            self.action_buttons_layout.addWidget(self.archive_client_btn)
 
             # self.mark_distributor_btn was here in the original autrewidget.py's action_layout
             # It's removed as its functionality is now with the checkbox.
@@ -388,31 +374,60 @@ class ClientMainWidget(QWidget):
 
             contacts_tab_widget = QWidget()
             contacts_tab_layout = QVBoxLayout(contacts_tab_widget)
+            contacts_tab_layout.setSpacing(10)
+
+            # Table des contacts
             self.contacts_table = QTableWidget()
-            self.contacts_table.setColumnCount(6) # Augmenté de 5 à 6
+            self.contacts_table.setObjectName("contactsClientTable")
+            self.contacts_table.setColumnCount(6)
             self.contacts_table.setHorizontalHeaderLabels([
                 self.tr("Nom"), self.tr("Email"), self.tr("Téléphone"),
-                self.tr("Position"), self.tr("Principal"), self.tr("Actions") # Nouvelle colonne
+                self.tr("Position"), self.tr("Principal"), self.tr("Actions")
             ])
             self.contacts_table.setSelectionBehavior(QAbstractItemView.SelectRows)
             self.contacts_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            self.contacts_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            self.contacts_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch) # Default, can be overridden per column
+            self.contacts_table.horizontalHeader().setSectionsClickable(True)
+            self.contacts_table.horizontalHeader().setSortIndicatorShown(True)
+            self.contacts_table.setSortingEnabled(True)
             self.contacts_table.setAlternatingRowColors(True)
-            self.contacts_table.cellDoubleClicked.connect(self.edit_contact)
+            self.contacts_table.cellDoubleClicked.connect(self.edit_contact) # Already present
+            # Style de l'en-tête
+            header_style = """
+                QHeaderView::section {
+                    background-color: #4a5568; /* Gris foncé Tailwind */
+                    color: white;
+                    padding: 4px;
+                    border: 1px solid #ddd;
+                    font-weight: bold;
+                }
+            """
+            self.contacts_table.horizontalHeader().setStyleSheet(header_style)
+            self.contacts_table.verticalHeader().setVisible(False) # Masquer l'en-tête vertical
+
             self.contacts_empty_label = QLabel(self.tr("Aucun contact ajouté pour ce client.\nCliquez sur '➕ Ajouter' pour commencer."))
             self.contacts_empty_label.setAlignment(Qt.AlignCenter)
             font_contacts_empty = self.contacts_empty_label.font(); font_contacts_empty.setPointSize(10)
             self.contacts_empty_label.setFont(font_contacts_empty)
+            self.contacts_empty_label.setStyleSheet("color: #718096;") # Gris moyen Tailwind
+
             contacts_tab_layout.addWidget(self.contacts_empty_label)
             contacts_tab_layout.addWidget(self.contacts_table)
+
+            # Pagination des contacts
             contacts_pagination_layout = QHBoxLayout()
-            self.prev_contact_button = QPushButton("<< Précédent")
+            contacts_pagination_layout.setSpacing(8)
+            self.prev_contact_button = QPushButton(QIcon(":/icons/arrow-left-circle.svg"), self.tr("Précédent"))
             self.prev_contact_button.setObjectName("paginationButton")
+            self.prev_contact_button.setStyleSheet("padding: 5px 10px;")
             self.prev_contact_button.clicked.connect(self.prev_contact_page)
             self.contact_page_info_label = QLabel("Page 1 / 1")
             self.contact_page_info_label.setObjectName("paginationLabel")
-            self.next_contact_button = QPushButton("Suivant >>")
+            self.contact_page_info_label.setStyleSheet("font-size: 9pt; color: #4a5568;")
+            self.next_contact_button = QPushButton(self.tr("Suivant"), QIcon(":/icons/arrow-right-circle.svg"))
+            self.next_contact_button.setLayoutDirection(Qt.RightToLeft) # Icon after text
             self.next_contact_button.setObjectName("paginationButton")
+            self.next_contact_button.setStyleSheet("padding: 5px 10px;")
             self.next_contact_button.clicked.connect(self.next_contact_page)
             contacts_pagination_layout.addStretch()
             contacts_pagination_layout.addWidget(self.prev_contact_button)
@@ -420,72 +435,160 @@ class ClientMainWidget(QWidget):
             contacts_pagination_layout.addWidget(self.next_contact_button)
             contacts_pagination_layout.addStretch()
             contacts_tab_layout.addLayout(contacts_pagination_layout)
+
+            # Boutons d'action sous le tableau
             contacts_btn_layout = QHBoxLayout()
-            self.add_contact_btn = QPushButton(self.tr("Ajouter")); self.add_contact_btn.setIcon(QIcon(":/icons/user-plus.svg")); self.add_contact_btn.setToolTip(self.tr("Ajouter un nouveau contact pour ce client")); self.add_contact_btn.clicked.connect(self.add_contact); contacts_btn_layout.addWidget(self.add_contact_btn)
-            self.edit_contact_btn = QPushButton(self.tr("Modifier")); self.edit_contact_btn.setIcon(QIcon(":/icons/pencil.svg")); self.edit_contact_btn.setToolTip(self.tr("Modifier le contact sélectionné")); self.edit_contact_btn.clicked.connect(self.edit_contact); contacts_btn_layout.addWidget(self.edit_contact_btn)
-            self.remove_contact_btn = QPushButton(self.tr("Supprimer")); self.remove_contact_btn.setIcon(QIcon(":/icons/trash.svg")); self.remove_contact_btn.setToolTip(self.tr("Supprimer le lien vers le contact sélectionné pour ce client")); self.remove_contact_btn.setObjectName("dangerButton"); self.remove_contact_btn.clicked.connect(self.remove_contact); contacts_btn_layout.addWidget(self.remove_contact_btn)
+            contacts_btn_layout.setSpacing(10)
+            self.add_contact_btn = QPushButton(QIcon(":/icons/plus-circle.svg"), self.tr("Ajouter Contact"))
+            self.add_contact_btn.setObjectName("primaryButton") # For QSS styling
+            self.add_contact_btn.setToolTip(self.tr("Ajouter un nouveau contact pour ce client"))
+            self.add_contact_btn.clicked.connect(self.add_contact)
+            contacts_btn_layout.addWidget(self.add_contact_btn)
+
+            self.edit_contact_btn = QPushButton(QIcon(":/icons/edit-2.svg"), self.tr("Modifier Contact"))
+            self.edit_contact_btn.setObjectName("secondaryButton") # For QSS styling
+            self.edit_contact_btn.setToolTip(self.tr("Modifier le contact sélectionné"))
+            self.edit_contact_btn.clicked.connect(self.edit_contact) # Connects to the same slot as double-click
+            contacts_btn_layout.addWidget(self.edit_contact_btn)
+
+            self.remove_contact_btn = QPushButton(QIcon(":/icons/trash-2.svg"), self.tr("Supprimer Contact"))
+            self.remove_contact_btn.setObjectName("dangerButton") # For QSS styling
+            self.remove_contact_btn.setToolTip(self.tr("Supprimer le lien vers le contact sélectionné pour ce client"))
+            self.remove_contact_btn.clicked.connect(self.remove_contact)
+            contacts_btn_layout.addWidget(self.remove_contact_btn)
+            contacts_btn_layout.addStretch() # Pushes buttons to the left
             contacts_tab_layout.addLayout(contacts_btn_layout)
-            self.internal_client_info_tabs.addTab(contacts_tab_widget, self.tr("Contacts"))
+
+            self.internal_client_info_tabs.addTab(contacts_tab_widget, QIcon(":/icons/users.svg"), self.tr("Contacts"))
 
             self.assignments_internal_tab = QWidget()
             assignments_internal_tab_layout = QVBoxLayout(self.assignments_internal_tab)
             self.assignments_sub_tabs = QTabWidget()
             assignments_internal_tab_layout.addWidget(self.assignments_sub_tabs)
+
+            header_style = """
+                QHeaderView::section {
+                    background-color: #4a5568;
+                    color: white;
+                    padding: 4px;
+                    border: 1px solid #ddd;
+                    font-weight: bold;
+                }
+            """ # Common header style for assignment tables
+
+            # --- Vendeurs & Personnel ---
             assigned_vendors_widget = QWidget()
             assigned_vendors_layout = QVBoxLayout(assigned_vendors_widget)
-            self.assigned_vendors_table = QTableWidget(); self.assigned_vendors_table.setColumnCount(4)
+            self.assigned_vendors_table = QTableWidget()
+            self.assigned_vendors_table.setObjectName("assignedVendorsTable")
+            self.assigned_vendors_table.setColumnCount(4)
             self.assigned_vendors_table.setHorizontalHeaderLabels([self.tr("Nom"), self.tr("Rôle Projet"), self.tr("Email"), self.tr("Téléphone")])
-            self.assigned_vendors_table.setSelectionBehavior(QAbstractItemView.SelectRows); self.assigned_vendors_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            self.assigned_vendors_table.horizontalHeader().setStretchLastSection(True)
+            self.assigned_vendors_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+            self.assigned_vendors_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            self.assigned_vendors_table.horizontalHeader().setStretchLastSection(True) # Keep for this one
+            self.assigned_vendors_table.horizontalHeader().setStyleSheet(header_style)
+            self.assigned_vendors_table.verticalHeader().setVisible(False)
+            self.assigned_vendors_table.setAlternatingRowColors(True)
+            self.assigned_vendors_table.setSortingEnabled(True)
             assigned_vendors_layout.addWidget(self.assigned_vendors_table)
             vendor_buttons_layout = QHBoxLayout()
-            self.add_assigned_vendor_btn = QPushButton(self.tr("Ajouter Vendeur/Personnel")); self.add_assigned_vendor_btn.clicked.connect(self.handle_add_assigned_vendor)
-            self.remove_assigned_vendor_btn = QPushButton(self.tr("Retirer Vendeur/Personnel")); self.remove_assigned_vendor_btn.clicked.connect(self.handle_remove_assigned_vendor)
-            vendor_buttons_layout.addWidget(self.add_assigned_vendor_btn); vendor_buttons_layout.addWidget(self.remove_assigned_vendor_btn)
+            self.add_assigned_vendor_btn = QPushButton(QIcon(":/icons/user-plus.svg"), self.tr("Ajouter Personnel"))
+            self.add_assigned_vendor_btn.setObjectName("primaryButton")
+            self.add_assigned_vendor_btn.clicked.connect(self.handle_add_assigned_vendor)
+            self.remove_assigned_vendor_btn = QPushButton(QIcon(":/icons/user-minus.svg"), self.tr("Retirer Personnel"))
+            self.remove_assigned_vendor_btn.setObjectName("dangerButton")
+            self.remove_assigned_vendor_btn.clicked.connect(self.handle_remove_assigned_vendor)
+            vendor_buttons_layout.addStretch()
+            vendor_buttons_layout.addWidget(self.add_assigned_vendor_btn)
+            vendor_buttons_layout.addWidget(self.remove_assigned_vendor_btn)
             assigned_vendors_layout.addLayout(vendor_buttons_layout)
-            self.assignments_sub_tabs.addTab(assigned_vendors_widget, QIcon.fromTheme("users", QIcon(":/icons/users.svg")), self.tr("Vendeurs & Personnel"))
+            self.assignments_sub_tabs.addTab(assigned_vendors_widget, QIcon(":/icons/users.svg"), self.tr("Personnel"))
 
+            # --- Techniciens ---
             assigned_technicians_widget = QWidget()
             assigned_technicians_layout = QVBoxLayout(assigned_technicians_widget)
-            self.assigned_technicians_table = QTableWidget(); self.assigned_technicians_table.setColumnCount(4)
+            self.assigned_technicians_table = QTableWidget()
+            self.assigned_technicians_table.setObjectName("assignedTechniciansTable")
+            self.assigned_technicians_table.setColumnCount(4)
             self.assigned_technicians_table.setHorizontalHeaderLabels([self.tr("Nom"), self.tr("Rôle Projet"), self.tr("Email"), self.tr("Téléphone")])
-            self.assigned_technicians_table.setSelectionBehavior(QAbstractItemView.SelectRows); self.assigned_technicians_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            self.assigned_technicians_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+            self.assigned_technicians_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
             self.assigned_technicians_table.horizontalHeader().setStretchLastSection(True)
+            self.assigned_technicians_table.horizontalHeader().setStyleSheet(header_style)
+            self.assigned_technicians_table.verticalHeader().setVisible(False)
+            self.assigned_technicians_table.setAlternatingRowColors(True)
+            self.assigned_technicians_table.setSortingEnabled(True)
             assigned_technicians_layout.addWidget(self.assigned_technicians_table)
             technician_buttons_layout = QHBoxLayout()
-            self.add_assigned_technician_btn = QPushButton(self.tr("Ajouter Technicien")); self.add_assigned_technician_btn.clicked.connect(self.handle_add_assigned_technician)
-            self.remove_assigned_technician_btn = QPushButton(self.tr("Retirer Technicien")); self.remove_assigned_technician_btn.clicked.connect(self.handle_remove_assigned_technician)
-            technician_buttons_layout.addWidget(self.add_assigned_technician_btn); technician_buttons_layout.addWidget(self.remove_assigned_technician_btn)
+            self.add_assigned_technician_btn = QPushButton(QIcon(":/icons/tool.svg"), self.tr("Ajouter Technicien")) # More specific icon
+            self.add_assigned_technician_btn.setObjectName("primaryButton")
+            self.add_assigned_technician_btn.clicked.connect(self.handle_add_assigned_technician)
+            self.remove_assigned_technician_btn = QPushButton(QIcon(":/icons/user-minus.svg"), self.tr("Retirer Technicien"))
+            self.remove_assigned_technician_btn.setObjectName("dangerButton")
+            self.remove_assigned_technician_btn.clicked.connect(self.handle_remove_assigned_technician)
+            technician_buttons_layout.addStretch()
+            technician_buttons_layout.addWidget(self.add_assigned_technician_btn)
+            technician_buttons_layout.addWidget(self.remove_assigned_technician_btn)
             assigned_technicians_layout.addLayout(technician_buttons_layout)
-            self.assignments_sub_tabs.addTab(assigned_technicians_widget, QIcon.fromTheme("preferences-system", QIcon(":/icons/settings.svg")), self.tr("Techniciens"))
+            self.assignments_sub_tabs.addTab(assigned_technicians_widget, QIcon(":/icons/settings.svg"), self.tr("Techniciens"))
 
+            # --- Transporteurs ---
             assigned_transporters_widget = QWidget()
             assigned_transporters_layout = QVBoxLayout(assigned_transporters_widget)
-            self.assigned_transporters_table = QTableWidget(); self.assigned_transporters_table.setColumnCount(6)
+            self.assigned_transporters_table = QTableWidget()
+            self.assigned_transporters_table.setObjectName("assignedTransportersTable")
+            self.assigned_transporters_table.setColumnCount(6)
             self.assigned_transporters_table.setHorizontalHeaderLabels([self.tr("Nom Transporteur"), self.tr("Contact"), self.tr("Téléphone"), self.tr("Détails Transport"), self.tr("Coût Estimé"), self.tr("Actions")])
-            self.assigned_transporters_table.setSelectionBehavior(QAbstractItemView.SelectRows); self.assigned_transporters_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            self.assigned_transporters_table.horizontalHeader().setStretchLastSection(True)
+            self.assigned_transporters_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+            self.assigned_transporters_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            self.assigned_transporters_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents) # Resize to contents
+            self.assigned_transporters_table.horizontalHeader().setStretchLastSection(True) # Stretch last section (Actions)
+            self.assigned_transporters_table.horizontalHeader().setStyleSheet(header_style)
+            self.assigned_transporters_table.verticalHeader().setVisible(False)
+            self.assigned_transporters_table.setAlternatingRowColors(True)
+            self.assigned_transporters_table.setSortingEnabled(True)
             assigned_transporters_layout.addWidget(self.assigned_transporters_table)
             transporter_buttons_layout = QHBoxLayout()
-            self.add_assigned_transporter_btn = QPushButton(self.tr("Ajouter Transporteur")); self.add_assigned_transporter_btn.clicked.connect(self.handle_add_assigned_transporter)
-            self.remove_assigned_transporter_btn = QPushButton(self.tr("Retirer Transporteur")); self.remove_assigned_transporter_btn.clicked.connect(self.handle_remove_assigned_transporter)
-            transporter_buttons_layout.addWidget(self.add_assigned_transporter_btn); transporter_buttons_layout.addWidget(self.remove_assigned_transporter_btn)
+            self.add_assigned_transporter_btn = QPushButton(QIcon(":/icons/plus-circle.svg"), self.tr("Ajouter Transporteur"))
+            self.add_assigned_transporter_btn.setObjectName("primaryButton")
+            self.add_assigned_transporter_btn.clicked.connect(self.handle_add_assigned_transporter)
+            self.remove_assigned_transporter_btn = QPushButton(QIcon(":/icons/trash-2.svg"), self.tr("Retirer Transporteur"))
+            self.remove_assigned_transporter_btn.setObjectName("dangerButton")
+            self.remove_assigned_transporter_btn.clicked.connect(self.handle_remove_assigned_transporter)
+            transporter_buttons_layout.addStretch()
+            transporter_buttons_layout.addWidget(self.add_assigned_transporter_btn)
+            transporter_buttons_layout.addWidget(self.remove_assigned_transporter_btn)
             assigned_transporters_layout.addLayout(transporter_buttons_layout)
-            self.assignments_sub_tabs.addTab(assigned_transporters_widget, QIcon.fromTheme("truck", QIcon(":/icons/truck.svg")), self.tr("Transporteurs"))
+            self.assignments_sub_tabs.addTab(assigned_transporters_widget, QIcon(":/icons/truck.svg"), self.tr("Transporteurs"))
 
+            # --- Transitaires ---
             assigned_forwarders_widget = QWidget()
             assigned_forwarders_layout = QVBoxLayout(assigned_forwarders_widget)
-            self.assigned_forwarders_table = QTableWidget(); self.assigned_forwarders_table.setColumnCount(5)
+            self.assigned_forwarders_table = QTableWidget()
+            self.assigned_forwarders_table.setObjectName("assignedForwardersTable")
+            self.assigned_forwarders_table.setColumnCount(5)
             self.assigned_forwarders_table.setHorizontalHeaderLabels([self.tr("Nom Transitaire"), self.tr("Contact"), self.tr("Téléphone"), self.tr("Description Tâche"), self.tr("Coût Estimé")])
-            self.assigned_forwarders_table.setSelectionBehavior(QAbstractItemView.SelectRows); self.assigned_forwarders_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            self.assigned_forwarders_table.horizontalHeader().setStretchLastSection(True)
+            self.assigned_forwarders_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+            self.assigned_forwarders_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            self.assigned_forwarders_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+            self.assigned_forwarders_table.horizontalHeader().setStretchLastSection(False) # Don't stretch last if 5 columns
+            self.assigned_forwarders_table.horizontalHeader().setStyleSheet(header_style)
+            self.assigned_forwarders_table.verticalHeader().setVisible(False)
+            self.assigned_forwarders_table.setAlternatingRowColors(True)
+            self.assigned_forwarders_table.setSortingEnabled(True)
             assigned_forwarders_layout.addWidget(self.assigned_forwarders_table)
             forwarder_buttons_layout = QHBoxLayout()
-            self.add_assigned_forwarder_btn = QPushButton(self.tr("Ajouter Transitaire")); self.add_assigned_forwarder_btn.clicked.connect(self.handle_add_assigned_forwarder)
-            self.remove_assigned_forwarder_btn = QPushButton(self.tr("Retirer Transitaire")); self.remove_assigned_forwarder_btn.clicked.connect(self.handle_remove_assigned_forwarder)
-            forwarder_buttons_layout.addWidget(self.add_assigned_forwarder_btn); forwarder_buttons_layout.addWidget(self.remove_assigned_forwarder_btn)
+            self.add_assigned_forwarder_btn = QPushButton(QIcon(":/icons/plus-circle.svg"), self.tr("Ajouter Transitaire"))
+            self.add_assigned_forwarder_btn.setObjectName("primaryButton")
+            self.add_assigned_forwarder_btn.clicked.connect(self.handle_add_assigned_forwarder)
+            self.remove_assigned_forwarder_btn = QPushButton(QIcon(":/icons/trash-2.svg"), self.tr("Retirer Transitaire"))
+            self.remove_assigned_forwarder_btn.setObjectName("dangerButton")
+            self.remove_assigned_forwarder_btn.clicked.connect(self.handle_remove_assigned_forwarder)
+            forwarder_buttons_layout.addStretch()
+            forwarder_buttons_layout.addWidget(self.add_assigned_forwarder_btn)
+            forwarder_buttons_layout.addWidget(self.remove_assigned_forwarder_btn)
             assigned_forwarders_layout.addLayout(forwarder_buttons_layout)
-            self.assignments_sub_tabs.addTab(assigned_forwarders_widget, QIcon.fromTheme("applications-internet", QIcon(":/icons/globe.svg")), self.tr("Transitaires"))
+            self.assignments_sub_tabs.addTab(assigned_forwarders_widget, QIcon(":/icons/globe.svg"), self.tr("Transitaires"))
 
             mta_widget = QWidget()
             mta_layout = QVBoxLayout(mta_widget)
@@ -495,22 +598,36 @@ class ClientMainWidget(QWidget):
             mta_project_selector_layout.addWidget(self.mta_project_selector_combo)
             mta_layout.addLayout(mta_project_selector_layout)
             self.assigned_mta_table = QTableWidget()
+            self.assigned_mta_table.setObjectName("assignedMtaTable")
             self.assigned_mta_table.setColumnCount(8)
             self.assigned_mta_table.setHorizontalHeaderLabels([
                 self.tr("Nom Agent"), self.tr("Type"), self.tr("Email"), self.tr("Téléphone"),
                 self.tr("Détails Affectation"), self.tr("Frais Estimés"), self.tr("Statut Email"), self.tr("Actions")])
-            self.assigned_mta_table.setSelectionBehavior(QAbstractItemView.SelectRows); self.assigned_mta_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            self.assigned_mta_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-            self.assigned_mta_table.setMinimumHeight(150)
+            self.assigned_mta_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+            self.assigned_mta_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            self.assigned_mta_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+            self.assigned_mta_table.horizontalHeader().setStretchLastSection(True) # Stretch Actions column
+            self.assigned_mta_table.horizontalHeader().setStyleSheet(header_style)
+            self.assigned_mta_table.verticalHeader().setVisible(False)
+            self.assigned_mta_table.setAlternatingRowColors(True)
+            self.assigned_mta_table.setSortingEnabled(True)
+            self.assigned_mta_table.setMinimumHeight(150) # Keep minimum height
             mta_layout.addWidget(self.assigned_mta_table)
-            mta_buttons_layout = QHBoxLayout()
-            self.add_assigned_mta_btn = QPushButton(self.tr("Assigner Agent de Transfert")); self.add_assigned_mta_btn.clicked.connect(self.handle_add_assigned_mta)
-            self.remove_assigned_mta_btn = QPushButton(self.tr("Retirer Agent de Transfert")); self.remove_assigned_mta_btn.clicked.connect(self.handle_remove_assigned_mta)
-            mta_buttons_layout.addWidget(self.add_assigned_mta_btn); mta_buttons_layout.addWidget(self.remove_assigned_mta_btn)
-            mta_layout.addLayout(mta_buttons_layout)
-            self.assignments_sub_tabs.addTab(mta_widget, QIcon.fromTheme("wallet", QIcon(":/icons/credit-card.svg")), self.tr("Agents de Transfert d'Argent"))
 
-            self.internal_client_info_tabs.addTab(self.assignments_internal_tab, QIcon.fromTheme("document-properties", QIcon(":/icons/briefcase.svg")), self.tr("Affectations"))
+            mta_buttons_layout = QHBoxLayout()
+            self.add_assigned_mta_btn = QPushButton(QIcon(":/icons/plus-circle.svg"), self.tr("Assigner Agent"))
+            self.add_assigned_mta_btn.setObjectName("primaryButton")
+            self.add_assigned_mta_btn.clicked.connect(self.handle_add_assigned_mta)
+            self.remove_assigned_mta_btn = QPushButton(QIcon(":/icons/trash-2.svg"), self.tr("Retirer Agent"))
+            self.remove_assigned_mta_btn.setObjectName("dangerButton")
+            self.remove_assigned_mta_btn.clicked.connect(self.handle_remove_assigned_mta)
+            mta_buttons_layout.addStretch()
+            mta_buttons_layout.addWidget(self.add_assigned_mta_btn)
+            mta_buttons_layout.addWidget(self.remove_assigned_mta_btn)
+            mta_layout.addLayout(mta_buttons_layout)
+            self.assignments_sub_tabs.addTab(mta_widget, QIcon(":/icons/credit-card.svg"), self.tr("Agents de Transfert d'Argent"))
+
+            self.internal_client_info_tabs.addTab(self.assignments_internal_tab, QIcon(":/icons/briefcase.svg"), self.tr("Affectations"))
             self.assigned_vendors_table.itemSelectionChanged.connect(self.update_assigned_vendors_buttons_state)
             self.assigned_technicians_table.itemSelectionChanged.connect(self.update_assigned_technicians_buttons_state)
             self.assigned_transporters_table.itemSelectionChanged.connect(self.update_assigned_transporters_buttons_state)
@@ -691,20 +808,26 @@ class ClientMainWidget(QWidget):
                     actions_layout.setContentsMargins(5, 0, 5, 0)
                     actions_layout.setSpacing(5)
 
-                    edit_button = QPushButton(QIcon(":/icons/pencil.svg"), "")
+                    edit_button = QPushButton(QIcon(":/icons/edit-2.svg"), "")
                     edit_button.setToolTip(self.tr("Modifier ce contact"))
+                    edit_button.setProperty("class", "tableActionButton") # For QSS styling
+                    # edit_button.setStyleSheet("QPushButton { padding: 4px; border: none; background-color: transparent; } QPushButton:hover { background-color: #e2e8f0; }")
                     edit_button.clicked.connect(lambda checked, r=row: self.handle_edit_contact_action(r))
                     actions_layout.addWidget(edit_button)
 
-                    remove_button = QPushButton(QIcon(":/icons/trash.svg"), "")
+                    remove_button = QPushButton(QIcon(":/icons/trash-2.svg"), "")
                     remove_button.setToolTip(self.tr("Supprimer le lien vers ce contact"))
-                    remove_button.setObjectName("dangerButton")
+                    remove_button.setProperty("class", "dangerButtonTable") # For QSS styling
+                    # remove_button.setStyleSheet("QPushButton { padding: 4px; border: none; background-color: transparent; } QPushButton:hover { background-color: #fed7d7; }")
                     remove_button.clicked.connect(lambda checked, r=row: self.handle_remove_contact_action(r))
                     actions_layout.addWidget(remove_button)
 
                     actions_layout.addStretch()
                     actions_widget.setLayout(actions_layout)
                     self.contacts_table.setCellWidget(row, 5, actions_widget)
+
+                self.contacts_table.resizeRowsToContents()
+
 
         except Exception as e:
             logging.error(f"Error loading contacts into table: {e}", exc_info=True)
@@ -2382,35 +2505,54 @@ class ClientMainWidget(QWidget):
 
         self.edit_widgets['country_combo'] = QComboBox(); self.edit_widgets['country_combo'].setEditable(True)
         # Populate countries and set current
-        # self._populate_country_edit_combo(self.edit_widgets['country_combo'], self.client_info.get('country_id'))
+        self._populate_country_edit_combo(self.edit_widgets['country_combo'], self.client_info.get('country_id'))
 
         self.edit_widgets['city_combo'] = QComboBox(); self.edit_widgets['city_combo'].setEditable(True)
         # Populate cities based on selected country and set current
-        # self.edit_widgets['country_combo'].currentIndexChanged.connect(
-        #     lambda index: self._populate_city_edit_combo(self.edit_widgets['city_combo'], self.edit_widgets['country_combo'].itemData(index), None)
-        # )
-        # self._populate_city_edit_combo(self.edit_widgets['city_combo'], self.client_info.get('country_id'), self.client_info.get('city_id'))
+        self.edit_widgets['country_combo'].currentIndexChanged.connect(
+            lambda index: self._populate_city_edit_combo(
+                self.edit_widgets['city_combo'],
+                self.edit_widgets['country_combo'].itemData(index) if self.edit_widgets['country_combo'].count() > 0 and index >=0 else None, # Ensure valid index and data
+                None # No city_id to preselect when country changes
+            )
+        )
+        # Initial population of cities for the current country
+        self._populate_city_edit_combo(self.edit_widgets['city_combo'], self.client_info.get('country_id'), self.client_info.get('city_id'))
 
-        country_city_h_layout.addWidget(QLabel(self.tr("Pays:"))); country_city_h_layout.addWidget(self.edit_widgets['country_combo'])
-        country_city_h_layout.addSpacing(10)
-        country_city_h_layout.addWidget(QLabel(self.tr("Ville:"))); country_city_h_layout.addWidget(self.edit_widgets['city_combo'])
+
+        country_city_h_layout.addWidget(self._create_styled_label(self.tr("Pays:")))
+        country_city_h_layout.addWidget(self.edit_widgets['country_combo'],1)
+        country_city_h_layout.addSpacing(15)
+        country_city_h_layout.addWidget(self._create_styled_label(self.tr("Ville:")))
+        country_city_h_layout.addWidget(self.edit_widgets['city_combo'],1)
         self.details_layout.addRow(self.country_city_label, country_city_edit_widget)
 
+        # Price and Creation Date (kept as read-only for now, as per original display logic)
+        price_date_edit_widget = QWidget()
+        price_date_edit_layout = QHBoxLayout(price_date_edit_widget)
+        price_date_edit_layout.setContentsMargins(0,0,0,0)
+        price_date_edit_layout.addWidget(self._create_styled_label(self.tr("Prix Final:")))
+        price_date_edit_layout.addWidget(self._create_styled_value_label(self.price_value_label.text()),1) # Display existing value
+        price_date_edit_layout.addSpacing(15)
+        price_date_edit_layout.addWidget(self._create_styled_label(self.tr("Date Création:")))
+        price_date_edit_layout.addWidget(self._create_styled_value_label(self.date_value_label.text()),1) # Display existing value
+        self.details_layout.addRow(self.price_date_label, price_date_edit_widget)
 
-        # Price (usually calculated, not directly edited, but for example)
-        # self.edit_widgets['price'] = QDoubleSpinBox()
-        # self.edit_widgets['price'].setValue(self.client_info.get("price", 0.0))
-        # self.details_layout.addRow(self.price_label_static, self.edit_widgets['price'])
-        # Creation Date (read-only)
-        self.details_layout.addRow(self.date_label_static, QLabel(self.date_value_label.text())) # Keep as label
 
-        # Status (already a QComboBox: self.status_combo)
-        self.status_combo.setEnabled(True) # Enable it for editing
-        self.details_layout.addRow(self.status_label_static, self.status_combo) # Add it back if it was removed
+        # Status and Category
+        status_category_edit_widget = QWidget()
+        status_category_edit_layout = QHBoxLayout(status_category_edit_widget)
+        status_category_edit_layout.setContentsMargins(0,0,0,0)
 
-        # Category
+        status_category_edit_layout.addWidget(self._create_styled_label(self.tr("Statut:")))
+        self.status_combo.setEnabled(True) # Already a QComboBox, ensure it's enabled and added back
+        status_category_edit_layout.addWidget(self.status_combo, 1)
+        status_category_edit_layout.addSpacing(15)
+
+        status_category_edit_layout.addWidget(self._create_styled_label(self.tr("Catégorie:")))
         self.edit_widgets['category'] = QLineEdit(self.client_info.get("category", ""))
-        self.details_layout.addRow(self.category_label_static, self.edit_widgets['category'])
+        status_category_edit_layout.addWidget(self.edit_widgets['category'], 1)
+        self.details_layout.addRow(self.status_category_label, status_category_edit_widget)
 
         # Distributor Info
         self.edit_widgets['distributor_info'] = QTextEdit(self.client_info.get("distributor_info", ""))
