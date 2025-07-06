@@ -129,8 +129,8 @@ def initialize_engine_and_session(app_config_param):
                 logging.info("db.connection: SQLAlchemy engine and SessionLocal created successfully for SQLite.")
             except Exception as e:
                 logging.error(f"db.connection: Failed to create SQLAlchemy engine or SessionLocal: {e}", exc_info=True)
-            engine = None
-            SessionLocal = None
+                engine = None      # Set to None only on failure
+                SessionLocal = None # Set to None only on failure
     elif database_type_for_engine == 'postgresql':
         pg_host = app_config_param.get('postgresql_host', 'localhost')
         pg_port = app_config_param.get('postgresql_port', 5432)
