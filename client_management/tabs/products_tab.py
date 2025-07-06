@@ -85,13 +85,13 @@ class ProductsTab(QWidget):
 
         top_bar_layout.addStretch(1)
 
-        self.add_product_btn = QPushButton(QIcon(":/icons/link.svg"), self.tr("Lier Produit Existant"))
+        self.add_product_btn = QPushButton(QIcon(":/icons/plus-circle.svg"), self.tr("Lier Produit Existant")) # Changed icon
         self.add_product_btn.setObjectName("primaryButton")
         self.add_product_btn.setToolTip(self.tr("Lier un produit existant du catalogue à ce client/commande"))
         self.add_product_btn.clicked.connect(self.add_product) # This should open ProductDialog to select existing
         top_bar_layout.addWidget(self.add_product_btn)
 
-        self.add_new_global_product_btn = QPushButton(QIcon(":/icons/package.svg"), self.tr("Créer Produit Global"))
+        self.add_new_global_product_btn = QPushButton(QIcon(":/icons/plus-square.svg"), self.tr("Créer Produit Global")) # Changed icon
         self.add_new_global_product_btn.setObjectName("secondaryButton")
         self.add_new_global_product_btn.setToolTip(self.tr("Créer un nouveau produit dans le catalogue global et le lier"))
         self.add_new_global_product_btn.clicked.connect(self.handle_add_new_global_product)

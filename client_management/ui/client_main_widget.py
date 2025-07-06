@@ -232,19 +232,22 @@ class ClientMainWidget(QWidget):
 
             self.action_buttons_layout.addStretch(1)
 
-            self.create_docs_btn = QPushButton(QIcon(":/icons/mail.svg"), self.tr("Envoyer Mail")) # Corrected icon path if mail.svg exists
+            self.create_docs_btn = QPushButton(self.tr("Envoyer Mail"))
+            self.create_docs_btn.setIcon(QIcon(":/icons/bell.svg")) # Using bell as a placeholder for mail
             self.create_docs_btn.setObjectName("actionButton")
             self.create_docs_btn.setToolTip(self.tr("Envoyer un email au client"))
             self.create_docs_btn.clicked.connect(self.open_send_email_dialog)
             self.action_buttons_layout.addWidget(self.create_docs_btn)
 
-            self.edit_save_client_btn = QPushButton(QIcon(":/icons/edit-2.svg"), self.tr("Modifier Client"))
+            self.edit_save_client_btn = QPushButton(self.tr("Modifier Client"))
+            self.edit_save_client_btn.setIcon(QIcon(":/icons/edit-2.svg"))
             self.edit_save_client_btn.setObjectName("primaryButton")
             self.edit_save_client_btn.setToolTip(self.tr("Modifier les informations du client"))
             self.edit_save_client_btn.clicked.connect(self.toggle_client_edit_mode)
             self.action_buttons_layout.addWidget(self.edit_save_client_btn)
 
-            self.archive_client_btn = QPushButton(QIcon(":/icons/archive.svg"), self.tr("Archiver Client")) # Corrected icon path if archive.svg exists
+            self.archive_client_btn = QPushButton(self.tr("Archiver Client"))
+            self.archive_client_btn.setIcon(QIcon(":/icons/trash.svg")) # Using trash as a placeholder for archive
             self.archive_client_btn.setObjectName("dangerButton")
             self.archive_client_btn.setToolTip(self.tr("Archiver ce client (soft delete)"))
             self.archive_client_btn.clicked.connect(self.handle_archive_client)
@@ -403,18 +406,24 @@ class ClientMainWidget(QWidget):
             # Pagination des contacts
             contacts_pagination_layout = QHBoxLayout()
             contacts_pagination_layout.setSpacing(8)
-            self.prev_contact_button = QPushButton(QIcon(":/icons/arrow-left-circle.svg"), self.tr("Précédent"))
+
+            self.prev_contact_button = QPushButton(self.tr("Précédent"))
+            self.prev_contact_button.setIcon(QIcon(":/icons/chevron-left.svg")) # Using chevron
             self.prev_contact_button.setObjectName("paginationButton")
             self.prev_contact_button.setStyleSheet("padding: 5px 10px;")
             self.prev_contact_button.clicked.connect(self.prev_contact_page)
-            self.contact_page_info_label = QLabel("Page 1 / 1")
+
+            self.contact_page_info_label = QLabel("Page 1 / 1") # Default text, updated in update_contact_pagination_controls
             self.contact_page_info_label.setObjectName("paginationLabel")
             self.contact_page_info_label.setStyleSheet("font-size: 9pt; color: #4a5568;")
-            self.next_contact_button = QPushButton(self.tr("Suivant"), QIcon(":/icons/arrow-right-circle.svg"))
-            self.next_contact_button.setLayoutDirection(Qt.RightToLeft) # Icon after text
+
+            self.next_contact_button = QPushButton(self.tr("Suivant"))
+            self.next_contact_button.setIcon(QIcon(":/icons/chevron-right.svg")) # Using chevron
+            self.next_contact_button.setLayoutDirection(Qt.RightToLeft)
             self.next_contact_button.setObjectName("paginationButton")
             self.next_contact_button.setStyleSheet("padding: 5px 10px;")
             self.next_contact_button.clicked.connect(self.next_contact_page)
+
             contacts_pagination_layout.addStretch()
             contacts_pagination_layout.addWidget(self.prev_contact_button)
             contacts_pagination_layout.addWidget(self.contact_page_info_label)
@@ -3582,3 +3591,54 @@ class ClientMainWidget(QWidget):
             self.product_dimensions_tab_widget_ref.select_product_in_combo(global_product_id)
         else:
             logging.warning("ClientMainWidget: ProductDimensionsTab reference or select_product_in_combo method not found.")
+
+    def _populate_country_edit_combo(self, combo_box, current_country_id=None):
+        combo_box.blockSignals(True)
+        combo_box.clear()
+        combo_box.addItem(self.tr("Sélectionner un pays..."), None)
+        selected_idx = 0
+        try:
+            countries = db_manager.get_all_countries()
+            if countries:
+                for i, country in enumerate(sorted(countries, key=lambda x: x['country_name'])):
+                    combo_box.addItem(country['country_name'], country['country_id'])
+                    if current_country_id and country['country_id'] == current_country_id:
+                        selected_idx = i + 1 # +1 because of "Sélectionner..."
+        except Exception as e:
+            logging.error(f"Error populating country combo box: {e}", exc_info=True)
+        combo_box.setCurrentIndex(selected_idx)
+        combo_box.blockSignals(False)
+        # Manually trigger city update for the initially selected country
+        if selected_idx > 0 and 'city_combo' in self.edit_widgets: # Ensure city_combo exists
+            self._populate_city_edit_combo(self.edit_widgets['city_combo'], combo_box.currentData(), self.client_info.get('city_id'))
+
+
+    def _populate_city_edit_combo(self, combo_box, country_id, current_city_id=None):
+        combo_box.blockSignals(True)
+        combo_box.clear()
+        combo_box.addItem(self.tr("Sélectionner une ville..."), None)
+        selected_idx = 0
+        if country_id:
+            try:
+                cities = db_manager.get_cities_by_country_id(country_id) # Assuming this CRUD function exists
+                if cities:
+                    for i, city in enumerate(sorted(cities, key=lambda x: x['city_name'])):
+                        combo_box.addItem(city['city_name'], city['city_id'])
+                        if current_city_id and city['city_id'] == current_city_id:
+                            selected_idx = i + 1
+            except Exception as e:
+                logging.error(f"Error populating city combo box for country_id {country_id}: {e}", exc_info=True)
+        combo_box.setCurrentIndex(selected_idx)
+        combo_box.setEnabled(country_id is not None and combo_box.count() > 1) # Enable if country selected and cities exist
+        combo_box.blockSignals(False)
+
+    def _create_styled_label(self, text): # Helper for styled labels in edit form
+        label = QLabel(text)
+        label.setStyleSheet("font-weight: bold; padding-right: 5px;")
+        return label
+
+    def _create_styled_value_label(self, text): # Helper for styled value labels (read-only in edit form)
+        label = QLabel(text)
+        label.setStyleSheet("padding: 3px; background-color: #f0f0f0; border-radius: 3px;") # Example style
+        label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        return label

@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 import logging
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QPushButton, QComboBox, QMessageBox, QApplication
+    QWidget, QVBoxLayout, QPushButton, QComboBox, QMessageBox, QApplication,
+    QGroupBox, QLabel, QHBoxLayout # Added missing imports
 )
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
