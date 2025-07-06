@@ -32,16 +32,21 @@
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                     {% if user.is_authenticated %}
                         <li class="nav-item">
-                            <a class="nav-link active" aria-current="page" href="#">Dashboard</a> {# Replace # with actual dashboard URL later #}
+                            {# {% url 'dashboard:main' %} est le nom d'URL attendu pour le dashboard #}
+                            <a class="nav-link {% if request.resolver_match.app_name == 'dashboard' %}active{% endif %}" aria-current="page" href="{% url 'dashboard:main' %}">Dashboard</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#">Clients</a> {# Replace # with actual clients URL later #}
+                            {# {% url 'clients:list' %} est le nom d'URL attendu pour la liste des clients #}
+                            <a class="nav-link {% if request.resolver_match.app_name == 'clients' %}active{% endif %}" href="#">Clients</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#">Produits</a> {# Replace # with actual products URL later #}
+                             {# {% url 'products:list' %} est le nom d'URL attendu pour la liste des produits #}
+                            <a class="nav-link {% if request.resolver_match.app_name == 'products' %}active{% endif %}" href="#">Produits</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#">Documents</a> {# Replace # with actual documents URL later #}
+                            {# {% url 'documents:list' %} est le nom d'URL attendu pour la liste des documents #}
+                            <a class="nav-link {% if request.resolver_match.app_name == 'documents' %}active{% endif %}" href="#">Documents</a>
+
                         </li>
                     {% endif %}
                 </ul>
@@ -49,21 +54,31 @@
                     {% if user.is_authenticated %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="navbarUserDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                {{ user.username }}
+                                {{ user.get_full_name|default:user.username }}
+                                {% if request.session.active_company_name %}
+                                    <small class="text-muted">(@{{ request.session.active_company_name }})</small>
+                                {% endif %}
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarUserDropdown">
-                                <li><a class="dropdown-item" href="#">Mon Profil</a></li> {# Replace # with actual profile URL #}
-                                <li><a class="dropdown-item" href="#">Mes Sociétés</a></li> {# Replace # with actual companies URL #}
+                                <li><a class="dropdown-item" href="#">Mon Profil</a></li> {# {% url 'users:profile' %} #}
+                                <li><a class="dropdown-item" href="#">Mes Sociétés</a></li> {# {% url 'users:company_list' %} #}
                                 <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="#">Déconnexion</a></li> {# Replace # with actual logout URL #}
+                                <li>
+                                    <form id="logout-form" action="{% url 'users:logout' %}" method="post" style="display: none;">
+                                        {% csrf_token %}
+                                    </form>
+                                    <a class="dropdown-item" href="#" onclick="document.getElementById('logout-form').submit(); return false;">Déconnexion</a>
+                                </li>
+
                             </ul>
                         </li>
                     {% else %}
                         <li class="nav-item">
-                            <a class="nav-link" href="#">Connexion</a> {# Replace # with actual login URL #}
+                            <a class="nav-link {% if request.resolver_match.url_name == 'login' %}active{% endif %}" href="{% url 'users:login' %}">Connexion</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#">Inscription</a> {# Replace # with actual register URL #}
+                            <a class="nav-link {% if request.resolver_match.url_name == 'register' %}active{% endif %}" href="{% url 'users:register' %}">Inscription</a>
+
                         </li>
                     {% endif %}
                 </ul>

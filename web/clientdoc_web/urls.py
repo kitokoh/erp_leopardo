@@ -23,8 +23,9 @@ urlpatterns = [
     # path('api/v1/documents/', include('apps.documents.urls_api')),
 
     # Frontend App URLs
-    # path('', include('apps.dashboard.urls')), # Dashboard typically at root
-    # path('auth/', include('apps.users.urls')), # For login, register, profile web pages
+    path('auth/', include('apps.users.urls')), # Pour /auth/login/, /auth/register/, etc.
+    path('', include('apps.dashboard.urls')), # Dashboard à la racine
+
     # path('clients/', include('apps.clients.urls')),
     # path('products/', include('apps.products.urls')),
     # path('documents/', include('apps.documents.urls')),

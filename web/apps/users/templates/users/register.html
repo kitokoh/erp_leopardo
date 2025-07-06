@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %} {# Si on utilise django-crispy-forms, sinon rendu manuel #}
+
+{% block title %}Inscription - {{ block.super }}{% endblock title %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Créer un Compte</h4>
+            </div>
+            <div class="card-body">
+                <p class="card-text">Remplissez le formulaire ci-dessous pour vous inscrire.</p>
+                <form method="post" novalidate>
+                    {% csrf_token %}
+
+                    {# Rendu avec Crispy Forms (si installé et configuré) #}
+                    {{ form|crispy }}
+
+                    {# Rendu manuel si Crispy Forms n'est pas utilisé
+                       (décommenter et adapter si besoin)
+                    {% for field in form %}
+                        <div class="mb-3">
+                            <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}
+                                <small class="form-text text-muted">{{ field.help_text }}</small>
+                            {% endif %}
+                            {% for error in field.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {% for error in form.non_field_errors %}
+                                <p class="mb-0">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    #}
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">S'inscrire</button>
+                    </div>
+                </form>
+                <hr>
+                <div class="text-center">
+                    <p>Déjà un compte ? <a href="{% url 'users:login' %}">Connectez-vous ici</a>.</p> {# Assurez-vous que 'users:login' est le bon nom d'URL #}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
