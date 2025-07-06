@@ -16,6 +16,7 @@ RestaurantMainWidget QLabel#titleLabel {
     margin-bottom: 15px;
     border-bottom: 2px solid #3498db; /* Accent color border */
     text-align: center; /* Ensure this is handled if alignment is off */
+
 }
 
 /* General Buttons in RestaurantMainWidget */
@@ -50,6 +51,7 @@ RestaurantMainWidget QPushButton#primaryActionButton:hover,
 RestaurantMainWidget QPushButton[primaryAction="true"]:hover {
     background-color: #2980b9; /* Darker accent blue on hover */
     border-color: #1f618d;
+
 }
 
 /* Refresh Button Style */
@@ -61,6 +63,7 @@ RestaurantMainWidget QPushButton#refreshButton {
 RestaurantMainWidget QPushButton#refreshButton:hover {
     background-color: #d35400;
     border-color: #ba4a00;
+
 }
 
 
@@ -92,12 +95,14 @@ RestaurantUITableWidget QLabel#tableNumeroLabel {
     font-size: 16pt; /* Larger table number */
     font-weight: bold;
     color: #ffffff; /* Pure white for table number */
+
 }
 
 RestaurantUITableWidget QLabel#tableStatusLabel {
     font-size: 10pt;
     font-style: italic;
     color: #bdc3c7; /* Lighter grey for status */
+
 }
 
 RestaurantUITableWidget QLabel#tableCapacityLabel {
@@ -109,6 +114,7 @@ RestaurantUITableWidget QLabel#tableIconLabel {
     font-size: 30pt; /* Larger icon */
     padding-bottom: 8px;
     color: #ecf0f1; /* Ensure icon color matches text */
+
 }
 
 
@@ -152,6 +158,7 @@ QDialog QGroupBox {
     border-radius: 8px;
     margin-top: 1.2em;
     padding: 1.5em 1em 1em 1em;
+
 }
 
 QDialog QGroupBox::title {
@@ -162,6 +169,7 @@ QDialog QGroupBox::title {
     border-radius: 5px;
     color: white; /* White text on accent background */
     font-size: 11pt;
+
 }
 
 /* Input Fields in Dialogs */
@@ -204,6 +212,7 @@ QDialog QSpinBox::down-arrow, QDialog QDoubleSpinBox::down-arrow {
 }
 
 
+
 /* TableWidget Styling (e.g., orderLinesTable) */
 QDialog QTableWidget#orderLinesTable {
     border: 1px solid #4a627a; /* Darker border */
@@ -212,6 +221,7 @@ QDialog QTableWidget#orderLinesTable {
     background-color: #1e272e; /* Dark background for table */
     gridline-color: #4a627a; /* Darker grid lines */
     color: #ecf0f1; /* Light text in table cells */
+
     font-size: 10pt;
 }
 
@@ -229,6 +239,7 @@ QDialog QTableWidget#orderLinesTable QHeaderView::section {
     color: white;
     padding: 8px; /* More padding for headers */
     border: 1px solid #2980b9; /* Darker accent border */
+
     font-weight: bold;
     font-size: 10pt;
 }
@@ -277,6 +288,7 @@ QPushButton#printReceiptButton { /* Assuming objectName for print button */
 QPushButton#printReceiptButton:hover {
     background-color: #8e44ad;
     border-color: #7d3c98;
+
 }
 
 
@@ -372,6 +384,7 @@ QScrollBar::handle:horizontal:hover {
 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { border: none; background: none; }
 QScrollBar::left-arrow:horizontal, QScrollBar::right-arrow:horizontal { border: none; background: none; }
 QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: none; }
+
 
 
 /* Example of a more "extravagant" look for the table widgets if desired: */

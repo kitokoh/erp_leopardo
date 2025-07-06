@@ -14,15 +14,7 @@ from datetime import date, datetime
 # It's good practice to have a Base per module if they are somewhat independent,
 # or use a shared Base from a central location (e.g., app.db.base.Base)
 # For now, let's define it here. If a central Base exists, this should be updated.
-# from api.models import Base # Assuming a central Base exists in api/models.py
-# Let's assume we need to import the existing Base from `api.models`
-# If `api.models.Base` is not the correct one, this might need adjustment.
-try:
-    from api.models import Base
-except ImportError:
-    # Fallback if api.models.Base cannot be imported (e.g. during isolated testing or if structure changes)
-    Base = declarative_base()
-
+from db.connection import Base # Use the central Base
 
 # --- Enum Definitions ---
 
