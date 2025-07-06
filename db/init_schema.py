@@ -3049,15 +3049,24 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
 
     # --- Create tables for MainBase (e.g., CalculatorHistory) ---
     # This needs to happen after the main 'conn' is closed if 'actual_main_engine' uses a new connection.
-    if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None and actual_main_engine is not None: # Intentionally same for testing save
+    if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None and actual_main_engine is not None:
         try:
-            logging.info("DEBUG_INIT_DB: Creating tables for MainBase (e.g., CalculatorHistory) using SQLAlchemy actual_main_engine.")
-            MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True) # Intentionally same
+            # Import B2C restaurant models to register them with MainBase before create_all
+            # This ensures that if b2c.ges_restaurant.models uses the same MainBase, its tables are included.
+            import b2c.ges_restaurant.models
+            logging.info("DEBUG_INIT_DB: Imported b2c.ges_restaurant.models for schema creation with MainBase.")
+        except ImportError as e_import_b2c_for_mainbase:
+            logging.error(f"DEBUG_INIT_DB: Failed to import b2c.ges_restaurant.models for MainBase, restaurant tables might not be created if they share MainBase: {e_import_b2c_for_mainbase}")
+        except Exception as e_b2c_generic_for_mainbase:
+            logging.error(f"DEBUG_INIT_DB: An unexpected error occurred during import of b2c.ges_restaurant.models for MainBase: {e_b2c_generic_for_mainbase}", exc_info=True)
+
+        try:
+            logging.info("DEBUG_INIT_DB: Creating tables for MainBase (e.g., CalculatorHistory, Restaurant*) using SQLAlchemy actual_main_engine.")
+            MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True)
 
             logging.info("DEBUG_INIT_DB: Tables for MainBase created successfully.")
         except Exception as e_main_base_create:
             logging.error(f"DEBUG_INIT_DB: Error creating tables for MainBase: {e_main_base_create}", exc_info=True)
-            # Decide if this is critical enough to rollback or raise. For now, logging error.
     else:
         logging.warning("DEBUG_INIT_DB: Main SQLAlchemy components (MainBase, actual_main_engine) not loaded or actual_main_engine is None. Skipping MainBase.metadata.create_all().")
 
