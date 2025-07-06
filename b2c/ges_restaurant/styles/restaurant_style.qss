@@ -1,0 +1,357 @@
+/* Styles for RestaurantMainWidget and its components */
+
+/* Main Widget Background and Font */
+RestaurantMainWidget {
+    background-color: #f8f9fa; /* Light grey background for the module */
+    font-family: "Segoe UI", Arial, sans-serif; /* Modern font */
+}
+
+/* Title Label in RestaurantMainWidget */
+RestaurantMainWidget QLabel#titleLabel { /* Assuming you set an objectName for the title */
+    font-size: 24pt;
+    font-weight: bold;
+    color: #343a40; /* Darker grey for title */
+    padding: 10px;
+    margin-bottom: 10px;
+    border-bottom: 2px solid #dee2e6; /* Light separator line */
+}
+
+/* General Buttons in RestaurantMainWidget */
+RestaurantMainWidget QPushButton {
+    background-color: #ffffff; /* White background for buttons */
+    border: 1px solid #ced4da; /* Standard border */
+    padding: 10px 20px; /* Generous padding */
+    border-radius: 5px; /* Rounded corners */
+    font-size: 11pt;
+    color: #495057; /* Standard text color */
+    min-width: 120px;
+}
+
+RestaurantMainWidget QPushButton:hover {
+    background-color: #f1f3f5; /* Slightly darker on hover */
+    border-color: #adb5bd;
+}
+
+RestaurantMainWidget QPushButton:pressed {
+    background-color: #e9ecef; /* Even darker when pressed */
+}
+
+/* Primary Action Button Style (e.g., Add Table, Manage Order) */
+RestaurantMainWidget QPushButton#primaryActionButton,
+RestaurantMainWidget QPushButton[primaryAction="true"] {
+    background-color: #007bff; /* Bootstrap primary blue */
+    color: white;
+    border-color: #007bff;
+    font-weight: bold;
+}
+RestaurantMainWidget QPushButton#primaryActionButton:hover,
+RestaurantMainWidget QPushButton[primaryAction="true"]:hover {
+    background-color: #0069d9;
+    border-color: #0062cc;
+}
+
+/* Refresh Button Style */
+RestaurantMainWidget QPushButton#refreshButton {
+    background-color: #28a745; /* Bootstrap success green */
+    color: white;
+    border-color: #28a745;
+}
+RestaurantMainWidget QPushButton#refreshButton:hover {
+    background-color: #218838;
+    border-color: #1e7e34;
+}
+
+
+/* ScrollArea and Tables Container */
+QScrollArea#tablesScrollArea { /* Set objectName for specific styling */
+    border: 1px solid #dee2e6;
+    background-color: #ffffff; /* White background for the scroll area content */
+    border-radius: 5px;
+}
+
+QWidget#tablesContainerWidget { /* Set objectName for the widget inside scrollArea */
+    background-color: #ffffff; /* Ensure container itself is white */
+}
+
+/* RestaurantUITableWidget - Individual Table Styling */
+/* Base style is set dynamically in Python, this can augment or override */
+RestaurantUITableWidget {
+    border-radius: 10px; /* More pronounced rounded corners */
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1); /* Subtle shadow for depth - QSS doesn't directly support box-shadow */
+    /* For shadow, consider using QGraphicsDropShadowEffect in Python if QSS is limited */
+    margin: 5px; /* Ensure some margin if not handled by layout spacing */
+}
+
+RestaurantUITableWidget QLabel { /* General labels within a table widget */
+    font-weight: 500; /* Medium weight */
+}
+
+RestaurantUITableWidget QLabel#tableNumeroLabel { /* Example: if you set objectName="tableNumeroLabel" */
+    font-size: 14pt;
+    font-weight: bold;
+}
+
+RestaurantUITableWidget QLabel#tableStatusLabel {
+    font-size: 10pt;
+    font-style: italic;
+}
+
+RestaurantUITableWidget QLabel#tableCapacityLabel {
+    font-size: 9pt;
+    color: #555; /* Darker grey for less prominent info */
+}
+
+RestaurantUITableWidget QLabel#tableIconLabel { /* For the emoji/icon */
+    font-size: 28pt; /* Larger icon */
+    padding-bottom: 5px;
+}
+
+
+/* Selected Table Details Area */
+QFrame#selectedTableDetailsArea { /* Set objectName */
+    background-color: #e9ecef; /* Light grey for selected details panel */
+    border: 1px solid #ced4da;
+    border-radius: 5px;
+    padding: 15px;
+    margin-top: 10px;
+}
+
+QFrame#selectedTableDetailsArea QLabel#selectedTableNameLabel {
+    font-size: 14pt;
+    font-weight: bold;
+    color: #2c3e50;
+    margin-bottom: 10px;
+}
+
+/* Dialog Styling (Example for AddEditTableDialog) */
+AddEditTableDialog {
+    background-color: #ffffff;
+    font-family: "Segoe UI", Arial, sans-serif;
+}
+
+AddEditTableDialog QLineEdit, AddEditTableDialog QSpinBox, AddEditTableDialog QComboBox {
+    padding: 8px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 10pt;
+    background-color: #f8f9fa; /* Slightly off-white for inputs */
+}
+AddEditTableDialog QLineEdit:focus, AddEditTableDialog QSpinBox:focus, AddEditTableDialog QComboBox:focus {
+    border-color: #80bdff; /* Blue border on focus */
+    background-color: #ffffff;
+}
+
+AddEditTableDialog QPushButton {
+    min-width: 80px;
+    padding: 8px 15px;
+}
+
+/* Specific styles for status colors in RestaurantUITableWidget (can also be done in Python) */
+RestaurantUITableWidget[status="libre"] {
+    background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 rgba(200, 255, 200, 255), stop:1 rgba(150, 230, 150, 255));
+    border: 2px solid #4CAF50; /* Green border for libre */
+}
+RestaurantUITableWidget[status="occupee"] {
+    background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 rgba(255, 200, 200, 255), stop:1 rgba(230, 150, 150, 255));
+    border: 2px solid #F44336; /* Red border for occupee */
+}
+RestaurantUITableWidget[status="reservee"] {
+    background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 rgba(255, 250, 200, 255), stop:1 rgba(230, 220, 150, 255));
+    border: 2px solid #FFC107; /* Yellow border for reservee */
+}
+RestaurantUITableWidget[status="a_nettoyer"] {
+    background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 rgba(220, 220, 220, 255), stop:1 rgba(190, 190, 190, 255));
+    border: 2px solid #9E9E9E; /* Grey border for a_nettoyer */
+}
+
+/* Styling for QScrollArea's scrollbars */
+QScrollBar:vertical {
+    border: 1px solid #ced4da;
+    background: #e9ecef;
+    width: 14px;
+    margin: 1px 1px 1px 1px;
+    border-radius: 7px;
+}
+QScrollBar::handle:vertical {
+    background-color: #6c757d;
+    min-height: 25px;
+    border-radius: 6px;
+}
+QScrollBar::handle:vertical:hover {
+    background-color: #5a6268;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    border: none; background: none; height: 0px;
+    subcontrol-position: top; subcontrol-origin: margin;
+}
+QScrollBar::up-arrow:vertical, QScrollBar::down-arrow:vertical { background: none; }
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: none; }
+
+QScrollBar:horizontal {
+    border: 1px solid #ced4da;
+    background: #e9ecef;
+    height: 14px;
+    margin: 1px 1px 1px 1px;
+    border-radius: 7px;
+}
+QScrollBar::handle:horizontal {
+    background-color: #6c757d;
+    min-width: 25px;
+    border-radius: 6px;
+}
+QScrollBar::handle:horizontal:hover {
+    background-color: #5a6268;
+}
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    border: none; background: none; width: 0px;
+}
+QScrollBar::left-arrow:horizontal, QScrollBar::right-arrow:horizontal { background: none; }
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: none; }
+
+
+/* General Dialog Styling */
+QDialog#OrderManagementDialog, QDialog#PaymentDialog, QDialog#AddEditTableDialog, QDialog#ProductSelectionDialog {
+    background-color: #ffffff; /* Clean white background for dialogs */
+    border: 1px solid #dee2e6;
+    border-radius: 8px; /* Slightly rounded dialog corners */
+}
+
+/* Dialog Title Bar (Note: This is hard to style extensively with QSS alone) */
+/* QDialog Title (Often handled by Window Manager, but some properties might apply) */
+/* No specific QSS for title bar usually, but ensuring dialog background is set. */
+
+/* QGroupBox Styling within Dialogs */
+QDialog QGroupBox {
+    font-family: "Verdana", sans-serif; /* Different font for group titles */
+    font-size: 11pt;
+    font-weight: bold;
+    color: #343a40;
+    border: 1px solid #d3d9df;
+    border-radius: 6px;
+    margin-top: 1em; /* Space for the title */
+    padding: 1.2em 0.8em 0.8em 0.8em; /* Top padding to not overlap title */
+}
+
+QDialog QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top center; /* Center the title */
+    padding: 0 10px;
+    background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #f8f9fa, stop:1 #e9ecef); /* Light gradient for title bg */
+    border-radius: 4px;
+    color: #007bff; /* Blue title text */
+}
+
+/* Input Fields in Dialogs */
+QDialog QLineEdit, QDialog QSpinBox, QDialog QDoubleSpinBox, QDialog QComboBox {
+    padding: 10px; /* More padding */
+    border: 1px solid #ced4da;
+    border-radius: 5px;
+    font-size: 10pt;
+    background-color: #fdfdfe; /* Very light grey, almost white */
+    color: #495057;
+    min-height: 20px; /* Ensure they are not too small */
+}
+QDialog QLineEdit:focus, QDialog QSpinBox:focus, QDialog QDoubleSpinBox:focus, QDialog QComboBox:focus {
+    border-color: #007bff; /* Blue highlight on focus */
+    background-color: #ffffff;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25); /* QSS doesn't support box-shadow this way */
+    /* For focus ring, often requires QProxyStyle or platform specific handling */
+}
+QDialog QComboBox::drop-down {
+    border-left: 1px solid #ced4da;
+    border-radius: 5px;
+    padding: 2px;
+}
+QDialog QComboBox::down-arrow {
+    /* image: url(:/icons/chevron-down-dark.svg); If you have such an icon */
+    width: 12px;
+    height: 12px;
+}
+
+
+/* TableWidget Styling (e.g., orderLinesTable) */
+QDialog QTableWidget#orderLinesTable {
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    alternate-background-color: #f1f8ff; /* Light blue alternate rows */
+    gridline-color: #d1e0ec; /* Lighter grid lines */
+    font-size: 10pt;
+}
+
+QDialog QTableWidget#orderLinesTable::item {
+    padding: 8px;
+}
+
+QDialog QTableWidget#orderLinesTable QHeaderView::section {
+    background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 #6c757d, stop:1 #495057); /* Dark gradient for headers */
+    color: white;
+    padding: 6px;
+    border: 1px solid #343a40;
+    font-weight: bold;
+    font-size: 10pt;
+}
+
+/* Dialog ButtonBox Buttons */
+QDialog QDialogButtonBox QPushButton {
+    padding: 10px 25px; /* Larger buttons in dialogs */
+    font-size: 10pt;
+    font-weight: bold;
+    border-radius: 5px;
+    min-width: 100px;
+}
+
+/* Specific button styling by objectName if needed, e.g. recordPaymentButton */
+QPushButton#recordPaymentButton {
+    background-color: #28a745; /* Green for record payment */
+    color: white;
+    border-color: #28a745;
+}
+QPushButton#recordPaymentButton:hover {
+    background-color: #218838;
+    border-color: #1e7e34;
+}
+
+QPushButton#saveButton { /* Example for a save button in OrderManagementDialog */
+    background-color: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+QPushButton#saveButton:hover {
+    background-color: #0069d9;
+    border-color: #0062cc;
+}
+
+
+/* Total Labels Styling */
+QLabel#totalHTLabel, QLabel#totalTTCLabel {
+    font-size: 12pt;
+    font-weight: bold;
+    padding: 5px;
+    border-radius: 4px;
+}
+QLabel#totalHTLabel {
+    color: #495057;
+    background-color: #e9ecef; /* Light background for HT */
+}
+QLabel#totalTTCLabel {
+    color: #ffffff;
+    background-color: #28a745; /* Green background for TTC */
+    font-size: 14pt; /* Make TTC more prominent */
+}
+
+
+/* Example of a more "extravagant" look for the table widgets if desired: */
+/*
+RestaurantUITableWidget {
+    border-radius: 15px;
+    border: 3px solid;
+    border-image: url(:/icons/gold_border_texture.png) 3 3 3 3 stretch stretch; (Requires a texture image)
+    background-color: qradialgradient(cx: 0.5, cy: 0.5, radius: 1, fx: 0.5, fy: 0.5, stop: 0 #ffffff, stop: 1 #e0e0e0);
+    color: #333;
+    box-shadow: 5px 5px 15px rgba(0,0,0,0.2); (Again, QSS shadow is tricky)
+    transition: transform 0.2s ease-in-out; (QSS doesn't support CSS transitions directly)
+}
+RestaurantUITableWidget:hover {
+    transform: scale(1.05); (Requires Python-side handling for hover effects like scale)
+}
+*/

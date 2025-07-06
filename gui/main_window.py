@@ -190,6 +190,10 @@ from dialogs.role_management_dialog import RoleManagementDialog # Added for Role
 from commande_management.commandes_dashboard_widget import CommandesDashboardWidget # Import CommandesDashboardWidget
 from utils.app_constants import CONFIGURABLE_MODULES # Import from new location
 
+# B2C Restaurant Module Import
+from b2c.ges_restaurant.ui.main_widget import RestaurantMainWidget
+
+
 # License Management Imports for feature constants and manager
 from license_management import manager as license_manager # To call get_allowed_features
 from license_management import (
@@ -369,6 +373,7 @@ class DocumentManager(QMainWindow):
         self.experience_management_widget_instance = None
         self.calendar_module_widget_instance = None
         self.calculator_module_widget_instance = None
+        self.restaurant_widget_instance = None # For B2C Restaurant Module
         
         # For HomePage related widgets that might depend on other modules (like statistics)
         self.statistics_summary_widget_instance = None
@@ -1083,6 +1088,12 @@ class DocumentManager(QMainWindow):
         self.customize_menu_action.triggered.connect(self.open_menu_customization_dialog)
         self.searchable_actions_map[self.tr("Personnaliser le Menu Modules")] = self.customize_menu_action
 
+        # B2C Restaurant Module Action
+        # TODO: Find or create a suitable icon e.g., :/icons/restaurant.svg or :/icons/utensils.svg
+        self.restaurant_module_action = QAction(QIcon(":/icons/placeholder_icon.svg"), self.tr("Service Restaurant (B2C)"), self)
+        self.restaurant_module_action.triggered.connect(self.show_restaurant_module_view)
+        self.searchable_actions_map[self.tr("Service Restaurant (B2C)")] = self.restaurant_module_action
+
 
     def _placeholder_manage_users(self):
         # This is a placeholder. Actual user management UI would be complex.
@@ -1116,6 +1127,8 @@ class DocumentManager(QMainWindow):
         modules_menu.addAction(self.documents_view_action)
         # modules_menu.addAction(self.commande_management_action) # Removed: Now part of CONFIGURABLE_MODULES
         modules_menu.addSeparator()
+        modules_menu.addAction(self.restaurant_module_action) # Added B2C Restaurant module action
+        modules_menu.addSeparator() # Separator after B2C module fixed entry
 
         # Load user's menu configuration
         user_menu_config = None
@@ -2562,6 +2575,47 @@ class DocumentManager(QMainWindow):
         # If any other part of MainWindow directly displays role names or uses a role combo,
         # it should be refreshed here as well.
         # Example: If a ClientWidget had a role dropdown (it doesn't currently), it would need refresh.
+
+    def show_restaurant_module_view(self):
+        """Shows the B2C Restaurant Management module."""
+        # Optional: Check module state if it's made configurable
+        # if not self.module_states.get('b2c_restaurant', True): # Example key
+        #     QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Service Restaurant est désactivé."))
+        #     return
+
+        # Optional: Check license feature if applicable
+        # RESTAURANT_FEATURE_KEY = "FEATURE_B2C_RESTAURANT" # Define this constant
+        # if RESTAURANT_FEATURE_KEY not in self.allowed_features:
+        #    QMessageBox.warning(self, self.tr("Licence Requise"), self.tr("Votre licence actuelle ne permet pas d'accéder à ce module."))
+        #    return
+
+        if self.restaurant_widget_instance is None:
+            logging.info("DocumentManager: Lazily creating RestaurantMainWidget...")
+            try:
+                self.restaurant_widget_instance = RestaurantMainWidget(
+                    parent=self,
+                    current_user_info=self.current_user_info
+                )
+                self.main_area_stack.addWidget(self.restaurant_widget_instance)
+                logging.info("DocumentManager: RestaurantMainWidget instance created and added to stack.")
+            except Exception as e:
+                logging.error(f"Failed to create RestaurantMainWidget: {e}", exc_info=True)
+                QMessageBox.critical(self, self.tr("Erreur Module"),
+                                     self.tr("Le module Service Restaurant n'a pas pu être chargé : {0}").format(str(e)))
+                self.restaurant_widget_instance = None # Ensure it's None on failure
+                return # Don't proceed to show if creation failed
+
+        if self.restaurant_widget_instance: # Check again in case creation failed
+            if hasattr(self.restaurant_widget_instance, 'refresh_all_data'):
+                self.restaurant_widget_instance.refresh_all_data()
+            self.main_area_stack.setCurrentWidget(self.restaurant_widget_instance)
+            logging.info("Switched to B2C Restaurant Management view.")
+        else:
+            # This case should be covered by the try-except above, but as a safeguard:
+            logging.error("RestaurantMainWidget instance is None after attempting creation. Cannot show view.")
+            QMessageBox.critical(self, self.tr("Erreur Critique"),
+                                 self.tr("La page du Service Restaurant n'a pas pu être chargée."))
+
 
     def open_menu_customization_dialog(self):
         if not self.current_user_id:
