@@ -93,6 +93,12 @@ class ProductsTab(QWidget):
         self.remove_product_btn = QPushButton(self.tr("Supprimer")); self.remove_product_btn.setIcon(QIcon(":/icons/trash.svg"))
         self.remove_product_btn.setToolTip(self.tr("Supprimer le produit sélectionné de ce client/projet")); self.remove_product_btn.setObjectName("dangerButton"); self.remove_product_btn.clicked.connect(self.remove_product)
         products_btn_layout.addWidget(self.remove_product_btn)
+        products_btn_layout.addStretch() # Add some space before new button if desired
+
+        self.add_new_global_product_btn = QPushButton(self.tr("➕ Nouveau Produit Global"))
+        self.add_new_global_product_btn.setToolTip(self.tr("Ajouter un nouveau produit global et le lier à ce client."))
+        self.add_new_global_product_btn.clicked.connect(self.handle_add_new_global_product)
+        products_btn_layout.addWidget(self.add_new_global_product_btn)
 
         products_layout.addLayout(products_btn_layout)
 
@@ -623,4 +629,141 @@ class ProductsTab(QWidget):
         """Public method to refresh data, callable from parent if needed."""
         self.load_products()
 
+    def handle_add_new_global_product(self):
+        if not self.ProductDialog:
+            QMessageBox.critical(self, self.tr("Erreur"), self.tr("Le composant d'ajout de produit n'est pas chargé."))
+            return
+
+        client_id = self.client_info.get("client_id")
+        if not client_id:
+            QMessageBox.critical(self, self.tr("Erreur Client"), self.tr("ID Client non trouvé."))
+            return
+
+        app_root_dir = None
+        if hasattr(self.parent_widget, 'app_root_dir'):
+            app_root_dir = self.parent_widget.app_root_dir
+        else:
+            # This case should ideally not happen if parent_widget is always ClientMainWidget or similar
+            logging.warning("handle_add_new_global_product: app_root_dir not found on parent_widget.")
+            # Depending on ProductDialog's needs, this might be critical or not.
+            # If ProductDialog strictly requires it (e.g., for image paths), show an error.
+            # QMessageBox.critical(self, self.tr("Erreur Configuration"), self.tr("Le répertoire racine de l'application n'est pas accessible."))
+            # return
+
+        # Instantiate ProductDialog. We assume it's configured to handle new global product creation.
+        # It might need a mode or specific parameters if its behavior needs to vary significantly.
+        dialog = self.ProductDialog(client_id=client_id,
+                                    app_root_dir=app_root_dir,
+                                    parent=self,
+                                    # product_data=None, # Explicitly not editing an existing product
+                                    # is_new_global_product_mode=True # Optional: A flag if dialog needs it
+                                    )
+
+        if dialog.exec_() == QDialog.Accepted:
+            # dialog.get_data() should return a list of product data dicts.
+            # For new global product, we expect one item in the list.
+            products_data_list = dialog.get_data()
+            if not products_data_list:
+                if self.notification_manager:
+                    self.notification_manager.show(self.tr("Information"), self.tr("Aucune donnée produit n'a été fournie."), type="INFO")
+                return
+
+            # Assuming the first item contains the data for the new global product and its initial link
+            new_product_info = products_data_list[0]
+
+            # --- 1. Create Global Product ---
+            # We need to extract details meant for the global product table.
+            # ProductDialog.get_data() needs to provide these. Example keys:
+            # 'product_name', 'product_code', 'description' (global), 'base_unit_price',
+            # 'language_code', 'weight' (global), 'dimensions' (global), 'category_id', etc.
+            # 'created_by_user_id'
+
+            # This is a simplified assumption of the structure from ProductDialog.
+            # The actual keys will depend on ProductDialog's implementation of get_data().
+            global_product_details = {
+                'product_name': new_product_info.get('name'), # Assuming 'name' from dialog is global name
+                'product_code': new_product_info.get('product_code'), # Crucial: Must be unique
+                'description': new_product_info.get('description'), # Global description
+                'base_unit_price': new_product_info.get('unit_price'), # Price from dialog becomes base_unit_price
+                'language_code': new_product_info.get('language_code', 'fr'), # Default if not provided
+                'weight': new_product_info.get('weight'), # Global weight
+                'dimensions': new_product_info.get('dimensions'), # Global dimensions
+                'created_by_user_id': self.current_user_id,
+                'is_active': True # Default to active
+                # Any other fields required by products_crud.add_product
+            }
+
+            if not global_product_details['product_name'] or not global_product_details['product_code']:
+                QMessageBox.warning(self, self.tr("Données Manquantes"), self.tr("Le nom et le code du produit sont obligatoires pour un nouveau produit global."))
+                return
+
+            # Call products_crud.add_product
+            # Assuming products_crud.add_product returns a dict like {'success': bool, 'id': new_id, 'error': str}
+            add_global_prod_result = db_manager.products_crud.add_product(global_product_details)
+
+            if not add_global_prod_result or not add_global_prod_result.get('success'):
+                error_msg = add_global_prod_result.get('error', self.tr("une erreur inconnue"))
+                QMessageBox.critical(self, self.tr("Erreur Création Produit Global"),
+                                     self.tr("Impossible de créer le produit global : {0}").format(error_msg))
+                return
+
+            new_global_product_id = add_global_prod_result.get('id')
+            if not new_global_product_id: # Should not happen if success is true and id is part of success response
+                QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("ID du produit global non retourné après création."))
+                return
+
+            if self.notification_manager:
+                self.notification_manager.show(self.tr("Succès"),
+                                               self.tr("Produit global '{0}' créé avec succès.").format(global_product_details['product_name']),
+                                               type="SUCCESS")
+
+            # --- 2. Link to Client ---
+            # Prepare data for ClientProjectProducts link.
+            # These are overrides or specific details for THIS client link.
+            # ProductDialog's get_data() should ideally differentiate these if they can be
+            # different from the global ones at the point of creation.
+            # For now, we'll assume some direct mappings and some potential overrides.
+
+            # Example: If ProductDialog allows specifying a quantity for the link
+            link_quantity = new_product_info.get('quantity', 1) # Default to 1 if not specified
+
+            # Example: If ProductDialog allows overriding the price for this client link
+            # If 'unit_price_override' is a specific field from dialog for this, use it.
+            # Otherwise, if 'unit_price' from dialog was meant as the override, it's already base_unit_price.
+            # Let's assume for now no override at creation via this simplified flow, so it uses global base price.
+            link_unit_price_override = new_product_info.get('client_unit_price_override', None)
+
+            # Client-specific name/description for the link, if different from global at creation
+            link_client_specific_name = new_product_info.get('client_specific_product_name', None)
+            link_line_description = new_product_info.get('client_line_description', None)
+
+
+            link_data = {
+                'client_id': client_id,
+                'product_id': new_global_product_id,
+                'quantity': link_quantity,
+                'unit_price_override': link_unit_price_override, # None means use global base price
+                'added_by_user_id': self.current_user_id,
+                'client_specific_product_name': link_client_specific_name if link_client_specific_name else global_product_details['product_name'],
+                'line_description': link_line_description if link_line_description else global_product_details['description'],
+                # 'line_weight': ..., # If ProductDialog allows specifying these for the link separately
+                # 'line_dimensions_notes': ...,
+            }
+
+            cpp_id = db_manager.add_product_to_client_or_project(link_data)
+
+            if cpp_id:
+                if self.notification_manager:
+                    self.notification_manager.show(self.tr("Succès"),
+                                                   self.tr("Nouveau produit '{0}' lié au client.").format(global_product_details['product_name']),
+                                                   type="SUCCESS")
+            else:
+                QMessageBox.warning(self, self.tr("Erreur Liaison Produit"),
+                                    self.tr("Le produit global a été créé, mais une erreur est survenue lors de sa liaison avec le client."))
+
+            self.load_products() # Refresh the table
+        else:
+            # Dialog was cancelled or closed
+            if self.notification_manager:
+                 self.notification_manager.show(self.tr("Annulé"), self.tr("L'ajout du nouveau produit a été annulé."), type="INFO")
 
