@@ -389,10 +389,10 @@ class ClientMainWidget(QWidget):
             contacts_tab_widget = QWidget()
             contacts_tab_layout = QVBoxLayout(contacts_tab_widget)
             self.contacts_table = QTableWidget()
-            self.contacts_table.setColumnCount(5)
+            self.contacts_table.setColumnCount(6) # Augmenté de 5 à 6
             self.contacts_table.setHorizontalHeaderLabels([
                 self.tr("Nom"), self.tr("Email"), self.tr("Téléphone"),
-                self.tr("Position"), self.tr("Principal")
+                self.tr("Position"), self.tr("Principal"), self.tr("Actions") # Nouvelle colonne
             ])
             self.contacts_table.setSelectionBehavior(QAbstractItemView.SelectRows)
             self.contacts_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -443,7 +443,8 @@ class ClientMainWidget(QWidget):
             self.remove_assigned_vendor_btn = QPushButton(self.tr("Retirer Vendeur/Personnel")); self.remove_assigned_vendor_btn.clicked.connect(self.handle_remove_assigned_vendor)
             vendor_buttons_layout.addWidget(self.add_assigned_vendor_btn); vendor_buttons_layout.addWidget(self.remove_assigned_vendor_btn)
             assigned_vendors_layout.addLayout(vendor_buttons_layout)
-            self.assignments_sub_tabs.addTab(assigned_vendors_widget, self.tr("Vendeurs & Personnel"))
+            self.assignments_sub_tabs.addTab(assigned_vendors_widget, QIcon.fromTheme("users", QIcon(":/icons/users.svg")), self.tr("Vendeurs & Personnel"))
+
             assigned_technicians_widget = QWidget()
             assigned_technicians_layout = QVBoxLayout(assigned_technicians_widget)
             self.assigned_technicians_table = QTableWidget(); self.assigned_technicians_table.setColumnCount(4)
@@ -456,7 +457,8 @@ class ClientMainWidget(QWidget):
             self.remove_assigned_technician_btn = QPushButton(self.tr("Retirer Technicien")); self.remove_assigned_technician_btn.clicked.connect(self.handle_remove_assigned_technician)
             technician_buttons_layout.addWidget(self.add_assigned_technician_btn); technician_buttons_layout.addWidget(self.remove_assigned_technician_btn)
             assigned_technicians_layout.addLayout(technician_buttons_layout)
-            self.assignments_sub_tabs.addTab(assigned_technicians_widget, self.tr("Techniciens"))
+            self.assignments_sub_tabs.addTab(assigned_technicians_widget, QIcon.fromTheme("preferences-system", QIcon(":/icons/settings.svg")), self.tr("Techniciens"))
+
             assigned_transporters_widget = QWidget()
             assigned_transporters_layout = QVBoxLayout(assigned_transporters_widget)
             self.assigned_transporters_table = QTableWidget(); self.assigned_transporters_table.setColumnCount(6)
@@ -469,7 +471,8 @@ class ClientMainWidget(QWidget):
             self.remove_assigned_transporter_btn = QPushButton(self.tr("Retirer Transporteur")); self.remove_assigned_transporter_btn.clicked.connect(self.handle_remove_assigned_transporter)
             transporter_buttons_layout.addWidget(self.add_assigned_transporter_btn); transporter_buttons_layout.addWidget(self.remove_assigned_transporter_btn)
             assigned_transporters_layout.addLayout(transporter_buttons_layout)
-            self.assignments_sub_tabs.addTab(assigned_transporters_widget, self.tr("Transporteurs"))
+            self.assignments_sub_tabs.addTab(assigned_transporters_widget, QIcon.fromTheme("truck", QIcon(":/icons/truck.svg")), self.tr("Transporteurs"))
+
             assigned_forwarders_widget = QWidget()
             assigned_forwarders_layout = QVBoxLayout(assigned_forwarders_widget)
             self.assigned_forwarders_table = QTableWidget(); self.assigned_forwarders_table.setColumnCount(5)
@@ -482,7 +485,8 @@ class ClientMainWidget(QWidget):
             self.remove_assigned_forwarder_btn = QPushButton(self.tr("Retirer Transitaire")); self.remove_assigned_forwarder_btn.clicked.connect(self.handle_remove_assigned_forwarder)
             forwarder_buttons_layout.addWidget(self.add_assigned_forwarder_btn); forwarder_buttons_layout.addWidget(self.remove_assigned_forwarder_btn)
             assigned_forwarders_layout.addLayout(forwarder_buttons_layout)
-            self.assignments_sub_tabs.addTab(assigned_forwarders_widget, self.tr("Transitaires"))
+            self.assignments_sub_tabs.addTab(assigned_forwarders_widget, QIcon.fromTheme("applications-internet", QIcon(":/icons/globe.svg")), self.tr("Transitaires"))
+
             mta_widget = QWidget()
             mta_layout = QVBoxLayout(mta_widget)
             mta_project_selector_layout = QHBoxLayout()
@@ -504,8 +508,9 @@ class ClientMainWidget(QWidget):
             self.remove_assigned_mta_btn = QPushButton(self.tr("Retirer Agent de Transfert")); self.remove_assigned_mta_btn.clicked.connect(self.handle_remove_assigned_mta)
             mta_buttons_layout.addWidget(self.add_assigned_mta_btn); mta_buttons_layout.addWidget(self.remove_assigned_mta_btn)
             mta_layout.addLayout(mta_buttons_layout)
-            self.assignments_sub_tabs.addTab(mta_widget, self.tr("Agents de Transfert d'Argent"))
-            self.internal_client_info_tabs.addTab(self.assignments_internal_tab, self.tr("Affectations"))
+            self.assignments_sub_tabs.addTab(mta_widget, QIcon.fromTheme("wallet", QIcon(":/icons/credit-card.svg")), self.tr("Agents de Transfert d'Argent"))
+
+            self.internal_client_info_tabs.addTab(self.assignments_internal_tab, QIcon.fromTheme("document-properties", QIcon(":/icons/briefcase.svg")), self.tr("Affectations"))
             self.assigned_vendors_table.itemSelectionChanged.connect(self.update_assigned_vendors_buttons_state)
             self.assigned_technicians_table.itemSelectionChanged.connect(self.update_assigned_technicians_buttons_state)
             self.assigned_transporters_table.itemSelectionChanged.connect(self.update_assigned_transporters_buttons_state)
@@ -679,6 +684,27 @@ class ClientMainWidget(QWidget):
                     primary_item = QTableWidgetItem(primary_text)
                     primary_item.setTextAlignment(Qt.AlignCenter)
                     self.contacts_table.setItem(row, 4, primary_item)
+
+                    # Colonne Actions (index 5)
+                    actions_widget = QWidget()
+                    actions_layout = QHBoxLayout(actions_widget)
+                    actions_layout.setContentsMargins(5, 0, 5, 0)
+                    actions_layout.setSpacing(5)
+
+                    edit_button = QPushButton(QIcon(":/icons/pencil.svg"), "")
+                    edit_button.setToolTip(self.tr("Modifier ce contact"))
+                    edit_button.clicked.connect(lambda checked, r=row: self.handle_edit_contact_action(r))
+                    actions_layout.addWidget(edit_button)
+
+                    remove_button = QPushButton(QIcon(":/icons/trash.svg"), "")
+                    remove_button.setToolTip(self.tr("Supprimer le lien vers ce contact"))
+                    remove_button.setObjectName("dangerButton")
+                    remove_button.clicked.connect(lambda checked, r=row: self.handle_remove_contact_action(r))
+                    actions_layout.addWidget(remove_button)
+
+                    actions_layout.addStretch()
+                    actions_widget.setLayout(actions_layout)
+                    self.contacts_table.setCellWidget(row, 5, actions_widget)
 
         except Exception as e:
             logging.error(f"Error loading contacts into table: {e}", exc_info=True)
@@ -888,20 +914,125 @@ class ClientMainWidget(QWidget):
             logging.error(f"Error editing contact (ID: {contact_id}): {e}", exc_info=True)
             QMessageBox.critical(self, self.tr("Erreur"), self.tr("Une erreur est survenue lors de la modification du contact: {0}").format(str(e)))
 
+    def handle_edit_contact_action(self, row):
+        """Appelé par le bouton 'Modifier' dans une ligne du tableau des contacts."""
+        contact_id_item = self.contacts_table.item(row, 0) # Nom (contient ID en UserRole)
+        if contact_id_item:
+            contact_id = contact_id_item.data(Qt.UserRole)
+            if contact_id:
+                self.edit_contact(contact_id_to_edit=contact_id) # Appeler la méthode existante avec l'ID
+            else:
+                QMessageBox.warning(self, self.tr("Erreur"), self.tr("ID de contact non trouvé pour cette ligne."))
+        else:
+            QMessageBox.warning(self, self.tr("Erreur"), self.tr("Impossible de récupérer les informations du contact pour cette ligne."))
 
-    def remove_contact(self):
-        selected_items = self.contacts_table.selectedItems()
-        if not selected_items:
-            QMessageBox.information(self, self.tr("Sélection Requise"), self.tr("Veuillez sélectionner un contact à délier."))
+    def handle_remove_contact_action(self, row):
+        """Appelé par le bouton 'Supprimer' dans une ligne du tableau des contacts."""
+        contact_id_item = self.contacts_table.item(row, 0) # Nom (contient ID en UserRole)
+        if contact_id_item:
+            contact_id = contact_id_item.data(Qt.UserRole)
+            contact_name = contact_id_item.text()
+            if contact_id:
+                self.remove_contact(contact_id_to_remove=contact_id, contact_name_for_confirm=contact_name) # Appeler la méthode existante
+            else:
+                QMessageBox.warning(self, self.tr("Erreur"), self.tr("ID de contact non trouvé pour cette ligne."))
+        else:
+            QMessageBox.warning(self, self.tr("Erreur"), self.tr("Impossible de récupérer les informations du contact pour cette ligne."))
+
+    def edit_contact(self, row=None, col=None, contact_id_to_edit=None): # Ajout de contact_id_to_edit
+        contact_id = contact_id_to_edit
+        selected_row = -1
+
+        if contact_id is None: # Comportement existant si appelé par le bouton sous le tableau ou double-clic
+            selected_items = self.contacts_table.selectedItems()
+            if not selected_items:
+                QMessageBox.information(self, self.tr("Sélection Requise"), self.tr("Veuillez sélectionner un contact à modifier."))
+                return
+            selected_row = selected_items[0].row()
+            contact_id_item = self.contacts_table.item(selected_row, 0)
+            if not contact_id_item: return
+            contact_id = contact_id_item.data(Qt.UserRole)
+
+        if not contact_id:
+            QMessageBox.warning(self, self.tr("Erreur"), self.tr("ID du contact non trouvé."))
             return
 
-        selected_row = selected_items[0].row()
-        contact_id_item = self.contacts_table.item(selected_row, 0)
-        contact_name_item = self.contacts_table.item(selected_row, 0) # Name is also in col 0 for display
+        try:
+            contact_global_data = db_manager.get_contact_by_id(contact_id)
+            if not contact_global_data:
+                QMessageBox.warning(self, self.tr("Erreur"), self.tr("Impossible de charger les détails du contact global (ID: {0}).").format(contact_id))
+                return
 
-        if not contact_id_item: return
-        contact_id = contact_id_item.data(Qt.UserRole)
-        contact_name = contact_name_item.text() if contact_name_item else "ID: " + str(contact_id)
+            client_contact_link_data = None
+            all_client_contacts_for_link_search = db_manager.get_contacts_for_client(self.client_info['client_id'])
+            if all_client_contacts_for_link_search:
+                for link in all_client_contacts_for_link_search:
+                    if link.get('contact_id') == contact_id:
+                        client_contact_link_data = {
+                            'role_in_entity': link.get('role_in_client'),
+                            'is_primary': link.get('is_primary_for_client'),
+                            'can_receive_documents': link.get('can_receive_documents'),
+                            'link_notes': link.get('link_notes')
+                        }
+                        break
+            if client_contact_link_data is None: client_contact_link_data = {}
+
+            dialog = self.ContactDialog(
+                contact_data=contact_global_data,
+                link_data=client_contact_link_data,
+                manage_link_fields=True,
+                parent=self
+            )
+
+            if dialog.exec_() == QDialog.Accepted:
+                updated_contact_core_data = dialog.get_contact_data()
+                updated_link_data = dialog.get_link_data()
+                db_manager.update_contact(contact_id, updated_contact_core_data)
+                if updated_link_data:
+                    link_update_payload = {
+                        'is_primary': updated_link_data.get('is_primary', False),
+                        'can_receive_documents': updated_link_data.get('can_receive_documents', True),
+                        'role_in_client': updated_link_data.get('role_in_entity'),
+                        'notes': updated_link_data.get('notes')
+                    }
+                    if link_update_payload['is_primary']:
+                        db_manager.clear_primary_contact_for_client(self.client_info['client_id'], except_contact_id=contact_id)
+
+                    # Assumons qu'une fonction `update_client_contact_link` existe ou sera créée
+                    # Pour l'instant, on loguerait ou on ferait un unlink/relink (moins idéal)
+                    # db_manager.update_client_contact_link(self.client_info['client_id'], contact_id, link_update_payload)
+                    logging.info(f"Mise à jour du lien pour client {self.client_info['client_id']}, contact {contact_id} avec: {link_update_payload} (logique de mise à jour DB à implémenter)")
+
+
+                self.notification_manager.show(self.tr("Succès"), self.tr("Contact mis à jour avec succès."), type='SUCCESS')
+                self.load_contacts()
+        except Exception as e:
+            logging.error(f"Error editing contact (ID: {contact_id}): {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur"), self.tr("Une erreur est survenue lors de la modification du contact: {0}").format(str(e)))
+
+
+    def remove_contact(self, contact_id_to_remove=None, contact_name_for_confirm=None): # Ajout de paramètres
+        contact_id = contact_id_to_remove
+        contact_name = contact_name_for_confirm
+
+        if contact_id is None: # Comportement existant
+            selected_items = self.contacts_table.selectedItems()
+            if not selected_items:
+                QMessageBox.information(self, self.tr("Sélection Requise"), self.tr("Veuillez sélectionner un contact à délier."))
+                return
+            selected_row = selected_items[0].row()
+            contact_id_item = self.contacts_table.item(selected_row, 0)
+            contact_name_item = self.contacts_table.item(selected_row, 0)
+            if not contact_id_item: return
+            contact_id = contact_id_item.data(Qt.UserRole)
+            contact_name = contact_name_item.text() if contact_name_item else "ID: " + str(contact_id)
+
+        if not contact_name and contact_id: # Si appelé avec ID mais sans nom, essayer de le trouver
+            for r in range(self.contacts_table.rowCount()):
+                if self.contacts_table.item(r, 0).data(Qt.UserRole) == contact_id:
+                    contact_name = self.contacts_table.item(r,0).text()
+                    break
+            if not contact_name: contact_name = f"ID: {contact_id}"
 
 
         if not contact_id:
@@ -1263,23 +1394,11 @@ class ClientMainWidget(QWidget):
             )
             self.tab_widget.addTab(self.billing_tab_widget_ref, QIcon(":/icons/credit-card.svg"), self.tr("Billing"))
 
-            # Add Commandes Tab
-            try:
-                self.commandes_content_widget = CommandeWidget(
-                    client_info=self.client_info,
-                    current_user_info=self.current_user_info,
-                    parent=self # CommandeWidget might need access to parent methods or config
-                )
-                self.tab_widget.addTab(self.commandes_content_widget, self.tr("Commandes"))
-                logging.info("ClientMainWidget._setup_main_tabs_section: Commandes tab added to self.tab_widget.")
-            except Exception as e_cmd:
-                logging.error(f"Error creating or adding Commandes tab: {e_cmd}", exc_info=True)
-                # Optionally add a placeholder tab on error
-                error_placeholder_commandes = QLabel(self.tr("Erreur chargement onglet Commandes."))
-                error_placeholder_commandes.setAlignment(Qt.AlignCenter)
-                self.tab_widget.addTab(error_placeholder_commandes, self.tr("Commandes (Erreur)"))
+            # Le bloc "Add Commandes Tab" était dupliqué. La première instance (plus haut dans la méthode)
+            # est conservée, celle-ci est supprimée.
 
             # Définir l'onglet "Commandes" comme onglet par défaut
+            # Cette logique doit s'appliquer à la première instance de commandes_content_widget
             if hasattr(self, 'commandes_content_widget') and self.commandes_content_widget is not None:
                 # Store the index of the Commandes tab if we want it as a default
                 commandes_tab_index = -1
@@ -2198,16 +2317,192 @@ class ClientMainWidget(QWidget):
             logging.info(f"ClientMainWidget: Entered edit mode for client {self.client_info.get('client_id')}.")
             # Example: self.client_name_edit.setReadOnly(False)
             # For now, just log and change button
+            self.switchTo_edit_client_view() # Nouvelle méthode pour passer en mode édition
         else:
             # Future: Call a method to save changes if any
             # For now, just revert button and log
-            self.edit_save_client_btn.setText(self.tr("Modifier Client"))
-            self.edit_save_client_btn.setIcon(QIcon.fromTheme("document-edit", QIcon(":/icons/pencil.svg")))
-            logging.info(f"ClientMainWidget: Exited edit mode for client {self.client_info.get('client_id')}. Save logic pending.")
-            # Example: self.client_name_edit.setReadOnly(True)
-            # Potentially reload client_info to discard non-saved changes: self.refresh_display(self.client_info)
+            if self.save_client_changes_from_edit_view(): # Nouvelle méthode pour sauvegarder
+                self.edit_save_client_btn.setText(self.tr("Modifier Client"))
+                self.edit_save_client_btn.setIcon(QIcon.fromTheme("document-edit", QIcon(":/icons/pencil.svg")))
+                logging.info(f"ClientMainWidget: Exited edit mode for client {self.client_info.get('client_id')}. Changes saved.")
+                # La vue est rafraîchie dans save_client_changes_from_edit_view
+            else:
+                # Si la sauvegarde échoue ou est annulée, rester en mode édition
+                self.is_editing_client = True # Maintenir l'état d'édition
+                # Le bouton reste "Sauvegarder Client"
+                logging.info(f"ClientMainWidget: Save attempt failed or cancelled. Remained in edit mode for client {self.client_info.get('client_id')}.")
+
         # After toggling, re-apply permissions if some actions should be disabled during edit mode
         self._apply_permissions()
+
+    def switchTo_edit_client_view(self):
+        """Switches the client details view to an editable form."""
+        if not self.client_info:
+            QMessageBox.warning(self, self.tr("Erreur"), self.tr("Aucune information client à modifier."))
+            self.is_editing_client = False # Revert state
+            self.edit_save_client_btn.setText(self.tr("Modifier Client"))
+            self.edit_save_client_btn.setIcon(QIcon.fromTheme("document-edit", QIcon(":/icons/pencil.svg")))
+            return
+
+        logging.info(f"ClientMainWidget: Switching to edit view for client {self.client_info.get('client_id')}")
+        self.edit_widgets = {} # Clear any previous edit widgets
+
+        # Iterate over details_layout and replace QLabel values with QLineEdits or appropriate widgets
+        # This is a simplified approach. A more robust way would be to have predefined edit widgets
+        # and toggle their visibility or manage them in a stacked layout.
+
+        # For simplicity, we'll clear and rebuild the details_layout for edit mode.
+        # Store original labels to restore them later if needed, or just repopulate from self.client_info
+
+        # Clear existing widgets from details_layout but keep the layout itself
+        while self.details_layout.count():
+            item = self.details_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+            elif item.layout(): # If it's a sub-layout
+                 # Clearing a sub-layout is more complex, for now assume direct widgets or simple layouts
+                while item.layout().count():
+                    sub_item = item.layout().takeAt(0)
+                    if sub_item.widget():
+                        sub_item.widget().deleteLater()
+
+        # Client Name (already a QLabel: self.header_label, not in details_layout directly, handle separately if needed)
+        # For now, let's assume client_name is part of the details_layout for editing
+        self.edit_widgets['client_name'] = QLineEdit(self.client_info.get("client_name", ""))
+        self.details_layout.addRow(self.tr("Nom Client:"), self.edit_widgets['client_name'])
+
+        # Project ID (usually not editable by user directly, but for example)
+        self.edit_widgets['project_identifier'] = QLineEdit(self.client_info.get("project_identifier", ""))
+        self.details_layout.addRow(self.project_id_label, self.edit_widgets['project_identifier'])
+
+        # Country and City - Needs QComboBoxes, potentially with "add new" functionality
+        country_city_edit_widget = QWidget()
+        country_city_h_layout = QHBoxLayout(country_city_edit_widget)
+        country_city_h_layout.setContentsMargins(0,0,0,0)
+
+        self.edit_widgets['country_combo'] = QComboBox(); self.edit_widgets['country_combo'].setEditable(True)
+        # Populate countries and set current
+        # self._populate_country_edit_combo(self.edit_widgets['country_combo'], self.client_info.get('country_id'))
+
+        self.edit_widgets['city_combo'] = QComboBox(); self.edit_widgets['city_combo'].setEditable(True)
+        # Populate cities based on selected country and set current
+        # self.edit_widgets['country_combo'].currentIndexChanged.connect(
+        #     lambda index: self._populate_city_edit_combo(self.edit_widgets['city_combo'], self.edit_widgets['country_combo'].itemData(index), None)
+        # )
+        # self._populate_city_edit_combo(self.edit_widgets['city_combo'], self.client_info.get('country_id'), self.client_info.get('city_id'))
+
+        country_city_h_layout.addWidget(QLabel(self.tr("Pays:"))); country_city_h_layout.addWidget(self.edit_widgets['country_combo'])
+        country_city_h_layout.addSpacing(10)
+        country_city_h_layout.addWidget(QLabel(self.tr("Ville:"))); country_city_h_layout.addWidget(self.edit_widgets['city_combo'])
+        self.details_layout.addRow(self.country_city_label, country_city_edit_widget)
+
+
+        # Price (usually calculated, not directly edited, but for example)
+        # self.edit_widgets['price'] = QDoubleSpinBox()
+        # self.edit_widgets['price'].setValue(self.client_info.get("price", 0.0))
+        # self.details_layout.addRow(self.price_label_static, self.edit_widgets['price'])
+        # Creation Date (read-only)
+        self.details_layout.addRow(self.date_label_static, QLabel(self.date_value_label.text())) # Keep as label
+
+        # Status (already a QComboBox: self.status_combo)
+        self.status_combo.setEnabled(True) # Enable it for editing
+        self.details_layout.addRow(self.status_label_static, self.status_combo) # Add it back if it was removed
+
+        # Category
+        self.edit_widgets['category'] = QLineEdit(self.client_info.get("category", ""))
+        self.details_layout.addRow(self.category_label_static, self.edit_widgets['category'])
+
+        # Distributor Info
+        self.edit_widgets['distributor_info'] = QTextEdit(self.client_info.get("distributor_info", ""))
+        self.edit_widgets['distributor_info'].setFixedHeight(60)
+        self.details_layout.addRow(self.distributor_info_label_static, self.edit_widgets['distributor_info'])
+        self.edit_widgets['distributor_info_label_static'] = self.distributor_info_label_static # Store for visibility toggle
+
+        # Need
+        self.edit_widgets['primary_need_description'] = QTextEdit(self.client_info.get("primary_need_description", ""))
+        self.edit_widgets['primary_need_description'].setFixedHeight(60)
+        self.details_layout.addRow(self.need_label_static, self.edit_widgets['primary_need_description'])
+
+        # Folder Path (read-only usually)
+        self.details_layout.addRow(self.folder_label_static, QLabel(self.folder_value_label.text()))
+
+        # Created By (read-only)
+        self.details_layout.addRow(self.created_by_label_static, QLabel(self.created_by_value_label.text()))
+
+        # Handle Client Statuses (checkboxes) - make them interactive if needed
+        # For now, assuming they are already interactive and their state will be read on save.
+
+        # TODO: Add more fields as QLineEdits, QComboBoxes, etc.
+        # Example for 'client_name' if it were a simple label:
+        # self.edit_widgets['client_name_edit'] = QLineEdit(self.client_info.get('client_name'))
+        # self.details_layout.replaceWidget(self.client_name_value_label, self.edit_widgets['client_name_edit'])
+        # self.client_name_value_label.setVisible(False) # Hide original label
+
+        # Make sure the client info group box is checked and visible
+        self.client_info_group_box.setChecked(True)
+        self.info_container_widget.setVisible(True)
+        self.client_details_tab.setVisible(True) # Ensure the tab itself is visible
+
+    def save_client_changes_from_edit_view(self):
+        """Saves the changes made in the edit view to the database."""
+        if not self.is_editing_client or not self.client_info:
+            return False # Should not happen if called correctly
+
+        logging.info(f"ClientMainWidget: Attempting to save changes for client {self.client_info.get('client_id')}")
+
+        data_to_save = {}
+        # Example: data_to_save['client_name'] = self.edit_widgets['client_name'].text().strip()
+        # ... collect data from all self.edit_widgets ...
+
+        # Collect data (simplified example)
+        if 'client_name' in self.edit_widgets:
+            data_to_save['client_name'] = self.edit_widgets['client_name'].text().strip()
+        if 'project_identifier' in self.edit_widgets:
+            data_to_save['project_identifier'] = self.edit_widgets['project_identifier'].text().strip()
+
+        # Status
+        data_to_save['status_id'] = self.status_combo.currentData()
+        # Category
+        if 'category' in self.edit_widgets:
+            data_to_save['category'] = self.edit_widgets['category'].text().strip()
+        # Distributor Info
+        if 'distributor_info' in self.edit_widgets:
+             data_to_save['distributor_info'] = self.edit_widgets['distributor_info'].toPlainText().strip()
+        # Need
+        if 'primary_need_description' in self.edit_widgets:
+            data_to_save['primary_need_description'] = self.edit_widgets['primary_need_description'].toPlainText().strip()
+
+        # TODO: Validate data_to_save before calling CRUD
+
+        try:
+            if not data_to_save: # No editable fields were actually changed or defined in edit_widgets
+                logging.info("No data to save from edit widgets.")
+                # Switch back to display mode without saving
+                self.is_editing_client = False # Important to correctly flip the mode
+                self.populate_details_layout() # Refresh to display mode
+                return True # Indicate success in terms of mode switch
+
+            success = clients_crud_instance.update_client(self.client_info['client_id'], data_to_save)
+            if success:
+                self.notification_manager.show(self.tr("Succès"), self.tr("Modifications client sauvegardées."), type='SUCCESS')
+                # Update self.client_info with the saved data
+                for key, value in data_to_save.items():
+                    self.client_info[key] = value
+                # Also update text representations if IDs were saved (e.g., status name from status_id)
+                self.client_info['status'] = self.status_combo.currentText()
+                # ... similar for country, city if they were editable ...
+
+                self.is_editing_client = False # Set before refresh
+                self.populate_details_layout() # Refresh to display mode with new data
+                self.refresh_display(self.client_info) # Ensure all parts of widget reflect change
+                return True
+            else:
+                QMessageBox.warning(self, self.tr("Erreur DB"), self.tr("Échec de la sauvegarde des modifications client."))
+                return False
+        except Exception as e:
+            logging.error(f"Error saving client changes: {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur Sauvegarde"), self.tr("Une erreur est survenue: {0}").format(str(e)))
+            return False
 
     def populate_details_layout(self):
         logging.info(f"Populating details layout for client: {self.client_info.get('client_name', 'N/A')}")
@@ -2341,7 +2636,11 @@ class ClientMainWidget(QWidget):
         # --- Distributor Status ---
         self.is_distributor_checkbox = QCheckBox(self.tr("Distributeur"))
         is_currently_distributor = (self.client_info.get('category') == 'Distributeur')
+
+        self.is_distributor_checkbox.blockSignals(True) # Bloquer les signaux
         self.is_distributor_checkbox.setChecked(is_currently_distributor)
+        self.is_distributor_checkbox.blockSignals(False) # Débloquer les signaux
+
         self.is_distributor_checkbox.toggled.connect(self.on_distributor_status_toggled)
         self.client_statuses_layout.addWidget(self.is_distributor_checkbox)
 
