@@ -213,8 +213,8 @@ class ProductsTab(QWidget):
             else:
                 self.products_empty_label.hide()
                 self.products_table.show()
-                self.products_table.setRowCount(len(products))
-                for row, prod in enumerate(products):
+                self.products_table.setRowCount(len(products_to_display))
+                for row, prod in enumerate(products_to_display):
                     # Assuming 'client_project_product_id' is the unique ID for this client-product link
                     # and 'product_id' is the global product ID.
                     # The table should display details of the linked product.
