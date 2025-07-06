@@ -116,41 +116,55 @@ class DocumentsTab(QWidget):
         self.doc_table.setColumnCount(6)
         self.doc_table.setHorizontalHeaderLabels([
             self.tr("Nom Document"), self.tr("Type"), self.tr("Langue"),
-            self.tr("Date Création"), self.tr("Fichier Original"), self.tr("Actions")
+            self.tr("Date Création"), self.tr("Fichier"), self.tr("Actions") # "Fichier Original" -> "Fichier"
         ])
-        header_font = QFont()
-        header_font.setBold(True)
-        self.doc_table.horizontalHeader().setFont(header_font)
-        self.doc_table.horizontalHeader().setStyleSheet(
-            "QHeaderView::section { background-color: #e9ecef; padding: 4px; border: 1px solid #dee2e6; font-weight: bold; }"
-        )
+
+        header_style = """
+            QHeaderView::section {
+                background-color: #4a5568; /* Equivalent de Tailwind bg-gray-700 */
+                color: white;
+                padding: 6px; /* Augmentation du padding */
+                border: 1px solid #ddd;
+                font-weight: bold;
+                font-size: 9pt; /* Taille de police légèrement augmentée */
+            }
+        """
+        self.doc_table.horizontalHeader().setStyleSheet(header_style)
         self.doc_table.verticalHeader().setVisible(False)
         self.doc_table.setAlternatingRowColors(True)
-
-        self.doc_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.doc_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        self.doc_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        self.doc_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        self.doc_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
-        self.doc_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents)
-        self.doc_table.setColumnWidth(4, 150)
-
         self.doc_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.doc_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.doc_table.setSortingEnabled(True) # Activer le tri
+
+        # Modes de redimensionnement des colonnes (ajustés pour une meilleure flexibilité)
+        self.doc_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch) # Nom Document
+        self.doc_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents) # Type
+        self.doc_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents) # Langue
+        self.doc_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents) # Date Création
+        self.doc_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive) # Fichier (Interactive pour que l'utilisateur puisse ajuster)
+        self.doc_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents) # Actions
+        self.doc_table.setColumnWidth(4, 180) # Largeur initiale pour Fichier
+
         docs_layout.addWidget(self.doc_table)
 
-        # New button layout
-        doc_actions_layout = QHBoxLayout()
-        doc_actions_layout.setSpacing(10)
+        # Barre d'actions sous le tableau
+        doc_actions_bar = QHBoxLayout()
+        doc_actions_bar.setSpacing(10)
 
-        self.main_add_doc_action_btn = QPushButton(QIcon(":/icons/plus.svg"), self.tr("Ajouter Document"))
-        self.main_add_doc_action_btn.setToolTip(self.tr("Ajouter un nouveau document (simple, importé ou généré)"))
+        self.main_add_doc_action_btn = QPushButton(QIcon(":/icons/plus-circle.svg"), self.tr("Ajouter/Générer Document"))
+        self.main_add_doc_action_btn.setToolTip(self.tr("Options pour ajouter ou générer un nouveau document"))
         self.main_add_doc_action_btn.setObjectName("primaryButton")
-        self.main_add_doc_action_btn.clicked.connect(self._open_add_document_menu) # To be implemented
-        doc_actions_layout.addWidget(self.main_add_doc_action_btn)
+        self.main_add_doc_action_btn.clicked.connect(self._open_add_document_menu)
+        doc_actions_bar.addWidget(self.main_add_doc_action_btn)
 
-        doc_actions_layout.addStretch() # Push button to the left
-        docs_layout.addLayout(doc_actions_layout)
+        self.compile_pdf_btn_tab = QPushButton(QIcon(":/icons/file-plus.svg"), self.tr("Compiler PDF")) # Icon changed
+        self.compile_pdf_btn_tab.setObjectName("secondaryButton")
+        self.compile_pdf_btn_tab.setToolTip(self.tr("Compiler plusieurs documents PDF en un seul"))
+        self.compile_pdf_btn_tab.clicked.connect(self.open_compile_pdf_dialog_from_parent) # Connects to parent's method
+        doc_actions_bar.addWidget(self.compile_pdf_btn_tab)
+
+        doc_actions_bar.addStretch()
+        docs_layout.addLayout(doc_actions_bar)
 
         self._load_order_filters()
 
@@ -376,37 +390,42 @@ class DocumentsTab(QWidget):
                         if doc_type == "HTML" and can_manage:
                             edit_btn = QPushButton(QIcon(":/icons/edit-2.svg"), "")
                             edit_btn.setToolTip(self.tr("Modifier HTML"))
+                            edit_btn.setProperty("class", "tableActionButton")
                             edit_btn.clicked.connect(lambda checked, p=full_file_path, d_id=doc_id: self.handle_edit_html_action(p, d_id))
                             actions_layout.addWidget(edit_btn)
                         elif doc_type == "XLSX" and can_manage:
                             edit_btn = QPushButton(QIcon(":/icons/edit-2.svg"), "")
                             edit_btn.setToolTip(self.tr("Modifier Excel"))
+                            edit_btn.setProperty("class", "tableActionButton")
                             edit_btn.clicked.connect(lambda checked, p=full_file_path, d_id=doc_id: self.handle_edit_excel_action(p, d_id))
                             actions_layout.addWidget(edit_btn)
 
                         view_icon_path = ":/icons/eye.svg"
-                        if doc_type == "PDF": view_icon_path = ":/icons/file-text.svg"
+                        if doc_type == "PDF": view_icon_path = ":/icons/file-text.svg" # More specific for PDF
 
                         view_btn = QPushButton(QIcon(view_icon_path), "")
                         view_btn.setToolTip(self.tr("Ouvrir Document"))
+                        view_btn.setProperty("class", "tableActionButton")
                         view_btn.clicked.connect(lambda checked, p=full_file_path, d_id=doc_id: self._handle_view_document_action(p, d_id))
                         actions_layout.addWidget(view_btn)
 
                     if can_manage:
-                        if doc.get("source_template_id"):
-                            version_btn = QPushButton(QIcon(":/icons/plus-square.svg"), "") # Remplacé copy.svg
-                            version_btn.setToolTip(self.tr("Créer une nouvelle version"))
+                        if doc.get("source_template_id"): # Only show "New Version" if it's from a template
+                            version_btn = QPushButton(QIcon(":/icons/copy.svg"), "") # Using copy icon for "new version"
+                            version_btn.setToolTip(self.tr("Créer une nouvelle version à partir du même modèle"))
+                            version_btn.setProperty("class", "tableActionButton")
                             version_btn.clicked.connect(lambda checked, old_id=doc_id, t_id=doc.get("source_template_id"): self.handle_create_new_version_clicked(old_id, t_id))
                             actions_layout.addWidget(version_btn)
 
-                        delete_btn = QPushButton(QIcon(":/icons/trash.svg"), "") # Remplacé trash-2.svg par trash.svg
+                        delete_btn = QPushButton(QIcon(":/icons/trash-2.svg"), "") # Standardized delete icon
                         delete_btn.setToolTip(self.tr("Supprimer Document"))
-                        delete_btn.setObjectName("dangerButton")
+                        delete_btn.setProperty("class", "dangerButtonTable") # Specific style for danger actions in table
                         delete_btn.clicked.connect(lambda checked, d_id=doc_id, p=full_file_path: self.delete_client_document_entry(d_id, p))
                         actions_layout.addWidget(delete_btn)
 
                     actions_layout.addStretch()
                     self.doc_table.setCellWidget(row_idx, 5, actions_widget)
+                self.doc_table.resizeRowsToContents() # Adjust row height for styled buttons
         except Exception as e:
             logging.error(f"Error populating documents table: {e}", exc_info=True)
             QMessageBox.critical(self, self.tr("Erreur Chargement"), self.tr("Impossible de charger les documents: {0}").format(str(e)))

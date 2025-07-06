@@ -56,72 +56,114 @@ class ProductsTab(QWidget):
         logging.info("ProductsTab._setup_ui: Starting setup for Products Tab Structure...")
         products_layout = QVBoxLayout(self)
 
-        # Product Filters
-        product_filters_layout = QHBoxLayout()
-        product_filters_layout.addWidget(QLabel(self.tr("Filtrer par langue:")))
+        products_layout.setSpacing(10)
+
+        # Filters and Action Buttons Bar
+        top_bar_layout = QHBoxLayout()
+        top_bar_layout.setSpacing(8)
+
+        filter_lang_label = QLabel(self.tr("Langue:"))
+        filter_lang_label.setStyleSheet("font-weight: bold;")
+        top_bar_layout.addWidget(filter_lang_label)
         self.product_lang_filter_combo = QComboBox()
-        self.product_lang_filter_combo.addItem(self.tr("All Languages"), None)
-        for lang_code in SUPPORTED_LANGUAGES: # Use imported SUPPORTED_LANGUAGES
-             self.product_lang_filter_combo.addItem(self.tr(f"{lang_code}"), lang_code)
+        self.product_lang_filter_combo.setMinimumWidth(100)
+        self.product_lang_filter_combo.setStyleSheet("QComboBox { padding: 4px; }")
+        self.product_lang_filter_combo.addItem(self.tr("Toutes"), None) # "All Languages" -> "Toutes"
+        for lang_code in SUPPORTED_LANGUAGES:
+             self.product_lang_filter_combo.addItem(self.tr(f"{lang_code.upper()}"), lang_code) # Display lang code in upper for distinction
         self.product_lang_filter_combo.currentTextChanged.connect(self.load_products)
-        product_filters_layout.addWidget(self.product_lang_filter_combo)
+        top_bar_layout.addWidget(self.product_lang_filter_combo)
 
-        product_filters_layout.addWidget(QLabel(self.tr("Filtrer par commande:")))
+        filter_cmd_label = QLabel(self.tr("Commande:"))
+        filter_cmd_label.setStyleSheet("font-weight: bold;")
+        top_bar_layout.addWidget(filter_cmd_label)
         self.product_commande_filter_combo = QComboBox()
-        # Items will be loaded by _load_commande_filter
+        self.product_commande_filter_combo.setMinimumWidth(200)
+        self.product_commande_filter_combo.setStyleSheet("QComboBox { padding: 4px; }")
         self.product_commande_filter_combo.currentTextChanged.connect(self.load_products)
-        product_filters_layout.addWidget(self.product_commande_filter_combo)
+        top_bar_layout.addWidget(self.product_commande_filter_combo)
 
-        product_filters_layout.addStretch()
-        products_layout.addLayout(product_filters_layout)
+        top_bar_layout.addStretch(1)
 
-        self.products_empty_label = QLabel(self.tr("Aucun produit ajouté pour ce client.\nCliquez sur '➕ Ajouter' pour commencer."))
+        self.add_product_btn = QPushButton(QIcon(":/icons/link.svg"), self.tr("Lier Produit Existant"))
+        self.add_product_btn.setObjectName("primaryButton")
+        self.add_product_btn.setToolTip(self.tr("Lier un produit existant du catalogue à ce client/commande"))
+        self.add_product_btn.clicked.connect(self.add_product) # This should open ProductDialog to select existing
+        top_bar_layout.addWidget(self.add_product_btn)
+
+        self.add_new_global_product_btn = QPushButton(QIcon(":/icons/package.svg"), self.tr("Créer Produit Global"))
+        self.add_new_global_product_btn.setObjectName("secondaryButton")
+        self.add_new_global_product_btn.setToolTip(self.tr("Créer un nouveau produit dans le catalogue global et le lier"))
+        self.add_new_global_product_btn.clicked.connect(self.handle_add_new_global_product)
+        top_bar_layout.addWidget(self.add_new_global_product_btn)
+
+        products_layout.addLayout(top_bar_layout)
+
+        self.products_empty_label = QLabel(self.tr("Aucun produit pour ce client/commande.\nUtilisez les boutons ci-dessus pour ajouter ou lier des produits."))
         self.products_empty_label.setAlignment(Qt.AlignCenter)
         font_products_empty = self.products_empty_label.font(); font_products_empty.setPointSize(10)
         self.products_empty_label.setFont(font_products_empty)
+        self.products_empty_label.setStyleSheet("color: #718096;")
         products_layout.addWidget(self.products_empty_label)
 
         self.products_table = QTableWidget()
-        self.products_table.setColumnCount(8) # ID, Name, Desc, Weight, Dims, Qty, Unit Price, Total Price
+        self.products_table.setObjectName("productsClientTable") # Added objectName
+        self.products_table.setColumnCount(8)
         self.products_table.setHorizontalHeaderLabels([
-            self.tr("ID"), self.tr("Nom Produit"), self.tr("Description (Ligne)"), # Nom de colonne modifié pour clarté
+            self.tr("ID Lien"), self.tr("Nom Produit"), self.tr("Description (Ligne)"),
             self.tr("Poids (Ligne)"), self.tr("Dimensions (Ligne)"),
-            self.tr("Qté"), self.tr("Prix Unitaire (Ligne)"), self.tr("Prix Total")
+            self.tr("Qté"), self.tr("Prix Unit. (Ligne)"), self.tr("Prix Total (Ligne)")
         ])
-        # Permettre l'édition directe pour certaines colonnes
-        # self.products_table.setEditTriggers(QAbstractItemView.DoubleClicked) # Garder, ou affiner avec des delegates
+        header_style = """
+            QHeaderView::section {
+                background-color: #4a5568; color: white; padding: 6px;
+                border: 1px solid #ddd; font-weight: bold; font-size: 9pt;
+            }
+        """
+        self.products_table.horizontalHeader().setStyleSheet(header_style)
+        self.products_table.verticalHeader().setVisible(False)
+        self.products_table.setAlternatingRowColors(True)
+        self.products_table.setSortingEnabled(True)
+
+        self.products_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents) # ID Lien (cpp_id)
+        self.products_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch) # Nom Produit
+        self.products_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch) # Description
+        self.products_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents) # Poids
+        self.products_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents) # Dimensions
+        self.products_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents) # Qté
+        self.products_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeToContents) # Prix Unit.
+        self.products_table.horizontalHeader().setSectionResizeMode(7, QHeaderView.ResizeToContents) # Prix Total
+        self.products_table.hideColumn(0) # ID Lien (client_project_product_id)
+
         self.products_table.itemChanged.connect(self.handle_product_item_changed)
         self.products_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.products_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.products_table.hideColumn(0) # Hide internal product_id
         products_layout.addWidget(self.products_table)
 
-        products_btn_layout = QHBoxLayout()
-        self.add_product_btn = QPushButton(self.tr("Ajouter")); self.add_product_btn.setIcon(QIcon(":/icons/plus-circle.svg"))
-        self.add_product_btn.setToolTip(self.tr("Ajouter un produit pour ce client/projet")); self.add_product_btn.clicked.connect(self.add_product)
-        products_btn_layout.addWidget(self.add_product_btn)
+        # Bottom action buttons (Edit Line, Remove Line, Generate Proforma)
+        bottom_actions_layout = QHBoxLayout()
+        bottom_actions_layout.setSpacing(10)
 
-        self.edit_product_btn = QPushButton(self.tr("Modifier")); self.edit_product_btn.setIcon(QIcon(":/icons/pencil.svg"))
-        self.edit_product_btn.setToolTip(self.tr("Modifier le produit sélectionné")); self.edit_product_btn.clicked.connect(self.edit_product)
-        products_btn_layout.addWidget(self.edit_product_btn)
+        self.edit_product_btn = QPushButton(QIcon(":/icons/edit-2.svg"), self.tr("Modifier Ligne"))
+        self.edit_product_btn.setObjectName("actionButton") # Generic style for non-primary/danger
+        self.edit_product_btn.setToolTip(self.tr("Modifier les détails de la ligne produit sélectionnée (quantité, prix spécifique, etc.)"))
+        self.edit_product_btn.clicked.connect(self.edit_product)
+        bottom_actions_layout.addWidget(self.edit_product_btn)
 
-        self.remove_product_btn = QPushButton(self.tr("Supprimer")); self.remove_product_btn.setIcon(QIcon(":/icons/trash.svg"))
-        self.remove_product_btn.setToolTip(self.tr("Supprimer le produit sélectionné de ce client/projet")); self.remove_product_btn.setObjectName("dangerButton"); self.remove_product_btn.clicked.connect(self.remove_product)
-        products_btn_layout.addWidget(self.remove_product_btn)
+        self.remove_product_btn = QPushButton(QIcon(":/icons/trash-2.svg"), self.tr("Supprimer Ligne"))
+        self.remove_product_btn.setObjectName("dangerButton")
+        self.remove_product_btn.setToolTip(self.tr("Supprimer la ligne produit sélectionnée de ce client/commande"))
+        self.remove_product_btn.clicked.connect(self.remove_product)
+        bottom_actions_layout.addWidget(self.remove_product_btn)
 
-        self.generate_proforma_btn = QPushButton(self.tr("Générer Proforma")); self.generate_proforma_btn.setIcon(QIcon(":/icons/file-plus.svg")) # Placeholder icon
-        self.generate_proforma_btn.setToolTip(self.tr("Générer une facture proforma pour les produits listés (filtrés)."))
+        bottom_actions_layout.addStretch(1) # Push proforma button to the right
+
+        self.generate_proforma_btn = QPushButton(QIcon(":/icons/file-text.svg"), self.tr("Générer Proforma"))
+        self.generate_proforma_btn.setObjectName("secondaryButton")
+        self.generate_proforma_btn.setToolTip(self.tr("Générer une facture proforma pour les produits actuellement affichés."))
         self.generate_proforma_btn.clicked.connect(self.handle_generate_proforma)
-        products_btn_layout.addWidget(self.generate_proforma_btn)
+        bottom_actions_layout.addWidget(self.generate_proforma_btn)
 
-        products_btn_layout.addStretch() # Add some space before new button if desired
-
-        self.add_new_global_product_btn = QPushButton(self.tr("➕ Nouveau Produit Global"))
-        self.add_new_global_product_btn.setToolTip(self.tr("Ajouter un nouveau produit global et le lier à ce client."))
-        self.add_new_global_product_btn.clicked.connect(self.handle_add_new_global_product)
-        products_btn_layout.addWidget(self.add_new_global_product_btn)
-
-        products_layout.addLayout(products_btn_layout)
+        products_layout.addLayout(bottom_actions_layout)
 
     def _load_commande_filter(self):
         self.product_commande_filter_combo.clear()

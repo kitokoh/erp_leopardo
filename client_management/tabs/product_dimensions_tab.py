@@ -32,17 +32,39 @@ class ProductDimensionsTab(QWidget):
     def _setup_ui(self):
         logging.info("ProductDimensionsTab._setup_ui: Starting setup...")
         prod_dims_layout = QVBoxLayout(self)
+        prod_dims_layout.setSpacing(10)
+        prod_dims_layout.setAlignment(Qt.AlignTop) # Align content to the top
+
+        # Product Selector Section
+        selector_group = QGroupBox(self.tr("Sélection du Produit Global"))
+        selector_group_layout = QVBoxLayout(selector_group)
+
+        selector_hbox = QHBoxLayout()
+        selector_label = QLabel(self.tr("Produit Global:"))
+        selector_label.setStyleSheet("font-weight: bold;")
+        selector_hbox.addWidget(selector_label)
 
         self.dim_product_selector_combo = QComboBox()
         self.dim_product_selector_combo.addItem(self.tr("Sélectionner un produit..."), None)
-        prod_dims_layout.addWidget(self.dim_product_selector_combo)
+        self.dim_product_selector_combo.setMinimumWidth(300)
+        self.dim_product_selector_combo.setStyleSheet("QComboBox { padding: 4px; }")
+        selector_hbox.addWidget(self.dim_product_selector_combo, 1) # Allow combo to stretch
+        selector_group_layout.addLayout(selector_hbox)
+        prod_dims_layout.addWidget(selector_group)
 
-        self.edit_client_product_dimensions_button = QPushButton(self.tr("Modifier Dimensions Produit (Global)"))
-        self.edit_client_product_dimensions_button.setIcon(QIcon.fromTheme("document-edit", QIcon(":/icons/pencil.svg")))
-        self.edit_client_product_dimensions_button.setEnabled(False) # Enabled when a product is selected
-        prod_dims_layout.addWidget(self.edit_client_product_dimensions_button)
+        # Action Button Section
+        action_group = QGroupBox(self.tr("Actions"))
+        action_group_layout = QVBoxLayout(action_group)
 
-        prod_dims_layout.addStretch()
+        self.edit_client_product_dimensions_button = QPushButton(self.tr("Gérer les Dimensions de ce Produit"))
+        self.edit_client_product_dimensions_button.setIcon(QIcon(":/icons/edit-3.svg")) # Updated icon
+        self.edit_client_product_dimensions_button.setObjectName("primaryButton") # Style as primary action
+        self.edit_client_product_dimensions_button.setToolTip(self.tr("Ouvrir le dialogue pour ajouter ou modifier les dimensions spécifiques pour le produit global sélectionné."))
+        self.edit_client_product_dimensions_button.setEnabled(False)
+        action_group_layout.addWidget(self.edit_client_product_dimensions_button)
+        prod_dims_layout.addWidget(action_group)
+
+        prod_dims_layout.addStretch(1) # Pushes content to the top
 
         # Connections
         self.dim_product_selector_combo.currentIndexChanged.connect(self.on_dim_product_selected)
@@ -51,45 +73,58 @@ class ProductDimensionsTab(QWidget):
     def load_products_for_dimension_tab(self):
         """Populates the product selector combo box."""
         self.dim_product_selector_combo.blockSignals(True)
-        current_selection = self.dim_product_selector_combo.currentData()
+        current_selection_data = self.dim_product_selector_combo.currentData() # Store current data (product_id)
         self.dim_product_selector_combo.clear()
         self.dim_product_selector_combo.addItem(self.tr("Sélectionner un produit..."), None)
 
         try:
-            all_global_products = db_manager.get_all_products(filters=None)
+            # Fetch all products, assuming this returns a list of dicts with 'product_id', 'product_name', 'product_code', 'language_code'
+            all_global_products = db_manager.get_all_products(filters={"is_active": True}) # Fetch only active products
             if all_global_products:
-                for prod_data in all_global_products:
-                    product_name = prod_data.get('product_name', 'N/A')
+                for prod_data in sorted(all_global_products, key=lambda p: p.get('product_name', '').lower()): # Sort alphabetically
+                    product_name = prod_data.get('product_name', self.tr('Nom Inconnu'))
                     global_product_id = prod_data.get('product_id')
+                    product_code = prod_data.get('product_code', '')
                     lang_code = prod_data.get('language_code', '')
-                    display_text = f"{product_name} ({lang_code}) - ID: {global_product_id}"
-                    self.dim_product_selector_combo.addItem(display_text, global_product_id)
+
+                    display_text = f"{product_name}"
+                    if product_code:
+                        display_text += f" (Code: {product_code})"
+                    if lang_code:
+                        display_text += f" [{lang_code.upper()}]"
+                    # display_text += f" - ID: {global_product_id}" # Keep ID for debugging if needed, but can be long for UI
+
+                    self.dim_product_selector_combo.addItem(display_text, global_product_id) # Store global_product_id
 
                 # Try to restore previous selection if still valid
-                idx = self.dim_product_selector_combo.findData(current_selection)
+                idx = self.dim_product_selector_combo.findData(current_selection_data)
                 if idx != -1:
                     self.dim_product_selector_combo.setCurrentIndex(idx)
-                elif self.dim_product_selector_combo.count() > 0:
-                     self.dim_product_selector_combo.setCurrentIndex(0) # Default to placeholder
+                elif self.dim_product_selector_combo.count() > 1: # If items were added, and previous not found
+                     self.dim_product_selector_combo.setCurrentIndex(0) # Default to placeholder "Sélectionner..."
+                # If count is 1 (only placeholder), it's already at index 0.
 
         except Exception as e:
             logging.error(f"Error loading products for dimension tab: {e}", exc_info=True)
-            QMessageBox.warning(self, self.tr("Erreur Chargement"), self.tr("Impossible de charger les produits."))
+            QMessageBox.warning(self, self.tr("Erreur Chargement"), self.tr("Impossible de charger la liste des produits globaux."))
 
         self.dim_product_selector_combo.blockSignals(False)
-        self.on_dim_product_selected() # Update button state
+        self.on_dim_product_selected() # Update button state based on current selection (or lack thereof)
 
-    def on_dim_product_selected(self, index=None):
+    def on_dim_product_selected(self, index=None): # index arg is optional, can be called directly
         """Handles selection change in the product selector."""
         selected_global_product_id = self.dim_product_selector_combo.currentData()
-        can_link_products = True # Default, or get from parent if more complex permission check needed
-        if hasattr(self.parent_widget, 'current_user_info'): # Check if parent has user info for permissions
-            from auth.permissions import has_permission, P_LINK_PRODUCTS_TO_CLIENT # Local import for safety
+
+        can_manage_product_data = True # Default or more specific permission check
+        # Example: Use a permission like P_MANAGE_GLOBAL_PRODUCTS if it exists
+        # For now, using P_LINK_PRODUCTS_TO_CLIENT as a proxy, assuming it implies some level of product data management.
+        if hasattr(self.parent_widget, 'current_user_info'):
+            from auth.permissions import has_permission, P_LINK_PRODUCTS_TO_CLIENT
             role_name = self.parent_widget.current_user_info.get('role_name')
             if role_name:
-                can_link_products = has_permission(role_name, P_LINK_PRODUCTS_TO_CLIENT)
+                can_manage_product_data = has_permission(role_name, P_LINK_PRODUCTS_TO_CLIENT)
 
-        self.edit_client_product_dimensions_button.setEnabled(selected_global_product_id is not None and can_link_products)
+        self.edit_client_product_dimensions_button.setEnabled(selected_global_product_id is not None and can_manage_product_data)
 
 
     def on_edit_client_product_dimensions(self):
