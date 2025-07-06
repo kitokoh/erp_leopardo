@@ -911,54 +911,58 @@ def initialize_database(app_config):
         serial_number TEXT,
         purchase_confirmed_at TIMESTAMP,
         added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+<<<<<<< HEAD
         added_by_user_id TEXT, -- Added column
+        client_specific_product_name TEXT, -- New field
+        line_description TEXT, -- New field
+        line_weight REAL, -- New field
+        line_dimensions_notes TEXT, -- New field
+=======
+        added_by_user_id TEXT,
+        client_specific_product_name TEXT,
+        line_description TEXT,
+        line_weight REAL,
+        line_dimensions_notes TEXT,
+>>>>>>> 277c515641a2066d1c9881773b7873a6623f1a7a
         FOREIGN KEY (client_id) REFERENCES Clients (client_id) ON DELETE CASCADE,
         FOREIGN KEY (project_id) REFERENCES Projects (project_id) ON DELETE CASCADE,
         FOREIGN KEY (product_id) REFERENCES Products (product_id) ON DELETE CASCADE,
-        FOREIGN KEY (added_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL, -- Added FK
+        FOREIGN KEY (added_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL,
         UNIQUE (client_id, project_id, product_id)
     )
     """)
 
-    # Ensure serial_number, purchase_confirmed_at, and added_by_user_id columns exist in ClientProjectProducts table
+    # Ensure serial_number, purchase_confirmed_at, added_by_user_id, and new columns exist in ClientProjectProducts table
     logging.info("DEBUG_INIT_DB: Verifying/Updating schema for ClientProjectProducts...")
     cursor.execute("PRAGMA table_info(ClientProjectProducts)")
     cpp_columns_info_before_alter = cursor.fetchall()
     cpp_column_names_before_alter = [info['name'] for info in cpp_columns_info_before_alter]
     logging.info(f"DEBUG_INIT_DB: ClientProjectProducts schema BEFORE alter: {cpp_column_names_before_alter}")
 
-    if 'serial_number' not in cpp_column_names_before_alter:
-        try:
-            logging.info("DEBUG_INIT_DB: 'serial_number' column missing in ClientProjectProducts. Attempting to add...")
-            cursor.execute("ALTER TABLE ClientProjectProducts ADD COLUMN serial_number TEXT")
-            logging.info("DEBUG_INIT_DB: Successfully ADDED 'serial_number' column to ClientProjectProducts.")
-        except sqlite3.Error as e_alter_cpp_sn:
-            logging.error(f"DEBUG_INIT_DB: FAILED to add 'serial_number' column to ClientProjectProducts: {e_alter_cpp_sn}")
-    else:
-        logging.info("DEBUG_INIT_DB: 'serial_number' column already exists in ClientProjectProducts.")
+    # Columns to check and add
+    columns_to_ensure = {
+        "client_specific_product_name": "TEXT",
+        "line_description": "TEXT",
+        "line_weight": "REAL",
+        "line_dimensions_notes": "TEXT",
+        "serial_number": "TEXT", # Existing check
+        "purchase_confirmed_at": "TIMESTAMP", # Existing check
+        "added_by_user_id": "TEXT REFERENCES Users(user_id) ON DELETE SET NULL" # Existing check
+    }
 
-    if 'purchase_confirmed_at' not in cpp_column_names_before_alter:
-        try:
-            logging.info("DEBUG_INIT_DB: 'purchase_confirmed_at' column missing in ClientProjectProducts. Attempting to add...")
-            cursor.execute("ALTER TABLE ClientProjectProducts ADD COLUMN purchase_confirmed_at TIMESTAMP")
-            logging.info("DEBUG_INIT_DB: Successfully ADDED 'purchase_confirmed_at' column to ClientProjectProducts.")
-        except sqlite3.Error as e_alter_cpp_pca:
-            logging.error(f"DEBUG_INIT_DB: FAILED to add 'purchase_confirmed_at' column to ClientProjectProducts: {e_alter_cpp_pca}")
-    else:
-        logging.info("DEBUG_INIT_DB: 'purchase_confirmed_at' column already exists in ClientProjectProducts.")
+    for col_name, col_type in columns_to_ensure.items():
+        if col_name not in cpp_column_names_before_alter:
+            try:
+                logging.info(f"DEBUG_INIT_DB: '{col_name}' column missing in ClientProjectProducts. Attempting to add...")
+                cursor.execute(f"ALTER TABLE ClientProjectProducts ADD COLUMN {col_name} {col_type}")
+                logging.info(f"DEBUG_INIT_DB: Successfully ADDED '{col_name}' column to ClientProjectProducts.")
+            except sqlite3.Error as e_alter_cpp:
+                logging.error(f"DEBUG_INIT_DB: FAILED to add '{col_name}' column to ClientProjectProducts: {e_alter_cpp}")
+        else:
+            logging.info(f"DEBUG_INIT_DB: '{col_name}' column already exists in ClientProjectProducts.")
 
-    if 'added_by_user_id' not in cpp_column_names_before_alter:
-        try:
-            logging.info("DEBUG_INIT_DB: 'added_by_user_id' column missing in ClientProjectProducts. Attempting to add...")
-            # Note: SQLite versions before 3.20.0 might not support ADD COLUMN with FOREIGN KEY constraint directly.
-            # The REFERENCES clause here might be ignored by older SQLite versions silently during ALTER TABLE.
-            # The FK constraint in CREATE TABLE IF NOT EXISTS is the primary definition for new databases.
-            cursor.execute("ALTER TABLE ClientProjectProducts ADD COLUMN added_by_user_id TEXT REFERENCES Users(user_id) ON DELETE SET NULL")
-            logging.info("DEBUG_INIT_DB: Successfully ADDED 'added_by_user_id' column to ClientProjectProducts.")
-        except sqlite3.Error as e_alter_cpp_creator:
-            logging.error(f"DEBUG_INIT_DB: FAILED to add 'added_by_user_id' column to ClientProjectProducts: {e_alter_cpp_creator}")
-    else:
-        logging.info("DEBUG_INIT_DB: 'added_by_user_id' column already exists in ClientProjectProducts.")
+    # Original checks for serial_number, purchase_confirmed_at, added_by_user_id were redundant
+    # and have been removed as the loop columns_to_ensure handles them.
 
     # Log schema AFTER all attempts
     cursor.execute("PRAGMA table_info(ClientProjectProducts)")
@@ -2360,19 +2364,6 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_exp_tags_tag_id ON ExperienceTags(tag_id)")
     # --- End Experience Module Indexes ---
 
-    # --- User Profile Management Indexes ---
-    print("DEBUG_INIT_DB: Creating User Profile Management Indexes...")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessprofile_user_id ON BusinessProfile(user_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessprofile_sector_id ON BusinessProfile(sector_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessusecases_profile_id ON BusinessUseCases(business_profile_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessusecases_case_id ON BusinessUseCases(use_case_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessselecteddocs_profile_id ON BusinessSelectedDocuments(business_profile_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessselecteddocs_doc_id ON BusinessSelectedDocuments(document_type_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_menuconfiguration_user_id ON MenuConfiguration(user_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_menuconfiguration_parent_id ON MenuConfiguration(parent_id)")
-    print("DEBUG_INIT_DB: User Profile Management Indexes created or exist.")
-    # --- End User Profile Management Indexes ---
-
     # EntityContacts Table (New)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS EntityContacts (
@@ -2702,6 +2693,19 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     )
     """)
     print("DEBUG_INIT_DB: Table MenuConfiguration created or exists.")
+
+    # --- User Profile Management Indexes ---
+    print("DEBUG_INIT_DB: Creating User Profile Management Indexes...")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessprofile_user_id ON BusinessProfile(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessprofile_sector_id ON BusinessProfile(sector_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessusecases_profile_id ON BusinessUseCases(business_profile_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessusecases_case_id ON BusinessUseCases(use_case_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessselecteddocs_profile_id ON BusinessSelectedDocuments(business_profile_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessselecteddocs_doc_id ON BusinessSelectedDocuments(document_type_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_menuconfiguration_user_id ON MenuConfiguration(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_menuconfiguration_parent_id ON MenuConfiguration(parent_id)")
+    print("DEBUG_INIT_DB: User Profile Management Indexes created or exist.")
+    # --- End User Profile Management Indexes ---
     # --- End User Profile Management Tables (Initial Set) ---
     # --- User Session Tokens Table (for Secure Remember Me) ---
     cursor.execute("""
@@ -3011,15 +3015,24 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
 
     # --- Create tables for MainBase (e.g., CalculatorHistory) ---
     # This needs to happen after the main 'conn' is closed if 'actual_main_engine' uses a new connection.
-    if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None and actual_main_engine is not None: # Intentionally same for testing save
+    if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None and actual_main_engine is not None:
         try:
-            logging.info("DEBUG_INIT_DB: Creating tables for MainBase (e.g., CalculatorHistory) using SQLAlchemy actual_main_engine.")
-            MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True) # Intentionally same
+            # Import B2C restaurant models to register them with MainBase before create_all
+            # This ensures that if b2c.ges_restaurant.models uses the same MainBase, its tables are included.
+            import b2c.ges_restaurant.models
+            logging.info("DEBUG_INIT_DB: Imported b2c.ges_restaurant.models for schema creation with MainBase.")
+        except ImportError as e_import_b2c_for_mainbase:
+            logging.error(f"DEBUG_INIT_DB: Failed to import b2c.ges_restaurant.models for MainBase, restaurant tables might not be created if they share MainBase: {e_import_b2c_for_mainbase}")
+        except Exception as e_b2c_generic_for_mainbase:
+            logging.error(f"DEBUG_INIT_DB: An unexpected error occurred during import of b2c.ges_restaurant.models for MainBase: {e_b2c_generic_for_mainbase}", exc_info=True)
+
+        try:
+            logging.info("DEBUG_INIT_DB: Creating tables for MainBase (e.g., CalculatorHistory, Restaurant*) using SQLAlchemy actual_main_engine.")
+            MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True)
 
             logging.info("DEBUG_INIT_DB: Tables for MainBase created successfully.")
         except Exception as e_main_base_create:
             logging.error(f"DEBUG_INIT_DB: Error creating tables for MainBase: {e_main_base_create}", exc_info=True)
-            # Decide if this is critical enough to rollback or raise. For now, logging error.
     else:
         logging.warning("DEBUG_INIT_DB: Main SQLAlchemy components (MainBase, actual_main_engine) not loaded or actual_main_engine is None. Skipping MainBase.metadata.create_all().")
 

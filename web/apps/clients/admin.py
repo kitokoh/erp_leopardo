@@ -41,3 +41,4 @@ class ClientAdmin(admin.ModelAdmin):
         # return qs.filter(company_account__in=user_companies)
         return qs # Par défaut, pour l'instant, ne pas filtrer plus pour les non-superusers dans l'admin
                  # La vraie sécurité multi-tenant sera dans l'API et les vues frontend.
+

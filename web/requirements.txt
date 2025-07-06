@@ -9,6 +9,7 @@ django-crispy-forms>=2.0,<2.2
 crispy-bootstrap5>=0.7,<0.8
 requests>=2.31,<2.32 # Pour les appels API depuis les vues Django
 
+
 # Pour les variables d'environnement plus tard, si besoin
 # python-dotenv>=1.0.0
 # Pour les tâches asynchrones plus tard

@@ -46,6 +46,7 @@
                         <li class="nav-item">
                             {# {% url 'documents:list' %} est le nom d'URL attendu pour la liste des documents #}
                             <a class="nav-link {% if request.resolver_match.app_name == 'documents' %}active{% endif %}" href="#">Documents</a>
+
                         </li>
                     {% endif %}
                 </ul>
@@ -68,6 +69,7 @@
                                     </form>
                                     <a class="dropdown-item" href="#" onclick="document.getElementById('logout-form').submit(); return false;">Déconnexion</a>
                                 </li>
+
                             </ul>
                         </li>
                     {% else %}
@@ -76,6 +78,7 @@
                         </li>
                         <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name == 'register' %}active{% endif %}" href="{% url 'users:register' %}">Inscription</a>
+
                         </li>
                     {% endif %}
                 </ul>

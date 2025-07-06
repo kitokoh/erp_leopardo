@@ -185,3 +185,4 @@ def user_logout_view(request):
 #     else:
 #         form = UserProfileUpdateForm(instance=request.user)
 #     return render(request, 'users/profile.html', {'form': form, 'page_title': "Mon Profil"})
+

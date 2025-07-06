@@ -18,12 +18,14 @@ urlpatterns = [
     # API V1
     path('api/v1/users/', include('apps.users.urls_api')),
     path('api/v1/clients/', include('apps.clients.urls_api')),
+
     # path('api/v1/products/', include('apps.products.urls_api')),
     # path('api/v1/documents/', include('apps.documents.urls_api')),
 
     # Frontend App URLs
     path('auth/', include('apps.users.urls')), # Pour /auth/login/, /auth/register/, etc.
     path('', include('apps.dashboard.urls')), # Dashboard à la racine
+
     # path('clients/', include('apps.clients.urls')),
     # path('products/', include('apps.products.urls')),
     # path('documents/', include('apps.documents.urls')),

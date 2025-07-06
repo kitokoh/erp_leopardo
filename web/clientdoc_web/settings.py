@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'crispy_forms', # Added
     'crispy_bootstrap5', # Added
 
+
     # Local apps
     # Will be added as 'apps.users.apps.UsersConfig', etc.
     'apps.common.apps.CommonConfig',
@@ -186,3 +187,4 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 LOGIN_URL = 'users:login' # Nom de l'URL de connexion
 LOGIN_REDIRECT_URL = 'dashboard:main' # Nom de l'URL du dashboard (à créer)
 LOGOUT_REDIRECT_URL = 'users:login' # Rediriger vers la page de connexion après logout
+

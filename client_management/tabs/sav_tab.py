@@ -50,62 +50,102 @@ class SAVTab(QWidget):
 
     def _setup_ui(self):
         logging.info("SAVTab._setup_ui: Starting setup...")
-        self.main_sav_layout = QVBoxLayout(self) # Main layout for the tab
+        self.main_sav_layout = QVBoxLayout(self)
+        self.main_sav_layout.setSpacing(10)
+        self.main_sav_layout.setContentsMargins(5, 5, 5, 5)
 
-        # Placeholder for when SAV is not applicable
-        self.placeholder_label = QLabel(self.tr("La section SAV n'est pas applicable pour le statut actuel de ce client."))
+        self.placeholder_label = QLabel(self.tr("La section SAV n'est pas applicable pour le statut actuel de ce client (doit être 'Vendu')."))
         self.placeholder_label.setAlignment(Qt.AlignCenter)
+        self.placeholder_label.setStyleSheet("font-style: italic; color: #718096; font-size: 10pt; padding: 20px;")
         self.main_sav_layout.addWidget(self.placeholder_label)
 
-        # Container for actual SAV content (initially hidden)
         self.sav_content_widget = QWidget()
         sav_content_layout = QVBoxLayout(self.sav_content_widget)
         sav_content_layout.setContentsMargins(0,0,0,0)
+        sav_content_layout.setSpacing(10)
 
-        sav_content_layout.addWidget(QLabel("<h3>" + self.tr("Historique des Achats") + "</h3>"))
+        header_style = """
+            QHeaderView::section {
+                background-color: #4a5568; color: white; padding: 6px;
+                border: 1px solid #ddd; font-weight: bold; font-size: 9pt;
+            }
+        """
+
+        # Purchase History Section
+        purchase_group = QGroupBox(self.tr("Historique des Achats et Numéros de Série"))
+        purchase_group_layout = QVBoxLayout(purchase_group)
+
         self.purchase_history_table = QTableWidget()
-        self.purchase_history_table.setColumnCount(6) # ID CPP (Hidden), Produit, Quantité, Numéro de Série, Date d'Achat, Actions
+        self.purchase_history_table.setObjectName("purchaseHistoryTable")
+        self.purchase_history_table.setColumnCount(6)
         self.purchase_history_table.setHorizontalHeaderLabels([
-            self.tr("ID CPP (Hidden)"), self.tr("Produit"), self.tr("Quantité"),
-            self.tr("Numéro de Série"), self.tr("Date d'Achat"), self.tr("Actions")
+            self.tr("ID CPP (Hidden)"), self.tr("Produit Acheté"), self.tr("Quantité"),
+            self.tr("Numéro de Série"), self.tr("Date d'Achat"), self.tr("Ouvrir Ticket")
         ])
         self.purchase_history_table.setColumnHidden(0, True)
-        self.purchase_history_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.purchase_history_table.horizontalHeader().setStyleSheet(header_style)
+        self.purchase_history_table.verticalHeader().setVisible(False)
+        self.purchase_history_table.setAlternatingRowColors(True)
+        self.purchase_history_table.setSortingEnabled(True)
         self.purchase_history_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.purchase_history_table.itemChanged.connect(self.handle_purchase_history_item_changed)
-        sav_content_layout.addWidget(self.purchase_history_table)
+        self.purchase_history_table.itemChanged.connect(self.handle_purchase_history_item_changed) # For serial number edit
 
-        self.refresh_purchase_history_btn = QPushButton(self.tr("Rafraîchir l'historique"))
-        self.refresh_purchase_history_btn.setIcon(QIcon.fromTheme("view-refresh"))
+        self.purchase_history_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch) # Produit
+        self.purchase_history_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents) # Quantité
+        self.purchase_history_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive) # Numéro de Série (Editable)
+        self.purchase_history_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents) # Date d'Achat
+        self.purchase_history_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents) # Actions (Ouvrir Ticket)
+        self.purchase_history_table.setColumnWidth(3, 150) # Initial width for Serial Number
+
+        purchase_group_layout.addWidget(self.purchase_history_table)
+
+        self.refresh_purchase_history_btn = QPushButton(QIcon(":/icons/refresh-cw.svg"), self.tr("Actualiser Historique"))
+        self.refresh_purchase_history_btn.setObjectName("secondaryButton")
         self.refresh_purchase_history_btn.clicked.connect(self.load_purchase_history_table)
-        sav_content_layout.addWidget(self.refresh_purchase_history_btn)
+        purchase_group_layout.addWidget(self.refresh_purchase_history_btn, 0, Qt.AlignRight)
+        sav_content_layout.addWidget(purchase_group)
+
 
         # SAV Tickets Section
-        sav_content_layout.addWidget(QLabel("<h3>" + self.tr("Tickets SAV") + "</h3>"))
+        tickets_group = QGroupBox(self.tr("Tickets SAV Associés au Client"))
+        tickets_group_layout = QVBoxLayout(tickets_group)
+
         self.sav_tickets_table = QTableWidget()
-        self.sav_tickets_table.setColumnCount(7) # ID (Hidden), Produit, Description, Statut, Ouvert le, Technicien, Actions
+        self.sav_tickets_table.setObjectName("savTicketsTable")
+        self.sav_tickets_table.setColumnCount(7)
         self.sav_tickets_table.setHorizontalHeaderLabels([
             self.tr("ID Ticket (Hidden)"), self.tr("Produit Concerné"), self.tr("Description Problème"),
-            self.tr("Statut"), self.tr("Date Ouverture"), self.tr("Technicien Assigné"), self.tr("Actions")
+            self.tr("Statut"), self.tr("Date Ouverture"), self.tr("Technicien"), self.tr("Actions")
         ])
         self.sav_tickets_table.setColumnHidden(0, True)
-        self.sav_tickets_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        self.sav_tickets_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        self.sav_tickets_table.horizontalHeader().setStyleSheet(header_style)
+        self.sav_tickets_table.verticalHeader().setVisible(False)
+        self.sav_tickets_table.setAlternatingRowColors(True)
+        self.sav_tickets_table.setSortingEnabled(True)
         self.sav_tickets_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.sav_tickets_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        sav_content_layout.addWidget(self.sav_tickets_table)
+
+        self.sav_tickets_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents) # Produit
+        self.sav_tickets_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch) # Description
+        self.sav_tickets_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents) # Statut
+        self.sav_tickets_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents) # Date Ouverture
+        self.sav_tickets_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents) # Technicien
+        self.sav_tickets_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeToContents) # Actions
+        tickets_group_layout.addWidget(self.sav_tickets_table)
 
         sav_tickets_buttons_layout = QHBoxLayout()
-        self.add_sav_ticket_btn = QPushButton(self.tr("Nouveau Ticket SAV"))
-        self.add_sav_ticket_btn.setIcon(QIcon.fromTheme("document-new"))
-        self.add_sav_ticket_btn.clicked.connect(self.open_new_sav_ticket_dialog)
-        sav_tickets_buttons_layout.addWidget(self.add_sav_ticket_btn)
+        self.add_sav_ticket_btn = QPushButton(QIcon(":/icons/plus-circle.svg"), self.tr("Nouveau Ticket SAV (Général)"))
+        self.add_sav_ticket_btn.setObjectName("primaryButton")
+        self.add_sav_ticket_btn.setToolTip(self.tr("Ouvrir un nouveau ticket SAV non lié à un achat spécifique de l'historique"))
+        self.add_sav_ticket_btn.clicked.connect(lambda: self.open_new_sav_ticket_dialog(client_project_product_id=None)) # General ticket
         sav_tickets_buttons_layout.addStretch()
-        sav_content_layout.addLayout(sav_tickets_buttons_layout)
+        sav_tickets_buttons_layout.addWidget(self.add_sav_ticket_btn)
+        tickets_group_layout.addLayout(sav_tickets_buttons_layout)
+        sav_content_layout.addWidget(tickets_group)
 
         sav_content_layout.addStretch()
         self.main_sav_layout.addWidget(self.sav_content_widget)
-        self.sav_content_widget.hide() # Initially hidden
+        self.sav_content_widget.hide()
 
     def update_sav_tab_visibility_and_load_data(self):
         client_status_id = self.client_info.get('status_id')

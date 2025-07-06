@@ -13,3 +13,4 @@ def dashboard_view(request):
     #     'active_company_name': active_company_name,
     # }
     # return render(request, 'dashboard/main_dashboard.html', context)
+

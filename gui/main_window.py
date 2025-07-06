@@ -190,6 +190,10 @@ from dialogs.role_management_dialog import RoleManagementDialog # Added for Role
 from commande_management.commandes_dashboard_widget import CommandesDashboardWidget # Import CommandesDashboardWidget
 from utils.app_constants import CONFIGURABLE_MODULES # Import from new location
 
+# B2C Restaurant Module Import
+from b2c.ges_restaurant.ui.main_widget import RestaurantMainWidget
+
+
 # License Management Imports for feature constants and manager
 from license_management import manager as license_manager # To call get_allowed_features
 from license_management import (
@@ -200,6 +204,12 @@ from license_management import (
     FEATURE_USER_MANAGEMENT_FULL, FEATURE_SETTINGS_MANAGEMENT,
     FEATURE_COMMANDES_MANAGEMENT, FEATURE_CALCULATOR_MODULE
 )
+
+# Import for menu customization
+from dialogs.menu_customization_dialog import MenuCustomizationDialog
+from utils.app_constants import CONFIGURABLE_MODULES # For menu customization and default order
+import json # For handling menu config storage
+
 
 class ClientListItemWidget(QWidget):
     def __init__(self, client_data, parent=None):
@@ -363,6 +373,7 @@ class DocumentManager(QMainWindow):
         self.experience_management_widget_instance = None
         self.calendar_module_widget_instance = None
         self.calculator_module_widget_instance = None
+        self.restaurant_widget_instance = None # For B2C Restaurant Module
         
         # For HomePage related widgets that might depend on other modules (like statistics)
         self.statistics_summary_widget_instance = None
@@ -485,38 +496,53 @@ class DocumentManager(QMainWindow):
 
     @pyqtSlot(str)
     def handle_add_client_from_stats_map(self, country_name_str):
-        logging.info(f"Received request to add client for country: {country_name_str} from statistics map using new dialog.")
+        logging.info(f"Received request to add client for country: {country_name_str} from statistics map.")
         try:
-            dialog = StatisticsAddClientDialog(initial_country_name=country_name_str, parent=self)
+            # Utiliser AddNewClientDialog au lieu de StatisticsAddClientDialog
+            dialog = AddNewClientDialog(parent=self, initial_country_name=country_name_str)
 
             if dialog.exec_() == QDialog.Accepted:
-                new_client_data = dialog.get_data()
-                logging.info(f"StatisticsAddClientDialog accepted. Data: {new_client_data}")
+                client_data_from_dialog = dialog.get_data()
+                logging.info(f"AddNewClientDialog accepted. Data: {client_data_from_dialog}")
 
-                if not new_client_data.get('country_id'):
-                    QMessageBox.critical(self, self.tr("Erreur Pays"), self.tr("ID du pays non obtenu depuis le dialogue. Impossible de continuer."))
+                # AddNewClientDialog.get_data() retourne déjà created_by_user_id
+                # et les noms de pays/ville qui seront résolus par client_controller.
+                # Le client_controller s'attend à country_name et city_name, pas IDs.
+
+                if not client_data_from_dialog.get('client_name'):
+                    QMessageBox.critical(self, self.tr("Erreur Données"), self.tr("Le nom du client est requis."))
                     return
 
-                client_data_for_db = {
-                    "client_name": new_client_data["client_name"],
-                    "company_name": new_client_data.get("company_name"),
-                    "country_id": new_client_data["country_id"],
-                    "city_id": new_client_data.get("city_id"),
-                    "project_identifier": new_client_data.get("project_identifier"),
-                    "primary_need_description": new_client_data.get("primary_need_description"),
-                    "selected_languages": new_client_data.get("selected_languages"),
-                    "created_by_user_id": self.current_user_id
-                }
+                if not client_data_from_dialog.get('country_name'):
+                    QMessageBox.critical(self, self.tr("Erreur Données"), self.tr("Le nom du pays est requis."))
+                    return
 
-                logging.info(f"Proceeding to call handle_create_client_execution with data from new dialog: {client_data_for_db}")
-                handle_create_client_execution(self, client_data_dict=client_data_for_db)
+                # Appeler directement le client_controller pour créer le client
+                created_client_info = self.client_controller_instance.create_client(client_data_from_dialog)
+
+                if created_client_info and created_client_info.get('success'):
+                    new_client_id = created_client_info.get('client_id')
+                    if new_client_id:
+                        self.notify(self.tr("Client Créé"),
+                                    self.tr("Le client '{0}' a été créé avec succès.").format(created_client_info.get('client_name')),
+                                    type='SUCCESS')
+                        self.load_clients_from_db_slot() # Recharger la liste des clients
+                        self.open_client_tab_by_id(new_client_id) # Ouvrir l'onglet du nouveau client
+                    else:
+                        QMessageBox.critical(self, self.tr("Erreur Création Client"),
+                                             self.tr("Le client a été créé mais son ID n'a pas été retourné."))
+                else:
+                    error_msg = created_client_info.get('error', self.tr("Erreur inconnue lors de la création du client."))
+                    QMessageBox.critical(self, self.tr("Erreur Création Client"), error_msg)
+                    # Pas besoin de recharger la liste des clients ici car la création a échoué
             else:
-                logging.info("StatisticsAddClientDialog cancelled by user.")
+                logging.info("AddNewClientDialog cancelled by user.")
         except Exception as e:
-            logging.error(f"Error opening or executing StatisticsAddClientDialog for country {country_name_str}: {e}", exc_info=True)
+            logging.error(f"Error opening or executing AddNewClientDialog for country {country_name_str}: {e}", exc_info=True)
             QMessageBox.critical(self,
                                  self.tr("Erreur Dialogue"),
-                                 self.tr("Impossible d'ouvrir le dialogue 'Ajouter Client'. Veuillez consulter les logs de l'application pour plus de détails."))
+                                 self.tr("Impossible d'ouvrir le dialogue 'Ajouter Nouveau Client'. Veuillez consulter les logs pour plus de détails."))
+
     def handle_new_document_detected(self, file_path):
         logging.info(f"Main_window: New document detected by service: {file_path}")
         try:
@@ -1072,6 +1098,17 @@ class DocumentManager(QMainWindow):
         self.searchable_actions_map[self.tr("Gestion des Commandes")] = self.commande_management_action
         self.searchable_actions_map[self.tr("Gérer les Rôles")] = self.manage_roles_action
 
+        # Action for menu customization
+        self.customize_menu_action = QAction(QIcon(":/icons/edit.svg"), self.tr("Personnaliser le Menu Modules"), self)
+        self.customize_menu_action.triggered.connect(self.open_menu_customization_dialog)
+        self.searchable_actions_map[self.tr("Personnaliser le Menu Modules")] = self.customize_menu_action
+
+        # B2C Restaurant Module Action
+        # TODO: Find or create a suitable icon e.g., :/icons/restaurant.svg or :/icons/utensils.svg
+        self.restaurant_module_action = QAction(QIcon(":/icons/placeholder_icon.svg"), self.tr("Service Restaurant (B2C)"), self)
+        self.restaurant_module_action.triggered.connect(self.show_restaurant_module_view)
+        self.searchable_actions_map[self.tr("Service Restaurant (B2C)")] = self.restaurant_module_action
+
 
     def _placeholder_manage_users(self):
         # This is a placeholder. Actual user management UI would be complex.
@@ -1087,9 +1124,8 @@ class DocumentManager(QMainWindow):
         # File Menu
         file_menu = menu_bar.addMenu(self.tr("Fichier"))
         file_menu.addAction(self.settings_action) # Will be controlled by _apply_permissions
-        # self.status_action was disabled with a tooltip, consider if it should be permission-based too
-        # For now, keeping its original behavior. If it becomes a real feature, add P_MANAGE_STATUSES.
-        file_menu.addAction(self.status_action)
+        file_menu.addAction(self.status_action) # Controlled by P_MANAGE_STATUSES
+        file_menu.addAction(self.customize_menu_action) # Add customization action
         file_menu.addSeparator()
         file_menu.addAction(self.exit_action) # Exit is always available
 
@@ -1104,8 +1140,10 @@ class DocumentManager(QMainWindow):
         # Core, non-configurable actions first
         modules_menu.addAction(self.home_action)
         modules_menu.addAction(self.documents_view_action)
-        modules_menu.addAction(self.commande_management_action)
+        # modules_menu.addAction(self.commande_management_action) # Removed: Now part of CONFIGURABLE_MODULES
         modules_menu.addSeparator()
+        modules_menu.addAction(self.restaurant_module_action) # Added B2C Restaurant module action
+        modules_menu.addSeparator() # Separator after B2C module fixed entry
 
         # Load user's menu configuration
         user_menu_config = None
@@ -1173,26 +1211,10 @@ class DocumentManager(QMainWindow):
                 # For simplicity, let's re-fetch or ensure self.allowed_features is up-to-date.
                 # It's set in __init__ and potentially updated in _handle_roles_changed if license itself changes.
 
-                # Re-using MODULE_TO_LICENSE_FEATURE_MAP as defined in _apply_permissions for consistency
-                # This map should ideally be a class member or globally accessible if used in multiple methods.
-                # For now, duplicating its structure here for clarity, or assuming _apply_permissions has already run
-                # and self.allowed_features is correctly populated.
-                _MODULE_TO_LICENSE_FEATURE_MAP_FOR_MENU = {
-                    'project_management': FEATURE_PROJECT_MANAGEMENT,
-                    'product_management': FEATURE_PRODUCT_MANAGEMENT,
-                    'partner_management': FEATURE_PARTNER_MANAGEMENT,
-                    'statistics': FEATURE_STATISTICS_MODULE,
-                    'inventory_management': FEATURE_INVENTORY_MANAGEMENT,
-                    'experience_management': FEATURE_EXPERIENCE_MANAGEMENT,
-                    'calendar': FEATURE_CALENDAR_MODULE,
-                    'botpress_integration': FEATURE_BOTPRESS_INTEGRATION,
-                    'calculator': FEATURE_CALCULATOR_MODULE,
-                    'commandes_management': FEATURE_COMMANDES_MANAGEMENT,
-                    # carrier_map and camera_management default to None (no specific license feature)
-                }
-                license_feature_key = _MODULE_TO_LICENSE_FEATURE_MAP_FOR_MENU.get(module_name)
-                permitted_by_license = True # Default to true if no specific license feature is mapped
-                if license_feature_key:
+                # Now using module_info['license_feature']
+                license_feature_key = module_info.get('license_feature')
+                permitted_by_license = True # Default to true if no specific license feature is mapped or feature is None
+                if license_feature_key: # If a specific license feature is defined for this module
                     permitted_by_license = license_feature_key in self.allowed_features
 
                 if not permitted_by_license:
@@ -1341,22 +1363,8 @@ class DocumentManager(QMainWindow):
         self.manage_roles_action.setEnabled(can_manage_roles and can_manage_users_licensed) # Assuming role management also tied to this feature
 
         # Module Menu Actions & Feature Mapping
-        # Maps module_name (from CONFIGURABLE_MODULES) to its corresponding license feature constant
-        MODULE_TO_LICENSE_FEATURE_MAP = {
-            'project_management': FEATURE_PROJECT_MANAGEMENT,
-            'product_management': FEATURE_PRODUCT_MANAGEMENT,
-            'partner_management': FEATURE_PARTNER_MANAGEMENT,
-            'statistics': FEATURE_STATISTICS_MODULE,
-            'inventory_management': FEATURE_INVENTORY_MANAGEMENT,
-            'experience_management': FEATURE_EXPERIENCE_MANAGEMENT,
-            'calendar': FEATURE_CALENDAR_MODULE,
-            'botpress_integration': FEATURE_BOTPRESS_INTEGRATION,
-            'carrier_map': None, # Example: Carrier map might not have a specific license feature, always available if role permits
-            'camera_management': None, # Example: Camera might not be license controlled
-            'calculator': FEATURE_CALCULATOR_MODULE,
-            'commandes_management': FEATURE_COMMANDES_MANAGEMENT,
-            # Add other modules from CONFIGURABLE_MODULES here and map to a FEATURE_* constant or None
-        }
+        # The MODULE_TO_LICENSE_FEATURE_MAP is now removed.
+        # License feature checks will use module_config.get('license_feature').
 
         # Role-based permissions for modules (as before)
         module_role_permissions = {
@@ -1391,7 +1399,7 @@ class DocumentManager(QMainWindow):
                 logging.info(f"  Module Action '{action_attr}' for '{module_name}': Module disabled by DB setting. Action HIDDEN.")
                 continue
 
-            perm_keys = module_permissions.get(module_name)
+            perm_keys = module_role_permissions.get(module_name)
             permitted = False
             log_perm_details = ""
 
@@ -1410,7 +1418,19 @@ class DocumentManager(QMainWindow):
 
 
             action_instance.setVisible(permitted)
-            logging.info(f"  Module Action '{action_attr}' for '{module_name}': Visible: {permitted}. {log_perm_details}")
+            logging.info(f"  Module Action '{action_attr}' for '{module_name}': Role permitted: {permitted}. {log_perm_details}")
+
+            # Additionally, check license feature for this module using the new structure
+            if permitted: # Only check license if role permits
+                license_feature = module_config.get('license_feature')
+                if license_feature and license_feature not in self.allowed_features:
+                    action_instance.setVisible(False) # Hide if license feature is required but not granted
+                    logging.info(f"  Module Action '{action_attr}' for '{module_name}': HIDDEN due to missing license feature '{license_feature}'.")
+                elif license_feature:
+                    logging.info(f"  Module Action '{action_attr}' for '{module_name}': License feature '{license_feature}' GRANTED.")
+                else:
+                    logging.info(f"  Module Action '{action_attr}' for '{module_name}': No specific license feature required.")
+
             # Note: setEnabled could also be used if the action should be visible but greyed out.
             # For menu items, setVisible(False) effectively removes them.
 
@@ -2570,5 +2590,125 @@ class DocumentManager(QMainWindow):
         # If any other part of MainWindow directly displays role names or uses a role combo,
         # it should be refreshed here as well.
         # Example: If a ClientWidget had a role dropdown (it doesn't currently), it would need refresh.
+
+    def show_restaurant_module_view(self):
+        """Shows the B2C Restaurant Management module."""
+        # Optional: Check module state if it's made configurable
+        # if not self.module_states.get('b2c_restaurant', True): # Example key
+        #     QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Service Restaurant est désactivé."))
+        #     return
+
+        # Optional: Check license feature if applicable
+        # RESTAURANT_FEATURE_KEY = "FEATURE_B2C_RESTAURANT" # Define this constant
+        # if RESTAURANT_FEATURE_KEY not in self.allowed_features:
+        #    QMessageBox.warning(self, self.tr("Licence Requise"), self.tr("Votre licence actuelle ne permet pas d'accéder à ce module."))
+        #    return
+
+        if self.restaurant_widget_instance is None:
+            logging.info("DocumentManager: Lazily creating RestaurantMainWidget...")
+            try:
+                self.restaurant_widget_instance = RestaurantMainWidget(
+                    parent=self,
+                    current_user_info=self.current_user_info
+                )
+                self.main_area_stack.addWidget(self.restaurant_widget_instance)
+                logging.info("DocumentManager: RestaurantMainWidget instance created and added to stack.")
+            except Exception as e:
+                logging.error(f"Failed to create RestaurantMainWidget: {e}", exc_info=True)
+                QMessageBox.critical(self, self.tr("Erreur Module"),
+                                     self.tr("Le module Service Restaurant n'a pas pu être chargé : {0}").format(str(e)))
+                self.restaurant_widget_instance = None # Ensure it's None on failure
+                return # Don't proceed to show if creation failed
+
+        if self.restaurant_widget_instance: # Check again in case creation failed
+            if hasattr(self.restaurant_widget_instance, 'refresh_all_data'):
+                self.restaurant_widget_instance.refresh_all_data()
+            self.main_area_stack.setCurrentWidget(self.restaurant_widget_instance)
+            logging.info("Switched to B2C Restaurant Management view.")
+        else:
+            # This case should be covered by the try-except above, but as a safeguard:
+            logging.error("RestaurantMainWidget instance is None after attempting creation. Cannot show view.")
+            QMessageBox.critical(self, self.tr("Erreur Critique"),
+                                 self.tr("La page du Service Restaurant n'a pas pu être chargée."))
+
+
+    def open_menu_customization_dialog(self):
+        if not self.current_user_id:
+            QMessageBox.warning(self, self.tr("Accès Refusé"), self.tr("Vous devez être connecté pour personnaliser le menu."))
+            return
+
+        available_modules_for_customization = []
+        for module_info_const in CONFIGURABLE_MODULES:
+            module_name = module_info_const['name']
+
+            if not self.module_states.get(module_name, True):
+                continue
+
+            # The local _MODULE_TO_LICENSE_FEATURE_MAP is removed.
+            # We now use the 'license_feature' directly from module_info_const (from CONFIGURABLE_MODULES).
+            license_feature_key = module_info_const.get('license_feature')
+            if license_feature_key and license_feature_key not in self.allowed_features:
+                continue # Skip if license feature is required for this module and not granted to the user
+
+
+            available_modules_for_customization.append(module_info_const)
+
+        if not available_modules_for_customization:
+            QMessageBox.information(self, self.tr("Aucun Module Configurable"),
+                                    self.tr("Il n'y a actuellement aucun module que vous êtes autorisé à configurer."))
+            return
+
+        dialog = MenuCustomizationDialog(
+            current_user_id=self.current_user_id,
+            configurable_modules=available_modules_for_customization,
+            module_states=self.module_states,
+            license_features=self.allowed_features,
+            parent=self
+        )
+
+        # Pass the actual database access functions to the dialog
+        # db_manager should be available as an import in main_window.py (e.g., import db as db_manager)
+        if not db_manager: # Ensure db_manager is imported and available
+             logging.error("db_manager not available in DocumentManager. Cannot open MenuCustomizationDialog.")
+             QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("Le gestionnaire de base de données n'est pas disponible."))
+             return
+
+        dialog.get_user_menu_config_func = lambda user_id: db_manager.get_setting(f"user_menu_config_{user_id}")
+
+        # Ensure set_setting expects a string for JSON, so dump it here.
+        dialog.set_user_menu_config_func = lambda user_id, data: db_manager.set_setting(f"user_menu_config_{user_id}", json.dumps(data))
+
+        dialog.menu_config_changed.connect(self._handle_menu_config_changed)
+        if dialog.exec_() == QDialog.Accepted:
+            # _handle_menu_config_changed is already connected to the signal,
+            # so it will be called if the dialog emits it upon successful save.
+            pass
+
+    def _handle_menu_config_changed(self):
+        logging.info("Configuration du menu utilisateur modifiée. Reconstruction des menus...")
+
+        # Store the corner widget (search bar and user button) to restore it later
+        corner_widget = self.menuBar().cornerWidget(Qt.TopRightCorner)
+        # Temporarily remove it from the menu bar to prevent it from being deleted by clear()
+        if corner_widget:
+            self.menuBar().setCornerWidget(None)
+            corner_widget.setParent(None) # Ensure it's not deleted with the old menubar
+
+        self.menuBar().clear() # This clears all menus and actions within them.
+
+        # Re-create actions and menus
+        # create_actions_main() generally doesn't need to be recalled unless action properties change.
+        # However, if action texts (used by dialog) or icons were part of user config, it might be needed.
+        # For now, assume only menu structure changes.
+        # self.create_actions_main() # Uncomment if actions themselves might change based on new config.
+
+        self.create_menus_main() # This will use the new configuration from the database.
+        self._apply_permissions() # Re-apply permissions to the new menu structure.
+
+        # Restore the corner widget
+        if corner_widget:
+            self.menuBar().setCornerWidget(corner_widget, Qt.TopRightCorner)
+
+        self.notify(self.tr("Menu Mis à Jour"), self.tr("Le menu principal a été mis à jour selon vos préférences."), type='INFO')
 
 # [end of main_window.py]

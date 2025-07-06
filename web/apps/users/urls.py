@@ -9,4 +9,5 @@ urlpatterns = [
     path('logout/', views.user_logout_view, name='logout'),
     # path('profile/', views.user_profile_view, name='profile'), # À ajouter quand la vue profil sera prête
     # Ajouter ici les URLs pour password_change, password_reset, etc. plus tard
+
 ]
