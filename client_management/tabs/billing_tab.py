@@ -381,12 +381,14 @@ class BillingTab(QWidget):
 
         self.generate_invoice_button.setEnabled(can_manage_billing)
         if hasattr(self, 'invoices_table'): # Check if table exists
-            self.invoices_table.setEnabled(can_manage_billing) # Or a more granular view permission
-            self.refresh_invoices_btn.setEnabled(can_manage_billing) # If they can't see the table, no need to refresh
+            # The table's general enabled state is less critical than its visibility and action controls.
+            # Visibility is handled by can_view_billing. Actions within are (or should be) by can_manage_billing.
+            self.refresh_invoices_btn.setEnabled(can_view_billing) # Refresh should be available if user can view
 
         if hasattr(self, 'invoices_table'):
             self.invoices_table.setVisible(can_view_billing) # Show/hide based on view permission
-            self.refresh_invoices_btn.setEnabled(can_view_billing)
+            # self.refresh_invoices_btn.setEnabled(can_view_billing) # Already set above
+
             if not can_view_billing:
                  self.invoices_empty_label.setText(self.tr("Vous n'avez pas la permission de voir l'historique des factures."))
                  self.invoices_empty_label.show()
