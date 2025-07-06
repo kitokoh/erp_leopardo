@@ -35,6 +35,7 @@ try:
     # Import specific models that use MainBase and need table creation here
     from calculator.models import CalculationHistory
     # from other_module.models import OtherModelUsingMainBase # Example for future models
+    from db.common_models import Products # Import the Products SQLAlchemy model
     MAIN_SQLALCHEMY_COMPONENTS_LOADED = True
 except ImportError as e_main_sqlalchemy:
     logging.error(f"db.init_schema: Could not import MainBase or initialize_engine_and_session from db.connection: {e_main_sqlalchemy}. Tables using MainBase (e.g., CalculatorHistory) might not be created by this script.")
@@ -804,74 +805,81 @@ def initialize_database(app_config):
     # For now, I will use the TEXT version from ca.py and note this potential issue.
 
     # Create Products table (logic from ca.py to add weight/dimensions if missing)
-    try:
-        cursor.execute("PRAGMA table_info(Products)")
-        columns_info = cursor.fetchall()
-        existing_column_names = {info['name'] for info in columns_info}
-        altered = False
-        if 'weight' not in existing_column_names:
-            cursor.execute("ALTER TABLE Products ADD COLUMN weight REAL")
-            altered = True
-        if 'dimensions' not in existing_column_names:
-            cursor.execute("ALTER TABLE Products ADD COLUMN dimensions TEXT")
-            altered = True
-        if altered:
-            print("Added 'weight' and/or 'dimensions' to Products table.")
-            # No commit here
-    except sqlite3.Error: # Products table might not exist yet
-        pass
+    # This logic is now handled by the SQLAlchemy model definition in db.common_models.py
+    # try:
+    #     cursor.execute("PRAGMA table_info(Products)")
+    #     columns_info = cursor.fetchall()
+    #     existing_column_names = {info['name'] for info in columns_info}
+    #     altered = False
+    #     if 'weight' not in existing_column_names:
+    #         cursor.execute("ALTER TABLE Products ADD COLUMN weight REAL")
+    #         altered = True
+    #     if 'dimensions' not in existing_column_names:
+    #         cursor.execute("ALTER TABLE Products ADD COLUMN dimensions TEXT")
+    #         altered = True
+    #     if altered:
+    #         print("Added 'weight' and/or 'dimensions' to Products table.")
+    #         # No commit here
+    # except sqlite3.Error: # Products table might not exist yet
+    #     pass
 
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS Products (
-        product_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        product_name TEXT NOT NULL,
-        product_code TEXT UNIQUE,
-        description TEXT,
-        category TEXT,
-        language_code TEXT DEFAULT 'fr',
-        base_unit_price REAL NOT NULL,
-        unit_of_measure TEXT,
-        weight REAL,
-        dimensions TEXT,
-        is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        is_deleted INTEGER DEFAULT 0, -- Added for soft delete
-        deleted_at TEXT, -- Added for soft delete
-        created_by_user_id TEXT, -- Added for tracking who created the product
-        FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL, -- Added FK
-        UNIQUE (product_name, language_code)
-    )
-    """)
+    # The Products table is now defined as an SQLAlchemy model in db.common_models.py
+    # and will be created by Base.metadata.create_all().
+    # The raw SQL creation below is no longer needed.
+    # cursor.execute("""
+    # CREATE TABLE IF NOT EXISTS Products (
+    #     product_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    #     product_name TEXT NOT NULL,
+    #     product_code TEXT UNIQUE,
+    #     description TEXT,
+    #     category TEXT,
+    #     language_code TEXT DEFAULT 'fr',
+    #     base_unit_price REAL NOT NULL,
+    #     unit_of_measure TEXT,
+    #     weight REAL,
+    #     dimensions TEXT,
+    #     is_active BOOLEAN DEFAULT TRUE,
+    #     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    #     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    #     is_deleted INTEGER DEFAULT 0, -- Added for soft delete
+    #     deleted_at TEXT, -- Added for soft delete
+    #     created_by_user_id TEXT, -- Added for tracking who created the product
+    #     FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL, -- Added FK
+    #     UNIQUE (product_name, language_code)
+    # )
+    # """)
 
     # Ensure is_deleted, deleted_at, and created_by_user_id columns exist for soft delete in Products table
-    cursor.execute("PRAGMA table_info(Products)")
-    products_columns_info = cursor.fetchall()
-    products_column_names = [info['name'] for info in products_columns_info]
+    # This ALTER TABLE logic is also not needed if SQLAlchemy manages the table from the start.
+    # If migrating an existing DB, this might be needed, but for initial creation, SA model is sufficient.
+    cursor.execute("PRAGMA table_info(Products)") # This can remain to check if SA created it, or be removed.
+    # products_columns_info = cursor.fetchall()
+    # products_column_names = [info['name'] for info in products_columns_info]
 
-    if 'is_deleted' not in products_column_names:
-        try:
-            cursor.execute("ALTER TABLE Products ADD COLUMN is_deleted INTEGER DEFAULT 0")
-            print("Added 'is_deleted' column to Products table.")
-        except sqlite3.Error as e_alter_is_deleted_prod:
-            print(f"Error adding 'is_deleted' column to Products table: {e_alter_is_deleted_prod}")
-
-    if 'deleted_at' not in products_column_names:
-        try:
-            cursor.execute("ALTER TABLE Products ADD COLUMN deleted_at TEXT")
-            print("Added 'deleted_at' column to Products table.")
-        except sqlite3.Error as e_alter_deleted_at_prod:
-            print(f"Error adding 'deleted_at' column to Products table: {e_alter_deleted_at_prod}")
-
-    if 'created_by_user_id' not in products_column_names:
-        try:
-            cursor.execute("ALTER TABLE Products ADD COLUMN created_by_user_id TEXT")
-            # Cannot add FOREIGN KEY constraint with ALTER TABLE in older SQLite versions easily.
-            # The FK in CREATE TABLE is for new DBs. For existing, this adds the column.
-            # App logic or a more complex migration would be needed for full FK on existing tables.
-            print("Added 'created_by_user_id' column to Products table.")
-        except sqlite3.Error as e_alter_created_by_prod:
-            print(f"Error adding 'created_by_user_id' column to Products table: {e_alter_created_by_prod}")
+    # The ALTER TABLE logic below is not needed if SQLAlchemy creates the table from its model definition.
+    # if 'is_deleted' not in products_column_names:
+    #     try:
+    #         cursor.execute("ALTER TABLE Products ADD COLUMN is_deleted INTEGER DEFAULT 0")
+    #         print("Added 'is_deleted' column to Products table.")
+    #     except sqlite3.Error as e_alter_is_deleted_prod:
+    #         print(f"Error adding 'is_deleted' column to Products table: {e_alter_is_deleted_prod}")
+    #
+    # if 'deleted_at' not in products_column_names:
+    #     try:
+    #         cursor.execute("ALTER TABLE Products ADD COLUMN deleted_at TEXT")
+    #         print("Added 'deleted_at' column to Products table.")
+    #     except sqlite3.Error as e_alter_deleted_at_prod:
+    #         print(f"Error adding 'deleted_at' column to Products table: {e_alter_deleted_at_prod}")
+    #
+    # if 'created_by_user_id' not in products_column_names:
+    #     try:
+    #         cursor.execute("ALTER TABLE Products ADD COLUMN created_by_user_id TEXT")
+    #         # Cannot add FOREIGN KEY constraint with ALTER TABLE in older SQLite versions easily.
+    #         # The FK in CREATE TABLE is for new DBs. For existing, this adds the column.
+    #         # App logic or a more complex migration would be needed for full FK on existing tables.
+    #         print("Added 'created_by_user_id' column to Products table.")
+    #     except sqlite3.Error as e_alter_created_by_prod:
+    #         print(f"Error adding 'created_by_user_id' column to Products table: {e_alter_created_by_prod}")
 
     # Create ProductDimensions table (from ca.py)
     cursor.execute("""
@@ -2873,9 +2881,20 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         # Use app_config for the database path
         engine_acc = create_engine(f"sqlite:///{app_config['database_path']}")
 
+        # This call is likely redundant if accounting models use the same Base as MainBase
+        # and are imported before MainBase.metadata.create_all().
+        # The original error occurred here, implying acc_models.Base was trying to create
+        # restaurant_lignes_commande which depends on Products, and Products wasn't found.
+        # By defining Products as an SQLAlchemy model and ensuring all models are known to MainBase,
+        # the single MainBase.metadata.create_all() later should suffice.
+        # acc_models.Base.metadata.create_all(bind=engine_acc, checkfirst=True)
+        # print("DEBUG_INIT_DB: Accounting Module Tables creation attempt using SQLAlchemy engine (engine_acc) was here (now commented out).")
+        # The tables for accounting models (sharing MainBase) should be created by the call
+        # MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True)
+        # provided `accounting.models` is imported before that.
+        # The import `from accounting import models as acc_models` is indeed present earlier.
 
-        acc_models.Base.metadata.create_all(bind=engine_acc, checkfirst=True)
-        print("DEBUG_INIT_DB: Accounting Module Tables creation attempted using SQLAlchemy engine.")
+        print("DEBUG_INIT_DB: Accounting Module Tables should be created by an earlier or later MainBase.metadata.create_all call.")
 
         # Seed Accounting Data
         with Session(engine_acc) as session_acc:
