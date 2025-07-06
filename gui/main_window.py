@@ -2581,6 +2581,7 @@ class DocumentManager(QMainWindow):
             if license_feature_key and license_feature_key not in self.allowed_features:
                 continue # Skip if license feature is required for this module and not granted to the user
 
+
             available_modules_for_customization.append(module_info_const)
 
         if not available_modules_for_customization:

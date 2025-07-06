@@ -93,6 +93,12 @@ class ProductsTab(QWidget):
         self.remove_product_btn = QPushButton(self.tr("Supprimer")); self.remove_product_btn.setIcon(QIcon(":/icons/trash.svg"))
         self.remove_product_btn.setToolTip(self.tr("Supprimer le produit sélectionné de ce client/projet")); self.remove_product_btn.setObjectName("dangerButton"); self.remove_product_btn.clicked.connect(self.remove_product)
         products_btn_layout.addWidget(self.remove_product_btn)
+        products_btn_layout.addStretch() # Add some space before new button if desired
+
+        self.add_new_global_product_btn = QPushButton(self.tr("➕ Nouveau Produit Global"))
+        self.add_new_global_product_btn.setToolTip(self.tr("Ajouter un nouveau produit global et le lier à ce client."))
+        self.add_new_global_product_btn.clicked.connect(self.handle_add_new_global_product)
+        products_btn_layout.addWidget(self.add_new_global_product_btn)
 
         products_layout.addLayout(products_btn_layout)
 
@@ -142,63 +148,60 @@ class ProductsTab(QWidget):
                     item_id.setData(Qt.UserRole, prod.get('client_project_product_id'))
                     self.products_table.setItem(row, 0, item_id) # Hidden column for link ID
 
-                    # Utiliser les champs de ligne spécifiques s'ils existent, sinon les champs globaux du produit
-                    line_description = prod.get('line_description', prod.get('product_description', ''))
-                    line_weight_val = prod.get('line_weight', prod.get('global_product_weight', ''))
-                    line_dimensions_notes_val = prod.get('line_dimensions_notes', prod.get('global_product_dimensions', ''))
+                    # Client-specific overrides with fallbacks to global product data
+                    client_specific_name = prod.get('client_specific_product_name')
+                    display_name = client_specific_name if client_specific_name and client_specific_name.strip() else prod.get('product_name', '')
 
+                    line_description = prod.get('line_description')
+                    display_description = line_description if line_description is not None else prod.get('product_description', '') # product_description is global
 
-                    self.products_table.setItem(row, 1, QTableWidgetItem(prod.get('product_name')))
-                    # self.products_table.setItem(row, 2, QTableWidgetItem(prod.get('description'))) # Old
-                    # self.products_table.setItem(row, 3, QTableWidgetItem(str(prod.get('weight', '')))) # Old
-                    # self.products_table.setItem(row, 4, QTableWidgetItem(prod.get('dimensions_notes'))) # Old
+                    line_weight_val = prod.get('line_weight')
+                    display_weight = str(line_weight_val) if line_weight_val is not None else str(prod.get('global_product_weight', ''))
 
-                    self.products_table.setItem(row, 2, QTableWidgetItem(line_description))
-                    self.products_table.setItem(row, 3, QTableWidgetItem(str(line_weight_val)))
-                    self.products_table.setItem(row, 4, QTableWidgetItem(line_dimensions_notes_val))
-
+                    line_dimensions_notes_val = prod.get('line_dimensions_notes')
+                    display_dimensions = line_dimensions_notes_val if line_dimensions_notes_val is not None else prod.get('global_product_dimensions', '')
 
                     qty = float(prod.get('quantity', 0))
-                    price_override = prod.get('unit_price_override', prod.get('price_override')) # Check both keys for safety
-                    unit_price = price_override if price_override is not None else float(prod.get('base_unit_price', 0)) # Use base_unit_price as fallback
-                    total_price = qty * unit_price
 
-                    name_item = QTableWidgetItem(prod.get('product_name'))
-                    name_item.setFlags(name_item.flags() & ~Qt.ItemIsEditable) # Non-editable
+                    price_override = prod.get('unit_price_override') # This is the client-specific price
+                    base_unit_price = float(prod.get('base_unit_price', 0)) # Global product base price
+                    display_unit_price = price_override if price_override is not None else base_unit_price
+
+                    total_price = qty * display_unit_price
+
+                    # Column 1: Nom Produit (Client / Global) - Editable
+                    name_item = QTableWidgetItem(display_name)
+                    name_item.setFlags(name_item.flags() | Qt.ItemIsEditable)
                     self.products_table.setItem(row, 1, name_item)
 
-                    # desc_item = QTableWidgetItem(prod.get('description')) # Old
-                    desc_item = QTableWidgetItem(line_description) # Description spécifique à la ligne
-                    desc_item.setFlags(desc_item.flags() | Qt.ItemIsEditable) # Editable
+                    # Column 2: Description (Ligne / Global) - Editable
+                    desc_item = QTableWidgetItem(display_description)
+                    desc_item.setFlags(desc_item.flags() | Qt.ItemIsEditable)
                     self.products_table.setItem(row, 2, desc_item)
 
-                    # weight_item = QTableWidgetItem(str(prod.get('weight', ''))) # Old
-                    weight_item = QTableWidgetItem(str(line_weight_val))
-                    weight_item.setFlags(weight_item.flags() | Qt.ItemIsEditable) # Editable
+                    # Column 3: Poids (Ligne / Global) - Editable
+                    weight_item = QTableWidgetItem(display_weight)
+                    weight_item.setFlags(weight_item.flags() | Qt.ItemIsEditable)
                     self.products_table.setItem(row, 3, weight_item)
 
-                    # dims_item = QTableWidgetItem(prod.get('dimensions_notes')) # Old
-                    dims_item = QTableWidgetItem(line_dimensions_notes_val)
-                    dims_item.setFlags(dims_item.flags() | Qt.ItemIsEditable) # Editable
+                    # Column 4: Dimensions (Ligne / Global) - Editable
+                    dims_item = QTableWidgetItem(display_dimensions)
+                    dims_item.setFlags(dims_item.flags() | Qt.ItemIsEditable)
                     self.products_table.setItem(row, 4, dims_item)
 
-                    qty = float(prod.get('quantity', 0))
-                    # price_override = prod.get('price_override') # Old
-                    # unit_price = price_override if price_override is not None else float(prod.get('unit_price', 0)) # Old
-                    price_override = prod.get('unit_price_override', prod.get('price_override'))
-                    unit_price = price_override if price_override is not None else float(prod.get('base_unit_price', 0))
-                    total_price = qty * unit_price
-
+                    # Column 5: Qté - Editable
                     qty_item = QTableWidgetItem(str(qty))
-                    qty_item.setFlags(qty_item.flags() | Qt.ItemIsEditable) # Editable
+                    qty_item.setFlags(qty_item.flags() | Qt.ItemIsEditable)
                     self.products_table.setItem(row, 5, qty_item)
 
-                    unit_price_item = QTableWidgetItem(f"{unit_price:.2f}") # Removed currency symbol for easier float conversion
-                    unit_price_item.setFlags(unit_price_item.flags() | Qt.ItemIsEditable) # Editable
+                    # Column 6: Prix Unitaire (Ligne / Base) - Editable
+                    unit_price_item = QTableWidgetItem(f"{display_unit_price:.2f}")
+                    unit_price_item.setFlags(unit_price_item.flags() | Qt.ItemIsEditable)
                     self.products_table.setItem(row, 6, unit_price_item)
 
-                    total_price_item = QTableWidgetItem(f"{total_price:.2f} €")
-                    total_price_item.setFlags(total_price_item.flags() & ~Qt.ItemIsEditable) # Non-editable
+                    # Column 7: Prix Total - Non-editable
+                    total_price_item = QTableWidgetItem(f"{total_price:.2f} €") # Assuming Euro
+                    total_price_item.setFlags(total_price_item.flags() & ~Qt.ItemIsEditable)
                     self.products_table.setItem(row, 7, total_price_item)
         except Exception as e:
             logging.error(f"Error loading products: {e}", exc_info=True)
@@ -230,48 +233,59 @@ class ProductsTab(QWidget):
             return
 
         update_data = {}
-        recalculate_total = False
+        original_value = None # To revert cell text on validation error for some fields
+
+        # Store original text for potential revert on validation failure
+        # For numeric fields, it's better to reload_products or re-fetch row data to ensure consistency.
+        # For text fields, we can revert more easily if needed, but often full reload is safer.
 
         try:
-            if col == 2: # Description (Ligne)
+            if col == 1: # Nom Produit (Client)
+                update_data['client_specific_product_name'] = new_value_str
+            elif col == 2: # Description (Ligne)
                 update_data['line_description'] = new_value_str
             elif col == 3: # Poids (Ligne)
                 try:
-                    update_data['line_weight'] = float(new_value_str.replace(",", ".")) if new_value_str.strip() else None
+                    if new_value_str.strip() == "" or new_value_str.strip().lower() == 'none':
+                        update_data['line_weight'] = None
+                    else:
+                        update_data['line_weight'] = float(new_value_str.replace(",", "."))
                 except ValueError:
-                    QMessageBox.warning(self, self.tr("Donnée Invalide"), self.tr("Le poids doit être un nombre."))
-                    self.load_products() # Revert
-                    self.products_table.blockSignals(False)
-                    return
+                    QMessageBox.warning(self, self.tr("Donnée Invalide"), self.tr("Le poids doit être un nombre ou vide."))
+                    self.load_products() # Revert by reloading all
+                    return # Exit after ensuring signals are unblocked by finally
             elif col == 4: # Dimensions (Ligne)
-                update_data['line_dimensions_notes'] = new_value_str
+                update_data['line_dimensions_notes'] = new_value_str # Assumed text
             elif col == 5: # Qté
                 try:
-                    update_data['quantity'] = float(new_value_str.replace(",", "."))
-                    if update_data['quantity'] < 0: raise ValueError("Quantity cannot be negative")
-                    recalculate_total = True
+                    qty_val = float(new_value_str.replace(",", "."))
+                    if qty_val < 0:
+                        QMessageBox.warning(self, self.tr("Donnée Invalide"), self.tr("La quantité ne peut pas être négative."))
+                        self.load_products() # Revert
+                        return
+                    update_data['quantity'] = qty_val
                 except ValueError:
-                    QMessageBox.warning(self, self.tr("Donnée Invalide"), self.tr("La quantité doit être un nombre positif."))
+                    QMessageBox.warning(self, self.tr("Donnée Invalide"), self.tr("La quantité doit être un nombre."))
                     self.load_products() # Revert
-                    self.products_table.blockSignals(False)
                     return
             elif col == 6: # Prix Unitaire (Ligne)
                 try:
-                    # Key in DB is unit_price_override
-                    update_data['unit_price_override'] = float(new_value_str.replace("€", "").replace(",", ".").strip())
-                    if update_data['unit_price_override'] < 0: raise ValueError("Price cannot be negative")
-                    recalculate_total = True
+                    price_val = float(new_value_str.replace("€", "").replace(",", ".").strip())
+                    if price_val < 0:
+                        QMessageBox.warning(self, self.tr("Donnée Invalide"), self.tr("Le prix unitaire ne peut pas être négatif."))
+                        self.load_products() # Revert
+                        return
+                    update_data['unit_price_override'] = price_val
                 except ValueError:
-                    QMessageBox.warning(self, self.tr("Donnée Invalide"), self.tr("Le prix unitaire doit être un nombre positif."))
+                    QMessageBox.warning(self, self.tr("Donnée Invalide"), self.tr("Le prix unitaire doit être un nombre."))
                     self.load_products() # Revert
-                    self.products_table.blockSignals(False)
                     return
-            else:
-                self.products_table.blockSignals(False)
-                return # No action for other columns
+            else: # Should not happen if only editable columns trigger this
+                self.products_table.blockSignals(False) # Unblock if loop is exited early
+                return
 
             if update_data:
-                # Utiliser la fonction CRUD mise à jour
+
                 success = db_manager.update_client_project_product(link_id, update_data) # Corrected call
                 if success:
                     if self.notification_manager:
@@ -616,4 +630,141 @@ class ProductsTab(QWidget):
         """Public method to refresh data, callable from parent if needed."""
         self.load_products()
 
+    def handle_add_new_global_product(self):
+        if not self.ProductDialog:
+            QMessageBox.critical(self, self.tr("Erreur"), self.tr("Le composant d'ajout de produit n'est pas chargé."))
+            return
+
+        client_id = self.client_info.get("client_id")
+        if not client_id:
+            QMessageBox.critical(self, self.tr("Erreur Client"), self.tr("ID Client non trouvé."))
+            return
+
+        app_root_dir = None
+        if hasattr(self.parent_widget, 'app_root_dir'):
+            app_root_dir = self.parent_widget.app_root_dir
+        else:
+            # This case should ideally not happen if parent_widget is always ClientMainWidget or similar
+            logging.warning("handle_add_new_global_product: app_root_dir not found on parent_widget.")
+            # Depending on ProductDialog's needs, this might be critical or not.
+            # If ProductDialog strictly requires it (e.g., for image paths), show an error.
+            # QMessageBox.critical(self, self.tr("Erreur Configuration"), self.tr("Le répertoire racine de l'application n'est pas accessible."))
+            # return
+
+        # Instantiate ProductDialog. We assume it's configured to handle new global product creation.
+        # It might need a mode or specific parameters if its behavior needs to vary significantly.
+        dialog = self.ProductDialog(client_id=client_id,
+                                    app_root_dir=app_root_dir,
+                                    parent=self,
+                                    # product_data=None, # Explicitly not editing an existing product
+                                    # is_new_global_product_mode=True # Optional: A flag if dialog needs it
+                                    )
+
+        if dialog.exec_() == QDialog.Accepted:
+            # dialog.get_data() should return a list of product data dicts.
+            # For new global product, we expect one item in the list.
+            products_data_list = dialog.get_data()
+            if not products_data_list:
+                if self.notification_manager:
+                    self.notification_manager.show(self.tr("Information"), self.tr("Aucune donnée produit n'a été fournie."), type="INFO")
+                return
+
+            # Assuming the first item contains the data for the new global product and its initial link
+            new_product_info = products_data_list[0]
+
+            # --- 1. Create Global Product ---
+            # We need to extract details meant for the global product table.
+            # ProductDialog.get_data() needs to provide these. Example keys:
+            # 'product_name', 'product_code', 'description' (global), 'base_unit_price',
+            # 'language_code', 'weight' (global), 'dimensions' (global), 'category_id', etc.
+            # 'created_by_user_id'
+
+            # This is a simplified assumption of the structure from ProductDialog.
+            # The actual keys will depend on ProductDialog's implementation of get_data().
+            global_product_details = {
+                'product_name': new_product_info.get('name'), # Assuming 'name' from dialog is global name
+                'product_code': new_product_info.get('product_code'), # Crucial: Must be unique
+                'description': new_product_info.get('description'), # Global description
+                'base_unit_price': new_product_info.get('unit_price'), # Price from dialog becomes base_unit_price
+                'language_code': new_product_info.get('language_code', 'fr'), # Default if not provided
+                'weight': new_product_info.get('weight'), # Global weight
+                'dimensions': new_product_info.get('dimensions'), # Global dimensions
+                'created_by_user_id': self.current_user_id,
+                'is_active': True # Default to active
+                # Any other fields required by products_crud.add_product
+            }
+
+            if not global_product_details['product_name'] or not global_product_details['product_code']:
+                QMessageBox.warning(self, self.tr("Données Manquantes"), self.tr("Le nom et le code du produit sont obligatoires pour un nouveau produit global."))
+                return
+
+            # Call products_crud.add_product
+            # Assuming products_crud.add_product returns a dict like {'success': bool, 'id': new_id, 'error': str}
+            add_global_prod_result = db_manager.products_crud.add_product(global_product_details)
+
+            if not add_global_prod_result or not add_global_prod_result.get('success'):
+                error_msg = add_global_prod_result.get('error', self.tr("une erreur inconnue"))
+                QMessageBox.critical(self, self.tr("Erreur Création Produit Global"),
+                                     self.tr("Impossible de créer le produit global : {0}").format(error_msg))
+                return
+
+            new_global_product_id = add_global_prod_result.get('id')
+            if not new_global_product_id: # Should not happen if success is true and id is part of success response
+                QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("ID du produit global non retourné après création."))
+                return
+
+            if self.notification_manager:
+                self.notification_manager.show(self.tr("Succès"),
+                                               self.tr("Produit global '{0}' créé avec succès.").format(global_product_details['product_name']),
+                                               type="SUCCESS")
+
+            # --- 2. Link to Client ---
+            # Prepare data for ClientProjectProducts link.
+            # These are overrides or specific details for THIS client link.
+            # ProductDialog's get_data() should ideally differentiate these if they can be
+            # different from the global ones at the point of creation.
+            # For now, we'll assume some direct mappings and some potential overrides.
+
+            # Example: If ProductDialog allows specifying a quantity for the link
+            link_quantity = new_product_info.get('quantity', 1) # Default to 1 if not specified
+
+            # Example: If ProductDialog allows overriding the price for this client link
+            # If 'unit_price_override' is a specific field from dialog for this, use it.
+            # Otherwise, if 'unit_price' from dialog was meant as the override, it's already base_unit_price.
+            # Let's assume for now no override at creation via this simplified flow, so it uses global base price.
+            link_unit_price_override = new_product_info.get('client_unit_price_override', None)
+
+            # Client-specific name/description for the link, if different from global at creation
+            link_client_specific_name = new_product_info.get('client_specific_product_name', None)
+            link_line_description = new_product_info.get('client_line_description', None)
+
+
+            link_data = {
+                'client_id': client_id,
+                'product_id': new_global_product_id,
+                'quantity': link_quantity,
+                'unit_price_override': link_unit_price_override, # None means use global base price
+                'added_by_user_id': self.current_user_id,
+                'client_specific_product_name': link_client_specific_name if link_client_specific_name else global_product_details['product_name'],
+                'line_description': link_line_description if link_line_description else global_product_details['description'],
+                # 'line_weight': ..., # If ProductDialog allows specifying these for the link separately
+                # 'line_dimensions_notes': ...,
+            }
+
+            cpp_id = db_manager.add_product_to_client_or_project(link_data)
+
+            if cpp_id:
+                if self.notification_manager:
+                    self.notification_manager.show(self.tr("Succès"),
+                                                   self.tr("Nouveau produit '{0}' lié au client.").format(global_product_details['product_name']),
+                                                   type="SUCCESS")
+            else:
+                QMessageBox.warning(self, self.tr("Erreur Liaison Produit"),
+                                    self.tr("Le produit global a été créé, mais une erreur est survenue lors de sa liaison avec le client."))
+
+            self.load_products() # Refresh the table
+        else:
+            # Dialog was cancelled or closed
+            if self.notification_manager:
+                 self.notification_manager.show(self.tr("Annulé"), self.tr("L'ajout du nouveau produit a été annulé."), type="INFO")
 
