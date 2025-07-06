@@ -223,12 +223,28 @@ class CommandeDialog(QDialog):
         commande_date_str = self.commande_data.get("commande_date")
         if commande_date_str:
             try:
-                # Assuming ISO format from DB
-                q_date = QDate.fromString(datetime.fromisoformat(commande_date_str.replace('Z', '')).strftime('%Y-%m-%d'), "yyyy-MM-dd")
+                # Assuming ISO format from DB (e.g., "2023-10-26T14:30:00Z" or "2023-10-26T14:30:00.123Z")
+                # Replace datetime.fromisoformat for broader Python compatibility (Python < 3.7)
+
+                # Remove 'Z' if present (for UTC timezone indicator)
+                if commande_date_str.endswith('Z'):
+                    commande_date_str = commande_date_str[:-1]
+
+                # Handle potential microseconds, which strptime %S doesn't like directly if there's a fractional part.
+                # We only need the date part for QDate, so we can split at 'T'
+                date_part = commande_date_str.split('T')[0]
+
+                # Now date_part should be "YYYY-MM-DD"
+                q_date = QDate.fromString(date_part, "yyyy-MM-dd")
+
                 if q_date.isValid():
                     self.commande_date_edit.setDate(q_date)
-            except ValueError:
-                self.logger.warning(f"Invalid date format for commande_date: {commande_date_str}")
+                else:
+                    self.logger.warning(f"QDate.fromString failed for date_part: {date_part} from original: {self.commande_data.get('commande_date')}")
+            except Exception as e: # Catch any parsing error
+                self.logger.error(f"Error parsing commande_date: {self.commande_data.get('commande_date')}. Error: {e}", exc_info=True)
+                # Optionally, inform the user or set a default date
+                # For now, just log and continue; QDateEdit might remain empty or default.
 
         status_id = self.commande_data.get("status_commande_id")
         if status_id:
@@ -572,6 +588,7 @@ class CommandeDialog(QDialog):
                 self._last_processed_project_id = commande_data_payload.get("project_id") # Store project_id
 
                 self._sync_commande_items(self.commande_id_to_edit)
+                self._ensure_products_linked_to_client(self.commande_id_to_edit, commande_data_payload.get("project_id")) # Ensure link
                 super().accept()
             else:
                 QMessageBox.critical(self, "Erreur", "Impossible de mettre à jour la commande.")
@@ -589,15 +606,6 @@ class CommandeDialog(QDialog):
                 super().accept()
             else:
                 QMessageBox.critical(self, "Erreur", "Impossible de créer la commande.")
-        elif self.commande_id_to_edit: # Check if it's an update
-            # This part was missing in the original structure for updates, adding it for completeness
-            # Assuming `success` was defined from `commandes_crud.update_commande`
-            if success: # if update_commande was successful
-                 self._sync_commande_items(self.commande_id_to_edit)
-                 self._ensure_products_linked_to_client(self.commande_id_to_edit, commande_data_payload.get("project_id")) # Ensure link
-                 super().accept()
-            else:
-                QMessageBox.critical(self, "Erreur", "Impossible de mettre à jour la commande.")
 
     def _ensure_products_linked_to_client(self, commande_id, project_id_for_link=None):
         """
