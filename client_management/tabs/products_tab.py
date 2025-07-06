@@ -14,7 +14,7 @@ import uuid # For unique filenames
 import db as db_manager
 from db.cruds import commandes_crud
 from db.cruds import proforma_invoices_crud # If creating a proforma DB record
-from db.utils import get_proforma_invoice_context_data # For context
+from utils.proforma_invoice_utils import get_proforma_invoice_context_data # For context
 from utils.html_to_pdf_util import render_html_template, convert_html_to_pdf, WeasyPrintError # For PDF generation
 # Import SUPPORTED_LANGUAGES, assuming documents_tab is a sibling
 from .documents_tab import SUPPORTED_LANGUAGES
@@ -213,8 +213,8 @@ class ProductsTab(QWidget):
             else:
                 self.products_empty_label.hide()
                 self.products_table.show()
-                self.products_table.setRowCount(len(products))
-                for row, prod in enumerate(products):
+                self.products_table.setRowCount(len(products_to_display))
+                for row, prod in enumerate(products_to_display):
                     # Assuming 'client_project_product_id' is the unique ID for this client-product link
                     # and 'product_id' is the global product ID.
                     # The table should display details of the linked product.
