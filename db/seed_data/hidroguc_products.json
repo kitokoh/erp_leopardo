@@ -1,0 +1,294 @@
+[
+  {
+    "base_product": {
+      "product_name": "Atölye Presi",
+      "product_code": "HP_ATOLYE_TR",
+      "description": "Genel amaçlı atölye presi.",
+      "category": "Atölye Presleri",
+      "language_code": "tr",
+      "base_unit_price": 15000.00,
+      "unit_of_measure": "adet",
+      "weight": 1200,
+      "dimensions": "100x80x200"
+    },
+    "translations": [
+      {
+        "product_name": "Presse d'Atelier",
+        "product_code": "HP_ATOLYE_FR",
+        "description": "Presse d'atelier à usage général.",
+        "category": "Presses d'Atelier",
+        "language_code": "fr",
+        "base_unit_price": 15000.00,
+        "unit_of_measure": "pièce",
+        "weight": 1200,
+        "dimensions": "100x80x200"
+      }
+    ]
+  },
+  {
+    "base_product": {
+      "product_name": "Sıvama Presi",
+      "product_code": "HP_SIVAMA_TR",
+      "description": "Metal şekillendirme için sıvama presi.",
+      "category": "Sıvama Presleri",
+      "language_code": "tr",
+      "base_unit_price": 25000.00,
+      "unit_of_measure": "adet",
+      "weight": 2500,
+      "dimensions": "150x120x250"
+    },
+    "translations": [
+      {
+        "product_name": "Presse à Emboutir",
+        "product_code": "HP_SIVAMA_FR",
+        "description": "Presse à emboutir pour le formage des métaux.",
+        "category": "Presses à Emboutir",
+        "language_code": "fr",
+        "base_unit_price": 25000.00,
+        "unit_of_measure": "pièce",
+        "weight": 2500,
+        "dimensions": "150x120x250"
+      }
+    ],
+    "variants": [
+      {
+        "base_product": {
+          "product_name": "H Tipi Sıvama Presi",
+          "product_code": "HP_SIVAMA_H_TR",
+          "description": "H tipi gövdeli, yüksek hassasiyetli sıvama presi.",
+          "category": "Sıvama Presleri",
+          "language_code": "tr",
+          "base_unit_price": 28000.00,
+          "unit_of_measure": "adet",
+          "weight": 2700,
+          "dimensions": "160x130x260"
+        },
+        "translations": [
+          {
+            "product_name": "Presse à Emboutir Type H",
+            "product_code": "HP_SIVAMA_H_FR",
+            "description": "Presse à emboutir de type H, haute précision.",
+            "category": "Presses à Emboutir",
+            "language_code": "fr",
+            "base_unit_price": 28000.00,
+            "unit_of_measure": "pièce",
+            "weight": 2700,
+            "dimensions": "160x130x260"
+          }
+        ]
+      },
+      {
+        "base_product": {
+          "product_name": "Kolonlu Tip Sıvama Presi",
+          "product_code": "HP_SIVAMA_KOLONLU_TR",
+          "description": "Kolonlu tipte, ağır hizmet sıvama presi.",
+          "category": "Sıvama Presleri",
+          "language_code": "tr",
+          "base_unit_price": 32000.00,
+          "unit_of_measure": "adet",
+          "weight": 3500,
+          "dimensions": "180x150x280"
+        },
+        "translations": [
+          {
+            "product_name": "Presse à Emboutir à Colonnes",
+            "product_code": "HP_SIVAMA_KOLONLU_FR",
+            "description": "Presse à emboutir à colonnes, pour applications lourdes.",
+            "category": "Presses à Emboutir",
+            "language_code": "fr",
+            "base_unit_price": 32000.00,
+            "unit_of_measure": "pièce",
+            "weight": 3500,
+            "dimensions": "180x150x280"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "base_product": {
+      "product_name": "Ütüleme Presi",
+      "product_code": "HP_UTULEME_TR",
+      "description": "Endüstriyel ütüleme presi.",
+      "category": "Ütüleme Presleri",
+      "language_code": "tr",
+      "base_unit_price": 18000.00,
+      "unit_of_measure": "adet",
+      "weight": 1500,
+      "dimensions": "120x100x220"
+    },
+    "translations": [
+      {
+        "product_name": "Presse à Repasser",
+        "product_code": "HP_UTULEME_FR",
+        "description": "Presse à repasser industrielle.",
+        "category": "Presses à Repasser",
+        "language_code": "fr",
+        "base_unit_price": 18000.00,
+        "unit_of_measure": "pièce",
+        "weight": 1500,
+        "dimensions": "120x100x220"
+      }
+    ]
+  },
+  {
+    "base_product": {
+      "product_name": "Kauçuk Pişirme Presi",
+      "product_code": "HP_KAUCUK_TR",
+      "description": "Kauçuk vulkanizasyonu için pres.",
+      "category": "Kauçuk Pişirme Presleri",
+      "language_code": "tr",
+      "base_unit_price": 35000.00,
+      "unit_of_measure": "adet",
+      "weight": 4000,
+      "dimensions": "200x180x300"
+    },
+    "translations": [
+      {
+        "product_name": "Presse de Vulcanisation du Caoutchouc",
+        "product_code": "HP_KAUCUK_FR",
+        "description": "Presse pour la vulcanisation du caoutchouc.",
+        "category": "Presses de Vulcanisation du Caoutchouc",
+        "language_code": "fr",
+        "base_unit_price": 35000.00,
+        "unit_of_measure": "pièce",
+        "weight": 4000,
+        "dimensions": "200x180x300"
+      }
+    ],
+    "variants": [
+      {
+        "base_product": {
+          "product_name": "H Tipi Çift İstasyonlu Kauçuk Pişirme Presi",
+          "product_code": "HP_KAUCUK_H_CIFIST_TR",
+          "description": "H tipi, çift istasyonlu, yüksek kapasiteli kauçuk pişirme presi.",
+          "category": "Kauçuk Pişirme Presleri",
+          "language_code": "tr",
+          "base_unit_price": 45000.00,
+          "unit_of_measure": "adet",
+          "weight": 5500,
+          "dimensions": "250x200x320"
+        },
+        "translations": [
+          {
+            "product_name": "Presse de Vulcanisation Caoutchouc Type H Double Station",
+            "product_code": "HP_KAUCUK_H_CIFIST_FR",
+            "description": "Presse de vulcanisation du caoutchouc type H, double station, haute capacité.",
+            "category": "Presses de Vulcanisation du Caoutchouc",
+            "language_code": "fr",
+            "base_unit_price": 45000.00,
+            "unit_of_measure": "pièce",
+            "weight": 5500,
+            "dimensions": "250x200x320"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "base_product": {
+      "product_name": "C Tipi Pres",
+      "product_code": "HP_CTIP_TR",
+      "description": "C tipi gövdeli pres.",
+      "category": "C Tipi Presler",
+      "language_code": "tr",
+      "base_unit_price": 22000.00,
+      "unit_of_measure": "adet",
+      "weight": 2000,
+      "dimensions": "130x100x230"
+    },
+    "translations": [
+      {
+        "product_name": "Presse de Type C",
+        "product_code": "HP_CTIP_FR",
+        "description": "Presse avec bâti de type C.",
+        "category": "Presses de Type C",
+        "language_code": "fr",
+        "base_unit_price": 22000.00,
+        "unit_of_measure": "pièce",
+        "weight": 2000,
+        "dimensions": "130x100x230"
+      }
+    ]
+  },
+  {
+    "base_product": {
+      "product_name": "Broş Basma ve Çekme Presi",
+      "product_code": "HP_BROS_TR",
+      "description": "Broşları basma ve çekme işlemleri için pres.",
+      "category": "Broş Basma ve Çekme Presleri",
+      "language_code": "tr",
+      "base_unit_price": 20000.00,
+      "unit_of_measure": "adet",
+      "weight": 1800,
+      "dimensions": "110x90x210"
+    },
+    "translations": [
+      {
+        "product_name": "Presse d'Insertion et d'Extraction de Broches",
+        "product_code": "HP_BROS_FR",
+        "description": "Presse pour les opérations d'insertion et d'extraction de broches.",
+        "category": "Presses d'Insertion et d'Extraction de Broches",
+        "language_code": "fr",
+        "base_unit_price": 20000.00,
+        "unit_of_measure": "pièce",
+        "weight": 1800,
+        "dimensions": "110x90x210"
+      }
+    ],
+    "variants": [
+        {
+            "base_product": {
+              "product_name": "Otomatik Broş Basma Çekme Presi",
+              "product_code": "HP_BROS_OTOMATIK_TR",
+              "description": "Otomatik modda broş basma ve çekme işlemleri için pres.",
+              "category": "Broş Basma ve Çekme Presleri",
+              "language_code": "tr",
+              "base_unit_price": 26000.00,
+              "unit_of_measure": "adet",
+              "weight": 2200,
+              "dimensions": "140x110x240"
+            },
+            "translations": [
+              {
+                "product_name": "Presse Automatique d'Insertion et d'Extraction de Broches",
+                "product_code": "HP_BROS_OTOMATIK_FR",
+                "description": "Presse automatique pour opérations d'insertion et d'extraction de broches.",
+                "category": "Presses d'Insertion et d'Extraction de Broches",
+                "language_code": "fr",
+                "base_unit_price": 26000.00,
+                "unit_of_measure": "pièce",
+                "weight": 2200,
+                "dimensions": "140x110x240"
+              }
+            ]
+          }
+    ]
+  },
+  {
+    "base_product": {
+      "product_name": "Özel Amaç Presi",
+      "product_code": "HP_OZELAMAC_TR",
+      "description": "Müşteri ihtiyacına göre özel olarak tasarlanmış pres.",
+      "category": "Özel Amaç Presleri",
+      "language_code": "tr",
+      "base_unit_price": 50000.00,
+      "unit_of_measure": "adet",
+      "weight": 5000,
+      "dimensions": "Sorunuz"
+    },
+    "translations": [
+      {
+        "product_name": "Presse Spéciale sur Mesure",
+        "product_code": "HP_OZELAMAC_FR",
+        "description": "Presse conçue spécifiquement selon les besoins du client.",
+        "category": "Presses Spéciales sur Mesure",
+        "language_code": "fr",
+        "base_unit_price": 50000.00,
+        "unit_of_measure": "pièce",
+        "weight": 5000,
+        "dimensions": "Demandez"
+      }
+    ]
+  }
+]
