@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 from typing import Optional, List, Dict, Any
+from PyQt5.QtWidgets import QWidget
 
 class AddEditStatusDialog(QDialog):
     def __init__(self, parent: Optional[QWidget] = None,
