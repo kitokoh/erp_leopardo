@@ -232,34 +232,23 @@ class ClientMainWidget(QWidget):
 
             self.action_buttons_layout.addStretch(1)
 
-            self.create_docs_btn = QPushButton(QIcon(":/icons/mail.svg"), self.tr("Envoyer Mail"))
-            self.create_docs_btn.setObjectName("actionButton") # Using a more generic name for QSS if not primary
+            self.create_docs_btn = QPushButton(QIcon(":/icons/mail.svg"), self.tr("Envoyer Mail")) # Corrected icon path if mail.svg exists
+            self.create_docs_btn.setObjectName("actionButton")
+
             self.create_docs_btn.setToolTip(self.tr("Envoyer un email au client"))
             self.create_docs_btn.clicked.connect(self.open_send_email_dialog)
             self.action_buttons_layout.addWidget(self.create_docs_btn)
 
-            # compile_pdf_btn is not currently added to layout, but if it were:
-            # self.compile_pdf_btn = QPushButton(QIcon(":/icons/file-plus.svg"), self.tr("Compiler PDF"))
-            # self.compile_pdf_btn.setObjectName("actionButton")
-            # self.compile_pdf_btn.setToolTip(self.tr("Compiler plusieurs documents PDF en un seul"))
-            # self.compile_pdf_btn.clicked.connect(self.open_compile_pdf_dialog)
-            # self.action_buttons_layout.addWidget(self.compile_pdf_btn)
-
             self.edit_save_client_btn = QPushButton(QIcon(":/icons/edit-2.svg"), self.tr("Modifier Client"))
-            self.edit_save_client_btn.setObjectName("primaryButton") # Main action for client details
+            self.edit_save_client_btn.setObjectName("primaryButton")
+
             self.edit_save_client_btn.setToolTip(self.tr("Modifier les informations du client"))
             self.edit_save_client_btn.clicked.connect(self.toggle_client_edit_mode)
             self.action_buttons_layout.addWidget(self.edit_save_client_btn)
 
-            # send_whatsapp_btn is not currently added, but if it were:
-            # self.send_whatsapp_btn = QPushButton(QIcon(":/icons/message-square.svg"), self.tr("Send WhatsApp")) # Example icon
-            # self.send_whatsapp_btn.setObjectName("actionButton")
-            # self.send_whatsapp_btn.setToolTip(self.tr("Send a WhatsApp message to the client"))
-            # self.send_whatsapp_btn.clicked.connect(self.open_send_whatsapp_dialog)
-            # self.action_buttons_layout.addWidget(self.send_whatsapp_btn)
+            self.archive_client_btn = QPushButton(QIcon(":/icons/archive.svg"), self.tr("Archiver Client")) # Corrected icon path if archive.svg exists
+            self.archive_client_btn.setObjectName("dangerButton")
 
-            self.archive_client_btn = QPushButton(QIcon(":/icons/archive.svg"), self.tr("Archiver Client"))
-            self.archive_client_btn.setObjectName("dangerButton") # Archiving is a significant (semi-destructive) action
             self.archive_client_btn.setToolTip(self.tr("Archiver ce client (soft delete)"))
             self.archive_client_btn.clicked.connect(self.handle_archive_client)
             self.action_buttons_layout.addWidget(self.archive_client_btn)
