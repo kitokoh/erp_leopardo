@@ -8,7 +8,8 @@ from datetime import datetime
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox,
     QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
-    QInputDialog, QMessageBox, QFileDialog, QApplication, QSizePolicy, QDialog
+    QInputDialog, QMessageBox, QFileDialog, QApplication, QSizePolicy, QDialog,
+    QMenu
 )
 from PyQt5.QtGui import QIcon, QDesktopServices, QFont
 from PyQt5.QtCore import Qt, QUrl, QStandardPaths
@@ -138,31 +139,126 @@ class DocumentsTab(QWidget):
         self.doc_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         docs_layout.addWidget(self.doc_table)
 
-        doc_btn_layout = QHBoxLayout()
-        doc_btn_layout.setSpacing(10)
-        self.add_doc_btn = QPushButton(self.tr("Importer Document"))
-        self.add_doc_btn.setIcon(QIcon(":/icons/file-plus.svg"))
-        self.add_doc_btn.setToolTip(self.tr("Importer un fichier document existant pour ce client"))
-        self.add_doc_btn.setObjectName("primaryButton") # Style as primary
-        self.add_doc_btn.clicked.connect(self.add_document)
-        doc_btn_layout.addWidget(self.add_doc_btn)
+        # New button layout
+        doc_actions_layout = QHBoxLayout()
+        doc_actions_layout.setSpacing(10)
 
-        self.refresh_docs_btn = QPushButton(self.tr("Actualiser"))
-        self.refresh_docs_btn.setIcon(QIcon(":/icons/refresh-cw.svg")) # Use a more common refresh icon
-        self.refresh_docs_btn.clicked.connect(self.populate_doc_table)
-        doc_btn_layout.addWidget(self.refresh_docs_btn)
+        self.main_add_doc_action_btn = QPushButton(QIcon(":/icons/plus.svg"), self.tr("Ajouter Document"))
+        self.main_add_doc_action_btn.setToolTip(self.tr("Ajouter un nouveau document (simple, importé ou généré)"))
+        self.main_add_doc_action_btn.setObjectName("primaryButton")
+        self.main_add_doc_action_btn.clicked.connect(self._open_add_document_menu) # To be implemented
+        doc_actions_layout.addWidget(self.main_add_doc_action_btn)
 
-        self.add_template_btn = QPushButton(self.tr("Générer via Modèle"))
-        self.add_template_btn.setIcon(QIcon(":/icons/file-text.svg")) # Icon for text/template based generation
-        self.add_template_btn.setToolTip(self.tr("Générer un nouveau document pour ce client à partir d'un modèle"))
-        self.add_template_btn.setObjectName("primaryButton")
-        self.add_template_btn.clicked.connect(self.add_document_from_template_action) # Modifié pour appeler la méthode directe
-        doc_btn_layout.addWidget(self.add_template_btn)
+        doc_actions_layout.addStretch() # Push button to the left
+        docs_layout.addLayout(doc_actions_layout)
 
-        doc_btn_layout.addStretch() # Push buttons to the left
-
-        docs_layout.addLayout(doc_btn_layout)
         self._load_order_filters()
+
+    def _open_add_document_menu(self):
+        # This method will be implemented in the next step.
+        # It will open a dialog or QMenu with options:
+        # - Ajouter un document simple
+        # - Importer un document existant
+        # - Générer un document via modèle
+
+        if not self.main_add_doc_action_btn: # Should not happen
+            logging.error("main_add_doc_action_btn not initialized.")
+            return
+
+        menu = QMenu(self)
+
+        action_simple = menu.addAction(self.tr("Ajouter un document simple"))
+        action_simple.triggered.connect(self._handle_add_simple_document_action) # Placeholder
+
+        action_import = menu.addAction(self.tr("Importer un document existant"))
+        action_import.triggered.connect(self._handle_import_document_action) # Placeholder, will likely call self.add_document
+
+        action_generate = menu.addAction(self.tr("Générer un document via modèle"))
+        action_generate.triggered.connect(self._handle_generate_via_template_action) # Placeholder, will likely call self.add_document_from_template_action
+
+        # Show the menu below the button
+        button_pos = self.main_add_doc_action_btn.mapToGlobal(self.main_add_doc_action_btn.rect().bottomLeft())
+        menu.exec_(button_pos)
+
+    def _handle_add_simple_document_action(self):
+        logging.info("Action: Ajouter un document simple selected.")
+        # TODO: Implement logic for adding a simple document
+        # This will likely involve a dialog to input document details (name, description).
+        # The document needs to be associated with the current client_id and potentially a commande_id.
+        # For a "simple" document, it might not have a physical file initially, or allow a generic upload.
+
+        client_id = self.client_info.get("client_id")
+        if not client_id:
+            self.notify(self.tr("Erreur"), self.tr("ID Client non trouvé."), type='ERROR')
+            return
+
+        doc_name, ok = QInputDialog.getText(self, self.tr("Nom du Document Simple"), self.tr("Entrez le nom pour le document simple:"))
+        if not ok or not doc_name.strip():
+            self.notify(self.tr("Annulé"), self.tr("Ajout de document simple annulé."), type='INFO')
+            return
+
+        doc_name = doc_name.strip()
+
+        # Optional: Ask for notes/description for this simple document
+        doc_notes, notes_ok = QInputDialog.getMultiLineText(self, self.tr("Notes (Optionnel)"),
+                                                            self.tr("Entrez des notes ou une description pour '{0}':").format(doc_name))
+        if not notes_ok: # User cancelled notes input, but proceed with document name
+            doc_notes = ""
+
+        order_identifier = None
+        current_order_data = self.doc_order_filter_combo.currentData()
+        if current_order_data not in ["ALL", "NONE"] and current_order_data is not None:
+            order_identifier = current_order_data
+
+        # For a "simple" document, file_path_relative and file_name_on_disk might be None or specific placeholders
+        # Language can be set to a default or also asked. For now, let's assume a default or None.
+        # Let's ask for language for consistency
+        available_languages = SUPPORTED_LANGUAGES
+        selected_doc_language, lang_ok = QInputDialog.getItem(
+            self, self.tr("Sélectionner la langue"), self.tr("Langue du document '{0}':").format(doc_name),
+            available_languages, 0, False
+        )
+        if not lang_ok or not selected_doc_language:
+            selected_doc_language = "fr" # Default to French if cancelled or not selected
+            self.notify(self.tr("Langue par Défaut"), self.tr("Langue par défaut 'fr' sera utilisée."), type='INFO')
+
+
+        doc_db_data = {
+            "client_id": client_id,
+            "document_name": doc_name,
+            "file_name_on_disk": None, # No physical file for a "simple" document initially
+            "file_path_relative": None,
+            "document_type_generated": "NOTE", # Or "SIMPLE_DOCUMENT", "TEXT_NOTE"
+            "language_code": selected_doc_language,
+            "source_template_id": None,
+            "order_identifier": order_identifier,
+            "user_id": self.current_user_id,
+            "notes": doc_notes.strip() if doc_notes else None, # Store notes
+            "version_tag": "1.0"
+        }
+
+        try:
+            new_doc_id = client_documents_crud.add_client_document(doc_db_data)
+            if new_doc_id:
+                self.notify(self.tr("Succès"), self.tr("Document simple '{0}' ajouté.").format(doc_name), type='SUCCESS')
+                self.populate_doc_table() # Refresh table
+            else:
+                self.notify(self.tr("Erreur DB"), self.tr("Échec de l'enregistrement du document simple."), type='ERROR')
+        except Exception as e:
+            logging.error(f"Error adding simple document: {e}", exc_info=True)
+            self.notify(self.tr("Erreur Inconnue"), str(e), type='CRITICAL')
+
+
+    def _handle_import_document_action(self):
+        logging.info("Action: Importer un document existant selected.")
+        # This can reuse the existing self.add_document() method which handles file import.
+        self.add_document() # self.add_document already handles file dialog and DB record.
+
+    def _handle_generate_via_template_action(self):
+        logging.info("Action: Générer un document via modèle selected.")
+        # This can reuse the existing self.add_document_from_template_action() method.
+        self.add_document_from_template_action()
+
 
     def _load_order_filters(self):
         self.doc_order_filter_combo.blockSignals(True)
@@ -527,10 +623,13 @@ class DocumentsTab(QWidget):
         self.populate_doc_table()
 
     def apply_permissions_to_tab(self, can_manage_documents: bool):
-        if hasattr(self, 'add_doc_btn'):
-            self.add_doc_btn.setEnabled(can_manage_documents)
-        if hasattr(self, 'add_template_btn'):
-            self.add_template_btn.setEnabled(can_manage_documents)
+        if hasattr(self, 'main_add_doc_action_btn'):
+            self.main_add_doc_action_btn.setEnabled(can_manage_documents)
+        # Old buttons self.add_doc_btn and self.add_template_btn are removed,
+        # so no need to manage their state here anymore.
 
         self.can_manage_documents_permission = can_manage_documents
-        self.populate_doc_table() # Refresh table to show/hide row actions based on new permission
+        # Row actions in populate_doc_table already use self.can_manage_documents_permission
+        # Calling populate_doc_table() here is good to refresh row action visibility
+        # if permissions change while the tab is visible.
+        self.populate_doc_table()
