@@ -272,14 +272,14 @@ class ProductsTab(QWidget):
 
             if update_data:
                 # Utiliser la fonction CRUD mise à jour
-                success = db_manager.client_project_products_crud.update_client_project_product(link_id, update_data)
+                success = db_manager.update_client_project_product(link_id, update_data) # Corrected call
                 if success:
                     if self.notification_manager:
                         self.notification_manager.show(self.tr("Succès"), self.tr("Produit mis à jour."), type="SUCCESS")
                     if recalculate_total:
                         # Re-fetch the updated item to get all necessary fields for total calculation
                         # Assurez-vous que get_client_project_product_by_link_id est disponible et correct
-                        updated_item_data = db_manager.client_project_products_crud.get_client_project_product_by_id(link_id) # Changé pour appeler la fonction CRUD directement
+                        updated_item_data = db_manager.get_client_project_product_by_id(link_id) # Corrected call
                         if updated_item_data:
                             qty = float(updated_item_data.get('quantity', 0))
                             price_override = updated_item_data.get('unit_price_override') # Clé correcte
