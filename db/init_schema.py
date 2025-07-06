@@ -911,19 +911,11 @@ def initialize_database(app_config):
         serial_number TEXT,
         purchase_confirmed_at TIMESTAMP,
         added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-<<<<<<< HEAD
-        added_by_user_id TEXT, -- Added column
-        client_specific_product_name TEXT, -- New field
-        line_description TEXT, -- New field
-        line_weight REAL, -- New field
-        line_dimensions_notes TEXT, -- New field
-=======
         added_by_user_id TEXT,
         client_specific_product_name TEXT,
         line_description TEXT,
         line_weight REAL,
         line_dimensions_notes TEXT,
->>>>>>> 277c515641a2066d1c9881773b7873a6623f1a7a
         FOREIGN KEY (client_id) REFERENCES Clients (client_id) ON DELETE CASCADE,
         FOREIGN KEY (project_id) REFERENCES Projects (project_id) ON DELETE CASCADE,
         FOREIGN KEY (product_id) REFERENCES Products (product_id) ON DELETE CASCADE,
