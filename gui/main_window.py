@@ -1391,7 +1391,7 @@ class DocumentManager(QMainWindow):
                 logging.info(f"  Module Action '{action_attr}' for '{module_name}': Module disabled by DB setting. Action HIDDEN.")
                 continue
 
-            perm_keys = module_permissions.get(module_name)
+            perm_keys = module_role_permissions.get(module_name)
             permitted = False
             log_perm_details = ""
 
