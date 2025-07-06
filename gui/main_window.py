@@ -1183,26 +1183,10 @@ class DocumentManager(QMainWindow):
                 # For simplicity, let's re-fetch or ensure self.allowed_features is up-to-date.
                 # It's set in __init__ and potentially updated in _handle_roles_changed if license itself changes.
 
-                # Re-using MODULE_TO_LICENSE_FEATURE_MAP as defined in _apply_permissions for consistency
-                # This map should ideally be a class member or globally accessible if used in multiple methods.
-                # For now, duplicating its structure here for clarity, or assuming _apply_permissions has already run
-                # and self.allowed_features is correctly populated.
-                _MODULE_TO_LICENSE_FEATURE_MAP_FOR_MENU = {
-                    'project_management': FEATURE_PROJECT_MANAGEMENT,
-                    'product_management': FEATURE_PRODUCT_MANAGEMENT,
-                    'partner_management': FEATURE_PARTNER_MANAGEMENT,
-                    'statistics': FEATURE_STATISTICS_MODULE,
-                    'inventory_management': FEATURE_INVENTORY_MANAGEMENT,
-                    'experience_management': FEATURE_EXPERIENCE_MANAGEMENT,
-                    'calendar': FEATURE_CALENDAR_MODULE,
-                    'botpress_integration': FEATURE_BOTPRESS_INTEGRATION,
-                    'calculator': FEATURE_CALCULATOR_MODULE,
-                    'commandes_management': FEATURE_COMMANDES_MANAGEMENT,
-                    # carrier_map and camera_management default to None (no specific license feature)
-                }
-                license_feature_key = _MODULE_TO_LICENSE_FEATURE_MAP_FOR_MENU.get(module_name)
-                permitted_by_license = True # Default to true if no specific license feature is mapped
-                if license_feature_key:
+                # Now using module_info['license_feature']
+                license_feature_key = module_info.get('license_feature')
+                permitted_by_license = True # Default to true if no specific license feature is mapped or feature is None
+                if license_feature_key: # If a specific license feature is defined for this module
                     permitted_by_license = license_feature_key in self.allowed_features
 
                 if not permitted_by_license:
@@ -1351,22 +1335,8 @@ class DocumentManager(QMainWindow):
         self.manage_roles_action.setEnabled(can_manage_roles and can_manage_users_licensed) # Assuming role management also tied to this feature
 
         # Module Menu Actions & Feature Mapping
-        # Maps module_name (from CONFIGURABLE_MODULES) to its corresponding license feature constant
-        MODULE_TO_LICENSE_FEATURE_MAP = {
-            'project_management': FEATURE_PROJECT_MANAGEMENT,
-            'product_management': FEATURE_PRODUCT_MANAGEMENT,
-            'partner_management': FEATURE_PARTNER_MANAGEMENT,
-            'statistics': FEATURE_STATISTICS_MODULE,
-            'inventory_management': FEATURE_INVENTORY_MANAGEMENT,
-            'experience_management': FEATURE_EXPERIENCE_MANAGEMENT,
-            'calendar': FEATURE_CALENDAR_MODULE,
-            'botpress_integration': FEATURE_BOTPRESS_INTEGRATION,
-            'carrier_map': None, # Example: Carrier map might not have a specific license feature, always available if role permits
-            'camera_management': None, # Example: Camera might not be license controlled
-            'calculator': FEATURE_CALCULATOR_MODULE,
-            'commandes_management': FEATURE_COMMANDES_MANAGEMENT,
-            # Add other modules from CONFIGURABLE_MODULES here and map to a FEATURE_* constant or None
-        }
+        # The MODULE_TO_LICENSE_FEATURE_MAP is now removed.
+        # License feature checks will use module_config.get('license_feature').
 
         # Role-based permissions for modules (as before)
         module_role_permissions = {
@@ -1420,7 +1390,19 @@ class DocumentManager(QMainWindow):
 
 
             action_instance.setVisible(permitted)
-            logging.info(f"  Module Action '{action_attr}' for '{module_name}': Visible: {permitted}. {log_perm_details}")
+            logging.info(f"  Module Action '{action_attr}' for '{module_name}': Role permitted: {permitted}. {log_perm_details}")
+
+            # Additionally, check license feature for this module using the new structure
+            if permitted: # Only check license if role permits
+                license_feature = module_config.get('license_feature')
+                if license_feature and license_feature not in self.allowed_features:
+                    action_instance.setVisible(False) # Hide if license feature is required but not granted
+                    logging.info(f"  Module Action '{action_attr}' for '{module_name}': HIDDEN due to missing license feature '{license_feature}'.")
+                elif license_feature:
+                    logging.info(f"  Module Action '{action_attr}' for '{module_name}': License feature '{license_feature}' GRANTED.")
+                else:
+                    logging.info(f"  Module Action '{action_attr}' for '{module_name}': No specific license feature required.")
+
             # Note: setEnabled could also be used if the action should be visible but greyed out.
             # For menu items, setVisible(False) effectively removes them.
 
@@ -2593,25 +2575,12 @@ class DocumentManager(QMainWindow):
             if not self.module_states.get(module_name, True):
                 continue
 
-            # Using the more complete license feature map from _apply_permissions
-            # This map should ideally be a class member or a shared utility if used in multiple places.
-            _MODULE_TO_LICENSE_FEATURE_MAP = {
-                'project_management': FEATURE_PROJECT_MANAGEMENT,
-                'product_management': FEATURE_PRODUCT_MANAGEMENT,
-                'partner_management': FEATURE_PARTNER_MANAGEMENT,
-                'statistics': FEATURE_STATISTICS_MODULE,
-                'inventory_management': FEATURE_INVENTORY_MANAGEMENT,
-                'experience_management': FEATURE_EXPERIENCE_MANAGEMENT,
-                'calendar': FEATURE_CALENDAR_MODULE,
-                'botpress_integration': FEATURE_BOTPRESS_INTEGRATION,
-                'carrier_map': None,
-                'camera_management': None,
-                'calculator': FEATURE_CALCULATOR_MODULE,
-                'commandes_management': FEATURE_COMMANDES_MANAGEMENT
-            }
-            license_feature_key = _MODULE_TO_LICENSE_FEATURE_MAP.get(module_name)
+            # The local _MODULE_TO_LICENSE_FEATURE_MAP is removed.
+            # We now use the 'license_feature' directly from module_info_const (from CONFIGURABLE_MODULES).
+            license_feature_key = module_info_const.get('license_feature')
             if license_feature_key and license_feature_key not in self.allowed_features:
-                continue
+                continue # Skip if license feature is required for this module and not granted to the user
+
 
             available_modules_for_customization.append(module_info_const)
 
