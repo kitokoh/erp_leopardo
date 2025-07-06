@@ -1,0 +1,13 @@
+/* Custom CSS styles for ClientDoc Manager web application */
+
+body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+main {
+    flex: 1;
+}
+
+/* Add more custom styles below */
