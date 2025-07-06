@@ -34,21 +34,19 @@ def add_product_to_client_or_project(link_data: dict, conn: sqlite3.Connection =
 
     total_price = qty * float(eff_price) # Ensure eff_price is float for calculation
 
-    # Nouveaux champs optionnels
-    line_description = link_data.get('line_description')
-    line_weight = link_data.get('line_weight')
-    line_dimensions_notes = link_data.get('line_dimensions_notes')
+    # Nouveaux champs optionnels - These are causing issues as the table schema might not have them
+    # line_description = link_data.get('line_description')
+    # line_weight = link_data.get('line_weight')
+    # line_dimensions_notes = link_data.get('line_dimensions_notes')
 
     sql="""INSERT INTO ClientProjectProducts
              (client_id, project_id, product_id, quantity, unit_price_override,
-              total_price_calculated, serial_number, purchase_confirmed_at, added_at, added_by_user_id,
-              line_description, line_weight, line_dimensions_notes)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""" # Ajout de 3 placeholders
+              total_price_calculated, serial_number, purchase_confirmed_at, added_at, added_by_user_id)
+             VALUES (?,?,?,?,?,?,?,?,?,?)""" # Removed 3 placeholders
     params=(client_id, link_data.get('project_id'), product_id, qty, override_price,
             total_price, link_data.get('serial_number'),
             link_data.get('purchase_confirmed_at'), datetime.utcnow().isoformat()+"Z",
-            link_data.get('added_by_user_id'),
-            line_description, line_weight, line_dimensions_notes) # Ajout des nouveaux paramètres
+            link_data.get('added_by_user_id')) # Removed the new parameters
 
     # Enhanced logging for diagnostics
     logger.info(f"Executing SQL for add_product_to_client_or_project: {sql}")
@@ -96,8 +94,7 @@ def update_client_project_product(link_id: int, data: dict, conn: sqlite3.Connec
 
     # Mise à jour des colonnes valides
     valid_cols = ['quantity', 'unit_price_override', 'total_price_calculated', 'serial_number',
-                  'purchase_confirmed_at',
-                  'line_description', 'line_weight', 'line_dimensions_notes'] # Nouveaux champs ajoutés
+                  'purchase_confirmed_at'] # Removed 'line_description', 'line_weight', 'line_dimensions_notes'
 
     to_set = {k: v for k, v in data.items() if k in valid_cols}
 
