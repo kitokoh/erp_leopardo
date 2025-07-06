@@ -912,16 +912,6 @@ def initialize_database(app_config):
         purchase_confirmed_at TIMESTAMP,
         added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         added_by_user_id TEXT, -- Added column
-        FOREIGN KEY (client_id) REFERENCES Clients (client_id) ON DELETE CASCADE,
-        FOREIGN KEY (project_id) REFERENCES Projects (project_id) ON DELETE CASCADE,
-        product_id INTEGER NOT NULL,
-        quantity INTEGER NOT NULL DEFAULT 1,
-        unit_price_override REAL,
-        total_price_calculated REAL,
-        serial_number TEXT,
-        purchase_confirmed_at TIMESTAMP,
-        added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        added_by_user_id TEXT, -- Added column
         client_specific_product_name TEXT, -- New field
         line_description TEXT, -- New field
         line_weight REAL, -- New field
@@ -929,7 +919,7 @@ def initialize_database(app_config):
         FOREIGN KEY (client_id) REFERENCES Clients (client_id) ON DELETE CASCADE,
         FOREIGN KEY (project_id) REFERENCES Projects (project_id) ON DELETE CASCADE,
         FOREIGN KEY (product_id) REFERENCES Products (product_id) ON DELETE CASCADE,
-        FOREIGN KEY (added_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL, -- Added FK
+        FOREIGN KEY (added_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL,
         UNIQUE (client_id, project_id, product_id)
     )
     """)
