@@ -19,6 +19,7 @@ h11>=0.12.0 # Required by Uvicorn
 # Database & ORM
 SQLAlchemy>=1.4.0
 aiofiles==24.1.0 # For async file operations, often with FastAPI
+psycopg2-binary>=2.9.9 # For PostgreSQL support
 
 # Authentication & Security
 python-jose[cryptography]>=3.3.0
