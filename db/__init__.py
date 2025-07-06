@@ -465,6 +465,11 @@ __all__ = [
     "delete_commande_document_note",
     "list_commande_document_notes_for_commande",
     "get_effective_document_note",
+    # SAV CRUD exports
+    "add_sav_ticket",
+    "get_sav_ticket_by_id",
+    "get_sav_tickets_for_client",
+    "update_sav_ticket",
 ]
 
 from .connection import get_db_connection
@@ -483,4 +488,12 @@ from .cruds.notes_crud import (
     delete_commande_document_note,
     list_commande_document_notes_for_commande,
     get_effective_document_note,
+)
+
+# SAV CRUD functions
+from .cruds.sav_crud import (
+    add_sav_ticket,
+    get_sav_ticket_by_id,
+    get_sav_tickets_for_client,
+    update_sav_ticket
 )

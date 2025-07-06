@@ -239,7 +239,7 @@ class ProductsCRUD(GenericCRUD):
             cursor.execute(sql, q_params)
             return [dict(row) for row in cursor.fetchall()]
         except sqlite3.Error as e:
-            logging.error(f"Error getting all products with filters '{filters}': {e}")
+            logging.error(f"Error getting all products with filters '{filters}': {e}", exc_info=True)
             return []
 
     @_manage_conn
@@ -321,7 +321,7 @@ class ProductsCRUD(GenericCRUD):
             cursor.execute(sql, params)
             return {'success': cursor.rowcount > 0, 'updated_count': cursor.rowcount}
         except sqlite3.Error as e:
-            logging.error(f"Error updating product {product_id}: {e}")
+            logging.error(f"Error updating product {product_id}: {e}", exc_info=True)
             return {'success': False, 'error': str(e)}
 
     @_manage_conn
@@ -358,7 +358,7 @@ class ProductsCRUD(GenericCRUD):
             else:
                 return {'success': False, 'error': f"Product {product_id} not found or no change made."}
         except sqlite3.Error as e:
-            logging.error(f"Failed to soft delete product {product_id}: {e}")
+            logging.error(f"Failed to soft delete product {product_id}: {e}", exc_info=True)
             return {'success': False, 'error': str(e)}
 
     @_manage_conn
@@ -395,7 +395,7 @@ class ProductsCRUD(GenericCRUD):
             cursor.execute(sql, tuple(params))
             return [dict(row) for row in cursor.fetchall()]
         except sqlite3.Error as e:
-            logging.error(f"Error getting products (lang: {language_code}): {e}")
+            logging.error(f"Error getting products (lang: {language_code}): {e}", exc_info=True)
             return []
 
     @_manage_conn
@@ -431,7 +431,7 @@ class ProductsCRUD(GenericCRUD):
             else:
                 return {'success': False, 'error': "Price update failed, product not found or price is the same."} # Should be caught by get_product_by_id
         except sqlite3.Error as e:
-            logging.error(f"Error updating price for product {product_id}: {e}")
+            logging.error(f"Error updating price for product {product_id}: {e}", exc_info=True)
             return {'success': False, 'error': str(e)}
 
     @_manage_conn
@@ -463,7 +463,7 @@ class ProductsCRUD(GenericCRUD):
             cursor.execute(sql, tuple(params))
             return [dict(row) for row in cursor.fetchall()]
         except sqlite3.Error as e:
-            logging.error(f"Error getting products by name pattern '{pattern}': {e}")
+            logging.error(f"Error getting products by name pattern '{pattern}': {e}", exc_info=True)
             return None # Or an empty list: []
 
     @_manage_conn
@@ -502,7 +502,7 @@ class ProductsCRUD(GenericCRUD):
             cursor.execute(sql, tuple(params))
             return [dict(row) for row in cursor.fetchall()]
         except sqlite3.Error as e:
-            logging.error(f"Error in get_all_products_for_selection_filtered (lang: {language_code}, pattern: {name_pattern}): {e}")
+            logging.error(f"Error in get_all_products_for_selection_filtered (lang: {language_code}, pattern: {name_pattern}): {e}", exc_info=True)
             return []
 
     @_manage_conn
@@ -534,7 +534,7 @@ class ProductsCRUD(GenericCRUD):
             row = cursor.fetchone()
             return row['total_count'] if row else 0
         except sqlite3.Error as e:
-            logging.error(f"Error getting total products count: {e}")
+            logging.error(f"Error getting total products count: {e}", exc_info=True)
             return 0
 
     # --- ProductDimensions CRUD ---
@@ -589,7 +589,7 @@ class ProductsCRUD(GenericCRUD):
             success = cursor.rowcount > 0 or (not exists and cursor.lastrowid is not None)
             return {'success': success, 'operation': op, 'product_id': product_id}
         except sqlite3.Error as e:
-            logging.error(f"Error in add_or_update_product_dimension for product {product_id}: {e}")
+            logging.error(f"Error in add_or_update_product_dimension for product {product_id}: {e}", exc_info=True)
             return {'success': False, 'error': str(e)}
 
     @_manage_conn
@@ -622,7 +622,7 @@ class ProductsCRUD(GenericCRUD):
             row = cursor.fetchone()
             return dict(row) if row else None
         except sqlite3.Error as e:
-            logging.error(f"Error getting product dimension for product {product_id}: {e}")
+            logging.error(f"Error getting product dimension for product {product_id}: {e}", exc_info=True)
             return None
 
     @_manage_conn
@@ -650,7 +650,7 @@ class ProductsCRUD(GenericCRUD):
             else:
                 return {'success': False, 'error': f"Dimensions for product {product_id} not found."}
         except sqlite3.Error as e:
-            logging.error(f"Error deleting product dimension for product {product_id}: {e}")
+            logging.error(f"Error deleting product dimension for product {product_id}: {e}", exc_info=True)
             return {'success': False, 'error': str(e)}
 
     # --- ProductEquivalencies CRUD ---
@@ -695,10 +695,10 @@ class ProductsCRUD(GenericCRUD):
                 logging.warning(f"Equivalence between {p_a} and {p_b} already exists.")
                 return {'success': True, 'id': row['equivalence_id'] if row else None, 'message': "Equivalence already exists."}
             except sqlite3.Error as e_fetch:
-                logging.error(f"Error fetching existing equivalence for {p_a}-{p_b}: {e_fetch}")
+                logging.error(f"Error fetching existing equivalence for {p_a}-{p_b}: {e_fetch}", exc_info=True)
                 return {'success': False, 'error': f"Error fetching existing equivalence: {str(e_fetch)}"}
         except sqlite3.Error as e:
-            logging.error(f"Error adding product equivalence for {p_a}-{p_b}: {e}")
+            logging.error(f"Error adding product equivalence for {p_a}-{p_b}: {e}", exc_info=True)
             return {'success': False, 'error': str(e)}
 
     @_manage_conn
@@ -748,7 +748,7 @@ class ProductsCRUD(GenericCRUD):
                 return [p for p in all_equivalent_products if not (p.get('is_deleted') == 1 or p.get('is_deleted') is True)]
 
         except sqlite3.Error as e:
-            logging.error(f"Error getting equivalent products for product {product_id}: {e}")
+            logging.error(f"Error getting equivalent products for product {product_id}: {e}", exc_info=True)
             return []
 
     @_manage_conn
@@ -791,7 +791,7 @@ class ProductsCRUD(GenericCRUD):
             cursor.execute(sql)
             return [dict(row) for row in cursor.fetchall()]
         except sqlite3.Error as e:
-            logging.error(f"Error getting all product equivalencies: {e}")
+            logging.error(f"Error getting all product equivalencies: {e}", exc_info=True)
             return []
 
     @_manage_conn
@@ -816,7 +816,7 @@ class ProductsCRUD(GenericCRUD):
             else:
                  return {'success': False, 'error': f"Equivalence {equivalence_id} not found."}
         except sqlite3.Error as e:
-            logging.error(f"Error removing product equivalence {equivalence_id}: {e}")
+            logging.error(f"Error removing product equivalence {equivalence_id}: {e}", exc_info=True)
             return {'success': False, 'error': str(e)}
 
     @_manage_conn
@@ -858,7 +858,7 @@ class ProductsCRUD(GenericCRUD):
 
             return product_dict
         except sqlite3.Error as e:
-            logging.error(f"Error getting product by code '{product_code}': {e}")
+            logging.error(f"Error getting product by code '{product_code}': {e}", exc_info=True)
             return None
 
 # Instantiate the CRUD class for easy import and use elsewhere

@@ -159,7 +159,7 @@ class ClientsCRUD(GenericCRUD):
 
             return {'success': True, 'client_id': new_id}
         except sqlite3.Error as e:
-            logging.error(f"Failed to add client '{data.get('client_name')}': {e}")
+            logging.error(f"Failed to add client '{data.get('client_name')}': {e}", exc_info=True)
             return {'success': False, 'error': str(e)}
 
     @_manage_conn
@@ -237,7 +237,7 @@ class ClientsCRUD(GenericCRUD):
             cursor.execute(sql, q_params)
             return [dict(row) for row in cursor.fetchall()]
         except sqlite3.Error as e:
-            logging.error(f"Failed to get all clients with filters '{filters}': {e}")
+            logging.error(f"Failed to get all clients with filters '{filters}': {e}", exc_info=True)
             return []
 
     @_manage_conn
@@ -407,24 +407,41 @@ class ClientsCRUD(GenericCRUD):
             conditions.append("(c.is_deleted IS NULL OR c.is_deleted = 0)")
 
         if filters:
-            if 'status_id' in filters and filters['status_id'] is not None:
+            # Handle multiple status IDs
+            if 'status_ids' in filters and isinstance(filters['status_ids'], list) and filters['status_ids']:
+                placeholders = ','.join('?' for _ in filters['status_ids'])
+                conditions.append(f"c.status_id IN ({placeholders})")
+                q_params.extend(filters['status_ids'])
+            elif 'status_id' in filters and filters['status_id'] is not None: # Fallback for single status_id
                 conditions.append("c.status_id = ?")
                 q_params.append(filters['status_id'])
+
             if 'client_name' in filters and filters['client_name']:
                 conditions.append("c.client_name LIKE ?")
                 q_params.append(f"%{filters['client_name']}%")
             if 'company_name' in filters and filters['company_name']:
                 conditions.append("c.company_name LIKE ?")
                 q_params.append(f"%{filters['company_name']}%")
-            if 'category' in filters and filters['category']:
+            if 'category' in filters and filters['category']: # Already handles LIKE
                 conditions.append("c.category LIKE ?")
                 q_params.append(f"%{filters['category']}%")
             if 'country_id' in filters and filters['country_id'] is not None:
                 conditions.append("c.country_id = ?")
                 q_params.append(filters['country_id'])
-            if 'city_id' in filters and filters['city_id'] is not None:
+            if 'city_id' in filters and filters['city_id'] is not None: # Retained for completeness
                 conditions.append("c.city_id = ?")
                 q_params.append(filters['city_id'])
+
+            # Date range filters for created_at
+            if 'created_at_start' in filters and filters['created_at_start']:
+                conditions.append("c.created_at >= ?")
+                # Ensure the date string includes time if DB stores full timestamp, or adjust query/DB function
+                # For YYYY-MM-DD, append time to include the whole day.
+                q_params.append(filters['created_at_start'] + "T00:00:00Z")
+            if 'created_at_end' in filters and filters['created_at_end']:
+                conditions.append("c.created_at <= ?")
+                q_params.append(filters['created_at_end'] + "T23:59:59Z")
+
 
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
@@ -439,7 +456,7 @@ class ClientsCRUD(GenericCRUD):
             cursor.execute(query, q_params)
             return [dict(row) for row in cursor.fetchall()]
         except sqlite3.Error as e:
-            logging.error(f"Failed to get all clients with details: {e}")
+            logging.error(f"Failed to get all clients with details: {e}", exc_info=True)
             return []
 
     @_manage_conn
@@ -470,7 +487,7 @@ class ClientsCRUD(GenericCRUD):
             row = cursor.fetchone()
             return row['active_count'] if row else 0
         except sqlite3.Error as e:
-            logging.error(f"Failed to get active clients count: {e}")
+            logging.error(f"Failed to get active clients count: {e}", exc_info=True)
             return 0
 
     @_manage_conn
@@ -506,7 +523,7 @@ class ClientsCRUD(GenericCRUD):
             cursor.execute(sql)
             return [dict(row) for row in cursor.fetchall()]
         except sqlite3.Error as e:
-            logging.error(f"Failed to get client counts by country: {e}")
+            logging.error(f"Failed to get client counts by country: {e}", exc_info=True)
             return []
 
     @_manage_conn
@@ -543,7 +560,7 @@ class ClientsCRUD(GenericCRUD):
             cursor.execute(sql)
             return [dict(row) for row in cursor.fetchall()]
         except sqlite3.Error as e:
-            logging.error(f"Failed to get client segmentation by city: {e}")
+            logging.error(f"Failed to get client segmentation by city: {e}", exc_info=True)
             return []
 
     @_manage_conn
@@ -576,7 +593,7 @@ class ClientsCRUD(GenericCRUD):
             cursor.execute(sql)
             return [dict(row) for row in cursor.fetchall()]
         except sqlite3.Error as e:
-            logging.error(f"Failed to get client segmentation by status: {e}")
+            logging.error(f"Failed to get client segmentation by status: {e}", exc_info=True)
             return []
 
     @_manage_conn
@@ -608,7 +625,7 @@ class ClientsCRUD(GenericCRUD):
             cursor.execute(sql)
             return [dict(row) for row in cursor.fetchall()]
         except sqlite3.Error as e:
-            logging.error(f"Failed to get client segmentation by category: {e}")
+            logging.error(f"Failed to get client segmentation by category: {e}", exc_info=True)
             return []
 
     @_manage_conn
@@ -664,7 +681,7 @@ class ClientsCRUD(GenericCRUD):
             cursor.execute(sql, params)
             return [dict(row) for row in cursor.fetchall()]
         except sqlite3.Error as e:
-            logging.error(f"Failed to get clients by archival status (is_archived={is_archived}): {e}")
+            logging.error(f"Failed to get clients by archival status (is_archived={is_archived}): {e}", exc_info=True)
             return []
 
     @_manage_conn
@@ -723,7 +740,7 @@ class ClientsCRUD(GenericCRUD):
                     clients_by_country_map[country] = []
                 clients_by_country_map[country].append(client_detail)
         except sqlite3.Error as e:
-            logging.error(f"Failed to get active clients per country: {e}")
+            logging.error(f"Failed to get active clients per country: {e}", exc_info=True)
         return clients_by_country_map
 
     # --- ClientNotes CRUD ---
@@ -751,7 +768,7 @@ class ClientsCRUD(GenericCRUD):
             cursor.execute(sql, (client_id, note_text, user_id, now))
             return {'success': True, 'note_id': cursor.lastrowid}
         except sqlite3.Error as e:
-            logging.error(f"Failed to add client note for client {client_id}: {e}")
+            logging.error(f"Failed to add client note for client {client_id}: {e}", exc_info=True)
             return {'success': False, 'error': str(e)}
 
     @_manage_conn
@@ -774,7 +791,7 @@ class ClientsCRUD(GenericCRUD):
             cursor.execute(sql, (client_id,))
             return [dict(row) for row in cursor.fetchall()]
         except sqlite3.Error as e:
-            logging.error(f"Failed to get client notes for client {client_id}: {e}")
+            logging.error(f"Failed to get client notes for client {client_id}: {e}", exc_info=True)
             return []
 
     @_manage_conn

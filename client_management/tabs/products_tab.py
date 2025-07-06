@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
     QMessageBox, QApplication, QInputDialog
 )
 from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QLocale # Added QLocale
 from PyQt5.QtWidgets import QDialog
 import os # For path operations
 import uuid # For unique filenames
@@ -56,72 +56,122 @@ class ProductsTab(QWidget):
         logging.info("ProductsTab._setup_ui: Starting setup for Products Tab Structure...")
         products_layout = QVBoxLayout(self)
 
-        # Product Filters
-        product_filters_layout = QHBoxLayout()
-        product_filters_layout.addWidget(QLabel(self.tr("Filtrer par langue:")))
+        products_layout.setSpacing(10)
+
+        # Filters and Action Buttons Bar
+        top_bar_layout = QHBoxLayout()
+        top_bar_layout.setSpacing(8)
+
+        filter_lang_label = QLabel(self.tr("Langue:"))
+        filter_lang_label.setStyleSheet("font-weight: bold;")
+        top_bar_layout.addWidget(filter_lang_label)
         self.product_lang_filter_combo = QComboBox()
-        self.product_lang_filter_combo.addItem(self.tr("All Languages"), None)
-        for lang_code in SUPPORTED_LANGUAGES: # Use imported SUPPORTED_LANGUAGES
-             self.product_lang_filter_combo.addItem(self.tr(f"{lang_code}"), lang_code)
+        self.product_lang_filter_combo.setMinimumWidth(100)
+        self.product_lang_filter_combo.setStyleSheet("QComboBox { padding: 4px; }")
+        self.product_lang_filter_combo.addItem(self.tr("Toutes"), None) # "All Languages" -> "Toutes"
+        for lang_code in SUPPORTED_LANGUAGES:
+             self.product_lang_filter_combo.addItem(self.tr(f"{lang_code.upper()}"), lang_code) # Display lang code in upper for distinction
         self.product_lang_filter_combo.currentTextChanged.connect(self.load_products)
-        product_filters_layout.addWidget(self.product_lang_filter_combo)
+        top_bar_layout.addWidget(self.product_lang_filter_combo)
 
-        product_filters_layout.addWidget(QLabel(self.tr("Filtrer par commande:")))
+        filter_cmd_label = QLabel(self.tr("Commande:"))
+        filter_cmd_label.setStyleSheet("font-weight: bold;")
+        top_bar_layout.addWidget(filter_cmd_label)
         self.product_commande_filter_combo = QComboBox()
-        # Items will be loaded by _load_commande_filter
+        self.product_commande_filter_combo.setMinimumWidth(200)
+        self.product_commande_filter_combo.setStyleSheet("QComboBox { padding: 4px; }")
         self.product_commande_filter_combo.currentTextChanged.connect(self.load_products)
-        product_filters_layout.addWidget(self.product_commande_filter_combo)
+        top_bar_layout.addWidget(self.product_commande_filter_combo)
 
-        product_filters_layout.addStretch()
-        products_layout.addLayout(product_filters_layout)
+        top_bar_layout.addStretch(1)
 
-        self.products_empty_label = QLabel(self.tr("Aucun produit ajouté pour ce client.\nCliquez sur '➕ Ajouter' pour commencer."))
+        self.add_product_btn = QPushButton(QIcon(":/icons/link.svg"), self.tr("Lier Produit Existant"))
+        self.add_product_btn.setObjectName("primaryButton")
+        self.add_product_btn.setToolTip(self.tr("Lier un produit existant du catalogue à ce client/commande"))
+        self.add_product_btn.clicked.connect(self.add_product) # This should open ProductDialog to select existing
+        top_bar_layout.addWidget(self.add_product_btn)
+
+        self.add_new_global_product_btn = QPushButton(QIcon(":/icons/package.svg"), self.tr("Créer Produit Global"))
+        self.add_new_global_product_btn.setObjectName("secondaryButton")
+        self.add_new_global_product_btn.setToolTip(self.tr("Créer un nouveau produit dans le catalogue global et le lier"))
+        self.add_new_global_product_btn.clicked.connect(self.handle_add_new_global_product)
+        top_bar_layout.addWidget(self.add_new_global_product_btn)
+
+        self.manage_global_catalog_btn = QPushButton(QIcon(":/icons/book-open.svg"), self.tr("Gérer Catalogue Global"))
+        self.manage_global_catalog_btn.setObjectName("secondaryButton")
+        self.manage_global_catalog_btn.setToolTip(self.tr("Ouvrir le dialogue de gestion du catalogue global des produits (ajouter, modifier, supprimer des produits maîtres)."))
+        self.manage_global_catalog_btn.clicked.connect(self.handle_manage_global_catalog)
+        top_bar_layout.addWidget(self.manage_global_catalog_btn)
+
+        products_layout.addLayout(top_bar_layout)
+
+        self.products_empty_label = QLabel(self.tr("Aucun produit pour ce client/commande.\nUtilisez les boutons ci-dessus pour ajouter ou lier des produits."))
         self.products_empty_label.setAlignment(Qt.AlignCenter)
         font_products_empty = self.products_empty_label.font(); font_products_empty.setPointSize(10)
         self.products_empty_label.setFont(font_products_empty)
+        self.products_empty_label.setStyleSheet("color: #718096;")
         products_layout.addWidget(self.products_empty_label)
 
         self.products_table = QTableWidget()
-        self.products_table.setColumnCount(8) # ID, Name, Desc, Weight, Dims, Qty, Unit Price, Total Price
+        self.products_table.setObjectName("productsClientTable") # Added objectName
+        self.products_table.setColumnCount(8)
         self.products_table.setHorizontalHeaderLabels([
-            self.tr("ID"), self.tr("Nom Produit"), self.tr("Description (Ligne)"), # Nom de colonne modifié pour clarté
+            self.tr("ID Lien"), self.tr("Nom Produit"), self.tr("Description (Ligne)"),
             self.tr("Poids (Ligne)"), self.tr("Dimensions (Ligne)"),
-            self.tr("Qté"), self.tr("Prix Unitaire (Ligne)"), self.tr("Prix Total")
+            self.tr("Qté"), self.tr("Prix Unit. (Ligne)"), self.tr("Prix Total (Ligne)")
         ])
-        # Permettre l'édition directe pour certaines colonnes
-        # self.products_table.setEditTriggers(QAbstractItemView.DoubleClicked) # Garder, ou affiner avec des delegates
+        header_style = """
+            QHeaderView::section {
+                background-color: #4a5568; color: white; padding: 6px;
+                border: 1px solid #ddd; font-weight: bold; font-size: 9pt;
+            }
+        """
+        self.products_table.horizontalHeader().setStyleSheet(header_style)
+        self.products_table.verticalHeader().setVisible(False)
+        self.products_table.setAlternatingRowColors(True)
+        self.products_table.setSortingEnabled(True)
+
+        self.products_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents) # ID Lien (cpp_id)
+        self.products_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch) # Nom Produit
+        self.products_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch) # Description
+        self.products_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents) # Poids
+        self.products_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents) # Dimensions
+        self.products_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents) # Qté
+        self.products_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeToContents) # Prix Unit.
+        self.products_table.horizontalHeader().setSectionResizeMode(7, QHeaderView.ResizeToContents) # Prix Total
+        self.products_table.hideColumn(0) # ID Lien (client_project_product_id)
+
         self.products_table.itemChanged.connect(self.handle_product_item_changed)
+        self.products_table.itemSelectionChanged.connect(self.handle_product_selection_changed) # New connection
         self.products_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.products_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.products_table.hideColumn(0) # Hide internal product_id
+        self.products_table.setSelectionMode(QAbstractItemView.SingleSelection) # Ensure single selection for clarity
         products_layout.addWidget(self.products_table)
 
-        products_btn_layout = QHBoxLayout()
-        self.add_product_btn = QPushButton(self.tr("Ajouter")); self.add_product_btn.setIcon(QIcon(":/icons/plus-circle.svg"))
-        self.add_product_btn.setToolTip(self.tr("Ajouter un produit pour ce client/projet")); self.add_product_btn.clicked.connect(self.add_product)
-        products_btn_layout.addWidget(self.add_product_btn)
+        # Bottom action buttons (Edit Line, Remove Line, Generate Proforma)
+        bottom_actions_layout = QHBoxLayout()
+        bottom_actions_layout.setSpacing(10)
 
-        self.edit_product_btn = QPushButton(self.tr("Modifier")); self.edit_product_btn.setIcon(QIcon(":/icons/pencil.svg"))
-        self.edit_product_btn.setToolTip(self.tr("Modifier le produit sélectionné")); self.edit_product_btn.clicked.connect(self.edit_product)
-        products_btn_layout.addWidget(self.edit_product_btn)
+        self.edit_product_btn = QPushButton(QIcon(":/icons/edit-2.svg"), self.tr("Modifier Ligne"))
+        self.edit_product_btn.setObjectName("actionButton") # Generic style for non-primary/danger
+        self.edit_product_btn.setToolTip(self.tr("Modifier les détails de la ligne produit sélectionnée (quantité, prix spécifique, etc.)"))
+        self.edit_product_btn.clicked.connect(self.edit_product)
+        bottom_actions_layout.addWidget(self.edit_product_btn)
 
-        self.remove_product_btn = QPushButton(self.tr("Supprimer")); self.remove_product_btn.setIcon(QIcon(":/icons/trash.svg"))
-        self.remove_product_btn.setToolTip(self.tr("Supprimer le produit sélectionné de ce client/projet")); self.remove_product_btn.setObjectName("dangerButton"); self.remove_product_btn.clicked.connect(self.remove_product)
-        products_btn_layout.addWidget(self.remove_product_btn)
+        self.remove_product_btn = QPushButton(QIcon(":/icons/trash-2.svg"), self.tr("Supprimer Ligne"))
+        self.remove_product_btn.setObjectName("dangerButton")
+        self.remove_product_btn.setToolTip(self.tr("Supprimer la ligne produit sélectionnée de ce client/commande"))
+        self.remove_product_btn.clicked.connect(self.remove_product)
+        bottom_actions_layout.addWidget(self.remove_product_btn)
 
-        self.generate_proforma_btn = QPushButton(self.tr("Générer Proforma")); self.generate_proforma_btn.setIcon(QIcon(":/icons/file-plus.svg")) # Placeholder icon
-        self.generate_proforma_btn.setToolTip(self.tr("Générer une facture proforma pour les produits listés (filtrés)."))
+        bottom_actions_layout.addStretch(1) # Push proforma button to the right
+
+        self.generate_proforma_btn = QPushButton(QIcon(":/icons/file-text.svg"), self.tr("Générer Proforma"))
+        self.generate_proforma_btn.setObjectName("secondaryButton")
+        self.generate_proforma_btn.setToolTip(self.tr("Générer une facture proforma pour les produits actuellement affichés."))
         self.generate_proforma_btn.clicked.connect(self.handle_generate_proforma)
-        products_btn_layout.addWidget(self.generate_proforma_btn)
+        bottom_actions_layout.addWidget(self.generate_proforma_btn)
 
-        products_btn_layout.addStretch() # Add some space before new button if desired
-
-        self.add_new_global_product_btn = QPushButton(self.tr("➕ Nouveau Produit Global"))
-        self.add_new_global_product_btn.setToolTip(self.tr("Ajouter un nouveau produit global et le lier à ce client."))
-        self.add_new_global_product_btn.clicked.connect(self.handle_add_new_global_product)
-        products_btn_layout.addWidget(self.add_new_global_product_btn)
-
-        products_layout.addLayout(products_btn_layout)
+        products_layout.addLayout(bottom_actions_layout)
 
     def _load_commande_filter(self):
         self.product_commande_filter_combo.clear()
@@ -266,17 +316,22 @@ class ProductsTab(QWidget):
                     self.products_table.setItem(row, 4, dims_item)
 
                     # Column 5: Qté - Editable
-                    qty_item = QTableWidgetItem(str(qty))
+                    locale = QLocale()
+                    qty_item = QTableWidgetItem(locale.toString(qty)) # Format quantity
                     qty_item.setFlags(qty_item.flags() | Qt.ItemIsEditable)
                     self.products_table.setItem(row, 5, qty_item)
 
                     # Column 6: Prix Unitaire (Ligne / Base) - Editable
-                    unit_price_item = QTableWidgetItem(f"{display_unit_price:.2f}")
+                    # Assuming display_unit_price is float
+                    unit_price_str = locale.toString(display_unit_price, 'f', 2)
+                    unit_price_item = QTableWidgetItem(unit_price_str)
                     unit_price_item.setFlags(unit_price_item.flags() | Qt.ItemIsEditable)
                     self.products_table.setItem(row, 6, unit_price_item)
 
                     # Column 7: Prix Total - Non-editable
-                    total_price_item = QTableWidgetItem(f"{total_price:.2f} €") # Assuming Euro
+                    # Assuming total_price is float, currency symbol hardcoded for now
+                    total_price_str = locale.toString(total_price, 'f', 2)
+                    total_price_item = QTableWidgetItem(f"{total_price_str} €")
                     total_price_item.setFlags(total_price_item.flags() & ~Qt.ItemIsEditable)
                     self.products_table.setItem(row, 7, total_price_item)
         except Exception as e:
@@ -379,18 +434,28 @@ class ProductsTab(QWidget):
                             unit_price = price_override if price_override is not None else float(updated_item_data.get('base_unit_price', 0)) # Clé correcte pour prix de base
                             total_price = qty * unit_price
                             total_price_item = self.products_table.item(row, 7)
+                            locale = QLocale()
+                            total_price_str = locale.toString(total_price, 'f', 2)
                             if total_price_item:
-                                total_price_item.setText(f"{total_price:.2f} €")
+                                total_price_item.setText(f"{total_price_str} €")
                             else: # Should not happen if table is correctly populated
-                                self.products_table.setItem(row, 7, QTableWidgetItem(f"{total_price:.2f} €"))
+                                self.products_table.setItem(row, 7, QTableWidgetItem(f"{total_price_str} €"))
                         else:
+                            logging.warning(f"Failed to refetch item {link_id} after update for total price recalculation.")
                             self.load_products() # Fallback to full reload if fetching updated item fails
-                else:
-                    QMessageBox.warning(self, self.tr("Échec"), self.tr("Impossible de mettre à jour le produit."))
+                else: # CRUD update_client_project_product returned False
+                    if self.notification_manager:
+                        self.notification_manager.show_notification(
+                            self.tr("Échec de la Mise à Jour"),
+                            self.tr("Impossible de sauvegarder les modifications du produit dans la base de données."),
+                            'ERROR'
+                        )
+                    else:
+                        QMessageBox.warning(self, self.tr("Échec"), self.tr("Impossible de mettre à jour le produit."))
                     self.load_products() # Revert
         except Exception as e:
             logging.error(f"Error in handle_product_item_changed for link_id {link_id}: {e}", exc_info=True)
-            QMessageBox.critical(self, self.tr("Erreur"), self.tr("Une erreur est survenue lors de la mise à jour."))
+            QMessageBox.critical(self, self.tr("Erreur"), self.tr("Une erreur est survenue lors de la mise à jour du produit."))
             self.load_products() # Revert to known state
         finally:
             self.products_table.blockSignals(False)
@@ -638,14 +703,31 @@ class ProductsTab(QWidget):
 
     def apply_permissions_to_tab(self, can_link_products: bool):
         """Applies permissions to buttons within this tab."""
+        # P_LINK_PRODUCTS_TO_CLIENT for client-specific linking actions
         self.add_product_btn.setEnabled(can_link_products)
-        self.edit_product_btn.setEnabled(can_link_products) # Also depends on selection
-        self.remove_product_btn.setEnabled(can_link_products) # Also depends on selection
+        self.edit_product_btn.setEnabled(can_link_products)
+        self.remove_product_btn.setEnabled(can_link_products)
 
-        # Update button states based on selection as well (if needed)
-        # For now, edit/remove are primarily permission-gated then selection-gated by their handlers.
-        # If table had direct editing, set it read-only:
-        # self.products_table.setEditTriggers(QAbstractItemView.NoEditTriggers if not can_link_products else QAbstractItemView.DoubleClicked)
+        # P_MANAGE_GLOBAL_PRODUCTS for global catalog management
+        # P_VIEW_GLOBAL_PRODUCTS for viewing (button might still be visible but dialog actions restricted)
+        from auth.permissions import has_permission, P_MANAGE_GLOBAL_PRODUCTS, P_VIEW_GLOBAL_PRODUCTS
+        role_name = self.current_user_info.get('role_name')
+
+        # Visibility of the "Gérer Catalogue Global" button could be tied to P_VIEW_GLOBAL_PRODUCTS,
+        # while actions inside the dialog are gated by P_MANAGE_GLOBAL_PRODUCTS.
+        # Or, simplify and only show if can manage. Let's go with manage for now.
+        can_manage_global_catalog = has_permission(role_name, P_MANAGE_GLOBAL_PRODUCTS)
+        self.manage_global_catalog_btn.setEnabled(can_manage_global_catalog)
+        self.add_new_global_product_btn.setEnabled(can_manage_global_catalog) # Creating a new global product is part of managing
+
+        # Inline editing permissions (already handled by Qt.ItemIsEditable flags set during load_products)
+        # If we wanted to disable inline editing based on permission:
+        # has_edit_permission = can_link_products # Or a more specific one
+        # if not has_edit_permission:
+        #     self.products_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        # else:
+        #     self.products_table.setEditTriggers(QAbstractItemView.AllEditTriggers) # Or specific like DoubleClicked
+
 
     def refresh_tab_data(self):
         """Public method to refresh data, callable from parent if needed."""
@@ -1044,3 +1126,68 @@ class ProductsTab(QWidget):
             QMessageBox.critical(self, self.tr("Erreur Inconnue"), self.tr(f"Une erreur inattendue est survenue: {e}"))
         finally:
             QApplication.restoreOverrideCursor()
+
+    def handle_product_selection_changed(self):
+        selected_rows = self.products_table.selectionModel().selectedRows()
+        if not selected_rows:
+            if hasattr(self.parent_widget, 'product_selected_in_products_tab'):
+                self.parent_widget.product_selected_in_products_tab(None) # Signal no selection
+            return
+
+        row_index = selected_rows[0].row()
+        cpp_id_item = self.products_table.item(row_index, 0) # Hidden column with client_project_product_id
+        if not cpp_id_item:
+            if hasattr(self.parent_widget, 'product_selected_in_products_tab'):
+                self.parent_widget.product_selected_in_products_tab(None)
+            return
+
+        client_project_product_id = cpp_id_item.data(Qt.UserRole)
+        if client_project_product_id is None: # Should not happen if table is populated correctly
+            if hasattr(self.parent_widget, 'product_selected_in_products_tab'):
+                self.parent_widget.product_selected_in_products_tab(None)
+            return
+
+        try:
+            # Fetch the ClientProjectProducts entry to get the global product_id
+            # Assuming db_manager.get_client_project_product_by_id exists and returns a dict with 'product_id'
+            cpp_details = db_manager.get_client_project_product_by_id(client_project_product_id)
+            if cpp_details and cpp_details.get('product_id') is not None:
+                global_product_id = cpp_details.get('product_id')
+                if hasattr(self.parent_widget, 'product_selected_in_products_tab'):
+                    self.parent_widget.product_selected_in_products_tab(global_product_id)
+            else:
+                if hasattr(self.parent_widget, 'product_selected_in_products_tab'):
+                    self.parent_widget.product_selected_in_products_tab(None) # Product link or global ID not found
+        except Exception as e:
+            logging.error(f"Error fetching cpp_details for selection change: {e}", exc_info=True)
+            if hasattr(self.parent_widget, 'product_selected_in_products_tab'):
+                self.parent_widget.product_selected_in_products_tab(None)
+
+
+    def handle_manage_global_catalog(self):
+        # This method will be called when 'Gérer Catalogue Global' button is clicked.
+        # It should instantiate and show ManageGlobalProductsDialog.
+        # ManageGlobalProductsDialog needs current_user_info, config, notification_manager
+        # It no longer needs product_dialog_class as it uses GlobalProductEditDialog internally.
+        try:
+            from product_management.manage_global_products_dialog import ManageGlobalProductsDialog
+            dialog = ManageGlobalProductsDialog(
+                current_user_info=self.current_user_info,
+                config=self.config,
+                notification_manager=self.notification_manager,
+                parent=self # Parent for styling and modality
+            )
+            dialog.exec_() # Show as modal dialog
+            # After dialog closes, refresh products in this tab as global catalog might have changed
+            self.load_products()
+            # Also refresh products in dimension tab's combo box
+            if hasattr(self.parent_widget, 'product_dimensions_tab_ref') and \
+               hasattr(self.parent_widget.product_dimensions_tab_ref, 'load_products_for_dimension_tab'):
+                self.parent_widget.product_dimensions_tab_ref.load_products_for_dimension_tab()
+
+        except ImportError as ie:
+            logging.error(f"Failed to import ManageGlobalProductsDialog: {ie}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur Importation"), self.tr("Impossible de charger le module de gestion du catalogue."))
+        except Exception as e:
+            logging.error(f"Error opening global catalog manager: {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur Inattendue"), str(e))
