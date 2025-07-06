@@ -15,7 +15,7 @@ from db.cruds import invoices_crud # Direct import for clarity
 from invoicing.record_payment_dialog import RecordPaymentDialog # To be created/imported
 from utils.document_manager_logic import create_final_invoice_and_update_db
 from auth.permissions import has_permission, P_MANAGE_CLIENT_BILLING, P_VIEW_CLIENT_BILLING
-from utils.app_utils import get_document_full_path # For opening PDF
+from utils.file_utils import get_document_full_path # For opening PDF
 
 class BillingTab(QWidget):
     def __init__(self, client_info: dict, current_user_info: dict,
