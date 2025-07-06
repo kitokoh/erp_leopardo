@@ -233,6 +233,7 @@ class ProductsTab(QWidget):
             return
 
         update_data = {}
+        recalculate_total = False # Initialize recalculate_total
         original_value = None # To revert cell text on validation error for some fields
 
         # Store original text for potential revert on validation failure
@@ -264,6 +265,7 @@ class ProductsTab(QWidget):
                         self.load_products() # Revert
                         return
                     update_data['quantity'] = qty_val
+                    recalculate_total = True # Set flag
                 except ValueError:
                     QMessageBox.warning(self, self.tr("Donnée Invalide"), self.tr("La quantité doit être un nombre."))
                     self.load_products() # Revert
@@ -276,6 +278,7 @@ class ProductsTab(QWidget):
                         self.load_products() # Revert
                         return
                     update_data['unit_price_override'] = price_val
+                    recalculate_total = True # Set flag
                 except ValueError:
                     QMessageBox.warning(self, self.tr("Donnée Invalide"), self.tr("Le prix unitaire doit être un nombre."))
                     self.load_products() # Revert
