@@ -7,7 +7,7 @@ from datetime import datetime
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLineEdit,
     QPushButton, QDialogButtonBox, QMessageBox, QLabel,
-    QListWidget, QListWidgetItem, QComboBox, QGroupBox, QWidget, QApplication
+    QListWidget, QListWidgetItem, QComboBox, QGroupBox, QWidget, QApplication, QTextEdit
 )
 from PyQt5.QtGui import QIcon, QColor, QDesktopServices # QColor was used for item background (optional)
 from PyQt5.QtCore import Qt, QUrl # Qt is used for e.g. Qt.UserRole

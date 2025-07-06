@@ -61,4 +61,4 @@ SpeechRecognition==3.14.3 # Voice input, ensure it's truly used or move to optio
 # PyAudio # Dependency for SpeechRecognition with microphones
 Flask>=2.0.0 # For the license request server simulation
 requests>=2.20.0 # For making HTTP requests (e.g., to license server)
-machineid>=0.5.0 # For generating unique machine identifiers
+# machineid>=0.5.0 # For generating unique machine identifiers - Caused installation issues

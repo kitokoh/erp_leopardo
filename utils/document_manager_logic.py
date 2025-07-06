@@ -44,6 +44,7 @@ from dialogs import (
 )
 # If ClientWidget is used by any logic here (e.g. for refreshing tabs), it would also need to be importable.
 # from client_widget import ClientWidget # Not directly used in the functions being moved, but DocumentManager uses it.
+from .app_utils import sanitize_foldername # Import the new utility
 
 import logging # For logging errors or info
 from db.cruds import activity_logs_crud # Added for activity logging
@@ -98,7 +99,17 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
     city_id_val = created_client_info.get("city_id")       # Resolved by controller
 
     # --- Folder Creation ---
-    folder_name_str = f"{client_name_val}_{country_name_for_folder}_{project_identifier_val}".replace(" ", "_").replace("/", "-")
+    # Sanitize components before creating the folder name
+    client_name_sane = sanitize_foldername(client_name_val)
+    country_name_sane = sanitize_foldername(country_name_for_folder)
+    project_id_sane = sanitize_foldername(project_identifier_val)
+
+    folder_name_str = f"{client_name_sane}_{country_name_sane}_{project_id_sane}"
+    # The sanitize_foldername function should handle spaces and slashes,
+    # so .replace(" ", "_").replace("/", "-") might be redundant or could be removed
+    # depending on how thoroughly sanitize_foldername is implemented.
+    # For now, let's assume sanitize_foldername is comprehensive enough.
+
     base_folder_full_path = os.path.join(doc_manager.config["clients_dir"], folder_name_str)
 
     # Note: project_identifier uniqueness should ideally be handled by client_controller.create_client

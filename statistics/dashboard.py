@@ -896,7 +896,12 @@ class StatisticsDashboard(QWidget):
 
             for wedge in wedges:
                 wedge.set_picker(True)
-                wedge.set_pickradius(5)
+                # wedge.set_pickradius(5) # AttributeError: 'Wedge' object has no attribute 'set_pickradius'. Did you mean: 'set_radius'?
+                # Picking is usually enabled by set_picker(True). Radius affects the wedge size.
+                # If the intent was to make wedges easier to click, set_picker(True) is the main part.
+                # If a visual change of radius was intended, set_radius() would be used, but pickradius is not standard.
+                # For now, let's assume set_picker(True) is sufficient for clickability.
+                # If a hover effect or similar was intended by pickradius, that's a more complex change.
 
             self.last_pie_chart_labels = list(labels)
 
