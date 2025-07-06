@@ -7,7 +7,7 @@ from datetime import datetime
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLineEdit,
     QPushButton, QDialogButtonBox, QMessageBox, QLabel,
-    QListWidget, QListWidgetItem, QComboBox, QGroupBox, QWidget, QApplication
+    QListWidget, QListWidgetItem, QComboBox, QGroupBox, QWidget, QApplication, QTextEdit
 )
 from PyQt5.QtGui import QIcon, QColor, QDesktopServices # QColor was used for item background (optional)
 from PyQt5.QtCore import Qt, QUrl # Qt is used for e.g. Qt.UserRole
@@ -452,7 +452,7 @@ class CreateDocumentDialog(QDialog):
 
 
                 # Convert HTML to PDF
-                from html_to_pdf_util import convert_html_to_pdf # Local import
+                from utils.html_to_pdf_util import convert_html_to_pdf # Corrected import
                 pdf_output_filename = f"{output_filename_base}.pdf"
                 pdf_output_path = os.path.join(target_doc_folder, pdf_output_filename)
                 base_url_for_pdf = QUrl.fromLocalFile(os.path.dirname(template_file_on_disk_abs)).toString() # Base URL from original template location for relative assets
