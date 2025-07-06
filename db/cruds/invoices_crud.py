@@ -5,25 +5,38 @@ import os
 
 # Logic to import DATABASE_PATH from root config.py
 import sys
+import logging # Added logging
+
 # Correctly determine the application's root directory relative to invoices_crud.py
-# invoices_crud.py is in app/db/cruds/
-# config.py is in app/
-app_root_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if app_root_directory not in sys.path:
-    sys.path.insert(0, app_root_directory)
+# invoices_crud.py is in db/cruds/
+# config.py is in project root (parent of db/)
+# So, os.path.dirname(__file__) -> db/cruds
+# os.path.join(..., "..") -> db/
+# os.path.join(..., "..", "..") -> project_root/
+_current_file_dir = os.path.dirname(os.path.abspath(__file__))
+_project_root_dir = os.path.abspath(os.path.join(_current_file_dir, "..", ".."))
+
+if _project_root_dir not in sys.path:
+    sys.path.insert(0, _project_root_dir)
 
 try:
     from config import DATABASE_PATH
+    # logging.debug(f"invoices_crud: Successfully imported DATABASE_PATH: {DATABASE_PATH}")
 except ImportError as e:
-    # This is a critical failure if config.py or DATABASE_PATH is not found.
-    # For robustness in case this script is run in an unexpected context,
-    # we might still need a hard fallback, but the primary aim is to use config.py
-    print(f"CRITICAL: Could not import DATABASE_PATH from config.py: {e}. Falling back to a default path.")
-    DATABASE_PATH = os.path.join(app_root_directory, "app_data_config_fallback.db")
+    logging.error(f"CRITICAL: Could not import DATABASE_PATH from config.py (path: {_project_root_dir}): {e}. Falling back to a default path.", exc_info=True)
+    # Fallback path relative to this file if config.py isn't found at assumed project root
+    _db_dir_fallback = os.path.join(os.path.dirname(_current_file_dir), "data_fallback") # db/data_fallback/
+    os.makedirs(_db_dir_fallback, exist_ok=True)
+    DATABASE_PATH = os.path.join(_db_dir_fallback, "app_invoices_fallback.db")
+    logging.warning(f"invoices_crud: Using fallback DATABASE_PATH: {DATABASE_PATH}")
 finally:
-    # Clean up sys.path if the directory was added
-    if app_root_directory in sys.path and sys.path[0] == app_root_directory:
+    # Clean up sys.path if the directory was added by this specific import logic
+    if sys.path[0] == _project_root_dir: # Check if it's the one we added
         sys.path.pop(0)
+        # logging.debug(f"invoices_crud: Removed {_project_root_dir} from sys.path after import attempt.")
+
+
+logger = logging.getLogger(__name__) # Initialize logger for this module
 
 def _get_db_connection():
     """Returns a SQLite connection object to the database."""
@@ -51,7 +64,7 @@ def add_invoice(invoice_data: dict) -> str | None:
     required_fields = ['client_id', 'invoice_number', 'issue_date', 'due_date', 'total_amount', 'currency']
     for field in required_fields:
         if field not in invoice_data:
-            print(f"Error: Missing required field '{field}' in invoice_data.")
+            logger.error(f"Missing required field '{field}' in invoice_data for add_invoice.")
             conn.close()
             return None
 
@@ -82,7 +95,7 @@ def add_invoice(invoice_data: dict) -> str | None:
         conn.commit()
         return invoice_id
     except sqlite3.Error as e:
-        print(f"Database error in add_invoice: {e}")
+        logger.error(f"Database error in add_invoice: {e}", exc_info=True)
         conn.rollback()
         return None
     finally:
@@ -106,7 +119,7 @@ def get_invoice_by_id(invoice_id: str) -> dict | None:
         invoice = cursor.fetchone()
         return dict(invoice) if invoice else None
     except sqlite3.Error as e:
-        print(f"Database error in get_invoice_by_id: {e}")
+        logger.error(f"Database error in get_invoice_by_id for invoice_id {invoice_id}: {e}", exc_info=True)
         return None
     finally:
         conn.close()
@@ -129,7 +142,7 @@ def get_invoices_by_client_id(client_id: str) -> list[dict]:
         invoices = cursor.fetchall()
         return [dict(invoice) for invoice in invoices]
     except sqlite3.Error as e:
-        print(f"Database error in get_invoices_by_client_id: {e}")
+        logger.error(f"Database error in get_invoices_by_client_id for client_id {client_id}: {e}", exc_info=True)
         return []
     finally:
         conn.close()
@@ -152,7 +165,7 @@ def get_invoices_by_project_id(project_id: str) -> list[dict]:
         invoices = cursor.fetchall()
         return [dict(invoice) for invoice in invoices]
     except sqlite3.Error as e:
-        print(f"Database error in get_invoices_by_project_id: {e}")
+        logger.error(f"Database error in get_invoices_by_project_id for project_id {project_id}: {e}", exc_info=True)
         return []
     finally:
         conn.close()
@@ -185,9 +198,10 @@ def update_invoice(invoice_id: str, update_data: dict) -> bool:
             fields.append(f"{key} = ?")
             values.append(value)
         else:
-            print(f"Warning: Attempted to update non-allowed field '{key}' in update_invoice. Skipping.")
+            logger.warning(f"Attempted to update non-allowed field '{key}' in update_invoice for invoice_id {invoice_id}. Skipping.")
 
     if not fields: # No valid fields to update
+        logger.info(f"No valid fields provided to update_invoice for invoice_id {invoice_id}.")
         conn.close()
         return False
 
@@ -200,7 +214,7 @@ def update_invoice(invoice_id: str, update_data: dict) -> bool:
         conn.commit()
         return cursor.rowcount > 0
     except sqlite3.Error as e:
-        print(f"Database error in update_invoice: {e}")
+        logger.error(f"Database error in update_invoice for invoice_id {invoice_id}: {e}", exc_info=True)
         conn.rollback()
         return False
     finally:
@@ -224,7 +238,7 @@ def delete_invoice(invoice_id: str) -> bool:
         conn.commit()
         return cursor.rowcount > 0
     except sqlite3.Error as e:
-        print(f"Database error in delete_invoice: {e}")
+        logger.error(f"Database error in delete_invoice for invoice_id {invoice_id}: {e}", exc_info=True)
         conn.rollback()
         return False
     finally:
@@ -286,7 +300,7 @@ def list_all_invoices(filters: dict = None, sort_by: str = None, limit: int = No
         if sort_column in allowed_sort_columns and sort_direction.upper() in ['ASC', 'DESC']:
             base_sql += f" ORDER BY {sort_column} {sort_direction.upper()}"
         else:
-            print(f"Warning: Invalid sort_by parameter '{sort_by}'. Using default sorting.")
+            logger.warning(f"Invalid sort_by parameter '{sort_by}' in list_all_invoices. Using default sorting.")
             base_sql += " ORDER BY issue_date DESC" # Default sort
     else:
         base_sql += " ORDER BY issue_date DESC" # Default sort if not specified
@@ -306,7 +320,7 @@ def list_all_invoices(filters: dict = None, sort_by: str = None, limit: int = No
         invoices = cursor.fetchall()
         return [dict(invoice) for invoice in invoices]
     except sqlite3.Error as e:
-        print(f"Database error in list_all_invoices: {e}")
+        logger.error(f"Database error in list_all_invoices with filters {filters}, sort_by {sort_by}: {e}", exc_info=True)
         return []
     finally:
         conn.close()

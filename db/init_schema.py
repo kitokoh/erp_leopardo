@@ -2155,6 +2155,10 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_company_name ON Clients(company_name)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_category ON Clients(category)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_created_by_user_id ON Clients(created_by_user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_client_name ON Clients(client_name)") # Added
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_is_deleted ON Clients(is_deleted)") # Added
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_created_at ON Clients(created_at)") # Added
+
 
     # ReportConfigurations Indexes
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_reportconfigurations_report_name ON ReportConfigurations(report_name)")
@@ -2200,6 +2204,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_invoices_document_id ON Invoices(document_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_invoices_payment_status ON Invoices(payment_status)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_invoices_invoice_number ON Invoices(invoice_number)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_invoices_issue_date ON Invoices(issue_date)") # Added
     # TeamMembers
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_teammembers_user_id ON TeamMembers(user_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_teammembers_is_active ON TeamMembers(is_active)")
@@ -2216,6 +2221,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     # ClientProjectProducts
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientprojectproducts_product_id ON ClientProjectProducts(product_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientprojectproducts_client_project ON ClientProjectProducts(client_id, project_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_cpp_purchase_confirmed_at ON ClientProjectProducts(purchase_confirmed_at)") # Added
     # ActivityLog
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_activitylog_user_id ON ActivityLog(user_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_activitylog_created_at ON ActivityLog(created_at)")
@@ -2231,6 +2237,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_savtickets_client_id ON SAVTickets(client_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_savtickets_status_id ON SAVTickets(status_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_savtickets_assigned_technician_id ON SAVTickets(assigned_technician_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_savtickets_opened_at ON SAVTickets(opened_at)") # Added
     # ImportantDates
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_importantdates_date_value ON ImportantDates(date_value)")
     # Transporters

@@ -233,3 +233,33 @@ def get_product_usage_counts(conn: sqlite3.Connection = None) -> list[dict]:
     except sqlite3.Error as e:
         logger.error(f"DB error in get_product_usage_counts: {e}", exc_info=True)
         return []
+
+@_manage_conn
+def get_client_purchase_history(client_id: str, conn: sqlite3.Connection = None) -> list[dict]:
+    """
+    Retrieves the purchase history for a given client.
+    A purchase is defined as an entry in ClientProjectProducts with a non-null purchase_confirmed_at.
+    """
+    cursor = conn.cursor()
+    sql = """
+        SELECT
+            cpp.client_project_product_id,
+            p.product_name,
+            cpp.quantity,
+            cpp.serial_number, /* Assuming serial_number is on ClientProjectProducts */
+            cpp.purchase_confirmed_at AS purchase_date,
+            cpp.unit_price_override, /* For context if needed */
+            p.base_unit_price /* For context if needed */
+        FROM ClientProjectProducts cpp
+        JOIN Products p ON cpp.product_id = p.product_id
+        WHERE cpp.client_id = ? AND cpp.purchase_confirmed_at IS NOT NULL
+        ORDER BY cpp.purchase_confirmed_at DESC
+    """
+    try:
+        cursor.execute(sql, (client_id,))
+        history = [dict(row) for row in cursor.fetchall()]
+        logger.info(f"Retrieved {len(history)} purchase history items for client_id {client_id}")
+        return history
+    except sqlite3.Error as e:
+        logger.error(f"DB error in get_client_purchase_history for client ID {client_id}: {e}", exc_info=True)
+        return []
