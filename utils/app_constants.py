@@ -28,4 +28,5 @@ CONFIGURABLE_MODULES = [
     # For now, I will assume 'commande_management_action' is a core, non-configurable-via-this-list action,
     # as it was added directly in create_menus_main and not iterated through CONFIGURABLE_MODULES for its license check.
     # If it needs to be configurable like others, its entry should be added above.
+    {'key': 'module_commandes_management_enabled', 'name': 'commandes_management', 'action_attr': 'commande_management_action', 'widget_attr': 'commandes_dashboard_widget_instance', 'license_feature': FEATURE_COMMANDES_MANAGEMENT},
 ]

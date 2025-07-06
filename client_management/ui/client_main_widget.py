@@ -249,6 +249,7 @@ class ClientMainWidget(QWidget):
             self.archive_client_btn = QPushButton(self.tr("Archiver Client"))
             self.archive_client_btn.setIcon(QIcon(":/icons/trash.svg")) # Using trash as a placeholder for archive
             self.archive_client_btn.setObjectName("dangerButton")
+
             self.archive_client_btn.setToolTip(self.tr("Archiver ce client (soft delete)"))
             self.archive_client_btn.clicked.connect(self.handle_archive_client)
             self.action_buttons_layout.addWidget(self.archive_client_btn)
@@ -409,6 +410,7 @@ class ClientMainWidget(QWidget):
 
             self.prev_contact_button = QPushButton(self.tr("Précédent"))
             self.prev_contact_button.setIcon(QIcon(":/icons/chevron-left.svg")) # Using chevron
+
             self.prev_contact_button.setObjectName("paginationButton")
             self.prev_contact_button.setStyleSheet("padding: 5px 10px;")
             self.prev_contact_button.clicked.connect(self.prev_contact_page)
@@ -420,6 +422,7 @@ class ClientMainWidget(QWidget):
             self.next_contact_button = QPushButton(self.tr("Suivant"))
             self.next_contact_button.setIcon(QIcon(":/icons/chevron-right.svg")) # Using chevron
             self.next_contact_button.setLayoutDirection(Qt.RightToLeft)
+
             self.next_contact_button.setObjectName("paginationButton")
             self.next_contact_button.setStyleSheet("padding: 5px 10px;")
             self.next_contact_button.clicked.connect(self.next_contact_page)

@@ -689,6 +689,44 @@ class SettingsPage(QWidget):
         self.pg_dbname_input.setPlaceholderText(self.tr("Name of the PostgreSQL database"))
         pg_settings_layout.addRow(self.tr("PostgreSQL Database Name:"), self.pg_dbname_input)
 
+        # SSL Mode
+        self.pg_ssl_mode_combo = QComboBox()
+        self.pg_ssl_mode_combo.addItems(["disable", "allow", "prefer", "require", "verify-ca", "verify-full"])
+        self.pg_ssl_mode_combo.setToolTip(self.tr("SSL connection mode. 'disable' for no SSL, 'require' for mandatory SSL."))
+        pg_settings_layout.addRow(self.tr("PostgreSQL SSL Mode:"), self.pg_ssl_mode_combo)
+
+        # SSL Root Certificate
+        self.pg_ssl_rootcert_input = QLineEdit()
+        self.pg_ssl_rootcert_input.setPlaceholderText(self.tr("Path to SSL root CA certificate file (optional)"))
+        pg_ssl_rootcert_browse_btn = QPushButton(self.tr("Browse..."))
+        pg_ssl_rootcert_browse_btn.clicked.connect(lambda: self._browse_file(self.pg_ssl_rootcert_input, self.tr("Select SSL Root CA File")))
+        pg_ssl_rootcert_layout = QHBoxLayout()
+        pg_ssl_rootcert_layout.addWidget(self.pg_ssl_rootcert_input)
+        pg_ssl_rootcert_layout.addWidget(pg_ssl_rootcert_browse_btn)
+        pg_settings_layout.addRow(self.tr("PostgreSQL SSL Root CA:"), pg_ssl_rootcert_layout)
+
+        # SSL Client Certificate
+        self.pg_ssl_clientcert_input = QLineEdit()
+        self.pg_ssl_clientcert_input.setPlaceholderText(self.tr("Path to SSL client certificate file (optional)"))
+        pg_ssl_clientcert_browse_btn = QPushButton(self.tr("Browse..."))
+        pg_ssl_clientcert_browse_btn.clicked.connect(lambda: self._browse_file(self.pg_ssl_clientcert_input, self.tr("Select SSL Client Certificate File")))
+        pg_ssl_clientcert_layout = QHBoxLayout()
+        pg_ssl_clientcert_layout.addWidget(self.pg_ssl_clientcert_input)
+        pg_ssl_clientcert_layout.addWidget(pg_ssl_clientcert_browse_btn)
+        pg_settings_layout.addRow(self.tr("PostgreSQL SSL Client Cert:"), pg_ssl_clientcert_layout)
+
+        # SSL Client Key
+        self.pg_ssl_clientkey_input = QLineEdit()
+        self.pg_ssl_clientkey_input.setPlaceholderText(self.tr("Path to SSL client key file (optional)"))
+        pg_ssl_clientkey_browse_btn = QPushButton(self.tr("Browse..."))
+        pg_ssl_clientkey_browse_btn.clicked.connect(lambda: self._browse_file(self.pg_ssl_clientkey_input, self.tr("Select SSL Client Key File")))
+        pg_ssl_clientkey_layout = QHBoxLayout()
+        pg_ssl_clientkey_layout.addWidget(self.pg_ssl_clientkey_input)
+        pg_ssl_clientkey_layout.addWidget(pg_ssl_clientkey_browse_btn)
+        pg_settings_layout.addRow(self.tr("PostgreSQL SSL Client Key:"), pg_ssl_clientkey_layout)
+
+
+
         db_form_layout.addRow(self.pg_settings_group) # Add the group to the main DB form layout
         self.pg_settings_group.setVisible(False) # Initially hidden
 
@@ -1521,6 +1559,13 @@ class SettingsPage(QWidget):
         self.pg_password_input.setText(self.main_config.get("postgresql_password", ""))
         self.pg_dbname_input.setText(self.main_config.get("postgresql_dbname", ""))
 
+        # Load PostgreSQL SSL settings
+        self.pg_ssl_mode_combo.setCurrentText(self.main_config.get("postgresql_ssl_mode", "disable"))
+        self.pg_ssl_rootcert_input.setText(self.main_config.get("postgresql_ssl_rootcert", ""))
+        self.pg_ssl_clientcert_input.setText(self.main_config.get("postgresql_ssl_clientcert", ""))
+        self.pg_ssl_clientkey_input.setText(self.main_config.get("postgresql_ssl_clientkey", ""))
+
+
         self._toggle_pg_settings_visibility() # Ensure correct visibility on load
         print("Data & Backup tab settings loaded.")
 
@@ -1550,6 +1595,12 @@ class SettingsPage(QWidget):
         current_path = line_edit_target.text()
         start_dir = os.path.dirname(current_path) if current_path and os.path.exists(os.path.dirname(current_path)) else os.path.expanduser('~')
         file_path, _ = QFileDialog.getOpenFileName(self, self.tr("Select Database File"), start_dir, self.tr("Database Files (*.db *.sqlite *.sqlite3);;All Files (*.*)"))
+        if file_path: line_edit_target.setText(file_path)
+
+    def _browse_file(self, line_edit_target, dialog_title, file_filter="All Files (*.*)"):
+        current_path = line_edit_target.text()
+        start_dir = os.path.dirname(current_path) if current_path and os.path.exists(os.path.dirname(current_path)) else os.path.expanduser('~')
+        file_path, _ = QFileDialog.getOpenFileName(self, dialog_title, start_dir, file_filter)
         if file_path: line_edit_target.setText(file_path)
 
     def get_general_settings_data(self):
@@ -1591,7 +1642,14 @@ class SettingsPage(QWidget):
             "postgresql_port": self.pg_port_spinbox.value(),
             "postgresql_user": self.pg_user_input.text().strip(),
             "postgresql_password": self.pg_password_input.text(), # Password not stripped
-            "postgresql_dbname": self.pg_dbname_input.text().strip()
+            "postgresql_dbname": self.pg_dbname_input.text().strip(),
+
+            # PostgreSQL SSL Settings
+            "postgresql_ssl_mode": self.pg_ssl_mode_combo.currentText(),
+            "postgresql_ssl_rootcert": self.pg_ssl_rootcert_input.text().strip(),
+            "postgresql_ssl_clientcert": self.pg_ssl_clientcert_input.text().strip(),
+            "postgresql_ssl_clientkey": self.pg_ssl_clientkey_input.text().strip()
+
         }
 
     def get_document_templates_settings_data(self):

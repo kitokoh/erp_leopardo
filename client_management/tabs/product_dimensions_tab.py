@@ -91,6 +91,7 @@ class ProductDimensionsTab(QWidget):
                     display_text = f"{product_name}"
                     if product_code:
                         display_text += self.tr(" (Code: {0})").format(product_code)
+
                     if lang_code:
                         display_text += f" [{lang_code.upper()}]"
                     # display_text += f" - ID: {global_product_id}" # Keep ID for debugging if needed, but can be long for UI
@@ -124,6 +125,7 @@ class ProductDimensionsTab(QWidget):
             role_name = self.parent_widget.current_user_info.get('role_name')
             if role_name:
                 can_manage_product_data = has_permission(role_name, P_MANAGE_GLOBAL_PRODUCTS) # Changed permission
+
 
         self.edit_client_product_dimensions_button.setEnabled(selected_global_product_id is not None and can_manage_product_data)
 

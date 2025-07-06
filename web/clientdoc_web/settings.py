@@ -39,6 +39,14 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'drf_spectacular',
 
+    # Third-party apps
+    'rest_framework',
+    'rest_framework.authtoken',
+    'drf_spectacular',
+    'crispy_forms', # Added
+    'crispy_bootstrap5', # Added
+
+
     # Local apps
     # Will be added as 'apps.users.apps.UsersConfig', etc.
     'apps.common.apps.CommonConfig',
@@ -170,3 +178,13 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False, # We will serve it explicitly
     # OTHER SETTINGS
 }
+
+# Crispy Forms settings
+CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
+CRISPY_TEMPLATE_PACK = "bootstrap5"
+
+# Login/Logout redirect URLs
+LOGIN_URL = 'users:login' # Nom de l'URL de connexion
+LOGIN_REDIRECT_URL = 'dashboard:main' # Nom de l'URL du dashboard (à créer)
+LOGOUT_REDIRECT_URL = 'users:login' # Rediriger vers la page de connexion après logout
+

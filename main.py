@@ -270,6 +270,39 @@ def main():
     # Initialize database after logging and API server start attempt
     db.initialize_database(CONFIG) # Pass CONFIG here
 
+    # Apply Alembic migrations
+    try:
+        from alembic.config import Config as AlembicConfig
+        from alembic import command as alembic_command
+        import os # Ensure os is imported if not already
+
+        # Construct the path to alembic.ini relative to the project root
+        # PROJECT_ROOT is defined at the top of main.py
+        alembic_ini_path = os.path.join(PROJECT_ROOT, 'alembic.ini')
+
+        if not os.path.exists(alembic_ini_path):
+            logging.error(f"Alembic configuration file not found at: {alembic_ini_path}")
+        else:
+            logging.info(f"Found Alembic config at: {alembic_ini_path}")
+            alembic_cfg = AlembicConfig(alembic_ini_path)
+
+            # Set the script location programmatically to avoid issues with relative paths in alembic.ini
+            # when alembic is called from a different directory.
+            # The 'here' variable in alembic.ini refers to the location of alembic.ini itself.
+            # So, if alembic.ini correctly sets script_location = %(here)s/alembic, this might not be strictly needed
+            # but can make it more robust if alembic commands are run from various places.
+            # alembic_cfg.set_main_option("script_location", os.path.join(PROJECT_ROOT, "alembic"))
+
+            logging.info("Attempting to upgrade database schema to head using Alembic...")
+            alembic_command.upgrade(alembic_cfg, "head")
+            logging.info("Alembic upgrade head command completed.")
+    except ImportError:
+        logging.error("Alembic is not installed. Skipping database migrations. Please install alembic.")
+    except Exception as e_alembic:
+        logging.error(f"An error occurred during Alembic migration: {e_alembic}", exc_info=True)
+        # Depending on the severity, you might want to show an error to the user or exit.
+        # For now, just logging.
+
     # Set the database configuration for db.connection module
     # This must be done after app_setup.CONFIG is loaded and db structure might be initialized
     if hasattr(db, 'connection') and hasattr(db.connection, 'set_db_config'):

@@ -69,6 +69,7 @@ class BillingTab(QWidget):
         self.invoices_table = QTableWidget()
         self.invoices_table.setObjectName("invoicesTable")
         self.invoices_table.setColumnCount(6)
+
         self.invoices_table.setHorizontalHeaderLabels([
             self.tr("Numéro Facture"), self.tr("Date Facture"), self.tr("Montant Total"),
             self.tr("Statut Paiement"), self.tr("Date Paiement"), self.tr("Actions")
@@ -95,6 +96,7 @@ class BillingTab(QWidget):
         invoices_group_layout.addWidget(self.invoices_table)
         self.invoices_table.hide()
 
+
         self.refresh_invoices_btn = QPushButton(QIcon(":/icons/refresh-cw.svg"), self.tr("Actualiser Factures"))
         self.refresh_invoices_btn.setObjectName("secondaryButton")
         self.refresh_invoices_btn.clicked.connect(self.load_invoices_table)
@@ -102,6 +104,7 @@ class BillingTab(QWidget):
 
         billing_layout.addWidget(invoices_group)
         billing_layout.addStretch(1)
+
         self.setLayout(billing_layout)
 
     def load_invoices_table(self):
@@ -116,6 +119,7 @@ class BillingTab(QWidget):
 
         try:
             invoices_list = invoices_crud.get_invoices_by_client_id(client_id)
+
 
             if not invoices_list:
                 self.invoices_empty_label.show()
@@ -199,6 +203,7 @@ class BillingTab(QWidget):
             else: # Fallback if notification_manager is somehow None
                 QMessageBox.critical(self, self.tr("Erreur Chargement Factures"), str(e))
             self.invoices_empty_label.setText(self.tr("Erreur lors du chargement des factures."))
+
             self.invoices_empty_label.show()
             self.invoices_table.hide()
         finally:
@@ -312,6 +317,7 @@ class BillingTab(QWidget):
                 logging.error(f"Error recording payment for invoice {invoice_id}: {e}", exc_info=True)
                 QMessageBox.critical(self, self.tr("Erreur Critique"), str(e))
 
+
     def handle_generate_final_invoice(self):
         # This method seems to be mostly fine but ensure QDialog is imported if FinalInvoiceDataDialog needs it.
         # FinalInvoiceDataDialog is already imported.
@@ -326,6 +332,7 @@ class BillingTab(QWidget):
         if dialog.exec_() == QDialog.Accepted:
             invoice_data_from_dialog = dialog.get_invoice_data() # Renamed to avoid conflict
             if not invoice_data_from_dialog:
+
                 QMessageBox.warning(self, self.tr("Données Manquantes"), self.tr("Aucune donnée de facture à traiter."))
                 return
 
@@ -333,6 +340,7 @@ class BillingTab(QWidget):
                 QApplication.setOverrideCursor(Qt.WaitCursor)
                 # create_final_invoice_and_update_db is expected to handle PDF generation and DB entries for Invoice and ClientDocument
                 document_id, invoice_id = create_final_invoice_and_update_db(
+
                     client_info=self.client_info,
                     current_user_id=self.current_user_info.get('user_id'),
                     invoice_data=invoice_data_from_dialog, # Use the new variable name
@@ -351,6 +359,7 @@ class BillingTab(QWidget):
                     # Refresh documents tab if it exists on the parent
                     if hasattr(self.parent_widget, 'documents_tab_widget_ref') and \
                        hasattr(self.parent_widget.documents_tab_widget_ref, 'refresh_tab_data'):
+
                         self.parent_widget.documents_tab_widget_ref.refresh_tab_data()
                 else:
                     QMessageBox.warning(self, self.tr("Échec de Génération"), self.tr("La facture n'a pas pu être générée ou enregistrée."))
@@ -369,7 +378,11 @@ class BillingTab(QWidget):
         can_manage_billing = has_permission(role_name, P_MANAGE_CLIENT_BILLING)
         can_view_billing = has_permission(role_name, P_VIEW_CLIENT_BILLING) or can_manage_billing # Manage implies view
 
+
         self.generate_invoice_button.setEnabled(can_manage_billing)
+        if hasattr(self, 'invoices_table'): # Check if table exists
+            self.invoices_table.setEnabled(can_manage_billing) # Or a more granular view permission
+            self.refresh_invoices_btn.setEnabled(can_manage_billing) # If they can't see the table, no need to refresh
 
         if hasattr(self, 'invoices_table'):
             self.invoices_table.setVisible(can_view_billing) # Show/hide based on view permission
@@ -386,6 +399,7 @@ class BillingTab(QWidget):
             # Further granular control for action buttons in table can be done during load_invoices_table
             # For now, the "Enregistrer Paiement" button is already managed by can_manage_billing in handle_record_payment dialog
             # and view PDF could be P_VIEW_CLIENT_BILLING.
+
 
     def refresh_tab_data(self):
         """Called by parent to refresh data in this tab."""

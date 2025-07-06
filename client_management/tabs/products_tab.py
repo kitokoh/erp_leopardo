@@ -105,6 +105,7 @@ class ProductsTab(QWidget):
 
         products_layout.addLayout(top_bar_layout)
 
+
         self.products_empty_label = QLabel(self.tr("Aucun produit pour ce client/commande.\nUtilisez les boutons ci-dessus pour ajouter ou lier des produits."))
         self.products_empty_label.setAlignment(Qt.AlignCenter)
         font_products_empty = self.products_empty_label.font(); font_products_empty.setPointSize(10)
@@ -145,6 +146,7 @@ class ProductsTab(QWidget):
         self.products_table.itemSelectionChanged.connect(self.handle_product_selection_changed) # New connection
         self.products_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.products_table.setSelectionMode(QAbstractItemView.SingleSelection) # Ensure single selection for clarity
+
         products_layout.addWidget(self.products_table)
 
         # Bottom action buttons (Edit Line, Remove Line, Generate Proforma)
@@ -162,6 +164,7 @@ class ProductsTab(QWidget):
         self.remove_product_btn.setToolTip(self.tr("Supprimer la ligne produit sélectionnée de ce client/commande"))
         self.remove_product_btn.clicked.connect(self.remove_product)
         bottom_actions_layout.addWidget(self.remove_product_btn)
+
 
         bottom_actions_layout.addStretch(1) # Push proforma button to the right
 
