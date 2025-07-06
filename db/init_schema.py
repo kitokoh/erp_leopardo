@@ -911,25 +911,15 @@ def initialize_database(app_config):
         serial_number TEXT,
         purchase_confirmed_at TIMESTAMP,
         added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        added_by_user_id TEXT, -- Added column
-        FOREIGN KEY (client_id) REFERENCES Clients (client_id) ON DELETE CASCADE,
-        FOREIGN KEY (project_id) REFERENCES Projects (project_id) ON DELETE CASCADE,
-        product_id INTEGER NOT NULL,
-        quantity INTEGER NOT NULL DEFAULT 1,
-        unit_price_override REAL,
-        total_price_calculated REAL,
-        serial_number TEXT,
-        purchase_confirmed_at TIMESTAMP,
-        added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        added_by_user_id TEXT, -- Added column
-        client_specific_product_name TEXT, -- New field
-        line_description TEXT, -- New field
-        line_weight REAL, -- New field
-        line_dimensions_notes TEXT, -- New field
+        added_by_user_id TEXT,
+        client_specific_product_name TEXT,
+        line_description TEXT,
+        line_weight REAL,
+        line_dimensions_notes TEXT,
         FOREIGN KEY (client_id) REFERENCES Clients (client_id) ON DELETE CASCADE,
         FOREIGN KEY (project_id) REFERENCES Projects (project_id) ON DELETE CASCADE,
         FOREIGN KEY (product_id) REFERENCES Products (product_id) ON DELETE CASCADE,
-        FOREIGN KEY (added_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL, -- Added FK
+        FOREIGN KEY (added_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL,
         UNIQUE (client_id, project_id, product_id)
     )
     """)
@@ -963,40 +953,8 @@ def initialize_database(app_config):
         else:
             logging.info(f"DEBUG_INIT_DB: '{col_name}' column already exists in ClientProjectProducts.")
 
-    # Original checks for serial_number, purchase_confirmed_at, added_by_user_id are now part of the loop above.
-    # Kept the structure below for reference but the actual add operations are done in the loop.
-    # if 'serial_number' not in cpp_column_names_before_alter:
-        try:
-            logging.info("DEBUG_INIT_DB: 'serial_number' column missing in ClientProjectProducts. Attempting to add...")
-            cursor.execute("ALTER TABLE ClientProjectProducts ADD COLUMN serial_number TEXT")
-            logging.info("DEBUG_INIT_DB: Successfully ADDED 'serial_number' column to ClientProjectProducts.")
-        except sqlite3.Error as e_alter_cpp_sn:
-            logging.error(f"DEBUG_INIT_DB: FAILED to add 'serial_number' column to ClientProjectProducts: {e_alter_cpp_sn}")
-    else:
-        logging.info("DEBUG_INIT_DB: 'serial_number' column already exists in ClientProjectProducts.")
-
-    if 'purchase_confirmed_at' not in cpp_column_names_before_alter:
-        try:
-            logging.info("DEBUG_INIT_DB: 'purchase_confirmed_at' column missing in ClientProjectProducts. Attempting to add...")
-            cursor.execute("ALTER TABLE ClientProjectProducts ADD COLUMN purchase_confirmed_at TIMESTAMP")
-            logging.info("DEBUG_INIT_DB: Successfully ADDED 'purchase_confirmed_at' column to ClientProjectProducts.")
-        except sqlite3.Error as e_alter_cpp_pca:
-            logging.error(f"DEBUG_INIT_DB: FAILED to add 'purchase_confirmed_at' column to ClientProjectProducts: {e_alter_cpp_pca}")
-    else:
-        logging.info("DEBUG_INIT_DB: 'purchase_confirmed_at' column already exists in ClientProjectProducts.")
-
-    if 'added_by_user_id' not in cpp_column_names_before_alter:
-        try:
-            logging.info("DEBUG_INIT_DB: 'added_by_user_id' column missing in ClientProjectProducts. Attempting to add...")
-            # Note: SQLite versions before 3.20.0 might not support ADD COLUMN with FOREIGN KEY constraint directly.
-            # The REFERENCES clause here might be ignored by older SQLite versions silently during ALTER TABLE.
-            # The FK constraint in CREATE TABLE IF NOT EXISTS is the primary definition for new databases.
-            cursor.execute("ALTER TABLE ClientProjectProducts ADD COLUMN added_by_user_id TEXT REFERENCES Users(user_id) ON DELETE SET NULL")
-            logging.info("DEBUG_INIT_DB: Successfully ADDED 'added_by_user_id' column to ClientProjectProducts.")
-        except sqlite3.Error as e_alter_cpp_creator:
-            logging.error(f"DEBUG_INIT_DB: FAILED to add 'added_by_user_id' column to ClientProjectProducts: {e_alter_cpp_creator}")
-    else:
-        logging.info("DEBUG_INIT_DB: 'added_by_user_id' column already exists in ClientProjectProducts.")
+    # Original checks for serial_number, purchase_confirmed_at, added_by_user_id were redundant
+    # and have been removed as the loop columns_to_ensure handles them.
 
     # Log schema AFTER all attempts
     cursor.execute("PRAGMA table_info(ClientProjectProducts)")
