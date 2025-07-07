@@ -2875,6 +2875,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         set_setting('initial_data_seeded_version', '1.5_refactored_init_v2', conn=conn)
         _populate_default_cover_page_templates(conn_passed=conn)
 
+
         conn.commit()
         logging.info("DEBUG_INIT_DB: Direct data seeding within initialize_database committed.")
     except Exception as e_direct_seed:
@@ -2886,6 +2887,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     # --- Seeding for Accounting Module (using SQLAlchemy session) ---
     # This should be the last data seeding step within initialize_database if it uses SQLAlchemy,
     # ensuring all its tables are perfectly ready.
+
     try:
         logging.info("DEBUG_INIT_DB: Seeding Accounting Module Data using SQLAlchemy session.")
         from accounting import cruds as acc_cruds
@@ -2926,6 +2928,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     # conn_cal.row_factory = sqlite3.Row
     # cursor_cal = conn_cal.cursor()
     # try:
+
         cursor_cal.execute("""
         CREATE TABLE IF NOT EXISTS CompanyCalendarSettings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
