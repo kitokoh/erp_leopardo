@@ -2817,8 +2817,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     # Create all tables defined by SQLAlchemy models
     if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None and actual_main_engine is not None:
         try:
-            # The DROP TABLE logic has been moved to before the ProductDimensions table creation.
-            # It is now executed on actual_main_engine directly.
+
 
             logging.info("DEBUG_INIT_DB: Creating all tables for MainBase using SQLAlchemy actual_main_engine (checkfirst=True).")
             MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True)
