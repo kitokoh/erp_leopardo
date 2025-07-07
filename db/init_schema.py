@@ -2137,6 +2137,23 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
 
     # --- Indexes (Consolidated from ca.py and schema.py) ---
     # Clients
+    # === DIAGNOSTIC START: Check Clients table schema before creating status_id index ===
+    try:
+        logging.info("DEBUG_INIT_DB: Executing PRAGMA table_info(Clients) before creating idx_clients_status_id...")
+        pragma_cursor = conn.cursor()
+        pragma_cursor.execute("PRAGMA table_info(Clients);")
+        columns_info = pragma_cursor.fetchall()
+        if columns_info:
+            col_details = []
+            for col in columns_info:
+                col_details.append(f"Name: {col['name']}, Type: {col['type']}, PK: {col['pk']}, NotNull: {col['notnull']}, Default: {col['dflt_value']}")
+            logging.info(f"DEBUG_INIT_DB: PRAGMA table_info(Clients) output: [{'; '.join(col_details)}]")
+        else:
+            logging.warning("DEBUG_INIT_DB: PRAGMA table_info(Clients) returned no information. Table might not exist.")
+        pragma_cursor.close()
+    except Exception as e_pragma_clients:
+        logging.error(f"DEBUG_INIT_DB: Error executing PRAGMA table_info(Clients): {e_pragma_clients}", exc_info=True)
+    # === DIAGNOSTIC END ===
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_status_id ON Clients(status_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_country_id ON Clients(country_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_city_id ON Clients(city_id)")
