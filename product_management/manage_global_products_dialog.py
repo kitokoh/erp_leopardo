@@ -378,10 +378,26 @@ if __name__ == '__main__':
     # app.exec_() # Not needed if dialog.exec_() is blocking
 
     def handle_manage_equivalencies(self):
+        source_product_id_to_pass = None
+        selected_rows = self.products_table.selectionModel().selectedRows()
+        if selected_rows:
+            # La colonne 0 contient l'ID du produit stocké avec setData(Qt.UserRole)
+            # et aussi affiché comme texte.
+            product_id_item = self.products_table.item(selected_rows[0].row(), 0)
+            if product_id_item:
+                source_product_id_to_pass = product_id_item.data(Qt.UserRole)
+                if source_product_id_to_pass is None: # Fallback si UserRole n'est pas l'ID mais le texte
+                    try:
+                        source_product_id_to_pass = int(product_id_item.text())
+                    except ValueError:
+                         logging.warning("Could not parse product_id from table cell text in ManageGlobalProductsDialog.")
+                         source_product_id_to_pass = None # Assurer qu'il est None si invalide
+
         # Import ProductEquivalencyDialog here to avoid circular dependencies at module level if any
         try:
             from dialogs.product_equivalency_dialog import ProductEquivalencyDialog
-            eq_dialog = ProductEquivalencyDialog(parent=self) # Pass self as parent
+            # Passer source_product_id_to_pass au constructeur
+            eq_dialog = ProductEquivalencyDialog(source_product_id=source_product_id_to_pass, parent=self)
             eq_dialog.exec_() # Show as a modal dialog
             # No specific action after close for now, but could refresh product list if equivalencies impact display
         except ImportError:
