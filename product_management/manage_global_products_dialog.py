@@ -144,6 +144,15 @@ class ManageGlobalProductsDialog(QDialog):
         self.refresh_button.clicked.connect(self.load_global_products)
         action_buttons_layout.addWidget(self.refresh_button)
 
+        action_buttons_layout.addStretch(1) # Add stretch before equivalency button
+
+        self.equivalency_button = QPushButton(QIcon.fromTheme("transform-move"), self.tr("Gérer les Équivalences")) # Using a generic theme icon
+        self.equivalency_button.setObjectName("actionButton") # Or "secondaryButton"
+        self.equivalency_button.setToolTip(self.tr("Ouvrir le dialogue de gestion des équivalences de produits"))
+        self.equivalency_button.clicked.connect(self.handle_manage_equivalencies)
+        action_buttons_layout.addWidget(self.equivalency_button)
+
+
         main_layout.addLayout(action_buttons_layout)
 
         # Bottom Bar (Close)
@@ -367,3 +376,33 @@ if __name__ == '__main__':
     dialog.exec_()
 
     # app.exec_() # Not needed if dialog.exec_() is blocking
+
+    def handle_manage_equivalencies(self):
+        source_product_id_to_pass = None
+        selected_rows = self.products_table.selectionModel().selectedRows()
+        if selected_rows:
+            # La colonne 0 contient l'ID du produit stocké avec setData(Qt.UserRole)
+            # et aussi affiché comme texte.
+            product_id_item = self.products_table.item(selected_rows[0].row(), 0)
+            if product_id_item:
+                source_product_id_to_pass = product_id_item.data(Qt.UserRole)
+                if source_product_id_to_pass is None: # Fallback si UserRole n'est pas l'ID mais le texte
+                    try:
+                        source_product_id_to_pass = int(product_id_item.text())
+                    except ValueError:
+                         logging.warning("Could not parse product_id from table cell text in ManageGlobalProductsDialog.")
+                         source_product_id_to_pass = None # Assurer qu'il est None si invalide
+
+        # Import ProductEquivalencyDialog here to avoid circular dependencies at module level if any
+        try:
+            from dialogs.product_equivalency_dialog import ProductEquivalencyDialog
+            # Passer source_product_id_to_pass au constructeur
+            eq_dialog = ProductEquivalencyDialog(source_product_id=source_product_id_to_pass, parent=self)
+            eq_dialog.exec_() # Show as a modal dialog
+            # No specific action after close for now, but could refresh product list if equivalencies impact display
+        except ImportError:
+            logging.error("Failed to import ProductEquivalencyDialog.")
+            QMessageBox.critical(self, self.tr("Erreur"), self.tr("Le module de gestion des équivalences est introuvable."))
+        except Exception as e:
+            logging.error(f"Error opening ProductEquivalencyDialog: {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur Inattendue"), str(e))
