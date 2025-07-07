@@ -159,33 +159,35 @@
 
         <div class="details-section">
             <div class="company-details">
-                <h3>{{ labels.from_colon | default('De :') }}</h3>
+                <h3>{{ labels.from_seller | default('De :') }}</h3>
                 <p><strong>{{ seller.name | default('N/A') }}</strong></p>
                 <p>{{ seller.address | default('N/A') }}</p>
-                <p>{{ labels.phone_short | default('Téléphone') }} : {{ seller.phone | default('N/A') }}</p>
-                <p>{{ labels.email_short | default('Email') }} : {{ seller.email | default('N/A') }}</p>
-                <p>{{ labels.vat_id_short | default('N° TVA') }} : {{ seller.vat_id | default('N/A') }}</p>
-                <p>{{ labels.reg_number_short | default('N° de registre') }} : {{ seller.registration_number | default('N/A') }}</p>
+                <p>{{ labels.phone | default('Téléphone:') }} {{ seller.phone | default('N/A') }}</p>
+                <p>{{ labels.email | default('Email:') }} {{ seller.email | default('N/A') }}</p>
+                <p>{{ labels.vat_id | default('N° TVA:') }} {{ seller.vat_id | default('N/A') }}</p>
+                <p>{{ labels.reg_number | default('N° de registre:') }} {{ seller.registration_number | default('N/A') }}</p>
             </div>
 
             <div class="client-details">
-                <h3>{{ labels.to_colon | default('À :') }}</h3>
+                <h3>{{ labels.to_client | default('À :') }}</h3>
                 <p><strong>{{ client.company_name | default(client.representative_name) | default('N/A') }}</strong></p>
                 <p>{{ client.address | default('N/A') }}</p>
-                <p>{{ labels.contact_short | default('Contact') }} : {{ client.representative_name | default('N/A') }}</p>
-                <p>{{ labels.email_short | default('Email') }} : {{ client.email | default('N/A') }}</p>
-                <p>{{ labels.vat_id_short | default('N° TVA') }} : {{ client.vat_id | default('N/A') }}</p>
+                <p>{{ labels.contact | default('Contact:') }} {{ client.representative_name | default('N/A') }}</p>
+                <p>{{ labels.email | default('Email:') }} {{ client.email | default('N/A') }}</p>
+                <p>{{ labels.vat_id | default('N° TVA:') }} {{ client.vat_id | default('N/A') }}</p>
+
             </div>
         </div>
 
         <div class="invoice-meta">
-            <p><strong>{{ labels.proforma_invoice_num_colon | default('Facture Proforma N° :') }}</strong> {{ doc.proforma_id | default('N/A') }}</p>
-            <p><strong>{{ labels.date_colon | default('Date :') }}</strong> {{ doc.current_date | default('N/A') }}</p>
-            <p><strong>{{ labels.project_id_colon | default('ID Projet :') }}</strong> {{ project.identifier | default(project.name) | default('N/A') }}</p>
-            <p><strong>{{ labels.payment_terms_colon | default('Conditions de Paiement :') }}</strong> {{ doc.payment_terms | default('N/A') }}</p>
-            <p><strong>{{ labels.delivery_terms_colon | default('Conditions de Livraison :') }}</strong> {{ doc.delivery_terms | default('N/A') }}</p>
+            <p><strong>{{ labels.proforma_no | default('Facture Proforma N° :') }}</strong> {{ doc.proforma_id | default('N/A') }}</p>
+            <p><strong>{{ labels.date_label | default('Date :') }}</strong> {{ doc.current_date | default('N/A') }}</p>
+            <p><strong>{{ labels.project_id_label | default('ID Projet :') }}</strong> {{ project.identifier | default(project.name) | default('N/A') }}</p>
+            <p><strong>{{ labels.payment_terms_label | default('Conditions de Paiement :') }}</strong> {{ doc.payment_terms | default('N/A') }}</p>
+            <p><strong>{{ labels.delivery_terms_label | default('Conditions de Livraison :') }}</strong> {{ doc.delivery_terms | default('N/A') }}</p>
             {% if doc.incoterms and doc.incoterms != 'N/A' %}
-            <p><strong>{{ labels.incoterms_colon | default('Incoterms :') }}</strong> {{ doc.incoterms }}{% if doc.named_place_of_delivery and doc.named_place_of_delivery != 'N/A' %} - {{ doc.named_place_of_delivery }}{% endif %}</p>
+            <p><strong>{{ labels.incoterms | default('Incoterms :') }}</strong> {{ doc.incoterms }}{% if doc.named_place_of_delivery and doc.named_place_of_delivery != 'N/A' %} - {{ doc.named_place_of_delivery }}{% endif %}</p>
+
             {% endif %}
         </div>
 
@@ -235,12 +237,13 @@
         {{/if}}
 
         <div class="total-section">
-            <p>{{ labels.subtotal | default('Sous-total') }} : {{ doc.subtotal_amount }}</p>
+            <p>{{ labels.sub_total | default('Sous-total :') }} {{ doc.subtotal_amount }}</p>
             {{#if doc.discount_amount_raw}} <!-- Check raw value for existence/non-zero -->
             <p>{{ labels.discount | default('Remise') }} ({{ doc.discount_rate }}%) : -{{ doc.discount_amount }}</p>
             {{/if}}
-            <p>{{ labels.vat_label | default('TVA') }} ({{ doc.vat_rate }}%) : {{ doc.vat_amount }}</p>
-            <h3><strong>{{ labels.grand_total | default('Montant Total') }} : {{ doc.grand_total_amount }}</strong></h3>
+            <p>{{ labels.vat | default('TVA') }} ({{ doc.vat_rate }}%) : {{ doc.vat_amount }}</p>
+            <h3><strong>{{ labels.grand_total | default('Montant Total :') }}</strong> {{ doc.grand_total_amount }}</h3>
+
             <!-- {{#if doc.grand_total_amount_words}}
             <p>({{ doc.grand_total_amount_words }})</p>
             {{/if}} -->
@@ -248,25 +251,28 @@
 
         {{#if doc.additional_notes}} <!-- Assuming proforma_notes might be in additional_notes or a specific key -->
         <div class="notes-section" style="margin-top:20px; margin-bottom:20px; padding:10px; background-color:#f9f9f9; border-radius:5px;">
-            <h4>{{ labels.notes_colon | default('Notes :') }}</h4>
+            <h4>{{ labels.notes | default('Notes :') }}</h4>
+
             <p>{{ doc.additional_notes }}</p> <!-- Basic display, no complex replace or safe filters -->
         </div>
         {{/if}}
 
         <div class="footer" style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 15px;">
-            <p><strong>{{ labels.our_bank_details_colon | default('Nos coordonnées bancaires :') }}</strong></p>
-            <p>{{ labels.bank_name_colon | default('Banque:') }} {{ seller.bank_name }}</p>
-            <p>{{ labels.account_holder_colon | default('Titulaire du compte:') }} {{ seller.bank_account_holder_name }}</p>
-            <p>{{ labels.iban_colon | default('IBAN:') }} {{ seller.bank_iban }}</p>
-            <p>{{ labels.swift_bic_colon | default('SWIFT/BIC:') }} {{ seller.bank_swift_bic }}</p>
-            <p>{{ labels.bank_address_colon | default('Adresse de la banque:') }} {{ seller.bank_address }}</p>
+            <p><strong>{{ labels.bank_details_title | default('Nos coordonnées bancaires :') }}</strong></p>
+            <p>{{ labels.bank_name | default('Banque :') }} {{ seller.bank_name }}</p>
+            <p>{{ labels.account_holder | default('Titulaire du compte :') }} {{ seller.bank_account_holder_name }}</p>
+            <p>{{ labels.iban | default('IBAN :') }} {{ seller.bank_iban }}</p>
+            <p>{{ labels.swift_bic | default('SWIFT/BIC :') }} {{ seller.bank_swift_bic }}</p>
+            <p>{{ labels.bank_address | default('Adresse de la banque :') }} {{ seller.bank_address }}</p>
+
             <hr>
             {{#each doc.client_specific_notes}}
             <p>{{this}}</p> <!-- Assuming client_specific_notes is a list of strings -->
             {{/each}}
-            <p style="margin-top: 10px;"><em>{{ labels.proforma_is_not_invoice_note | default('Ceci est une facture proforma et ne constitue pas une demande de paiement.') }}</em></p>
-            <p><em>{{ labels.thank_you_note | default('Merci de votre confiance !') }}</em></p>
-            <p style="font-size: 0.8em; color: #999; margin-top: 20px;">{{ seller.name }} - {{ seller.address_full }} - {{ labels.vat_id_short | default('N° TVA') }}: {{ seller.vat_id }} - {{ labels.reg_number_short | default('N° de registre') }}: {{ seller.registration_number }}</p>
+            <p style="margin-top: 10px;"><em>{{ labels.proforma_notice | default('Ceci est une facture proforma et ne constitue pas une demande de paiement.') }}</em></p>
+            <p><em>{{ labels.thank_you_message | default('Merci de votre confiance !') }}</em></p>
+            <p style="font-size: 0.8em; color: #999; margin-top: 20px;">{{ seller.name }} - {{ seller.address_full }} - {{ labels.vat_id | default('N° TVA:') }} {{ seller.vat_id }} - {{ labels.reg_number | default('N° de registre:') }} {{ seller.registration_number }}</p>
+
         </div>
     </div>
 </body>

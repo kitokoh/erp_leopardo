@@ -47,6 +47,60 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
     # Ensure all context population logic is within the main try-except-finally block.
+
+def format_date(date_str_or_obj, language_code='en', date_format_iso="%Y-%m-%d"):
+    """
+    Formats a date string or datetime object into a localized string.
+    """
+    if not date_str_or_obj:
+        return "N/A"
+
+    date_obj = None
+    if isinstance(date_str_or_obj, str):
+        try:
+            # Handle ISO format with optional Z (UTC) or timezone offset
+            if 'T' in date_str_or_obj: # Full datetime string
+                 date_str_or_obj = date_str_or_obj.split('T')[0] # Take only date part
+
+            # Common date formats it might receive
+            possible_formats = [
+                date_format_iso, # YYYY-MM-DD
+                "%Y-%m-%dT%H:%M:%S.%fZ",
+                "%Y-%m-%dT%H:%M:%SZ",
+                "%Y-%m-%d %H:%M:%S",
+                 # Add other common formats if necessary
+            ]
+            parsed = False
+            for fmt in possible_formats:
+                try:
+                    date_obj = datetime.datetime.strptime(date_str_or_obj, fmt).date()
+                    parsed = True
+                    break
+                except ValueError:
+                    continue
+            if not parsed:
+                 logger.warning(f"Could not parse date string '{date_str_or_obj}' with known formats.")
+                 return date_str_or_obj # Return original string if parsing fails
+        except ValueError as e:
+            logger.warning(f"Error parsing date string '{date_str_or_obj}': {e}")
+            return date_str_or_obj # Return original string if parsing fails
+    elif isinstance(date_str_or_obj, datetime.date):
+        date_obj = date_str_or_obj
+    elif isinstance(date_str_or_obj, datetime.datetime):
+        date_obj = date_str_or_obj.date()
+    else:
+        logger.warning(f"Invalid date type for format_date: {type(date_str_or_obj)}")
+        return "N/A"
+
+    if language_code == "fr":
+        return date_obj.strftime("%d/%m/%Y")
+    elif language_code == "en":
+        return date_obj.strftime("%m/%d/%Y")
+    # Add more language-specific formats here if needed
+    # else: # Default format (ISO)
+    return date_obj.strftime(date_format_iso)
+
+
 def format_currency(amount, currency_symbol='€', decimal_places=2, language_code='en'):
     """
     Formats a numerical amount as a currency string, with basic localization.
@@ -473,7 +527,17 @@ def get_document_context(
             if product_for_display:
                 display_name = product_for_display.get("product_name", item_data.get("description_item"))
                 display_description = product_for_display.get("description", "")
-                # If it was a fallback to original product in different language, append language code
+
+                # Fallback pour la description si celle du produit équivalent est vide
+                # et que nous utilisons bien un équivalent (pas le produit original directement)
+                if not display_description and \
+                   product_for_display.get("product_id") != original_product_details.get("product_id") and \
+                   original_product_details:
+                    logger.info(f"Product ID {global_product_id}: Equivalent product {product_for_display.get('product_id')} has no description in lang {language_code}. Falling back to original product's description.")
+                    display_description = original_product_details.get("description", "")
+
+                # If it was a fallback to original product in different language for the name, append language code
+
                 if product_for_display.get("product_id") == global_product_id and \
                    product_for_display.get("language_code") != language_code:
                     display_name += f" ({product_for_display.get('language_code', '').upper()})"
