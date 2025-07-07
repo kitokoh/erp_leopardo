@@ -2927,7 +2927,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     # The following lines are removed:
     # conn_cal.row_factory = sqlite3.Row
     # cursor_cal = conn_cal.cursor()
-    # try:
+    try:
 
         cursor_cal.execute("""
         CREATE TABLE IF NOT EXISTS CompanyCalendarSettings (
