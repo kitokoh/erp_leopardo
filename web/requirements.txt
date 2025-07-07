@@ -1,0 +1,16 @@
+Django>=4.2,<5.0
+djangorestframework>=3.14,<3.15
+psycopg2-binary>=2.9,<3.0
+dj-database-url>=2.1,<2.2
+drf-spectacular>=0.26,<0.27
+whitenoise>=6.6,<6.7
+gunicorn>=21.2,<22.0
+django-crispy-forms>=2.0,<2.2
+crispy-bootstrap5>=0.7,<0.8
+requests>=2.31,<2.32 # Pour les appels API depuis les vues Django
+
+# Pour les variables d'environnement plus tard, si besoin
+# python-dotenv>=1.0.0
+# Pour les tâches asynchrones plus tard
+# celery>=5.3,<5.4
+# redis>=5.0,<5.1
