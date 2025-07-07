@@ -9,6 +9,7 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
 
 from db.cruds import templates_crud
+from .template_edit_dialog import TemplateEditDialog # Ajout de l'import
 # Supposer que APP_ROOT_DIR et config (pour templates_dir) sont accessibles
 # via le parent ou une configuration globale.
 
@@ -70,8 +71,20 @@ class TemplateManagementWidget(QWidget):
         self.view_content_button.setEnabled(False)
         action_layout.addWidget(self.view_content_button)
 
-        # TODO: Boutons pour Ajouter/Modifier/Supprimer template dans une phase ultérieure.
-        action_layout.addStretch()
+        action_layout.addStretch() # Garder un stretch avant les boutons d'action principaux
+
+        self.add_template_button = QPushButton(QIcon.fromTheme("document-new"), self.tr("Ajouter Nouveau Template"))
+        action_layout.addWidget(self.add_template_button)
+
+        self.edit_template_button = QPushButton(QIcon.fromTheme("document-edit"), self.tr("Modifier Template"))
+        self.edit_template_button.setEnabled(False)
+        action_layout.addWidget(self.edit_template_button)
+
+        self.delete_template_button = QPushButton(QIcon.fromTheme("edit-delete"), self.tr("Supprimer Template"))
+        self.delete_template_button.setObjectName("dangerButton")
+        self.delete_template_button.setEnabled(False)
+        action_layout.addWidget(self.delete_template_button)
+
         main_layout.addLayout(action_layout)
 
     def _connect_signals(self):
@@ -79,8 +92,13 @@ class TemplateManagementWidget(QWidget):
         self.lang_filter_combo.currentTextChanged.connect(self.load_templates)
         self.refresh_button.clicked.connect(self.load_templates)
         self.templates_table.itemSelectionChanged.connect(self._update_action_button_states)
+
         self.set_default_button.clicked.connect(self._on_set_default_clicked)
         self.view_content_button.clicked.connect(self._on_view_content_clicked)
+
+        self.add_template_button.clicked.connect(self._on_add_template_clicked)
+        self.edit_template_button.clicked.connect(self._on_edit_template_clicked)
+        self.delete_template_button.clicked.connect(self._on_delete_template_clicked)
 
     def _populate_filters(self):
         # Types
@@ -144,16 +162,19 @@ class TemplateManagementWidget(QWidget):
     def _update_action_button_states(self):
         has_selection = bool(self.templates_table.selectedItems())
         self.set_default_button.setEnabled(has_selection)
+        self.edit_template_button.setEnabled(has_selection)
+        self.delete_template_button.setEnabled(has_selection)
 
         can_view_content = False
         if has_selection:
             selected_row = self.templates_table.currentRow()
-            # Vérifier si la colonne 7 (Contenu en DB) est "Oui" ou si Fichier Base (col 4) a une valeur
-            has_db_content_item = self.templates_table.item(selected_row, 7)
-            base_file_item = self.templates_table.item(selected_row, 4)
-            if (has_db_content_item and has_db_content_item.text() == self.tr("Oui")) or \
-               (base_file_item and base_file_item.text()):
-                can_view_content = True
+            if selected_row >= 0: # S'assurer qu'une ligne est bien sélectionnée
+                # Vérifier si la colonne 7 (Contenu en DB) est "Oui" ou si Fichier Base (col 4) a une valeur
+                has_db_content_item = self.templates_table.item(selected_row, 7)
+                base_file_item = self.templates_table.item(selected_row, 4)
+                if (has_db_content_item and has_db_content_item.text() == self.tr("Oui")) or \
+                   (base_file_item and base_file_item.text()):
+                    can_view_content = True
         self.view_content_button.setEnabled(can_view_content)
 
 
@@ -231,6 +252,91 @@ class TemplateManagementWidget(QWidget):
         close_button.clicked.connect(dialog.accept)
         layout.addWidget(close_button)
         dialog.exec_()
+
+    def _on_add_template_clicked(self):
+        dialog = TemplateEditDialog(app_root_dir=self.app_root_dir, config=self.config, parent=self)
+        if dialog.exec_() == QDialog.Accepted:
+            data = dialog.get_data()
+
+            # created_by_user_id devrait être ajouté ici si current_user_info est disponible
+            # Pour l'instant, on suppose qu'il est optionnel ou géré autrement.
+            # data['created_by_user_id'] = self.current_user_info.get('user_id') # Si disponible
+
+            # raw_template_file_data est déjà en bytes si lu depuis fichier dans get_data,
+            # ou encodé en utf-8 si depuis QTextEdit.
+
+            new_template_id = templates_crud.add_template(data)
+            if new_template_id:
+                QMessageBox.information(self, self.tr("Succès"), self.tr("Nouveau modèle ajouté avec ID: {0}").format(new_template_id))
+                self.load_templates()
+            else:
+                QMessageBox.critical(self, self.tr("Erreur"), self.tr("Impossible d'ajouter le nouveau modèle."))
+
+
+    def _on_edit_template_clicked(self):
+        selected_rows = self.templates_table.selectionModel().selectedRows()
+        if not selected_rows:
+            QMessageBox.information(self, self.tr("Sélection Requise"), self.tr("Veuillez sélectionner un modèle à modifier."))
+            return
+
+        template_id = self.templates_table.item(selected_rows[0].row(), 0).data(Qt.UserRole)
+        if not template_id:
+            self.logger.error("Aucun ID de modèle trouvé pour la ligne sélectionnée.")
+            return
+
+        existing_template_data = templates_crud.get_template_by_id(template_id)
+        if not existing_template_data:
+            QMessageBox.warning(self, self.tr("Erreur"), self.tr("Données du modèle non trouvées pour l'ID {0}.").format(template_id))
+            return
+
+        dialog = TemplateEditDialog(template_data=existing_template_data, app_root_dir=self.app_root_dir, config=self.config, parent=self)
+        if dialog.exec_() == QDialog.Accepted:
+            updated_data = dialog.get_data()
+
+            # updated_by_user_id devrait être ajouté ici si current_user_info est disponible
+            # updated_data['updated_by_user_id'] = self.current_user_info.get('user_id') # Si disponible
+
+            success = templates_crud.update_template(template_id, updated_data)
+            if success:
+                QMessageBox.information(self, self.tr("Succès"), self.tr("Modèle ID {0} mis à jour.").format(template_id))
+                self.load_templates()
+            else:
+                QMessageBox.critical(self, self.tr("Erreur"), self.tr("Impossible de mettre à jour le modèle ID {0}.").format(template_id))
+
+    def _on_delete_template_clicked(self):
+        selected_rows = self.templates_table.selectionModel().selectedRows()
+        if not selected_rows:
+            QMessageBox.information(self, self.tr("Sélection Requise"), self.tr("Veuillez sélectionner un modèle à supprimer."))
+            return
+
+        template_id = self.templates_table.item(selected_rows[0].row(), 0).data(Qt.UserRole)
+        template_name = self.templates_table.item(selected_rows[0].row(), 1).text()
+        base_file_name = self.templates_table.item(selected_rows[0].row(), 4).text()
+
+
+        if not template_id:
+            self.logger.error("Aucun ID de modèle trouvé pour la suppression.")
+            return
+
+        reply = QMessageBox.question(self, self.tr("Confirmer Suppression"),
+                                     self.tr("Êtes-vous sûr de vouloir supprimer le modèle '{0}' (ID: {1}) ?\n"
+                                             "Ceci supprimera l'entrée de la base de données. "
+                                             "Si un fichier de base ('{2}') est associé, il ne sera PAS supprimé du disque automatiquement.").format(template_name, template_id, base_file_name or "N/A"),
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+
+        if reply == QMessageBox.Yes:
+            # Utiliser delete_template_and_get_file_info pour obtenir des infos si on veut informer sur le fichier
+            # Pour l'instant, utilisons juste delete_template
+            success = templates_crud.delete_template(template_id)
+            if success:
+                QMessageBox.information(self, self.tr("Succès"), self.tr("Modèle '{0}' supprimé de la base de données.").format(template_name))
+                self.load_templates()
+                if base_file_name:
+                    QMessageBox.information(self, self.tr("Information Fichier"),
+                                            self.tr("Le fichier '{0}' associé à ce modèle (si stocké sur disque et non en DB) n'a pas été supprimé du serveur. Veuillez le faire manuellement si nécessaire.").format(base_file_name))
+            else:
+                QMessageBox.critical(self, self.tr("Erreur"), self.tr("Impossible de supprimer le modèle ID {0}.").format(template_id))
+
 
     def tr(self, text, disambiguation=None, n=-1):
         return QApplication.translate("TemplateManagementWidget", text, disambiguation, n)
