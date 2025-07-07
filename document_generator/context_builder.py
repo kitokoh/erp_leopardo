@@ -47,6 +47,60 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
     # Ensure all context population logic is within the main try-except-finally block.
+
+def format_date(date_str_or_obj, language_code='en', date_format_iso="%Y-%m-%d"):
+    """
+    Formats a date string or datetime object into a localized string.
+    """
+    if not date_str_or_obj:
+        return "N/A"
+
+    date_obj = None
+    if isinstance(date_str_or_obj, str):
+        try:
+            # Handle ISO format with optional Z (UTC) or timezone offset
+            if 'T' in date_str_or_obj: # Full datetime string
+                 date_str_or_obj = date_str_or_obj.split('T')[0] # Take only date part
+
+            # Common date formats it might receive
+            possible_formats = [
+                date_format_iso, # YYYY-MM-DD
+                "%Y-%m-%dT%H:%M:%S.%fZ",
+                "%Y-%m-%dT%H:%M:%SZ",
+                "%Y-%m-%d %H:%M:%S",
+                 # Add other common formats if necessary
+            ]
+            parsed = False
+            for fmt in possible_formats:
+                try:
+                    date_obj = datetime.datetime.strptime(date_str_or_obj, fmt).date()
+                    parsed = True
+                    break
+                except ValueError:
+                    continue
+            if not parsed:
+                 logger.warning(f"Could not parse date string '{date_str_or_obj}' with known formats.")
+                 return date_str_or_obj # Return original string if parsing fails
+        except ValueError as e:
+            logger.warning(f"Error parsing date string '{date_str_or_obj}': {e}")
+            return date_str_or_obj # Return original string if parsing fails
+    elif isinstance(date_str_or_obj, datetime.date):
+        date_obj = date_str_or_obj
+    elif isinstance(date_str_or_obj, datetime.datetime):
+        date_obj = date_str_or_obj.date()
+    else:
+        logger.warning(f"Invalid date type for format_date: {type(date_str_or_obj)}")
+        return "N/A"
+
+    if language_code == "fr":
+        return date_obj.strftime("%d/%m/%Y")
+    elif language_code == "en":
+        return date_obj.strftime("%m/%d/%Y")
+    # Add more language-specific formats here if needed
+    # else: # Default format (ISO)
+    return date_obj.strftime(date_format_iso)
+
+
 def format_currency(amount, currency_symbol='€', decimal_places=2, language_code='en'):
     """
     Formats a numerical amount as a currency string, with basic localization.
@@ -427,41 +481,74 @@ def get_document_context(
             display_name = item_data.get("description_item") # Default to item's own description
             display_description = "" # CommandeItem might not have a separate long description field
             
-            # Try to get product details in the target language for this item
-            # This part needs robust multilingual product fetching logic.
-            # For now, using placeholder logic:
-            product_details_in_target_lang = None
+            # --- Product Name and Description Translation Logic ---
+            # target_language_code is the language selected by the user for the document.
+            # item_specific_lang_code is the language code stored on the CommandeItem itself (if any).
+            # language_code is the main language_code passed to get_document_context, typically same as target_language_code.
+
+            product_for_display = None # This will hold the product dict (original or equivalent) used for display details.
+
             if global_product_id:
-                # Ideal: products_crud.get_product_translation(global_product_id, target_lang_for_this_item, fallback_lang='en')
-                # Simplified for now:
-                global_product_base_info = get_product_by_id(global_product_id) # Gets default lang
-                if global_product_base_info:
-                    if global_product_base_info.get("language_code") == target_lang_for_this_item:
-                        product_details_in_target_lang = global_product_base_info
-                    else: # Try equivalents (simplified)
-                        equivalents = get_equivalent_products(global_product_id)
-                        if equivalents:
-                            for eq in equivalents:
-                                if eq.get("language_code") == target_lang_for_this_item:
-                                    product_details_in_target_lang = eq
+                original_product_details = get_product_by_id(global_product_id) # Get the product as stored in CommandeItems
+
+                if original_product_details:
+                    original_product_lang = original_product_details.get("language_code")
+
+                    if original_product_lang == language_code: # language_code is the target_language_code for the document
+                        product_for_display = original_product_details
+                        logger.info(f"Product ID {global_product_id}: Using original details in target language {language_code}.")
+                    else:
+                        logger.info(f"Product ID {global_product_id}: Original lang ({original_product_lang}) differs from target ({language_code}). Searching equivalents.")
+                        equivalent_products = get_equivalent_products(global_product_id)
+                        found_equivalent_in_target_lang = False
+                        if equivalent_products:
+                            for eq_product in equivalent_products:
+                                if eq_product.get("language_code") == language_code:
+                                    product_for_display = eq_product
+                                    logger.info(f"Product ID {global_product_id}: Found equivalent product (ID {eq_product.get('product_id')}) in target language {language_code}.")
+                                    found_equivalent_in_target_lang = True
                                     break
-                    if not product_details_in_target_lang: # Fallback to base if no translation found
-                         product_details_in_target_lang = global_product_base_info
-                         logger.warning(f"No translation for product {global_product_id} to lang {target_lang_for_this_item}. Using base: {global_product_base_info.get('name')}")
 
-                if product_details_in_target_lang:
-                    # Override item's description with product's name if item's description is empty or too generic
-                    if not display_name or display_name == product_details_in_target_lang.get("product_code"):
-                        display_name = product_details_in_target_lang.get("product_name", item_data.get("description_item"))
-                    display_description = product_details_in_target_lang.get("description", "")
+                        if not found_equivalent_in_target_lang:
+                            product_for_display = original_product_details # Fallback to original product
+                            logger.warning(f"Product ID {global_product_id}: No equivalent found in target language {language_code}. Using original details from lang {original_product_lang}.")
+                            # Optionally, add a note about the language mismatch to display_name or display_description later.
+                            # For example: display_name += f" ({original_product_lang.upper()})"
+                else:
+                    logger.warning(f"Product details not found for product_id {global_product_id} linked to item_id {item_data.get('item_id')}.")
+                    # Fallback: use item's own description if product is missing
+                    display_name = item_data.get("description_item", "Produit inconnu")
+                    display_description = ""
+            else: # No global_product_id linked to the item
+                logger.info(f"Item {item_data.get('item_id')} is a custom item (no product_id). Using item's description.")
+                display_name = item_data.get("description_item", "Article personnalisé")
+                display_description = ""
 
+            if product_for_display:
+                display_name = product_for_display.get("product_name", item_data.get("description_item"))
+                display_description = product_for_display.get("description", "")
+
+                # Fallback pour la description si celle du produit équivalent est vide
+                # et que nous utilisons bien un équivalent (pas le produit original directement)
+                if not display_description and \
+                   product_for_display.get("product_id") != original_product_details.get("product_id") and \
+                   original_product_details:
+                    logger.info(f"Product ID {global_product_id}: Equivalent product {product_for_display.get('product_id')} has no description in lang {language_code}. Falling back to original product's description.")
+                    display_description = original_product_details.get("description", "")
+
+                # If it was a fallback to original product in different language for the name, append language code
+                if product_for_display.get("product_id") == global_product_id and \
+                   product_for_display.get("language_code") != language_code:
+                    display_name += f" ({product_for_display.get('language_code', '').upper()})"
+
+            # --- End Product Name and Description Translation Logic ---
 
             quantity = Decimal(str(item_data.get("quantity", 1)))
-            unit_price_ht = Decimal(str(item_data.get("unit_price_ht", "0.00")))
-            total_item_ht = Decimal(str(item_data.get("total_item_ht", "0.00"))) # Use pre-calculated from DB
+            unit_price_ht = Decimal(str(item_data.get("unit_price_ht", "0.00"))) # Price comes from CommandeItem
+            total_item_ht = Decimal(str(item_data.get("total_item_ht", "0.00"))) # Total comes from CommandeItem
             calculated_subtotal_ht += total_item_ht
 
-            # Media links (similar to previous product logic)
+            # Media links (logic remains similar, but ensure it uses global_product_id if product_for_display is an equivalent)
             media_links_processed = []
             if global_product_id and app_root_dir and _module_config:
                 media_links_raw = get_media_links_for_product(global_product_id)
@@ -660,6 +747,17 @@ def get_document_context(
     # finally: # The conn variable is no longer managed at this level
         # if db_conn is None and conn:
             # conn.close()
+
+    # --- Custom Fields ---
+    # Check for custom fields in additional_data and add them to the context
+    if isinstance(additional_data, dict) and "custom_fields" in additional_data:
+        if isinstance(additional_data["custom_fields"], dict):
+            context["custom"] = additional_data["custom_fields"]
+            # Also add them to placeholders for simpler template engines if needed, prefixed
+            for cf_key, cf_value in additional_data["custom_fields"].items():
+                context["placeholders"][f"CUSTOM_{cf_key.upper()}"] = cf_value
+        else:
+            logger.warning("'custom_fields' in additional_data is not a dictionary. Skipping.")
 
     return context
 

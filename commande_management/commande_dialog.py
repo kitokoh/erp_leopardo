@@ -157,7 +157,8 @@ class CommandeDialog(QDialog):
             all_products = products_crud.get_all_products(filters={'is_active': True})
             if all_products:
                 for prod in sorted(all_products, key=lambda p: p.get('product_name', '').lower()):
-                    item_text = f"{prod.get('product_name', 'N/A')} ({prod.get('product_code', 'N/A')})"
+                    lang_code_display = prod.get('language_code', 'N/A').upper()
+                    item_text = f"{prod.get('product_name', 'N/A')} ({prod.get('product_code', 'N/A')}) [{lang_code_display}]"
                     item = QListWidgetItem(item_text)
                     item.setData(Qt.UserRole, prod) # Store full product dict
                     self.product_selection_list.addItem(item)

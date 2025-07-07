@@ -144,6 +144,15 @@ class ManageGlobalProductsDialog(QDialog):
         self.refresh_button.clicked.connect(self.load_global_products)
         action_buttons_layout.addWidget(self.refresh_button)
 
+        action_buttons_layout.addStretch(1) # Add stretch before equivalency button
+
+        self.equivalency_button = QPushButton(QIcon.fromTheme("transform-move"), self.tr("Gérer les Équivalences")) # Using a generic theme icon
+        self.equivalency_button.setObjectName("actionButton") # Or "secondaryButton"
+        self.equivalency_button.setToolTip(self.tr("Ouvrir le dialogue de gestion des équivalences de produits"))
+        self.equivalency_button.clicked.connect(self.handle_manage_equivalencies)
+        action_buttons_layout.addWidget(self.equivalency_button)
+
+
         main_layout.addLayout(action_buttons_layout)
 
         # Bottom Bar (Close)
@@ -367,3 +376,17 @@ if __name__ == '__main__':
     dialog.exec_()
 
     # app.exec_() # Not needed if dialog.exec_() is blocking
+
+    def handle_manage_equivalencies(self):
+        # Import ProductEquivalencyDialog here to avoid circular dependencies at module level if any
+        try:
+            from dialogs.product_equivalency_dialog import ProductEquivalencyDialog
+            eq_dialog = ProductEquivalencyDialog(parent=self) # Pass self as parent
+            eq_dialog.exec_() # Show as a modal dialog
+            # No specific action after close for now, but could refresh product list if equivalencies impact display
+        except ImportError:
+            logging.error("Failed to import ProductEquivalencyDialog.")
+            QMessageBox.critical(self, self.tr("Erreur"), self.tr("Le module de gestion des équivalences est introuvable."))
+        except Exception as e:
+            logging.error(f"Error opening ProductEquivalencyDialog: {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur Inattendue"), str(e))
