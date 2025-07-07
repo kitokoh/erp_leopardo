@@ -248,17 +248,28 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
     # or when a new token is successfully generated for the same user.
 
     try:
+        logger.info(f"AUTH_LOGIN: Attempting login for username: '{username}'")
         user = users_crud.get_user_by_username(username)
+
         if not user:
-            logger.warning(f"Login attempt failed: User '{username}' not found.")
+            logger.warning(f"AUTH_LOGIN: User '{username}' not found in database.")
             return False, "Nom d'utilisateur ou mot de passe incorrect.", None, None
+        
+        logger.info(f"AUTH_LOGIN: User '{username}' found. User data: ID={user.get('user_id')}, RoleName={user.get('role_name')}, HashedPW={user.get('hashed_password')}")
+
+        logger.info(f"AUTH_LOGIN: User '{username}' found. User data: ID={user.get('user_id')}, RoleName={user.get('role_name')}, HashedPW={user.get('hashed_password')}")
+
+        logger.info(f"AUTH_LOGIN: User '{username}' found. User data: ID={user.get('user_id')}, RoleName={user.get('role_name')}, HashedPW={user.get('hashed_password')}")
 
         if not user.get('is_active'):
-            logger.warning(f"Login attempt failed: User '{username}' is inactive.")
+            logger.warning(f"AUTH_LOGIN: User '{username}' is inactive.")
             return False, "Ce compte utilisateur est désactivé.", None, None
 
-        if users_crud.util_verify_password(password, user['hashed_password'])[0]:
-            logger.info(f"User '{username}' logged in successfully.")
+        password_verified, new_hash_if_needed = users_crud.util_verify_password(password, user['hashed_password'])
+        logger.info(f"AUTH_LOGIN: Password verification result for '{username}': {password_verified}")
+
+        if password_verified:
+            logger.info(f"AUTH_LOGIN: User '{username}' logged in successfully (password verified).")
             users_crud.record_login_time(user['user_id'])
 
             _current_user_data = {

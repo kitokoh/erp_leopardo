@@ -537,6 +537,7 @@ def get_document_context(
                     display_description = original_product_details.get("description", "")
 
                 # If it was a fallback to original product in different language for the name, append language code
+
                 if product_for_display.get("product_id") == global_product_id and \
                    product_for_display.get("language_code") != language_code:
                     display_name += f" ({product_for_display.get('language_code', '').upper()})"

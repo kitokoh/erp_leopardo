@@ -1,5 +1,6 @@
 import sqlite3
 import os
+from sqlalchemy import text
 import json
 import logging # Added missing import
 from datetime import datetime, date # Added date
@@ -150,7 +151,7 @@ def initialize_database(app_config):
 
 
     # Use DATABASE_PATH from the passed app_config
-    conn = sqlite3.connect(database_path) # Keep for direct cursor use
+    conn = sqlite3.connect(database_path, timeout=10) # Keep for direct cursor use, increased timeout
     conn.row_factory = sqlite3.Row # Essential for accessing columns by name
     cursor = conn.cursor() # Keep for direct cursor use
 
@@ -830,6 +831,31 @@ def initialize_database(app_config):
     # and will be created by Base.metadata.create_all().
     # The raw SQL creation and ALTER TABLE statements for Products are removed.
     logging.info("DEBUG_INIT_DB: Products table creation will be handled by SQLAlchemy MainBase.metadata.create_all().")
+
+    # --- START DEBUGGING: Check if Products table exists before DROP ---
+    try:
+        with actual_main_engine.connect() as connection:
+            result = connection.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='Products'")).fetchone()
+            if result:
+                logging.info(f"DEBUG_INIT_DB: PRE-DROP CHECK: 'Products' table FOUND by sqlite_master query on actual_main_engine.")
+            else:
+                logging.info(f"DEBUG_INIT_DB: PRE-DROP CHECK: 'Products' table NOT FOUND by sqlite_master query on actual_main_engine.")
+    except Exception as e_check_before_drop:
+        logging.error(f"DEBUG_INIT_DB: Error checking Products table existence before drop: {e_check_before_drop}", exc_info=True)
+    # --- END DEBUGGING ---
+
+    # The specific "DROP TABLE IF EXISTS Products" block that was here (lines ~849-856 in original log context)
+    # has been removed. It was causing "database is locked" errors and is redundant if the
+    # "Enhanced DEBUGGING/CLEANUP STEP" (dropping all tables in MainBase.metadata) works correctly,
+    # as Products is an SQLAlchemy model and should be handled by that loop.
+    # The "Enhanced DEBUGGING/CLEANUP STEP" is located just before MainBase.metadata.create_all().
+
+    # --- START DEBUGGING: Check if Products table exists AFTER POTENTIAL DROP by general loop ---
+    # This check is now implicitly covered by MainBase.metadata.create_all(checkfirst=True)
+    # or by observing logs if the general drop loop runs.
+    # For clarity, we rely on `create_all(checkfirst=True)` to robustly handle
+    # the existence or non-existence of Products table.
+    # --- END DEBUGGING ---
 
     # Create ProductDimensions table (from ca.py)
     # This table depends on Products.product_id.
@@ -2111,6 +2137,23 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
 
     # --- Indexes (Consolidated from ca.py and schema.py) ---
     # Clients
+    # === DIAGNOSTIC START: Check Clients table schema before creating status_id index ===
+    try:
+        logging.info("DEBUG_INIT_DB: Executing PRAGMA table_info(Clients) before creating idx_clients_status_id...")
+        pragma_cursor = conn.cursor()
+        pragma_cursor.execute("PRAGMA table_info(Clients);")
+        columns_info = pragma_cursor.fetchall()
+        if columns_info:
+            col_details = []
+            for col in columns_info:
+                col_details.append(f"Name: {col['name']}, Type: {col['type']}, PK: {col['pk']}, NotNull: {col['notnull']}, Default: {col['dflt_value']}")
+            logging.info(f"DEBUG_INIT_DB: PRAGMA table_info(Clients) output: [{'; '.join(col_details)}]")
+        else:
+            logging.warning("DEBUG_INIT_DB: PRAGMA table_info(Clients) returned no information. Table might not exist.")
+        pragma_cursor.close()
+    except Exception as e_pragma_clients:
+        logging.error(f"DEBUG_INIT_DB: Error executing PRAGMA table_info(Clients): {e_pragma_clients}", exc_info=True)
+    # === DIAGNOSTIC END ===
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_status_id ON Clients(status_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_country_id ON Clients(country_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_city_id ON Clients(city_id)")
@@ -2741,6 +2784,20 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         logging.info("DEBUG_INIT_DB: Committing raw SQL table creations and default roles before SQLAlchemy operations.")
         conn.commit()
         logging.info("DEBUG_INIT_DB: Raw SQL table creations and default roles committed.")
+
+        # === DIAGNOSTIC START: Check roles right after commit ===
+        try:
+            debug_cursor = conn.cursor()
+            debug_cursor.execute("SELECT role_id, role_name FROM Roles")
+            debug_roles = debug_cursor.fetchall()
+            logging.info(f"DEBUG_INIT_DB (POST-COMMIT CHECK): Roles found: {[(r['role_id'], r['role_name']) for r in debug_roles]}")
+            if not debug_roles:
+                logging.warning("DEBUG_INIT_DB (POST-COMMIT CHECK): No roles found immediately after commit. Initial insertion might have failed.")
+            debug_cursor.close()
+        except Exception as e_debug_roles:
+            logging.error(f"DEBUG_INIT_DB (POST-COMMIT CHECK): Error querying roles: {e_debug_roles}")
+        # === DIAGNOSTIC END ===
+
     except sqlite3.Error as e_commit_raw_sql:
         logging.error(f"DEBUG_INIT_DB: Error committing raw SQL table creations: {e_commit_raw_sql}", exc_info=True)
         conn.rollback()
@@ -2780,17 +2837,34 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     # Create all tables defined by SQLAlchemy models
     if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None and actual_main_engine is not None:
         try:
+            # --- Enhanced DEBUGGING/CLEANUP STEP for tables managed by MainBase ---
+            logging.info("DEBUG_INIT_DB: Attempting to DROP all tables managed by MainBase IF THEY EXIST...")
+            try:
+                with actual_main_engine.connect() as connection:
+                    # Iterate over tables in reverse order of creation dependency
+                    for table in reversed(MainBase.metadata.sorted_tables):
+                        table_name = table.name
+                        logging.info(f"DEBUG_INIT_DB: Dropping table {table_name} if it exists.")
+                        connection.execute(text(f"DROP TABLE IF EXISTS {table_name}"))
+                    connection.commit() # Commit all drops
+                logging.info("DEBUG_INIT_DB: All tables managed by MainBase (if they existed) dropped successfully.")
+            except Exception as e_drop_all:
+                logging.error(f"DEBUG_INIT_DB: Error trying to DROP tables managed by MainBase: {e_drop_all}", exc_info=True)
+            # --- END Enhanced DEBUGGING/CLEANUP STEP ---
+
+
             logging.info("DEBUG_INIT_DB: Creating all tables for MainBase using SQLAlchemy actual_main_engine (checkfirst=True).")
+            # Setting checkfirst=True to handle cases where tables might exist,
+            # especially if the manual drop loop had issues or for general robustness.
             MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True)
-            logging.info("DEBUG_INIT_DB: All tables for MainBase created successfully by SQLAlchemy.")
+            logging.info("DEBUG_INIT_DB: All tables for MainBase created successfully by SQLAlchemy (using checkfirst=True).")
             # At this point, tables like Products, acc_currencies, etc., should exist if defined via SQLAlchemy.
         except Exception as e_main_base_create_all:
             logging.error(f"DEBUG_INIT_DB: CRITICAL ERROR creating tables for MainBase with SQLAlchemy: {e_main_base_create_all}", exc_info=True)
             # This is a major failure point. Subsequent seeding will likely fail.
             # Depending on the error, conn might need rollback/close.
-            # For now, we let the main try-except-finally handle conn.
-            # Consider re-raising if this is fatal for application startup.
-            # raise e_main_base_create_all # Optionally re-raise
+            # Re-raise to ensure this critical failure stops initialization.
+            raise e_main_base_create_all
 
     # Create remaining indexes for raw SQL tables (if any; many are now SQLAlchemy models)
     # And also for SQLAlchemy tables if not defined in model with index=True
@@ -2966,55 +3040,75 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         # Here, the session_acc_seed should handle its own rollback on error if needed,
         # or the exception will propagate up.
 
-    # --- Calendar Module Tables (Must use a new connection as 'conn' was closed) ---
-    # This was moved up to be part of the raw SQL block
-    # print("DEBUG_INIT_DB: Creating Calendar Module Tables (using a new raw connection)...")
-    # conn_cal = sqlite3.connect(app_config['database_path']) # Use app_config here
-    conn_cal.row_factory = sqlite3.Row
-    cursor_cal = conn_cal.cursor()
+    # --- Calendar Module Tables ---
+    print("DEBUG_INIT_DB: Attempting to create Calendar Module Tables...")
+    conn_cal = None  # Initialize conn_cal to None
     try:
-        cursor_cal.execute("""
-        CREATE TABLE IF NOT EXISTS CompanyCalendarSettings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT NOT NULL UNIQUE, -- Assuming user_id is a string UUID from Users table
-            business_type TEXT, -- B2B, B2C, Both
-            activity_category TEXT,
-            country_iso TEXT NOT NULL, -- ISO 3166-1 alpha-2 country code
-            region TEXT, -- Subdivision of the country
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
-        )
-        """)
-        print("DEBUG_INIT_DB: Table CompanyCalendarSettings created or exists.")
+        # Ensure app_config and database_path are valid before attempting to connect
+        if app_config and 'database_path' in app_config and app_config['database_path']:
+            conn_cal = sqlite3.connect(app_config['database_path'])
+            conn_cal.row_factory = sqlite3.Row
+            cursor_cal = conn_cal.cursor()
+            print("DEBUG_INIT_DB: Connection for Calendar module established.")
 
-        cursor_cal.execute("""
-        CREATE TABLE IF NOT EXISTS UserCalendarEvents (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT NOT NULL, -- Assuming user_id is a string UUID from Users table
-            event_date DATE NOT NULL,
-            event_type TEXT NOT NULL, -- Holiday, RemoteWork, WorkDay, OtherPersonal
-            description TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
-        )
-        """)
-        print("DEBUG_INIT_DB: Table UserCalendarEvents created or exists.")
+            cursor_cal.execute("""
+            CREATE TABLE IF NOT EXISTS CompanyCalendarSettings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL UNIQUE,
+                business_type TEXT,
+                activity_category TEXT,
+                country_iso TEXT NOT NULL,
+                region TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
+            )
+            """)
+            print("DEBUG_INIT_DB: Table CompanyCalendarSettings created or exists (via conn_cal).")
 
-        # Indexes for Calendar Module
-        cursor_cal.execute("CREATE INDEX IF NOT EXISTS idx_companycalendarsettings_user_id ON CompanyCalendarSettings(user_id)")
-        cursor_cal.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_user_id ON UserCalendarEvents(user_id)")
-        cursor_cal.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_date ON UserCalendarEvents(event_date)")
-        cursor_cal.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_type ON UserCalendarEvents(event_type)")
-        print("DEBUG_INIT_DB: Indexes for Calendar Module created or already exist.")
-        conn_cal.commit()
+            cursor_cal.execute("""
+            CREATE TABLE IF NOT EXISTS UserCalendarEvents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                event_date DATE NOT NULL,
+                event_type TEXT NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
+            )
+            """)
+            print("DEBUG_INIT_DB: Table UserCalendarEvents created or exists (via conn_cal).")
+
+            # Indexes for Calendar Module
+            cursor_cal.execute("CREATE INDEX IF NOT EXISTS idx_companycalendarsettings_user_id ON CompanyCalendarSettings(user_id)")
+            cursor_cal.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_user_id ON UserCalendarEvents(user_id)")
+            cursor_cal.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_date ON UserCalendarEvents(event_date)")
+            cursor_cal.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_type ON UserCalendarEvents(event_type)")
+            print("DEBUG_INIT_DB: Indexes for Calendar Module created or already exist (via conn_cal).")
+
+            conn_cal.commit()
+            print("DEBUG_INIT_DB: Calendar module table changes committed (via conn_cal).")
+        else:
+            logging.error("DEBUG_INIT_DB: app_config or database_path missing for Calendar module. Skipping table creation.")
+            print("DEBUG_INIT_DB: app_config or database_path missing for Calendar module. Skipping table creation.")
+
     except sqlite3.Error as e_cal_schema:
+        logging.error(f"Error during Calendar module schema/index creation: {e_cal_schema}", exc_info=True)
         print(f"Error during Calendar module schema/index creation: {e_cal_schema}")
-        conn_cal.rollback()
+        if conn_cal:
+            conn_cal.rollback()
+    except Exception as e_cal_general: # Catch any other unexpected error
+        logging.error(f"General error during Calendar module setup: {e_cal_general}", exc_info=True)
+        print(f"General error during Calendar module setup: {e_cal_general}")
+        if conn_cal: # Attempt rollback if connection was made
+            conn_cal.rollback()
     finally:
-        conn_cal.close()
-        print("DEBUG_INIT_DB: Raw SQLite connection for Calendar module closed.")
+        if conn_cal:
+            conn_cal.close()
+            print("DEBUG_INIT_DB: Raw SQLite connection 'conn_cal' for Calendar module closed.")
+        else:
+            print("DEBUG_INIT_DB: No 'conn_cal' to close (was not initialized or failed to initialize).")
     # --- End Calendar Module Tables ---
 
     # --- Create tables for MainBase (e.g., CalculatorHistory, Products, Accounting tables) ---
@@ -3262,59 +3356,72 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
             from sqlalchemy.orm import Session
 
             # Use a SQLAlchemy session for CRUD operations
-            # FIX: Use engine_acc which is defined for accounting, instead of undefined 'engine'
-            with Session(engine_acc) as session:
-                base_curr = acc_cruds.currency.get_base_currency(db=session)
-                if not base_curr:
-                    print("DEBUG_INIT_DB: No base currency found. Seeding USD as base.")
-                    usd_currency_in = acc_models_pydantic.CurrencyCreate(
-                        code="USD",
-                        name="US Dollar",
-                        symbol="$",
-                        exchange_rate_to_base=Decimal("1.000000"),
-                        is_base_currency=True
-                    )
-                    acc_cruds.currency.create(db=session, obj_in=usd_currency_in)
-                    print("DEBUG_INIT_DB: USD seeded as base currency.")
+            # FIX: Replaced undefined 'engine_acc' with 'actual_main_engine'
+            # Ensure actual_main_engine is not None before proceeding
+            if actual_main_engine:
+                with Session(actual_main_engine) as session: # Use actual_main_engine
+                    base_curr = acc_cruds.currency.get_base_currency(db=session)
+                    if not base_curr:
+                        print("DEBUG_INIT_DB: No base currency found. Seeding USD as base.")
+                        usd_currency_in = acc_models_pydantic.CurrencyCreate(
+                            code="USD",
+                            name="US Dollar",
+                            symbol="$",
+                            exchange_rate_to_base=Decimal("1.000000"),
+                            is_base_currency=True
+                        )
+                        acc_cruds.currency.create(db=session, obj_in=usd_currency_in)
+                        print("DEBUG_INIT_DB: USD seeded as base currency.")
 
-                current_year_name = f"FY{datetime.now().year}"
-                existing_fy = acc_cruds.fiscal_year.get_by_name(db=session, name=current_year_name)
-                if not existing_fy:
-                    print(f"DEBUG_INIT_DB: No fiscal year found for {current_year_name}. Seeding it now.")
-                    default_fy_in = acc_models_pydantic.FiscalYearCreate(
-                        name=current_year_name,
-                        start_date=date(datetime.now().year, 1, 1),
-                        end_date=date(datetime.now().year, 12, 31),
-                        status=acc_models_pydantic.FiscalYearStatusEnum.OPEN
-                    )
-                    acc_cruds.fiscal_year.create(db=session, obj_in=default_fy_in)
-                    print(f"DEBUG_INIT_DB: Fiscal year {current_year_name} seeded.")
+                    current_year_name = f"FY{datetime.now().year}"
+                    existing_fy = acc_cruds.fiscal_year.get_by_name(db=session, name=current_year_name)
+                    if not existing_fy:
+                        print(f"DEBUG_INIT_DB: No fiscal year found for {current_year_name}. Seeding it now.")
+                        default_fy_in = acc_models_pydantic.FiscalYearCreate(
+                            name=current_year_name,
+                            start_date=date(datetime.now().year, 1, 1),
+                            end_date=date(datetime.now().year, 12, 31),
+                            status=acc_models_pydantic.FiscalYearStatusEnum.OPEN
+                        )
+                        acc_cruds.fiscal_year.create(db=session, obj_in=default_fy_in)
+                        print(f"DEBUG_INIT_DB: Fiscal year {current_year_name} seeded.")
 
-                if not acc_cruds.chart_of_accounts.get_multi(db=session, limit=1): # Check if any account exists
-                    print("DEBUG_INIT_DB: Chart of Accounts is empty. Seeding minimal accounts.")
-                    accounts_to_seed = [
-                        {"code": "1010", "name": "Cash", "account_type": acc_models_pydantic.AccountTypeEnum.ASSET},
-                        {"code": "1020", "name": "Accounts Receivable", "account_type": acc_models_pydantic.AccountTypeEnum.ASSET},
-                        {"code": "2010", "name": "Accounts Payable", "account_type": acc_models_pydantic.AccountTypeEnum.LIABILITY},
-                        {"code": "3010", "name": "Common Stock", "account_type": acc_models_pydantic.AccountTypeEnum.EQUITY},
-                        {"code": "4010", "name": "Sales Revenue", "account_type": acc_models_pydantic.AccountTypeEnum.REVENUE},
-                        {"code": "5010", "name": "Office Supplies Expense", "account_type": acc_models_pydantic.AccountTypeEnum.EXPENSE},
-                    ]
-                    for acc_data in accounts_to_seed:
-                        acc_in = acc_models_pydantic.ChartOfAccountsCreate(**acc_data)
-                        if not acc_cruds.chart_of_accounts.get_by_code(db=session, code=acc_in.code):
-                            acc_cruds.chart_of_accounts.create(db=session, obj_in=acc_in)
-                    print("DEBUG_INIT_DB: Minimal Chart of Accounts seeded.")
+                    if not acc_cruds.chart_of_accounts.get_multi(db=session, limit=1): # Check if any account exists
+                        print("DEBUG_INIT_DB: Chart of Accounts is empty. Seeding minimal accounts.")
+                        accounts_to_seed = [
+                            {"code": "1010", "name": "Cash", "account_type": acc_models_pydantic.AccountTypeEnum.ASSET},
+                            {"code": "1020", "name": "Accounts Receivable", "account_type": acc_models_pydantic.AccountTypeEnum.ASSET},
+                            {"code": "2010", "name": "Accounts Payable", "account_type": acc_models_pydantic.AccountTypeEnum.LIABILITY},
+                            {"code": "3010", "name": "Common Stock", "account_type": acc_models_pydantic.AccountTypeEnum.EQUITY},
+                            {"code": "4010", "name": "Sales Revenue", "account_type": acc_models_pydantic.AccountTypeEnum.REVENUE},
+                            {"code": "5010", "name": "Office Supplies Expense", "account_type": acc_models_pydantic.AccountTypeEnum.EXPENSE},
+                        ]
+                        for acc_data in accounts_to_seed:
+                            acc_in = acc_models_pydantic.ChartOfAccountsCreate(**acc_data)
+                            if not acc_cruds.chart_of_accounts.get_by_code(db=session, code=acc_in.code):
+                                acc_cruds.chart_of_accounts.create(db=session, obj_in=acc_in)
+                        print("DEBUG_INIT_DB: Minimal Chart of Accounts seeded.")
 
-                session.commit() # Commit SQLAlchemy session changes
-                print("DEBUG_INIT_DB: Accounting module specific seed data committed using SQLAlchemy session.")
+                    session.commit() # Commit SQLAlchemy session changes
+                    print("DEBUG_INIT_DB: Accounting module specific seed data committed using SQLAlchemy session.")
+            else:
+                logging.error("DEBUG_INIT_DB: actual_main_engine is None. Cannot seed accounting data.")
+                print("DEBUG_INIT_DB: actual_main_engine is None. Cannot seed accounting data.")
+                # The original 'conn.rollback()' in the except block for e_acc_seed might still be problematic
+                # if it rolls back unrelated changes. If actual_main_engine is None, this block is skipped,
+                # so the rollback in the outer try/except for e_acc_seed won't be triggered by this specific path.
 
         except ImportError:
             print("DEBUG_INIT_DB: Could not import accounting cruds/models for seeding. Skipping accounting seed data.")
         except Exception as e_acc_seed:
-            print(f"DEBUG_INIT_DB: Error during accounting data seeding: {e_acc_seed}")
-            conn.rollback() # Rollback accounting seed data on error
-            print("DEBUG_INIT_DB: Rollback due to accounting seeding error.")
+            logging.error(f"DEBUG_INIT_DB: Error during accounting data seeding: {e_acc_seed}", exc_info=True) # Log with traceback
+            # CRITICAL CHANGE: Removed conn.rollback() here.
+            # The SQLAlchemy session 'session' (or 'session_acc_seed') within the 'with' block
+            # will automatically rollback if an unhandled exception occurs within it.
+            # Rolling back the outer 'conn' here could discard valid operations
+            # (like Users table creation) if the accounting seed fails.
+            print("DEBUG_INIT_DB: Error occurred during accounting seeding. SQLAlchemy session should handle its own rollback.")
+            # If actual_main_engine was None, this block wouldn't have been entered, so no specific handling needed here for that.
 
 
         # User Seeding (Admin user) - This initial seeding attempt is now handled by db_seed.py

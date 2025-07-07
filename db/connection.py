@@ -46,11 +46,15 @@ def get_db_connection(db_path_override=None) -> Union[sqlite3.Connection, Sessio
     # Prioritize SQLAlchemy session if SessionLocal is available
     if SessionLocal:
         db_session = SessionLocal()
-        logging.debug("db.connection: Provided SQLAlchemy session from SessionLocal.")
+        # Log the engine URL associated with this SessionLocal to know which DB it's for
+        if db_session.bind:
+            logging.info(f"db.connection (get_db_connection - SQLAlchemy Session): Providing SQLAlchemy session linked to engine: {db_session.bind.url}")
+        else:
+            logging.warning("db.connection (get_db_connection - SQLAlchemy Session): SessionLocal is available but not bound to an engine.")
         return db_session
 
     # Fallback to original logic if SessionLocal is not initialized
-    logging.warning("db.connection: SessionLocal not initialized. Falling back to raw connection. Ensure initialize_engine_and_session is called for ORM features.")
+    logging.warning("db.connection (get_db_connection - Fallback): SessionLocal not initialized. Falling back to raw connection. Ensure initialize_engine_and_session is called for ORM features.")
 
     if db_path_override:
         path_to_connect = db_path_override
@@ -76,7 +80,8 @@ def get_db_connection(db_path_override=None) -> Union[sqlite3.Connection, Sessio
     if database_type == 'sqlite':
         if not path_to_connect: # Should be caught above if not overridden, but double check
             raise ValueError("SQLite connection requires a valid database path.")
-        logging.debug(f"db.connection: Providing raw sqlite3 connection to {path_to_connect}.")
+        # Log specifically for raw SQLite connection path
+        logging.info(f"db.connection (get_db_connection - raw sqlite): Attempting to connect to SQLite DB at: {path_to_connect}")
         conn = sqlite3.connect(path_to_connect)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON;")
@@ -167,7 +172,7 @@ def initialize_engine_and_session(app_config_param):
 
             logging.info(f"db.connection: SQLAlchemy engine connecting to: {engine_url}")
             try:
-                engine = create_engine(engine_url, connect_args={"check_same_thread": False})
+                engine = create_engine(engine_url, connect_args={"check_same_thread": False, "timeout": 10}) # Increased timeout
                 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
                 logging.info("db.connection: SQLAlchemy engine and SessionLocal created successfully for SQLite.")
             except Exception as e:
