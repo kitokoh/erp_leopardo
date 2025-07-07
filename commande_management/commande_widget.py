@@ -533,6 +533,7 @@ class CommandeWidget(QWidget):
                             default_idx = i
                             break
 
+
             selected_lang_display, lang_ok = QInputDialog.getItem(
                 self,
                 self.tr("Sélectionner la Langue du Proforma"),
