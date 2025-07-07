@@ -2780,6 +2780,17 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     # Create all tables defined by SQLAlchemy models
     if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None and actual_main_engine is not None:
         try:
+            # --- DEBUGGING STEP for "Products already exists" ---
+            logging.info("DEBUG_INIT_DB: Attempting to DROP Products table IF IT EXISTS (DEBUGGING STEP)...")
+            try:
+                with actual_main_engine.connect() as connection:
+                    connection.execute(text("DROP TABLE IF EXISTS Products"))
+                    connection.commit() # Commit the drop
+                logging.info("DEBUG_INIT_DB: Products table (if it existed) dropped successfully.")
+            except Exception as e_drop:
+                logging.error(f"DEBUG_INIT_DB: Error trying to DROP Products table: {e_drop}", exc_info=True)
+            # --- END DEBUGGING STEP ---
+
             logging.info("DEBUG_INIT_DB: Creating all tables for MainBase using SQLAlchemy actual_main_engine (checkfirst=True).")
             MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True)
             logging.info("DEBUG_INIT_DB: All tables for MainBase created successfully by SQLAlchemy.")
@@ -3012,7 +3023,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
             cursor_cal.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_date ON UserCalendarEvents(event_date)")
             cursor_cal.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_type ON UserCalendarEvents(event_type)")
             print("DEBUG_INIT_DB: Indexes for Calendar Module created or already exist (via conn_cal).")
-
+            
             conn_cal.commit()
             print("DEBUG_INIT_DB: Calendar module table changes committed (via conn_cal).")
         else:
@@ -3327,7 +3338,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
                             if not acc_cruds.chart_of_accounts.get_by_code(db=session, code=acc_in.code):
                                 acc_cruds.chart_of_accounts.create(db=session, obj_in=acc_in)
                         print("DEBUG_INIT_DB: Minimal Chart of Accounts seeded.")
-
+                    
                     session.commit() # Commit SQLAlchemy session changes
                     print("DEBUG_INIT_DB: Accounting module specific seed data committed using SQLAlchemy session.")
             else:
@@ -3336,7 +3347,6 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
                 # The original 'conn.rollback()' in the except block for e_acc_seed might still be problematic
                 # if it rolls back unrelated changes. If actual_main_engine is None, this block is skipped,
                 # so the rollback in the outer try/except for e_acc_seed won't be triggered by this specific path.
-
 
         except ImportError:
             print("DEBUG_INIT_DB: Could not import accounting cruds/models for seeding. Skipping accounting seed data.")
@@ -3349,7 +3359,6 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
             # (like Users table creation) if the accounting seed fails.
             print("DEBUG_INIT_DB: Error occurred during accounting seeding. SQLAlchemy session should handle its own rollback.")
             # If actual_main_engine was None, this block wouldn't have been entered, so no specific handling needed here for that.
-
 
 
         # User Seeding (Admin user) - This initial seeding attempt is now handled by db_seed.py
