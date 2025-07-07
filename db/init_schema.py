@@ -3282,11 +3282,22 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
             from sqlalchemy.orm import Session
 
             # Use a SQLAlchemy session for CRUD operations
-            # FIX: Use engine_acc which is defined for accounting, instead of undefined 'engine'
-            with Session(engine_acc) as session:
-                base_curr = acc_cruds.currency.get_base_currency(db=session)
-                if not base_curr:
-                    print("DEBUG_INIT_DB: No base currency found. Seeding USD as base.")
+            # FIX: Replaced undefined 'engine_acc' with 'actual_main_engine'
+            # Ensure actual_main_engine is not None before proceeding
+            if actual_main_engine:
+                with Session(actual_main_engine) as session: # Use actual_main_engine
+                    base_curr = acc_cruds.currency.get_base_currency(db=session)
+                    if not base_curr:
+                        print("DEBUG_INIT_DB: No base currency found. Seeding USD as base.")
+            else:
+                logging.error("DEBUG_INIT_DB: actual_main_engine is None. Cannot seed accounting data.")
+                print("DEBUG_INIT_DB: actual_main_engine is None. Cannot seed accounting data.")
+                # Important: If actual_main_engine is None, we should not proceed to conn.rollback()
+                # as if an error occurred in *this* block, because the issue is upstream.
+                # The original 'conn.rollback()' in the except block for e_acc_seed might still be problematic
+                # if it rolls back unrelated changes.
+                # For now, this change focuses on fixing engine_acc.
+                # Consider raising an error here or ensuring the except block is more specific.
                     usd_currency_in = acc_models_pydantic.CurrencyCreate(
                         code="USD",
                         name="US Dollar",
