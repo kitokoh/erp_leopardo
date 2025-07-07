@@ -254,6 +254,8 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
         if not user:
             logger.warning(f"AUTH_LOGIN: User '{username}' not found in database.")
             return False, "Nom d'utilisateur ou mot de passe incorrect.", None, None
+        
+        logger.info(f"AUTH_LOGIN: User '{username}' found. User data: ID={user.get('user_id')}, RoleName={user.get('role_name')}, HashedPW={user.get('hashed_password')}")
 
         logger.info(f"AUTH_LOGIN: User '{username}' found. User data: ID={user.get('user_id')}, RoleName={user.get('role_name')}, HashedPW={user.get('hashed_password')}")
 
