@@ -21,7 +21,14 @@ from excel_editor import ExcelEditor
 from gui.widgets.html_editor import HtmlEditor
 # Other necessary dialogs and modules will be imported as needed, or passed from parent
 
-SUPPORTED_LANGUAGES = ["en", "fr", "ar", "tr", "pt", "ru"]
+SUPPORTED_LANGUAGES = {
+    "en": "English",
+    "fr": "French",
+    "ar": "Arabic",
+    "tr": "Turkish",
+    "pt": "Portuguese",
+    "ru": "Russian"
+}
 
 class DocumentsTab(QWidget):
     def __init__(self, client_info: dict, config: object, app_root_dir: str,
@@ -81,8 +88,9 @@ class DocumentsTab(QWidget):
         self.doc_language_filter_combo = QComboBox()
         self.doc_language_filter_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.doc_language_filter_combo.addItem(self.tr("Toutes"), "ALL")
-        for lang_code in SUPPORTED_LANGUAGES:
-            self.doc_language_filter_combo.addItem(lang_code, lang_code)
+        # Iterate over dictionary items (code, name)
+        for lang_code, lang_name in SUPPORTED_LANGUAGES.items():
+            self.doc_language_filter_combo.addItem(self.tr(lang_name), lang_code) # Display translated name, store code
         self.doc_language_filter_combo.currentIndexChanged.connect(self.populate_doc_table)
         doc_filter_layout.addWidget(self.doc_language_filter_combo)
         doc_filter_layout.addSpacing(10)
