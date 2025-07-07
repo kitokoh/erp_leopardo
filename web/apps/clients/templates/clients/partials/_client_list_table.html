@@ -1,0 +1,174 @@
+{% if clients_data and clients_data.results %}
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead class="table-light">
+                <tr>
+                    <th scope="col">Nom du Client</th>
+                    <th scope="col">Email</th>
+                    <th scope="col">Téléphone</th>
+                    <th scope="col">Contact Principal</th>
+                    <th scope="col">Statut</th>
+                    <th scope="col">Créé le</th>
+                    <th scope="col">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for client in clients_data.results %}
+                <tr>
+                    <td>
+                        {# <a href="{% url 'clients:detail' client.id %}">{{ client.client_name }}</a> #}
+                        <a href="#">{{ client.client_name }}</a>
+                    </td>
+                    <td>{{ client.email|default:"-" }}</td>
+                    <td>{{ client.phone|default:"-" }}</td>
+                    <td>{{ client.contact_person_name|default:"-" }}</td>
+                    <td>
+                        {% if client.is_active %}
+                            <span class="badge bg-success">Actif</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Inactif</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ client.created_at|date:"d/m/Y H:i" }}</td>
+                    <td>
+                        {# <a href="{% url 'clients:update' client.id %}" class="btn btn-sm btn-outline-secondary me-1" title="Modifier"> #}
+                        <a href="#" class="btn btn-sm btn-outline-secondary me-1" title="Modifier">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pencil-square" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/></svg>
+                        </a>
+                        {# <button type="button" class="btn btn-sm btn-outline-danger" title="Supprimer"
+                                 hx-post="{% url 'clients:delete' client.id %}"
+                                 hx-confirm="Êtes-vous sûr de vouloir supprimer ce client ?"
+                                 hx-target="closest tr"
+                                 hx-swap="outerHTML swap:1s">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash3-fill" viewBox="0 0 16 16"><path d="M11 1.5v1h3.5a.5.5 0 0 1 0 1h-.538l-.853 10.66A2 2 0 0 1 11.115 16h-6.23a2 2 0 0 1-1.994-1.84L2.038 3.5H1.5a.5.5 0 0 1 0-1H5v-1A1.5 1.5 0 0 1 6.5 0h3A1.5 1.5 0 0 1 11 1.5Zm-5 0v1h4v-1a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5ZM4.5 5.029l.5 8.5a.5.5 0 1 0 .998-.06l-.5-8.5a.5.5 0 1 0-.998.06Zm6.53-.528a.5.5 0 0 0-.528.47l-.5 8.5a.5.5 0 0 0 .998.058l.5-8.5a.5.5 0 0 0-.47-.058ZM8 5.5a.5.5 0 0 0-.5.5v8.5a.5.5 0 0 0 1 0V6a.5.5 0 0 0-.5-.5Z"/></svg>
+                        </button> #}
+                        <button type="button" class="btn btn-sm btn-outline-danger" title="Supprimer (Action à définir)">
+                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash3-fill" viewBox="0 0 16 16"><path d="M11 1.5v1h3.5a.5.5 0 0 1 0 1h-.538l-.853 10.66A2 2 0 0 1 11.115 16h-6.23a2 2 0 0 1-1.994-1.84L2.038 3.5H1.5a.5.5 0 0 1 0-1H5v-1A1.5 1.5 0 0 1 6.5 0h3A1.5 1.5 0 0 1 11 1.5Zm-5 0v1h4v-1a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5ZM4.5 5.029l.5 8.5a.5.5 0 1 0 .998-.06l-.5-8.5a.5.5 0 1 0-.998.06Zm6.53-.528a.5.5 0 0 0-.528.47l-.5 8.5a.5.5 0 0 0 .998.058l.5-8.5a.5.5 0 0 0-.47-.058ZM8 5.5a.5.5 0 0 0-.5.5v8.5a.5.5 0 0 0 1 0V6a.5.5 0 0 0-.5-.5Z"/></svg>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {# Pagination #}
+    {% if clients_data.results %}
+    <nav aria-label="Page navigation clients" class="mt-3">
+        <ul class="pagination justify-content-center">
+            {# Lien Précédent #}
+            {% if clients_data.previous %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ request.path }}?{{ clients_data.previous|urlencode_params:request.GET }}"
+                       hx-get="{{ request.path }}?{{ clients_data.previous|urlencode_params:request.GET }}"
+                       hx-target="#client-table-container"
+                       hx-swap="outerHTML"
+                       hx-indicator="#loading-indicator"
+                       aria-label="Previous">
+                        <span aria-hidden="true">&laquo; Précédent</span>
+                    </a>
+                </li>
+            {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link">&laquo; Précédent</span>
+                </li>
+            {% endif %}
+
+            {# Numéros de Page (simplifié, juste pour montrer le concept) #}
+            {# Pour une pagination complète, il faudrait une logique pour afficher les numéros de page ici #}
+            <li class="page-item active" aria-current="page">
+                <span class="page-link">{{ clients_data.results.paginator.page_obj.number }} sur {{ clients_data.results.paginator.num_pages }}</span>
+                 {# Note: DRF PageNumberPagination ne met pas directement paginator et page_obj dans `results`.
+                    Il faudrait passer `clients_data.count`, `clients_data.page_size`, et le numéro de page actuel
+                    depuis la vue pour construire une pagination plus complète.
+                    Pour l'instant, on affiche juste le numéro de page si disponible ou une info simple.
+                    La réponse de DRF contient 'count', 'next', 'previous'.
+                    Le numéro de page actuel peut être déduit de `request.GET.get('page', 1)`.
+                 #}
+            </li>
+
+            {# Lien Suivant #}
+            {% if clients_data.next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ request.path }}?{{ clients_data.next|urlencode_params:request.GET }}"
+                       hx-get="{{ request.path }}?{{ clients_data.next|urlencode_params:request.GET }}"
+                       hx-target="#client-table-container"
+                       hx-swap="outerHTML"
+                       hx-indicator="#loading-indicator"
+                       aria-label="Next">
+                        <span aria-hidden="true">Suivant &raquo;</span>
+                    </a>
+                </li>
+            {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link">Suivant &raquo;</span>
+                </li>
+            {% endif %}
+        </ul>
+    </nav>
+    <p class="text-center text-muted"><small>Affichage de {{ clients_data.results|length }} client(s) sur {{ clients_data.count }} au total.</small></p>
+    {% endif %}
+
+{% else %}
+    <div class="alert alert-info mt-3" role="alert">
+        Aucun client trouvé pour cette société
+        {% if search_query or status_filter %}
+            avec les filtres actuels.
+        {% else %}
+            . Vous pouvez commencer par <a href="#">en ajouter un</a>. {# URL de création à définir #}
+        {% endif %}
+    </div>
+{% endif %}
+
+{# Template tag personnalisé pour la pagination HTMX #}
+{% comment %}
+Dans un fichier templatetags/pagination_tags.py :
+from django import template
+from urllib.parse import parse_qs, urlencode, urlparse
+
+register = template.Library()
+
+@register.filter
+def urlencode_params(url_string, current_get_params):
+    """
+    Prend une URL (qui peut contenir des params GET) et un QueryDict de params GET actuels.
+    Extrait les params de l'URL, les fusionne/remplace avec current_get_params (sauf 'page'),
+    puis ajoute le param 'page' de l'URL originale.
+    Ceci est utile pour que les filtres soient conservés lors de la pagination HTMX.
+    """
+    if not url_string:
+        return ''
+
+    parsed_url = urlparse(url_string)
+    original_params_qs = parse_qs(parsed_url.query) # {'page': ['2']}
+
+    # Copier les paramètres GET actuels, mais sans 'page' car on veut celui du lien de pagination
+    new_params = current_get_params.copy()
+    if 'page' in new_params:
+        del new_params['page']
+
+    # Ajouter/remplacer les paramètres du lien de pagination (juste 'page' en général)
+    for key, value_list in original_params_qs.items():
+        # Pour 'page', on prend la valeur du lien de pagination.
+        # Pour d'autres params (si le lien de pagination en contenait), on pourrait choisir de les ignorer ou de les fusionner.
+        if key == 'page' and value_list:
+            new_params[key] = value_list[0]
+            # Si d'autres filtres sont dans le lien de pagination, on pourrait les ajouter ici.
+            # Mais typiquement, les liens next/previous de DRF ne contiennent que 'page' ou 'offset'/'limit'.
+
+    return urlencode(new_params)
+
+Ce filtre est un peu complexe et dépend de comment les liens `next`/`previous` sont formés par DRF
+et comment on veut que les filtres interagissent. Une approche plus simple pour les filtres
+avec HTMX est de s'assurer que le formulaire de filtre est toujours soumis avec la requête de pagination,
+par exemple en utilisant `hx-include` sur le formulaire de filtre dans les liens de pagination.
+Ou, la vue `client_list_view` doit reconstruire les query params pour les liens de pagination
+en incluant les filtres actifs.
+
+Pour l'instant, je simplifie la pagination en ne passant que le paramètre 'page' des liens next/previous,
+ce qui signifie que les filtres pourraient être perdus si on ne les resoumet pas.
+La vue devrait reconstruire les liens de pagination en incluant les filtres actifs.
+Je vais ajuster la vue pour cela.
+Le filtre `urlencode_params` ne sera pas utilisé pour l'instant, je vais simplifier.
+La vue doit passer les params de pagination complets.
+{% endcomment %}

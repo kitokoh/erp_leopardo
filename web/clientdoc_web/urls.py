@@ -24,7 +24,7 @@ urlpatterns = [
     # Frontend App URLs
     path('auth/', include('apps.users.urls')), # Pour /auth/login/, /auth/register/, etc.
     path('', include('apps.dashboard.urls')), # Dashboard à la racine
-    # path('clients/', include('apps.clients.urls')),
+    path('clients/', include('apps.clients.urls')),
     # path('products/', include('apps.products.urls')),
     # path('documents/', include('apps.documents.urls')),
 ]

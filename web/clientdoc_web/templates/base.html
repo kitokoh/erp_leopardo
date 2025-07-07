@@ -36,8 +36,7 @@
                             <a class="nav-link {% if request.resolver_match.app_name == 'dashboard' %}active{% endif %}" aria-current="page" href="{% url 'dashboard:main' %}">Dashboard</a>
                         </li>
                         <li class="nav-item">
-                            {# {% url 'clients:list' %} est le nom d'URL attendu pour la liste des clients #}
-                            <a class="nav-link {% if request.resolver_match.app_name == 'clients' %}active{% endif %}" href="#">Clients</a>
+                            <a class="nav-link {% if request.resolver_match.app_name == 'clients' %}active{% endif %}" href="{% url 'clients:list' %}">Clients</a>
                         </li>
                         <li class="nav-item">
                              {# {% url 'products:list' %} est le nom d'URL attendu pour la liste des produits #}
