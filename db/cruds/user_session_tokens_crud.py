@@ -180,29 +180,48 @@ def cleanup_expired_tokens(conn, specific_hash: str | None = None) -> int:
     Returns the number of tokens deleted.
     """
     now_utc_iso = datetime.now(timezone.utc).isoformat()
-    if specific_hash:
-        sql = "DELETE FROM UserSessionTokens WHERE token_hash = ? AND expires_at <= ?"
-        params = (specific_hash, now_utc_iso)
-        log_msg_start = f"Cleaning up specific expired token (if any) for hash {specific_hash[:10]}..."
-    else:
-        sql = "DELETE FROM UserSessionTokens WHERE expires_at <= ?"
-        params = (now_utc_iso,)
-        log_msg_start = "Cleaning up all expired session tokens..."
+    deleted_count = 0
 
-    logger.info(log_msg_start)
     try:
-        cursor = conn.cursor()
-        cursor.execute(sql, params)
-        deleted_count = cursor.rowcount
-        conn.commit()
+        if _is_sqlalchemy_session(conn):
+            sa_params = {"now_utc_iso": now_utc_iso}
+            if specific_hash:
+                sql_stmt = "DELETE FROM UserSessionTokens WHERE token_hash = :specific_hash AND expires_at <= :now_utc_iso"
+                sa_params["specific_hash"] = specific_hash
+                log_msg_start = f"Cleaning up specific expired token (if any) for hash {specific_hash[:10]}... (SQLAlchemy)"
+            else:
+                sql_stmt = "DELETE FROM UserSessionTokens WHERE expires_at <= :now_utc_iso"
+                log_msg_start = "Cleaning up all expired session tokens... (SQLAlchemy)"
+
+            logger.info(log_msg_start)
+            result = conn.execute(text(sql_stmt), sa_params)
+            conn.commit()
+            deleted_count = result.rowcount
+        else: # sqlite3.Connection
+            if specific_hash:
+                sql_qmark = "DELETE FROM UserSessionTokens WHERE token_hash = ? AND expires_at <= ?"
+                qmark_params = (specific_hash, now_utc_iso)
+                log_msg_start = f"Cleaning up specific expired token (if any) for hash {specific_hash[:10]}... (sqlite3)"
+            else:
+                sql_qmark = "DELETE FROM UserSessionTokens WHERE expires_at <= ?"
+                qmark_params = (now_utc_iso,)
+                log_msg_start = "Cleaning up all expired session tokens... (sqlite3)"
+
+            logger.info(log_msg_start)
+            cursor = conn.cursor()
+            cursor.execute(sql_qmark, qmark_params)
+            conn.commit()
+            deleted_count = cursor.rowcount
+
         if deleted_count > 0:
             logger.info(f"Cleaned up {deleted_count} expired session token(s).")
         else:
             logger.info("No expired session tokens found to clean up matching criteria.")
         return deleted_count
-    except sqlite3.Error as e:
+
+    except (sqlite3.Error, SQLAlchemyError) as e:
         logger.error(f"Error cleaning up expired session tokens: {e}", exc_info=True)
-        conn.rollback()
+        if hasattr(conn, 'rollback'): conn.rollback()
         return 0
 
 # Example Usage (for testing or integration)
