@@ -3337,6 +3337,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
                 # if it rolls back unrelated changes. If actual_main_engine is None, this block is skipped,
                 # so the rollback in the outer try/except for e_acc_seed won't be triggered by this specific path.
 
+
         except ImportError:
             print("DEBUG_INIT_DB: Could not import accounting cruds/models for seeding. Skipping accounting seed data.")
         except Exception as e_acc_seed:
