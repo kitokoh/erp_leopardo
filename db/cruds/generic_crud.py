@@ -110,6 +110,7 @@ class GenericCRUD:
         if _is_sqlalchemy_obj(conn):
             # Query uses '?', so pass params as a tuple for SA text()
             result = conn.execute(sqlalchemy_text(query), (item_id,))
+
             row = result.fetchone()
         else:
             # Temporarily set row_factory for sqlite3 for dict-like access if not already default
@@ -150,6 +151,7 @@ class GenericCRUD:
         if _is_sqlalchemy_obj(conn):
             # Query uses '?', so pass params as a tuple for SA text()
             result = conn.execute(sqlalchemy_text(query), (item_id,))
+
             row = result.fetchone()
         else:
             cursor = conn.execute(query, (item_id,))
@@ -270,6 +272,7 @@ class GenericCRUD:
         if _is_sqlalchemy_obj(conn):
             # For SA with '?' placeholders (qmark style), pass 'values' as a tuple.
             result = conn.execute(sqlalchemy_text(query), tuple(values))
+
             rows = result.fetchall()
         else:
             original_row_factory = None
