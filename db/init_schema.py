@@ -121,18 +121,6 @@ def initialize_database(app_config):
 
     database_path = app_config['database_path']
 
-    # --- TEMPORARY: Force delete database for clean schema generation during debugging ---
-    # In a production environment, this should be handled by migrations or conditional logic.
-    if os.path.exists(database_path):
-        try:
-            os.remove(database_path)
-            logging.warning(f"DEBUG_INIT_DB: TEMPORARILY DELETED existing database file for fresh schema: {database_path}")
-        except OSError as e:
-            logging.error(f"DEBUG_INIT_DB: Error deleting database file {database_path}: {e}. Proceeding might use old data or fail.")
-    else:
-        logging.info(f"DEBUG_INIT_DB: Database file {database_path} not found, will create anew.")
-    # --- END TEMPORARY DELETE ---
-
     # Ensure the directory for the database exists
     db_dir = os.path.dirname(database_path)
     if db_dir and not os.path.exists(db_dir):
