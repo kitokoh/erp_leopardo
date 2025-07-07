@@ -1,41 +1,60 @@
-import sqlite3
+import sqlite3 # Keep for type hint reference if _manage_conn can provide both
+from sqlalchemy.sql import text # Import text
 from datetime import datetime
-import logging # Added import
-from .generic_crud import _manage_conn # get_db_connection is not used directly
+import logging
+from .generic_crud import _manage_conn
 
 # --- ApplicationSettings CRUD ---
 @_manage_conn
-def get_setting(key: str, default: any = None, conn: sqlite3.Connection = None) -> any: # Signature modified
-    cursor = conn.cursor()
-    value_to_return = default # Initialize with default
+def get_setting(key: str, default: any = None, conn = None) -> any: # conn type can be Session or Connection
+    value_to_return = default
     try:
-        cursor.execute("SELECT setting_value FROM ApplicationSettings WHERE setting_key = ?", (key,))
-        row = cursor.fetchone()
-        if row:
-            value_to_return = row['setting_value']
-        # If row is None, value_to_return remains default
+        # Check if conn is SQLAlchemy Session or sqlite3 Connection
+        if hasattr(conn, 'execute'): # Likely SQLAlchemy Session or Engine
+            # SQLAlchemy execution
+            stmt = text("SELECT setting_value FROM ApplicationSettings WHERE setting_key = :key")
+            result = conn.execute(stmt, {"key": key})
+            row = result.fetchone()
+            if row:
+                # Access by index or by name if known (e.g., row[0] or row._mapping['setting_value'])
+                value_to_return = row[0]
+        else: # Fallback to sqlite3.Connection interface (original code)
+            cursor = conn.cursor()
+            cursor.execute("SELECT setting_value FROM ApplicationSettings WHERE setting_key = ?", (key,))
+            row = cursor.fetchone()
+            if row:
+                value_to_return = row['setting_value'] # sqlite3 rows are dict-like or tuple
+
         logging.info(f"Retrieved setting: {key} = {value_to_return}")
         return value_to_return
-    except sqlite3.Error as e:
-        logging.error(f"Failed to get setting for key {key}: {e}")
+    except Exception as e: # Catch generic Exception as it could be SQLAlchemy or sqlite3
+        logging.error(f"Failed to get setting for key {key}: {e}", exc_info=True)
         logging.info(f"Returning default value for key {key} due to error: {default}")
         return default
 
 @_manage_conn
-def set_setting(key: str, value: str, conn: sqlite3.Connection = None, **kwargs) -> bool:
-    cursor = conn.cursor()
-    sql = "INSERT OR REPLACE INTO ApplicationSettings (setting_key, setting_value) VALUES (?, ?)"
+def set_setting(key: str, value: str, conn = None, **kwargs) -> bool: # conn type can be Session or Connection
     try:
-        logging.info(f"Setting value for key {key} = {value}") # Added logging
-        cursor.execute(sql, (key, value))
-        # conn.commit() is handled by _manage_conn
-        return cursor.rowcount > 0
-    except sqlite3.Error as e:
-        logging.error(f"Failed to set setting for key {key}, value {value}: {e}") # Added logging
+        logging.info(f"Setting value for key {key} = {value}")
+        if hasattr(conn, 'execute'): # Likely SQLAlchemy Session or Engine
+            stmt = text("INSERT OR REPLACE INTO ApplicationSettings (setting_key, setting_value) VALUES (:key, :value)")
+            result = conn.execute(stmt, {"key": key, "value": value})
+            # For SQLAlchemy, commit is often handled by the session's context manager or explicitly outside.
+            # If _manage_conn handles session commit, this is fine. Otherwise, conn.commit() might be needed if conn is a Session.
+            # Assuming _manage_conn handles commit for session if it provided one.
+            return result.rowcount > 0 if hasattr(result, 'rowcount') else True # rowcount might not be straightforward for all session.execute
+        else: # Fallback to sqlite3.Connection interface
+            cursor = conn.cursor()
+            sql = "INSERT OR REPLACE INTO ApplicationSettings (setting_key, setting_value) VALUES (?, ?)"
+            cursor.execute(sql, (key, value))
+            # conn.commit() is handled by _manage_conn for sqlite3
+            return cursor.rowcount > 0
+    except Exception as e: # Catch generic Exception
+        logging.error(f"Failed to set setting for key {key}, value {value}: {e}", exc_info=True)
         return False
 
 @_manage_conn
-def get_next_invoice_number(conn: sqlite3.Connection = None) -> str:
+def get_next_invoice_number(conn = None) -> str: # conn type can be Session or Connection
     """
     Generates the next invoice number in the sequence for the current year.
     Format: INV-YYYY-NNNNN (e.g., INV-2024-00001)

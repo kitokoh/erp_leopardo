@@ -883,19 +883,69 @@ def _seed_motivational_messages(cursor: sqlite3.Cursor, conn: sqlite3.Connection
 def run_seed():
     logger = logging.getLogger(__name__)
     logger.info(f"Attempting to seed database: {DATABASE_PATH}")
-    conn = None
+    db_conn_object = None # Renamed to avoid confusion with sqlite3.Connection type hint in callees
+    raw_sqlite_conn_for_seeders = None # To hold the raw connection if db_conn_object is a Session
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        seed_initial_data_master(cursor) 
-        conn.commit()
+        db_conn_object = get_db_connection()
+
+        # Check if db_conn_object is a SQLAlchemy Session or a raw sqlite3 connection
+        if hasattr(db_conn_object, 'get_bind'): # Characteristic of SQLAlchemy Session
+            logger.info("Detected SQLAlchemy Session in run_seed. Attempting to get raw connection for seeders.")
+            # For SQLAlchemy, get the underlying DBAPI connection
+            # This can be engine-specific. For sqlite, .raw_connection() on the engine's connect() result works.
+            # If db_conn_object is a Session, db_conn_object.get_bind() is the Engine.
+            engine = db_conn_object.get_bind()
+            raw_sqlite_conn_for_seeders = engine.raw_connection()
+            cursor = raw_sqlite_conn_for_seeders.cursor()
+            logger.info("Using cursor from raw_connection() of SQLAlchemy session's engine.")
+        elif hasattr(db_conn_object, 'cursor'): # Looks like a sqlite3.Connection
+            logger.info("Detected sqlite3.Connection in run_seed.")
+            raw_sqlite_conn_for_seeders = db_conn_object # It's already the raw connection
+            cursor = raw_sqlite_conn_for_seeders.cursor()
+        else:
+            logger.error("Unknown database connection type in run_seed. Cannot get cursor.")
+            raise TypeError("Unsupported database connection object in run_seed.")
+
+        seed_initial_data_master(cursor) # This function and its children expect sqlite3.Cursor
+
+        # Commit logic
+        if hasattr(db_conn_object, 'commit'): # SQLAlchemy Session or sqlite3.Connection
+            db_conn_object.commit()
+            logger.info("Main db_conn_object committed (SQLAlchemy Session or sqlite3.Connection).")
+        elif raw_sqlite_conn_for_seeders and hasattr(raw_sqlite_conn_for_seeders, 'commit'):
+            # This case might be redundant if raw_sqlite_conn_for_seeders is db_conn_object
+            # but useful if only raw_sqlite_conn_for_seeders was obtained and needs commit.
+            raw_sqlite_conn_for_seeders.commit()
+            logger.info("Raw SQLite connection used by seeders was committed.")
+
         logger.info("Seeding process completed and committed.")
+
     except Exception as e:
-        if conn: conn.rollback()
         logger.error(f"Error during seeding process: {e}", exc_info=True)
+        if hasattr(db_conn_object, 'rollback'):
+            db_conn_object.rollback()
+            logger.info("Main db_conn_object rolled back.")
+        elif raw_sqlite_conn_for_seeders and hasattr(raw_sqlite_conn_for_seeders, 'rollback'):
+            raw_sqlite_conn_for_seeders.rollback()
+            logger.info("Raw SQLite connection used by seeders was rolled back.")
+
     finally:
-        if conn: conn.close()
-        logger.info("Database connection closed after seeding attempt.")
+        # Close the raw connection obtained from SQLAlchemy engine if it was created
+        if raw_sqlite_conn_for_seeders and raw_sqlite_conn_for_seeders is not db_conn_object:
+            if hasattr(raw_sqlite_conn_for_seeders, 'close'):
+                raw_sqlite_conn_for_seeders.close()
+                logger.info("Raw SQLite connection obtained for seeders has been closed.")
+
+        # Close the main connection object (Session or sqlite3.Connection)
+        if db_conn_object and hasattr(db_conn_object, 'close'):
+            db_conn_object.close()
+            logger.info("Main database connection object closed after seeding attempt.")
+        elif not hasattr(db_conn_object, 'close') and raw_sqlite_conn_for_seeders is db_conn_object and hasattr(raw_sqlite_conn_for_seeders, 'close'):
+            # This case is if db_conn_object was a raw sqlite3 connection and already closed by raw_sqlite_conn_for_seeders logic
+            pass # Already closed
+        else:
+            logger.info("Main database connection object was not closed (either no close method or already handled).")
+
 
 if __name__ == '__main__':
     # Adjust sys.path to allow finding 'config' module from project root
