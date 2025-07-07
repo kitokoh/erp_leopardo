@@ -76,7 +76,7 @@ from .template_categories_crud import get_all_template_categories, add_template_
 from .templates_crud import get_all_templates, get_template_by_id, add_template, update_template, delete_template, get_all_file_based_templates, get_distinct_template_languages, get_distinct_template_types, get_filtered_templates, get_distinct_languages_for_template_type, add_utility_document_template, get_utility_documents, get_distinct_template_extensions
 from .transporters_crud import get_all_transporters, add_transporter, get_transporter_by_id, update_transporter, delete_transporter
 from .money_transfer_agents_crud import get_all_money_transfer_agents, add_money_transfer_agent, get_money_transfer_agent_by_id, update_money_transfer_agent, delete_money_transfer_agent
-from .users_crud import get_user_by_id, list_users, update_user_password, verify_password, add_user as add_user_crud, verify_user_password, update_user_role, set_user_active_status, record_login_time, get_user_by_username
+from .users_crud import get_user_by_id, list_users, update_user_password, add_user as add_user_crud, verify_user_password, update_user_role, set_user_active_status, record_login_time, get_user_by_username
 from .company_expenses_crud import add_company_expense, get_company_expense_by_id, get_all_company_expenses, update_company_expense, soft_delete_company_expense as delete_company_expense, add_company_facture, get_company_facture_by_id, update_company_facture, soft_delete_company_facture as delete_company_facture, get_all_company_factures, link_facture_to_expense, unlink_facture_from_expense
 
 
@@ -260,7 +260,7 @@ __all__ = [
     # Functions from money_transfer_agents_crud
     'get_all_money_transfer_agents', 'add_money_transfer_agent', 'get_money_transfer_agent_by_id', 'update_money_transfer_agent', 'delete_money_transfer_agent',
     # Functions from users_crud
-    'get_user_by_id', 'list_users', 'update_user_password', 'verify_password', 'add_user_crud',
+    'get_user_by_id', 'list_users', 'update_user_password', 'add_user_crud',
     'verify_user_password', 'update_user_role', 'set_user_active_status', 'record_login_time', 'get_user_by_username',
     # Functions from company_expenses_crud
     'add_company_expense', 'get_company_expense_by_id', 'get_all_company_expenses', 'update_company_expense', 'delete_company_expense',
