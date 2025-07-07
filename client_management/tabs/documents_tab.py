@@ -19,16 +19,8 @@ from db.cruds import client_documents_crud, projects_crud
 
 from excel_editor import ExcelEditor
 from gui.widgets.html_editor import HtmlEditor
+from utils.app_constants import SUPPORTED_LANGUAGES # Import centralisé
 # Other necessary dialogs and modules will be imported as needed, or passed from parent
-
-SUPPORTED_LANGUAGES = {
-    "en": "English",
-    "fr": "French",
-    "ar": "Arabic",
-    "tr": "Turkish",
-    "pt": "Portuguese",
-    "ru": "Russian"
-}
 
 class DocumentsTab(QWidget):
     def __init__(self, client_info: dict, config: object, app_root_dir: str,
@@ -88,8 +80,8 @@ class DocumentsTab(QWidget):
         self.doc_language_filter_combo = QComboBox()
         self.doc_language_filter_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.doc_language_filter_combo.addItem(self.tr("Toutes"), "ALL")
-        # Iterate over dictionary items (code, name)
-        for lang_code, lang_name in SUPPORTED_LANGUAGES.items():
+        # Iterate over dictionary items (code, name) from imported constant
+        for lang_code, lang_name in SUPPORTED_LANGUAGES.items(): # SUPPORTED_LANGUAGES est maintenant importé
             self.doc_language_filter_combo.addItem(self.tr(lang_name), lang_code) # Display translated name, store code
         self.doc_language_filter_combo.currentIndexChanged.connect(self.populate_doc_table)
         doc_filter_layout.addWidget(self.doc_language_filter_combo)
@@ -235,14 +227,42 @@ class DocumentsTab(QWidget):
         # For a "simple" document, file_path_relative and file_name_on_disk might be None or specific placeholders
         # Language can be set to a default or also asked. For now, let's assume a default or None.
         # Let's ask for language for consistency
-        available_languages = SUPPORTED_LANGUAGES
-        selected_doc_language, lang_ok = QInputDialog.getItem(
+
+        # Use the same language selection logic as in add_document
+        language_items_for_dialog_simple = [f"{self.tr(name)} ({code})" for code, name in SUPPORTED_LANGUAGES.items()]
+        default_lang_code_simple = 'fr' # Ou une autre logique pour le défaut
+        default_idx_simple = 0
+        for i, item_str in enumerate(language_items_for_dialog_simple):
+            if f"({default_lang_code_simple})" in item_str:
+                default_idx_simple = i
+                break
+
+        selected_lang_item_str_simple, lang_ok = QInputDialog.getItem(
             self, self.tr("Sélectionner la langue"), self.tr("Langue du document '{0}':").format(doc_name),
-            available_languages, 0, False
+            language_items_for_dialog_simple, default_idx_simple, False
         )
-        if not lang_ok or not selected_doc_language:
-            selected_doc_language = "fr" # Default to French if cancelled or not selected
-            self.notify(self.tr("Langue par Défaut"), self.tr("Langue par défaut 'fr' sera utilisée."), type='INFO')
+
+        selected_doc_language_code = default_lang_code_simple # Default if user cancels or error
+
+        if lang_ok and selected_lang_item_str_simple:
+            try:
+                # Extract code from "Name (code)" format
+                start_idx = selected_lang_item_str_simple.rfind('(')
+                end_idx = selected_lang_item_str_simple.rfind(')')
+                if start_idx != -1 and end_idx != -1 and start_idx < end_idx:
+                     temp_code = selected_lang_item_str_simple[start_idx+1:end_idx]
+                else:
+                     raise ValueError("Format de l'item de langue inattendu.")
+
+                if temp_code not in SUPPORTED_LANGUAGES:
+                    raise ValueError(f"Code langue '{temp_code}' non supporté.")
+                selected_doc_language_code = temp_code
+            except ValueError as e:
+                self.notify(self.tr("Erreur de Langue"), f"{str(e)}. Utilisation de '{default_lang_code_simple}'.", type='WARNING')
+                # selected_doc_language_code reste la valeur par défaut
+        elif not lang_ok : # User cancelled dialog
+             self.notify(self.tr("Langue par Défaut"), self.tr("Langue par défaut '{0}' sera utilisée.").format(default_lang_code_simple), type='INFO')
+             # selected_doc_language_code reste la valeur par défaut
 
 
         doc_db_data = {
@@ -251,7 +271,7 @@ class DocumentsTab(QWidget):
             "file_name_on_disk": None, # No physical file for a "simple" document initially
             "file_path_relative": None,
             "document_type_generated": "NOTE", # Or "SIMPLE_DOCUMENT", "TEXT_NOTE"
-            "language_code": selected_doc_language,
+            "language_code": selected_doc_language_code, # Utiliser le code extrait/par défaut
             "source_template_id": None,
             "order_identifier": order_identifier,
             "user_id": self.current_user_id,
@@ -431,6 +451,14 @@ class DocumentsTab(QWidget):
                         delete_btn.clicked.connect(lambda checked, d_id=doc_id, p=full_file_path: self.delete_client_document_entry(d_id, p))
                         actions_layout.addWidget(delete_btn)
 
+                    # Bouton "Convertir en Facture" pour les Proformas PDF
+                    if doc.get("document_type_generated") == "PROFORMA_PDF" and can_manage: # PROFORMA_PDF est une constante de app_constants
+                        convert_btn = QPushButton(QIcon(":/icons/share.svg"), "") # Utiliser une icône appropriée, share comme placeholder
+                        convert_btn.setToolTip(self.tr("Convertir en Facture"))
+                        convert_btn.setProperty("class", "tableActionButton")
+                        convert_btn.clicked.connect(lambda checked, doc_id_proforma=doc_id: self.handle_convert_proforma_to_invoice(doc_id_proforma))
+                        actions_layout.addWidget(convert_btn)
+
                     actions_layout.addStretch()
                     self.doc_table.setCellWidget(row_idx, 5, actions_widget)
                 self.doc_table.resizeRowsToContents() # Adjust row height for styled buttons
@@ -442,13 +470,37 @@ class DocumentsTab(QWidget):
             self._is_populating_docs = False
 
     def add_document(self):
-        available_languages = SUPPORTED_LANGUAGES
-        selected_doc_language, ok = QInputDialog.getItem(
+        language_items_for_dialog = [f"{self.tr(name)} ({code})" for code, name in SUPPORTED_LANGUAGES.items()]
+        default_lang_code = 'fr' # Ou une autre logique pour le défaut
+        default_idx = 0
+        for i, item_str in enumerate(language_items_for_dialog):
+            if f"({default_lang_code})" in item_str: # Cherche "(fr)" par exemple
+                default_idx = i
+                break
+
+        selected_lang_item_str, ok = QInputDialog.getItem(
             self, self.tr("Sélectionner la langue"), self.tr("Langue du document:"),
-            available_languages, 0, False
+            language_items_for_dialog, default_idx, False
         )
-        if not ok or not selected_doc_language:
+
+        if not ok or not selected_lang_item_str:
             self.notify(self.tr("Annulé"), self.tr("L'opération d'ajout de document a été annulée."), type='INFO')
+            return
+
+        selected_doc_language_code = ""
+        try:
+            # Extract code from "Name (code)" format
+            start_idx = selected_lang_item_str.rfind('(')
+            end_idx = selected_lang_item_str.rfind(')')
+            if start_idx != -1 and end_idx != -1 and start_idx < end_idx:
+                 selected_doc_language_code = selected_lang_item_str[start_idx+1:end_idx]
+            else: # Should not happen if items are formatted correctly
+                 raise ValueError("Format de l'item de langue inattendu.")
+
+            if selected_doc_language_code not in SUPPORTED_LANGUAGES:
+                raise ValueError(f"Code langue '{selected_doc_language_code}' non supporté.")
+        except ValueError as e:
+            self.notify(self.tr("Erreur de Langue"), str(e), type='ERROR')
             return
 
         clients_root_dir = os.path.join(self.app_root_dir, self.config.get("clients_dir", "clients"))
@@ -468,7 +520,7 @@ class DocumentsTab(QWidget):
                 # Construct absolute base path for the client
                 client_abs_base_path = os.path.join(self.app_root_dir, client_relative_base_path)
 
-                target_lang_dir_abs = os.path.join(client_abs_base_path, selected_doc_language)
+                target_lang_dir_abs = os.path.join(client_abs_base_path, selected_doc_language_code) # Utiliser le code extrait
 
                 # Handle order identifier for subfolder structure
                 order_identifier = None
@@ -476,7 +528,7 @@ class DocumentsTab(QWidget):
                 if current_order_data not in ["ALL", "NONE"] and current_order_data is not None:
                     order_identifier = current_order_data
                     safe_order_subfolder = order_identifier.replace(':', '_').replace('/', '_').replace('\\', '_').replace(' ', '_')
-                    target_lang_dir_abs = os.path.join(client_abs_base_path, safe_order_subfolder, selected_doc_language)
+                    target_lang_dir_abs = os.path.join(client_abs_base_path, safe_order_subfolder, selected_doc_language_code) # Utiliser le code extrait
 
                 os.makedirs(target_lang_dir_abs, exist_ok=True)
                 file_name = os.path.basename(selected_file_path)
@@ -499,7 +551,7 @@ class DocumentsTab(QWidget):
 
                 # File path relative to client's base folder
                 file_path_relative_to_client_base = os.path.join(
-                    (os.path.join(safe_order_subfolder, selected_doc_language) if order_identifier else selected_doc_language),
+                    (os.path.join(safe_order_subfolder, selected_doc_language_code) if order_identifier else selected_doc_language_code), # Utiliser le code extrait
                     file_name
                 )
 
@@ -508,7 +560,7 @@ class DocumentsTab(QWidget):
                     "file_name_on_disk": file_name, # Storing just filename, path is derived
                     "file_path_relative": file_path_relative_to_client_base,
                     "document_type_generated": document_type_generated,
-                    "language_code": selected_doc_language, "source_template_id": None,
+                    "language_code": selected_doc_language_code, "source_template_id": None, # Utiliser le code extrait
                     "order_identifier": order_identifier, "user_id": self.current_user_id,
                     "notes": None, "version_tag": "1.0"
                 }
@@ -660,3 +712,91 @@ class DocumentsTab(QWidget):
         # Calling populate_doc_table() here is good to refresh row action visibility
         # if permissions change while the tab is visible.
         self.populate_doc_table()
+
+    def handle_convert_proforma_to_invoice(self, proforma_document_id: str):
+        self.notify(self.tr("Information"), self.tr(f"Conversion de proforma ID {proforma_document_id} en facture demandée. Cette fonctionnalité est en cours de développement."), type='INFO')
+        logging.info(f"Conversion de proforma ID {proforma_document_id} en facture demandée.")
+
+        # 1. Récupérer les détails du document proforma
+        proforma_doc = client_documents_crud.get_document_by_id(proforma_document_id)
+        if not proforma_doc:
+            self.notify(self.tr("Erreur"), self.tr("Document proforma non trouvé."), type='ERROR')
+            return
+
+        commande_id = proforma_doc.get('commande_id')
+        if not commande_id:
+            self.notify(self.tr("Erreur"), self.tr("Aucune commande n'est liée à cette proforma. Conversion manuelle requise."), type='WARNING')
+            return
+
+        # 2. Récupérer les détails de la commande et ses items
+        # Assurez-vous que commandes_crud est importé ou accessible via db_manager
+        commande_details = db_manager.commandes_crud.get_commande_by_id(commande_id)
+        if not commande_details:
+            self.notify(self.tr("Erreur"), self.tr(f"Détails de la commande ID {commande_id} non trouvés."), type='ERROR')
+            return
+
+        commande_items = db_manager.commandes_crud.get_items_for_commande(commande_id)
+        if commande_items is None: # Peut retourner None en cas d'erreur DB
+            self.notify(self.tr("Erreur"), self.tr(f"Articles pour la commande ID {commande_id} non trouvés."), type='ERROR')
+            return
+
+        # 3. Préparer les données pour le dialogue de facture
+        # La structure exacte dépendra de ce que ManualInvoiceDialog attend
+        invoice_data_prefill = {
+            "client_id": commande_details.get("client_id"),
+            "project_id": commande_details.get("project_id"),
+            "commande_id_source": commande_id, # Pour référence
+            "currency": commande_details.get("currency", "EUR"),
+            "items": [],
+            "notes": f"Basé sur la Proforma Doc ID: {proforma_document_id}, Commande Réf: {commande_details.get('commande_reference')}"
+            # D'autres champs comme les termes de paiement pourraient être copiés de la commande/proforma
+        }
+
+        for item in commande_items:
+            invoice_data_prefill["items"].append({
+                "product_id": item.get("product_id"),
+                "description": item.get("description_item"), # Ou product_name si description_item est vide
+                "quantity": item.get("quantity"),
+                "unit_price": item.get("unit_price_ht"),
+                "vat_rate": item.get("vat_rate", 0.0) # Le dialogue de facture gérera probablement le %
+                # ... autres champs que ManualInvoiceDialog pourrait attendre pour les items
+            })
+
+        # 4. Ouvrir le dialogue de création de facture
+        try:
+            from invoicing.manual_invoice_dialog import ManualInvoiceDialog # Importation locale
+            # Il faut s'assurer que ManualInvoiceDialog peut accepter des données pré-remplies
+            # Par exemple, via un paramètre `prefill_data` ou des setters.
+            # Ceci est une supposition sur le fonctionnement de ManualInvoiceDialog.
+            invoice_dialog = ManualInvoiceDialog(
+                client_id=invoice_data_prefill["client_id"],
+                current_user_id=self.current_user_id,
+                prefill_data=invoice_data_prefill, # Paramètre hypothétique
+                parent=self
+            )
+
+            if invoice_dialog.exec_() == QDialog.Accepted:
+                new_invoice_id = invoice_dialog.get_created_invoice_id() # Méthode hypothétique
+                if new_invoice_id:
+                    self.notify(self.tr("Succès"), self.tr(f"Facture ID {new_invoice_id} créée avec succès à partir de la proforma."), type='SUCCESS')
+
+                    # 5. Mettre à jour la proforma (par exemple, ajouter une note)
+                    updated_proforma_notes = proforma_doc.get("notes", "") or ""
+                    updated_proforma_notes += f"\nConvertie en Facture ID: {new_invoice_id} le {datetime.now().strftime('%Y-%m-%d %H:%M')}."
+
+                    client_documents_crud.update_client_document_notes(proforma_document_id, updated_proforma_notes.strip())
+                    # Idéalement, il y aurait un champ `linked_invoice_id` sur la table ClientDocuments ou ProformaInvoices.
+                    # Ou un statut "Convertie" pour la proforma.
+
+                    self.populate_doc_table() # Rafraîchir la liste des documents
+                else:
+                    self.notify(self.tr("Information"), self.tr("La facture a été créée mais son ID n'a pas pu être récupéré."), type='INFO')
+            else:
+                self.notify(self.tr("Annulé"), self.tr("Conversion en facture annulée."), type='INFO')
+
+        except ImportError:
+            self.logger.error("ManualInvoiceDialog n'a pas pu être importé.")
+            self.notify(self.tr("Erreur"), self.tr("Le module de facturation n'est pas disponible."), type='CRITICAL')
+        except Exception as e:
+            self.logger.error(f"Erreur lors de la conversion proforma en facture : {e}", exc_info=True)
+            self.notify(self.tr("Erreur Inattendue"), str(e), type='CRITICAL')
