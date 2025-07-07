@@ -2781,19 +2781,25 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     # Create all tables defined by SQLAlchemy models
     if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None and actual_main_engine is not None:
         try:
-            # --- DEBUGGING STEP for "Products already exists" ---
-            logging.info("DEBUG_INIT_DB: Attempting to DROP Products table IF IT EXISTS (DEBUGGING STEP)...")
+            # --- Enhanced DEBUGGING/CLEANUP STEP for tables managed by MainBase ---
+            logging.info("DEBUG_INIT_DB: Attempting to DROP all tables managed by MainBase IF THEY EXIST...")
             try:
                 with actual_main_engine.connect() as connection:
-                    connection.execute(text("DROP TABLE IF EXISTS Products"))
-                    connection.commit() # Commit the drop
-                logging.info("DEBUG_INIT_DB: Products table (if it existed) dropped successfully.")
-            except Exception as e_drop:
-                logging.error(f"DEBUG_INIT_DB: Error trying to DROP Products table: {e_drop}", exc_info=True)
-            # --- END DEBUGGING STEP ---
+                    # Iterate over tables in reverse order of creation dependency
+                    for table in reversed(MainBase.metadata.sorted_tables):
+                        table_name = table.name
+                        logging.info(f"DEBUG_INIT_DB: Dropping table {table_name} if it exists.")
+                        connection.execute(text(f"DROP TABLE IF EXISTS {table_name}"))
+                    connection.commit() # Commit all drops
+                logging.info("DEBUG_INIT_DB: All tables managed by MainBase (if they existed) dropped successfully.")
+            except Exception as e_drop_all:
+                logging.error(f"DEBUG_INIT_DB: Error trying to DROP tables managed by MainBase: {e_drop_all}", exc_info=True)
+            # --- END Enhanced DEBUGGING/CLEANUP STEP ---
 
             logging.info("DEBUG_INIT_DB: Creating all tables for MainBase using SQLAlchemy actual_main_engine (checkfirst=True).")
-            MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True)
+            # Setting checkfirst=False now as we've manually ensured tables are dropped.
+            # This might avoid some redundant checks by SQLAlchemy if the drop was successful.
+            MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=False)
             logging.info("DEBUG_INIT_DB: All tables for MainBase created successfully by SQLAlchemy.")
             # At this point, tables like Products, acc_currencies, etc., should exist if defined via SQLAlchemy.
         except Exception as e_main_base_create_all:
