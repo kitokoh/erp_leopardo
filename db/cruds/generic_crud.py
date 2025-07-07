@@ -18,6 +18,13 @@ import logging
 #     # Re-raise the error as the CRUD operations cannot function without a db connection.
 #     raise ImportError(f"Essential import get_db_connection from ..connection failed in generic_crud.py") from e
 
+from sqlalchemy.sql import text as sqlalchemy_text # Import text
+from sqlalchemy.exc import SQLAlchemyError # For SQLAlchemy specific errors
+
+# Helper to check if conn is SQLAlchemy Session or similar
+def _is_sqlalchemy_obj(conn_obj):
+    return hasattr(conn_obj, 'execute') and not hasattr(conn_obj, 'cursor')
+
 # Helper to manage connection lifecycle for CRUD functions
 def _manage_conn(func):
     def wrapper(*args, **kwargs):
@@ -99,106 +106,116 @@ class GenericCRUD:
             dict | None: A dictionary representing the record if found, otherwise None.
         """
         query = f"SELECT * FROM {table_name} WHERE {id_column} = ?"
-        cursor = conn.execute(query, (item_id,))
-        row = cursor.fetchone()
+
+        if _is_sqlalchemy_obj(conn):
+            # Query uses '?', so pass params as a tuple for SA text()
+            result = conn.execute(sqlalchemy_text(query), (item_id,))
+            row = result.fetchone()
+        else:
+            # Temporarily set row_factory for sqlite3 for dict-like access if not already default
+            original_row_factory = None
+            if hasattr(conn, 'row_factory') and conn.row_factory != sqlite3.Row:
+                original_row_factory = conn.row_factory
+                conn.row_factory = sqlite3.Row
+
+            cursor = conn.execute(query, (item_id,))
+            row = cursor.fetchone()
+
+            if original_row_factory is not None: # Reset if changed
+                conn.row_factory = original_row_factory
+
         return self._object_to_dict(row)
 
     @_manage_conn
     def delete_by_id(self, table_name: str, id_column: str, item_id: Any, conn: sqlite3.Connection) -> bool:
-        """
-        Deletes a record from a specified table by its ID.
-        This performs a hard delete.
-
-        Args:
-            table_name (str): The name of the table.
-            id_column (str): The name of the ID column.
-            item_id (any): The ID of the item to delete.
-            conn (sqlite3.Connection): The database connection object.
-
-        Returns:
-            bool: True if a record was deleted, False otherwise.
-        """
         query = f"DELETE FROM {table_name} WHERE {id_column} = ?"
-        cursor = conn.execute(query, (item_id,))
-        return cursor.rowcount > 0
+        if _is_sqlalchemy_obj(conn):
+            # For SQLAlchemy, parameters for text() are typically passed as a dictionary
+            # if the query string uses named parameters e.g. :id_param
+            # If using '?', it depends on the DBAPI driver's paramstyle.
+            # Pysqlite (sqlite3) uses qmark or numeric.
+            # Let's assume qmark style for simplicity with text() for now.
+            result = conn.execute(sqlalchemy_text(query), (item_id,))
+            # conn.commit() # Handled by _manage_conn for SA if it's a session
+        else:
+            cursor = conn.execute(query, (item_id,))
+            # conn.commit() # Handled by _manage_conn for sqlite3
+            result = cursor
+        return result.rowcount > 0
 
     @_manage_conn
     def exists_by_id(self, table_name: str, id_column: str, item_id: Any, conn: sqlite3.Connection) -> bool:
-        """
-        Checks if a record exists in a specified table by its ID.
-
-        Args:
-            table_name (str): The name of the table.
-            id_column (str): The name of the ID column.
-            item_id (any): The ID of the item to check for.
-            conn (sqlite3.Connection): The database connection object.
-
-        Returns:
-            bool: True if the record exists, False otherwise.
-        """
         query = f"SELECT 1 FROM {table_name} WHERE {id_column} = ?"
-        cursor = conn.execute(query, (item_id,))
-        return cursor.fetchone() is not None
+        row = None
+        if _is_sqlalchemy_obj(conn):
+            # Query uses '?', so pass params as a tuple for SA text()
+            result = conn.execute(sqlalchemy_text(query), (item_id,))
+            row = result.fetchone()
+        else:
+            cursor = conn.execute(query, (item_id,))
+            row = cursor.fetchone()
+        return row is not None
 
     @_manage_conn
     def get_all(self, table_name: str, conn: sqlite3.Connection, order_by: str = None) -> List[Dict]:
-        """
-        Fetches all records from a specified table, with optional ordering.
-
-        Args:
-            table_name (str): The name of the table.
-            conn (sqlite3.Connection): The database connection object.
-            order_by (str, optional): A string to use for the ORDER BY clause
-                                      (e.g., "column_name ASC"). Defaults to None.
-
-        Returns:
-            list[dict]: A list of dictionaries, where each dictionary represents a record.
-                        Returns an empty list if the table is empty or not found.
-        """
         query = f"SELECT * FROM {table_name}"
         if order_by:
+            # Important: Ensure order_by is sanitized if it comes from user input
+            # For now, assuming it's a safe, internally defined string.
             query += f" ORDER BY {order_by}"
-        cursor = conn.execute(query)
-        rows = cursor.fetchall()
-        return [self._object_to_dict(row) for row in rows]
 
-    # Placeholder for query construction helper
-    # def _build_query(self, query_type: str, **kwargs) -> str:
-    #     """Helper method to construct SQL queries dynamically."""
-    #     # This method would handle more complex query building logic
-    #     # For example, handling multiple conditions, joins, etc.
-    #     pass
+        rows = []
+        if _is_sqlalchemy_obj(conn):
+            result = conn.execute(sqlalchemy_text(query))
+            rows = result.fetchall()
+        else:
+            # Temporarily set row_factory for sqlite3 for dict-like access
+            original_row_factory = None
+            if hasattr(conn, 'row_factory') and conn.row_factory != sqlite3.Row:
+                original_row_factory = conn.row_factory
+                conn.row_factory = sqlite3.Row
+
+            cursor = conn.execute(query)
+            rows = cursor.fetchall()
+
+            if original_row_factory is not None: # Reset if changed
+                conn.row_factory = original_row_factory
+
+        return [self._object_to_dict(row) for row in rows]
 
     @_manage_conn
     def create(self, data: Dict, conn: sqlite3.Connection, table_name: str = None) -> Union[Any, None]:
-        """
-        Inserts a new record into the specified table.
-
-        Args:
-            data (dict): A dictionary where keys are column names and values are the values to insert.
-            conn (sqlite3.Connection): The database connection object.
-            table_name (str, optional): The name of the table. If None, uses self.table_name.
-
-        Returns:
-            any | None: The ID of the newly inserted row if successful, otherwise None.
-                        Returns None if table_name is not set and not provided.
-        """
         _table_name = table_name if table_name else self.table_name
         if not _table_name:
             logging.error("Table name not specified for create operation.")
             return None
 
         columns = ', '.join(data.keys())
-        placeholders = ', '.join(['?'] * len(data))
-        query = f"INSERT INTO {_table_name} ({columns}) VALUES ({placeholders})"
+
+        if _is_sqlalchemy_obj(conn):
+            # For SQLAlchemy, use named parameters for clarity with text()
+            named_placeholders = ', '.join([f":{key}" for key in data.keys()])
+            query = f"INSERT INTO {_table_name} ({columns}) VALUES ({named_placeholders})"
+            params = data # Use the dict directly
+        else:
+            qmark_placeholders = ', '.join(['?'] * len(data))
+            query = f"INSERT INTO {_table_name} ({columns}) VALUES ({qmark_placeholders})"
+            params = list(data.values())
 
         try:
-            cursor = conn.execute(query, list(data.values()))
-            return cursor.lastrowid
-        except sqlite3.Error as e:
+            if _is_sqlalchemy_obj(conn):
+                result = conn.execute(sqlalchemy_text(query), params)
+                # conn.commit() # Handled by _manage_conn for SA Session
+                # lastrowid might not be available or reliable on all DBs/drivers with SA
+                # For SQLite with SA, result.lastrowid should work after an INSERT.
+                return result.lastrowid
+            else:
+                cursor = conn.execute(query, params)
+                # conn.commit() # Handled by _manage_conn for sqlite3
+                return cursor.lastrowid
+        except (sqlite3.Error, SQLAlchemyError) as e:
             logging.error(f"Error creating record in {_table_name}: {e} with data {data}")
-            # The @_manage_conn decorator will handle rollback if conn is not external.
-            raise # Re-raise to be caught by _manage_conn or caller
+            raise
 
     @_manage_conn
     def get_by_attributes(self, attributes: Dict, conn: sqlite3.Connection, table_name: str = None, logical_operator: str = "AND", order_by: str = None) -> List[Dict]:
@@ -243,30 +260,33 @@ class GenericCRUD:
              return self.get_all(table_name=_table_name, conn=conn, order_by=order_by)
 
         where_clause = f" {logical_operator.upper()} ".join(conditions)
+        # query will use '?' placeholders as constructed.
         query = f"SELECT * FROM {_table_name} WHERE {where_clause}"
 
         if order_by:
-            query += f" ORDER BY {order_by}"
+            query += f" ORDER BY {order_by}" # Assuming order_by is safe
 
-        cursor = conn.execute(query, values)
-        rows = cursor.fetchall()
+        rows = []
+        if _is_sqlalchemy_obj(conn):
+            # For SA with '?' placeholders (qmark style), pass 'values' as a tuple.
+            result = conn.execute(sqlalchemy_text(query), tuple(values))
+            rows = result.fetchall()
+        else:
+            original_row_factory = None
+            if hasattr(conn, 'row_factory') and conn.row_factory != sqlite3.Row:
+                original_row_factory = conn.row_factory
+                conn.row_factory = sqlite3.Row
+
+            cursor = conn.execute(query, values)
+            rows = cursor.fetchall()
+
+            if original_row_factory is not None:
+                conn.row_factory = original_row_factory
+
         return [self._object_to_dict(row) for row in rows]
 
     @_manage_conn
     def update(self, item_id: Any, data: Dict, conn: sqlite3.Connection, table_name: str = None, id_column: str = None) -> bool:
-        """
-        Updates an existing record in the specified table.
-
-        Args:
-            item_id (any): The ID of the item to update.
-            data (dict): A dictionary where keys are column names and values are the new values.
-            conn (sqlite3.Connection): The database connection object.
-            table_name (str, optional): The name of the table. If None, uses self.table_name.
-            id_column (str, optional): The name of the ID column. If None, uses self.primary_key.
-
-        Returns:
-            bool: True if the record was updated successfully (at least one row affected), False otherwise.
-        """
         _table_name = table_name if table_name else self.table_name
         _id_column = id_column if id_column else self.primary_key
 
@@ -275,20 +295,45 @@ class GenericCRUD:
             return False
         if not data:
             logging.warning(f"No data provided for update on table {_table_name}, ID {item_id}.")
-            return False # No operation performed, arguably not a "success" in terms of changing data
+            return False
 
-        set_clause = ", ".join([f"{key} = ?" for key in data.keys()])
-        values = list(data.values())
-        values.append(item_id)
+        params_dict_for_sa = {} # For SQLAlchemy if using named parameters
 
-        query = f"UPDATE {_table_name} SET {set_clause} WHERE {_id_column} = ?"
+        if _is_sqlalchemy_obj(conn):
+            # Build SET clause with named parameters for SQLAlchemy
+            set_clause_parts = []
+            current_params = {}
+            idx = 0
+            for key, value in data.items():
+                param_name = f"val_{idx}"
+                set_clause_parts.append(f"{key} = :{param_name}")
+                current_params[param_name] = value
+                idx += 1
+            set_clause = ", ".join(set_clause_parts)
+
+            id_param_name = "id_val"
+            current_params[id_param_name] = item_id
+            query = f"UPDATE {_table_name} SET {set_clause} WHERE {_id_column} = :{id_param_name}"
+            params_for_exec = current_params
+        else:
+            # Build SET clause with '?' for sqlite3
+            set_clause = ", ".join([f"{key} = ?" for key in data.keys()])
+            query = f"UPDATE {_table_name} SET {set_clause} WHERE {_id_column} = ?"
+            params_for_exec = list(data.values())
+            params_for_exec.append(item_id)
 
         try:
-            cursor = conn.execute(query, values)
-            return cursor.rowcount > 0
-        except sqlite3.Error as e:
+            if _is_sqlalchemy_obj(conn):
+                result = conn.execute(sqlalchemy_text(query), params_for_exec)
+                # conn.commit() # Handled by _manage_conn for SA Session
+            else:
+                cursor = conn.execute(query, params_for_exec)
+                # conn.commit() # Handled by _manage_conn for sqlite3
+                result = cursor # Use cursor for rowcount
+            return result.rowcount > 0
+        except (sqlite3.Error, SQLAlchemyError) as e:
             logging.error(f"Error updating record in {_table_name} with ID {item_id}: {e} using data {data}")
-            raise # Re-raise to be caught by _manage_conn or caller
+            raise
 
 # Utility function, can be outside the class if preferred, or static.
 # Making it a top-level function for easier import/use by other modules if needed.
