@@ -151,7 +151,7 @@ def initialize_database(app_config):
 
 
     # Use DATABASE_PATH from the passed app_config
-    conn = sqlite3.connect(database_path) # Keep for direct cursor use
+    conn = sqlite3.connect(database_path, timeout=10) # Keep for direct cursor use, increased timeout
     conn.row_factory = sqlite3.Row # Essential for accessing columns by name
     cursor = conn.cursor() # Keep for direct cursor use
 
@@ -844,28 +844,17 @@ def initialize_database(app_config):
         logging.error(f"DEBUG_INIT_DB: Error checking Products table existence before drop: {e_check_before_drop}", exc_info=True)
     # --- END DEBUGGING ---
 
-    # --- DEBUGGING STEP for "Products already exists" ---
-    # Ensure this DROP is effective on the same engine that create_all uses.
-    logging.info("DEBUG_INIT_DB: Attempting to DROP Products table IF IT EXISTS using actual_main_engine...")
-    try:
-        with actual_main_engine.connect() as connection:
-            connection.execute(text("DROP TABLE IF EXISTS Products"))
-            connection.commit() # Commit the drop
-        logging.info("DEBUG_INIT_DB: Products table (if it existed) dropped successfully using actual_main_engine.")
-    except Exception as e_drop:
-        logging.error(f"DEBUG_INIT_DB: Error trying to DROP Products table with actual_main_engine: {e_drop}", exc_info=True)
-    # --- END DEBUGGING STEP ---
+    # The specific "DROP TABLE IF EXISTS Products" block that was here (lines ~849-856 in original log context)
+    # has been removed. It was causing "database is locked" errors and is redundant if the
+    # "Enhanced DEBUGGING/CLEANUP STEP" (dropping all tables in MainBase.metadata) works correctly,
+    # as Products is an SQLAlchemy model and should be handled by that loop.
+    # The "Enhanced DEBUGGING/CLEANUP STEP" is located just before MainBase.metadata.create_all().
 
-    # --- START DEBUGGING: Check if Products table exists AFTER DROP ---
-    try:
-        with actual_main_engine.connect() as connection:
-            result = connection.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='Products'")).fetchone()
-            if result:
-                logging.info(f"DEBUG_INIT_DB: POST-DROP CHECK: 'Products' table STILL FOUND by sqlite_master query on actual_main_engine. This is unexpected if DROP was successful.")
-            else:
-                logging.info(f"DEBUG_INIT_DB: POST-DROP CHECK: 'Products' table NOT FOUND by sqlite_master query on actual_main_engine. This is expected if DROP was successful.")
-    except Exception as e_check_after_drop:
-        logging.error(f"DEBUG_INIT_DB: Error checking Products table existence after drop: {e_check_after_drop}", exc_info=True)
+    # --- START DEBUGGING: Check if Products table exists AFTER POTENTIAL DROP by general loop ---
+    # This check is now implicitly covered by MainBase.metadata.create_all(checkfirst=True)
+    # or by observing logs if the general drop loop runs.
+    # For clarity, we rely on `create_all(checkfirst=True)` to robustly handle
+    # the existence or non-existence of Products table.
     # --- END DEBUGGING ---
 
     # Create ProductDimensions table (from ca.py)
@@ -2778,6 +2767,20 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         logging.info("DEBUG_INIT_DB: Committing raw SQL table creations and default roles before SQLAlchemy operations.")
         conn.commit()
         logging.info("DEBUG_INIT_DB: Raw SQL table creations and default roles committed.")
+
+        # === DIAGNOSTIC START: Check roles right after commit ===
+        try:
+            debug_cursor = conn.cursor()
+            debug_cursor.execute("SELECT role_id, role_name FROM Roles")
+            debug_roles = debug_cursor.fetchall()
+            logging.info(f"DEBUG_INIT_DB (POST-COMMIT CHECK): Roles found: {[(r['role_id'], r['role_name']) for r in debug_roles]}")
+            if not debug_roles:
+                logging.warning("DEBUG_INIT_DB (POST-COMMIT CHECK): No roles found immediately after commit. Initial insertion might have failed.")
+            debug_cursor.close()
+        except Exception as e_debug_roles:
+            logging.error(f"DEBUG_INIT_DB (POST-COMMIT CHECK): Error querying roles: {e_debug_roles}")
+        # === DIAGNOSTIC END ===
+
     except sqlite3.Error as e_commit_raw_sql:
         logging.error(f"DEBUG_INIT_DB: Error committing raw SQL table creations: {e_commit_raw_sql}", exc_info=True)
         conn.rollback()
@@ -2834,18 +2837,17 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
 
 
             logging.info("DEBUG_INIT_DB: Creating all tables for MainBase using SQLAlchemy actual_main_engine (checkfirst=True).")
-            # Setting checkfirst=False now as we've manually ensured tables are dropped.
-            # This might avoid some redundant checks by SQLAlchemy if the drop was successful.
-            MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=False)
-            logging.info("DEBUG_INIT_DB: All tables for MainBase created successfully by SQLAlchemy.")
+            # Setting checkfirst=True to handle cases where tables might exist,
+            # especially if the manual drop loop had issues or for general robustness.
+            MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True)
+            logging.info("DEBUG_INIT_DB: All tables for MainBase created successfully by SQLAlchemy (using checkfirst=True).")
             # At this point, tables like Products, acc_currencies, etc., should exist if defined via SQLAlchemy.
         except Exception as e_main_base_create_all:
             logging.error(f"DEBUG_INIT_DB: CRITICAL ERROR creating tables for MainBase with SQLAlchemy: {e_main_base_create_all}", exc_info=True)
             # This is a major failure point. Subsequent seeding will likely fail.
             # Depending on the error, conn might need rollback/close.
-            # For now, we let the main try-except-finally handle conn.
-            # Consider re-raising if this is fatal for application startup.
-            # raise e_main_base_create_all # Optionally re-raise
+            # Re-raise to ensure this critical failure stops initialization.
+            raise e_main_base_create_all
 
     # Create remaining indexes for raw SQL tables (if any; many are now SQLAlchemy models)
     # And also for SQLAlchemy tables if not defined in model with index=True
