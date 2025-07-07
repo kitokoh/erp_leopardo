@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 import logging
-
-
+import os # Added os import
 import datetime
 
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QTableWidget,
-    QTableWidgetItem, QHeaderView, QAbstractItemView, QMessageBox, QComboBox
+    QTableWidgetItem, QHeaderView, QAbstractItemView, QMessageBox, QComboBox,
+    QInputDialog # Added QInputDialog
 )
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QUrl
@@ -310,6 +310,9 @@ class CommandeWidget(QWidget):
         self.logger.info(f"Génération de proforma demandée pour la commande ID: {commande_id}")
 
         try:
+            from utils.app_constants import SUPPORTED_LANGUAGES # Import centralisé
+            from db.cruds import client_documents_crud # Import pour la dernière langue de proforma
+
             # 1. Fetching commande details (header, items).
             commande_details = commandes_crud.get_commande_by_id(commande_id)
             if not commande_details:
@@ -460,20 +463,94 @@ class CommandeWidget(QWidget):
             self.logger.info(f"Context préparé pour la proforma : {document_context}")
 
             # 5. Selecting the appropriate proforma template.
-            # Determine target language (e.g., first selected language of the client, or default)
-            target_lang_code = 'fr' # Default
-            if client_info_for_doc.get('selected_languages'):
-                try:
-                    # Assuming selected_languages is a comma-separated string or a list
-                    langs = client_info_for_doc['selected_languages']
-                    if isinstance(langs, str):
-                        langs = [lang.strip() for lang in langs.split(',') if lang.strip()]
-                    if langs:
-                        target_lang_code = langs[0]
-                except Exception as lang_ex:
-                    self.logger.warning(f"Could not determine client's preferred language, defaulting to 'fr'. Error: {lang_ex}")
+            # --- Language Selection ---
+            # SUPPORTED_LANGUAGES est maintenant importé depuis utils.app_constants
 
-            self.logger.info(f"Target language for Proforma template: {target_lang_code}")
+            # Determine default language for dialog more intelligently
+            default_lang_code_for_dialog = 'fr' # Ultimate fallback
+
+            # 1. Try client's main language code (assuming a field like 'main_language_code' or 'language_preference')
+            #    (This field needs to be added to Clients table and CRUDs if it doesn't exist)
+            #    For now, let's assume client_info_for_doc might have 'language_code' field from Clients table
+            if client_info_for_doc.get('language_code') and client_info_for_doc['language_code'] in SUPPORTED_LANGUAGES:
+                default_lang_code_for_dialog = client_info_for_doc['language_code']
+                self.logger.info(f"Using client's main language '{default_lang_code_for_dialog}' as default for proforma.")
+            else:
+                # 2. Try language of the last proforma for this client
+                last_proforma_lang = None
+                try:
+                    # Need client_id, which is in client_info_for_doc or commande_details
+                    client_id_for_last_doc = client_info_for_doc.get('client_id')
+                    if client_id_for_last_doc:
+                        # Get last proforma (e.g., PROFORMA_PDF type, ordered by creation_date desc)
+                        # This requires client_documents_crud to have a suitable function.
+                        # Let's assume a function get_last_document_language(client_id, doc_type_pattern)
+                        # For now, a simplified conceptual check:
+                        recent_docs = client_documents_crud.get_documents_for_client(
+                            client_id=client_id_for_last_doc,
+                            filters={"document_type_generated": "PROFORMA_PDF"}, # Or a more general proforma type
+                            limit=1, order_by="created_at DESC"
+                        )
+                        if recent_docs and recent_docs[0].get('language_code') in SUPPORTED_LANGUAGES:
+                            last_proforma_lang = recent_docs[0]['language_code']
+                            default_lang_code_for_dialog = last_proforma_lang
+                            self.logger.info(f"Using last proforma language '{last_proforma_lang}' as default.")
+                except Exception as e_last_lang:
+                    self.logger.warning(f"Could not fetch last proforma language: {e_last_lang}")
+
+                # 3. Fallback to client's 'selected_languages' (existing logic) or 'fr'
+                if not last_proforma_lang: # Only if step 2 didn't yield a result
+                    if client_info_for_doc.get('selected_languages'):
+                        try:
+                            langs = client_info_for_doc['selected_languages']
+                            if isinstance(langs, str):
+                                langs = [lang.strip() for lang in langs.split(',') if lang.strip()]
+                            if langs and langs[0] in SUPPORTED_LANGUAGES:
+                                default_lang_code_for_dialog = langs[0]
+                                self.logger.info(f"Using client's selected_languages[0] '{default_lang_code_for_dialog}' as default.")
+                        except Exception as lang_ex:
+                            self.logger.warning(f"Could not determine client's preferred language from selected_languages, defaulting to 'fr'. Error: {lang_ex}")
+                            # default_lang_code_for_dialog remains 'fr' (ultimate fallback)
+                    else:
+                        self.logger.info(f"Client has no main language or selected_languages, defaulting to '{default_lang_code_for_dialog}'.")
+
+
+            language_items = [f"{name} ({code})" for code, name in SUPPORTED_LANGUAGES.items()]
+
+            default_idx = 0
+            try:
+                default_lang_item_str = f"{SUPPORTED_LANGUAGES.get(default_lang_code_for_dialog, 'French')} ({default_lang_code_for_dialog})"
+                default_idx = language_items.index(default_lang_item_str)
+            except ValueError: # Fallback if constructed string not found (e.g. lang code valid but name mapping issue)
+                self.logger.warning(f"Could not find default language item string '{default_lang_item_str}' in list. Falling back to index 0 or 'fr'.")
+                for i, item_str in enumerate(language_items):
+                    if f"({default_lang_code_for_dialog})" in item_str: # Try matching by code only
+                        default_idx = i
+                        break
+                else: # If code itself not found, try 'fr'
+                    for i, item_str in enumerate(language_items):
+                        if "(fr)" in item_str:
+                            default_idx = i
+                            break
+
+            selected_lang_display, lang_ok = QInputDialog.getItem(
+                self,
+                self.tr("Sélectionner la Langue du Proforma"),
+                self.tr("Langue pour la génération du document proforma :"),
+                language_items,
+                default_selection_idx, # Set default selection
+                False # Not editable
+            )
+
+            if not lang_ok or not selected_lang_display:
+                self.logger.info("Génération de proforma annulée par l'utilisateur (sélection de langue).")
+                return # User cancelled
+
+            # Extract code from "Name (code)"
+            target_lang_code = selected_lang_display.split('(')[-1].replace(')', '').strip()
+            self.logger.info(f"Langue sélectionnée pour la Proforma: {target_lang_code} ({selected_lang_display})")
+
+            # --- End Language Selection ---
 
             from db.cruds import templates_crud # Local import for clarity
             # Assuming "HTML_PROFORMA" is the template_type for proforma invoices. This might need adjustment.

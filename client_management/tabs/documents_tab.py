@@ -19,16 +19,8 @@ from db.cruds import client_documents_crud, projects_crud
 
 from excel_editor import ExcelEditor
 from gui.widgets.html_editor import HtmlEditor
+from utils.app_constants import SUPPORTED_LANGUAGES # Import centralisé
 # Other necessary dialogs and modules will be imported as needed, or passed from parent
-
-SUPPORTED_LANGUAGES = {
-    "en": "English",
-    "fr": "French",
-    "ar": "Arabic",
-    "tr": "Turkish",
-    "pt": "Portuguese",
-    "ru": "Russian"
-}
 
 class DocumentsTab(QWidget):
     def __init__(self, client_info: dict, config: object, app_root_dir: str,
@@ -88,8 +80,8 @@ class DocumentsTab(QWidget):
         self.doc_language_filter_combo = QComboBox()
         self.doc_language_filter_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.doc_language_filter_combo.addItem(self.tr("Toutes"), "ALL")
-        # Iterate over dictionary items (code, name)
-        for lang_code, lang_name in SUPPORTED_LANGUAGES.items():
+        # Iterate over dictionary items (code, name) from imported constant
+        for lang_code, lang_name in SUPPORTED_LANGUAGES.items(): # SUPPORTED_LANGUAGES est maintenant importé
             self.doc_language_filter_combo.addItem(self.tr(lang_name), lang_code) # Display translated name, store code
         self.doc_language_filter_combo.currentIndexChanged.connect(self.populate_doc_table)
         doc_filter_layout.addWidget(self.doc_language_filter_combo)
@@ -235,14 +227,42 @@ class DocumentsTab(QWidget):
         # For a "simple" document, file_path_relative and file_name_on_disk might be None or specific placeholders
         # Language can be set to a default or also asked. For now, let's assume a default or None.
         # Let's ask for language for consistency
-        available_languages = SUPPORTED_LANGUAGES
-        selected_doc_language, lang_ok = QInputDialog.getItem(
+
+        # Use the same language selection logic as in add_document
+        language_items_for_dialog_simple = [f"{self.tr(name)} ({code})" for code, name in SUPPORTED_LANGUAGES.items()]
+        default_lang_code_simple = 'fr' # Ou une autre logique pour le défaut
+        default_idx_simple = 0
+        for i, item_str in enumerate(language_items_for_dialog_simple):
+            if f"({default_lang_code_simple})" in item_str:
+                default_idx_simple = i
+                break
+
+        selected_lang_item_str_simple, lang_ok = QInputDialog.getItem(
             self, self.tr("Sélectionner la langue"), self.tr("Langue du document '{0}':").format(doc_name),
-            available_languages, 0, False
+            language_items_for_dialog_simple, default_idx_simple, False
         )
-        if not lang_ok or not selected_doc_language:
-            selected_doc_language = "fr" # Default to French if cancelled or not selected
-            self.notify(self.tr("Langue par Défaut"), self.tr("Langue par défaut 'fr' sera utilisée."), type='INFO')
+
+        selected_doc_language_code = default_lang_code_simple # Default if user cancels or error
+
+        if lang_ok and selected_lang_item_str_simple:
+            try:
+                # Extract code from "Name (code)" format
+                start_idx = selected_lang_item_str_simple.rfind('(')
+                end_idx = selected_lang_item_str_simple.rfind(')')
+                if start_idx != -1 and end_idx != -1 and start_idx < end_idx:
+                     temp_code = selected_lang_item_str_simple[start_idx+1:end_idx]
+                else:
+                     raise ValueError("Format de l'item de langue inattendu.")
+
+                if temp_code not in SUPPORTED_LANGUAGES:
+                    raise ValueError(f"Code langue '{temp_code}' non supporté.")
+                selected_doc_language_code = temp_code
+            except ValueError as e:
+                self.notify(self.tr("Erreur de Langue"), f"{str(e)}. Utilisation de '{default_lang_code_simple}'.", type='WARNING')
+                # selected_doc_language_code reste la valeur par défaut
+        elif not lang_ok : # User cancelled dialog
+             self.notify(self.tr("Langue par Défaut"), self.tr("Langue par défaut '{0}' sera utilisée.").format(default_lang_code_simple), type='INFO')
+             # selected_doc_language_code reste la valeur par défaut
 
 
         doc_db_data = {
@@ -251,7 +271,7 @@ class DocumentsTab(QWidget):
             "file_name_on_disk": None, # No physical file for a "simple" document initially
             "file_path_relative": None,
             "document_type_generated": "NOTE", # Or "SIMPLE_DOCUMENT", "TEXT_NOTE"
-            "language_code": selected_doc_language,
+            "language_code": selected_doc_language_code, # Utiliser le code extrait/par défaut
             "source_template_id": None,
             "order_identifier": order_identifier,
             "user_id": self.current_user_id,
@@ -442,13 +462,37 @@ class DocumentsTab(QWidget):
             self._is_populating_docs = False
 
     def add_document(self):
-        available_languages = SUPPORTED_LANGUAGES
-        selected_doc_language, ok = QInputDialog.getItem(
+        language_items_for_dialog = [f"{self.tr(name)} ({code})" for code, name in SUPPORTED_LANGUAGES.items()]
+        default_lang_code = 'fr' # Ou une autre logique pour le défaut
+        default_idx = 0
+        for i, item_str in enumerate(language_items_for_dialog):
+            if f"({default_lang_code})" in item_str: # Cherche "(fr)" par exemple
+                default_idx = i
+                break
+
+        selected_lang_item_str, ok = QInputDialog.getItem(
             self, self.tr("Sélectionner la langue"), self.tr("Langue du document:"),
-            available_languages, 0, False
+            language_items_for_dialog, default_idx, False
         )
-        if not ok or not selected_doc_language:
+
+        if not ok or not selected_lang_item_str:
             self.notify(self.tr("Annulé"), self.tr("L'opération d'ajout de document a été annulée."), type='INFO')
+            return
+
+        selected_doc_language_code = ""
+        try:
+            # Extract code from "Name (code)" format
+            start_idx = selected_lang_item_str.rfind('(')
+            end_idx = selected_lang_item_str.rfind(')')
+            if start_idx != -1 and end_idx != -1 and start_idx < end_idx:
+                 selected_doc_language_code = selected_lang_item_str[start_idx+1:end_idx]
+            else: # Should not happen if items are formatted correctly
+                 raise ValueError("Format de l'item de langue inattendu.")
+
+            if selected_doc_language_code not in SUPPORTED_LANGUAGES:
+                raise ValueError(f"Code langue '{selected_doc_language_code}' non supporté.")
+        except ValueError as e:
+            self.notify(self.tr("Erreur de Langue"), str(e), type='ERROR')
             return
 
         clients_root_dir = os.path.join(self.app_root_dir, self.config.get("clients_dir", "clients"))
@@ -468,7 +512,7 @@ class DocumentsTab(QWidget):
                 # Construct absolute base path for the client
                 client_abs_base_path = os.path.join(self.app_root_dir, client_relative_base_path)
 
-                target_lang_dir_abs = os.path.join(client_abs_base_path, selected_doc_language)
+                target_lang_dir_abs = os.path.join(client_abs_base_path, selected_doc_language_code) # Utiliser le code extrait
 
                 # Handle order identifier for subfolder structure
                 order_identifier = None
@@ -476,7 +520,7 @@ class DocumentsTab(QWidget):
                 if current_order_data not in ["ALL", "NONE"] and current_order_data is not None:
                     order_identifier = current_order_data
                     safe_order_subfolder = order_identifier.replace(':', '_').replace('/', '_').replace('\\', '_').replace(' ', '_')
-                    target_lang_dir_abs = os.path.join(client_abs_base_path, safe_order_subfolder, selected_doc_language)
+                    target_lang_dir_abs = os.path.join(client_abs_base_path, safe_order_subfolder, selected_doc_language_code) # Utiliser le code extrait
 
                 os.makedirs(target_lang_dir_abs, exist_ok=True)
                 file_name = os.path.basename(selected_file_path)
@@ -499,7 +543,7 @@ class DocumentsTab(QWidget):
 
                 # File path relative to client's base folder
                 file_path_relative_to_client_base = os.path.join(
-                    (os.path.join(safe_order_subfolder, selected_doc_language) if order_identifier else selected_doc_language),
+                    (os.path.join(safe_order_subfolder, selected_doc_language_code) if order_identifier else selected_doc_language_code), # Utiliser le code extrait
                     file_name
                 )
 
@@ -508,7 +552,7 @@ class DocumentsTab(QWidget):
                     "file_name_on_disk": file_name, # Storing just filename, path is derived
                     "file_path_relative": file_path_relative_to_client_base,
                     "document_type_generated": document_type_generated,
-                    "language_code": selected_doc_language, "source_template_id": None,
+                    "language_code": selected_doc_language_code, "source_template_id": None, # Utiliser le code extrait
                     "order_identifier": order_identifier, "user_id": self.current_user_id,
                     "notes": None, "version_tag": "1.0"
                 }

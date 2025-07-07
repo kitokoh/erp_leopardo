@@ -30,3 +30,29 @@ CONFIGURABLE_MODULES = [
     # If it needs to be configurable like others, its entry should be added above.
     {'key': 'module_commandes_management_enabled', 'name': 'commandes_management', 'action_attr': 'commande_management_action', 'widget_attr': 'commandes_dashboard_widget_instance', 'license_feature': FEATURE_COMMANDES_MANAGEMENT},
 ]
+
+# Langues supportées pour la génération de documents et l'interface
+# Clé: code langue (ISO 639-1), Valeur: Nom affichable (de préférence en anglais ou clé de traduction)
+SUPPORTED_LANGUAGES = {
+    "en": "English",
+    "fr": "French",
+    "ar": "Arabic",
+    "tr": "Turkish",
+    "pt": "Portuguese",
+    "ru": "Russian"
+    # Ajoutez d'autres langues ici au besoin
+}
+
+# Types de documents (exemples, à étendre selon les besoins de l'application)
+DOCUMENT_TYPE_PROFORMA_PDF = "PROFORMA_PDF" # Utilisé dans commande_widget
+DOCUMENT_TYPE_PROFORMA_HTML = "HTML_PROFORMA" # Utilisé dans commande_widget (pour le type de template)
+DOCUMENT_TYPE_PACKING_LIST_PDF = "PACKING_LIST_PDF"
+DOCUMENT_TYPE_TECHNICAL_SHEET_HTML = "TECHNICAL_SHEET_HTML"
+
+# Autres constantes pour les types de documents dans DocumentsTab
+DOC_TYPE_HTML = "HTML"
+DOC_TYPE_PDF = "PDF"
+DOC_TYPE_XLSX = "XLSX"
+DOC_TYPE_DOCX = "DOCX"
+DOC_TYPE_OTHER = "OTHER"
+DOC_TYPE_NOTE = "NOTE" # Ajouté pour les documents simples dans DocumentsTab
