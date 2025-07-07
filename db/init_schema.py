@@ -3081,6 +3081,35 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         except Exception as e_main_base_create:
             # This is where the original "NoReferencedTableError" for Products.created_by_user_id occurred.
             logging.error(f"DEBUG_INIT_DB: Error creating tables for MainBase: {e_main_base_create}", exc_info=True)
+
+        # --- Manual check and addition for Products.product_code ---
+        # This is a short-term fix. Alembic should be used for migrations.
+        try:
+            logging.info("DEBUG_INIT_DB: Checking for 'product_code' column in 'Products' table...")
+            cursor.execute("PRAGMA table_info(Products)")
+            products_columns_info = cursor.fetchall()
+            products_column_names = [info['name'] for info in products_columns_info]
+
+            if 'product_code' not in products_column_names:
+                logging.warning("DEBUG_INIT_DB: 'product_code' column NOT FOUND in 'Products' table. Attempting to add it.")
+                try:
+                    cursor.execute("ALTER TABLE Products ADD COLUMN product_code TEXT")
+                    # The SQLAlchemy model defines unique=True, nullable=True.
+                    # The UNIQUE constraint would ideally be added too, but ALTER TABLE for constraints is limited in SQLite.
+                    # For new inserts, SQLAlchemy will respect the model's uniqueness.
+                    # For existing data, this just adds the column.
+                    conn.commit() # Commit this change immediately
+                    logging.info("DEBUG_INIT_DB: Successfully ADDED 'product_code' column to 'Products' table.")
+                except sqlite3.Error as e_alter_products:
+                    logging.error(f"DEBUG_INIT_DB: FAILED to add 'product_code' column to 'Products' table: {e_alter_products}", exc_info=True)
+                    conn.rollback() # Rollback if alter fails
+            else:
+                logging.info("DEBUG_INIT_DB: 'product_code' column already exists in 'Products' table.")
+        except sqlite3.Error as e_check_products:
+            # This might happen if Products table itself doesn't exist, though create_all should have handled it.
+            logging.error(f"DEBUG_INIT_DB: Error checking 'Products' table schema for 'product_code': {e_check_products}", exc_info=True)
+        # --- End manual check for Products.product_code ---
+
     else:
         logging.warning("DEBUG_INIT_DB: Main SQLAlchemy components (MainBase, actual_main_engine) not loaded or actual_main_engine is None. Skipping MainBase.metadata.create_all().")
 
