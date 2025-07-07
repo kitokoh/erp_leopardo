@@ -259,6 +259,8 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
 
         logger.info(f"AUTH_LOGIN: User '{username}' found. User data: ID={user.get('user_id')}, RoleName={user.get('role_name')}, HashedPW={user.get('hashed_password')}")
 
+        logger.info(f"AUTH_LOGIN: User '{username}' found. User data: ID={user.get('user_id')}, RoleName={user.get('role_name')}, HashedPW={user.get('hashed_password')}")
+
         if not user.get('is_active'):
             logger.warning(f"AUTH_LOGIN: User '{username}' is inactive.")
             return False, "Ce compte utilisateur est désactivé.", None, None
