@@ -126,4 +126,3 @@ if __name__ == '__main__':
     else:
         print("Request Password Reset Dialog Cancelled.")
     sys.exit(app.exec_())
-"""

@@ -10,7 +10,8 @@ def get_country_by_name(name: str, conn: sqlite3.Connection = None) -> dict | No
     try:
         cursor.execute("SELECT * FROM Countries WHERE country_name = ?",(name,))
         row=cursor.fetchone()
-        return dict(row) if row else None
+        # return dict(row) if row else None
+        return {key: row[key] for key in row.keys()} if row else None
     except sqlite3.Error as e:
         logging.error(f"Error getting country by name '{name}': {e}")
         return None
@@ -21,7 +22,8 @@ def get_country_by_id(id: int, conn: sqlite3.Connection = None) -> dict | None:
     try:
         cursor.execute("SELECT * FROM Countries WHERE country_id = ?",(id,))
         row=cursor.fetchone()
-        return dict(row) if row else None
+        # return dict(row) if row else None
+        return {key: row[key] for key in row.keys()} if row else None
     except sqlite3.Error as e:
         logging.error(f"Error getting country by id {id}: {e}")
         return None
@@ -37,7 +39,8 @@ def get_or_add_country(country_name: str, conn: sqlite3.Connection = None) -> di
         cursor.execute("SELECT * FROM Countries WHERE country_name = ?", (country_name,))
         row = cursor.fetchone()
         if row:
-            return dict(row)
+            # return dict(row)
+            return {key: row[key] for key in row.keys()} if row else None
         else:
             now = datetime.utcnow().isoformat() + "Z"
             sql = "INSERT INTO Countries (country_name, created_at, updated_at) VALUES (?, ?, ?)"
@@ -53,7 +56,8 @@ def get_or_add_country(country_name: str, conn: sqlite3.Connection = None) -> di
         logging.warning(f"Integrity error adding country '{country_name}', trying to fetch again.")
         cursor.execute("SELECT * FROM Countries WHERE country_name = ?", (country_name,))
         row_after_error = cursor.fetchone()
-        return dict(row_after_error) if row_after_error else None
+        # return dict(row_after_error) if row_after_error else None
+        return {key: row_after_error[key] for key in row_after_error.keys()} if row_after_error else None
     except sqlite3.Error as e_general:
         logging.error(f"General SQLite error in get_or_add_country for '{country_name}': {e_general}")
         return None
@@ -92,7 +96,8 @@ def get_all_countries(conn: sqlite3.Connection = None) -> list[dict]:
     cursor = conn.cursor()
     try:
         cursor.execute("SELECT * FROM Countries ORDER BY country_name")
-        return [dict(row) for row in cursor.fetchall()]
+        # return [dict(row) for row in cursor.fetchall()]
+        return [{key: item[key] for key in item.keys()} for item in cursor.fetchall()]
     except sqlite3.Error as e:
         logging.error(f"Database error in get_all_countries: {e}")
         return []
@@ -104,7 +109,8 @@ def get_city_by_name_and_country_id(name: str, country_id: int, conn: sqlite3.Co
     try:
         cursor.execute("SELECT * FROM Cities WHERE city_name = ? AND country_id = ?",(name,country_id))
         row=cursor.fetchone()
-        return dict(row) if row else None
+        # return dict(row) if row else None
+        return {key: row[key] for key in row.keys()} if row else None
     except sqlite3.Error as e:
         logging.error(f"Error getting city by name '{name}' and country_id {country_id}: {e}")
         return None
@@ -115,7 +121,8 @@ def get_city_by_id(id: int, conn: sqlite3.Connection = None) -> dict | None:
     try:
         cursor.execute("SELECT * FROM Cities WHERE city_id = ?",(id,))
         row=cursor.fetchone()
-        return dict(row) if row else None
+        # return dict(row) if row else None
+        return {key: row[key] for key in row.keys()} if row else None
     except sqlite3.Error as e:
         logging.error(f"Error getting city by id {id}: {e}")
         return None
@@ -157,7 +164,8 @@ def get_or_add_city(city_name: str, country_id: int, conn: sqlite3.Connection = 
         cursor.execute("SELECT * FROM Cities WHERE city_name = ? AND country_id = ?", (city_name, country_id))
         row = cursor.fetchone()
         if row:
-            return dict(row)
+            # return dict(row)
+            return {key: row[key] for key in row.keys()} if row else None
         else:
             now = datetime.utcnow().isoformat() + "Z"
             sql = "INSERT INTO Cities (city_name, country_id, created_at, updated_at) VALUES (?, ?, ?, ?)"
@@ -192,7 +200,8 @@ def get_all_cities(country_id: int = None, conn: sqlite3.Connection = None) -> l
     sql += " ORDER BY city_name" # Or country_id, city_name
     try:
         cursor.execute(sql, params)
-        return [dict(row) for row in cursor.fetchall()]
+        # return [dict(row) for row in cursor.fetchall()]
+        return [{key: item[key] for key in item.keys()} for item in cursor.fetchall()]
     except sqlite3.Error as e:
         logging.error(f"Database error in get_all_cities (country_id={country_id}): {e}")
         return []

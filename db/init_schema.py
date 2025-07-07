@@ -43,6 +43,7 @@ except ImportError as e_main_sqlalchemy:
     MainBase = None # Ensure it's None so later checks don't fail with NameError
     # main_engine = None # No longer importing main_engine directly at the top
 
+from sqlalchemy import Table, Column, Text # Added for reflecting Users table more explicitly
 
 from auth.roles import SUPER_ADMIN
 
@@ -3039,25 +3040,46 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         print("DEBUG_INIT_DB: Raw SQLite connection for Calendar module closed.")
     # --- End Calendar Module Tables ---
 
-    # --- Create tables for MainBase (e.g., CalculatorHistory) ---
+    # --- Create tables for MainBase (e.g., CalculatorHistory, Products, Accounting tables) ---
     # This needs to happen after the main 'conn' is closed if 'actual_main_engine' uses a new connection.
+    # The 'Users' table (created by raw SQL) needs to be known to MainBase.metadata for FKs.
     if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None and actual_main_engine is not None:
+        logging.info("DEBUG_INIT_DB: Preparing to call MainBase.metadata.create_all().")
+        try:
+            # Explicitly reflect the 'Users' table if it's created by raw SQL and other SQLAlchemy models depend on it.
+            # This makes SQLAlchemy's metadata aware of the 'Users' table structure.
+            # Ensure this happens after 'Users' table is created and committed by raw SQL,
+            # and actual_main_engine is initialized.
+            logging.info("DEBUG_INIT_DB: Attempting to reflect 'Users' table into MainBase.metadata.")
+            # We define the primary key column and type explicitly for robust reflection.
+            # Other columns will be autoloaded.
+            users_table_for_reflection = Table('Users', MainBase.metadata,
+                                               Column('user_id', Text, primary_key=True),
+                                               autoload_with=actual_main_engine,
+                                               extend_existing=True) # Important if other parts of code might also define 'Users'
+            logging.info(f"DEBUG_INIT_DB: 'Users' table reflected. Columns: {users_table_for_reflection.columns.keys()}")
+        except Exception as e_reflect_users:
+            logging.error(f"DEBUG_INIT_DB: Error reflecting 'Users' table: {e_reflect_users}. Proceeding with create_all, but FK issues might persist.", exc_info=True)
+
         try:
             # Import B2C restaurant models to register them with MainBase before create_all
             # This ensures that if b2c.ges_restaurant.models uses the same MainBase, its tables are included.
-            import b2c.ges_restaurant.models
+            import b2c.ges_restaurant.models # This registers restaurant models with MainBase
             logging.info("DEBUG_INIT_DB: Imported b2c.ges_restaurant.models for schema creation with MainBase.")
-        except ImportError as e_import_b2c_for_mainbase:
-            logging.error(f"DEBUG_INIT_DB: Failed to import b2c.ges_restaurant.models for MainBase, restaurant tables might not be created if they share MainBase: {e_import_b2c_for_mainbase}")
-        except Exception as e_b2c_generic_for_mainbase:
-            logging.error(f"DEBUG_INIT_DB: An unexpected error occurred during import of b2c.ges_restaurant.models for MainBase: {e_b2c_generic_for_mainbase}", exc_info=True)
+            # Also ensure accounting models are imported if they share MainBase
+            import accounting.models # This registers accounting models with MainBase
+            logging.info("DEBUG_INIT_DB: Imported accounting.models for schema creation with MainBase.")
+        except ImportError as e_import_models_for_mainbase:
+            logging.error(f"DEBUG_INIT_DB: Failed to import additional models (b2c or accounting) for MainBase: {e_import_models_for_mainbase}")
+        except Exception as e_generic_import_for_mainbase:
+            logging.error(f"DEBUG_INIT_DB: An unexpected error occurred during import of additional models for MainBase: {e_generic_import_for_mainbase}", exc_info=True)
 
         try:
-            logging.info("DEBUG_INIT_DB: Creating tables for MainBase (e.g., CalculatorHistory, Restaurant*) using SQLAlchemy actual_main_engine.")
+            logging.info("DEBUG_INIT_DB: Creating tables for MainBase (e.g., CalculatorHistory, Products, Accounting, Restaurant*) using SQLAlchemy actual_main_engine.")
             MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True)
-
             logging.info("DEBUG_INIT_DB: Tables for MainBase created successfully.")
         except Exception as e_main_base_create:
+            # This is where the original "NoReferencedTableError" for Products.created_by_user_id occurred.
             logging.error(f"DEBUG_INIT_DB: Error creating tables for MainBase: {e_main_base_create}", exc_info=True)
     else:
         logging.warning("DEBUG_INIT_DB: Main SQLAlchemy components (MainBase, actual_main_engine) not loaded or actual_main_engine is None. Skipping MainBase.metadata.create_all().")
