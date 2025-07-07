@@ -161,3 +161,56 @@ def client_create_view(request):
         'submit_button_text': 'Enregistrer le Client' # Texte pour le bouton de soumission
     }
     return render(request, 'clients/client_form.html', context)
+
+
+@login_required
+def client_detail_view(request, client_id): # client_id est passé par l'URL
+    api_auth_token = request.session.get('api_auth_token')
+    active_company_id = request.session.get('active_company_id') # Utilisé pour le contexte, l'API gère la permission
+    active_company_name = request.session.get('active_company_name', 'N/A')
+
+    if not api_auth_token:
+        messages.error(request, "Erreur d'authentification API. Veuillez vous reconnecter.")
+        return redirect('users:login')
+
+    # Bien que l'API ClientViewSet doive filtrer par company, avoir active_company_id ici
+    # est utile pour le contexte ou si on voulait ajouter une vérification supplémentaire (redondante si API bien faite).
+    if not active_company_id:
+        messages.warning(request, "Veuillez sélectionner une société active.")
+        return redirect(getattr(settings, 'LOGIN_REDIRECT_URL', 'dashboard:main'))
+
+    headers = {'Authorization': f'Token {api_auth_token}'}
+    client_detail_api_url = f"{API_BASE_URL}/clients/{client_id}/"
+
+    client_data = None
+    try:
+        response = requests.get(client_detail_api_url, headers=headers)
+        response.raise_for_status()
+        client_data = response.json()
+
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 404:
+            messages.error(request, "Client non trouvé ou vous n'avez pas la permission de le voir.")
+            return redirect('clients:list') # Rediriger vers la liste
+        elif e.response.status_code == 401:
+             messages.error(request, "Session API invalide. Veuillez vous reconnecter.")
+             return redirect('users:login')
+        elif e.response.status_code == 403: # Normalement géré par le 404 du ViewSet si le queryset ne trouve rien
+             messages.error(request, "Vous n'êtes pas autorisé à voir ce client.")
+             return redirect('clients:list')
+        else:
+            messages.error(request, f"Erreur lors de la récupération du client (API Error {e.response.status_code}).")
+            return redirect('clients:list') # Ou une page d'erreur générique
+    except requests.exceptions.RequestException:
+        messages.error(request, "Erreur de communication avec le service des clients.")
+        return redirect('clients:list')
+    except ValueError: # Erreur de décodage JSON
+        messages.error(request, "Réponse invalide du service des clients.")
+        return redirect('clients:list')
+
+    context = {
+        'client': client_data,
+        'page_title': f"Détails du Client : {client_data.get('client_name', '') if client_data else 'N/A'}",
+        'active_company_name': active_company_name,
+    }
+    return render(request, 'clients/client_detail.html', context)

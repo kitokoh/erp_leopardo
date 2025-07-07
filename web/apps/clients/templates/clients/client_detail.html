@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% load humanize %} {# Pour améliorer l'affichage des dates/nombres si besoin plus tard #}
+
+{% block title %}
+    {{ page_title|default:"Détail Client" }} - {{ block.super }}
+    {% if active_company_name %}
+        ({{ active_company_name }})
+    {% endif %}
+{% endblock title %}
+
+{% block content %}
+<div class="container mt-4">
+    {% if client %}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>
+            {{ client.client_name }}
+            {% if client.is_active %}
+                <span class="badge bg-success fs-6 ms-2">Actif</span>
+            {% else %}
+                <span class="badge bg-secondary fs-6 ms-2">Inactif</span>
+            {% endif %}
+        </h2>
+        <div>
+            {# <a href="{% url 'clients:update' client.id %}" class="btn btn-outline-primary me-2"> #}
+            <a href="#" class="btn btn-outline-primary me-2"> {# URL de modification à définir #}
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pencil-square" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/></svg>
+                Modifier
+            </a>
+            <a href="{% url 'clients:list' %}" class="btn btn-outline-secondary">Retour à la liste</a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header">
+            Informations du Client
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Nom du Client :</strong><br> {{ client.client_name }}</p>
+                    <p><strong>Email :</strong><br> {{ client.email|default:"Non renseigné" }}</p>
+                    <p><strong>Téléphone :</strong><br> {{ client.phone|default:"Non renseigné" }}</p>
+                    <p><strong>Adresse :</strong><br> {{ client.address|linebreaksbr|default:"Non renseignée" }}</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Personne de Contact :</strong><br> {{ client.contact_person_name|default:"Non renseigné" }}</p>
+                    <p><strong>Email du Contact :</strong><br> {{ client.contact_person_email|default:"Non renseigné" }}</p>
+                    <p><strong>Téléphone du Contact :</strong><br> {{ client.contact_person_phone|default:"Non renseigné" }}</p>
+                    <p><strong>Société Propriétaire :</strong><br>
+                        {{ client.company_account_name|default:active_company_name|default:"N/A" }}
+                    </p>
+                </div>
+            </div>
+            <hr>
+            <p><strong>Notes Internes :</strong><br> {{ client.notes|linebreaksbr|default:"Aucune note." }}</p>
+            <hr>
+            <div class="row">
+                <div class="col-sm-6">
+                    <p class="text-muted"><small>ID Client : {{ client.id }}</small></p>
+                </div>
+                <div class="col-sm-6 text-sm-end">
+                    <p class="text-muted">
+                        <small>Créé le : {{ client.created_at|date:"d/m/Y H:i" }}</small><br>
+                        <small>Mis à jour le : {{ client.updated_at|date:"d/m/Y H:i" }}</small>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Section pour les documents liés (à implémenter plus tard) #}
+    <div class="mt-4">
+        <h4>Documents Associés</h4>
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <p class="text-muted"><em>La liste des documents pour ce client sera affichée ici.</em></p>
+                {# Exemple de structure de table si on avait les documents
+                <table class="table table-sm">
+                    <thead>
+                        <tr><th>Référence</th><th>Type</th><th>Date</th><th>Statut</th><th>Montant</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="5">Aucun document pour l'instant.</td></tr>
+                    </tbody>
+                </table>
+                #}
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-warning" role="alert">
+        Les informations du client n'ont pas pu être chargées ou le client n'existe pas.
+        <a href="{% url 'clients:list' %}" class="alert-link">Retour à la liste des clients</a>.
+    </div>
+    {% endif %}
+</div>
+{% endblock content %}

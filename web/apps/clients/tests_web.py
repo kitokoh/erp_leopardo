@@ -357,5 +357,130 @@ class ClientCreateViewWebTests(TestCase):
 # Nécessaire pour récupérer les messages après une redirection
 from django.contrib.messages import get_messages
 # Importer ClientForm depuis le bon endroit
-from .forms import ClientForm
+from .forms import ClientForm # , ClientFilterForm (si on teste le form de filtre)
 from django.conf import settings
+from .models import Client # Importer Client pour créer une instance de test
+
+class ClientDetailViewWebTests(TestCase):
+    def setUp(self):
+        self.django_client = DjangoClient()
+        self.login_url = reverse('users:login')
+
+        self.test_user = User.objects.create_user(
+            username='detailclientuser',
+            email='detailclientuser@example.com',
+            password='password123'
+        )
+        self.test_company = Company.objects.create(name="Detail Client Test Co", owner=self.test_user)
+
+        self.client_instance = Client.objects.create(
+            company_account=self.test_company,
+            client_name="Detailed Client One",
+            email="detailed@example.com",
+            phone="555-1234"
+        )
+        self.detail_url = reverse('clients:detail', kwargs={'client_id': self.client_instance.id})
+
+        # Connexion et setup session
+        self.django_client.login(username='detailclientuser@example.com', password='password123')
+        session = self.django_client.session
+        session['api_auth_token'] = 'faketesttoken_detail123'
+        session['active_company_id'] = str(self.test_company.id)
+        session['active_company_name'] = self.test_company.name
+        session.save()
+
+        # Réponse API mockée pour un détail client réussi
+        self.mock_api_detail_success_response = {
+            "id": str(self.client_instance.id),
+            "client_name": "Detailed Client One",
+            "email": "detailed@example.com",
+            "phone": "555-1234",
+            "address": "123 Detail St",
+            "contact_person_name": "Contact D.",
+            "contact_person_email": "contactd@example.com",
+            "contact_person_phone": "555-0000",
+            "notes": "Some notes here.",
+            "is_active": True,
+            "company_account": str(self.test_company.id),
+            "company_account_name": self.test_company.name,
+            "created_at": "2023-01-10T10:00:00Z",
+            "updated_at": "2023-01-10T11:00:00Z",
+        }
+
+    def test_client_detail_view_unauthenticated(self):
+        self.django_client.logout()
+        response = self.django_client.get(self.detail_url)
+        self.assertRedirects(response, f"{self.login_url}?next={self.detail_url}")
+
+    @patch('requests.get')
+    def test_client_detail_view_displays_data_from_api(self, mock_api_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = self.mock_api_detail_success_response
+        mock_api_get.return_value = mock_response
+
+        response = self.django_client.get(self.detail_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'clients/client_detail.html')
+        self.assertIn('client', response.context)
+        self.assertEqual(response.context['client']['client_name'], "Detailed Client One")
+        self.assertContains(response, "Detailed Client One")
+        self.assertContains(response, "detailed@example.com")
+
+        expected_api_url = f"http://localhost:8000/api/v1/clients/{self.client_instance.id}/"
+        mock_api_get.assert_called_once_with(
+            expected_api_url,
+            headers={'Authorization': f'Token faketesttoken_detail123'}
+        )
+
+    @patch('requests.get')
+    def test_client_detail_view_api_returns_404(self, mock_api_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(response=mock_response)
+        mock_api_get.return_value = mock_response
+
+        response = self.django_client.get(self.detail_url)
+        self.assertRedirects(response, reverse('clients:list')) # Redirige vers la liste
+        messages_list = list(get_messages(response.wsgi_request))
+        self.assertTrue(any("Client non trouvé" in str(m) for m in messages_list))
+
+    @patch('requests.get')
+    def test_client_detail_view_api_returns_403_forbidden(self, mock_api_get):
+        # Simule le cas où l'API retourne 403 car le client n'appartient pas à la société de l'user
+        # (même si notre ViewSet API devrait plutôt retourner 404 dans ce cas via le filtrage du queryset)
+        mock_response = MagicMock()
+        mock_response.status_code = 403
+        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(response=mock_response)
+        mock_api_get.return_value = mock_response
+
+        response = self.django_client.get(self.detail_url)
+        self.assertRedirects(response, reverse('clients:list'))
+        messages_list = list(get_messages(response.wsgi_request))
+        self.assertTrue(any("Vous n'êtes pas autorisé à voir ce client" in str(m) for m in messages_list))
+
+
+    def test_client_detail_view_no_active_company_in_session(self):
+        session = self.django_client.session
+        del session['active_company_id']
+        session.save()
+
+        response = self.django_client.get(self.detail_url)
+        self.assertRedirects(response, reverse(settings.LOGIN_REDIRECT_URL))
+        # Le message d'avertissement est affiché sur la requête avant redirection.
+        # Pour le tester, il faudrait suivre la redirection et vérifier le contexte de la page finale,
+        # ou inspecter la réponse avant redirection si possible (plus complexe avec le client de test).
+
+    # Test pour vérifier que le lien "Modifier" et "Retour à la liste" sont présents
+    @patch('requests.get')
+    def test_client_detail_view_action_links_present(self, mock_api_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = self.mock_api_detail_success_response
+        mock_api_get.return_value = mock_response
+
+        response = self.django_client.get(self.detail_url)
+        self.assertEqual(response.status_code, 200)
+        # self.assertContains(response, reverse('clients:update', kwargs={'client_id': self.client_instance.id})) # Quand l'URL update sera prête
+        self.assertContains(response, "Modifier") # Vérifier le texte du bouton pour l'instant
+        self.assertContains(response, reverse('clients:list'))
