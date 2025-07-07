@@ -1,5 +1,7 @@
 import sqlite3 # Keep for type hint reference if _manage_conn can provide both
 from sqlalchemy.sql import text # Import text
+from sqlalchemy.orm import Session
+from sqlalchemy.engine import Engine, Connection as SQLAlchemyConnection
 from datetime import datetime
 import logging
 from .generic_crud import _manage_conn
@@ -9,21 +11,26 @@ from .generic_crud import _manage_conn
 def get_setting(key: str, default: any = None, conn = None) -> any: # conn type can be Session or Connection
     value_to_return = default
     try:
-        # Check if conn is SQLAlchemy Session or sqlite3 Connection
-        if hasattr(conn, 'execute'): # Likely SQLAlchemy Session or Engine
+        # Check if conn is SQLAlchemy Session, Engine, or Connection
+        if isinstance(conn, (Session, Engine, SQLAlchemyConnection)):
             # SQLAlchemy execution
             stmt = text("SELECT setting_value FROM ApplicationSettings WHERE setting_key = :key")
             result = conn.execute(stmt, {"key": key})
             row = result.fetchone()
             if row:
-                # Access by index or by name if known (e.g., row[0] or row._mapping['setting_value'])
+                # Access by index (e.g., row[0])
                 value_to_return = row[0]
-        else: # Fallback to sqlite3.Connection interface (original code)
+        elif hasattr(conn, 'cursor'): # Fallback to sqlite3.Connection interface
             cursor = conn.cursor()
             cursor.execute("SELECT setting_value FROM ApplicationSettings WHERE setting_key = ?", (key,))
             row = cursor.fetchone()
             if row:
-                value_to_return = row['setting_value'] # sqlite3 rows are dict-like or tuple
+                # sqlite3 rows can be accessed by index or by name if row_factory is set
+                # Assuming row is a tuple or a row object that supports indexed access like a tuple
+                value_to_return = row[0] if isinstance(row, tuple) else row['setting_value']
+        else:
+            logging.error(f"Unsupported connection type for get_setting: {type(conn)}")
+            return default
 
         logging.info(f"Retrieved setting: {key} = {value_to_return}")
         return value_to_return
@@ -36,19 +43,25 @@ def get_setting(key: str, default: any = None, conn = None) -> any: # conn type 
 def set_setting(key: str, value: str, conn = None, **kwargs) -> bool: # conn type can be Session or Connection
     try:
         logging.info(f"Setting value for key {key} = {value}")
-        if hasattr(conn, 'execute'): # Likely SQLAlchemy Session or Engine
+        # Check if conn is an SQLAlchemy Session, Engine, or Connection
+        if isinstance(conn, (Session, Engine, SQLAlchemyConnection)):
             stmt = text("INSERT OR REPLACE INTO ApplicationSettings (setting_key, setting_value) VALUES (:key, :value)")
             result = conn.execute(stmt, {"key": key, "value": value})
             # For SQLAlchemy, commit is often handled by the session's context manager or explicitly outside.
-            # If _manage_conn handles session commit, this is fine. Otherwise, conn.commit() might be needed if conn is a Session.
-            # Assuming _manage_conn handles commit for session if it provided one.
-            return result.rowcount > 0 if hasattr(result, 'rowcount') else True # rowcount might not be straightforward for all session.execute
-        else: # Fallback to sqlite3.Connection interface
+            # _manage_conn is assumed to handle commit for session if it provided one.
+            # result.rowcount might not be available/reliable for all drivers/statements with SQLAlchemy,
+            # but for INSERT/REPLACE it usually is.
+            return result.rowcount > 0 if hasattr(result, 'rowcount') else True
+        elif hasattr(conn, 'cursor'): # Fallback to sqlite3.Connection interface (DBAPI)
+            # This branch handles raw sqlite3 connections
             cursor = conn.cursor()
             sql = "INSERT OR REPLACE INTO ApplicationSettings (setting_key, setting_value) VALUES (?, ?)"
             cursor.execute(sql, (key, value))
             # conn.commit() is handled by _manage_conn for sqlite3
             return cursor.rowcount > 0
+        else:
+            logging.error(f"Unsupported connection type for set_setting: {type(conn)}")
+            return False
     except Exception as e: # Catch generic Exception
         logging.error(f"Failed to set setting for key {key}, value {value}: {e}", exc_info=True)
         return False
