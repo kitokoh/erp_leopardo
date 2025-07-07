@@ -1248,15 +1248,16 @@ CREATE TABLE IF NOT EXISTS Templates (
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         created_by_user_id TEXT,
+        deleted_at TEXT, -- Added for soft delete
         FOREIGN KEY (client_id) REFERENCES Clients (client_id) ON DELETE CASCADE,
         FOREIGN KEY (project_id) REFERENCES Projects (project_id) ON DELETE SET NULL,
         FOREIGN KEY (status_commande_id) REFERENCES StatusSettings (status_id),
         FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL
     )
     """)
-    print("DEBUG_INIT_DB: Table Commandes created or exists.")
+    print("DEBUG_INIT_DB: Table Commandes created or exists (with deleted_at).")
 
-    # Ensure notes and is_default columns exist in Commandes table for existing databases
+    # Ensure notes, is_default, and deleted_at columns exist in Commandes table for existing databases
     cursor.execute("PRAGMA table_info(Commandes)")
     commandes_columns_info = cursor.fetchall()
     commandes_column_names = [info['name'] for info in commandes_columns_info]
@@ -1274,6 +1275,13 @@ CREATE TABLE IF NOT EXISTS Templates (
             print("DEBUG_INIT_DB: Added 'is_default' column to Commandes table.")
         except sqlite3.Error as e_alter_commandes_is_default:
             print(f"DEBUG_INIT_DB: Error adding 'is_default' column to Commandes table: {e_alter_commandes_is_default}")
+
+    if 'deleted_at' not in commandes_column_names:
+        try:
+            cursor.execute("ALTER TABLE Commandes ADD COLUMN deleted_at TEXT")
+            print("DEBUG_INIT_DB: Added 'deleted_at' column to Commandes table.")
+        except sqlite3.Error as e_alter_commandes_deleted_at:
+            print(f"DEBUG_INIT_DB: Error adding 'deleted_at' column to Commandes table: {e_alter_commandes_deleted_at}")
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS CommandeItems (
