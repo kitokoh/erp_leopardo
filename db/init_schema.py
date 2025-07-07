@@ -3289,63 +3289,66 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
                     base_curr = acc_cruds.currency.get_base_currency(db=session)
                     if not base_curr:
                         print("DEBUG_INIT_DB: No base currency found. Seeding USD as base.")
+                        usd_currency_in = acc_models_pydantic.CurrencyCreate(
+                            code="USD",
+                            name="US Dollar",
+                            symbol="$",
+                            exchange_rate_to_base=Decimal("1.000000"),
+                            is_base_currency=True
+                        )
+                        acc_cruds.currency.create(db=session, obj_in=usd_currency_in)
+                        print("DEBUG_INIT_DB: USD seeded as base currency.")
+
+                    current_year_name = f"FY{datetime.now().year}"
+                    existing_fy = acc_cruds.fiscal_year.get_by_name(db=session, name=current_year_name)
+                    if not existing_fy:
+                        print(f"DEBUG_INIT_DB: No fiscal year found for {current_year_name}. Seeding it now.")
+                        default_fy_in = acc_models_pydantic.FiscalYearCreate(
+                            name=current_year_name,
+                            start_date=date(datetime.now().year, 1, 1),
+                            end_date=date(datetime.now().year, 12, 31),
+                            status=acc_models_pydantic.FiscalYearStatusEnum.OPEN
+                        )
+                        acc_cruds.fiscal_year.create(db=session, obj_in=default_fy_in)
+                        print(f"DEBUG_INIT_DB: Fiscal year {current_year_name} seeded.")
+
+                    if not acc_cruds.chart_of_accounts.get_multi(db=session, limit=1): # Check if any account exists
+                        print("DEBUG_INIT_DB: Chart of Accounts is empty. Seeding minimal accounts.")
+                        accounts_to_seed = [
+                            {"code": "1010", "name": "Cash", "account_type": acc_models_pydantic.AccountTypeEnum.ASSET},
+                            {"code": "1020", "name": "Accounts Receivable", "account_type": acc_models_pydantic.AccountTypeEnum.ASSET},
+                            {"code": "2010", "name": "Accounts Payable", "account_type": acc_models_pydantic.AccountTypeEnum.LIABILITY},
+                            {"code": "3010", "name": "Common Stock", "account_type": acc_models_pydantic.AccountTypeEnum.EQUITY},
+                            {"code": "4010", "name": "Sales Revenue", "account_type": acc_models_pydantic.AccountTypeEnum.REVENUE},
+                            {"code": "5010", "name": "Office Supplies Expense", "account_type": acc_models_pydantic.AccountTypeEnum.EXPENSE},
+                        ]
+                        for acc_data in accounts_to_seed:
+                            acc_in = acc_models_pydantic.ChartOfAccountsCreate(**acc_data)
+                            if not acc_cruds.chart_of_accounts.get_by_code(db=session, code=acc_in.code):
+                                acc_cruds.chart_of_accounts.create(db=session, obj_in=acc_in)
+                        print("DEBUG_INIT_DB: Minimal Chart of Accounts seeded.")
+
+                    session.commit() # Commit SQLAlchemy session changes
+                    print("DEBUG_INIT_DB: Accounting module specific seed data committed using SQLAlchemy session.")
             else:
                 logging.error("DEBUG_INIT_DB: actual_main_engine is None. Cannot seed accounting data.")
                 print("DEBUG_INIT_DB: actual_main_engine is None. Cannot seed accounting data.")
-                # Important: If actual_main_engine is None, we should not proceed to conn.rollback()
-                # as if an error occurred in *this* block, because the issue is upstream.
                 # The original 'conn.rollback()' in the except block for e_acc_seed might still be problematic
-                # if it rolls back unrelated changes.
-                # For now, this change focuses on fixing engine_acc.
-                # Consider raising an error here or ensuring the except block is more specific.
-                    usd_currency_in = acc_models_pydantic.CurrencyCreate(
-                        code="USD",
-                        name="US Dollar",
-                        symbol="$",
-                        exchange_rate_to_base=Decimal("1.000000"),
-                        is_base_currency=True
-                    )
-                    acc_cruds.currency.create(db=session, obj_in=usd_currency_in)
-                    print("DEBUG_INIT_DB: USD seeded as base currency.")
+                # if it rolls back unrelated changes. If actual_main_engine is None, this block is skipped,
+                # so the rollback in the outer try/except for e_acc_seed won't be triggered by this specific path.
 
-                current_year_name = f"FY{datetime.now().year}"
-                existing_fy = acc_cruds.fiscal_year.get_by_name(db=session, name=current_year_name)
-                if not existing_fy:
-                    print(f"DEBUG_INIT_DB: No fiscal year found for {current_year_name}. Seeding it now.")
-                    default_fy_in = acc_models_pydantic.FiscalYearCreate(
-                        name=current_year_name,
-                        start_date=date(datetime.now().year, 1, 1),
-                        end_date=date(datetime.now().year, 12, 31),
-                        status=acc_models_pydantic.FiscalYearStatusEnum.OPEN
-                    )
-                    acc_cruds.fiscal_year.create(db=session, obj_in=default_fy_in)
-                    print(f"DEBUG_INIT_DB: Fiscal year {current_year_name} seeded.")
-
-                if not acc_cruds.chart_of_accounts.get_multi(db=session, limit=1): # Check if any account exists
-                    print("DEBUG_INIT_DB: Chart of Accounts is empty. Seeding minimal accounts.")
-                    accounts_to_seed = [
-                        {"code": "1010", "name": "Cash", "account_type": acc_models_pydantic.AccountTypeEnum.ASSET},
-                        {"code": "1020", "name": "Accounts Receivable", "account_type": acc_models_pydantic.AccountTypeEnum.ASSET},
-                        {"code": "2010", "name": "Accounts Payable", "account_type": acc_models_pydantic.AccountTypeEnum.LIABILITY},
-                        {"code": "3010", "name": "Common Stock", "account_type": acc_models_pydantic.AccountTypeEnum.EQUITY},
-                        {"code": "4010", "name": "Sales Revenue", "account_type": acc_models_pydantic.AccountTypeEnum.REVENUE},
-                        {"code": "5010", "name": "Office Supplies Expense", "account_type": acc_models_pydantic.AccountTypeEnum.EXPENSE},
-                    ]
-                    for acc_data in accounts_to_seed:
-                        acc_in = acc_models_pydantic.ChartOfAccountsCreate(**acc_data)
-                        if not acc_cruds.chart_of_accounts.get_by_code(db=session, code=acc_in.code):
-                            acc_cruds.chart_of_accounts.create(db=session, obj_in=acc_in)
-                    print("DEBUG_INIT_DB: Minimal Chart of Accounts seeded.")
-
-                session.commit() # Commit SQLAlchemy session changes
-                print("DEBUG_INIT_DB: Accounting module specific seed data committed using SQLAlchemy session.")
 
         except ImportError:
             print("DEBUG_INIT_DB: Could not import accounting cruds/models for seeding. Skipping accounting seed data.")
         except Exception as e_acc_seed:
-            print(f"DEBUG_INIT_DB: Error during accounting data seeding: {e_acc_seed}")
-            conn.rollback() # Rollback accounting seed data on error
-            print("DEBUG_INIT_DB: Rollback due to accounting seeding error.")
+            logging.error(f"DEBUG_INIT_DB: Error during accounting data seeding: {e_acc_seed}", exc_info=True) # Log with traceback
+            # Only rollback 'conn' if the error is truly from this block's operations,
+            # not if actual_main_engine was None from the start.
+            if actual_main_engine: # Check if we even attempted operations that might need rollback on 'conn'
+                conn.rollback()
+                print("DEBUG_INIT_DB: Rollback on 'conn' due to accounting seeding error.")
+            else:
+                print("DEBUG_INIT_DB: Accounting seeding skipped due to missing actual_main_engine, no rollback on 'conn' from this point.")
 
 
         # User Seeding (Admin user) - This initial seeding attempt is now handled by db_seed.py
