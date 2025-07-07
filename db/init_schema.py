@@ -3362,6 +3362,14 @@ if __name__ == '__main__':
     }
     print(f"Using mock database path for standalone test: {mock_app_config['database_path']}")
 
+    # Ensure a clean state by deleting the test database file if it exists
+    if os.path.exists(mock_app_config["database_path"]):
+        try:
+            os.remove(mock_app_config["database_path"])
+            print(f"Deleted existing test database: {mock_app_config['database_path']}")
+        except OSError as e:
+            print(f"Error deleting test database {mock_app_config['database_path']}: {e}. Proceeding might use old data or fail.")
+
     # Ensure the directory for the mock database exists
     _test_db_dir = os.path.dirname(mock_app_config["database_path"])
     if _test_db_dir and not os.path.exists(_test_db_dir):
