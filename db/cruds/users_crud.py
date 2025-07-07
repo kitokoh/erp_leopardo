@@ -467,4 +467,4 @@ def get_user_by_email(email: str, conn=None, logger_passed: logging.Logger | Non
     if user_data: current_logger.debug(f"User with email '{email}' found.")
     else: current_logger.debug(f"User with email '{email}' not found.")
     return user_data
-        return None
+        # # return None
