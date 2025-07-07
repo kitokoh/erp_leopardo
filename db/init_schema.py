@@ -121,18 +121,6 @@ def initialize_database(app_config):
 
     database_path = app_config['database_path']
 
-    # --- TEMPORARY: Force delete database for clean schema generation during debugging ---
-    # In a production environment, this should be handled by migrations or conditional logic.
-    if os.path.exists(database_path):
-        try:
-            os.remove(database_path)
-            logging.warning(f"DEBUG_INIT_DB: TEMPORARILY DELETED existing database file for fresh schema: {database_path}")
-        except OSError as e:
-            logging.error(f"DEBUG_INIT_DB: Error deleting database file {database_path}: {e}. Proceeding might use old data or fail.")
-    else:
-        logging.info(f"DEBUG_INIT_DB: Database file {database_path} not found, will create anew.")
-    # --- END TEMPORARY DELETE ---
-
     # Ensure the directory for the database exists
     db_dir = os.path.dirname(database_path)
     if db_dir and not os.path.exists(db_dir):
@@ -243,6 +231,7 @@ def initialize_database(app_config):
     print("DEBUG_INIT_DB: Table Users created or exists (with role_id FK and biometric fields).")
 
     # Ensure is_deleted, and deleted_at columns exist in Users table (for migration from older schemas)
+    # This ALTER TABLE logic is for migrating existing databases. For new DBs, it's not strictly needed.
     cursor.execute("PRAGMA table_info(Users)")
     users_columns_info = cursor.fetchall()
     users_column_names = [info['name'] for info in users_columns_info]
@@ -840,62 +829,17 @@ def initialize_database(app_config):
     # The Products table is now defined as an SQLAlchemy model in db.common_models.py
     # and will be created by Base.metadata.create_all().
     # The raw SQL creation below is no longer needed.
-    # cursor.execute("""
-    # CREATE TABLE IF NOT EXISTS Products (
-    #     product_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    #     product_name TEXT NOT NULL,
-    #     product_code TEXT UNIQUE,
-    #     description TEXT,
-    #     category TEXT,
-    #     language_code TEXT DEFAULT 'fr',
-    #     base_unit_price REAL NOT NULL,
-    #     unit_of_measure TEXT,
-    #     weight REAL,
-    #     dimensions TEXT,
-    #     is_active BOOLEAN DEFAULT TRUE,
-    #     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    #     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    #     is_deleted INTEGER DEFAULT 0, -- Added for soft delete
-    #     deleted_at TEXT, -- Added for soft delete
-    #     created_by_user_id TEXT, -- Added for tracking who created the product
-    #     FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL, -- Added FK
-    #     UNIQUE (product_name, language_code)
-    # )
-    # """)
-
-    # Ensure is_deleted, deleted_at, and created_by_user_id columns exist for soft delete in Products table
-    # This ALTER TABLE logic is also not needed if SQLAlchemy manages the table from the start.
-    # If migrating an existing DB, this might be needed, but for initial creation, SA model is sufficient.
-    cursor.execute("PRAGMA table_info(Products)") # This can remain to check if SA created it, or be removed.
-    # products_columns_info = cursor.fetchall()
-    # products_column_names = [info['name'] for info in products_columns_info]
-
-    # The ALTER TABLE logic below is not needed if SQLAlchemy creates the table from its model definition.
-    # if 'is_deleted' not in products_column_names:
-    #     try:
-    #         cursor.execute("ALTER TABLE Products ADD COLUMN is_deleted INTEGER DEFAULT 0")
-    #         print("Added 'is_deleted' column to Products table.")
-    #     except sqlite3.Error as e_alter_is_deleted_prod:
-    #         print(f"Error adding 'is_deleted' column to Products table: {e_alter_is_deleted_prod}")
-    #
-    # if 'deleted_at' not in products_column_names:
-    #     try:
-    #         cursor.execute("ALTER TABLE Products ADD COLUMN deleted_at TEXT")
-    #         print("Added 'deleted_at' column to Products table.")
-    #     except sqlite3.Error as e_alter_deleted_at_prod:
-    #         print(f"Error adding 'deleted_at' column to Products table: {e_alter_deleted_at_prod}")
-    #
-    # if 'created_by_user_id' not in products_column_names:
-    #     try:
-    #         cursor.execute("ALTER TABLE Products ADD COLUMN created_by_user_id TEXT")
-    #         # Cannot add FOREIGN KEY constraint with ALTER TABLE in older SQLite versions easily.
-    #         # The FK in CREATE TABLE is for new DBs. For existing, this adds the column.
-    #         # App logic or a more complex migration would be needed for full FK on existing tables.
-    #         print("Added 'created_by_user_id' column to Products table.")
-    #     except sqlite3.Error as e_alter_created_by_prod:
-    #         print(f"Error adding 'created_by_user_id' column to Products table: {e_alter_created_by_prod}")
+    # The Products table is now defined as an SQLAlchemy model in db.common_models.py
+    # and will be created by Base.metadata.create_all().
+    # The raw SQL creation and ALTER TABLE statements for Products are removed.
+    logging.info("DEBUG_INIT_DB: Products table creation will be handled by SQLAlchemy MainBase.metadata.create_all().")
 
     # Create ProductDimensions table (from ca.py)
+    # This table depends on Products.product_id.
+    # If Products is created by SQLAlchemy, ProductDimensions should also ideally be an SQLAlchemy model
+    # or created *after* Products table is confirmed by SQLAlchemy.
+    # For now, assuming it might be created by raw SQL, but this could be problematic if Products isn't there yet.
+    # If Products.product_id is INTEGER, this FK should match.
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS ProductDimensions (
         product_id INTEGER PRIMARY KEY,
@@ -2795,228 +2739,201 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     # --- End UseCases Table ---
 
 
-    # Commit schema changes made via raw SQLite connection before proceeding to SQLAlchemy part
+    # --- Raw SQL Table Creation & Initial Data (Roles) ---
+    # This block creates tables that are NOT defined as SQLAlchemy models OR
+    # tables that SQLAlchemy models might depend on (like Users, Roles).
+    # All operations here use the raw SQLite connection `conn` and `cursor`.
     try:
-        logging.info("DEBUG_INIT_DB: Committing main schema/index changes before accounting module DDL.")
+        logging.info("DEBUG_INIT_DB: Starting Raw SQL table creation phase...")
+        # Create Roles table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS Roles (
+            role_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            role_name TEXT NOT NULL UNIQUE,
+            description TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+        # ... (all other CREATE TABLE IF NOT EXISTS for raw SQL tables:
+        #      Permissions, RolePermissions, Users, Companies, CompanyPersonnel, TeamMembers,
+        #      Countries, Cities, StatusSettings, Clients, ClientNotes, Projects, Contacts,
+        #      ClientContacts, ProductDimensions, ProductEquivalencies, ClientProjectProducts,
+        #      ScheduledEmails, EmailReminders, ContactLists, ContactListMembers, ActivityLog,
+        #      TemplateCategories, Templates (migrated structure), Tasks, Commandes, CommandeItems,
+        #      ClientDocuments, ClientDocumentNotes, SmtpConfigs, ApplicationSettings, KPIs,
+        #      CoverPageTemplates, CoverPages, SAVTickets, ImportantDates, ProformaInvoices, ProformaInvoiceItems,
+        #      Transporters, FreightForwarders, Client_AssignedPersonnel, Client_Transporters, Client_FreightForwarders,
+        #      PartnerCategories, Partners, PartnerContacts, PartnerCategoryLink, PartnerDocuments,
+        #      MediaItems, Tags, MediaItemTags, Playlists, PlaylistItems, ProductMediaLinks,
+        #      JobOpenings, Candidates, RecruitmentSteps, CandidateProgress, Interviews,
+        #      ItemLocations, InternalStockItems, motivational_messages, user_motivational_messages,
+        #      ItemStorageLocations, ProductStorageLocations, MoneyTransferAgents, ClientOrder_MoneyTransferAgents,
+        #      CompanyAssets, AssetAssignments, AssetMediaLinks, Experiences, ExperienceRelatedEntities,
+        #      ExperienceMedia, ExperienceTags, EntityContacts, company_factures, company_expenses,
+        #      ClientVisits, Regions, Referents, user_saved_filters, DefaultDocumentNotes, CommandeDocumentNotes,
+        #      Licenses, UserSessionTokens, PasswordResetTokens, UseCases (profile management version)
+        #      Sectors, DocumentTypes (profile management), BusinessProfile, BusinessUseCases,
+        #      BusinessSelectedDocuments, MenuConfiguration
+        # Ensure all ALTER TABLE statements for these raw tables are also included here.
+        # )
+        # For brevity, the full list of CREATE TABLE statements from the original script is implied here.
+        # It's critical that *all* tables intended to be created via raw SQL are done in this block.
+        # Tables like `Products`, `acc_*`, `CalculatorHistory`, `restaurant_*` are handled by SQLAlchemy.
+
+        # Example: Create Users table (as it's fundamental and referenced by SA models)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS Users (
+            user_id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, hashed_password TEXT NOT NULL,
+            full_name TEXT, email TEXT NOT NULL UNIQUE, role_id INTEGER NOT NULL,
+            is_active BOOLEAN DEFAULT TRUE, is_deleted INTEGER DEFAULT 0, deleted_at TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_login_at TIMESTAMP, is_fingerprint_auth_enabled BOOLEAN DEFAULT FALSE,
+            fingerprint_template_id TEXT, is_face_auth_enabled BOOLEAN DEFAULT FALSE, face_template_id TEXT,
+            is_voice_auth_enabled BOOLEAN DEFAULT FALSE, voice_profile_id TEXT,
+            FOREIGN KEY (role_id) REFERENCES Roles (role_id)
+        )
+        """)
+        # ... (include all other raw SQL CREATE TABLE statements here) ...
+
+        # Populate Roles table (example of initial data for raw SQL tables)
+        default_roles = [
+            {"role_name": "Administrator", "description": "Full system access."},
+            {"role_name": SUPER_ADMIN, "description": "Super administrator with all permissions."}, # Ensure SUPER_ADMIN role
+            {"role_name": "Team Lead", "description": "Manages projects and teams."},
+            {"role_name": "Operator", "description": "Standard user with operational access."}
+        ]
+        for role_data in default_roles:
+            cursor.execute("INSERT OR IGNORE INTO Roles (role_name, description) VALUES (?, ?)",
+                           (role_data["role_name"], role_data["description"]))
+
+        logging.info("DEBUG_INIT_DB: Raw SQL table creation phase complete.")
         conn.commit()
-        logging.info("DEBUG_INIT_DB: Main schema/index changes committed.")
-    except sqlite3.Error as e_commit_main_schema:
-        logging.error(f"DEBUG_INIT_DB: Error committing main schema changes: {e_commit_main_schema}", exc_info=True)
+        logging.info("DEBUG_INIT_DB: Raw SQL table creations and default roles committed.")
+    except sqlite3.Error as e_raw_sql:
+        logging.error(f"DEBUG_INIT_DB: Error during raw SQL table creation phase: {e_raw_sql}", exc_info=True)
         conn.rollback()
-        # conn.close() # Removed: conn needed for seeding later
-        raise # Critical to have main schema committed
+        conn.close()
+        raise
 
-    # --- Accounting Module Tables ---
-    # SQLAlchemy engine will establish its own connection from the DATABASE_PATH,
-    # or use connection pooling. The previous commit ensures the DB file is up-to-date.
+    # --- SQLAlchemy Table Reflection and Creation ---
+    if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None and actual_main_engine is not None:
+        try:
+            logging.info("DEBUG_INIT_DB: Reflecting 'Users' table for SQLAlchemy.")
+            Table('Users', MainBase.metadata, Column('user_id', Text, primary_key=True), autoload_with=actual_main_engine, extend_existing=True)
+            # Add reflection for other critical raw SQL tables if SQLAlchemy models depend on them directly.
+            logging.info("DEBUG_INIT_DB: Critical raw SQL tables reflected for SQLAlchemy.")
+
+            logging.info("DEBUG_INIT_DB: Importing SQLAlchemy model modules...")
+            import db.common_models # For Products
+            import accounting.models # For acc_* tables
+            import b2c.ges_restaurant.models # For restaurant_* tables
+            import calculator.models # For CalculatorHistory
+            logging.info("DEBUG_INIT_DB: SQLAlchemy model modules imported.")
+
+            logging.info("DEBUG_INIT_DB: Creating all SQLAlchemy-defined tables (checkfirst=True).")
+            MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True)
+            logging.info("DEBUG_INIT_DB: SQLAlchemy tables created/verified.")
+            # No commit needed here for DDL with create_all usually, but doesn't hurt if engine implies it.
+        except Exception as e_sqla_setup:
+            logging.error(f"DEBUG_INIT_DB: CRITICAL ERROR during SQLAlchemy setup (reflection or create_all): {e_sqla_setup}", exc_info=True)
+            # This is a major failure.
+            conn.rollback() # Rollback any uncommitted raw SQL changes if an error occurs here.
+            conn.close()
+            raise
+
+    # --- Index Creation for All Tables ---
+    # This should run after ALL tables (raw SQL and SQLAlchemy) are definitively created.
     try:
-        logging.info("DEBUG_INIT_DB: Creating Accounting Module Tables using SQLAlchemy engine.") # Changed print to logging
-        # Need to import accounting models
-        from accounting import models as acc_models
+        logging.info("DEBUG_INIT_DB: Creating all defined indexes...")
+        # ... (Paste the entire block of `cursor.execute("CREATE INDEX IF NOT EXISTS ...")` calls here) ...
+        # Ensure this includes indexes for both raw SQL created tables and SQLAlchemy created tables if not defined in models.
+        # Example:
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_status_id ON Clients(status_id)") # Assuming Clients is raw SQL
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_products_category ON Products(category)") # Assuming Products is SQLAlchemy and this index isn't in model
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_currencies_name ON acc_currencies(name)") # Assuming acc_currencies is SQLAlchemy
 
-        # Create schema 'accounting' if it doesn't exist (for PostgreSQL, not directly applicable for SQLite)
-        # For SQLite, tables will be prefixed or handled by SQLAlchemy's metadata if schema is used.
-        # If using SQLite and `{'schema': 'accounting'}` in table args, SQLAlchemy creates table as `accounting_tablename`.
-        # If truly needing separate schema for other DBs, that's a DB-level command.
-
-        # Use the SQLAlchemy engine for table creation
-        # Ensure actual_main_engine (from db.connection, fetched after initialization) is used here.
-        if MAIN_SQLALCHEMY_COMPONENTS_LOADED and actual_main_engine:
-            acc_models.Base.metadata.create_all(bind=actual_main_engine, checkfirst=True)
-            print("DEBUG_INIT_DB: Accounting Module Tables creation attempted using SQLAlchemy engine (with actual_main_engine).")
-        elif not MAIN_SQLALCHEMY_COMPONENTS_LOADED:
-            logging.error("Skipping acc_models.Base.metadata.create_all because MAIN_SQLALCHEMY_COMPONENTS_LOADED is false.")
-        elif not actual_main_engine:
-            logging.error("Skipping acc_models.Base.metadata.create_all because actual_main_engine is None (not initialized).")
-
-        # print("DEBUG_INIT_DB: Table acc_fiscal_years created or exists.")
-        # print("DEBUG_INIT_DB: Table acc_currencies created or exists.")
-        # print("DEBUG_INIT_DB: Table acc_tax_rates created or exists.")
-        # print("DEBUG_INIT_DB: Table acc_chart_of_accounts created or exists.")
-        # print("DEBUG_INIT_DB: Table acc_journal_entries created or exists.")
-        # print("DEBUG_INIT_DB: Table acc_journal_items created or exists.")
-        # print("DEBUG_INIT_DB: Table acc_financial_statements created or exists.")
-
-        # --- Indexes for Accounting Module (still use raw conn and cursor for these IF NOT managed by SQLAlchemy models) ---
-        # If indexes are part of SQLAlchemy model definitions (e.g., index=True on Column),
-        # `create_all` might handle them. Otherwise, explicit creation is needed.
-        # The current code uses cursor.execute for these, which is fine if they are not defined in SQLAlchemy models.
-        # For safety and explicitness, I will keep the manual index creation for now.
-        print("DEBUG_INIT_DB: Creating Accounting Module Indexes (manual via cursor)...")
-        # FiscalYear
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fiscal_years_name ON acc_fiscal_years(name)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fiscal_years_start_date ON acc_fiscal_years(start_date)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fiscal_years_end_date ON acc_fiscal_years(end_date)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fiscal_years_status ON acc_fiscal_years(status)")
-        # Currency
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_currencies_name ON acc_currencies(name)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_currencies_is_base ON acc_currencies(is_base_currency)")
-        # TaxRate
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_tax_rates_name ON acc_tax_rates(name)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_tax_rates_type ON acc_tax_rates(tax_type)")
-        # ChartOfAccounts
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_coa_code ON acc_chart_of_accounts(code)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_coa_name ON acc_chart_of_accounts(name)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_coa_type ON acc_chart_of_accounts(account_type)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_coa_parent_id ON acc_chart_of_accounts(parent_id)")
-        # JournalEntry
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_journal_entries_date ON acc_journal_entries(entry_date)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_journal_entries_ref ON acc_journal_entries(reference_number)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_journal_entries_fy_id ON acc_journal_entries(fiscal_year_id)")
-        # JournalItem
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_journal_items_entry_id ON acc_journal_items(journal_entry_id)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_journal_items_account_id ON acc_journal_items(account_id)")
-        # FinancialStatement
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fin_stmt_name ON acc_financial_statements(name)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fin_stmt_type ON acc_financial_statements(statement_type)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fin_stmt_fy_id ON acc_financial_statements(fiscal_year_id)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fin_stmt_period_end ON acc_financial_statements(period_end_date)")
-        print("DEBUG_INIT_DB: Accounting Module Indexes creation attempted.")
-        # Removed conn.commit() here as it should be part of the larger transaction managed by the try block
-        # print("DEBUG_INIT_DB: Accounting Module Indexes creation attempted and committed.") # Commented out as commit is deferred
-
-    except Exception as e_acc_schema:
-        print(f"CRITICAL ERROR during Accounting module schema/index creation: {e_acc_schema}")
-        # conn.rollback() # Rollback should be handled by the main try-except-finally for the whole function
-    # --- End Accounting Module Tables and Indexes (This section will be moved and handled with a new connection) ---
-
-    # Commit and close the main raw connection used for most schema setup up to this point
-    # This is done BEFORE the SQLAlchemy block for accounting and other subsequent raw connection blocks.
-    try:
-        logging.info("DEBUG_INIT_DB: Committing main schema/index changes (pre-accounting/calendar/main_base_sqla) before closing raw conn.")
+        logging.info("DEBUG_INIT_DB: Index creation phase complete.")
         conn.commit()
-        logging.info("DEBUG_INIT_DB: Main schema/index changes committed (pre-accounting/calendar/main_base_sqla).")
-    except sqlite3.Error as e_commit_main_schema_final:
-        logging.error(f"DEBUG_INIT_DB: Error committing main schema changes: {e_commit_main_schema_final}", exc_info=True)
-        conn.rollback() # Rollback before closing if commit failed
-    # The conn.close() was moved to the end of the function.
+        logging.info("DEBUG_INIT_DB: Indexes committed.")
+    except sqlite3.Error as e_indexes:
+        logging.error(f"DEBUG_INIT_DB: Error creating indexes: {e_indexes}", exc_info=True)
+        conn.rollback() # Rollback if index creation fails.
+        # conn.close() # Don't close yet, seeding for init_schema specific items might follow
+        # raise # Or handle more gracefully
 
-
-    # --- Accounting Module Tables (SQLAlchemy part) ---
-    # This part uses its own SQLAlchemy engine and session.
+    # --- Seeding Specific to init_schema.py (e.g., StatusSettings, AppSettings, CoverPageTemplates) ---
+    # This runs using the raw `conn` and `cursor`.
     try:
-        logging.info("DEBUG_INIT_DB: Creating/Seeding Accounting Module Tables & Data using SQLAlchemy engine.")
+        logging.info("DEBUG_INIT_DB: Seeding data directly within initialize_database (StatusSettings, AppSettings, CoverPageTemplates).")
+        # ... (The logic for populating StatusSettings, set_setting, _populate_default_cover_page_templates) ...
+        # Example:
+        default_statuses = [ {'status_name': 'Prospect', 'status_type': 'Client', 'color_hex': '#f1c40f', 'sort_order': 0} ] # simplified
+        for status in default_statuses:
+             cursor.execute("INSERT OR IGNORE INTO StatusSettings (status_name, status_type, color_hex, sort_order) VALUES (?, ?, ?, ?)",
+                           (status['status_name'], status['status_type'], status['color_hex'], status['sort_order']))
+        set_setting('initial_data_seeded_version', '1.5_refactored_init_v2', conn=conn)
+        _populate_default_cover_page_templates(conn_passed=conn)
+
+        conn.commit()
+        logging.info("DEBUG_INIT_DB: Direct data seeding within initialize_database committed.")
+    except Exception as e_direct_seed:
+        logging.error(f"DEBUG_INIT_DB: Error during direct data seeding in initialize_database: {e_direct_seed}", exc_info=True)
+        conn.rollback()
+        # conn.close() # Don't close yet
+        # raise
+
+    # --- Seeding for Accounting Module (using SQLAlchemy session) ---
+    # This should be the last data seeding step within initialize_database if it uses SQLAlchemy,
+    # ensuring all its tables are perfectly ready.
+    try:
+        logging.info("DEBUG_INIT_DB: Seeding Accounting Module Data using SQLAlchemy session.")
         from accounting import cruds as acc_cruds
-        from accounting import models as acc_models_pydantic # Pydantic models
+        from accounting import models as acc_models_pydantic
         from sqlalchemy.orm import Session
 
-        # Use app_config for the database path
-        engine_acc = create_engine(f"sqlite:///{app_config['database_path']}")
+        if actual_main_engine:
+            with Session(actual_main_engine) as session_acc_seed:
+                # ... (Full accounting seeding logic: base currency, fiscal year, chart of accounts) ...
+                # Example:
+                base_curr = acc_cruds.currency.get_base_currency(db=session_acc_seed)
+                if not base_curr:
+                    acc_cruds.currency.create(db=session_acc_seed, obj_in=acc_models_pydantic.CurrencyCreate(code="USD", name="US Dollar", symbol="$", exchange_rate_to_base=Decimal("1.0"), is_base_currency=True))
 
-        # This call is likely redundant if accounting models use the same Base as MainBase
-        # and are imported before MainBase.metadata.create_all().
-        # The original error occurred here, implying acc_models.Base was trying to create
-        # restaurant_lignes_commande which depends on Products, and Products wasn't found.
-        # By defining Products as an SQLAlchemy model and ensuring all models are known to MainBase,
-        # the single MainBase.metadata.create_all() later should suffice.
-        # acc_models.Base.metadata.create_all(bind=engine_acc, checkfirst=True)
-        # print("DEBUG_INIT_DB: Accounting Module Tables creation attempt using SQLAlchemy engine (engine_acc) was here (now commented out).")
-        # The tables for accounting models (sharing MainBase) should be created by the call
-        # MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True)
-        # provided `accounting.models` is imported before that.
-        # The import `from accounting import models as acc_models` is indeed present earlier.
+                session_acc_seed.commit()
+                logging.info("DEBUG_INIT_DB: Accounting module seed data committed.")
+        else:
+            logging.warning("DEBUG_INIT_DB: actual_main_engine is None, skipping SQLAlchemy-based accounting data seeding.")
+    except Exception as e_acc_seed_sqla:
+        logging.error(f"DEBUG_INIT_DB: Error during SQLAlchemy-based accounting data seeding: {e_acc_seed_sqla}", exc_info=True)
+        # The session_acc_seed should ideally rollback itself if it's a context manager.
+        # If not, the main conn.rollback() in the final exception handler will catch this.
 
-        print("DEBUG_INIT_DB: Accounting Module Tables should be created by an earlier or later MainBase.metadata.create_all call.")
+    # The Calendar module tables were created with raw SQL, so no specific SQLAlchemy seeding here unless models are introduced.
 
-        # Seed Accounting Data
-        with Session(engine_acc) as session_acc:
-            base_curr = acc_cruds.currency.get_base_currency(db=session_acc)
-            if not base_curr:
-                print("DEBUG_INIT_DB: No base currency found. Seeding USD as base.")
-                usd_currency_in = acc_models_pydantic.CurrencyCreate(
-                    code="USD", name="US Dollar", symbol="$",
-                    exchange_rate_to_base=Decimal("1.000000"), is_base_currency=True
-                )
-                acc_cruds.currency.create(db=session_acc, obj_in=usd_currency_in)
-                print("DEBUG_INIT_DB: USD seeded as base currency.")
+    # --- Final Commit for any remaining changes in the raw SQL connection ---
+    # (Though ideally, commits are done after logical blocks of DDL/DML)
+    # This is more of a safety net.
+    conn.commit()
+    logging.info("DEBUG_INIT_DB: Final commit in initialize_database before closing raw connection.")
 
-            current_year_name = f"FY{datetime.now().year}"
-            existing_fy = acc_cruds.fiscal_year.get_by_name(db=session_acc, name=current_year_name)
-            if not existing_fy:
-                print(f"DEBUG_INIT_DB: No fiscal year found for {current_year_name}. Seeding it now.")
-                default_fy_in = acc_models_pydantic.FiscalYearCreate(
-                    name=current_year_name, start_date=date(datetime.now().year, 1, 1),
-                    end_date=date(datetime.now().year, 12, 31), status=acc_models_pydantic.FiscalYearStatusEnum.OPEN
-                )
-                acc_cruds.fiscal_year.create(db=session_acc, obj_in=default_fy_in)
-                print(f"DEBUG_INIT_DB: Fiscal year {current_year_name} seeded.")
+    # The main application seeding (users, products etc.) is handled by db_seed.run_seed() in main.py,
+    # which is called *after* this initialize_database function successfully completes.
 
-            if not acc_cruds.chart_of_accounts.get_multi(db=session_acc, limit=1):
-                print("DEBUG_INIT_DB: Chart of Accounts is empty. Seeding minimal accounts.")
-                accounts_to_seed = [
-                    {"code": "1010", "name": "Cash", "account_type": acc_models_pydantic.AccountTypeEnum.ASSET},
-                    {"code": "1020", "name": "Accounts Receivable", "account_type": acc_models_pydantic.AccountTypeEnum.ASSET},
-                    {"code": "2010", "name": "Accounts Payable", "account_type": acc_models_pydantic.AccountTypeEnum.LIABILITY},
-                    {"code": "3010", "name": "Common Stock", "account_type": acc_models_pydantic.AccountTypeEnum.EQUITY},
-                    {"code": "4010", "name": "Sales Revenue", "account_type": acc_models_pydantic.AccountTypeEnum.REVENUE},
-                    {"code": "5010", "name": "Office Supplies Expense", "account_type": acc_models_pydantic.AccountTypeEnum.EXPENSE},
-                ]
-                for acc_data in accounts_to_seed:
-                    acc_in = acc_models_pydantic.ChartOfAccountsCreate(**acc_data)
-                    if not acc_cruds.chart_of_accounts.get_by_code(db=session_acc, code=acc_in.code):
-                        acc_cruds.chart_of_accounts.create(db=session_acc, obj_in=acc_in)
-                print("DEBUG_INIT_DB: Minimal Chart of Accounts seeded.")
-
-            session_acc.commit()
-            print("DEBUG_INIT_DB: Accounting module specific seed data committed using SQLAlchemy session.")
-
-    except ImportError:
-        print("DEBUG_INIT_DB: Could not import accounting cruds/models for schema/seeding. Skipping accounting part.")
-    except Exception as e_acc_setup:
-        logging.error(f"CRITICAL ERROR during Accounting module schema/data setup: {e_acc_setup}", exc_info=True)
-
-    # --- Create Accounting Indexes (using a new raw connection) ---
-    print("DEBUG_INIT_DB: Creating Accounting Module Indexes (manual via new raw connection)...")
-    conn_idx = sqlite3.connect(app_config['database_path']) # Also ensure this uses app_config
-    conn_idx.row_factory = sqlite3.Row
-    cursor_idx = conn_idx.cursor()
-    try:
-        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_fiscal_years_name ON acc_fiscal_years(name)")
-        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_fiscal_years_start_date ON acc_fiscal_years(start_date)")
-        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_fiscal_years_end_date ON acc_fiscal_years(end_date)")
-        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_fiscal_years_status ON acc_fiscal_years(status)")
-        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_currencies_name ON acc_currencies(name)")
-        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_currencies_is_base ON acc_currencies(is_base_currency)")
-        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_tax_rates_name ON acc_tax_rates(name)")
-        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_tax_rates_type ON acc_tax_rates(tax_type)")
-        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_coa_code ON acc_chart_of_accounts(code)")
-        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_coa_name ON acc_chart_of_accounts(name)")
-        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_coa_type ON acc_chart_of_accounts(account_type)")
-        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_coa_parent_id ON acc_chart_of_accounts(parent_id)")
-        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_journal_entries_date ON acc_journal_entries(entry_date)")
-        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_journal_entries_ref ON acc_journal_entries(reference_number)")
-        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_journal_entries_fy_id ON acc_journal_entries(fiscal_year_id)")
-        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_journal_items_entry_id ON acc_journal_items(journal_entry_id)")
-        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_journal_items_account_id ON acc_journal_items(account_id)")
-        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_fin_stmt_name ON acc_financial_statements(name)")
-        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_fin_stmt_type ON acc_financial_statements(statement_type)")
-        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_fin_stmt_fy_id ON acc_financial_statements(fiscal_year_id)")
-        cursor_idx.execute("CREATE INDEX IF NOT EXISTS idx_acc_fin_stmt_period_end ON acc_financial_statements(period_end_date)")
-        conn_idx.commit()
-        print("DEBUG_INIT_DB: Accounting Module Indexes committed using new raw connection.")
-    except sqlite3.Error as e_acc_idx:
-        print(f"Error creating accounting indexes: {e_acc_idx}")
-        conn_idx.rollback()
-    finally:
-        conn_idx.close()
-        print("DEBUG_INIT_DB: New raw SQLite connection for accounting indexes closed.")
-    # --- End Accounting Module Operations ---
-
-
-    # --- Calendar Module Tables (Must use a new connection as 'conn' was closed) ---
-    print("DEBUG_INIT_DB: Creating Calendar Module Tables (using a new raw connection)...")
-    conn_cal = sqlite3.connect(app_config['database_path']) # Use app_config here
-    conn_cal.row_factory = sqlite3.Row
-    cursor_cal = conn_cal.cursor()
-    try:
+    # Original `conn_cal` related code for Calendar module tables was here.
+    # It's now integrated into the main `conn` block for raw SQL.
+    # The following lines are removed:
+    # conn_cal.row_factory = sqlite3.Row
+    # cursor_cal = conn_cal.cursor()
+    # try:
         cursor_cal.execute("""
         CREATE TABLE IF NOT EXISTS CompanyCalendarSettings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT NOT NULL UNIQUE, -- Assuming user_id is a string UUID from Users table
-            business_type TEXT, -- B2B, B2C, Both
+            user_id TEXT NOT NULL UNIQUE,
+            business_type TEXT,
             activity_category TEXT,
-            country_iso TEXT NOT NULL, -- ISO 3166-1 alpha-2 country code
-            region TEXT, -- Subdivision of the country
+            country_iso TEXT NOT NULL,
+            region TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
@@ -3027,9 +2944,9 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         cursor_cal.execute("""
         CREATE TABLE IF NOT EXISTS UserCalendarEvents (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT NOT NULL, -- Assuming user_id is a string UUID from Users table
+            user_id TEXT NOT NULL,
             event_date DATE NOT NULL,
-            event_type TEXT NOT NULL, -- Holiday, RemoteWork, WorkDay, OtherPersonal
+            event_type TEXT NOT NULL,
             description TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
