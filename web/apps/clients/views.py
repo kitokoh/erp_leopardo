@@ -214,3 +214,97 @@ def client_detail_view(request, client_id): # client_id est passé par l'URL
         'active_company_name': active_company_name,
     }
     return render(request, 'clients/client_detail.html', context)
+
+
+@login_required
+def client_update_view(request, client_id):
+    api_auth_token = request.session.get('api_auth_token')
+    active_company_id = request.session.get('active_company_id')
+    active_company_name = request.session.get('active_company_name', 'N/A')
+
+    if not api_auth_token:
+        messages.error(request, "Erreur d'authentification API. Veuillez vous reconnecter.")
+        return redirect('users:login')
+
+    if not active_company_id: # Important pour le contexte, même si l'API vérifie la propriété
+        messages.warning(request, "Veuillez sélectionner une société active.")
+        return redirect(getattr(settings, 'LOGIN_REDIRECT_URL', 'dashboard:main'))
+
+    headers = {'Authorization': f'Token {api_auth_token}'}
+    client_api_url = f"{API_BASE_URL}/clients/{client_id}/"
+
+    # Récupérer les données initiales du client pour pré-remplir le formulaire en GET
+    if request.method == 'GET':
+        try:
+            response_get = requests.get(client_api_url, headers=headers)
+            response_get.raise_for_status()
+            client_initial_data = response_get.json()
+            # Le ClientForm n'est pas un ModelForm, donc on passe les initiales.
+            # Il faut s'assurer que les clés de client_initial_data correspondent aux champs du ClientForm.
+            form = ClientForm(initial=client_initial_data)
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                messages.error(request, "Client non trouvé ou non autorisé.")
+            else:
+                messages.error(request, f"Erreur API ({e.response.status_code}) lors de la récupération du client.")
+            return redirect('clients:list')
+        except requests.exceptions.RequestException:
+            messages.error(request, "Erreur de communication pour récupérer les détails du client.")
+            return redirect('clients:list')
+
+    elif request.method == 'POST':
+        form = ClientForm(request.POST) # Pas d'instance pour un forms.Form simple
+        if form.is_valid():
+            api_data = form.cleaned_data.copy()
+            # La company_account ne devrait pas être modifiable via ce formulaire directement
+            # si elle est gérée par l'appartenance à l'utilisateur.
+            # L'API (PUT) s'attend à recevoir tous les champs requis pour une mise à jour complète.
+            # Notre ClientSerializer est configuré avec company_account en write_only=True, required=False
+            # car le ViewSet le gère. Pour un PUT via l'API, le ViewSet va utiliser l'instance existante.
+            # Donc, ne pas envoyer company_account ici est correct si l'API ne l'attend pas pour un PUT.
+            # Si l'API l'attendait, il faudrait le récupérer de l'instance initiale.
+
+            try:
+                response_put = requests.put(client_api_url, headers=headers, json=api_data)
+                response_put.raise_for_status()
+
+                updated_client_data = response_put.json()
+                messages.success(request, f"Client '{updated_client_data.get('client_name', '')}' mis à jour avec succès.")
+                return redirect('clients:detail', client_id=client_id) # Rediriger vers le détail
+
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 400:
+                    error_data = e.response.json()
+                    for field, errors in error_data.items():
+                        if field in form.fields:
+                            for error in errors if isinstance(errors, list) else [errors]:
+                                form.add_error(field, error)
+                        elif field == 'detail' or field == 'non_field_errors':
+                             for error in errors if isinstance(errors, list) else [errors]:
+                                messages.error(request, error)
+                        else:
+                            for error in errors if isinstance(errors, list) else [errors]:
+                                messages.error(request, f"Erreur API pour '{field}': {error}")
+                elif e.response.status_code == 404:
+                    messages.error(request, "Client non trouvé pour la mise à jour.")
+                    return redirect('clients:list')
+                # Autres erreurs (401, 403) gérées par les redirections au début ou par l'API elle-même.
+                else:
+                    messages.error(request, f"Erreur API ({e.response.status_code}) lors de la mise à jour du client.")
+            except requests.exceptions.RequestException:
+                messages.error(request, "Erreur de communication lors de la mise à jour du client.")
+            except ValueError:
+                 messages.error(request, "Réponse invalide du service lors de la mise à jour.")
+        else:
+            messages.warning(request, "Veuillez corriger les erreurs dans le formulaire.")
+    else: # Méthode non GET ou POST (improbable ici)
+        form = ClientForm() # Devrait déjà être initialisé par le GET
+
+    context = {
+        'form': form,
+        'page_title': f"Modifier le Client : {client_initial_data.get('client_name', '') if request.method == 'GET' and 'client_initial_data' in locals() else 'Client'}",
+        'active_company_name': active_company_name,
+        'submit_button_text': 'Enregistrer les Modifications',
+        'client_id': client_id # Pour l'URL du formulaire si besoin (pas pour POST car déjà dans l'URL)
+    }
+    return render(request, 'clients/client_form.html', context)

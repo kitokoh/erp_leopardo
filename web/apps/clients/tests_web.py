@@ -481,6 +481,163 @@ class ClientDetailViewWebTests(TestCase):
 
         response = self.django_client.get(self.detail_url)
         self.assertEqual(response.status_code, 200)
-        # self.assertContains(response, reverse('clients:update', kwargs={'client_id': self.client_instance.id})) # Quand l'URL update sera prête
-        self.assertContains(response, "Modifier") # Vérifier le texte du bouton pour l'instant
+        self.assertContains(response, reverse('clients:update', kwargs={'client_id': self.client_instance.id}))
+        self.assertContains(response, "Modifier")
         self.assertContains(response, reverse('clients:list'))
+
+
+class ClientUpdateViewWebTests(TestCase):
+    def setUp(self):
+        self.django_client = DjangoClient()
+        self.login_url = reverse('users:login')
+
+        self.test_user = User.objects.create_user(
+            username='updateclientuser',
+            email='updateclientuser@example.com',
+            password='password123'
+        )
+        self.test_company = Company.objects.create(name="Update Client Test Co", owner=self.test_user)
+
+        self.client_instance = Client.objects.create(
+            company_account=self.test_company,
+            client_name="Client To Update",
+            email="toupdate@example.com",
+        )
+        self.update_url = reverse('clients:update', kwargs={'client_id': self.client_instance.id})
+        self.detail_url = reverse('clients:detail', kwargs={'client_id': self.client_instance.id})
+        self.list_url = reverse('clients:list')
+
+        # Connexion et setup session
+        self.django_client.login(username='updateclientuser@example.com', password='password123')
+        session = self.django_client.session
+        session['api_auth_token'] = 'faketesttoken_update123'
+        session['active_company_id'] = str(self.test_company.id)
+        session['active_company_name'] = self.test_company.name
+        session.save()
+
+        self.client_initial_api_data = { # Ce que l'API GET /client_id/ retournerait
+            "id": str(self.client_instance.id),
+            "client_name": "Client To Update",
+            "email": "toupdate@example.com",
+            "phone": "", "address": "", "contact_person_name": "",
+            "contact_person_email": "", "contact_person_phone": "",
+            "notes": "", "is_active": True,
+            "company_account": str(self.test_company.id)
+        }
+        self.form_update_data = { # Données envoyées par le formulaire POST
+            'client_name': 'Client Updated Successfully',
+            'email': 'updated@example.com',
+            'phone': '111222333',
+            'is_active': True,
+            # Les autres champs optionnels peuvent être vides ou non envoyés si pas modifiés
+        }
+        self.mock_api_update_success_response = { # Ce que l'API PUT /client_id/ retournerait
+            "id": str(self.client_instance.id),
+            "client_name": "Client Updated Successfully",
+            "email": "updated@example.com",
+            "phone": "111222333",
+             "is_active": True,
+            # ... autres champs ...
+        }
+
+    @patch('requests.get')
+    def test_client_update_view_get_displays_form_with_initial_data(self, mock_api_get):
+        mock_response_get = MagicMock()
+        mock_response_get.status_code = 200
+        mock_response_get.json.return_value = self.client_initial_api_data
+        mock_api_get.return_value = mock_response_get
+
+        response = self.django_client.get(self.update_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'clients/client_form.html')
+        self.assertIn('form', response.context)
+        form = response.context['form']
+        self.assertIsInstance(form, ClientForm)
+        self.assertEqual(form.initial.get('client_name'), self.client_initial_api_data['client_name'])
+        self.assertEqual(form.initial.get('email'), self.client_initial_api_data['email'])
+        self.assertEqual(response.context['page_title'], f"Modifier le Client : {self.client_initial_api_data['client_name']}")
+
+        expected_api_url = f"http://localhost:8000/api/v1/clients/{self.client_instance.id}/"
+        mock_api_get.assert_called_once_with(
+            expected_api_url,
+            headers={'Authorization': f'Token faketesttoken_update123'}
+        )
+
+    @patch('requests.put')
+    @patch('requests.get') # Aussi pour le GET initial si la vue redirige vers le détail
+    def test_client_update_view_post_success(self, mock_api_get_fordetail, mock_api_put):
+        # Mock pour l'appel PUT
+        mock_response_put = MagicMock()
+        mock_response_put.status_code = 200 # Succès de la mise à jour
+        mock_response_put.json.return_value = self.mock_api_update_success_response
+        mock_api_put.return_value = mock_response_put
+
+        # Mock pour l'appel GET vers le détail après redirection (non essentiel ici si on ne suit pas la redir)
+        # mock_response_get = MagicMock()
+        # mock_response_get.status_code = 200
+        # mock_response_get.json.return_value = self.mock_api_update_success_response
+        # mock_api_get_fordetail.return_value = mock_response_get
+
+
+        response = self.django_client.post(self.update_url, self.form_update_data)
+
+        self.assertRedirects(response, self.detail_url) # Redirige vers la page de détail
+        messages_list = list(get_messages(response.wsgi_request))
+        self.assertTrue(any("Client 'Client Updated Successfully' mis à jour" in str(m) for m in messages_list))
+
+        expected_api_url = f"http://localhost:8000/api/v1/clients/{self.client_instance.id}/"
+        mock_api_put.assert_called_once_with(
+            expected_api_url,
+            headers={'Authorization': f'Token faketesttoken_update123'},
+            json=self.form_update_data
+        )
+
+    @patch('requests.get') # Pour le GET initial du formulaire
+    def test_client_update_view_post_form_invalid(self, mock_api_get_initial):
+        mock_response_get = MagicMock()
+        mock_response_get.status_code = 200
+        mock_response_get.json.return_value = self.client_initial_api_data
+        mock_api_get_initial.return_value = mock_response_get
+
+        invalid_data = self.form_update_data.copy()
+        invalid_data['client_name'] = '' # Invalide
+        response = self.django_client.post(self.update_url, invalid_data)
+
+        self.assertEqual(response.status_code, 200) # Reste sur la page
+        self.assertTemplateUsed(response, 'clients/client_form.html')
+        self.assertFormError(response, 'form', 'client_name', 'Ce champ est obligatoire.')
+
+
+    @patch('requests.put')
+    @patch('requests.get') # Pour le GET initial du formulaire
+    def test_client_update_view_api_validation_error(self, mock_api_get_initial, mock_api_put):
+        mock_response_get = MagicMock()
+        mock_response_get.status_code = 200
+        mock_response_get.json.return_value = self.client_initial_api_data
+        mock_api_get_initial.return_value = mock_response_get
+
+        mock_response_put = MagicMock()
+        mock_response_put.status_code = 400
+        mock_response_put.json.return_value = {"email": ["Cet email est déjà utilisé par un autre client."]}
+        mock_response_put.raise_for_status.side_effect = requests.exceptions.HTTPError(response=mock_response_put)
+        mock_api_put.return_value = mock_response_put
+
+        response = self.django_client.post(self.update_url, self.form_update_data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'clients/client_form.html')
+        self.assertFormError(response, 'form', 'email', "Cet email est déjà utilisé par un autre client.")
+
+    def test_client_update_view_get_other_company_client_fails_or_redirects(self):
+        # Créer un client pour une autre société
+        other_user = User.objects.create_user(username="otherowner", email="other@owner.com", password="password")
+        other_company = Company.objects.create(name="Other Company", owner=other_user)
+        other_client = Client.objects.create(company_account=other_company, client_name="Belongs to Other")
+
+        url_for_other_client_update = reverse('clients:update', kwargs={'client_id': other_client.id})
+
+        # self.django_client est loggué comme self.test_user (owner de self.test_company)
+        response = self.django_client.get(url_for_other_client_update)
+        # La vue devrait rediriger vers la liste si l'API GET retourne 404 (car le client n'est pas à self.test_user)
+        self.assertRedirects(response, self.list_url)
+        messages_list = list(get_messages(response.wsgi_request))
+        self.assertTrue(any("Client non trouvé ou non autorisé" in str(m) for m in messages_list))
