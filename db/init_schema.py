@@ -2222,8 +2222,8 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     # ClientContacts
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientcontacts_contact_id ON ClientContacts(contact_id)")
     # Products
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_products_category ON Products(category)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_products_is_active ON Products(is_active)")
+    # cursor.execute("CREATE INDEX IF NOT EXISTS idx_products_category ON Products(category)") # Moved to model
+    # cursor.execute("CREATE INDEX IF NOT EXISTS idx_products_is_active ON Products(is_active)") # Moved to model
     # ProductEquivalencies
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_productequivalencies_product_id_b ON ProductEquivalencies(product_id_b)")
     # ClientProjectProducts
