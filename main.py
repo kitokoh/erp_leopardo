@@ -240,6 +240,7 @@ def main():
     # 1. Configure logging as the very first step.
     setup_logging()
     logging.info("Application starting...")
+    logging.info(f"CONFIGURED DATABASE_PATH: {CONFIG.get('database_path', 'NOT FOUND IN CONFIG')}")
 
     # Start the API server - Commented out as per user request for local PyQt app
     # start_api_server()

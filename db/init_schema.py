@@ -828,9 +828,6 @@ def initialize_database(app_config):
 
     # The Products table is now defined as an SQLAlchemy model in db.common_models.py
     # and will be created by Base.metadata.create_all().
-    # The raw SQL creation below is no longer needed.
-    # The Products table is now defined as an SQLAlchemy model in db.common_models.py
-    # and will be created by Base.metadata.create_all().
     # The raw SQL creation and ALTER TABLE statements for Products are removed.
     logging.info("DEBUG_INIT_DB: Products table creation will be handled by SQLAlchemy MainBase.metadata.create_all().")
 
