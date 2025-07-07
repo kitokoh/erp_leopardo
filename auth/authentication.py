@@ -250,11 +250,13 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
     try:
         logger.info(f"AUTH_LOGIN: Attempting login for username: '{username}'")
         user = users_crud.get_user_by_username(username)
-        
+
         if not user:
             logger.warning(f"AUTH_LOGIN: User '{username}' not found in database.")
             return False, "Nom d'utilisateur ou mot de passe incorrect.", None, None
         
+        logger.info(f"AUTH_LOGIN: User '{username}' found. User data: ID={user.get('user_id')}, RoleName={user.get('role_name')}, HashedPW={user.get('hashed_password')}")
+
         logger.info(f"AUTH_LOGIN: User '{username}' found. User data: ID={user.get('user_id')}, RoleName={user.get('role_name')}, HashedPW={user.get('hashed_password')}")
 
         if not user.get('is_active'):

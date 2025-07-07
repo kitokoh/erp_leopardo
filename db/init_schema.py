@@ -1,5 +1,6 @@
 import sqlite3
 import os
+from sqlalchemy import text
 import json
 import logging # Added missing import
 from datetime import datetime, date # Added date
@@ -3023,7 +3024,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
             cursor_cal.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_date ON UserCalendarEvents(event_date)")
             cursor_cal.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_type ON UserCalendarEvents(event_type)")
             print("DEBUG_INIT_DB: Indexes for Calendar Module created or already exist (via conn_cal).")
-            
+
             conn_cal.commit()
             print("DEBUG_INIT_DB: Calendar module table changes committed (via conn_cal).")
         else:
@@ -3338,7 +3339,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
                             if not acc_cruds.chart_of_accounts.get_by_code(db=session, code=acc_in.code):
                                 acc_cruds.chart_of_accounts.create(db=session, obj_in=acc_in)
                         print("DEBUG_INIT_DB: Minimal Chart of Accounts seeded.")
-                    
+
                     session.commit() # Commit SQLAlchemy session changes
                     print("DEBUG_INIT_DB: Accounting module specific seed data committed using SQLAlchemy session.")
             else:
