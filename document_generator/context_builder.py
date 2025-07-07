@@ -749,6 +749,17 @@ def get_document_context(
         # if db_conn is None and conn:
             # conn.close()
 
+    # --- Custom Fields ---
+    # Check for custom fields in additional_data and add them to the context
+    if isinstance(additional_data, dict) and "custom_fields" in additional_data:
+        if isinstance(additional_data["custom_fields"], dict):
+            context["custom"] = additional_data["custom_fields"]
+            # Also add them to placeholders for simpler template engines if needed, prefixed
+            for cf_key, cf_value in additional_data["custom_fields"].items():
+                context["placeholders"][f"CUSTOM_{cf_key.upper()}"] = cf_value
+        else:
+            logger.warning("'custom_fields' in additional_data is not a dictionary. Skipping.")
+
     return context
 
 if __name__ == '__main__':

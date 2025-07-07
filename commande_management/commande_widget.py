@@ -533,7 +533,6 @@ class CommandeWidget(QWidget):
                             default_idx = i
                             break
 
-
             selected_lang_display, lang_ok = QInputDialog.getItem(
                 self,
                 self.tr("Sélectionner la Langue du Proforma"),
@@ -554,22 +553,69 @@ class CommandeWidget(QWidget):
             # --- End Language Selection ---
 
             from db.cruds import templates_crud # Local import for clarity
-            # Assuming "HTML_PROFORMA" is the template_type for proforma invoices. This might need adjustment.
-            proforma_template_type = "HTML_PROFORMA"
-            default_proforma_template = templates_crud.get_template_by_type_lang_default(
+            from utils.app_constants import DOCUMENT_TYPE_PROFORMA_HTML # Use constant
+
+            proforma_template_type = DOCUMENT_TYPE_PROFORMA_HTML
+
+            available_templates = templates_crud.get_templates_by_type(
                 template_type=proforma_template_type,
                 language_code=target_lang_code,
-                client_id=None # Global default template
+                client_id=None # Global templates for now
             )
 
-            if not default_proforma_template:
-                self.logger.error(f"No default Proforma template found for type '{proforma_template_type}' and language '{target_lang_code}'.")
-                QMessageBox.warning(self, "Modèle Manquant",
-                                    f"Aucun modèle de facture proforma par défaut trouvé pour la langue '{target_lang_code}'.")
+            if not available_templates:
+                self.logger.error(f"No Proforma templates found for type '{proforma_template_type}' and language '{target_lang_code}'.")
+                QMessageBox.warning(self, self.tr("Modèles Manquants"),
+                                    self.tr(f"Aucun modèle de facture proforma trouvé pour le type '{proforma_template_type}' et la langue '{target_lang_code}'. Veuillez en configurer un."))
                 return
 
-            template_base_filename = default_proforma_template.get('base_file_name')
-            template_inherent_language = default_proforma_template.get('language_code', target_lang_code) # Use template's lang if specified
+            selected_template_data = None
+            if len(available_templates) == 1:
+                selected_template_data = available_templates[0]
+                self.logger.info(f"Un seul modèle de proforma trouvé pour {target_lang_code}, type {proforma_template_type}: {selected_template_data.get('template_name')}")
+            else:
+                self.logger.info(f"{len(available_templates)} modèles de proforma trouvés pour {target_lang_code}, type {proforma_template_type}. Demande de choix à l'utilisateur.")
+                template_choices_map = {
+                    f"{t.get('template_name', 'Sans nom')} ({t.get('base_file_name') or 'Fichier non défini'})": t.get('template_id')
+                    for t in available_templates
+                }
+                template_display_names = list(template_choices_map.keys())
+
+                default_choice_idx = 0
+                # Try to find a template marked as default for this type/language
+                for i, t_data_loop in enumerate(available_templates):
+                    if t_data_loop.get('is_default_for_type_lang'):
+                        display_name_for_default = f"{t_data_loop.get('template_name', 'Sans nom')} ({t_data_loop.get('base_file_name') or 'Fichier non défini'})"
+                        if display_name_for_default in template_display_names:
+                           default_choice_idx = template_display_names.index(display_name_for_default)
+                           self.logger.info(f"Modèle par défaut trouvé: {display_name_for_default}")
+                           break
+
+                selected_template_name_display, choice_ok = QInputDialog.getItem(
+                    self,
+                    self.tr("Choisir un Modèle de Proforma"),
+                    self.tr("Plusieurs modèles de proforma sont disponibles pour la langue '{0}'. Veuillez en choisir un:").format(target_lang_code),
+                    template_display_names,
+                    default_choice_idx,
+                    False # Non éditable
+                )
+                if not choice_ok or not selected_template_name_display:
+                    self.logger.info("Choix de modèle annulé par l'utilisateur.")
+                    return
+
+                chosen_template_id = template_choices_map[selected_template_name_display]
+                for t_data_loop in available_templates:
+                    if t_data_loop.get('template_id') == chosen_template_id:
+                        selected_template_data = t_data_loop
+                        break
+
+            if not selected_template_data:
+                self.logger.error("Aucun modèle de proforma sélectionné ou trouvé après le choix utilisateur (ou si un seul était dispo mais a échoué).")
+                QMessageBox.warning(self, self.tr("Erreur Modèle"), self.tr("Impossible de déterminer le modèle de proforma à utiliser."))
+                return
+
+            template_base_filename = selected_template_data.get('base_file_name')
+            template_inherent_language = selected_template_data.get('language_code', target_lang_code)
 
             # Construct path to the template file
             # Need app_root_dir for this. ClientWidget should have it.
@@ -604,19 +650,111 @@ class CommandeWidget(QWidget):
                 "commande_items": commande_items,
                 "client_info_for_doc": client_info_for_doc, # Has absolute default_base_folder_path and relative db_relative_base_folder_path
                 "default_company": default_company,
-                "document_context": document_context,
-                "template_file_path": template_file_on_disk_abs,
+                "document_context": document_context, # This context was built BEFORE template selection, might need re-evaluation if template choice affects context keys
+                "template_file_path": template_file_on_disk_abs, # This needs to be updated based on selection
                 "target_language_code": target_lang_code, # Language used for selecting template and for PDF content
-                "source_template_id": default_proforma_template.get('template_id')
+                "source_template_id": selected_template_data.get('template_id') # Use the ID of the actually selected template
             }
+            # Update template_file_path based on actual selection
+            # app_root_dir_for_template was defined before this block
+            self._current_proforma_generation_data["template_file_path"] = os.path.join(
+                app_root_dir_for_template,
+                db_manager.CONFIG.get("templates_dir", "templates"),
+                template_inherent_language, # This should be the language of the chosen template
+                template_base_filename
+            )
 
-            self.logger.info(f"Modèle proforma '{template_base_filename}' sélectionné. Prêt pour la génération PDF.")
+            self.logger.info(f"Modèle proforma '{template_base_filename}' (ID: {selected_template_data.get('template_id')}) sélectionné. Prêt pour la génération PDF.")
 
-            # 6. Calling a utility function to create the PDF.
+            # 6. Show Preview Dialog
+            from document_generator.html_generator import generate_html_document # For preview
+            from dialogs.proforma_preview_dialog import ProformaPreviewDialog # Import the new dialog
+
+            app_root_dir = "" # Initialize app_root_dir
+            if hasattr(self, 'app_root_dir'): app_root_dir = self.app_root_dir
+            elif hasattr(self.parent(), 'app_root_dir'): app_root_dir = self.parent().app_root_dir
+            else:
+                self.logger.critical("app_root_dir is still not available before HTML generation for preview.")
+                QMessageBox.critical(self, "Erreur Critique", "Configuration de l'application manquante pour l'aperçu HTML.")
+                return
+
+            # Generate HTML for preview
+            # Note: generate_html_document expects company_id and client_id as int if they are used as such in cruds.
+            # Here, they are UUID strings. This might need adjustment in generate_html_document or its underlying context builder
+            # if the CRUDs it calls expect integer IDs for company/client.
+            # For now, assuming the context builder handles string IDs or they are passed correctly.
+
+            # The additional_context for generate_html_document should be the one we built for the template.
+            # The `document_context` we prepared IS the `additional_context` for the template rendering,
+            # but `generate_html_document` itself calls `get_document_context` internally.
+            # We need to pass the *inputs* to `get_document_context` to `generate_html_document`.
+
+            preview_html_content = generate_html_document(
+                client_id=client_id, # client_id from earlier in this function
+                company_id=default_company.get('company_id'), # company_id from default_company
+                template_path=self._current_proforma_generation_data["template_file_path"],
+                language_code=self._current_proforma_generation_data["target_language_code"],
+                project_id=self._current_proforma_generation_data["commande_details"].get("project_id"),
+                document_type="HTML_PROFORMA", # Match the template type
+                # Pass the fully built document_context as additional_context to be used by the template renderer
+                # This is a bit of a workaround if generate_html_document rebuilds context.
+                # Ideally, generate_html_document would take an already built context.
+                # For now, we pass the main IDs and the full context hoping the renderer uses it.
+                # A better approach: generate_html_document should accept a pre-built context.
+                # Let's assume for now it uses the additional_context for rendering if the context_builder part is skipped.
+                # The current html_generator.py -> render_html_template uses the context from get_document_context.
+                # So, we should pass what get_document_context expects in additional_data for overrides.
+                # The `document_context` we built earlier is *already* the full context.
+                # We need to ensure render_html_template in html_to_pdf_util.py can use this directly.
+                # The current structure is:
+                # CommandeWidget -> generate_pdf_for_document (utils) -> generate_html_and_convert_to_pdf (html_generator)
+                #   -> generate_html_document (html_generator) -> get_document_context (context_builder) -> render_html_template (html_to_pdf_util)
+                # This means our `document_context` built here is not directly used by `render_html_template` if we call `generate_html_document`.
+                #
+                # Let's modify the plan: ProformaPreviewDialog should take the *final* context and template path,
+                # and do the HTML rendering itself using the same render_html_template from html_to_pdf_util.
+                # This avoids issues with generate_html_document rebuilding a different context.
+                #
+                # **Correction:** The `generate_html_document` function in `html_generator.py` already does:
+                # 1. Call `get_document_context` (which has our translation logic)
+                # 2. Read template content
+                # 3. Call `render_html_template` (from `utils.html_to_pdf_util`)
+                # So, we just need to call `generate_html_document` with the right parameters.
+                # The `additional_data` for `get_document_context` should contain any overrides.
+                # Our `document_context` is the *output* of `get_document_context`.
+                # The `additional_context` for `generate_html_document` is what's passed to `get_document_context`.
+                # The `document_context` we built earlier in this function was for `generate_pdf_for_document`.
+                # We need to ensure that `get_document_context` called by `generate_html_document` gets the `order_id`.
+                additional_context_for_preview = {
+                    "order_id": commande_id, # Crucial for get_document_context to fetch order items
+                    "currency_symbol": commande_details.get('currency', 'EUR'),
+                    # Any other overrides for get_document_context can go here.
+                }
+            )
+
+            if not preview_html_content:
+                self.logger.error("Failed to generate HTML content for preview.")
+                QMessageBox.critical(self, self.tr("Erreur d'Aperçu"), self.tr("Impossible de générer l'aperçu HTML de la proforma."))
+                return
+
+            preview_dialog = ProformaPreviewDialog(
+                html_content=preview_html_content,
+                base_template_path=self._current_proforma_generation_data["template_file_path"],
+                parent=self
+            )
+
+            if preview_dialog.exec_() != QDialog.Accepted:
+                self.logger.info("Génération de proforma annulée par l'utilisateur après l'aperçu.")
+                return
+
+            # User clicked "Générer PDF", proceed with PDF generation
+            self.logger.info("Utilisateur a confirmé l'aperçu. Génération du PDF en cours...")
+
+            # 7. Calling a utility function to create the PDF.
             from utils import generate_pdf_for_document # Ensure this is imported
 
-            # app_root_dir is needed by generate_pdf_for_document for resolving paths (e.g. fonts, images in templates)
-            # It was determined when constructing template_file_on_disk_abs
+            # app_root_dir is needed by generate_pdf_for_document for resolving paths
+            # It was determined when constructing template_file_on_disk_abs / set above
             app_root_dir = ""
             if hasattr(self, 'app_root_dir'): app_root_dir = self.app_root_dir
             elif hasattr(self.parent(), 'app_root_dir'): app_root_dir = self.parent().app_root_dir

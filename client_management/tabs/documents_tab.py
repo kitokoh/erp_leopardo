@@ -451,6 +451,14 @@ class DocumentsTab(QWidget):
                         delete_btn.clicked.connect(lambda checked, d_id=doc_id, p=full_file_path: self.delete_client_document_entry(d_id, p))
                         actions_layout.addWidget(delete_btn)
 
+                    # Bouton "Convertir en Facture" pour les Proformas PDF
+                    if doc.get("document_type_generated") == "PROFORMA_PDF" and can_manage: # PROFORMA_PDF est une constante de app_constants
+                        convert_btn = QPushButton(QIcon(":/icons/share.svg"), "") # Utiliser une icône appropriée, share comme placeholder
+                        convert_btn.setToolTip(self.tr("Convertir en Facture"))
+                        convert_btn.setProperty("class", "tableActionButton")
+                        convert_btn.clicked.connect(lambda checked, doc_id_proforma=doc_id: self.handle_convert_proforma_to_invoice(doc_id_proforma))
+                        actions_layout.addWidget(convert_btn)
+
                     actions_layout.addStretch()
                     self.doc_table.setCellWidget(row_idx, 5, actions_widget)
                 self.doc_table.resizeRowsToContents() # Adjust row height for styled buttons
@@ -704,3 +712,91 @@ class DocumentsTab(QWidget):
         # Calling populate_doc_table() here is good to refresh row action visibility
         # if permissions change while the tab is visible.
         self.populate_doc_table()
+
+    def handle_convert_proforma_to_invoice(self, proforma_document_id: str):
+        self.notify(self.tr("Information"), self.tr(f"Conversion de proforma ID {proforma_document_id} en facture demandée. Cette fonctionnalité est en cours de développement."), type='INFO')
+        logging.info(f"Conversion de proforma ID {proforma_document_id} en facture demandée.")
+
+        # 1. Récupérer les détails du document proforma
+        proforma_doc = client_documents_crud.get_document_by_id(proforma_document_id)
+        if not proforma_doc:
+            self.notify(self.tr("Erreur"), self.tr("Document proforma non trouvé."), type='ERROR')
+            return
+
+        commande_id = proforma_doc.get('commande_id')
+        if not commande_id:
+            self.notify(self.tr("Erreur"), self.tr("Aucune commande n'est liée à cette proforma. Conversion manuelle requise."), type='WARNING')
+            return
+
+        # 2. Récupérer les détails de la commande et ses items
+        # Assurez-vous que commandes_crud est importé ou accessible via db_manager
+        commande_details = db_manager.commandes_crud.get_commande_by_id(commande_id)
+        if not commande_details:
+            self.notify(self.tr("Erreur"), self.tr(f"Détails de la commande ID {commande_id} non trouvés."), type='ERROR')
+            return
+
+        commande_items = db_manager.commandes_crud.get_items_for_commande(commande_id)
+        if commande_items is None: # Peut retourner None en cas d'erreur DB
+            self.notify(self.tr("Erreur"), self.tr(f"Articles pour la commande ID {commande_id} non trouvés."), type='ERROR')
+            return
+
+        # 3. Préparer les données pour le dialogue de facture
+        # La structure exacte dépendra de ce que ManualInvoiceDialog attend
+        invoice_data_prefill = {
+            "client_id": commande_details.get("client_id"),
+            "project_id": commande_details.get("project_id"),
+            "commande_id_source": commande_id, # Pour référence
+            "currency": commande_details.get("currency", "EUR"),
+            "items": [],
+            "notes": f"Basé sur la Proforma Doc ID: {proforma_document_id}, Commande Réf: {commande_details.get('commande_reference')}"
+            # D'autres champs comme les termes de paiement pourraient être copiés de la commande/proforma
+        }
+
+        for item in commande_items:
+            invoice_data_prefill["items"].append({
+                "product_id": item.get("product_id"),
+                "description": item.get("description_item"), # Ou product_name si description_item est vide
+                "quantity": item.get("quantity"),
+                "unit_price": item.get("unit_price_ht"),
+                "vat_rate": item.get("vat_rate", 0.0) # Le dialogue de facture gérera probablement le %
+                # ... autres champs que ManualInvoiceDialog pourrait attendre pour les items
+            })
+
+        # 4. Ouvrir le dialogue de création de facture
+        try:
+            from invoicing.manual_invoice_dialog import ManualInvoiceDialog # Importation locale
+            # Il faut s'assurer que ManualInvoiceDialog peut accepter des données pré-remplies
+            # Par exemple, via un paramètre `prefill_data` ou des setters.
+            # Ceci est une supposition sur le fonctionnement de ManualInvoiceDialog.
+            invoice_dialog = ManualInvoiceDialog(
+                client_id=invoice_data_prefill["client_id"],
+                current_user_id=self.current_user_id,
+                prefill_data=invoice_data_prefill, # Paramètre hypothétique
+                parent=self
+            )
+
+            if invoice_dialog.exec_() == QDialog.Accepted:
+                new_invoice_id = invoice_dialog.get_created_invoice_id() # Méthode hypothétique
+                if new_invoice_id:
+                    self.notify(self.tr("Succès"), self.tr(f"Facture ID {new_invoice_id} créée avec succès à partir de la proforma."), type='SUCCESS')
+
+                    # 5. Mettre à jour la proforma (par exemple, ajouter une note)
+                    updated_proforma_notes = proforma_doc.get("notes", "") or ""
+                    updated_proforma_notes += f"\nConvertie en Facture ID: {new_invoice_id} le {datetime.now().strftime('%Y-%m-%d %H:%M')}."
+
+                    client_documents_crud.update_client_document_notes(proforma_document_id, updated_proforma_notes.strip())
+                    # Idéalement, il y aurait un champ `linked_invoice_id` sur la table ClientDocuments ou ProformaInvoices.
+                    # Ou un statut "Convertie" pour la proforma.
+
+                    self.populate_doc_table() # Rafraîchir la liste des documents
+                else:
+                    self.notify(self.tr("Information"), self.tr("La facture a été créée mais son ID n'a pas pu être récupéré."), type='INFO')
+            else:
+                self.notify(self.tr("Annulé"), self.tr("Conversion en facture annulée."), type='INFO')
+
+        except ImportError:
+            self.logger.error("ManualInvoiceDialog n'a pas pu être importé.")
+            self.notify(self.tr("Erreur"), self.tr("Le module de facturation n'est pas disponible."), type='CRITICAL')
+        except Exception as e:
+            self.logger.error(f"Erreur lors de la conversion proforma en facture : {e}", exc_info=True)
+            self.notify(self.tr("Erreur Inattendue"), str(e), type='CRITICAL')
