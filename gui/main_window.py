@@ -238,54 +238,90 @@ class ClientListItemWidget(QWidget):
         return QApplication.translate("ClientListItemWidget", text) # Fallback
 
     def init_ui(self):
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(5, 3, 5, 3)
-        main_layout.setSpacing(1) # Reduced spacing
+        main_layout = QHBoxLayout(self) # Changed to QHBoxLayout for side-by-side status and text
+        main_layout.setContentsMargins(8, 5, 8, 5) # Increased margins for better spacing
+        main_layout.setSpacing(8) # Increased spacing
 
-        # Line 1: Status Icon + Client Name
-        line1_layout = QHBoxLayout()
-        line1_layout.setSpacing(4)
+        # Status Indicator (larger, more distinct)
+        self.status_indicator_label = QLabel()
+        self.status_indicator_label.setFixedSize(12, 12) # Circular indicator
+        self.status_indicator_label.setStyleSheet("border-radius: 6px; background-color: #343A40;") # Default color
 
-        status_icon_label = QLabel()
-        status_name = self.client_data.get("status", "")
-        icon_html = self._get_status_icon_html(status_name)
-        status_icon_label.setText(icon_html)
-        status_icon_label.setFixedWidth(12) # Adjusted for typical font size of icon
-        line1_layout.addWidget(status_icon_label)
+        # Text content layout (Client Name and Additional Info)
+        text_content_layout = QVBoxLayout()
+        text_content_layout.setContentsMargins(0,0,0,0)
+        text_content_layout.setSpacing(2)
 
-        client_name_label = QLabel(f"<b>{self.client_data.get('client_name', 'N/A')}</b>")
-        client_name_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        line1_layout.addWidget(client_name_label)
-        line1_layout.addStretch()
-        main_layout.addLayout(line1_layout)
+        self.client_name_label = QLabel() # Will be set in update_data
+        self.client_name_label.setObjectName("clientNameInList") # For QSS styling
+        font = self.client_name_label.font()
+        font.setBold(True)
+        font.setPointSize(font.pointSize() + 1) # Slightly larger
+        self.client_name_label.setFont(font)
+        self.client_name_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        text_content_layout.addWidget(self.client_name_label)
 
-        # Line 2: Additional Info (e.g., Project Identifier)
+        self.additional_info_label = QLabel() # Will be set in update_data
+        self.additional_info_label.setObjectName("clientAdditionalInfoInList") # For QSS styling
+        font_additional = self.additional_info_label.font()
+        font_additional.setPointSize(font_additional.pointSize() -1) # Slightly smaller
+        self.additional_info_label.setFont(font_additional)
+        self.additional_info_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        palette = self.additional_info_label.palette()
+        palette.setColor(QPalette.WindowText, QColor(Qt.gray)) # Darker gray for better readability
+        self.additional_info_label.setPalette(palette)
+        text_content_layout.addWidget(self.additional_info_label)
+
+        main_layout.addWidget(self.status_indicator_label)
+        main_layout.addLayout(text_content_layout)
+        main_layout.addStretch() # Pushes content to the left
+
+        self.update_data(self.client_data) # Populate widget with data
+
+        # Basic styling for the widget itself (can be overridden by QListWidget delegate)
+        self.setAutoFillBackground(True) # Important for hover effects if not handled by delegate
+        self.setStyleSheet("""
+            ClientListItemWidget {
+                background-color: transparent; /* Base background */
+                border-radius: 4px; /* Optional: rounded corners for items */
+            }
+            ClientListItemWidget:hover {
+                background-color: #e9ecef; /* Subtle hover, adjust as needed */
+            }
+        """)
+
+    def update_data(self, client_data):
+        self.client_data = client_data
+        self.client_name_label.setText(self.client_data.get('client_name', self._tr('Client Inconnu')))
+
         project_identifier = self.client_data.get('project_identifier', '')
+        country_name = self.client_data.get('country', '') # Assuming country name is now in client_data
+
+        additional_parts = []
         if project_identifier:
-            additional_info_label = QLabel(f"<small>{self._tr('Projet:')} {project_identifier}</small>")
-            additional_info_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            additional_parts.append(f"{self._tr('Projet:')} {project_identifier}")
+        if country_name:
+            additional_parts.append(country_name)
 
-            palette = additional_info_label.palette()
-            palette.setColor(QPalette.WindowText, QColor(Qt.darkGray))
-            additional_info_label.setPalette(palette)
+        self.additional_info_label.setText(" | ".join(additional_parts))
+        self.additional_info_label.setVisible(bool(additional_parts))
 
-            additional_info_layout = QHBoxLayout()
-            additional_info_layout.addSpacing(15)
-            additional_info_layout.addWidget(additional_info_label)
-            additional_info_layout.addStretch()
-            main_layout.addLayout(additional_info_layout)
+        self._update_status_indicator()
 
-        self.setStyleSheet("background:transparent;")
-
-    def _get_status_icon_html(self, status_name_str):
+    def _update_status_indicator(self):
+        status_name_str = self.client_data.get("status", "")
         status_lower = status_name_str.lower() if status_name_str else ""
-        # Colors chosen for visibility against typical delegate backgrounds
-        if "actif" in status_lower or "active" in status_lower: return "<span style='font-size:10pt; color: #28A745;'>●</span>" # Green
-        elif "prospect" in status_lower: return "<span style='font-size:10pt; color: #007BFF;'>●</span>" # Blue
-        elif "inactif" in status_lower or "inactive" in status_lower: return "<span style='font-size:10pt; color: #FFC107;'>●</span>" # Yellow/Orange
-        elif "archivé" in status_lower or "archived" in status_lower: return "<span style='font-size:10pt; color: #6c757d;'>●</span>" # Grey
-        elif "complété" in status_lower or "completed" in status_lower: return "<span style='font-size:10pt; color: #663399;'>●</span>" # Purple
-        else: return "<span style='font-size:10pt; color: #343A40;'>○</span>" # Dark Grey/Black circle for others
+
+        color = "#343A40" # Default (Dark Grey/Black)
+        if "actif" in status_lower or "active" in status_lower: color = "#28A745" # Green
+        elif "prospect" in status_lower: color = "#007BFF" # Blue
+        elif "inactif" in status_lower or "inactive" in status_lower: color = "#FFC107" # Yellow/Orange
+        elif "archivé" in status_lower or "archived" in status_lower: color = "#6c757d" # Grey
+        elif "complété" in status_lower or "completed" in status_lower: color = "#663399" # Purple
+
+        self.status_indicator_label.setStyleSheet(f"border-radius: 6px; background-color: {color};")
+
+    # _get_status_icon_html is no longer needed as we use a styled QLabel
 
 
 class DocumentManager(QMainWindow):
@@ -669,12 +705,17 @@ class DocumentManager(QMainWindow):
         self.main_splitter = QSplitter(Qt.Horizontal, self.documents_page_widget) # Store as self.main_splitter
 
         left_pane_widget = QWidget()
+        left_pane_widget.setObjectName("leftPaneWidget") # Set object name for QSS
         left_pane_layout = QVBoxLayout(left_pane_widget)
-        left_pane_layout.setContentsMargins(0,0,0,0)
+        left_pane_layout.setContentsMargins(5,5,5,5) # Add some margins to the overall left pane
+        left_pane_layout.setSpacing(8) # Adjust spacing between elements in left pane
 
         # Filter Search Group - Now uses QVBoxLayout for vertical stacking of filter groups
         filter_search_group = QGroupBox(self.tr("Filtres et Recherche Clients"))
+        filter_search_group.setObjectName("filterSearchGroup") # For QSS styling
         filter_search_main_layout = QVBoxLayout(filter_search_group) # Changed to QVBoxLayout
+        filter_search_main_layout.setSpacing(10) # Spacing within the filter group
+        filter_search_main_layout.setContentsMargins(8, 8, 8, 8) # Padding inside the groupbox
 
         # --- Top line filters (Status, Search, More Filters button) ---
         top_filter_line_layout = QHBoxLayout()
@@ -709,7 +750,23 @@ class DocumentManager(QMainWindow):
         self.more_filters_button.setCheckable(True)
         self.more_filters_button.toggled.connect(self.toggle_more_filters_visibility)
         self.more_filters_button.setToolTip(self.tr("Afficher/Masquer plus de filtres"))
-        # self.more_filters_button.setText("🔽") # Using setIcon instead
+        self.more_filters_button.setFixedSize(28, 28) # Make it small and square
+        self.more_filters_button.setIconSize(QSize(16, 16)) # Ensure icon isn't too large
+        self.more_filters_button.setStyleSheet("""
+            QPushButton#moreFiltersButton {
+                border: 1px solid #ced4da; /* Standard border */
+                border-radius: 4px; /* Standard border-radius */
+                padding: 4px; /* Adjust padding to center icon */
+                background-color: #f8f9fa; /* Light background */
+            }
+            QPushButton#moreFiltersButton:hover {
+                background-color: #e9ecef; /* Slightly darker on hover */
+            }
+            QPushButton#moreFiltersButton:checked {
+                background-color: #dde2e6; /* Different background when checked (filters shown) */
+                border-color: #adb5bd;
+            }
+        """)
         top_filter_line_layout.addWidget(self.more_filters_button)
 
         # "Réinitialiser Filtres" Button is now moved to the collapsible section
@@ -789,15 +846,16 @@ class DocumentManager(QMainWindow):
 
         # --- Category Filter (moved into collapsible area) ---
         category_filter_layout_group = QWidget()
-        category_filter_h_layout = QHBoxLayout(category_filter_layout_group) # Horizontal for label + input
-        category_filter_h_layout.setContentsMargins(0,0,0,0)
+        category_filter_v_layout = QVBoxLayout(category_filter_layout_group) # Changed to QVBoxLayout for consistency
+        category_filter_v_layout.setContentsMargins(0,0,0,0) # No extra margins for the group itself
         category_label = QLabel(self.tr("Catégorie:"))
         self.category_filter_input = QLineEdit()
         self.category_filter_input.setPlaceholderText(self.tr("Filtrer par catégorie..."))
         self.category_filter_input.textChanged.connect(self.filter_client_list_display_slot)
-        category_filter_h_layout.addWidget(category_label)
-        category_filter_h_layout.addWidget(self.category_filter_input)
+        category_filter_v_layout.addWidget(category_label) # Label on top
+        category_filter_v_layout.addWidget(self.category_filter_input) # Input below
         collapsible_layout.addWidget(category_filter_layout_group) # Add to collapsible
+
 
         # --- Saved Filters UI ---
         saved_filters_group = QGroupBox(self.tr("Filtres Sauvegardés")) # Optional: GroupBox for clarity
@@ -854,10 +912,15 @@ class DocumentManager(QMainWindow):
         # filter_search_main_layout.addStretch(1) # REMOVE THIS to prevent pushing client list down
         left_pane_layout.addWidget(filter_search_group)
 
-        self.client_list_widget = QListWidget(); self.client_list_widget.setAlternatingRowColors(True)
-        self.client_list_widget.setItemDelegate(StatusDelegate(self.client_list_widget))
-        self.client_list_widget.itemClicked.connect(self.handle_client_list_click); self.client_list_widget.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.client_list_widget.customContextMenuRequested.connect(self.show_client_context_menu); left_pane_layout.addWidget(self.client_list_widget)
+        self.client_list_widget = QListWidget()
+        self.client_list_widget.setObjectName("clientListWidget") # Set object name for QSS
+        self.client_list_widget.setAlternatingRowColors(False) # Disable alternating colors, rely on item hover
+        self.client_list_widget.setItemDelegate(StatusDelegate(self.client_list_widget)) # StatusDelegate might still be useful for item sizing or other non-background roles
+        self.client_list_widget.itemClicked.connect(self.handle_client_list_click)
+        self.client_list_widget.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.client_list_widget.customContextMenuRequested.connect(self.show_client_context_menu)
+        self.client_list_widget.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff) # Often better for lists
+        left_pane_layout.addWidget(self.client_list_widget)
         
         pagination_layout = QHBoxLayout()
         self.prev_page_button = QPushButton(self.tr("Précédent")); self.prev_page_button.clicked.connect(self.prev_page)
