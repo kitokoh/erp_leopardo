@@ -55,14 +55,7 @@ from .cruds.activity_logs_crud import add_activity_log, get_activity_logs
 from .cruds.users_crud import (
     get_user_by_id,
     list_users, # Changed from get_all_users
-    update_user_password, # Changed from update_user
-<<<<<<< HEAD
-    # verify_password, # Removed as it's not directly in users_crud anymore
-=======
-    # verify_password, # Changed from verify_user_password ### REMOVED - erroneous import
->>>>>>> 0c69b5aff7a65cb90e062c29962798001ba14f54
     add_user as add_user_crud, # Alias to avoid conflict if main has add_user
-
     verify_user_password, # This is the correct one to use for full verification
     update_user_password,
     update_user_role,
@@ -296,8 +289,7 @@ __all__ = [
     "get_activity_logs",
     "get_user_by_id",
     "list_users", # Changed from get_all_users
-    "update_user_password", # Changed from update_user
-    # "verify_password", # Changed from verify_user_password ### REMOVED
+    # "verify_password", # Changed from verify_user_password ### REMOVED / Not needed in __all__ due to specific imports
     "add_user_crud", # Exporting aliased add_user
     "get_user_by_username", # Exporting get_user_by_username
 

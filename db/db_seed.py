@@ -125,9 +125,16 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
             logger.critical(f"Administrator role ('{ADMINISTRATOR}') could not be seeded or found. Cannot create default admin user.")
             # Depending on policy, might raise an error or try to proceed if other roles are vital.
             # For now, log critical and proceed, other parts of seeding might still be useful.
+    except Exception as e_roles:
+        logger.error(f"An error occurred during role seeding: {e_roles}", exc_info=True)
+        # This error will be logged, and the broader seeding process might continue or be caught by an outer try-except.
+    finally:
+        # This block is executed regardless of whether an exception occurred in the try block.
+        pass
 
-    # 1. Users - Seed initial Admin User (now 'admin' with SUPER_ADMIN role)
-    super_admin_user_id = None # Initialize
+    try:
+        # 1. Users - Seed initial Admin User (now 'admin' with SUPER_ADMIN role)
+        super_admin_user_id = None # Initialize
     # Fetch SUPER_ADMIN role_id
     from auth.roles import SUPER_ADMIN as SUPER_ADMIN_ROLE_NAME # Import the role name
     super_admin_role_dict = crud_get_role_by_name(SUPER_ADMIN_ROLE_NAME, conn=conn)
