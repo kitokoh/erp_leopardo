@@ -3,26 +3,66 @@ from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QLineEdit,
     QPushButton, QDialogButtonBox, QMessageBox, QLabel,
     QListWidget, QListWidgetItem, QTableWidget, QTableWidgetItem,
-    QAbstractItemView, QHeaderView, QGroupBox
+    QAbstractItemView, QHeaderView, QGroupBox, QInputDialog # Added QInputDialog
 )
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
+import logging # Added logging
 
 from db.cruds.products_crud import products_crud_instance
+# Import GlobalProductEditDialog and SUPPORTED_LANGUAGES later, inside the method,
+# to avoid potential circular import issues at module load time.
+# from product_management.global_product_edit_dialog import GlobalProductEditDialog
+# from utils.app_constants import SUPPORTED_LANGUAGES
+
 
 class ProductEquivalencyDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, source_product_id=None, parent=None): # Ajout de source_product_id
         super().__init__(parent)
+        self.logger = logging.getLogger(__name__) # Initialize logger
         self.setWindowTitle(self.tr("Gérer les Équivalences de Produits"))
         self.setMinimumSize(900, 700)
 
+        self.initial_source_product_id = source_product_id # Stocker l'ID initial
         self.current_selected_product_a_id = None
         self.current_selected_product_a_info = {}
         self.current_selected_product_b_id = None
         self.current_selected_product_b_info = {}
 
         self.setup_ui()
-        self.load_equivalencies()
+        if self.initial_source_product_id:
+            self._load_initial_source_product()
+
+        self.load_equivalencies() # Charge toutes les équivalences pour l'instant
+
+    def _load_initial_source_product(self):
+        if not self.initial_source_product_id:
+            return
+
+        product_data = products_crud_instance.get_product_by_id(self.initial_source_product_id)
+        if product_data:
+            self.current_selected_product_a_id = product_data.get('product_id')
+            self.current_selected_product_a_info = {
+                'name': product_data.get('product_name'),
+                'lang': product_data.get('language_code'),
+                'code': product_data.get('product_code') # Ajout du code pour affichage complet
+            }
+            display_text = self.tr("Produit A: {name} ({lang}) - Code: {code}").format(
+                name=self.current_selected_product_a_info['name'],
+                lang=self.current_selected_product_a_info['lang'],
+                code=self.current_selected_product_a_info['code']
+            )
+            self.selected_product_a_label.setText(display_text)
+            self.search_product_a_input.setText(product_data.get('product_name')) # Pré-remplir la recherche
+            self.search_product_a_input.setEnabled(False) # Désactiver la recherche pour Produit A
+            self.results_product_a_list.setEnabled(False) # Désactiver la liste des résultats pour A
+            self.results_product_a_list.clear()
+            # Note: load_equivalencies() n'est pas encore filtré par produit A.
+            # Pour un filtrage, il faudrait modifier load_equivalencies ou appeler une autre fonction.
+            # Pour l'instant, on se contente de pré-remplir A.
+        else:
+            QMessageBox.warning(self, self.tr("Erreur"), self.tr("Produit source initial (ID: {0}) non trouvé.").format(self.initial_source_product_id))
+            self.initial_source_product_id = None # Réinitialiser si non trouvé
 
     def setup_ui(self):
         main_layout = QVBoxLayout(self)
@@ -91,7 +131,15 @@ class ProductEquivalencyDialog(QDialog):
         self.add_equivalency_button.setObjectName("primaryButton")
         self.add_equivalency_button.setEnabled(False)
         self.add_equivalency_button.clicked.connect(self.add_new_equivalency)
-        add_layout.addWidget(self.add_equivalency_button, 4, 0, 1, 2)
+        add_layout.addWidget(self.add_equivalency_button, 4, 0, 1, 2) # Bouton existant pour lier A et B
+
+        self.create_and_link_button = QPushButton(self.tr("Créer et Lier Nouveau Produit Équivalent au Produit A"))
+        self.create_and_link_button.setIcon(QIcon.fromTheme("document-new"))
+        self.create_and_link_button.setToolTip(self.tr("Crée un nouveau produit et le lie comme équivalent au Produit A sélectionné."))
+        self.create_and_link_button.setEnabled(False) # Sera activé si Produit A est sélectionné
+        self.create_and_link_button.clicked.connect(self._on_create_and_link_new_equivalent_clicked)
+        add_layout.addWidget(self.create_and_link_button, 5, 0, 1, 2) # Nouveau bouton en dessous
+
         main_layout.addWidget(add_group)
 
         self.button_box = QDialogButtonBox(QDialogButtonBox.Close)
@@ -107,6 +155,9 @@ class ProductEquivalencyDialog(QDialog):
             self.current_selected_product_a_id is not None and \
             self.current_selected_product_b_id is not None
         )
+        # Le bouton "Créer et Lier" ne dépend que de la sélection du Produit A
+        self.create_and_link_button.setEnabled(self.current_selected_product_a_id is not None)
+
 
     def load_equivalencies(self):
         self.equivalencies_table.setRowCount(0)
@@ -226,3 +277,109 @@ class ProductEquivalencyDialog(QDialog):
             QMessageBox.critical(self, self.tr("Erreur"), self.tr("Erreur lors de l'ajout de l'équivalence: {0}").format(str(e)))
         finally:
             self._update_button_states()
+
+    def _on_create_and_link_new_equivalent_clicked(self):
+        if not self.current_selected_product_a_id or not self.current_selected_product_a_info:
+            QMessageBox.warning(self, self.tr("Produit Source Manquant"), self.tr("Veuillez d'abord sélectionner un Produit A (source)."))
+            return
+
+        # Importations tardives pour éviter les problèmes d'import circulaire et pour la portée
+        from product_management.global_product_edit_dialog import GlobalProductEditDialog
+        from utils.app_constants import SUPPORTED_LANGUAGES
+        # QInputDialog est déjà importé au niveau du module
+
+        source_name = self.current_selected_product_a_info.get('name', 'Produit Source')
+        source_code_from_info = self.current_selected_product_a_info.get('code', 'CODE') # Code du label
+        source_lang = self.current_selected_product_a_info.get('lang', '')
+
+        # Récupérer les détails complets du produit source A pour un meilleur pré-remplissage
+        full_source_product_data = products_crud_instance.get_product_by_id(self.current_selected_product_a_id)
+        if not full_source_product_data:
+            QMessageBox.critical(self, self.tr("Erreur"), self.tr("Impossible de récupérer les détails complets du produit source A."))
+            return
+
+        source_actual_code = full_source_product_data.get('product_code', source_code_from_info)
+
+
+        # Demander la langue pour le nouveau produit équivalent
+        lang_items = [f"{name} ({code})" for code, name in SUPPORTED_LANGUAGES.items() if code.lower() != source_lang.lower()]
+        if not lang_items:
+            QMessageBox.information(self, self.tr("Langues"), self.tr("Aucune autre langue disponible pour créer un équivalent (la langue source est '{0}').").format(source_lang))
+            return
+
+        target_lang_display, ok = QInputDialog.getItem(self, self.tr("Langue du Nouveau Produit Équivalent"),
+                                                       self.tr("Choisissez la langue pour le nouveau produit équivalent:"),
+                                                       lang_items, 0, False)
+        if not ok or not target_lang_display:
+            self.logger.info("Sélection de langue pour nouveau produit équivalent annulée.")
+            return
+
+        target_lang_code = target_lang_display.split('(')[-1].replace(')', '').strip()
+
+        # Préparer les données pour GlobalProductEditDialog
+        prefill_data_for_new_equivalent = {
+            'product_name': f"{source_name} ({target_lang_code.upper()})",
+            'product_code': f"{source_actual_code}-{target_lang_code.upper()}",
+            'language_code': target_lang_code,
+            'description': full_source_product_data.get('description', self.tr("Équivalent de '{0}' en {1}.").format(source_name, target_lang_display)),
+            'category': full_source_product_data.get('category'),
+            'base_unit_price': full_source_product_data.get('base_unit_price'),
+            'unit_of_measure': full_source_product_data.get('unit_of_measure'),
+            'weight': full_source_product_data.get('weight'),
+            'dimensions': full_source_product_data.get('dimensions'),
+            'is_active': True # Actif par défaut
+        }
+
+        current_user_info_for_new_prod = None
+        # Tenter de récupérer current_user_info depuis le parent (ManageGlobalProductsDialog)
+        # ou depuis self si ProductEquivalencyDialog a été modifié pour le stocker.
+        if hasattr(self.parent(), 'current_user_info'):
+            current_user_info_for_new_prod = self.parent().current_user_info
+        elif hasattr(self, 'current_user_info'): # Si ProductEquivalencyDialog l'a lui-même
+             current_user_info_for_new_prod = self.current_user_info
+        else:
+            self.logger.warning("current_user_info non trouvé pour GlobalProductEditDialog lors de la création d'équivalent.")
+            # On pourrait demander à l'utilisateur de confirmer ou d'annuler si l'info utilisateur est critique.
+
+        new_product_dialog = GlobalProductEditDialog(product_data=None, # Mode ajout
+                                                     current_user_info=current_user_info_for_new_prod,
+                                                     parent=self)
+        # Pré-remplir manuellement les champs après l'initialisation du dialogue
+        new_product_dialog.name_input.setText(prefill_data_for_new_equivalent['product_name'])
+        new_product_dialog.code_input.setText(prefill_data_for_new_equivalent['product_code'])
+        lang_idx = new_product_dialog.language_combo.findData(prefill_data_for_new_equivalent['language_code'])
+        if lang_idx >= 0: new_product_dialog.language_combo.setCurrentIndex(lang_idx)
+        new_product_dialog.description_input.setPlainText(prefill_data_for_new_equivalent['description'])
+        if prefill_data_for_new_equivalent['category']: new_product_dialog.category_input.setText(prefill_data_for_new_equivalent['category'])
+        if prefill_data_for_new_equivalent['base_unit_price'] is not None: new_product_dialog.base_price_input.setValue(float(prefill_data_for_new_equivalent['base_unit_price']))
+        if prefill_data_for_new_equivalent['unit_of_measure']: new_product_dialog.unit_of_measure_input.setText(prefill_data_for_new_equivalent['unit_of_measure'])
+        if prefill_data_for_new_equivalent['weight'] is not None: new_product_dialog.weight_input.setValue(float(prefill_data_for_new_equivalent['weight']))
+        if prefill_data_for_new_equivalent['dimensions']: new_product_dialog.dimensions_input.setText(prefill_data_for_new_equivalent['dimensions'])
+        new_product_dialog.is_active_checkbox.setChecked(prefill_data_for_new_equivalent['is_active'])
+
+        if new_product_dialog.exec_() == QDialog.Accepted:
+            new_product_data_from_dialog = new_product_dialog.get_product_data()
+
+            # Assurer que created_by_user_id est là (normalement géré par GlobalProductEditDialog si current_user_info est passé)
+            if not new_product_data_from_dialog.get('created_by_user_id') and current_user_info_for_new_prod:
+                new_product_data_from_dialog['created_by_user_id'] = current_user_info_for_new_prod.get('user_id')
+
+            add_result = products_crud_instance.add_product(new_product_data_from_dialog)
+            if add_result and add_result.get('success'):
+                new_product_id = add_result.get('id')
+                self.logger.info(f"Nouveau produit équivalent '{new_product_data_from_dialog.get('product_name')}' créé avec ID: {new_product_id}.")
+
+                link_result = products_crud_instance.add_product_equivalence(self.current_selected_product_a_id, new_product_id)
+                if link_result.get('success'):
+                    QMessageBox.information(self, self.tr("Succès"), self.tr("Nouveau produit créé et lié comme équivalent."))
+                    self.load_equivalencies() # Rafraîchir la table des équivalences
+                else:
+                    QMessageBox.warning(self, self.tr("Erreur de Liaison"),
+                                        self.tr("Le nouveau produit a été créé (ID: {0}), mais la liaison d'équivalence a échoué: {1}")
+                                        .format(new_product_id, link_result.get('error', 'Inconnue')))
+            else:
+                QMessageBox.critical(self, self.tr("Erreur Création Produit"),
+                                     self.tr("Impossible de créer le nouveau produit équivalent: {0}")
+                                     .format(add_result.get('error', 'Inconnue')))
+        else:
+            self.logger.info("Création de nouveau produit équivalent annulée par l'utilisateur via GlobalProductEditDialog.")

@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 import logging
-
-
+import os # Added os import
 import datetime
 
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QTableWidget,
-    QTableWidgetItem, QHeaderView, QAbstractItemView, QMessageBox, QComboBox
+    QTableWidgetItem, QHeaderView, QAbstractItemView, QMessageBox, QComboBox,
+    QInputDialog # Added QInputDialog
 )
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QUrl
@@ -193,6 +193,12 @@ class CommandeWidget(QWidget):
                 proforma_btn.clicked.connect(lambda ch, cmd_id=commande_data.get("commande_id"): self.handle_generate_proforma_for_commande(cmd_id))
                 actions_layout.addWidget(proforma_btn)
 
+                compile_docs_btn = QPushButton(QIcon.fromTheme("document-export"), "") # ou une autre icône pertinente
+                compile_docs_btn.setToolTip(self.tr("Compiler les Documents PDF de la Commande"))
+                compile_docs_btn.setProperty("class", "tableActionButton")
+                compile_docs_btn.clicked.connect(lambda ch, cmd_id=commande_data.get("commande_id"): self.handle_compile_order_documents(cmd_id))
+                actions_layout.addWidget(compile_docs_btn)
+
                 delete_btn = QPushButton(QIcon(":/icons/trash-2.svg"), "")
                 delete_btn.setToolTip("Supprimer Commande")
                 delete_btn.setProperty("class", "dangerButtonTable")
@@ -310,6 +316,9 @@ class CommandeWidget(QWidget):
         self.logger.info(f"Génération de proforma demandée pour la commande ID: {commande_id}")
 
         try:
+            from utils.app_constants import SUPPORTED_LANGUAGES # Import centralisé
+            from db.cruds import client_documents_crud # Import pour la dernière langue de proforma
+
             # 1. Fetching commande details (header, items).
             commande_details = commandes_crud.get_commande_by_id(commande_id)
             if not commande_details:
@@ -460,38 +469,159 @@ class CommandeWidget(QWidget):
             self.logger.info(f"Context préparé pour la proforma : {document_context}")
 
             # 5. Selecting the appropriate proforma template.
-            # Determine target language (e.g., first selected language of the client, or default)
-            target_lang_code = 'fr' # Default
-            if client_info_for_doc.get('selected_languages'):
+            # --- Language Selection ---
+            # SUPPORTED_LANGUAGES est maintenant importé depuis utils.app_constants
+
+            # Determine default language for dialog more intelligently
+            default_lang_code_for_dialog = 'fr' # Ultimate fallback
+
+            # 1. Try client's main language code (assuming a field like 'main_language_code' or 'language_preference')
+            #    (This field needs to be added to Clients table and CRUDs if it doesn't exist)
+            #    For now, let's assume client_info_for_doc might have 'language_code' field from Clients table
+            if client_info_for_doc.get('language_code') and client_info_for_doc['language_code'] in SUPPORTED_LANGUAGES:
+                default_lang_code_for_dialog = client_info_for_doc['language_code']
+                self.logger.info(f"Using client's main language '{default_lang_code_for_dialog}' as default for proforma.")
+            else:
+                # 2. Try language of the last proforma for this client
+                last_proforma_lang = None
                 try:
-                    # Assuming selected_languages is a comma-separated string or a list
-                    langs = client_info_for_doc['selected_languages']
-                    if isinstance(langs, str):
-                        langs = [lang.strip() for lang in langs.split(',') if lang.strip()]
-                    if langs:
-                        target_lang_code = langs[0]
-                except Exception as lang_ex:
-                    self.logger.warning(f"Could not determine client's preferred language, defaulting to 'fr'. Error: {lang_ex}")
+                    # Need client_id, which is in client_info_for_doc or commande_details
+                    client_id_for_last_doc = client_info_for_doc.get('client_id')
+                    if client_id_for_last_doc:
+                        # Get last proforma (e.g., PROFORMA_PDF type, ordered by creation_date desc)
+                        # This requires client_documents_crud to have a suitable function.
+                        # Let's assume a function get_last_document_language(client_id, doc_type_pattern)
+                        # For now, a simplified conceptual check:
+                        recent_docs = client_documents_crud.get_documents_for_client(
+                            client_id=client_id_for_last_doc,
+                            filters={"document_type_generated": "PROFORMA_PDF"}, # Or a more general proforma type
+                            limit=1, order_by="created_at DESC"
+                        )
+                        if recent_docs and recent_docs[0].get('language_code') in SUPPORTED_LANGUAGES:
+                            last_proforma_lang = recent_docs[0]['language_code']
+                            default_lang_code_for_dialog = last_proforma_lang
+                            self.logger.info(f"Using last proforma language '{last_proforma_lang}' as default.")
+                except Exception as e_last_lang:
+                    self.logger.warning(f"Could not fetch last proforma language: {e_last_lang}")
 
-            self.logger.info(f"Target language for Proforma template: {target_lang_code}")
+                # 3. Fallback to client's 'selected_languages' (existing logic) or 'fr'
+                if not last_proforma_lang: # Only if step 2 didn't yield a result
+                    if client_info_for_doc.get('selected_languages'):
+                        try:
+                            langs = client_info_for_doc['selected_languages']
+                            if isinstance(langs, str):
+                                langs = [lang.strip() for lang in langs.split(',') if lang.strip()]
+                            if langs and langs[0] in SUPPORTED_LANGUAGES:
+                                default_lang_code_for_dialog = langs[0]
+                                self.logger.info(f"Using client's selected_languages[0] '{default_lang_code_for_dialog}' as default.")
+                        except Exception as lang_ex:
+                            self.logger.warning(f"Could not determine client's preferred language from selected_languages, defaulting to 'fr'. Error: {lang_ex}")
+                            # default_lang_code_for_dialog remains 'fr' (ultimate fallback)
+                    else:
+                        self.logger.info(f"Client has no main language or selected_languages, defaulting to '{default_lang_code_for_dialog}'.")
 
-            from db.cruds import templates_crud # Local import for clarity
-            # Assuming "HTML_PROFORMA" is the template_type for proforma invoices. This might need adjustment.
-            proforma_template_type = "HTML_PROFORMA"
-            default_proforma_template = templates_crud.get_template_by_type_lang_default(
-                template_type=proforma_template_type,
-                language_code=target_lang_code,
-                client_id=None # Global default template
+
+            language_items = [f"{name} ({code})" for code, name in SUPPORTED_LANGUAGES.items()]
+
+            default_idx = 0
+            try:
+                default_lang_item_str = f"{SUPPORTED_LANGUAGES.get(default_lang_code_for_dialog, 'French')} ({default_lang_code_for_dialog})"
+                default_idx = language_items.index(default_lang_item_str)
+            except ValueError: # Fallback if constructed string not found (e.g. lang code valid but name mapping issue)
+                self.logger.warning(f"Could not find default language item string '{default_lang_item_str}' in list. Falling back to index 0 or 'fr'.")
+                for i, item_str in enumerate(language_items):
+                    if f"({default_lang_code_for_dialog})" in item_str: # Try matching by code only
+                        default_idx = i
+                        break
+                else: # If code itself not found, try 'fr'
+                    for i, item_str in enumerate(language_items):
+                        if "(fr)" in item_str:
+                            default_idx = i
+                            break
+
+            selected_lang_display, lang_ok = QInputDialog.getItem(
+                self,
+                self.tr("Sélectionner la Langue du Proforma"),
+                self.tr("Langue pour la génération du document proforma :"),
+                language_items,
+                default_selection_idx, # Set default selection
+                False # Not editable
             )
 
-            if not default_proforma_template:
-                self.logger.error(f"No default Proforma template found for type '{proforma_template_type}' and language '{target_lang_code}'.")
-                QMessageBox.warning(self, "Modèle Manquant",
-                                    f"Aucun modèle de facture proforma par défaut trouvé pour la langue '{target_lang_code}'.")
+            if not lang_ok or not selected_lang_display:
+                self.logger.info("Génération de proforma annulée par l'utilisateur (sélection de langue).")
+                return # User cancelled
+
+            # Extract code from "Name (code)"
+            target_lang_code = selected_lang_display.split('(')[-1].replace(')', '').strip()
+            self.logger.info(f"Langue sélectionnée pour la Proforma: {target_lang_code} ({selected_lang_display})")
+
+            # --- End Language Selection ---
+
+            from db.cruds import templates_crud # Local import for clarity
+            from utils.app_constants import DOCUMENT_TYPE_PROFORMA_HTML # Use constant
+
+            proforma_template_type = DOCUMENT_TYPE_PROFORMA_HTML
+
+            available_templates = templates_crud.get_templates_by_type(
+                template_type=proforma_template_type,
+                language_code=target_lang_code,
+                client_id=None # Global templates for now
+            )
+
+            if not available_templates:
+                self.logger.error(f"No Proforma templates found for type '{proforma_template_type}' and language '{target_lang_code}'.")
+                QMessageBox.warning(self, self.tr("Modèles Manquants"),
+                                    self.tr(f"Aucun modèle de facture proforma trouvé pour le type '{proforma_template_type}' et la langue '{target_lang_code}'. Veuillez en configurer un."))
                 return
 
-            template_base_filename = default_proforma_template.get('base_file_name')
-            template_inherent_language = default_proforma_template.get('language_code', target_lang_code) # Use template's lang if specified
+            selected_template_data = None
+            if len(available_templates) == 1:
+                selected_template_data = available_templates[0]
+                self.logger.info(f"Un seul modèle de proforma trouvé pour {target_lang_code}, type {proforma_template_type}: {selected_template_data.get('template_name')}")
+            else:
+                self.logger.info(f"{len(available_templates)} modèles de proforma trouvés pour {target_lang_code}, type {proforma_template_type}. Demande de choix à l'utilisateur.")
+                template_choices_map = {
+                    f"{t.get('template_name', 'Sans nom')} ({t.get('base_file_name') or 'Fichier non défini'})": t.get('template_id')
+                    for t in available_templates
+                }
+                template_display_names = list(template_choices_map.keys())
+
+                default_choice_idx = 0
+                # Try to find a template marked as default for this type/language
+                for i, t_data_loop in enumerate(available_templates):
+                    if t_data_loop.get('is_default_for_type_lang'):
+                        display_name_for_default = f"{t_data_loop.get('template_name', 'Sans nom')} ({t_data_loop.get('base_file_name') or 'Fichier non défini'})"
+                        if display_name_for_default in template_display_names:
+                           default_choice_idx = template_display_names.index(display_name_for_default)
+                           self.logger.info(f"Modèle par défaut trouvé: {display_name_for_default}")
+                           break
+
+                selected_template_name_display, choice_ok = QInputDialog.getItem(
+                    self,
+                    self.tr("Choisir un Modèle de Proforma"),
+                    self.tr("Plusieurs modèles de proforma sont disponibles pour la langue '{0}'. Veuillez en choisir un:").format(target_lang_code),
+                    template_display_names,
+                    default_choice_idx,
+                    False # Non éditable
+                )
+                if not choice_ok or not selected_template_name_display:
+                    self.logger.info("Choix de modèle annulé par l'utilisateur.")
+                    return
+
+                chosen_template_id = template_choices_map[selected_template_name_display]
+                for t_data_loop in available_templates:
+                    if t_data_loop.get('template_id') == chosen_template_id:
+                        selected_template_data = t_data_loop
+                        break
+
+            if not selected_template_data:
+                self.logger.error("Aucun modèle de proforma sélectionné ou trouvé après le choix utilisateur (ou si un seul était dispo mais a échoué).")
+                QMessageBox.warning(self, self.tr("Erreur Modèle"), self.tr("Impossible de déterminer le modèle de proforma à utiliser."))
+                return
+
+            template_base_filename = selected_template_data.get('base_file_name')
+            template_inherent_language = selected_template_data.get('language_code', target_lang_code)
 
             # Construct path to the template file
             # Need app_root_dir for this. ClientWidget should have it.
@@ -526,19 +656,111 @@ class CommandeWidget(QWidget):
                 "commande_items": commande_items,
                 "client_info_for_doc": client_info_for_doc, # Has absolute default_base_folder_path and relative db_relative_base_folder_path
                 "default_company": default_company,
-                "document_context": document_context,
-                "template_file_path": template_file_on_disk_abs,
+                "document_context": document_context, # This context was built BEFORE template selection, might need re-evaluation if template choice affects context keys
+                "template_file_path": template_file_on_disk_abs, # This needs to be updated based on selection
                 "target_language_code": target_lang_code, # Language used for selecting template and for PDF content
-                "source_template_id": default_proforma_template.get('template_id')
+                "source_template_id": selected_template_data.get('template_id') # Use the ID of the actually selected template
             }
+            # Update template_file_path based on actual selection
+            # app_root_dir_for_template was defined before this block
+            self._current_proforma_generation_data["template_file_path"] = os.path.join(
+                app_root_dir_for_template,
+                db_manager.CONFIG.get("templates_dir", "templates"),
+                template_inherent_language, # This should be the language of the chosen template
+                template_base_filename
+            )
 
-            self.logger.info(f"Modèle proforma '{template_base_filename}' sélectionné. Prêt pour la génération PDF.")
+            self.logger.info(f"Modèle proforma '{template_base_filename}' (ID: {selected_template_data.get('template_id')}) sélectionné. Prêt pour la génération PDF.")
 
-            # 6. Calling a utility function to create the PDF.
+            # 6. Show Preview Dialog
+            from document_generator.html_generator import generate_html_document # For preview
+            from dialogs.proforma_preview_dialog import ProformaPreviewDialog # Import the new dialog
+
+            app_root_dir = "" # Initialize app_root_dir
+            if hasattr(self, 'app_root_dir'): app_root_dir = self.app_root_dir
+            elif hasattr(self.parent(), 'app_root_dir'): app_root_dir = self.parent().app_root_dir
+            else:
+                self.logger.critical("app_root_dir is still not available before HTML generation for preview.")
+                QMessageBox.critical(self, "Erreur Critique", "Configuration de l'application manquante pour l'aperçu HTML.")
+                return
+
+            # Generate HTML for preview
+            # Note: generate_html_document expects company_id and client_id as int if they are used as such in cruds.
+            # Here, they are UUID strings. This might need adjustment in generate_html_document or its underlying context builder
+            # if the CRUDs it calls expect integer IDs for company/client.
+            # For now, assuming the context builder handles string IDs or they are passed correctly.
+
+            # The additional_context for generate_html_document should be the one we built for the template.
+            # The `document_context` we prepared IS the `additional_context` for the template rendering,
+            # but `generate_html_document` itself calls `get_document_context` internally.
+            # We need to pass the *inputs* to `get_document_context` to `generate_html_document`.
+
+            preview_html_content = generate_html_document(
+                client_id=client_id, # client_id from earlier in this function
+                company_id=default_company.get('company_id'), # company_id from default_company
+                template_path=self._current_proforma_generation_data["template_file_path"],
+                language_code=self._current_proforma_generation_data["target_language_code"],
+                project_id=self._current_proforma_generation_data["commande_details"].get("project_id"),
+                document_type="HTML_PROFORMA", # Match the template type
+                # Pass the fully built document_context as additional_context to be used by the template renderer
+                # This is a bit of a workaround if generate_html_document rebuilds context.
+                # Ideally, generate_html_document would take an already built context.
+                # For now, we pass the main IDs and the full context hoping the renderer uses it.
+                # A better approach: generate_html_document should accept a pre-built context.
+                # Let's assume for now it uses the additional_context for rendering if the context_builder part is skipped.
+                # The current html_generator.py -> render_html_template uses the context from get_document_context.
+                # So, we should pass what get_document_context expects in additional_data for overrides.
+                # The `document_context` we built earlier is *already* the full context.
+                # We need to ensure render_html_template in html_to_pdf_util.py can use this directly.
+                # The current structure is:
+                # CommandeWidget -> generate_pdf_for_document (utils) -> generate_html_and_convert_to_pdf (html_generator)
+                #   -> generate_html_document (html_generator) -> get_document_context (context_builder) -> render_html_template (html_to_pdf_util)
+                # This means our `document_context` built here is not directly used by `render_html_template` if we call `generate_html_document`.
+                #
+                # Let's modify the plan: ProformaPreviewDialog should take the *final* context and template path,
+                # and do the HTML rendering itself using the same render_html_template from html_to_pdf_util.
+                # This avoids issues with generate_html_document rebuilding a different context.
+                #
+                # **Correction:** The `generate_html_document` function in `html_generator.py` already does:
+                # 1. Call `get_document_context` (which has our translation logic)
+                # 2. Read template content
+                # 3. Call `render_html_template` (from `utils.html_to_pdf_util`)
+                # So, we just need to call `generate_html_document` with the right parameters.
+                # The `additional_data` for `get_document_context` should contain any overrides.
+                # Our `document_context` is the *output* of `get_document_context`.
+                # The `additional_context` for `generate_html_document` is what's passed to `get_document_context`.
+                # The `document_context` we built earlier in this function was for `generate_pdf_for_document`.
+                # We need to ensure that `get_document_context` called by `generate_html_document` gets the `order_id`.
+                additional_context_for_preview = {
+                    "order_id": commande_id, # Crucial for get_document_context to fetch order items
+                    "currency_symbol": commande_details.get('currency', 'EUR'),
+                    # Any other overrides for get_document_context can go here.
+                }
+            )
+
+            if not preview_html_content:
+                self.logger.error("Failed to generate HTML content for preview.")
+                QMessageBox.critical(self, self.tr("Erreur d'Aperçu"), self.tr("Impossible de générer l'aperçu HTML de la proforma."))
+                return
+
+            preview_dialog = ProformaPreviewDialog(
+                html_content=preview_html_content,
+                base_template_path=self._current_proforma_generation_data["template_file_path"],
+                parent=self
+            )
+
+            if preview_dialog.exec_() != QDialog.Accepted:
+                self.logger.info("Génération de proforma annulée par l'utilisateur après l'aperçu.")
+                return
+
+            # User clicked "Générer PDF", proceed with PDF generation
+            self.logger.info("Utilisateur a confirmé l'aperçu. Génération du PDF en cours...")
+
+            # 7. Calling a utility function to create the PDF.
             from utils import generate_pdf_for_document # Ensure this is imported
 
-            # app_root_dir is needed by generate_pdf_for_document for resolving paths (e.g. fonts, images in templates)
-            # It was determined when constructing template_file_on_disk_abs
+            # app_root_dir is needed by generate_pdf_for_document for resolving paths
+            # It was determined when constructing template_file_on_disk_abs / set above
             app_root_dir = ""
             if hasattr(self, 'app_root_dir'): app_root_dir = self.app_root_dir
             elif hasattr(self.parent(), 'app_root_dir'): app_root_dir = self.parent().app_root_dir
@@ -651,6 +873,158 @@ class CommandeWidget(QWidget):
         # Implementation will involve:
         # 9. Notifying the user and potentially opening the PDF.
         # 10. Refreshing document lists.
+
+    def handle_compile_order_documents(self, commande_id):
+        """
+        Placeholder pour la logique de compilation des documents PDF d'une commande.
+        """
+        self.logger.info(f"Compilation des documents PDF demandée pour la commande ID: {commande_id}")
+        # La logique sera implémentée dans l'étape suivante du plan.
+        # QMessageBox.information(self,
+        #                         self.tr("Fonctionnalité en Développement"),
+        #                         self.tr("La compilation des documents PDF pour la commande {0} sera bientôt disponible.").format(commande_id))
+
+        try:
+            from db.cruds import client_documents_crud # Assurez-vous que cet import est présent ou ajoutez-le en haut du fichier
+            from dialogs.compile_documents_dialog import CompileDocumentsDialog
+            from PyPDF2 import PdfMerger # Ou PdfWriter si vous utilisez une version plus récente de PyPDF2/pypdf
+            import os
+            import uuid
+            from datetime import datetime
+
+            # 1. Récupérer les informations de la commande pour le nom du fichier et le client_id
+            commande_details = commandes_crud.get_commande_by_id(commande_id)
+            if not commande_details:
+                QMessageBox.warning(self, self.tr("Erreur"), self.tr("Impossible de trouver les détails de la commande ID: {0}").format(commande_id))
+                return
+
+            client_id = commande_details.get("client_id")
+            commande_ref = commande_details.get("commande_reference", f"CMD-{commande_id[:8]}")
+
+            # 2. Récupérer les documents PDF pour cette commande
+            pdf_documents_data = client_documents_crud.get_pdf_documents_for_order(commande_id)
+            if not pdf_documents_data:
+                QMessageBox.information(self, self.tr("Aucun Document"), self.tr("Aucun document PDF trouvé pour la commande {0}.").format(commande_ref))
+                return
+
+            # Construire les chemins absolus et préparer les données pour le dialogue
+            # Assumer que self.app_root_dir est disponible (passé au constructeur de CommandeWidget ou de son parent)
+            app_root = ""
+            if hasattr(self, 'app_root_dir'): app_root = self.app_root_dir
+            elif hasattr(self.parent(), 'app_root_dir'): app_root = self.parent().app_root_dir
+            else:
+                self.logger.error("app_root_dir non trouvé pour construire les chemins des PDF.")
+                QMessageBox.critical(self, self.tr("Erreur Configuration"), self.tr("Chemin racine de l'application non défini."))
+                return
+
+            # Récupérer le dossier de base du client
+            client_info = db.get_client_by_id(client_id) # db.clients_crud.get_client_by_id
+            if not client_info or not client_info.get("default_base_folder_path"):
+                 self.logger.error(f"Dossier de base non trouvé pour le client {client_id}.")
+                 QMessageBox.critical(self, self.tr("Erreur Client"), self.tr("Dossier de base du client non configuré."))
+                 return
+
+            client_base_abs_path = os.path.join(app_root, client_info["default_base_folder_path"])
+
+            docs_for_dialog = []
+            for doc_data in pdf_documents_data:
+                if doc_data.get("file_path_relative"):
+                    abs_path = os.path.join(client_base_abs_path, doc_data["file_path_relative"])
+                    if os.path.exists(abs_path):
+                        docs_for_dialog.append({
+                            'document_id': doc_data.get('document_id'),
+                            'document_name': doc_data.get('document_name'),
+                            'file_path_abs': abs_path
+                        })
+                    else:
+                        self.logger.warning(f"Fichier document PDF non trouvé: {abs_path} pour doc ID {doc_data.get('document_id')}")
+                else:
+                    self.logger.warning(f"Chemin relatif manquant pour document ID {doc_data.get('document_id')}")
+
+            if not docs_for_dialog:
+                QMessageBox.information(self, self.tr("Aucun Fichier Valide"), self.tr("Aucun fichier PDF valide trouvé pour la compilation pour la commande {0}.").format(commande_ref))
+                return
+
+            # 3. Afficher le dialogue de sélection
+            default_compiled_name = f"Compilation_Cmd_{commande_ref.replace('/', '_').replace(':', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+            compile_dialog = CompileDocumentsDialog(docs_for_dialog, default_compiled_name, parent=self)
+
+            if compile_dialog.exec_() == QDialog.Accepted:
+                selected_docs_to_compile_info = compile_dialog.get_selected_documents_info()
+                output_file_name = compile_dialog.get_output_file_name()
+
+                if not selected_docs_to_compile_info:
+                    QMessageBox.information(self, self.tr("Aucune Sélection"), self.tr("Aucun document n'a été sélectionné pour la compilation."))
+                    return
+
+                if not output_file_name:
+                    QMessageBox.warning(self, self.tr("Nom de Fichier Manquant"), self.tr("Veuillez fournir un nom pour le fichier compilé."))
+                    return # Ou redemander
+
+                # 4. Compilation
+                merger = PdfMerger()
+                try:
+                    for doc_info in selected_docs_to_compile_info:
+                        merger.append(doc_info['file_path_abs'])
+
+                    # 5. Sauvegarde
+                    # Déterminer le sous-dossier "Compilations" ou similaire
+                    compilations_subfolder_name = "Compilations"
+                    target_save_dir_abs = os.path.join(client_base_abs_path, compilations_subfolder_name)
+                    os.makedirs(target_save_dir_abs, exist_ok=True)
+
+                    compiled_pdf_abs_path = os.path.join(target_save_dir_abs, output_file_name)
+
+                    with open(compiled_pdf_abs_path, "wb") as fout:
+                        merger.write(fout)
+                    merger.close()
+                    self.logger.info(f"PDF compilé sauvegardé ici : {compiled_pdf_abs_path}")
+
+                    # 6. Enregistrement en DB
+                    relative_path_for_db = os.path.join(compilations_subfolder_name, output_file_name)
+                    doc_db_data = {
+                        'document_id': str(uuid.uuid4()),
+                        'client_id': client_id,
+                        'project_id': commande_details.get("project_id"),
+                        'order_identifier': commande_id, # Lié à la commande
+                        'document_name': output_file_name,
+                        'file_name_on_disk': output_file_name,
+                        'file_path_relative': relative_path_for_db,
+                        'document_type_generated': "COMPILED_PDF",
+                        'source_template_id': None, # Pas basé sur un template
+                        'user_id': self.current_user_info.get('user_id'),
+                        'notes': f"Compilation de {len(selected_docs_to_compile_info)} documents.",
+                        'version_tag': "1.0"
+                    }
+                    new_doc_id = client_documents_crud.add_client_document(doc_db_data)
+                    if new_doc_id:
+                        QMessageBox.information(self, self.tr("Succès"), self.tr("Documents compilés avec succès en '{0}'.").format(output_file_name))
+                        # Optionnel: ouvrir le fichier
+                        from PyQt5.QtGui import QDesktopServices
+                        from PyQt5.QtCore import QUrl
+                        QDesktopServices.openUrl(QUrl.fromLocalFile(compiled_pdf_abs_path))
+                        # Rafraîchir la liste des documents si elle est visible
+                        if hasattr(self.parent(), 'populate_doc_table'):
+                            self.parent().populate_doc_table()
+                    else:
+                        QMessageBox.critical(self, self.tr("Erreur DB"), self.tr("Le PDF compilé a été créé mais son enregistrement en base de données a échoué."))
+
+                except Exception as e_compile:
+                    self.logger.error(f"Erreur lors de la compilation ou sauvegarde du PDF: {e_compile}", exc_info=True)
+                    QMessageBox.critical(self, self.tr("Erreur de Compilation"), self.tr("Une erreur est survenue: {0}").format(e_compile))
+                finally:
+                    if 'merger' in locals() and hasattr(merger, 'close'):
+                        merger.close() # Assurer que le merger est fermé
+            else:
+                self.logger.info("Compilation annulée par l'utilisateur.")
+
+        except ImportError as ie:
+            self.logger.error(f"Erreur d'importation pour la compilation PDF: {ie}")
+            QMessageBox.critical(self, self.tr("Erreur Module"), self.tr("Un module nécessaire pour la compilation PDF est manquant: {0}").format(ie.name))
+        except Exception as e_main:
+            self.logger.error(f"Erreur inattendue dans handle_compile_order_documents: {e_main}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur Inattendue"), str(e_main))
+
 
     def populate_status_filters(self):
         """Populates the status filter combobox for Commandes."""
