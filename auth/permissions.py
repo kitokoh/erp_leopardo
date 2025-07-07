@@ -22,6 +22,7 @@ P_EDIT_CLIENT_BASIC = "edit_client_basic" # Potentially restricted fields for op
 P_ARCHIVE_CLIENT = "archive_client"
 P_DELETE_CLIENT_PERMANENT = "delete_client_permanent"
 P_MANAGE_CLIENT_CONTACTS = "manage_client_contacts" # Add, edit, link, unlink contacts for a client
+P_REFERENTS_MANAGE = "manage_referents" # Manage referents for a client
 
 # Product Management (Global)
 P_VIEW_GLOBAL_PRODUCTS = "view_global_products"
@@ -36,6 +37,7 @@ P_MANAGE_CLIENT_DOCUMENTS = "manage_client_documents" # Create, view, edit, dele
 # Client Assignments & Billing
 P_MANAGE_CLIENT_ASSIGNMENTS = "manage_client_assignments" # Manage assignments of personnel, transporters, etc. to a client/project
 P_MANAGE_CLIENT_BILLING = "manage_client_billing" # Manage billing aspects, generate invoices for a client
+P_VIEW_CLIENT_BILLING = "view_client_billing" # View client billing information (read-only)
 
 # Client Visits
 P_MANAGE_CLIENT_VISITS = "manage_client_visits" # Add, edit, delete client visits
@@ -72,12 +74,12 @@ P_MANAGE_STATUSES = "manage_statuses"
 # Define a comprehensive list of all permissions
 ALL_PERMISSIONS = [
     P_MANAGE_USERS, P_MANAGE_ROLES, P_MANAGE_SYSTEM_SETTINGS,
-    P_VIEW_ALL_CLIENTS, P_CREATE_CLIENT, P_EDIT_CLIENT_FULL, P_EDIT_CLIENT_BASIC, P_ARCHIVE_CLIENT, P_DELETE_CLIENT_PERMANENT, P_MANAGE_CLIENT_CONTACTS,
+    P_VIEW_ALL_CLIENTS, P_CREATE_CLIENT, P_EDIT_CLIENT_FULL, P_EDIT_CLIENT_BASIC, P_ARCHIVE_CLIENT, P_DELETE_CLIENT_PERMANENT, P_MANAGE_CLIENT_CONTACTS, P_REFERENTS_MANAGE,
     P_MANAGE_CLIENT_VISITS, P_VIEW_CLIENT_VISITS, # Added client visit permissions
     P_VIEW_GLOBAL_PRODUCTS, P_MANAGE_GLOBAL_PRODUCTS,
     P_LINK_PRODUCTS_TO_CLIENT,
     P_MANAGE_CLIENT_DOCUMENTS,
-    P_MANAGE_CLIENT_ASSIGNMENTS, P_MANAGE_CLIENT_BILLING,
+    P_MANAGE_CLIENT_ASSIGNMENTS, P_MANAGE_CLIENT_BILLING, P_VIEW_CLIENT_BILLING,
     P_VIEW_CLIENT_VISITS, P_MANAGE_CLIENT_VISITS, # Added for Team Lead
     P_ACCESS_PROJECT_MODULE, P_MANAGE_ALL_PROJECTS, P_MANAGE_ASSIGNED_PROJECTS,
     P_ACCESS_STATISTICS_MODULE,
@@ -92,11 +94,11 @@ ALL_PERMISSIONS = [
 
 # Define permissions for Team Lead
 TEAM_LEAD_PERMISSIONS = [
-    P_VIEW_ALL_CLIENTS, P_CREATE_CLIENT, P_EDIT_CLIENT_FULL, P_ARCHIVE_CLIENT, P_MANAGE_CLIENT_CONTACTS,
+    P_VIEW_ALL_CLIENTS, P_CREATE_CLIENT, P_EDIT_CLIENT_FULL, P_ARCHIVE_CLIENT, P_MANAGE_CLIENT_CONTACTS, P_REFERENTS_MANAGE,
     P_VIEW_GLOBAL_PRODUCTS, P_MANAGE_GLOBAL_PRODUCTS,
     P_LINK_PRODUCTS_TO_CLIENT,
     P_MANAGE_CLIENT_DOCUMENTS,
-    P_MANAGE_CLIENT_ASSIGNMENTS, P_MANAGE_CLIENT_BILLING,
+    P_MANAGE_CLIENT_ASSIGNMENTS, P_MANAGE_CLIENT_BILLING, P_VIEW_CLIENT_BILLING,
     P_ACCESS_PROJECT_MODULE, P_MANAGE_ALL_PROJECTS, P_MANAGE_ASSIGNED_PROJECTS,
     P_ACCESS_STATISTICS_MODULE,
     P_ACCESS_PARTNER_MODULE, P_MANAGE_PARTNERS,
@@ -114,6 +116,7 @@ OPERATOR_PERMISSIONS = [
     P_VIEW_GLOBAL_PRODUCTS,
     P_LINK_PRODUCTS_TO_CLIENT,
     P_MANAGE_CLIENT_DOCUMENTS,
+    P_VIEW_CLIENT_BILLING, # Added for Operator
     P_VIEW_CLIENT_VISITS, # Added for Operator
     P_ACCESS_PROJECT_MODULE, P_MANAGE_ASSIGNED_PROJECTS,
     P_ACCESS_STATISTICS_MODULE,
@@ -161,6 +164,13 @@ def has_permission(user_role_name: str, required_permission_key: str) -> bool:
     if not user_role_name:
         logger.warning("has_permission called with no user_role_name. Denying permission.")
         return False
+
+    # SUPER_ADMIN role bypasses individual permission checks and always has all permissions.
+    # Ensure SUPER_ADMIN is imported or defined in this scope.
+    from .roles import SUPER_ADMIN as SUPER_ADMIN_ROLE_CONSTANT
+    if user_role_name == SUPER_ADMIN_ROLE_CONSTANT:
+        logger.debug(f"Permission check for SUPER_ADMIN ('{user_role_name}') for key '{required_permission_key}': GRANTED (superuser).")
+        return True
 
     if not required_permission_key:
         logger.warning(f"has_permission called for role '{user_role_name}' with no required_permission_key. Denying permission.")

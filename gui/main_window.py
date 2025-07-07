@@ -113,8 +113,32 @@ from dialogs import (
 #     # or allowing the ModuleNotFoundError to naturally occur if this fails.
 #     pass
 # --- END TARGETED sys.path FIX ---
+
+# --- BEGIN Local sys.path adjustment in gui/main_window.py ---
+# This is a targeted fix to ensure product_management can be imported from here.
+# os and sys modules are imported at the top of this file.
+try:
+    _gui_main_window_file_path = os.path.abspath(__file__)
+    _gui_dir = os.path.dirname(_gui_main_window_file_path)
+    _project_root_local_calc = os.path.dirname(_gui_dir) # Project root is parent of 'gui'
+
+    if _project_root_local_calc not in sys.path:
+        sys.path.insert(0, _project_root_local_calc)
+        print(f"DEBUG gui/main_window.py (LOCAL SYS.PATH MOD): Inserted project root {_project_root_local_calc}. New sys.path: {sys.path}")
+    elif sys.path[0] != _project_root_local_calc:
+        if _project_root_local_calc in sys.path: # Check before removing
+             sys.path.remove(_project_root_local_calc)
+        sys.path.insert(0, _project_root_local_calc)
+        print(f"DEBUG gui/main_window.py (LOCAL SYS.PATH MOD): Moved project root {_project_root_local_calc} to start. New sys.path: {sys.path}")
+    # else:
+        # print(f"DEBUG gui/main_window.py (LOCAL SYS.PATH MOD): Project root {_project_root_local_calc} already at sys.path[0].")
+except Exception as e_local_sys_path_mod:
+    print(f"ERROR in gui/main_window.py local sys.path modification: {e_local_sys_path_mod}")
+# --- END Local sys.path adjustment ---
+
 print(f"DEBUG: Current sys.path before product_management import: {sys.path}")
 print(f"DEBUG: Current working directory before product_management import: {os.getcwd()}")
+
 from product_management.page import ProductManagementPage # Added
 from PyQt5.QtWidgets import QSizePolicy
 
@@ -126,6 +150,7 @@ from PyQt5.QtWidgets import QDateEdit
 
 # Updated import for the refactored client widget
 from client_management.ui.client_main_widget import ClientMainWidget
+from client_management.client_controller import ClientController # Import ClientController
 from project_management import MainDashboard as ProjectManagementDashboard
 from statistics import StatisticsDashboard, StatisticsSummaryWidget # Updated import
 from statistics.map_widget import HomePageMapWidget # Import HomePageMapWidget
@@ -133,13 +158,13 @@ from statistics.map_widget import HomePageMapWidget # Import HomePageMapWidget
 
 from utils import save_config
 from company_management import CompanyTabWidget
-from settings_page import SettingsPage # Import the new SettingsPage
+from settings.settings_page import SettingsPage # Import the new SettingsPage
 from botpress_integration.ui_components import BotpressIntegrationUI # Import Botpress UI
 from dialogs.carrier_map_dialog import CarrierMapDialog # Import CarrierMapDialog
 from voice_input_service import VoiceInputService # Added import
 
 from partners.partner_main_widget import PartnerMainWidget # Partner Management
-from inventory_browser_widget import InventoryBrowserWidget # Inventory Management
+from gui.widgets.inventory_browser_widget import InventoryBrowserWidget # Inventory Management
 from camera_management.camera_management_widget import CameraManagementWidget # Camera Management
 
 from PyQt5.QtGui import QColor, QPalette # For ClientListItemWidget text color
@@ -147,8 +172,8 @@ from PyQt5.QtGui import QColor, QPalette # For ClientListItemWidget text color
 from recruitment.recruitment_dashboard import RecruitmentDashboard # Import RecruitmentDashboard
 
 from ui.home.home_page_widget import HomePageWidget # Updated import path
-from experience_module_widget import ExperienceModuleWidget # Added
-from download_monitor_service import DownloadMonitorService
+from gui.widgets.experience_module_widget import ExperienceModuleWidget # Added
+from services.download_monitor_service import DownloadMonitorService
 from dialogs.assign_document_dialog import AssignDocumentToClientDialog
 from db.cruds.client_documents_crud import add_client_document # For assign dialog
 import os # For path checks in download monitor init
@@ -163,23 +188,28 @@ from user_management.user_menu_button import UserMenuButton # Import UserMenuBut
 from dialogs.edit_user_dialog import EditUserDialog # For handling edit/add user requests
 from dialogs.role_management_dialog import RoleManagementDialog # Added for Role Management
 from commande_management.commandes_dashboard_widget import CommandesDashboardWidget # Import CommandesDashboardWidget
+from utils.app_constants import CONFIGURABLE_MODULES # Import from new location
 
-# Definition of configurable modules
-CONFIGURABLE_MODULES = [
-    {'key': 'module_project_management_enabled', 'name': 'project_management', 'action_attr': 'project_management_action', 'widget_attr': 'project_management_widget_instance'},
-    {'key': 'module_product_management_enabled', 'name': 'product_management', 'action_attr': 'product_list_action', 'widget_attr': 'product_management_page_instance'},
-    {'key': 'module_partner_management_enabled', 'name': 'partner_management', 'action_attr': 'partner_management_action', 'widget_attr': 'partner_management_widget_instance'},
-    {'key': 'module_statistics_enabled', 'name': 'statistics', 'action_attr': 'statistics_action', 'widget_attr': 'statistics_dashboard_instance'},
-    {'key': 'module_inventory_management_enabled', 'name': 'inventory_management', 'action_attr': 'inventory_browser_action', 'widget_attr': 'inventory_browser_widget_instance'},
-    {'key': 'module_experience_management_enabled', 'name': 'experience_management', 'action_attr': 'experience_management_action', 'widget_attr': 'experience_management_widget_instance'}, # Added
-    {'key': 'module_botpress_integration_enabled', 'name': 'botpress_integration', 'action_attr': 'botpress_integration_action', 'widget_attr': 'botpress_integration_ui_instance'},
-    {'key': 'module_carrier_map_enabled', 'name': 'carrier_map', 'action_attr': 'open_carrier_map_action', 'widget_attr': None}, # Carrier map is a dialog
-    # Add Calendar module here - for now, not making it 'configurable' via DB setting, always enabled.
-    # If it needs to be configurable, add a 'key' and handle its state in _load_module_states and settings.
-    {'key': 'module_calendar_enabled', 'name': 'calendar', 'action_attr': 'calendar_module_action', 'widget_attr': 'calendar_module_widget_instance'},
-    {'key': 'module_camera_management_enabled', 'name': 'camera_management', 'action_attr': 'camera_management_action', 'widget_attr': 'camera_management_widget_instance'},
-    {'key': 'module_calculator_enabled', 'name': 'calculator', 'action_attr': 'calculator_module_action', 'widget_attr': 'calculator_module_widget_instance'} # Added Calculator module
-]
+# B2C Restaurant Module Import
+from b2c.ges_restaurant.ui.main_widget import RestaurantMainWidget
+
+
+# License Management Imports for feature constants and manager
+from license_management import manager as license_manager # To call get_allowed_features
+from license_management import (
+    FEATURE_BASIC_CLIENT_DOCS, FEATURE_PROJECT_MANAGEMENT, FEATURE_STATISTICS_MODULE,
+    FEATURE_PRODUCT_MANAGEMENT, FEATURE_PARTNER_MANAGEMENT, FEATURE_INVENTORY_MANAGEMENT,
+    FEATURE_RECRUITMENT_MODULE, FEATURE_BOTPRESS_INTEGRATION, FEATURE_CALENDAR_MODULE,
+    FEATURE_EXPERIENCE_MANAGEMENT, FEATURE_ADVANCED_REPORTING, FEATURE_API_ACCESS,
+    FEATURE_USER_MANAGEMENT_FULL, FEATURE_SETTINGS_MANAGEMENT,
+    FEATURE_COMMANDES_MANAGEMENT, FEATURE_CALCULATOR_MODULE
+)
+
+# Import for menu customization
+from dialogs.menu_customization_dialog import MenuCustomizationDialog
+from utils.app_constants import CONFIGURABLE_MODULES # For menu customization and default order
+import json # For handling menu config storage
+
 
 class ClientListItemWidget(QWidget):
     def __init__(self, client_data, parent=None):
@@ -259,14 +289,31 @@ class ClientListItemWidget(QWidget):
 
 
 class DocumentManager(QMainWindow):
-    def __init__(self, app_root_dir, current_user_info: dict): # Changed current_user_id to current_user_info
+    def __init__(self, app_root_dir, current_user_info: dict, current_license_info: dict | None):
         super().__init__()
         self.app_root_dir = app_root_dir
         self.current_user_info = current_user_info # Store the full user info dictionary
-        # self.current_user_id = current_user_id # Kept for compatibility, but new code should use current_user_info
+        self.current_license_info = current_license_info # Store license information
         self.current_user_id = self.current_user_info.get('user_id') # Extract user_id for existing usage
 
-        logging.info(f"DocumentManager initialized for user: {self.current_user_info.get('username')}, Role: {self.current_user_info.get('role_name')}")
+        # Extract allowed features from license_info or get them using license_manager
+        if self.current_license_info and 'allowed_features' in self.current_license_info:
+            self.allowed_features = self.current_license_info['allowed_features']
+            logging.info(f"Allowed features loaded from current_license_info: {self.allowed_features}")
+        elif self.current_license_info and self.current_license_info.get('license_type'):
+            self.allowed_features = license_manager.get_allowed_features(self.current_license_info['license_type'])
+            logging.info(f"Allowed features derived using license_manager.get_allowed_features for type '{self.current_license_info['license_type']}': {self.allowed_features}")
+        else:
+            self.allowed_features = set() # Default to no features if license info is missing or incomplete
+            logging.warning("No valid license information to determine allowed features. Defaulting to empty set.")
+
+        logging.info(f"DocumentManager initialized for user: {self.current_user_info.get('username')}, Role: {self.current_user_info.get('role_name')}, License active: {self.current_license_info.get('is_active') if self.current_license_info else 'N/A'}")
+        logging.info(f"Effective allowed features for this session: {self.allowed_features}")
+
+        # Instantiate ClientController
+        self.client_controller_instance = ClientController()
+        # Later, self.notification_manager will be set up and can be passed if ClientController needs it.
+
 
         self.setWindowTitle(self.tr("Gestionnaire de Documents Client")); self.setGeometry(100, 100, 1200, 800)
         self.setWindowIcon(QIcon(":/icons/logo.svg"))
@@ -326,6 +373,7 @@ class DocumentManager(QMainWindow):
         self.experience_management_widget_instance = None
         self.calendar_module_widget_instance = None
         self.calculator_module_widget_instance = None
+        self.restaurant_widget_instance = None # For B2C Restaurant Module
         
         # For HomePage related widgets that might depend on other modules (like statistics)
         self.statistics_summary_widget_instance = None
@@ -448,38 +496,53 @@ class DocumentManager(QMainWindow):
 
     @pyqtSlot(str)
     def handle_add_client_from_stats_map(self, country_name_str):
-        logging.info(f"Received request to add client for country: {country_name_str} from statistics map using new dialog.")
+        logging.info(f"Received request to add client for country: {country_name_str} from statistics map.")
         try:
-            dialog = StatisticsAddClientDialog(initial_country_name=country_name_str, parent=self)
+            # Utiliser AddNewClientDialog au lieu de StatisticsAddClientDialog
+            dialog = AddNewClientDialog(parent=self, initial_country_name=country_name_str)
 
             if dialog.exec_() == QDialog.Accepted:
-                new_client_data = dialog.get_data()
-                logging.info(f"StatisticsAddClientDialog accepted. Data: {new_client_data}")
+                client_data_from_dialog = dialog.get_data()
+                logging.info(f"AddNewClientDialog accepted. Data: {client_data_from_dialog}")
 
-                if not new_client_data.get('country_id'):
-                    QMessageBox.critical(self, self.tr("Erreur Pays"), self.tr("ID du pays non obtenu depuis le dialogue. Impossible de continuer."))
+                # AddNewClientDialog.get_data() retourne déjà created_by_user_id
+                # et les noms de pays/ville qui seront résolus par client_controller.
+                # Le client_controller s'attend à country_name et city_name, pas IDs.
+
+                if not client_data_from_dialog.get('client_name'):
+                    QMessageBox.critical(self, self.tr("Erreur Données"), self.tr("Le nom du client est requis."))
                     return
 
-                client_data_for_db = {
-                    "client_name": new_client_data["client_name"],
-                    "company_name": new_client_data.get("company_name"),
-                    "country_id": new_client_data["country_id"],
-                    "city_id": new_client_data.get("city_id"),
-                    "project_identifier": new_client_data.get("project_identifier"),
-                    "primary_need_description": new_client_data.get("primary_need_description"),
-                    "selected_languages": new_client_data.get("selected_languages"),
-                    "created_by_user_id": self.current_user_id
-                }
+                if not client_data_from_dialog.get('country_name'):
+                    QMessageBox.critical(self, self.tr("Erreur Données"), self.tr("Le nom du pays est requis."))
+                    return
 
-                logging.info(f"Proceeding to call handle_create_client_execution with data from new dialog: {client_data_for_db}")
-                handle_create_client_execution(self, client_data_dict=client_data_for_db)
+                # Appeler directement le client_controller pour créer le client
+                created_client_info = self.client_controller_instance.create_client(client_data_from_dialog)
+
+                if created_client_info and created_client_info.get('success'):
+                    new_client_id = created_client_info.get('client_id')
+                    if new_client_id:
+                        self.notify(self.tr("Client Créé"),
+                                    self.tr("Le client '{0}' a été créé avec succès.").format(created_client_info.get('client_name')),
+                                    type='SUCCESS')
+                        self.load_clients_from_db_slot() # Recharger la liste des clients
+                        self.open_client_tab_by_id(new_client_id) # Ouvrir l'onglet du nouveau client
+                    else:
+                        QMessageBox.critical(self, self.tr("Erreur Création Client"),
+                                             self.tr("Le client a été créé mais son ID n'a pas été retourné."))
+                else:
+                    error_msg = created_client_info.get('error', self.tr("Erreur inconnue lors de la création du client."))
+                    QMessageBox.critical(self, self.tr("Erreur Création Client"), error_msg)
+                    # Pas besoin de recharger la liste des clients ici car la création a échoué
             else:
-                logging.info("StatisticsAddClientDialog cancelled by user.")
+                logging.info("AddNewClientDialog cancelled by user.")
         except Exception as e:
-            logging.error(f"Error opening or executing StatisticsAddClientDialog for country {country_name_str}: {e}", exc_info=True)
+            logging.error(f"Error opening or executing AddNewClientDialog for country {country_name_str}: {e}", exc_info=True)
             QMessageBox.critical(self,
                                  self.tr("Erreur Dialogue"),
-                                 self.tr("Impossible d'ouvrir le dialogue 'Ajouter Client'. Veuillez consulter les logs de l'application pour plus de détails."))
+                                 self.tr("Impossible d'ouvrir le dialogue 'Ajouter Nouveau Client'. Veuillez consulter les logs pour plus de détails."))
+
     def handle_new_document_detected(self, file_path):
         logging.info(f"Main_window: New document detected by service: {file_path}")
         try:
@@ -617,16 +680,13 @@ class DocumentManager(QMainWindow):
         top_filter_line_layout = QHBoxLayout()
 
         # Status Filter
-        # status_filter_layout_group = QWidget() # Use a QWidget as a container for label and combo
-        # status_filter_v_layout = QVBoxLayout(status_filter_layout_group)
-        # status_filter_v_layout.setContentsMargins(0,0,0,0)
-        # status_label = QLabel(self.tr("Statut:")) # Label for status
-        self.status_filter_combo = QComboBox(); self.status_filter_combo.addItem(self.tr("Tous les statuts"), None)
-        self.load_statuses_into_filter_combo(); self.status_filter_combo.currentIndexChanged.connect(self.filter_client_list_display_slot)
-        self.status_filter_combo.setToolTip(self.tr("Filtrer par statut"))
-        # status_filter_v_layout.addWidget(status_label)
-        # status_filter_v_layout.addWidget(self.status_filter_combo)
-        top_filter_line_layout.addWidget(self.status_filter_combo) # Add combo directly
+        self.status_filter_button = QPushButton(self.tr("Statut: Tous")) # Button text will be updated
+        self.status_filter_button.setObjectName("filterButton") # For styling
+        self.status_filter_button.setToolTip(self.tr("Sélectionner plusieurs statuts client"))
+        self.status_filter_button.clicked.connect(self.open_multi_select_status_dialog)
+        self.selected_status_ids_filter = [] # Store selected status IDs
+        top_filter_line_layout.addWidget(self.status_filter_button)
+
 
         # Search Input
         # search_input_layout_group = QWidget() # Container for label and input
@@ -726,6 +786,18 @@ class DocumentManager(QMainWindow):
 
         self.collapsible_filter_widget.setVisible(False) # Initially hidden
         filter_search_main_layout.addWidget(self.collapsible_filter_widget)
+
+        # --- Category Filter (moved into collapsible area) ---
+        category_filter_layout_group = QWidget()
+        category_filter_h_layout = QHBoxLayout(category_filter_layout_group) # Horizontal for label + input
+        category_filter_h_layout.setContentsMargins(0,0,0,0)
+        category_label = QLabel(self.tr("Catégorie:"))
+        self.category_filter_input = QLineEdit()
+        self.category_filter_input.setPlaceholderText(self.tr("Filtrer par catégorie..."))
+        self.category_filter_input.textChanged.connect(self.filter_client_list_display_slot)
+        category_filter_h_layout.addWidget(category_label)
+        category_filter_h_layout.addWidget(self.category_filter_input)
+        collapsible_layout.addWidget(category_filter_layout_group) # Add to collapsible
 
         # --- Saved Filters UI ---
         saved_filters_group = QGroupBox(self.tr("Filtres Sauvegardés")) # Optional: GroupBox for clarity
@@ -858,19 +930,26 @@ class DocumentManager(QMainWindow):
         """Resets all filter inputs to their default states and refreshes the client list."""
         logging.info("Resetting all filters.")
 
-        # Reset ComboBoxes to their first item (index 0)
-        self.status_filter_combo.setCurrentIndex(0)
+        # Reset Status Filter Button and selected IDs
+        self.selected_status_ids_filter = []
+        self.status_filter_button.setText(self.tr("Statut: Tous"))
+
+        # Reset other ComboBoxes
         self.client_archive_filter_combo.setCurrentIndex(0)
         self.country_filter_combo.setCurrentIndex(0)
+
+        # Reset Category Input
+        if hasattr(self, 'category_filter_input'):
+            self.category_filter_input.setText("")
 
         # Clear the search input field
         self.search_input_field.setText("")
 
         # Clear date filters
-        if hasattr(self, 'date_filter_start'): # Check if attributes exist (they should)
-            self.date_filter_start.setDate(QDate())
+        if hasattr(self, 'date_filter_start'):
+            self.date_filter_start.setDate(QDate()) # Set to null QDate
         if hasattr(self, 'date_filter_end'):
-            self.date_filter_end.setDate(QDate())
+            self.date_filter_end.setDate(QDate()) # Set to null QDate
 
 
         # Collapse the "More Filters" section if it's open
@@ -878,7 +957,6 @@ class DocumentManager(QMainWindow):
             self.more_filters_button.setChecked(False) # This will trigger toggle_more_filters_visibility
 
         # Refresh the client list
-        # Calling filter_client_list_display_slot will also reset pagination and load from DB
         self.filter_client_list_display_slot()
 
         self.notify(self.tr("Filtres Réinitialisés"), self.tr("Tous les filtres ont été réinitialisés."), type='INFO')
@@ -1035,6 +1113,17 @@ class DocumentManager(QMainWindow):
         self.searchable_actions_map[self.tr("Gestion des Commandes")] = self.commande_management_action
         self.searchable_actions_map[self.tr("Gérer les Rôles")] = self.manage_roles_action
 
+        # Action for menu customization
+        self.customize_menu_action = QAction(QIcon(":/icons/edit.svg"), self.tr("Personnaliser le Menu Modules"), self)
+        self.customize_menu_action.triggered.connect(self.open_menu_customization_dialog)
+        self.searchable_actions_map[self.tr("Personnaliser le Menu Modules")] = self.customize_menu_action
+
+        # B2C Restaurant Module Action
+        # TODO: Find or create a suitable icon e.g., :/icons/restaurant.svg or :/icons/utensils.svg
+        self.restaurant_module_action = QAction(QIcon(":/icons/placeholder_icon.svg"), self.tr("Service Restaurant (B2C)"), self)
+        self.restaurant_module_action.triggered.connect(self.show_restaurant_module_view)
+        self.searchable_actions_map[self.tr("Service Restaurant (B2C)")] = self.restaurant_module_action
+
 
     def _placeholder_manage_users(self):
         # This is a placeholder. Actual user management UI would be complex.
@@ -1050,9 +1139,8 @@ class DocumentManager(QMainWindow):
         # File Menu
         file_menu = menu_bar.addMenu(self.tr("Fichier"))
         file_menu.addAction(self.settings_action) # Will be controlled by _apply_permissions
-        # self.status_action was disabled with a tooltip, consider if it should be permission-based too
-        # For now, keeping its original behavior. If it becomes a real feature, add P_MANAGE_STATUSES.
-        file_menu.addAction(self.status_action)
+        file_menu.addAction(self.status_action) # Controlled by P_MANAGE_STATUSES
+        file_menu.addAction(self.customize_menu_action) # Add customization action
         file_menu.addSeparator()
         file_menu.addAction(self.exit_action) # Exit is always available
 
@@ -1067,8 +1155,10 @@ class DocumentManager(QMainWindow):
         # Core, non-configurable actions first
         modules_menu.addAction(self.home_action)
         modules_menu.addAction(self.documents_view_action)
-        modules_menu.addAction(self.commande_management_action)
+        # modules_menu.addAction(self.commande_management_action) # Removed: Now part of CONFIGURABLE_MODULES
         modules_menu.addSeparator()
+        modules_menu.addAction(self.restaurant_module_action) # Added B2C Restaurant module action
+        modules_menu.addSeparator() # Separator after B2C module fixed entry
 
         # Load user's menu configuration
         user_menu_config = None
@@ -1125,17 +1215,32 @@ class DocumentManager(QMainWindow):
             action_instance = getattr(self, action_attr_name, None)
 
             if action_instance:
-                # Module activation state (from DB global settings) also needs to be checked.
-                # self.module_states is populated by _load_module_states() in __init__
-                is_module_globally_enabled = self.module_states.get(module_name, True) # Default to True if not in global states for some reason
+                # 1. Check if module is globally enabled by admin settings
+                is_module_globally_enabled = self.module_states.get(module_name, True)
+                if not is_module_globally_enabled:
+                    logging.info(f"Module '{module_name}' globally DISABLED by admin. Action '{action_attr_name}' NOT ADDED to menu.")
+                    continue # Skip adding this module to the menu entirely
 
-                if is_module_globally_enabled:
-                    # Permissions will be applied later by _apply_permissions, which sets action.setVisible()
-                    # Here, we just add it to the menu if user wants it and it's globally enabled.
-                    modules_menu.addAction(action_instance)
-                    logging.info(f"Module '{module_name}' (Action: {action_attr_name}) ADDED to menu based on user config and global state.")
-                else:
-                    logging.info(f"Module '{module_name}' is GLOBALLY DISABLED by admin settings. Action '{action_attr_name}' NOT ADDED to menu, despite user config.")
+                # 2. Check if license permits this feature
+                # Assuming MODULE_TO_LICENSE_FEATURE_MAP is defined and accessible (it is in _apply_permissions, should be consistent here or passed)
+                # For simplicity, let's re-fetch or ensure self.allowed_features is up-to-date.
+                # It's set in __init__ and potentially updated in _handle_roles_changed if license itself changes.
+
+                # Now using module_info['license_feature']
+                license_feature_key = module_info.get('license_feature')
+                permitted_by_license = True # Default to true if no specific license feature is mapped or feature is None
+                if license_feature_key: # If a specific license feature is defined for this module
+                    permitted_by_license = license_feature_key in self.allowed_features
+
+                if not permitted_by_license:
+                    logging.info(f"Module '{module_name}': Feature '{license_feature_key}' NOT ALLOWED by current license. Action '{action_attr_name}' NOT ADDED to menu.")
+                    continue # Skip adding this module to the menu
+
+                # If globally enabled AND permitted by license, then add to menu.
+                # Role-based visibility will be handled by _apply_permissions.
+                modules_menu.addAction(action_instance)
+                logging.info(f"Module '{module_name}' (Action: {action_attr_name}) ADDED to menu (globally enabled, license permitted, user visible).")
+
             else:
                 logging.warning(f"Action attribute '{action_attr_name}' for module '{module_name}' not found on DocumentManager instance.")
 
@@ -1265,13 +1370,21 @@ class DocumentManager(QMainWindow):
         admin_menu_visible = can_manage_users or can_manage_roles
         self.admin_menu.menuAction().setVisible(admin_menu_visible)
         logging.info(f"  Admin Menu visible: {admin_menu_visible} (P_MANAGE_USERS={can_manage_users}, P_MANAGE_ROLES={can_manage_roles})")
-        self.manage_users_action.setEnabled(can_manage_users) # Should already be visible if menu is
-        self.manage_roles_action.setEnabled(can_manage_roles) # Should already be visible if menu is
 
-        # Module Menu Actions
-        module_permissions = {
+        # Further check for admin menu actions based on license features if applicable
+        # Example: If P_MANAGE_USERS requires a certain license feature beyond role permission
+        can_manage_users_licensed = FEATURE_USER_MANAGEMENT_FULL in self.allowed_features
+        self.manage_users_action.setEnabled(can_manage_users and can_manage_users_licensed)
+        self.manage_roles_action.setEnabled(can_manage_roles and can_manage_users_licensed) # Assuming role management also tied to this feature
+
+        # Module Menu Actions & Feature Mapping
+        # The MODULE_TO_LICENSE_FEATURE_MAP is now removed.
+        # License feature checks will use module_config.get('license_feature').
+
+        # Role-based permissions for modules (as before)
+        module_role_permissions = {
             'project_management': P_ACCESS_PROJECT_MODULE,
-            'product_management': (P_MANAGE_GLOBAL_PRODUCTS, P_VIEW_GLOBAL_PRODUCTS), # Tuple for OR condition
+            'product_management': (P_MANAGE_GLOBAL_PRODUCTS, P_VIEW_GLOBAL_PRODUCTS),
             'partner_management': P_ACCESS_PARTNER_MODULE,
             'statistics': P_ACCESS_STATISTICS_MODULE,
             'inventory_management': P_ACCESS_INVENTORY_MODULE,
@@ -1301,7 +1414,7 @@ class DocumentManager(QMainWindow):
                 logging.info(f"  Module Action '{action_attr}' for '{module_name}': Module disabled by DB setting. Action HIDDEN.")
                 continue
 
-            perm_keys = module_permissions.get(module_name)
+            perm_keys = module_role_permissions.get(module_name)
             permitted = False
             log_perm_details = ""
 
@@ -1320,7 +1433,19 @@ class DocumentManager(QMainWindow):
 
 
             action_instance.setVisible(permitted)
-            logging.info(f"  Module Action '{action_attr}' for '{module_name}': Visible: {permitted}. {log_perm_details}")
+            logging.info(f"  Module Action '{action_attr}' for '{module_name}': Role permitted: {permitted}. {log_perm_details}")
+
+            # Additionally, check license feature for this module using the new structure
+            if permitted: # Only check license if role permits
+                license_feature = module_config.get('license_feature')
+                if license_feature and license_feature not in self.allowed_features:
+                    action_instance.setVisible(False) # Hide if license feature is required but not granted
+                    logging.info(f"  Module Action '{action_attr}' for '{module_name}': HIDDEN due to missing license feature '{license_feature}'.")
+                elif license_feature:
+                    logging.info(f"  Module Action '{action_attr}' for '{module_name}': License feature '{license_feature}' GRANTED.")
+                else:
+                    logging.info(f"  Module Action '{action_attr}' for '{module_name}': No specific license feature required.")
+
             # Note: setEnabled could also be used if the action should be visible but greyed out.
             # For menu items, setVisible(False) effectively removes them.
 
@@ -1653,15 +1778,23 @@ class DocumentManager(QMainWindow):
         self.load_clients_from_db_slot()
 
     def load_clients_from_db_slot(self):
-        status_id_filter = self.status_filter_combo.currentData()
-        country_id_filter = self.country_filter_combo.currentData() # Get country filter
+        # status_id_filter = self.status_filter_combo.currentData() # Old single status filter
+        country_id_filter = self.country_filter_combo.currentData()
+        category_filter_text = self.category_filter_input.text().strip() if hasattr(self, 'category_filter_input') else None
+
         archive_filter_data = self.client_archive_filter_combo.currentData()
         include_deleted_filter = False
         if archive_filter_data == "all_status_types": include_deleted_filter = True
         elif isinstance(archive_filter_data, bool): include_deleted_filter = archive_filter_data
-        filters_for_crud = {};
-        if status_id_filter is not None: filters_for_crud['status_id'] = status_id_filter
+
+        filters_for_crud = {}
+        if self.selected_status_ids_filter: # Use the list of selected status IDs
+            filters_for_crud['status_ids'] = self.selected_status_ids_filter
+        # If self.selected_status_ids_filter is empty, no status_ids filter is applied (shows all, respecting archive filter)
+
         if country_id_filter is not None: filters_for_crud['country_id'] = country_id_filter
+        if category_filter_text: filters_for_crud['category'] = category_filter_text
+
 
         # Add date filters if they are set
         if hasattr(self, 'date_filter_start') and self.date_filter_start.date().isValid() and not self.date_filter_start.date().isNull():
@@ -1773,19 +1906,7 @@ class DocumentManager(QMainWindow):
             logging.error(self.tr("Erreur chargement pays pour filtre: {0}").format(str(e)))
             # self.country_filter_combo.setEnabled(False)
 
-    def load_statuses_into_filter_combo(self): 
-        current_selection_data = self.status_filter_combo.currentData()
-        self.status_filter_combo.clear()
-        self.status_filter_combo.addItem(self.tr("Tous les statuts"), None)
-        try:
-            client_statuses = db_manager.get_all_status_settings(type_filter='Client')
-            if client_statuses is None: client_statuses = []
-            for status_dict in client_statuses:
-                self.status_filter_combo.addItem(status_dict['status_name'], status_dict.get('status_id'))
-            index = self.status_filter_combo.findData(current_selection_data)
-            if index != -1: self.status_filter_combo.setCurrentIndex(index)
-        except Exception as e:
-            print(self.tr("Erreur chargement statuts pour filtre: {0}").format(str(e)))
+    # load_statuses_into_filter_combo is no longer needed as statuses are loaded in MultiSelectStatusDialog
             
     def handle_client_list_click(self, item):
         logging.info(f"handle_client_list_click entered. Item text: {item.text()}, Item data: {item.data(Qt.UserRole)}")
@@ -1900,7 +2021,8 @@ class DocumentManager(QMainWindow):
                 config=self.config,
                 app_root_dir=self.app_root_dir,
                 notification_manager=notification_manager,
-                current_user_info=self.current_user_info, # Changed to pass current_user_info
+                current_user_info=self.current_user_info,
+                client_controller_instance=self.client_controller_instance, # Pass ClientController instance
                 parent=self
             )
             logging.info(f"main_window.open_client_tab_by_id: Successfully created ClientMainWidget for client_id: {client_id_to_open} with user_info.") # Log updated
@@ -1974,10 +2096,35 @@ class DocumentManager(QMainWindow):
         # Ensure the save button signal is connected
         try:
             self.settings_page_instance.save_settings_button.clicked.disconnect(self._handle_settings_saved)
-        except TypeError:
-            pass
+        except TypeError: # This happens if it was not connected before
+            pass # No need to disconnect if not connected
         self.settings_page_instance.save_settings_button.clicked.connect(self._handle_settings_saved)
         logging.info("Switched to Settings Page and refreshed its data.")
+
+    def open_multi_select_status_dialog(self):
+        from dialogs.multi_select_status_dialog import MultiSelectStatusDialog # Local import
+
+        dialog = MultiSelectStatusDialog(pre_selected_status_ids=self.selected_status_ids_filter, parent=self)
+        if dialog.exec_() == QDialog.Accepted:
+            self.selected_status_ids_filter = dialog.get_selected_status_ids()
+            if not self.selected_status_ids_filter: # Empty list means "All"
+                self.status_filter_button.setText(self.tr("Statut: Tous"))
+            elif len(self.selected_status_ids_filter) == 1:
+                # Try to get status name for single selection display
+                status_name = self.tr("Statut: Inconnu")
+                try:
+                    status_info = db_manager.get_status_setting_by_id(self.selected_status_ids_filter[0])
+                    if status_info:
+                        status_name = status_info.get('status_name', self.tr("Inconnu"))
+                    self.status_filter_button.setText(self.tr("Statut: {0}").format(status_name))
+                except Exception as e_status_name:
+                    logging.error(f"Error fetching status name for ID {self.selected_status_ids_filter[0]}: {e_status_name}")
+                    self.status_filter_button.setText(self.tr("Statut: ID {0}").format(self.selected_status_ids_filter[0]))
+            else:
+                self.status_filter_button.setText(self.tr("Statut: {0} sélectionnés").format(len(self.selected_status_ids_filter)))
+
+            self.filter_client_list_display_slot() # Trigger refresh
+        # If dialog is cancelled, self.selected_status_ids_filter remains unchanged.
 
     def _handle_settings_saved(self):
         """Called when 'Save All Settings' in SettingsPage is clicked."""
@@ -2217,9 +2364,23 @@ class DocumentManager(QMainWindow):
             if hasattr(self, 'more_filters_button'): self.more_filters_button.blockSignals(True)
 
 
-            # Apply status filter
-            status_idx = self.status_filter_combo.findData(params.get('status_id'))
-            self.status_filter_combo.setCurrentIndex(status_idx if status_idx != -1 else 0)
+            # Apply status filter (now multi-select)
+            self.selected_status_ids_filter = params.get('status_ids', [])
+            if not self.selected_status_ids_filter:
+                self.status_filter_button.setText(self.tr("Statut: Tous"))
+            elif len(self.selected_status_ids_filter) == 1:
+                 # Try to get status name for single selection display
+                status_name_display = self.tr("Statut: Inconnu")
+                try:
+                    status_info = db_manager.get_status_setting_by_id(self.selected_status_ids_filter[0])
+                    if status_info: status_name_display = status_info.get('status_name', self.tr("Inconnu"))
+                    self.status_filter_button.setText(self.tr("Statut: {0}").format(status_name_display))
+                except Exception as e_status_name_saved:
+                    logging.error(f"Error fetching status name for saved ID {self.selected_status_ids_filter[0]}: {e_status_name_saved}")
+                    self.status_filter_button.setText(self.tr("Statut: ID {0}").format(self.selected_status_ids_filter[0]))
+            else:
+                self.status_filter_button.setText(self.tr("Statut: {0} sélectionnés").format(len(self.selected_status_ids_filter)))
+
 
             # Apply archive filter
             archive_idx = self.client_archive_filter_combo.findData(params.get('archive_filter'))
@@ -2229,11 +2390,16 @@ class DocumentManager(QMainWindow):
             country_idx = self.country_filter_combo.findData(params.get('country_id'))
             self.country_filter_combo.setCurrentIndex(country_idx if country_idx != -1 else 0)
 
+            # Apply category filter
+            if hasattr(self, 'category_filter_input'):
+                self.category_filter_input.setText(params.get('category', ''))
+
+
             # Apply search term
             self.search_input_field.setText(params.get('search_term', ''))
 
             # Apply date filters
-            show_collapsible = False
+            show_collapsible = False # Flag to determine if advanced filter section should be visible
             if hasattr(self, 'date_filter_start'):
                 date_start_str = params.get('created_at_start')
                 if date_start_str:
@@ -2307,10 +2473,9 @@ class DocumentManager(QMainWindow):
 
         parameters_dict = {}
 
-        # Status Filter
-        status_data = self.status_filter_combo.currentData()
-        if status_data is not None: # Only save if not "All Statuses" (which is None)
-            parameters_dict['status_id'] = status_data
+        # Status Filter (now multi-select)
+        if self.selected_status_ids_filter: # Save if list is not empty
+            parameters_dict['status_ids'] = self.selected_status_ids_filter
 
         # Archive Filter
         archive_data = self.client_archive_filter_combo.currentData()
@@ -2321,6 +2486,12 @@ class DocumentManager(QMainWindow):
         country_data = self.country_filter_combo.currentData()
         if country_data is not None: # Only save if not "All Countries"
             parameters_dict['country_id'] = country_data
+
+        # Category Filter
+        if hasattr(self, 'category_filter_input'):
+            category_text = self.category_filter_input.text().strip()
+            if category_text:
+                parameters_dict['category'] = category_text
 
         # Search Term
         search_text = self.search_input_field.text().strip()
@@ -2434,7 +2605,42 @@ class DocumentManager(QMainWindow):
         # 2. Re-apply permissions for the main window
         # This is important if the current user's role's permissions were changed.
         logging.debug("Re-applying permissions for MainWindow due to role changes.")
-        self._apply_permissions()
+        self._apply_permissions() # This will now also consider license features
+
+        # If user's own license type changed (e.g. admin changed it), re-fetch allowed_features
+        # This is a bit indirect. A more direct way would be if EditUserDialog could signal license change.
+        # For now, re-evaluating on any role change is a safe bet if EditUserDialog could also modify license.
+        # However, EditUserDialog currently does not seem to modify licenses directly.
+        # This is more relevant if the license itself is modified for the current user.
+        if self.current_user_info and self.current_user_info.get('user_id') == self.current_user_id: # Check if current user was affected
+            # Re-fetch license info for the current user, as their license type might have been part of the "role" change
+            # or an admin modified their license in a user management screen that triggered this.
+            conn_lic_refresh = None
+            try:
+                from db.connection import get_db_connection # Local import
+                conn_lic_refresh = get_db_connection()
+                is_valid, _, lic_details = license_manager.check_license_validity(conn_lic_refresh, self.current_user_id)
+                if is_valid and lic_details:
+                    self.current_license_info = lic_details # Update stored license info
+                    self.allowed_features = lic_details.get('allowed_features', set())
+                    logging.info(f"Refreshed license info for current user. New allowed features: {self.allowed_features}")
+                    self._apply_permissions() # Re-apply with potentially new feature set
+                elif lic_details: # License exists but is not valid (e.g., expired)
+                    self.current_license_info = lic_details
+                    self.allowed_features = set() # No features if license became invalid
+                    logging.warning(f"Current user's license is now invalid after role/permission changes. Allowed features set to empty.")
+                    self._apply_permissions()
+                else: # No license found
+                    self.current_license_info = None
+                    self.allowed_features = set()
+                    logging.warning(f"No license found for current user after role/permission changes. Allowed features set to empty.")
+                    self._apply_permissions()
+
+            except Exception as e_lic_refresh:
+                logging.error(f"Error refreshing license info for current user after role change: {e_lic_refresh}", exc_info=True)
+            finally:
+                if conn_lic_refresh:
+                    conn_lic_refresh.close()
 
         # 3. If EditUserDialog instances could be open and non-modal, they'd need updating.
         # For now, assuming EditUserDialog is modal and will fetch fresh roles upon its next opening.
@@ -2444,5 +2650,125 @@ class DocumentManager(QMainWindow):
         # If any other part of MainWindow directly displays role names or uses a role combo,
         # it should be refreshed here as well.
         # Example: If a ClientWidget had a role dropdown (it doesn't currently), it would need refresh.
+
+    def show_restaurant_module_view(self):
+        """Shows the B2C Restaurant Management module."""
+        # Optional: Check module state if it's made configurable
+        # if not self.module_states.get('b2c_restaurant', True): # Example key
+        #     QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Service Restaurant est désactivé."))
+        #     return
+
+        # Optional: Check license feature if applicable
+        # RESTAURANT_FEATURE_KEY = "FEATURE_B2C_RESTAURANT" # Define this constant
+        # if RESTAURANT_FEATURE_KEY not in self.allowed_features:
+        #    QMessageBox.warning(self, self.tr("Licence Requise"), self.tr("Votre licence actuelle ne permet pas d'accéder à ce module."))
+        #    return
+
+        if self.restaurant_widget_instance is None:
+            logging.info("DocumentManager: Lazily creating RestaurantMainWidget...")
+            try:
+                self.restaurant_widget_instance = RestaurantMainWidget(
+                    parent=self,
+                    current_user_info=self.current_user_info
+                )
+                self.main_area_stack.addWidget(self.restaurant_widget_instance)
+                logging.info("DocumentManager: RestaurantMainWidget instance created and added to stack.")
+            except Exception as e:
+                logging.error(f"Failed to create RestaurantMainWidget: {e}", exc_info=True)
+                QMessageBox.critical(self, self.tr("Erreur Module"),
+                                     self.tr("Le module Service Restaurant n'a pas pu être chargé : {0}").format(str(e)))
+                self.restaurant_widget_instance = None # Ensure it's None on failure
+                return # Don't proceed to show if creation failed
+
+        if self.restaurant_widget_instance: # Check again in case creation failed
+            if hasattr(self.restaurant_widget_instance, 'refresh_all_data'):
+                self.restaurant_widget_instance.refresh_all_data()
+            self.main_area_stack.setCurrentWidget(self.restaurant_widget_instance)
+            logging.info("Switched to B2C Restaurant Management view.")
+        else:
+            # This case should be covered by the try-except above, but as a safeguard:
+            logging.error("RestaurantMainWidget instance is None after attempting creation. Cannot show view.")
+            QMessageBox.critical(self, self.tr("Erreur Critique"),
+                                 self.tr("La page du Service Restaurant n'a pas pu être chargée."))
+
+
+    def open_menu_customization_dialog(self):
+        if not self.current_user_id:
+            QMessageBox.warning(self, self.tr("Accès Refusé"), self.tr("Vous devez être connecté pour personnaliser le menu."))
+            return
+
+        available_modules_for_customization = []
+        for module_info_const in CONFIGURABLE_MODULES:
+            module_name = module_info_const['name']
+
+            if not self.module_states.get(module_name, True):
+                continue
+
+            # The local _MODULE_TO_LICENSE_FEATURE_MAP is removed.
+            # We now use the 'license_feature' directly from module_info_const (from CONFIGURABLE_MODULES).
+            license_feature_key = module_info_const.get('license_feature')
+            if license_feature_key and license_feature_key not in self.allowed_features:
+                continue # Skip if license feature is required for this module and not granted to the user
+
+
+            available_modules_for_customization.append(module_info_const)
+
+        if not available_modules_for_customization:
+            QMessageBox.information(self, self.tr("Aucun Module Configurable"),
+                                    self.tr("Il n'y a actuellement aucun module que vous êtes autorisé à configurer."))
+            return
+
+        dialog = MenuCustomizationDialog(
+            current_user_id=self.current_user_id,
+            configurable_modules=available_modules_for_customization,
+            module_states=self.module_states,
+            license_features=self.allowed_features,
+            parent=self
+        )
+
+        # Pass the actual database access functions to the dialog
+        # db_manager should be available as an import in main_window.py (e.g., import db as db_manager)
+        if not db_manager: # Ensure db_manager is imported and available
+             logging.error("db_manager not available in DocumentManager. Cannot open MenuCustomizationDialog.")
+             QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("Le gestionnaire de base de données n'est pas disponible."))
+             return
+
+        dialog.get_user_menu_config_func = lambda user_id: db_manager.get_setting(f"user_menu_config_{user_id}")
+
+        # Ensure set_setting expects a string for JSON, so dump it here.
+        dialog.set_user_menu_config_func = lambda user_id, data: db_manager.set_setting(f"user_menu_config_{user_id}", json.dumps(data))
+
+        dialog.menu_config_changed.connect(self._handle_menu_config_changed)
+        if dialog.exec_() == QDialog.Accepted:
+            # _handle_menu_config_changed is already connected to the signal,
+            # so it will be called if the dialog emits it upon successful save.
+            pass
+
+    def _handle_menu_config_changed(self):
+        logging.info("Configuration du menu utilisateur modifiée. Reconstruction des menus...")
+
+        # Store the corner widget (search bar and user button) to restore it later
+        corner_widget = self.menuBar().cornerWidget(Qt.TopRightCorner)
+        # Temporarily remove it from the menu bar to prevent it from being deleted by clear()
+        if corner_widget:
+            self.menuBar().setCornerWidget(None)
+            corner_widget.setParent(None) # Ensure it's not deleted with the old menubar
+
+        self.menuBar().clear() # This clears all menus and actions within them.
+
+        # Re-create actions and menus
+        # create_actions_main() generally doesn't need to be recalled unless action properties change.
+        # However, if action texts (used by dialog) or icons were part of user config, it might be needed.
+        # For now, assume only menu structure changes.
+        # self.create_actions_main() # Uncomment if actions themselves might change based on new config.
+
+        self.create_menus_main() # This will use the new configuration from the database.
+        self._apply_permissions() # Re-apply permissions to the new menu structure.
+
+        # Restore the corner widget
+        if corner_widget:
+            self.menuBar().setCornerWidget(corner_widget, Qt.TopRightCorner)
+
+        self.notify(self.tr("Menu Mis à Jour"), self.tr("Le menu principal a été mis à jour selon vos préférences."), type='INFO')
 
 # [end of main_window.py]

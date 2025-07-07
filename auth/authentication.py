@@ -1,6 +1,17 @@
 # auth/authentication.py
 import logging
-from db.cruds import users_crud # Assuming users_crud.py is in db/cruds/
+from datetime import datetime, timedelta, timezone # Added timedelta and timezone
+
+# auth/authentication.py
+import logging
+from datetime import datetime, timedelta, timezone # Added timedelta and timezone
+
+from db.cruds import users_crud, activity_logs_crud, licenses_crud # Added licenses_crud
+
+from db.cruds import user_session_tokens_crud # New CRUD for session tokens
+from utils.security_helpers import generate_secure_token, hash_token_for_storage # New helpers
+from license_management import manager as license_manager # Already imported below, moved up for clarity
+from db.connection import get_db_connection # Already imported below, moved up
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +59,22 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
             save_remember_me_preference(username, False) # Clear on failure
             return False, "Ce compte utilisateur est désactivé.", None
 
-        if users_crud.verify_password(user['hashed_password'], password):
+        # Corrected function call: users_crud.util_verify_password
+        # The users_crud module imports verify_password as util_verify_password from utils
+        # and then has its own wrapper verify_user_password.
+        # However, the original error indicates a direct call to a function named verify_password
+        # within the users_crud namespace, which was likely the util_verify_password before a potential refactor
+        # or an intended direct call to the utility.
+        # Given the error "Did you mean: 'util_verify_password'?",
+        # the most direct fix is to use users_crud.util_verify_password.
+        #
+        # An alternative would be to use users_crud.verify_user_password(username, password)
+        # but that function does more than just verify the password string (it also gets the user, checks active status).
+        # Since we already have the user object and checked active status,
+        # calling the lower-level password verification directly is more appropriate here.
+        # The users_crud module makes util_verify_password available via:
+        # from utils import verify_password as util_verify_password
+        if users_crud.util_verify_password(password, user['hashed_password'])[0]: # util_verify_password returns (bool, str|None)
             logger.info(f"User '{username}' logged in successfully.")
             users_crud.record_login_time(user['user_id'])
 
@@ -70,18 +96,34 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
                 conn = get_db_connection()
                 is_license_valid, license_msg, license_details = license_manager.check_license_validity(conn, user['user_id'])
 
-                # Le login est réussi, mais la licence peut être invalide.
-                # Le message d'erreur de la licence sera prioritaire s'il y en a un.
-                # La fonction login retourne maintenant aussi license_details pour que main.py puisse agir.
-                if not is_license_valid:
-                    logger.warning(f"Login réussi pour {username} mais licence invalide: {license_msg}")
-                    # On ne retourne pas False pour le login, car l'utilisateur est authentifié.
-                    # C'est à l'appelant (main.py) de gérer le flux de licence.
-                    # Cependant, on peut enrichir le message d'erreur.
-                    # Le `license_details` ici pourrait être None ou contenir les infos de la licence invalide.
-                    return True, license_msg, _current_user_data, license_details # license_details peut être la licence invalide
+                if not is_license_valid and username == license_manager.ADMIN_USERNAME:
+                    logger.warning(f"Admin user '{username}' has an invalid/missing license: {license_msg}. Attempting to create a default 6-month license.")
+                    try:
+                        # Pass the existing connection 'conn'
+                        created_ok, create_msg, new_license_details = license_manager.create_default_admin_license(conn, user['user_id'])
+                        if created_ok:
+                            logger.info(f"Default admin license created successfully for '{username}'. Re-checking validity.")
+                            # Re-check license validity
+                            is_license_valid, license_msg, license_details = license_manager.check_license_validity(conn, user['user_id'])
+                        else:
+                            logger.error(f"Failed to create default admin license for '{username}': {create_msg}")
+                            # Proceed with original invalid license message if creation failed
+                            # The original license_msg and license_details (which might be None) are still in scope
+                            # We return True for login success, but the license_msg will indicate the issue.
+                            return True, create_msg or license_msg, _current_user_data, license_details
 
-                logger.info(f"Login et vérification de licence réussis pour {username}.")
+                    except Exception as e_create_lic:
+                        logger.error(f"Exception during default admin license creation for '{username}': {e_create_lic}", exc_info=True)
+                        # Proceed with original invalid license message
+                        return True, f"Erreur critique lors de la création de la licence admin: {str(e_create_lic)}", _current_user_data, license_details
+
+                # After potential admin license creation, check final status
+                if not is_license_valid:
+                    logger.warning(f"Login for '{username}' successful, but license is invalid: {license_msg}")
+                    # Return True for login success (user authenticated), but include license error message and details
+                    return True, license_msg, _current_user_data, license_details
+
+                logger.info(f"Login and license check successful for {username}.")
                 return True, None, _current_user_data, license_details
 
             except Exception as e_lic:
@@ -151,54 +193,336 @@ def get_current_user_role() -> str | None:
         return _current_user_data.get('role_name')
     return None
 
-# --- Remember Me Functionality ---
+# --- Remember Me Functionality (Token-Based) ---
 from PyQt5.QtCore import QSettings
 
-APP_NAME = "ClientDocManager" # Or your application's name
-ORG_NAME = "SaadiyaManagement" # Or your organization's name
+APP_NAME = "ClientDocManager"
+ORG_NAME = "SaadiyaManagement"
 
-REMEMBER_ME_KEY = "auth/remember_me_active"
-REMEMBER_ME_USERNAME_KEY = "auth/remembered_username"
-# For a more secure approach with a token:
-# REMEMBER_ME_TOKEN_KEY = "auth/remember_me_token"
+REMEMBER_ME_TOKEN_QSETTINGS_KEY = "auth/remember_me_token" # Key for QSettings
+SESSION_TOKEN_EXPIRY_DAYS = 60 # How long a "remember me" token is valid in the DB
 
-def save_remember_me_preference(username: str, remember: bool):
-    """Saves the 'Remember Me' preference and username if remember is True."""
+def save_remember_me_token_to_settings(token: str):
+    """Saves the remember me token to QSettings."""
     settings = QSettings(ORG_NAME, APP_NAME)
-    if remember and username:
-        settings.setValue(REMEMBER_ME_KEY, True)
-        settings.setValue(REMEMBER_ME_USERNAME_KEY, username)
-        # In a token-based system, you'd store a persistent token here instead of/additionally
-        # settings.setValue(REMEMBER_ME_TOKEN_KEY, persistent_session_token)
-        logger.info(f"Remember Me preference saved for user: {username}")
-    else:
-        settings.remove(REMEMBER_ME_KEY)
-        settings.remove(REMEMBER_ME_USERNAME_KEY)
-        # settings.remove(REMEMBER_ME_TOKEN_KEY)
-        logger.info("Remember Me preference cleared.")
-    settings.sync() # Ensure changes are written
+    if token:
+        settings.setValue(REMEMBER_ME_TOKEN_QSETTINGS_KEY, token)
+        logger.info("Remember Me token saved to QSettings.")
+    else: # Should not happen if we always generate a token, but good for explicit clear
+        settings.remove(REMEMBER_ME_TOKEN_QSETTINGS_KEY)
+        logger.info("Remember Me token cleared from QSettings (empty token provided).")
+    settings.sync()
 
-def get_remembered_user() -> str | None:
-    """
-    Retrieves the username if 'Remember Me' was active.
-    In a token-based system, this would return the token.
-    """
+def get_remembered_token_from_settings() -> str | None:
+    """Retrieves the remember me token from QSettings."""
     settings = QSettings(ORG_NAME, APP_NAME)
-    if settings.value(REMEMBER_ME_KEY, False, type=bool): # Ensure type conversion
-        username = settings.value(REMEMBER_ME_USERNAME_KEY, "", type=str)
-        # token = settings.value(REMEMBER_ME_TOKEN_KEY, "", type=str)
-        # if token: return token # For token-based
-        if username:
-            logger.info(f"Found remembered user: {username}")
-            return username
-    logger.info("No remembered user found or preference not active.")
+    token = settings.value(REMEMBER_ME_TOKEN_QSETTINGS_KEY, "", type=str)
+    if token:
+        logger.info("Found Remember Me token in QSettings.")
+        return token
+    logger.info("No Remember Me token found in QSettings.")
     return None
 
-def clear_remember_me_preference():
-    """Clears any stored 'Remember Me' preferences."""
+def clear_remember_me_token_from_settings():
+    """Clears the remember me token from QSettings."""
     settings = QSettings(ORG_NAME, APP_NAME)
-    settings.remove(REMEMBER_ME_KEY)
-    settings.remove(REMEMBER_ME_USERNAME_KEY)
-    # settings.remove(REMEMBER_ME_TOKEN_KEY)
-    logger.info("Cleared all Remember Me preferences forcefully.")
-    settings.sync()
+    if settings.contains(REMEMBER_ME_TOKEN_QSETTINGS_KEY):
+        settings.remove(REMEMBER_ME_TOKEN_QSETTINGS_KEY)
+        logger.info("Cleared Remember Me token from QSettings.")
+        settings.sync()
+    else:
+        logger.info("No Remember Me token in QSettings to clear.")
+
+# Updated login function to handle token generation
+def login(username: str, password: str, remember_me: bool = False) -> tuple[bool, str | None, dict | None, dict | None]:
+    """
+    Attempts to log in a user. If remember_me is True, generates and stores a session token.
+    """
+    global _current_user_data
+    # Note: license_manager and get_db_connection are already imported at module level
+
+    # Clear any old token from QSettings before attempting a new login,
+    # especially if this login is manual.
+    # If login fails, we don't want an old token lingering.
+    # If login succeeds and remember_me is false, we also want it cleared.
+    clear_remember_me_token_from_settings() # Clear token from QSettings first
+    # We also need to clear any associated DB token if one existed and this is a new manual login.
+    # This is tricky without knowing the old token. Best to handle DB token clearing on explicit logout
+    # or when a new token is successfully generated for the same user.
+
+    try:
+        user = users_crud.get_user_by_username(username)
+        if not user:
+            logger.warning(f"Login attempt failed: User '{username}' not found.")
+            return False, "Nom d'utilisateur ou mot de passe incorrect.", None, None
+
+        if not user.get('is_active'):
+            logger.warning(f"Login attempt failed: User '{username}' is inactive.")
+            return False, "Ce compte utilisateur est désactivé.", None, None
+
+        if users_crud.util_verify_password(password, user['hashed_password'])[0]:
+            logger.info(f"User '{username}' logged in successfully.")
+            users_crud.record_login_time(user['user_id'])
+
+            _current_user_data = {
+                'user_id': user['user_id'],
+                'username': user['username'],
+                'full_name': user.get('full_name'),
+                'email': user.get('email'),
+                'role_id': user['role_id'],
+                'role_name': user.get('role_name')
+            }
+
+            conn = None
+            try: # Corrected from try { to try:
+
+                conn = get_db_connection()
+                if remember_me:
+                    # Invalidate old tokens for this user on this device (or all devices)
+                    # For simplicity, let's invalidate all for now. A device_identifier could refine this.
+                    user_session_tokens_crud.delete_all_user_session_tokens(conn, user['user_id'])
+
+                    new_token = generate_secure_token(48) # Generate a new strong token
+                    token_hash = hash_token_for_storage(new_token)
+                    expires_at = datetime.now(timezone.utc) + timedelta(days=SESSION_TOKEN_EXPIRY_DAYS)
+
+                    device_id = None
+
+
+                    token_record_id = user_session_tokens_crud.add_session_token(
+                        conn, user['user_id'], token_hash, expires_at, device_id
+                    )
+                    if token_record_id:
+                        save_remember_me_token_to_settings(new_token)
+                        logger.info(f"New session token generated and stored for user {user['user_id']}.")
+                        activity_logs_crud.add_activity_log(
+                            conn=conn,
+
+                            data={
+                                "user_id": user['user_id'],
+                                "action_type": "REMEMBER_ME_TOKEN_GENERATED",
+                                "details": f"New 'Remember Me' session token generated. Expires: {expires_at.isoformat()}.",
+                                "related_entity_type": "UserSessionToken",
+                                "related_entity_id": token_record_id
+                            }
+                        )
+                    else:
+                        logger.error(f"Failed to store new session token in DB for user {user['user_id']}.")
+                else:
+
+                    deleted_count = user_session_tokens_crud.delete_all_user_session_tokens(conn, user['user_id'])
+                    if deleted_count > 0:
+                        logger.info(f"Cleared {deleted_count} 'Remember Me' token(s) for user {user['user_id']} as 'Remember Me' was not checked.")
+                        activity_logs_crud.add_activity_log(
+                            conn=conn,
+                            data={
+                                "user_id": user['user_id'],
+                                "action_type": "REMEMBER_ME_TOKENS_CLEARED_ON_LOGIN",
+                                "details": f"All 'Remember Me' tokens cleared for user as 'Remember Me' was not selected during login. Count: {deleted_count}.",
+                            }
+                        )
+
+                # License Check
+                is_license_valid, license_msg, license_details = license_manager.check_license_validity(conn, user['user_id'])
+
+                # --- Modified Default Admin License Creation Trigger ---
+                if not is_license_valid and user.get('role_name') == "Administrator": # Check role
+                    # Check if any other 'complet' license exists in the system
+                    if not licenses_crud.has_any_active_complete_license(conn): # Corrected: Use licenses_crud directly
+
+                        logger.warning(f"Administrator user '{username}' has an invalid/missing license and no other active 'complet' license found. Attempting to create a default 6-month license.")
+                        try:
+                            created_ok, create_msg, new_license_details = license_manager.create_default_admin_license(conn, user['user_id'])
+                            if created_ok:
+                                logger.info(f"Default admin license created successfully for '{username}'. Re-checking validity.")
+                                is_license_valid, license_msg, license_details = license_manager.check_license_validity(conn, user['user_id'])
+                            else:
+                                logger.error(f"Failed to create default admin license for '{username}': {create_msg}")
+                                return True, create_msg or license_msg, _current_user_data, license_details
+                        except Exception as e_create_lic:
+                            logger.error(f"Exception during default admin license creation for '{username}': {e_create_lic}", exc_info=True)
+                            return True, f"Erreur critique lors de la création de la licence admin: {str(e_create_lic)}", _current_user_data, license_details
+                    else:
+                        logger.info(f"Administrator user '{username}' has an invalid/missing license, but other 'complet' licenses exist. Default license not created.")
+                # --- End Modified Default Admin License Creation Trigger ---
+
+
+                if not is_license_valid:
+                    return True, license_msg, _current_user_data, license_details
+
+                return True, None, _current_user_data, license_details
+
+            except Exception as e_inner: # Catch exceptions within the 'try with conn'
+
+                logger.error(f"Error during token/license processing for {username}: {e_inner}", exc_info=True)
+                # Decide on return value: if token/license fails, is login still valid?
+                # For now, let's assume if this block fails, login might be compromised or incomplete.
+                _current_user_data = None # Don't consider user logged in
+                # Attempt to clear any potentially partially saved token if remember_me was true
+                if remember_me and conn: # Check conn as it might have failed to be established
+                    user_session_tokens_crud.delete_all_user_session_tokens(conn, user['user_id'])
+                clear_remember_me_token_from_settings()
+                return False, f"Erreur interne ({type(e_inner).__name__}).", None, None
+            finally:
+                if conn:
+                    conn.close()
+        else: # Password verification failed
+            logger.warning(f"Login attempt failed: Invalid password for user '{username}'.")
+            # clear_remember_me_token_from_settings() was already called
+            return False, "Nom d'utilisateur ou mot de passe incorrect.", None, None
+
+    except Exception as e: # General error during login (e.g., DB connection before try-with-conn)
+        logger.error(f"Error during login for user '{username}': {e}", exc_info=True)
+        clear_remember_me_token_from_settings() # Ensure token is cleared on any failure path
+        return False, "Une erreur est survenue lors de la connexion.", None, None
+
+def login_with_session_token(token_from_qsettings: str) -> tuple[bool, str | None, dict | None, dict | None]:
+    """
+    Attempts to log in a user using a session token from QSettings.
+    Returns: (success, message, user_data, license_info)
+    """
+    global _current_user_data
+    logger.info("Attempting login with session token.")
+
+    if not token_from_qsettings:
+        return False, "No token provided.", None, None
+
+    token_hash = hash_token_for_storage(token_from_qsettings)
+    conn = None
+
+    try:
+
+        conn = get_db_connection()
+        token_data = user_session_tokens_crud.get_session_token_by_hash(conn, token_hash)
+
+        if not token_data:
+            logger.warning("Session token not found in DB or expired. Clearing from QSettings.")
+            clear_remember_me_token_from_settings()
+            # Log failed token login attempt
+            activity_logs_crud.add_activity_log(
+                conn=conn,
+                data={
+                    "user_id": None, # User is unknown at this point
+                    "action_type": "REMEMBER_ME_TOKEN_LOGIN_FAILED",
+                    "details": f"Failed login attempt with token hash {token_hash[:10]}... Token not found or expired.",
+                    "related_entity_type": "UserSessionToken",
+                    "related_entity_id": token_hash # Log the hash for investigation
+                }
+            )
+            return False, "Session invalide ou expirée.", None, None
+
+        # Token found and not expired, fetch user
+        user = users_crud.get_user_by_id(token_data['user_id'], conn=conn) # Pass conn to reuse
+        if not user or not user.get('is_active'):
+            logger.warning(f"User for token (ID: {token_data['user_id']}) not found or inactive. Deleting token.")
+            user_session_tokens_crud.delete_session_token(conn, token_hash) # Delete the compromised/invalid token
+            clear_remember_me_token_from_settings()
+            activity_logs_crud.add_activity_log(
+                 conn=conn,
+                 data={
+                    "user_id": token_data.get('user_id'),
+                    "action_type": "REMEMBER_ME_TOKEN_LOGIN_FAILED",
+                    "details": f"Login with token hash {token_hash[:10]}... failed: User not found or inactive.",
+                    "related_entity_type": "UserSessionToken",
+                    "related_entity_id": token_hash
+                }
+            )
+            return False, "Utilisateur associé à la session introuvable ou inactif.", None, None
+
+        # User is valid and active, establish session
+        _current_user_data = {
+            'user_id': user['user_id'],
+            'username': user['username'],
+            'full_name': user.get('full_name'),
+            'email': user.get('email'),
+            'role_id': user['role_id'],
+            'role_name': user.get('role_name')
+        }
+        user_session_tokens_crud.update_token_last_used(conn, token_hash)
+        users_crud.record_login_time(user['user_id'], conn=conn) # Record login time
+        logger.info(f"Successfully logged in user {user['username']} with session token.")
+        activity_logs_crud.add_activity_log(
+            conn=conn,
+            data={
+                "user_id": user['user_id'],
+                "action_type": "REMEMBER_ME_TOKEN_LOGIN_SUCCESS",
+                "details": f"User {user['username']} successfully logged in using a 'Remember Me' session token.",
+                "related_entity_type": "UserSessionToken",
+                "related_entity_id": token_data['token_id']
+            }
+        )
+
+        # License Check
+        is_license_valid, license_msg, license_details = license_manager.check_license_validity(conn, user['user_id'])
+        # Admin default license creation is not typically part of token login,
+        # as it's an interactive step usually following explicit password login.
+
+        if not is_license_valid:
+            logger.warning(f"Token login for '{user['username']}' successful, but license is invalid: {license_msg}")
+            # User is authenticated, but license is an issue.
+            # main.py will handle showing LicenseDialog if needed.
+            return True, license_msg, _current_user_data, license_details # Return True for auth, with license message
+
+        return True, None, _current_user_data, license_details
+
+
+    except Exception as e:
+
+        logger.error(f"Error during login with session token: {e}", exc_info=True)
+        clear_remember_me_token_from_settings() # Clear token on error
+        if conn and token_hash: # Attempt to delete token from DB if error occurred after hash was known
+             user_session_tokens_crud.delete_session_token(conn, token_hash)
+        return False, "Erreur interne lors de la connexion par session.", None, None
+    finally:
+        if conn:
+            conn.close()
+
+
+def logout():
+    """Logs out the current user and clears any session token."""
+    global _current_user_data
+
+    token_to_clear = get_remembered_token_from_settings() # Get token before clearing _current_user_data
+
+    if _current_user_data:
+        logger.info(f"User '{_current_user_data.get('username')}' logged out.")
+        _current_user_data = None # Clear current user data from this service
+    else:
+        logger.info("Logout called but no user was logged in locally in auth_service.")
+
+    if token_to_clear:
+        conn = None
+
+
+        try :
+            conn = get_db_connection()
+            token_hash = hash_token_for_storage(token_to_clear)
+            token_deleted_from_db = user_session_tokens_crud.delete_session_token(conn, token_hash)
+            if token_deleted_from_db:
+                logger.info("Session token deleted from database during logout.")
+                activity_logs_crud.add_activity_log(
+                    conn=conn,
+                    data={
+                        # _current_user_data might be None if logout is called without an active session,
+                        # but token_to_clear implies a previous session existed.
+                        # We need user_id associated with the token if possible.
+                        # This is tricky as delete_session_token only takes hash.
+                        # For now, we'll log without user_id if not available in _current_user_data.
+                        "user_id": _current_user_data.get('user_id') if _current_user_data else None,
+                        "action_type": "REMEMBER_ME_TOKEN_DELETED_ON_LOGOUT",
+                        "details": f"Session token (hash: {token_hash[:10]}...) deleted from DB due to logout.",
+                        "related_entity_type": "UserSessionToken",
+                        "related_entity_id": token_hash
+                    }
+                )
+            else:
+                logger.info("No matching session token found in database to delete during logout.")
+
+
+        except Exception as e:
+            logger.error(f"Error deleting session token from DB during logout: {e}", exc_info=True)
+        finally:
+            if conn:
+                conn.close()
+
+    clear_remember_me_token_from_settings() # Always clear from QSettings on logout

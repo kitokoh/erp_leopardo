@@ -27,7 +27,9 @@ try:
     # Assuming get_products_for_client_or_project and get_client_document_notes might be in client_project_products_crud or similar
     # For now, let's assume they might be in a general db utility or directly in db if not found in specific cruds
     from db import get_products_for_client_or_project as db_get_products_for_client_or_project # Placeholder if not in a specific crud
-    from db import get_client_document_notes as db_get_client_document_notes # Placeholder
+    # from db import get_client_document_notes as db_get_client_document_notes # Placeholder - This is now in notes_crud
+    from db.cruds.notes_crud import get_effective_document_note as db_get_effective_document_note
+
 
     from db.cruds.application_settings_crud import get_next_invoice_number
 except ImportError as e:
@@ -51,15 +53,21 @@ except ImportError as e:
     # Adjusted signature for db_get_product_by_id
     def db_get_product_by_id(conn, product_id): return MockProduct(id=product_id, name=f"Mock Product {product_id}", desc="Mock Desc", lang="en", price=10.0, unit="pcs", code=f"CODE-{product_id}")
     def db_get_products_for_client_or_project(conn, client_id, project_id=None): return [] # Adjusted signature
-    def db_get_client_document_notes(conn, client_id, document_type, language_code): return "N/A" # Adjusted signature
+    # def db_get_client_document_notes(conn, client_id, document_type, language_code): return "N/A" # Adjusted signature
+    def db_get_effective_document_note(conn, client_id, document_type, language_code): return "N/A" # Adjusted signature for new function
 
 
 # --- Constants ---
-APP_ROOT_DIR_CONTEXT = os.path.dirname(os.path.abspath(__file__)) # This is db/utils.py directory
-# To get project root, assuming db is a direct subdir of project root:
+# APP_ROOT_DIR_CONTEXT is this file's dir: utils/
+APP_ROOT_DIR_CONTEXT = os.path.dirname(os.path.abspath(__file__))
+# PROJECT_ROOT_DIR_CONTEXT is one level up from utils/
 PROJECT_ROOT_DIR_CONTEXT = os.path.dirname(APP_ROOT_DIR_CONTEXT)
-LOGO_SUBDIR_CONTEXT = os.path.join("assets", "logos") # Relative to project root
-LOGO_SUBDIR_CONTEXT = "assets/logos"
+
+# Import get_doc_label from app_utils (which is in the same directory 'utils')
+from .app_utils import get_doc_label
+from PyQt5.QtCore import QLocale, QDate, QDateTime # Added QDate, QDateTime for date formatting
+
+LOGO_SUBDIR_CONTEXT = os.path.join("resources", "company_logos") # Corrected typical path
 CURRENCY_SYMBOLS = {
     "USD": "$", "EUR": "€", "GBP": "£", "JPY": "¥",
     # Add more as needed
@@ -101,10 +109,21 @@ def _format_address_parts(address_line1, city, postal_code, country):
     parts = [address_line1, city, postal_code, country]
     return ", ".join(filter(None, [str(p).strip() for p in parts if p and str(p).strip() != "N/A"])) or "N/A"
 
-def format_currency(amount, currency_symbol="€", decimal_places=2):
+def format_currency(amount: Union[int, float, None], currency_code: str = "EUR", target_language_code: str = "fr") -> str:
+    locale = QLocale(QLocale.Language[target_language_code.capitalize() if len(target_language_code)==2 else "AnyLanguage"]) # Get locale for lang
+
     if amount is None or not isinstance(amount, (int, float)):
-        return f"N/A {currency_symbol}"
-    return f"{amount:,.{decimal_places}f} {currency_symbol}".replace(",", " ").replace(".", ",") # French format like "1 234,56 €"
+        # Use get_doc_label for "N/A" to make it translatable too
+        na_text = get_doc_label("not_applicable_short", target_language_code, "N/A")
+        return f"{na_text} {CURRENCY_SYMBOLS.get(currency_code.upper(), currency_code)}"
+
+    # QLocale.toCurrencyString can be very powerful if full ICU data is available with Qt installation.
+    # It handles symbol placement, grouping, decimal separators according to locale and currency.
+    # Example: return locale.toCurrencyString(float(amount), currency_code.upper())
+    # For simpler number formatting with explicit symbol, which is often more reliable across minimal Qt installs:
+    number_str = locale.toString(float(amount), 'f', 2) # 'f' for fixed point, 2 decimal places
+    return f"{number_str} {CURRENCY_SYMBOLS.get(currency_code.upper(), currency_code)}"
+
 
 # Placeholder for _get_batch_products_and_equivalents
 # This is a complex function that would normally interact with a ProductEquivalents table.
@@ -120,32 +139,79 @@ def _get_batch_products_and_equivalents(db_session, product_ids: List[str], targ
     # The db_session here is expected to be an SQLite connection for db_get_product_by_id
     conn = db_session # Rename for clarity as it's an SQLite connection
 
-    for pid_str in product_ids:
-        product_dict = db_get_product_by_id(conn, pid_str) # db_get_product_by_id now expects conn
-        if product_dict: # db_get_product_by_id (actual one) returns a dict or None
-            products_data[str(pid_str)] = { # Ensure key is string
-                "id": str(pid_str),
-                "original_name": product_dict.get('product_name', 'N/A'),
-                "original_description": product_dict.get('description', 'N/A'),
-                "original_language_code": product_dict.get('language_code', 'N/A'),
-                "base_unit_price": product_dict.get('base_unit_price', 0.0),
-                "unit_of_measure": product_dict.get('unit_of_measure', 'N/A'),
-                "product_weight_kg": product_dict.get('weight', None), # Field name 'weight' in schema
-                "product_dimensions_cm": product_dict.get('dimensions', None), # Field name 'dimensions'
-                "product_code": product_dict.get('product_code', 'N/A'), # Added product_code
-                "equivalent_name": None,
-                "equivalent_description": None,
-                "equivalent_language_code": None,
-            }
-            # Simple mock translation logic (replace with actual DB query for equivalents if needed)
-            current_product_data = products_data[str(pid_str)]
-            if target_language_code != current_product_data["original_language_code"] and target_language_code == 'fr':
-                current_product_data["equivalent_name"] = f"{current_product_data['original_name']} (FR)"
-                current_product_data["equivalent_description"] = f"{current_product_data['original_description']} (Description Française)"
-                current_product_data["equivalent_language_code"] = "fr"
-        else:
-            logging.warning(f"Product with ID {pid_str} not found or is invalid.")
-            products_data[pid_str] = None # Explicitly mark as not found / error
+    # Efficiently fetch all products in the list
+    if product_ids:
+        placeholders = ','.join('?' for _ in product_ids)
+        # Ensure product_ids are of the correct type for the query (e.g., int if product_id is INTEGER)
+        # Assuming product_id in Products table is INTEGER. If TEXT, this is fine.
+        # The db_get_product_by_id mock uses int, but actual might be different.
+        # For now, assuming product_ids in list are already compatible type or string.
+        # Let's assume product_id is INTEGER for this example, so convert pid_str.
+        try:
+            # Convert product_ids to int if they are expected to be integers for the IN clause
+            # This depends on the actual type of Products.product_id
+            # If Products.product_id is TEXT, then pid_str is fine.
+            # If Products.product_id is INTEGER, map(int, product_ids) is needed.
+            # products_crud.get_product_by_id takes int.
+
+            # Corrected approach: query all products using IN clause.
+            # This requires products_crud to have a function like get_products_by_ids_list.
+            # If not, we construct the SQL here.
+
+            # Assuming product_id is INTEGER for Products table
+            # Ensure product_ids are integers for the query
+            int_product_ids = [int(pid) for pid in product_ids if pid is not None]
+            if not int_product_ids: # If all product_ids were None or list became empty
+                return products_data
+
+            sql_batch = f"SELECT * FROM Products WHERE product_id IN ({','.join('?'*len(int_product_ids))})"
+            cursor = conn.cursor()
+            cursor.execute(sql_batch, tuple(int_product_ids))
+            fetched_products_raw = cursor.fetchall()
+
+            fetched_products_map = {str(p['product_id']): dict(p) for p in fetched_products_raw}
+
+            for pid_str in product_ids: # Iterate original list to maintain order/check existence
+                product_dict = fetched_products_map.get(pid_str)
+                if product_dict:
+                    products_data[pid_str] = {
+                        "id": pid_str, # Use the string version of ID as key
+                        "original_name": product_dict.get('product_name', 'N/A'),
+                        "original_description": product_dict.get('description', 'N/A'),
+                        "original_language_code": product_dict.get('language_code', 'N/A'),
+                        "base_unit_price": product_dict.get('base_unit_price', 0.0),
+                        "unit_of_measure": product_dict.get('unit_of_measure', 'N/A'),
+                        "product_weight_kg": product_dict.get('weight', None),
+                        "product_dimensions_cm": product_dict.get('dimensions', None),
+                        "product_code": product_dict.get('product_code', 'N/A'),
+                        "equivalent_name": None, # TODO: Implement actual equivalent fetching if needed
+                        "equivalent_description": None,
+                        "equivalent_language_code": None,
+                    }
+                    # Mock translation logic (can be enhanced with actual equivalent product fetching)
+                    current_product_data = products_data[pid_str]
+                    if target_language_code != current_product_data["original_language_code"]:
+                        # This part needs to query for an equivalent product in the target language.
+                        # For now, simple mock:
+                        if target_language_code == 'fr' and current_product_data["original_language_code"] == 'en':
+                             current_product_data["equivalent_name"] = f"{current_product_data['original_name']} (FR)"
+                             current_product_data["equivalent_description"] = f"{current_product_data['original_description']} (Description Française)"
+                             current_product_data["equivalent_language_code"] = "fr"
+                        # Add more language pair mocks or a real lookup
+                else:
+                    logging.warning(f"Product with ID {pid_str} not found in batch fetch.")
+                    products_data[pid_str] = None
+        except sqlite3.Error as e_batch:
+            logging.error(f"Failed to batch fetch products: {e_batch}", exc_info=True)
+            # Fallback to individual fetches (original N+1) if batch fails, or handle error
+            for pid_str_fallback in product_ids: # Fallback loop
+                 product_dict_fallback = db_get_product_by_id(conn, int(pid_str_fallback)) # Assuming int ID
+                 if product_dict_fallback:
+                     products_data[pid_str_fallback] = { "id": pid_str_fallback, "original_name": product_dict_fallback.get('product_name', 'N/A'), # simplified
+                                                          "original_description": product_dict_fallback.get('description', 'N/A'), "base_unit_price": product_dict_fallback.get('base_unit_price',0.0)}
+                 else: products_data[pid_str_fallback] = None
+
+
     return products_data
 
 
@@ -211,30 +277,35 @@ def get_proforma_invoice_context_data(
     else:
         # Fallback to additional_context or defaults if no proforma_instance
         doc_ctx["proforma_id"] = additional_context.get("proforma_id", f"PF-{uuid.uuid4().hex[:8].upper()}")
-        doc_ctx["payment_terms"] = additional_context.get("payment_terms", "Paiement anticipé")
-        doc_ctx["delivery_terms"] = additional_context.get("delivery_terms", "Selon accord")
-        doc_ctx["incoterms"] = additional_context.get("incoterms", "EXW")
-        doc_ctx["named_place_of_delivery"] = additional_context.get("named_place_of_delivery", "Lieu du vendeur")
-        doc_ctx["currency_symbol"] = additional_context.get("currency_symbol", "€")
+        doc_ctx["payment_terms"] = additional_context.get("payment_terms", get_doc_label("payment_terms_default", target_language_code, "Advance Payment"))
+        doc_ctx["delivery_terms"] = additional_context.get("delivery_terms", get_doc_label("delivery_terms_default", target_language_code, "As agreed"))
+        doc_ctx["incoterms"] = additional_context.get("incoterms", "EXW") # Incoterms are standard, usually not translated
+        doc_ctx["named_place_of_delivery"] = additional_context.get("named_place_of_delivery", get_doc_label("named_place_default", target_language_code, "Seller's premises"))
+        doc_ctx["currency_symbol"] = CURRENCY_SYMBOLS.get(additional_context.get("currency_code", "EUR").upper(), additional_context.get("currency_code", "EUR"))
         doc_ctx["proforma_notes"] = additional_context.get("notes", "")
-        doc_ctx["current_date"] = additional_context.get("current_date", datetime.now(timezone.utc).strftime('%Y-%m-%d'))
-        doc_ctx["sent_date"] = additional_context.get("sent_date")
+
+        # Date formatting using QLocale
+        locale = QLocale(QLocale.Language[target_language_code.capitalize() if len(target_language_code)==2 else "AnyLanguage"])
+        current_date_dt = datetime.strptime(additional_context.get("current_date", datetime.now(timezone.utc).strftime('%Y-%m-%d')), '%Y-%m-%d')
+        doc_ctx["current_date"] = locale.toString(QDate(current_date_dt.year, current_date_dt.month, current_date_dt.day), QLocale.ShortFormat)
+
+        sent_date_str = additional_context.get("sent_date")
+        if sent_date_str:
+            sent_date_dt = datetime.strptime(sent_date_str, '%Y-%m-%d')
+            doc_ctx["sent_date"] = locale.toString(QDate(sent_date_dt.year, sent_date_dt.month, sent_date_dt.day), QLocale.ShortFormat)
+        else:
+            doc_ctx["sent_date"] = None
+
         # Order specific from additional_context
-        order_ctx["client_order_number"] = additional_context.get("client_order_number", "N/A")
-        order_ctx["client_order_date"] = additional_context.get("client_order_date", "N/A")
+        order_ctx["client_order_number"] = additional_context.get("client_order_number", get_doc_label("not_applicable_short", target_language_code, "N/A"))
+        order_ctx["client_order_date"] = additional_context.get("client_order_date", get_doc_label("not_applicable_short", target_language_code, "N/A"))
 
 
     # VAT and Discount rates often come from additional_context during creation/regeneration
     doc_ctx["vat_rate_percentage"] = float(additional_context.get("vat_rate_percentage", 20.0))
     doc_ctx["discount_rate_percentage"] = float(additional_context.get("discount_rate_percentage", 0.0))
     doc_ctx["current_year"] = str(datetime.now(timezone.utc).year)
-    # Add vat_label based on language
-    if target_language_code == "fr":
-        doc_ctx["vat_label"] = additional_context.get("vat_label", "TVA")
-    elif target_language_code == "en":
-        doc_ctx["vat_label"] = additional_context.get("vat_label", "VAT")
-    else: # Default or other languages
-        doc_ctx["vat_label"] = additional_context.get("vat_label", "Tax")
+    doc_ctx["vat_label"] = additional_context.get("vat_label", get_doc_label("vat", target_language_code, "VAT"))
 
 
     db_conn = None # This will be an SQLite connection
@@ -705,25 +776,30 @@ def get_final_invoice_context_data(
     # Title can be set here or in template. If set here, it can be dynamic.
     # For multilingual, template is better for static titles.
     # We'll set a default that can be overridden by additional_context or template.
-    context["doc"]["invoice_title"] = additional_context.get("invoice_title", "INVOICE")
-    if target_language_code == "fr":
-        context["doc"]["invoice_title"] = additional_context.get("invoice_title", "FACTURE")
+    context["doc"]["invoice_title"] = additional_context.get("invoice_title", get_doc_label("final_invoice_title", target_language_code, "INVOICE"))
 
 
     # --- Document Info (defaults and from additional_context) ---
     doc_ctx = context["doc"]
-    # issue_date and due_date should ideally come from additional_context or be set when the invoice record is created.
-    doc_ctx["issue_date"] = additional_context.get("issue_date", datetime.now(timezone.utc).strftime('%Y-%m-%d'))
-    default_due_date = (datetime.strptime(doc_ctx["issue_date"], '%Y-%m-%d') + timedelta(days=30)).strftime('%Y-%m-%d')
-    doc_ctx["due_date"] = additional_context.get("due_date", default_due_date)
+    locale = QLocale(QLocale.Language[target_language_code.capitalize() if len(target_language_code)==2 else "AnyLanguage"])
 
-    doc_ctx["currency_symbol"] = additional_context.get("currency_symbol", "€")
-    doc_ctx["payment_terms"] = additional_context.get("final_payment_terms",
-        "Payment due within 30 days" if target_language_code == "en" else "Paiement dû sous 30 jours")
+    # issue_date and due_date should ideally come from additional_context or be set when the invoice record is created.
+    issue_date_str = additional_context.get("issue_date", datetime.now(timezone.utc).strftime('%Y-%m-%d'))
+    issue_date_dt = datetime.strptime(issue_date_str, '%Y-%m-%d')
+    doc_ctx["issue_date"] = locale.toString(QDate(issue_date_dt.year, issue_date_dt.month, issue_date_dt.day), QLocale.ShortFormat)
+
+    default_due_date_dt = issue_date_dt + timedelta(days=30)
+    due_date_str = additional_context.get("due_date", default_due_date_dt.strftime('%Y-%m-%d'))
+    due_date_dt = datetime.strptime(due_date_str, '%Y-%m-%d')
+    doc_ctx["due_date"] = locale.toString(QDate(due_date_dt.year, due_date_dt.month, due_date_dt.day), QLocale.ShortFormat)
+
+
+    doc_ctx["currency_symbol"] = CURRENCY_SYMBOLS.get(additional_context.get("currency_code", "EUR").upper(), additional_context.get("currency_code", "EUR"))
+    doc_ctx["payment_terms"] = additional_context.get("final_payment_terms", get_doc_label("final_invoice_payment_terms_default", target_language_code, "Payment due within 30 days."))
     doc_ctx["notes"] = additional_context.get("invoice_notes", "")
 
     # Tax details from additional_context or defaults
-    doc_ctx["tax_label"] = additional_context.get("tax_label", "VAT" if target_language_code == "en" else "TVA")
+    doc_ctx["tax_label"] = additional_context.get("tax_label", get_doc_label("vat", target_language_code, "VAT"))
     doc_ctx["tax_rate_percentage"] = float(additional_context.get("tax_rate_percentage", 20.0)) # Default 20%
     doc_ctx["discount_rate_percentage"] = float(additional_context.get("discount_rate_percentage", 0.0))
 

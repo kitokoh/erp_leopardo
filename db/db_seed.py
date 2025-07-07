@@ -1,6 +1,13 @@
 import os
 import sys
 import sqlite3
+
+# Adjust sys.path to allow finding 'config' module from project root
+# This needs to be at the very top before any project-level imports like 'config'
+PROJECT_ROOT_FOR_SEED = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT_FOR_SEED not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT_FOR_SEED)
+
 import uuid
 import hashlib
 from datetime import datetime
@@ -78,6 +85,11 @@ def _seed_default_partner_categories(cursor: sqlite3.Cursor, conn: sqlite3.Conne
 def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
     logger = logger_passed
 
+    # Ensure the connection uses sqlite3.Row for dictionary-like access to rows
+    if conn and not isinstance(conn.row_factory, sqlite3.Row):
+        conn.row_factory = sqlite3.Row
+        logger.info("Applied sqlite3.Row factory to connection in _original_seed_initial_data_func_placeholder.")
+
     # Import here to avoid circular dependencies if roles_crud uses get_db_connection
     # Alias imports to avoid conflict with the 'logger' variable in this function's scope.
     from db.cruds.roles_crud import add_role as crud_add_role, get_role_by_name as crud_get_role_by_name
@@ -114,52 +126,79 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
             # Depending on policy, might raise an error or try to proceed if other roles are vital.
             # For now, log critical and proceed, other parts of seeding might still be useful.
 
-        # 1. Users - Seed initial Admin User
-        admin_user_id = None # Initialize
-        if admin_role_id: # Only proceed if Admin role exists
-            logger.info(f"Checking for default admin user '{DEFAULT_ADMIN_USERNAME}'...")
-            admin_user_dict = users_crud.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn, logger_passed=logger)
-            temp_admin_password = "admin" # Known default password
+    # 1. Users - Seed initial Admin User (now 'admin' with SUPER_ADMIN role)
+    super_admin_user_id = None # Initialize
+    # Fetch SUPER_ADMIN role_id
+    from auth.roles import SUPER_ADMIN as SUPER_ADMIN_ROLE_NAME # Import the role name
+    super_admin_role_dict = crud_get_role_by_name(SUPER_ADMIN_ROLE_NAME, conn=conn)
+    if not super_admin_role_dict:
+        logger.info(f"Role '{SUPER_ADMIN_ROLE_NAME}' not found, creating it...")
+        super_admin_role_id_new = crud_add_role(SUPER_ADMIN_ROLE_NAME, "Super administrator with all permissions.", conn=conn)
+        if super_admin_role_id_new:
+            super_admin_role_id = super_admin_role_id_new
+            logger.info(f"Role '{SUPER_ADMIN_ROLE_NAME}' created with ID {super_admin_role_id}.")
+        else:
+            logger.error(f"Failed to create role '{SUPER_ADMIN_ROLE_NAME}'. Cannot create super_admin user.")
+            super_admin_role_id = None # Ensure it's None if creation failed
+    else:
+        super_admin_role_id = super_admin_role_dict['role_id']
+        logger.info(f"Role '{SUPER_ADMIN_ROLE_NAME}' found with ID {super_admin_role_id}.")
+
+
+    if super_admin_role_id: # Only proceed if SUPER_ADMIN role exists/was created
+        target_admin_username = "admin" # Explicitly "admin"
+        logger.info(f"Checking for default super admin user '{target_admin_username}'...")
+        admin_user_dict = users_crud.get_user_by_username(target_admin_username, conn=conn, logger_passed=logger)
+        temp_admin_password = "admin" # Explicitly "admin"
 
             if admin_user_dict:
-                admin_user_id = admin_user_dict['user_id']
-                logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' (ID: {admin_user_id}) exists. Forcing password update to default to ensure bcrypt hash.")
-                update_success = users_crud.update_user_password(admin_user_id, temp_admin_password, conn=conn, logger_passed=logger)
+            super_admin_user_id = admin_user_dict['user_id']
+            logger.info(f"Default super admin user '{target_admin_username}' (ID: {super_admin_user_id}) exists.")
+            # Ensure role is SUPER_ADMIN
+            if admin_user_dict.get('role_id') != super_admin_role_id:
+                logger.info(f"User '{target_admin_username}' exists but does not have SUPER_ADMIN role. Updating role...")
+                users_crud.update_user_role(super_admin_user_id, super_admin_role_id, conn=conn, logger_passed=logger)
+            # Force password update to default "admin" to ensure it's current and hash is updated if needed
+            logger.info(f"Forcing password update for '{target_admin_username}' to default to ensure bcrypt hash and correct password.")
+            update_success = users_crud.update_user_password(super_admin_user_id, temp_admin_password, conn=conn, logger_passed=logger)
                 if update_success:
-                    logger.info(f"Password for default admin user '{DEFAULT_ADMIN_USERNAME}' (ID: {admin_user_id}) reset/updated successfully.")
-                    # Re-fetch to log the hash that's now in DB
-                    updated_admin_info = users_crud.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn, logger_passed=logger)
+                logger.info(f"Password for super admin user '{target_admin_username}' (ID: {super_admin_user_id}) reset/updated successfully.")
+                updated_admin_info = users_crud.get_user_by_username(target_admin_username, conn=conn, logger_passed=logger)
                     if updated_admin_info:
-                        logger.info(f"Hash for '{DEFAULT_ADMIN_USERNAME}' in DB after update: {updated_admin_info.get('hashed_password')}")
-                    else:
-                        logger.error(f"Could not re-fetch admin user '{DEFAULT_ADMIN_USERNAME}' after password update.")
+                    logger.info(f"Hash for '{target_admin_username}' in DB after update: {updated_admin_info.get('hashed_password')}")
                 else:
-                    logger.error(f"Failed to update password for default admin user '{DEFAULT_ADMIN_USERNAME}' (ID: {admin_user_id}). This is critical for login.")
+                logger.error(f"Failed to update password for super admin user '{target_admin_username}' (ID: {super_admin_user_id}). This is critical for login.")
             else:
-                logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' not found. Creating with password '{temp_admin_password}'...")
-
+            logger.info(f"Default super admin user '{target_admin_username}' not found. Creating with password '{temp_admin_password}'...")
                 new_admin_id = users_crud.add_user(
-                    username=DEFAULT_ADMIN_USERNAME,
-                    password=temp_admin_password, # crud_add_user logs the hash used
-                    role_id=admin_role_id,
-                    full_name="Default Administrator",
-                    email="admin@example.local",
+                username=target_admin_username,
+                password=temp_admin_password,
+                role_id=super_admin_role_id,
+                full_name="Super Administrator",
+                email="superadmin@example.local", # Changed email for distinction
                     conn=conn,
                     logger_passed=logger
                 )
                 if new_admin_id:
-                    admin_user_id = new_admin_id
-                    logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' created with ID {admin_user_id}. PLEASE CHANGE THE DEFAULT PASSWORD IMMEDIATELY.")
-                    # Re-fetch to log the hash that's now in DB
-                    created_admin_info = users_crud.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn, logger_passed=logger)
+                super_admin_user_id = new_admin_id
+                logger.info(f"Default super admin user '{target_admin_username}' created with ID {super_admin_user_id}. PLEASE CHANGE THE DEFAULT PASSWORD IMMEDIATELY.")
+                created_admin_info = users_crud.get_user_by_username(target_admin_username, conn=conn, logger_passed=logger)
                     if created_admin_info:
-                        logger.info(f"Hash for new admin '{DEFAULT_ADMIN_USERNAME}' in DB: {created_admin_info.get('hashed_password')}")
-                    else:
-                        logger.error(f"Could not re-fetch admin user '{DEFAULT_ADMIN_USERNAME}' after creation.")
+                    logger.info(f"Hash for new super admin '{target_admin_username}' in DB: {created_admin_info.get('hashed_password')}")
                 else:
-                    logger.error(f"Failed to create default admin user '{DEFAULT_ADMIN_USERNAME}'.")
-        else: # admin_role_id was not found/created
-            logger.warning(f"Cannot seed default admin user because Administrator role ID is missing.")
+                logger.error(f"Failed to create default super admin user '{target_admin_username}'.")
+    else:
+        logger.warning(f"Cannot seed default super admin user because SUPER_ADMIN role ID is missing.")
+
+    # Preserve admin_user_id for compatibility with other seeding parts if they expect it.
+    # If super_admin_user_id was set, use it. Otherwise, try to use the old admin_role_id path if it exists.
+    admin_user_id = super_admin_user_id if super_admin_user_id else None
+    if not admin_user_id and admin_role_id: # Fallback for original admin user if super_admin failed but old admin might exist
+        logger.warning("Super admin seeding had issues, checking for original default admin user for compatibility.")
+        original_admin_user_dict = users_crud.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn, logger_passed=logger)
+        if original_admin_user_dict:
+            admin_user_id = original_admin_user_dict['user_id']
+            logger.info(f"Found original default admin user '{DEFAULT_ADMIN_USERNAME}' with ID {admin_user_id} for compatibility.")
 
 
         # 2. Companies (uses admin_user_id if available for created_by or similar in future)
@@ -315,7 +354,19 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
 
         # Seed default hydraulic presses
         # _seed_default_hydraulic_presses(cursor, conn, logger_passed=logger) # Function definition not found
-        
+        try:
+            # Changed to absolute import based on PROJECT_ROOT being in sys.path
+            from db.hidroguc_product_seeder import seed_hidroguc_products
+            logger.info("Attempting to seed HİDROGÜÇ PRES products...")
+            seed_hidroguc_products(conn, cursor, logger_passed=logger)
+            logger.info("HİDROGÜÇ PRES products seeding attempt finished.")
+        except ImportError as e_import_hp:
+            logger.error(f"Could not import seed_hidroguc_products. Error: {e_import_hp}. Skipping HİDROGÜÇ PRES products seeding.", exc_info=True)
+        except Exception as e_hp_seed:
+            logger.error(f"An error occurred during HİDROGÜÇ PRES products seeding: {e_hp_seed}", exc_info=True)
+            # Ne pas laisser une erreur ici arrêter le reste du seeding, sauf si critique.
+            # conn.rollback() # Peut-être pas souhaitable de rollback tout le seeding pour ça.
+
         # 11. SmtpConfigs
         logger.info("Seeding placeholder SMTP config...")
         cursor.execute("SELECT COUNT(*) FROM SmtpConfigs")
@@ -519,7 +570,7 @@ def _seed_default_regions(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logg
     skipped_count = 0
 
     for country_name, region_names in default_regions_data.items():
-        country = regions_crud.get_country_by_name(country_name, conn=conn)
+        country = get_country_by_name(country_name, conn=conn) # Changed from locations_crud.get_country_by_name
         if not country or 'country_id' not in country:
             logger.warning(f"Country '{country_name}' not found for seeding regions. Skipping its regions.")
             skipped_count += len(region_names)
@@ -864,27 +915,129 @@ def _seed_motivational_messages(cursor: sqlite3.Cursor, conn: sqlite3.Connection
 def run_seed():
     logger = logging.getLogger(__name__)
     logger.info(f"Attempting to seed database: {DATABASE_PATH}")
-    conn = None
+    db_conn_object = None # Renamed to avoid confusion with sqlite3.Connection type hint in callees
+    raw_sqlite_conn_for_seeders = None # To hold the raw connection if db_conn_object is a Session
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        seed_initial_data_master(cursor) 
-        conn.commit()
+        db_conn_object = get_db_connection()
+
+        # Check if db_conn_object is a SQLAlchemy Session or a raw sqlite3 connection
+        if hasattr(db_conn_object, 'get_bind'): # Characteristic of SQLAlchemy Session
+            logger.info("Detected SQLAlchemy Session in run_seed. Attempting to get raw connection for seeders.")
+            # For SQLAlchemy, get the underlying DBAPI connection
+            # This can be engine-specific. For sqlite, .raw_connection() on the engine's connect() result works.
+            # If db_conn_object is a Session, db_conn_object.get_bind() is the Engine.
+            engine = db_conn_object.get_bind()
+            raw_sqlite_conn_for_seeders = engine.raw_connection()
+            cursor = raw_sqlite_conn_for_seeders.cursor()
+            logger.info("Using cursor from raw_connection() of SQLAlchemy session's engine.")
+        elif hasattr(db_conn_object, 'cursor'): # Looks like a sqlite3.Connection
+            logger.info("Detected sqlite3.Connection in run_seed.")
+            raw_sqlite_conn_for_seeders = db_conn_object # It's already the raw connection
+            cursor = raw_sqlite_conn_for_seeders.cursor()
+        else:
+            logger.error("Unknown database connection type in run_seed. Cannot get cursor.")
+            raise TypeError("Unsupported database connection object in run_seed.")
+
+        seed_initial_data_master(cursor) # This function and its children expect sqlite3.Cursor
+
+        # Commit logic
+        if hasattr(db_conn_object, 'commit'): # SQLAlchemy Session or sqlite3.Connection
+            db_conn_object.commit()
+            logger.info("Main db_conn_object committed (SQLAlchemy Session or sqlite3.Connection).")
+        elif raw_sqlite_conn_for_seeders and hasattr(raw_sqlite_conn_for_seeders, 'commit'):
+            # This case might be redundant if raw_sqlite_conn_for_seeders is db_conn_object
+            # but useful if only raw_sqlite_conn_for_seeders was obtained and needs commit.
+            raw_sqlite_conn_for_seeders.commit()
+            logger.info("Raw SQLite connection used by seeders was committed.")
+
         logger.info("Seeding process completed and committed.")
+
     except Exception as e:
-        if conn: conn.rollback()
         logger.error(f"Error during seeding process: {e}", exc_info=True)
+        if hasattr(db_conn_object, 'rollback'):
+            db_conn_object.rollback()
+            logger.info("Main db_conn_object rolled back.")
+        elif raw_sqlite_conn_for_seeders and hasattr(raw_sqlite_conn_for_seeders, 'rollback'):
+            raw_sqlite_conn_for_seeders.rollback()
+            logger.info("Raw SQLite connection used by seeders was rolled back.")
+
     finally:
-        if conn: conn.close()
-        logger.info("Database connection closed after seeding attempt.")
+        # Close the raw connection obtained from SQLAlchemy engine if it was created
+        if raw_sqlite_conn_for_seeders and raw_sqlite_conn_for_seeders is not db_conn_object:
+            if hasattr(raw_sqlite_conn_for_seeders, 'close'):
+                raw_sqlite_conn_for_seeders.close()
+                logger.info("Raw SQLite connection obtained for seeders has been closed.")
+
+        # Close the main connection object (Session or sqlite3.Connection)
+        if db_conn_object and hasattr(db_conn_object, 'close'):
+            db_conn_object.close()
+            logger.info("Main database connection object closed after seeding attempt.")
+        elif not hasattr(db_conn_object, 'close') and raw_sqlite_conn_for_seeders is db_conn_object and hasattr(raw_sqlite_conn_for_seeders, 'close'):
+            # This case is if db_conn_object was a raw sqlite3 connection and already closed by raw_sqlite_conn_for_seeders logic
+            pass # Already closed
+        else:
+            logger.info("Main database connection object was not closed (either no close method or already handled).")
+
 
 if __name__ == '__main__':
+    # Adjust sys.path to allow finding 'config' module from project root
+    import sys
+    import os
+    PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # This gets the project root from db/
+    if PROJECT_ROOT not in sys.path:
+        sys.path.insert(0, PROJECT_ROOT)
+
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
     main_logger = logging.getLogger(__name__)
+
+    # Now that sys.path is adjusted, config should be importable.
+    # Load APP_CONFIG and then set it for db.connection
+    # We need to load config here and pass it.
+    try:
+        from config import load_config # Assuming config.py has a load_config() or similar
+        APP_CONFIG = load_config() # Or however your config is loaded
+        # If config is just a dict defined in config.py, then:
+        # import config as app_config_module
+        # APP_CONFIG = {key: getattr(app_config_module, key) for key in dir(app_config_module) if not key.startswith('_')}
+        # For simplicity, let's assume APP_CONFIG can be derived or config.py makes it available directly
+        # Fallback: if load_config() doesn't exist, try importing the dict.
+    except ImportError: # No load_config, try direct import of a dict or module attributes
+        try:
+            import config as app_config_module
+            # Construct a dictionary from the config module's attributes
+            # This is a common pattern if config.py defines variables directly.
+            APP_CONFIG = {
+                "database_path": app_config_module.DATABASE_PATH,
+                "default_admin_username": app_config_module.DEFAULT_ADMIN_USERNAME,
+                # Add any other necessary config variables that init_schema might use
+                # or that are part of the CONFIG dict used in the app.
+                # For init_schema, 'database_path' is critical.
+            }
+            # If your config.py actually defines a dictionary named CONFIG:
+            # from config import CONFIG as APP_CONFIG
+        except ImportError as e_cfg_import:
+            main_logger.critical(f"Failed to import or load configuration: {e_cfg_import}. Seeding cannot proceed without DB path.")
+            sys.exit(1)
+        except AttributeError as e_cfg_attr:
+             main_logger.critical(f"Config module is missing expected attributes (e.g., DATABASE_PATH): {e_cfg_attr}. Seeding cannot proceed.")
+             sys.exit(1)
+
+    # Set the DB_CONFIG in db.connection module
+    # This must be done BEFORE initialize_database is called if get_db_connection is used within it,
+    # or before run_seed() which definitely uses get_db_connection.
+    try:
+        from db import connection as db_connection_module
+        db_connection_module.set_db_config(APP_CONFIG)
+        main_logger.info("db.connection.DB_CONFIG has been set.")
+    except Exception as e_set_conf:
+        main_logger.critical(f"Failed to set DB_CONFIG in db.connection: {e_set_conf}. Seeding may fail.", exc_info=True)
+        # Depending on how critical this is, you might sys.exit(1)
+
     main_logger.info("Ensuring database schema is initialized before seeding...")
     from db.init_schema import initialize_database
     try:
-        initialize_database()
+        # initialize_database now expects app_config
+        initialize_database(APP_CONFIG) # Pass the loaded config
         main_logger.info("Database schema initialization check complete.")
         run_seed()
     except Exception as e_main:

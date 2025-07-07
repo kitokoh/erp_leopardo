@@ -31,8 +31,8 @@ L'architecture détaillée de l'application est décrite dans le document :
 
 L'application s'articule autour des modules fonctionnels principaux suivants (chaque module sera détaillé dans un document spécifique) :
 
-*   **Gestion des Documents**:
-    *   Description : [Module Gestion des Documents](./module_gestion_documents.md)
+*   **Gestion Client**:
+    *   Description : [Module Gestion Client](./module_gestion_clients_v2.md)
 *   **Authentification et Gestion des Utilisateurs**:
     *   Description : [Module Authentification et Gestion des Utilisateurs](./module_auth_utilisateurs.md)
 *   **Gestion des Clients**:

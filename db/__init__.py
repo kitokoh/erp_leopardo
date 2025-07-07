@@ -56,7 +56,11 @@ from .cruds.users_crud import (
     get_user_by_id,
     list_users, # Changed from get_all_users
     update_user_password, # Changed from update_user
+<<<<<<< HEAD
     # verify_password, # Removed as it's not directly in users_crud anymore
+=======
+    # verify_password, # Changed from verify_user_password ### REMOVED - erroneous import
+>>>>>>> 0c69b5aff7a65cb90e062c29962798001ba14f54
     add_user as add_user_crud, # Alias to avoid conflict if main has add_user
 
     verify_user_password, # This is the correct one to use for full verification
@@ -293,7 +297,7 @@ __all__ = [
     "get_user_by_id",
     "list_users", # Changed from get_all_users
     "update_user_password", # Changed from update_user
-    # "verify_password", # Removed, use verify_user_password or utils.verify_password
+    # "verify_password", # Changed from verify_user_password ### REMOVED
     "add_user_crud", # Exporting aliased add_user
     "get_user_by_username", # Exporting get_user_by_username
 
@@ -465,6 +469,11 @@ __all__ = [
     "delete_commande_document_note",
     "list_commande_document_notes_for_commande",
     "get_effective_document_note",
+    # SAV CRUD exports
+    "add_sav_ticket",
+    "get_sav_ticket_by_id",
+    "get_sav_tickets_for_client",
+    "update_sav_ticket",
 ]
 
 from .connection import get_db_connection
@@ -483,4 +492,12 @@ from .cruds.notes_crud import (
     delete_commande_document_note,
     list_commande_document_notes_for_commande,
     get_effective_document_note,
+)
+
+# SAV CRUD functions
+from .cruds.sav_crud import (
+    add_sav_ticket,
+    get_sav_ticket_by_id,
+    get_sav_tickets_for_client,
+    update_sav_ticket
 )

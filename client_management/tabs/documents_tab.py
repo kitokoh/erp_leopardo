@@ -8,19 +8,27 @@ from datetime import datetime
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox,
     QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
-    QInputDialog, QMessageBox, QFileDialog, QApplication, QSizePolicy
+    QInputDialog, QMessageBox, QFileDialog, QApplication, QSizePolicy, QDialog,
+    QMenu
 )
 from PyQt5.QtGui import QIcon, QDesktopServices, QFont
-from PyQt5.QtCore import Qt, QUrl
+from PyQt5.QtCore import Qt, QUrl, QStandardPaths
 
 import db as db_manager
 from db.cruds import client_documents_crud, projects_crud
 
 from excel_editor import ExcelEditor
-from html_editor import HtmlEditor
+from gui.widgets.html_editor import HtmlEditor
 # Other necessary dialogs and modules will be imported as needed, or passed from parent
 
-SUPPORTED_LANGUAGES = ["en", "fr", "ar", "tr", "pt", "ru"]
+SUPPORTED_LANGUAGES = {
+    "en": "English",
+    "fr": "French",
+    "ar": "Arabic",
+    "tr": "Turkish",
+    "pt": "Portuguese",
+    "ru": "Russian"
+}
 
 class DocumentsTab(QWidget):
     def __init__(self, client_info: dict, config: object, app_root_dir: str,
@@ -80,8 +88,9 @@ class DocumentsTab(QWidget):
         self.doc_language_filter_combo = QComboBox()
         self.doc_language_filter_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.doc_language_filter_combo.addItem(self.tr("Toutes"), "ALL")
-        for lang_code in SUPPORTED_LANGUAGES:
-            self.doc_language_filter_combo.addItem(lang_code, lang_code)
+        # Iterate over dictionary items (code, name)
+        for lang_code, lang_name in SUPPORTED_LANGUAGES.items():
+            self.doc_language_filter_combo.addItem(self.tr(lang_name), lang_code) # Display translated name, store code
         self.doc_language_filter_combo.currentIndexChanged.connect(self.populate_doc_table)
         doc_filter_layout.addWidget(self.doc_language_filter_combo)
         doc_filter_layout.addSpacing(10)
@@ -115,54 +124,163 @@ class DocumentsTab(QWidget):
         self.doc_table.setColumnCount(6)
         self.doc_table.setHorizontalHeaderLabels([
             self.tr("Nom Document"), self.tr("Type"), self.tr("Langue"),
-            self.tr("Date Création"), self.tr("Fichier Original"), self.tr("Actions")
+            self.tr("Date Création"), self.tr("Fichier"), self.tr("Actions") # "Fichier Original" -> "Fichier"
         ])
-        header_font = QFont()
-        header_font.setBold(True)
-        self.doc_table.horizontalHeader().setFont(header_font)
-        self.doc_table.horizontalHeader().setStyleSheet(
-            "QHeaderView::section { background-color: #e9ecef; padding: 4px; border: 1px solid #dee2e6; font-weight: bold; }"
-        )
+
+        header_style = """
+            QHeaderView::section {
+                background-color: #4a5568; /* Equivalent de Tailwind bg-gray-700 */
+                color: white;
+                padding: 6px; /* Augmentation du padding */
+                border: 1px solid #ddd;
+                font-weight: bold;
+                font-size: 9pt; /* Taille de police légèrement augmentée */
+            }
+        """
+        self.doc_table.horizontalHeader().setStyleSheet(header_style)
         self.doc_table.verticalHeader().setVisible(False)
         self.doc_table.setAlternatingRowColors(True)
-
-        self.doc_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.doc_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        self.doc_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        self.doc_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        self.doc_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
-        self.doc_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents)
-        self.doc_table.setColumnWidth(4, 150)
-
         self.doc_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.doc_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.doc_table.setSortingEnabled(True) # Activer le tri
+
+        # Modes de redimensionnement des colonnes (ajustés pour une meilleure flexibilité)
+        self.doc_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch) # Nom Document
+        self.doc_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents) # Type
+        self.doc_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents) # Langue
+        self.doc_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents) # Date Création
+        self.doc_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive) # Fichier (Interactive pour que l'utilisateur puisse ajuster)
+        self.doc_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents) # Actions
+        self.doc_table.setColumnWidth(4, 180) # Largeur initiale pour Fichier
+
         docs_layout.addWidget(self.doc_table)
 
-        doc_btn_layout = QHBoxLayout()
-        doc_btn_layout.setSpacing(10)
-        self.add_doc_btn = QPushButton(self.tr("Importer Document"))
-        self.add_doc_btn.setIcon(QIcon(":/icons/file-plus.svg"))
-        self.add_doc_btn.setToolTip(self.tr("Importer un fichier document existant pour ce client"))
-        self.add_doc_btn.setObjectName("primaryButton") # Style as primary
-        self.add_doc_btn.clicked.connect(self.add_document)
-        doc_btn_layout.addWidget(self.add_doc_btn)
+        # Barre d'actions sous le tableau
+        doc_actions_bar = QHBoxLayout()
+        doc_actions_bar.setSpacing(10)
 
-        self.refresh_docs_btn = QPushButton(self.tr("Actualiser"))
-        self.refresh_docs_btn.setIcon(QIcon(":/icons/refresh-cw.svg")) # Use a more common refresh icon
-        self.refresh_docs_btn.clicked.connect(self.populate_doc_table)
-        doc_btn_layout.addWidget(self.refresh_docs_btn)
+        self.main_add_doc_action_btn = QPushButton(QIcon(":/icons/plus-circle.svg"), self.tr("Ajouter/Générer Document"))
+        self.main_add_doc_action_btn.setToolTip(self.tr("Options pour ajouter ou générer un nouveau document"))
+        self.main_add_doc_action_btn.setObjectName("primaryButton")
+        self.main_add_doc_action_btn.clicked.connect(self._open_add_document_menu)
+        doc_actions_bar.addWidget(self.main_add_doc_action_btn)
 
-        self.add_template_btn = QPushButton(self.tr("Générer via Modèle"))
-        self.add_template_btn.setIcon(QIcon(":/icons/file-text.svg")) # Icon for text/template based generation
-        self.add_template_btn.setToolTip(self.tr("Générer un nouveau document pour ce client à partir d'un modèle"))
-        self.add_template_btn.setObjectName("primaryButton")
-        self.add_template_btn.clicked.connect(self.open_create_docs_dialog_from_parent)
-        doc_btn_layout.addWidget(self.add_template_btn)
+        self.compile_pdf_btn_tab = QPushButton(QIcon(":/icons/file-plus.svg"), self.tr("Compiler PDF")) # Icon changed
+        self.compile_pdf_btn_tab.setObjectName("secondaryButton")
+        self.compile_pdf_btn_tab.setToolTip(self.tr("Compiler plusieurs documents PDF en un seul"))
+        self.compile_pdf_btn_tab.clicked.connect(self.open_compile_pdf_dialog_from_parent) # Connects to parent's method
+        doc_actions_bar.addWidget(self.compile_pdf_btn_tab)
 
-        doc_btn_layout.addStretch() # Push buttons to the left
+        doc_actions_bar.addStretch()
+        docs_layout.addLayout(doc_actions_bar)
 
-        docs_layout.addLayout(doc_btn_layout)
         self._load_order_filters()
+
+    def _open_add_document_menu(self):
+        # This method will be implemented in the next step.
+        # It will open a dialog or QMenu with options:
+        # - Ajouter un document simple
+        # - Importer un document existant
+        # - Générer un document via modèle
+
+        if not self.main_add_doc_action_btn: # Should not happen
+            logging.error("main_add_doc_action_btn not initialized.")
+            return
+
+        menu = QMenu(self)
+
+        action_simple = menu.addAction(self.tr("Ajouter un document simple"))
+        action_simple.triggered.connect(self._handle_add_simple_document_action) # Placeholder
+
+        action_import = menu.addAction(self.tr("Importer un document existant"))
+        action_import.triggered.connect(self._handle_import_document_action) # Placeholder, will likely call self.add_document
+
+        action_generate = menu.addAction(self.tr("Générer un document via modèle"))
+        action_generate.triggered.connect(self._handle_generate_via_template_action) # Placeholder, will likely call self.add_document_from_template_action
+
+        # Show the menu below the button
+        button_pos = self.main_add_doc_action_btn.mapToGlobal(self.main_add_doc_action_btn.rect().bottomLeft())
+        menu.exec_(button_pos)
+
+    def _handle_add_simple_document_action(self):
+        logging.info("Action: Ajouter un document simple selected.")
+        # TODO: Implement logic for adding a simple document
+        # This will likely involve a dialog to input document details (name, description).
+        # The document needs to be associated with the current client_id and potentially a commande_id.
+        # For a "simple" document, it might not have a physical file initially, or allow a generic upload.
+
+        client_id = self.client_info.get("client_id")
+        if not client_id:
+            self.notify(self.tr("Erreur"), self.tr("ID Client non trouvé."), type='ERROR')
+            return
+
+        doc_name, ok = QInputDialog.getText(self, self.tr("Nom du Document Simple"), self.tr("Entrez le nom pour le document simple:"))
+        if not ok or not doc_name.strip():
+            self.notify(self.tr("Annulé"), self.tr("Ajout de document simple annulé."), type='INFO')
+            return
+
+        doc_name = doc_name.strip()
+
+        # Optional: Ask for notes/description for this simple document
+        doc_notes, notes_ok = QInputDialog.getMultiLineText(self, self.tr("Notes (Optionnel)"),
+                                                            self.tr("Entrez des notes ou une description pour '{0}':").format(doc_name))
+        if not notes_ok: # User cancelled notes input, but proceed with document name
+            doc_notes = ""
+
+        order_identifier = None
+        current_order_data = self.doc_order_filter_combo.currentData()
+        if current_order_data not in ["ALL", "NONE"] and current_order_data is not None:
+            order_identifier = current_order_data
+
+        # For a "simple" document, file_path_relative and file_name_on_disk might be None or specific placeholders
+        # Language can be set to a default or also asked. For now, let's assume a default or None.
+        # Let's ask for language for consistency
+        available_languages = SUPPORTED_LANGUAGES
+        selected_doc_language, lang_ok = QInputDialog.getItem(
+            self, self.tr("Sélectionner la langue"), self.tr("Langue du document '{0}':").format(doc_name),
+            available_languages, 0, False
+        )
+        if not lang_ok or not selected_doc_language:
+            selected_doc_language = "fr" # Default to French if cancelled or not selected
+            self.notify(self.tr("Langue par Défaut"), self.tr("Langue par défaut 'fr' sera utilisée."), type='INFO')
+
+
+        doc_db_data = {
+            "client_id": client_id,
+            "document_name": doc_name,
+            "file_name_on_disk": None, # No physical file for a "simple" document initially
+            "file_path_relative": None,
+            "document_type_generated": "NOTE", # Or "SIMPLE_DOCUMENT", "TEXT_NOTE"
+            "language_code": selected_doc_language,
+            "source_template_id": None,
+            "order_identifier": order_identifier,
+            "user_id": self.current_user_id,
+            "notes": doc_notes.strip() if doc_notes else None, # Store notes
+            "version_tag": "1.0"
+        }
+
+        try:
+            new_doc_id = client_documents_crud.add_client_document(doc_db_data)
+            if new_doc_id:
+                self.notify(self.tr("Succès"), self.tr("Document simple '{0}' ajouté.").format(doc_name), type='SUCCESS')
+                self.populate_doc_table() # Refresh table
+            else:
+                self.notify(self.tr("Erreur DB"), self.tr("Échec de l'enregistrement du document simple."), type='ERROR')
+        except Exception as e:
+            logging.error(f"Error adding simple document: {e}", exc_info=True)
+            self.notify(self.tr("Erreur Inconnue"), str(e), type='CRITICAL')
+
+
+    def _handle_import_document_action(self):
+        logging.info("Action: Importer un document existant selected.")
+        # This can reuse the existing self.add_document() method which handles file import.
+        self.add_document() # self.add_document already handles file dialog and DB record.
+
+    def _handle_generate_via_template_action(self):
+        logging.info("Action: Générer un document via modèle selected.")
+        # This can reuse the existing self.add_document_from_template_action() method.
+        self.add_document_from_template_action()
+
 
     def _load_order_filters(self):
         self.doc_order_filter_combo.blockSignals(True)
@@ -280,37 +398,42 @@ class DocumentsTab(QWidget):
                         if doc_type == "HTML" and can_manage:
                             edit_btn = QPushButton(QIcon(":/icons/edit-2.svg"), "")
                             edit_btn.setToolTip(self.tr("Modifier HTML"))
+                            edit_btn.setProperty("class", "tableActionButton")
                             edit_btn.clicked.connect(lambda checked, p=full_file_path, d_id=doc_id: self.handle_edit_html_action(p, d_id))
                             actions_layout.addWidget(edit_btn)
                         elif doc_type == "XLSX" and can_manage:
                             edit_btn = QPushButton(QIcon(":/icons/edit-2.svg"), "")
                             edit_btn.setToolTip(self.tr("Modifier Excel"))
+                            edit_btn.setProperty("class", "tableActionButton")
                             edit_btn.clicked.connect(lambda checked, p=full_file_path, d_id=doc_id: self.handle_edit_excel_action(p, d_id))
                             actions_layout.addWidget(edit_btn)
 
                         view_icon_path = ":/icons/eye.svg"
-                        if doc_type == "PDF": view_icon_path = ":/icons/file-text.svg"
+                        if doc_type == "PDF": view_icon_path = ":/icons/file-text.svg" # More specific for PDF
 
                         view_btn = QPushButton(QIcon(view_icon_path), "")
                         view_btn.setToolTip(self.tr("Ouvrir Document"))
+                        view_btn.setProperty("class", "tableActionButton")
                         view_btn.clicked.connect(lambda checked, p=full_file_path, d_id=doc_id: self._handle_view_document_action(p, d_id))
                         actions_layout.addWidget(view_btn)
 
                     if can_manage:
-                        if doc.get("source_template_id"):
-                            version_btn = QPushButton(QIcon(":/icons/copy.svg"), "")
-                            version_btn.setToolTip(self.tr("Créer une nouvelle version"))
+                        if doc.get("source_template_id"): # Only show "New Version" if it's from a template
+                            version_btn = QPushButton(QIcon(":/icons/copy.svg"), "") # Using copy icon for "new version"
+                            version_btn.setToolTip(self.tr("Créer une nouvelle version à partir du même modèle"))
+                            version_btn.setProperty("class", "tableActionButton")
                             version_btn.clicked.connect(lambda checked, old_id=doc_id, t_id=doc.get("source_template_id"): self.handle_create_new_version_clicked(old_id, t_id))
                             actions_layout.addWidget(version_btn)
 
-                        delete_btn = QPushButton(QIcon(":/icons/trash-2.svg"), "")
+                        delete_btn = QPushButton(QIcon(":/icons/trash-2.svg"), "") # Standardized delete icon
                         delete_btn.setToolTip(self.tr("Supprimer Document"))
-                        delete_btn.setObjectName("dangerButton")
+                        delete_btn.setProperty("class", "dangerButtonTable") # Specific style for danger actions in table
                         delete_btn.clicked.connect(lambda checked, d_id=doc_id, p=full_file_path: self.delete_client_document_entry(d_id, p))
                         actions_layout.addWidget(delete_btn)
 
                     actions_layout.addStretch()
                     self.doc_table.setCellWidget(row_idx, 5, actions_widget)
+                self.doc_table.resizeRowsToContents() # Adjust row height for styled buttons
         except Exception as e:
             logging.error(f"Error populating documents table: {e}", exc_info=True)
             QMessageBox.critical(self, self.tr("Erreur Chargement"), self.tr("Impossible de charger les documents: {0}").format(str(e)))
@@ -406,6 +529,26 @@ class DocumentsTab(QWidget):
         else:
             logging.error("DocumentsTab: Parent widget or open_create_docs_dialog method not found.")
             self.notify(self.tr("Erreur"), self.tr("Impossible d'ouvrir le dialogue de création de document."), type='ERROR')
+
+    def add_document_from_template_action(self):
+        if not self.CreateDocumentDialog:
+            self.notify(self.tr("Erreur"), self.tr("Le composant de création de document n'est pas chargé."), type='CRITICAL')
+            return
+
+        current_order_identifier = self.doc_order_filter_combo.currentData()
+        if current_order_identifier == "ALL" or current_order_identifier == "NONE":
+            current_order_identifier = None # Ne pas passer "ALL" ou "NONE" comme identifiant de commande
+
+        dialog = self.CreateDocumentDialog(
+            client_info=self.client_info,
+            config=self.config,
+            current_user_id=self.current_user_id,
+            order_identifier=current_order_identifier, # Passer l'identifiant de commande
+            parent=self
+        )
+        if dialog.exec_() == QDialog.Accepted:
+            self.populate_doc_table()
+            # Notification de succès gérée dans CreateDocumentDialog ou ici si nécessaire
 
     def open_compile_pdf_dialog_from_parent(self):
         if self.parent_widget and hasattr(self.parent_widget, 'open_compile_pdf_dialog'):
@@ -507,10 +650,13 @@ class DocumentsTab(QWidget):
         self.populate_doc_table()
 
     def apply_permissions_to_tab(self, can_manage_documents: bool):
-        if hasattr(self, 'add_doc_btn'):
-            self.add_doc_btn.setEnabled(can_manage_documents)
-        if hasattr(self, 'add_template_btn'):
-            self.add_template_btn.setEnabled(can_manage_documents)
+        if hasattr(self, 'main_add_doc_action_btn'):
+            self.main_add_doc_action_btn.setEnabled(can_manage_documents)
+        # Old buttons self.add_doc_btn and self.add_template_btn are removed,
+        # so no need to manage their state here anymore.
 
         self.can_manage_documents_permission = can_manage_documents
-        self.populate_doc_table() # Refresh table to show/hide row actions based on new permission
+        # Row actions in populate_doc_table already use self.can_manage_documents_permission
+        # Calling populate_doc_table() here is good to refresh row action visibility
+        # if permissions change while the tab is visible.
+        self.populate_doc_table()

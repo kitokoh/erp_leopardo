@@ -3,9 +3,9 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
 
-DATABASE_URL = "sqlite:///./botpress_integration.db"  # Example SQLite URL
+# DATABASE_URL = "sqlite:///./botpress_integration.db"  # Example SQLite URL - Should be managed centrally
 
-Base = declarative_base()
+from db.connection import Base # Use the central Base
 
 class UserBotpressSettings(Base):
     __tablename__ = "user_botpress_settings"
@@ -37,17 +37,20 @@ class UserPrompt(Base):
     def __repr__(self):
         return f"<UserPrompt(prompt_name='{self.prompt_name}')>"
 
-# Engine and session setup (can be moved to a central db management file later)
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False}) # check_same_thread for SQLite
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Engine and session setup should be managed centrally.
+# Remove local engine, SessionLocal, and create_db_and_tables.
 
-def create_db_and_tables():
-    Base.metadata.create_all(bind=engine)
+# def create_db_and_tables():
+#     Base.metadata.create_all(bind=engine) # engine would come from db.connection
 
-if __name__ == "__main__":
+# The __main__ block below was for testing this module's DB setup independently.
+# It should be removed or adapted if specific testing for these models is needed
+# using the central DB connection. For now, removing it to avoid confusion.
+
+# if __name__ == "__main__":
     # This will create the database and tables when models.py is run directly
-    create_db_and_tables()
-    print("Database and tables created (if they didn't exist).")
+    # create_db_and_tables()
+    # print("Database and tables created (if they didn't exist).")
 
     # Example of how to use the models (optional, for testing)
     # from sqlalchemy.orm import Session
@@ -105,80 +108,3 @@ class Message(Base):
 
     def __repr__(self):
         return f"<Message(id={self.id}, sender_type='{self.sender_type}', timestamp='{self.timestamp}')>"
-
-if __name__ == "__main__":
-    # This will create the database and tables when models.py is run directly
-    create_db_and_tables()
-    print("Database and tables created (if they didn't exist).")
-
-    # Example of how to use the models (optional, for testing)
-    from sqlalchemy.orm import Session
-    db: Session = SessionLocal()
-
-    # Clean up existing test data for a fresh run
-    db.query(Message).delete()
-    db.query(Conversation).delete()
-    db.query(UserPrompt).delete()
-    db.query(UserBotpressSettings).delete()
-    db.commit()
-    print("Cleared existing test data.")
-
-    # Create a new setting
-    new_setting = UserBotpressSettings(user_id="user_conv_test", api_key="test_key", bot_id="test_bot", base_url="http://localhost:3000/api/v1")
-    db.add(new_setting)
-    db.commit()
-    db.refresh(new_setting)
-    print(f"Created setting: {new_setting}")
-
-    # Create a new conversation
-    new_conversation = Conversation(
-        botpress_conversation_id="bp_conv_123",
-        channel_type="web",
-        user_identifier_on_channel="visitor_xyz",
-        last_message_timestamp=datetime.utcnow(),
-        status="active"
-    )
-    db.add(new_conversation)
-    db.commit()
-    db.refresh(new_conversation)
-    print(f"Created conversation: {new_conversation}")
-
-    # Add messages to the conversation
-    message1 = Message(
-        conversation_id=new_conversation.id,
-        botpress_message_id="bp_msg_abc",
-        sender_type="user",
-        content="Hello, I need help!",
-        timestamp=datetime.utcnow()
-    )
-    db.add(message1)
-
-    message2 = Message(
-        conversation_id=new_conversation.id,
-        sender_type="bot",
-        content="Hello! How can I assist you today?",
-        timestamp=datetime.utcnow() # Botpress message ID might be null if bot initiated locally
-    )
-    db.add(message2)
-    db.commit()
-    db.refresh(message1)
-    db.refresh(message2)
-    print(f"Added message: {message1}")
-    print(f"Added message: {message2}")
-
-    # Query the conversation and its messages
-    retrieved_conv = db.query(Conversation).filter(Conversation.botpress_conversation_id == "bp_conv_123").first()
-    if retrieved_conv:
-        print(f"\nRetrieved conversation: {retrieved_conv}")
-        print(f"  Status: {retrieved_conv.status}")
-        print(f"  Last message at: {retrieved_conv.last_message_timestamp}")
-        print(f"  Messages ({len(retrieved_conv.messages)}):")
-        for msg in retrieved_conv.messages:
-            print(f"    - [{msg.sender_type} at {msg.timestamp.strftime('%Y-%m-%d %H:%M:%S')}]: {msg.content[:50]}...")
-
-    # Example of querying a message by its Botpress ID
-    retrieved_msg = db.query(Message).filter(Message.botpress_message_id == "bp_msg_abc").first()
-    if retrieved_msg:
-        print(f"\nRetrieved message by Botpress ID 'bp_msg_abc': {retrieved_msg.content}")
-
-    db.close()

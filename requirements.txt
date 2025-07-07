@@ -19,6 +19,9 @@ h11>=0.12.0 # Required by Uvicorn
 # Database & ORM
 SQLAlchemy>=1.4.0
 aiofiles==24.1.0 # For async file operations, often with FastAPI
+psycopg2-binary>=2.9.9 # For PostgreSQL support
+alembic>=1.7.0 # For database migrations
+
 
 # Authentication & Security
 python-jose[cryptography]>=3.3.0
@@ -58,6 +61,7 @@ isort>=5.10.0
 # Optional/Experimental (Review if needed)
 SpeechRecognition==3.14.3 # Voice input, ensure it's truly used or move to optional
 # pywhatkit # For WhatsApp integration, review usage
-PyAudio # Dependency for SpeechRecognition with microphones
+# PyAudio # Dependency for SpeechRecognition with microphones
 Flask>=2.0.0 # For the license request server simulation
 requests>=2.20.0 # For making HTTP requests (e.g., to license server)
+# machineid>=0.5.0 # For generating unique machine identifiers - Caused installation issues

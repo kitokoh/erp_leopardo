@@ -70,7 +70,7 @@ Le module de Gestion des Contacts dans ClientDocManager a pour objectif de fourn
 ## 4. Interactions avec d'Autres Modules
 
 *   **Gestion des Clients**: Les contacts sont souvent des employés ou des représentants des entreprises clientes. Un contact peut être lié à une ou plusieurs fiches clients.
-*   **Gestion des Documents / Facturation**: L'adresse e-mail d'un contact peut être utilisée comme destinataire principal pour l'envoi de devis, factures, etc.
+*   **Gestion Client / Facturation**: L'adresse e-mail d'un contact peut être utilisée comme destinataire principal pour l'envoi de devis, factures, etc., gérés via le module "Gestion Client".
 *   **Gestion des E-mails**: Le module de gestion des contacts fournit les adresses e-mail pour le module d'envoi d'e-mails.
 *   **Authentification et Gestion des Utilisateurs**: Distinguer les "contacts" (externes à l'entreprise) des "utilisateurs" (internes qui utilisent l'application).
 *   **Base de Données**: Toutes les informations des contacts locaux et les données de synchronisation Google sont stockées et gérées via la couche d'accès aux données.

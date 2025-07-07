@@ -28,7 +28,7 @@ L'application ClientDocManager intègre un serveur API backend développé avec 
         *   **`api/assets.py`**: Endpoints pour la gestion des actifs.
         *   **`api/company_expenses_api.py`**: Endpoints pour les dépenses de l'entreprise.
         *   **`api/company_factures_api.py`**: Endpoints pour les factures fournisseurs.
-        *   **`api/documents.py`**: Endpoints pour la gestion des documents.
+        *   **`api/documents.py`**: Endpoints pour la gestion des documents (potentiellement à revoir/intégrer dans une logique "client").
         *   **`api/employee_documents.py`**: Endpoints pour les documents des employés.
         *   **`api/employees.py`**: Endpoints pour la gestion des employés.
         *   **`api/hr_reports.py`**: Endpoints pour les rapports RH.
@@ -118,7 +118,7 @@ Ce qui suit est une liste des principaux fichiers de routeurs identifiés dans l
     *   `GET /supplier-invoices/`: Lister toutes les factures fournisseurs.
     *   `POST /supplier-invoices/`: Enregistrer une nouvelle facture fournisseur.
 
-*   **`api/documents.py`**: Gestion des Documents (génériques ou types non spécifiques)
+*   **`api/documents.py`**: Gestion des Documents (génériques ou types non spécifiques, à évaluer pour intégration dans "Gestion Client")
     *   `GET /documents/`: Lister les documents.
     *   `POST /documents/`: Créer/uploader un nouveau document.
     *   Endpoints pour la recherche, le téléchargement, la mise à jour des métadonnées.

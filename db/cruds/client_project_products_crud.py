@@ -34,14 +34,23 @@ def add_product_to_client_or_project(link_data: dict, conn: sqlite3.Connection =
 
     total_price = qty * float(eff_price) # Ensure eff_price is float for calculation
 
+    # Client-specific override fields
+    client_specific_product_name = link_data.get('client_specific_product_name')
+    line_description = link_data.get('line_description')
+    line_weight = link_data.get('line_weight')
+    line_dimensions_notes = link_data.get('line_dimensions_notes')
+
     sql="""INSERT INTO ClientProjectProducts
              (client_id, project_id, product_id, quantity, unit_price_override,
-              total_price_calculated, serial_number, purchase_confirmed_at, added_at, added_by_user_id)
-             VALUES (?,?,?,?,?,?,?,?,?,?)""" # Added added_by_user_id
+              total_price_calculated, serial_number, purchase_confirmed_at, added_at, added_by_user_id,
+              client_specific_product_name, line_description, line_weight, line_dimensions_notes)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""" # Added 4 placeholders
     params=(client_id, link_data.get('project_id'), product_id, qty, override_price,
             total_price, link_data.get('serial_number'),
             link_data.get('purchase_confirmed_at'), datetime.utcnow().isoformat()+"Z",
-            link_data.get('added_by_user_id')) # Added added_by_user_id
+            link_data.get('added_by_user_id'),
+            client_specific_product_name, line_description, line_weight, line_dimensions_notes)
+
 
     # Enhanced logging for diagnostics
     logger.info(f"Executing SQL for add_product_to_client_or_project: {sql}")
@@ -80,10 +89,20 @@ def update_client_project_product(link_id: int, data: dict, conn: sqlite3.Connec
         logger.warning(f"Effective price for product in link {link_id} is None. Defaulting to 0.0 for total calculation.")
         eff_price = 0.0
 
-    data['total_price_calculated'] = qty * float(eff_price) # Ensure eff_price is float
+    # S'assurer que data contient total_price_calculated s'il y a eu un changement pertinent
+    if 'quantity' in data or 'unit_price_override' in data:
+        data['total_price_calculated'] = qty * float(eff_price)
+    elif 'total_price_calculated' not in data: # Si non fourni et pas de recalcul, utiliser la valeur actuelle
+        data['total_price_calculated'] = current_link.get('total_price_calculated')
 
-    valid_cols = ['quantity','unit_price_override','total_price_calculated','serial_number','purchase_confirmed_at']
-    to_set={k:v for k,v in data.items() if k in valid_cols}
+
+    # Mise à jour des colonnes valides
+    valid_cols = ['quantity', 'unit_price_override', 'total_price_calculated', 'serial_number',
+                  'purchase_confirmed_at',
+                  'client_specific_product_name', 'line_description', 'line_weight', 'line_dimensions_notes']
+
+
+    to_set = {k: v for k, v in data.items() if k in valid_cols}
 
     if not to_set:
         logger.info(f"No valid fields to update for ClientProjectProduct link ID {link_id}.")
@@ -114,12 +133,16 @@ def remove_product_from_client_or_project(link_id: int, conn: sqlite3.Connection
 @_manage_conn
 def get_client_project_product_by_id(link_id: int, conn: sqlite3.Connection = None) -> dict | None:
     cursor = conn.cursor()
+    # Assurez-vous que les nouvelles colonnes sont sélectionnées ici
     sql="""SELECT cpp.*,
                   p.product_name, p.description as product_description, p.category as product_category,
-                  p.base_unit_price, p.unit_of_measure, p.weight, p.dimensions, p.language_code
+                  p.base_unit_price, p.unit_of_measure, p.weight as global_product_weight,
+                  p.dimensions as global_product_dimensions, p.language_code
            FROM ClientProjectProducts cpp
            JOIN Products p ON cpp.product_id = p.product_id
            WHERE cpp.client_project_product_id = ?"""
+    # Note: cpp.* va chercher toutes les colonnes de ClientProjectProducts, y compris les nouvelles.
+    # Les alias global_product_weight et global_product_dimensions sont pour distinguer des line_weight etc.
     try:
         cursor.execute(sql,(link_id,))
         row=cursor.fetchone()
@@ -137,13 +160,17 @@ def get_products_for_client_or_project(client_id: str, project_id: str = None, c
     If project_id is '__NONE__', retrieves products for the client that are NOT linked to any project.
     """
     logging.info(f"cpp_crud.get_products_for_client_or_project: Fetching for client_id='{client_id}', project_id='{project_id}'")
+    # ... (logique existante) ...
     cursor = conn.cursor()
+    # Assurez-vous que les nouvelles colonnes sont sélectionnées ici
     sql = """SELECT cpp.*,
                     p.product_name, p.description as product_description, p.category as product_category,
-                    p.base_unit_price, p.unit_of_measure, p.weight, p.dimensions, p.language_code
+                    p.base_unit_price, p.unit_of_measure, p.weight as global_product_weight,
+                    p.dimensions as global_product_dimensions, p.language_code
              FROM ClientProjectProducts cpp
              JOIN Products p ON cpp.product_id = p.product_id
              WHERE cpp.client_id = ?"""
+    # Note: cpp.* va chercher toutes les colonnes de ClientProjectProducts.
     params = [client_id]
 
     if project_id is not None:
@@ -205,4 +232,34 @@ def get_product_usage_counts(conn: sqlite3.Connection = None) -> list[dict]:
         return results
     except sqlite3.Error as e:
         logger.error(f"DB error in get_product_usage_counts: {e}", exc_info=True)
+        return []
+
+@_manage_conn
+def get_client_purchase_history(client_id: str, conn: sqlite3.Connection = None) -> list[dict]:
+    """
+    Retrieves the purchase history for a given client.
+    A purchase is defined as an entry in ClientProjectProducts with a non-null purchase_confirmed_at.
+    """
+    cursor = conn.cursor()
+    sql = """
+        SELECT
+            cpp.client_project_product_id,
+            p.product_name,
+            cpp.quantity,
+            cpp.serial_number, /* Assuming serial_number is on ClientProjectProducts */
+            cpp.purchase_confirmed_at AS purchase_date,
+            cpp.unit_price_override, /* For context if needed */
+            p.base_unit_price /* For context if needed */
+        FROM ClientProjectProducts cpp
+        JOIN Products p ON cpp.product_id = p.product_id
+        WHERE cpp.client_id = ? AND cpp.purchase_confirmed_at IS NOT NULL
+        ORDER BY cpp.purchase_confirmed_at DESC
+    """
+    try:
+        cursor.execute(sql, (client_id,))
+        history = [dict(row) for row in cursor.fetchall()]
+        logger.info(f"Retrieved {len(history)} purchase history items for client_id {client_id}")
+        return history
+    except sqlite3.Error as e:
+        logger.error(f"DB error in get_client_purchase_history for client ID {client_id}: {e}", exc_info=True)
         return []

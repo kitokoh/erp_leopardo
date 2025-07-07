@@ -3,7 +3,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 from .edit_dialog import ProductEditDialog
 from db.cruds.products_crud import products_crud_instance
-import html_to_pdf_util
+from utils import html_to_pdf_util
 # Import for RBAC
 from auth.permissions import has_permission, P_MANAGE_GLOBAL_PRODUCTS, P_VIEW_GLOBAL_PRODUCTS
 

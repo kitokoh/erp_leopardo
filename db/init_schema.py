@@ -30,17 +30,20 @@ import sys # Ensure sys is imported for path manipulation
 # Import the main SQLAlchemy components from db.connection
 # Note: main_engine will be None here and needs to be initialized by main.py calling db.connection.initialize_engine_and_session
 try:
-    from db.connection import Base as MainBase, engine as main_engine, initialize_engine_and_session
+    # Import Base and initialize_engine_and_session. We will get 'engine' later, after it's initialized.
+    from db.connection import Base as MainBase, initialize_engine_and_session
     # Import specific models that use MainBase and need table creation here
     from calculator.models import CalculationHistory
     # from other_module.models import OtherModelUsingMainBase # Example for future models
+    from db.common_models import Products # Import the Products SQLAlchemy model
     MAIN_SQLALCHEMY_COMPONENTS_LOADED = True
 except ImportError as e_main_sqlalchemy:
-    logging.error(f"db.init_schema: Could not import MainBase or main_engine from db.connection: {e_main_sqlalchemy}. Tables using MainBase (e.g., CalculatorHistory) might not be created by this script.")
+    logging.error(f"db.init_schema: Could not import MainBase or initialize_engine_and_session from db.connection: {e_main_sqlalchemy}. Tables using MainBase (e.g., CalculatorHistory) might not be created by this script.")
     MAIN_SQLALCHEMY_COMPONENTS_LOADED = False
     MainBase = None # Ensure it's None so later checks don't fail with NameError
-    main_engine = None
+    # main_engine = None # No longer importing main_engine directly at the top
 
+from sqlalchemy import Table, Column, Text # Added for reflecting Users table more explicitly
 
 from auth.roles import SUPER_ADMIN
 
@@ -117,6 +120,19 @@ def initialize_database(app_config):
         raise ValueError("app_config with database_path is required for initialize_database.")
 
     database_path = app_config['database_path']
+
+    # --- TEMPORARY: Force delete database for clean schema generation during debugging ---
+    # In a production environment, this should be handled by migrations or conditional logic.
+    if os.path.exists(database_path):
+        try:
+            os.remove(database_path)
+            logging.warning(f"DEBUG_INIT_DB: TEMPORARILY DELETED existing database file for fresh schema: {database_path}")
+        except OSError as e:
+            logging.error(f"DEBUG_INIT_DB: Error deleting database file {database_path}: {e}. Proceeding might use old data or fail.")
+    else:
+        logging.info(f"DEBUG_INIT_DB: Database file {database_path} not found, will create anew.")
+    # --- END TEMPORARY DELETE ---
+
     # Ensure the directory for the database exists
     db_dir = os.path.dirname(database_path)
     if db_dir and not os.path.exists(db_dir):
@@ -138,7 +154,12 @@ def initialize_database(app_config):
     # The `engine` variable here is local to initialize_database scope.
     # The `main_engine` imported from db.connection is the global one.
     # For acc_models.Base.metadata.create_all(bind=engine_acc), a new engine `engine_acc` is created later.
-    # For MainBase.metadata.create_all(bind=main_engine), it uses the globally set main_engine.
+    # For MainBase.metadata.create_all(bind=actual_main_engine), it uses the globally set main_engine.
+
+    # Get the initialized engine from db.connection now that initialize_engine_and_session has been called
+    from db.connection import engine as actual_main_engine
+    logging.info(f"db.init_schema: Imported actual_main_engine from db.connection. Is None: {actual_main_engine is None}")
+
 
     # Use DATABASE_PATH from the passed app_config
     conn = sqlite3.connect(database_path) # Keep for direct cursor use
@@ -798,74 +819,81 @@ def initialize_database(app_config):
     # For now, I will use the TEXT version from ca.py and note this potential issue.
 
     # Create Products table (logic from ca.py to add weight/dimensions if missing)
-    try:
-        cursor.execute("PRAGMA table_info(Products)")
-        columns_info = cursor.fetchall()
-        existing_column_names = {info['name'] for info in columns_info}
-        altered = False
-        if 'weight' not in existing_column_names:
-            cursor.execute("ALTER TABLE Products ADD COLUMN weight REAL")
-            altered = True
-        if 'dimensions' not in existing_column_names:
-            cursor.execute("ALTER TABLE Products ADD COLUMN dimensions TEXT")
-            altered = True
-        if altered:
-            print("Added 'weight' and/or 'dimensions' to Products table.")
-            # No commit here
-    except sqlite3.Error: # Products table might not exist yet
-        pass
+    # This logic is now handled by the SQLAlchemy model definition in db.common_models.py
+    # try:
+    #     cursor.execute("PRAGMA table_info(Products)")
+    #     columns_info = cursor.fetchall()
+    #     existing_column_names = {info['name'] for info in columns_info}
+    #     altered = False
+    #     if 'weight' not in existing_column_names:
+    #         cursor.execute("ALTER TABLE Products ADD COLUMN weight REAL")
+    #         altered = True
+    #     if 'dimensions' not in existing_column_names:
+    #         cursor.execute("ALTER TABLE Products ADD COLUMN dimensions TEXT")
+    #         altered = True
+    #     if altered:
+    #         print("Added 'weight' and/or 'dimensions' to Products table.")
+    #         # No commit here
+    # except sqlite3.Error: # Products table might not exist yet
+    #     pass
 
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS Products (
-        product_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        product_name TEXT NOT NULL,
-        product_code TEXT UNIQUE,
-        description TEXT,
-        category TEXT,
-        language_code TEXT DEFAULT 'fr',
-        base_unit_price REAL NOT NULL,
-        unit_of_measure TEXT,
-        weight REAL,
-        dimensions TEXT,
-        is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        is_deleted INTEGER DEFAULT 0, -- Added for soft delete
-        deleted_at TEXT, -- Added for soft delete
-        created_by_user_id TEXT, -- Added for tracking who created the product
-        FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL, -- Added FK
-        UNIQUE (product_name, language_code)
-    )
-    """)
+    # The Products table is now defined as an SQLAlchemy model in db.common_models.py
+    # and will be created by Base.metadata.create_all().
+    # The raw SQL creation below is no longer needed.
+    # cursor.execute("""
+    # CREATE TABLE IF NOT EXISTS Products (
+    #     product_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    #     product_name TEXT NOT NULL,
+    #     product_code TEXT UNIQUE,
+    #     description TEXT,
+    #     category TEXT,
+    #     language_code TEXT DEFAULT 'fr',
+    #     base_unit_price REAL NOT NULL,
+    #     unit_of_measure TEXT,
+    #     weight REAL,
+    #     dimensions TEXT,
+    #     is_active BOOLEAN DEFAULT TRUE,
+    #     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    #     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    #     is_deleted INTEGER DEFAULT 0, -- Added for soft delete
+    #     deleted_at TEXT, -- Added for soft delete
+    #     created_by_user_id TEXT, -- Added for tracking who created the product
+    #     FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL, -- Added FK
+    #     UNIQUE (product_name, language_code)
+    # )
+    # """)
 
     # Ensure is_deleted, deleted_at, and created_by_user_id columns exist for soft delete in Products table
-    cursor.execute("PRAGMA table_info(Products)")
-    products_columns_info = cursor.fetchall()
-    products_column_names = [info['name'] for info in products_columns_info]
+    # This ALTER TABLE logic is also not needed if SQLAlchemy manages the table from the start.
+    # If migrating an existing DB, this might be needed, but for initial creation, SA model is sufficient.
+    cursor.execute("PRAGMA table_info(Products)") # This can remain to check if SA created it, or be removed.
+    # products_columns_info = cursor.fetchall()
+    # products_column_names = [info['name'] for info in products_columns_info]
 
-    if 'is_deleted' not in products_column_names:
-        try:
-            cursor.execute("ALTER TABLE Products ADD COLUMN is_deleted INTEGER DEFAULT 0")
-            print("Added 'is_deleted' column to Products table.")
-        except sqlite3.Error as e_alter_is_deleted_prod:
-            print(f"Error adding 'is_deleted' column to Products table: {e_alter_is_deleted_prod}")
-
-    if 'deleted_at' not in products_column_names:
-        try:
-            cursor.execute("ALTER TABLE Products ADD COLUMN deleted_at TEXT")
-            print("Added 'deleted_at' column to Products table.")
-        except sqlite3.Error as e_alter_deleted_at_prod:
-            print(f"Error adding 'deleted_at' column to Products table: {e_alter_deleted_at_prod}")
-
-    if 'created_by_user_id' not in products_column_names:
-        try:
-            cursor.execute("ALTER TABLE Products ADD COLUMN created_by_user_id TEXT")
-            # Cannot add FOREIGN KEY constraint with ALTER TABLE in older SQLite versions easily.
-            # The FK in CREATE TABLE is for new DBs. For existing, this adds the column.
-            # App logic or a more complex migration would be needed for full FK on existing tables.
-            print("Added 'created_by_user_id' column to Products table.")
-        except sqlite3.Error as e_alter_created_by_prod:
-            print(f"Error adding 'created_by_user_id' column to Products table: {e_alter_created_by_prod}")
+    # The ALTER TABLE logic below is not needed if SQLAlchemy creates the table from its model definition.
+    # if 'is_deleted' not in products_column_names:
+    #     try:
+    #         cursor.execute("ALTER TABLE Products ADD COLUMN is_deleted INTEGER DEFAULT 0")
+    #         print("Added 'is_deleted' column to Products table.")
+    #     except sqlite3.Error as e_alter_is_deleted_prod:
+    #         print(f"Error adding 'is_deleted' column to Products table: {e_alter_is_deleted_prod}")
+    #
+    # if 'deleted_at' not in products_column_names:
+    #     try:
+    #         cursor.execute("ALTER TABLE Products ADD COLUMN deleted_at TEXT")
+    #         print("Added 'deleted_at' column to Products table.")
+    #     except sqlite3.Error as e_alter_deleted_at_prod:
+    #         print(f"Error adding 'deleted_at' column to Products table: {e_alter_deleted_at_prod}")
+    #
+    # if 'created_by_user_id' not in products_column_names:
+    #     try:
+    #         cursor.execute("ALTER TABLE Products ADD COLUMN created_by_user_id TEXT")
+    #         # Cannot add FOREIGN KEY constraint with ALTER TABLE in older SQLite versions easily.
+    #         # The FK in CREATE TABLE is for new DBs. For existing, this adds the column.
+    #         # App logic or a more complex migration would be needed for full FK on existing tables.
+    #         print("Added 'created_by_user_id' column to Products table.")
+    #     except sqlite3.Error as e_alter_created_by_prod:
+    #         print(f"Error adding 'created_by_user_id' column to Products table: {e_alter_created_by_prod}")
 
     # Create ProductDimensions table (from ca.py)
     cursor.execute("""
@@ -905,54 +933,50 @@ def initialize_database(app_config):
         serial_number TEXT,
         purchase_confirmed_at TIMESTAMP,
         added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        added_by_user_id TEXT, -- Added column
+        added_by_user_id TEXT,
+        client_specific_product_name TEXT,
+        line_description TEXT,
+        line_weight REAL,
+        line_dimensions_notes TEXT,
         FOREIGN KEY (client_id) REFERENCES Clients (client_id) ON DELETE CASCADE,
         FOREIGN KEY (project_id) REFERENCES Projects (project_id) ON DELETE CASCADE,
         FOREIGN KEY (product_id) REFERENCES Products (product_id) ON DELETE CASCADE,
-        FOREIGN KEY (added_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL, -- Added FK
+        FOREIGN KEY (added_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL,
         UNIQUE (client_id, project_id, product_id)
     )
     """)
 
-    # Ensure serial_number, purchase_confirmed_at, and added_by_user_id columns exist in ClientProjectProducts table
+    # Ensure serial_number, purchase_confirmed_at, added_by_user_id, and new columns exist in ClientProjectProducts table
     logging.info("DEBUG_INIT_DB: Verifying/Updating schema for ClientProjectProducts...")
     cursor.execute("PRAGMA table_info(ClientProjectProducts)")
     cpp_columns_info_before_alter = cursor.fetchall()
     cpp_column_names_before_alter = [info['name'] for info in cpp_columns_info_before_alter]
     logging.info(f"DEBUG_INIT_DB: ClientProjectProducts schema BEFORE alter: {cpp_column_names_before_alter}")
 
-    if 'serial_number' not in cpp_column_names_before_alter:
-        try:
-            logging.info("DEBUG_INIT_DB: 'serial_number' column missing in ClientProjectProducts. Attempting to add...")
-            cursor.execute("ALTER TABLE ClientProjectProducts ADD COLUMN serial_number TEXT")
-            logging.info("DEBUG_INIT_DB: Successfully ADDED 'serial_number' column to ClientProjectProducts.")
-        except sqlite3.Error as e_alter_cpp_sn:
-            logging.error(f"DEBUG_INIT_DB: FAILED to add 'serial_number' column to ClientProjectProducts: {e_alter_cpp_sn}")
-    else:
-        logging.info("DEBUG_INIT_DB: 'serial_number' column already exists in ClientProjectProducts.")
+    # Columns to check and add
+    columns_to_ensure = {
+        "client_specific_product_name": "TEXT",
+        "line_description": "TEXT",
+        "line_weight": "REAL",
+        "line_dimensions_notes": "TEXT",
+        "serial_number": "TEXT", # Existing check
+        "purchase_confirmed_at": "TIMESTAMP", # Existing check
+        "added_by_user_id": "TEXT REFERENCES Users(user_id) ON DELETE SET NULL" # Existing check
+    }
 
-    if 'purchase_confirmed_at' not in cpp_column_names_before_alter:
-        try:
-            logging.info("DEBUG_INIT_DB: 'purchase_confirmed_at' column missing in ClientProjectProducts. Attempting to add...")
-            cursor.execute("ALTER TABLE ClientProjectProducts ADD COLUMN purchase_confirmed_at TIMESTAMP")
-            logging.info("DEBUG_INIT_DB: Successfully ADDED 'purchase_confirmed_at' column to ClientProjectProducts.")
-        except sqlite3.Error as e_alter_cpp_pca:
-            logging.error(f"DEBUG_INIT_DB: FAILED to add 'purchase_confirmed_at' column to ClientProjectProducts: {e_alter_cpp_pca}")
-    else:
-        logging.info("DEBUG_INIT_DB: 'purchase_confirmed_at' column already exists in ClientProjectProducts.")
+    for col_name, col_type in columns_to_ensure.items():
+        if col_name not in cpp_column_names_before_alter:
+            try:
+                logging.info(f"DEBUG_INIT_DB: '{col_name}' column missing in ClientProjectProducts. Attempting to add...")
+                cursor.execute(f"ALTER TABLE ClientProjectProducts ADD COLUMN {col_name} {col_type}")
+                logging.info(f"DEBUG_INIT_DB: Successfully ADDED '{col_name}' column to ClientProjectProducts.")
+            except sqlite3.Error as e_alter_cpp:
+                logging.error(f"DEBUG_INIT_DB: FAILED to add '{col_name}' column to ClientProjectProducts: {e_alter_cpp}")
+        else:
+            logging.info(f"DEBUG_INIT_DB: '{col_name}' column already exists in ClientProjectProducts.")
 
-    if 'added_by_user_id' not in cpp_column_names_before_alter:
-        try:
-            logging.info("DEBUG_INIT_DB: 'added_by_user_id' column missing in ClientProjectProducts. Attempting to add...")
-            # Note: SQLite versions before 3.20.0 might not support ADD COLUMN with FOREIGN KEY constraint directly.
-            # The REFERENCES clause here might be ignored by older SQLite versions silently during ALTER TABLE.
-            # The FK constraint in CREATE TABLE IF NOT EXISTS is the primary definition for new databases.
-            cursor.execute("ALTER TABLE ClientProjectProducts ADD COLUMN added_by_user_id TEXT REFERENCES Users(user_id) ON DELETE SET NULL")
-            logging.info("DEBUG_INIT_DB: Successfully ADDED 'added_by_user_id' column to ClientProjectProducts.")
-        except sqlite3.Error as e_alter_cpp_creator:
-            logging.error(f"DEBUG_INIT_DB: FAILED to add 'added_by_user_id' column to ClientProjectProducts: {e_alter_cpp_creator}")
-    else:
-        logging.info("DEBUG_INIT_DB: 'added_by_user_id' column already exists in ClientProjectProducts.")
+    # Original checks for serial_number, purchase_confirmed_at, added_by_user_id were redundant
+    # and have been removed as the loop columns_to_ensure handles them.
 
     # Log schema AFTER all attempts
     cursor.execute("PRAGMA table_info(ClientProjectProducts)")
@@ -1238,15 +1262,16 @@ CREATE TABLE IF NOT EXISTS Templates (
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         created_by_user_id TEXT,
+        deleted_at TEXT, -- Added for soft delete
         FOREIGN KEY (client_id) REFERENCES Clients (client_id) ON DELETE CASCADE,
         FOREIGN KEY (project_id) REFERENCES Projects (project_id) ON DELETE SET NULL,
         FOREIGN KEY (status_commande_id) REFERENCES StatusSettings (status_id),
         FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL
     )
     """)
-    print("DEBUG_INIT_DB: Table Commandes created or exists.")
+    print("DEBUG_INIT_DB: Table Commandes created or exists (with deleted_at).")
 
-    # Ensure notes and is_default columns exist in Commandes table for existing databases
+    # Ensure notes, is_default, and deleted_at columns exist in Commandes table for existing databases
     cursor.execute("PRAGMA table_info(Commandes)")
     commandes_columns_info = cursor.fetchall()
     commandes_column_names = [info['name'] for info in commandes_columns_info]
@@ -1264,6 +1289,13 @@ CREATE TABLE IF NOT EXISTS Templates (
             print("DEBUG_INIT_DB: Added 'is_default' column to Commandes table.")
         except sqlite3.Error as e_alter_commandes_is_default:
             print(f"DEBUG_INIT_DB: Error adding 'is_default' column to Commandes table: {e_alter_commandes_is_default}")
+
+    if 'deleted_at' not in commandes_column_names:
+        try:
+            cursor.execute("ALTER TABLE Commandes ADD COLUMN deleted_at TEXT")
+            print("DEBUG_INIT_DB: Added 'deleted_at' column to Commandes table.")
+        except sqlite3.Error as e_alter_commandes_deleted_at:
+            print(f"DEBUG_INIT_DB: Error adding 'deleted_at' column to Commandes table: {e_alter_commandes_deleted_at}")
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS CommandeItems (
@@ -2145,6 +2177,10 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_company_name ON Clients(company_name)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_category ON Clients(category)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_created_by_user_id ON Clients(created_by_user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_client_name ON Clients(client_name)") # Added
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_is_deleted ON Clients(is_deleted)") # Added
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_created_at ON Clients(created_at)") # Added
+
 
     # ReportConfigurations Indexes
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_reportconfigurations_report_name ON ReportConfigurations(report_name)")
@@ -2190,6 +2226,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_invoices_document_id ON Invoices(document_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_invoices_payment_status ON Invoices(payment_status)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_invoices_invoice_number ON Invoices(invoice_number)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_invoices_issue_date ON Invoices(issue_date)") # Added
     # TeamMembers
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_teammembers_user_id ON TeamMembers(user_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_teammembers_is_active ON TeamMembers(is_active)")
@@ -2199,13 +2236,14 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     # ClientContacts
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientcontacts_contact_id ON ClientContacts(contact_id)")
     # Products
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_products_category ON Products(category)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_products_is_active ON Products(is_active)")
+    # cursor.execute("CREATE INDEX IF NOT EXISTS idx_products_category ON Products(category)") # Moved to model
+    # cursor.execute("CREATE INDEX IF NOT EXISTS idx_products_is_active ON Products(is_active)") # Moved to model
     # ProductEquivalencies
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_productequivalencies_product_id_b ON ProductEquivalencies(product_id_b)")
     # ClientProjectProducts
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientprojectproducts_product_id ON ClientProjectProducts(product_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientprojectproducts_client_project ON ClientProjectProducts(client_id, project_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_cpp_purchase_confirmed_at ON ClientProjectProducts(purchase_confirmed_at)") # Added
     # ActivityLog
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_activitylog_user_id ON ActivityLog(user_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_activitylog_created_at ON ActivityLog(created_at)")
@@ -2221,6 +2259,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_savtickets_client_id ON SAVTickets(client_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_savtickets_status_id ON SAVTickets(status_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_savtickets_assigned_technician_id ON SAVTickets(assigned_technician_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_savtickets_opened_at ON SAVTickets(opened_at)") # Added
     # ImportantDates
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_importantdates_date_value ON ImportantDates(date_value)")
     # Transporters
@@ -2588,6 +2627,174 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     print("DEBUG_INIT_DB: Indexes for Licenses table created or exists.")
     # --- End License Management Table ---
 
+    # --- User Profile Management Tables (Business Profile, Menu Config, etc.) ---
+    print("DEBUG_INIT_DB: Creating User Profile Management Tables...")
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Sectors (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        type_association TEXT CHECK(type_association IN ('B2B', 'B2C', 'BOTH')) NOT NULL
+    )
+    """)
+    print("DEBUG_INIT_DB: Table Sectors created or exists.")
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS UseCases (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        description TEXT
+    )
+    """)
+    print("DEBUG_INIT_DB: Table UseCases created or exists.")
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS DocumentTypes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        description TEXT
+    )
+    """)
+    print("DEBUG_INIT_DB: Table DocumentTypes created or exists.")
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS BusinessProfile (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL, -- Corresponds to Users.user_id (TEXT)
+        name TEXT,
+        business_type TEXT CHECK(business_type IN ('B2B', 'B2C')),
+        sector_id INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE,
+        FOREIGN KEY (sector_id) REFERENCES Sectors(id) ON DELETE SET NULL
+    )
+    """)
+    print("DEBUG_INIT_DB: Table BusinessProfile created or exists.")
+
+    # Trigger to update 'updated_at' timestamp on BusinessProfile update
+    cursor.execute("""
+    CREATE TRIGGER IF NOT EXISTS update_business_profile_updated_at
+    AFTER UPDATE ON BusinessProfile
+    FOR EACH ROW
+    BEGIN
+        UPDATE BusinessProfile
+        SET updated_at = CURRENT_TIMESTAMP
+        WHERE id = OLD.id;
+    END;
+    """)
+    print("DEBUG_INIT_DB: Trigger update_business_profile_updated_at created or exists.")
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS BusinessUseCases (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_profile_id INTEGER NOT NULL,
+        use_case_id INTEGER NOT NULL,
+        FOREIGN KEY (business_profile_id) REFERENCES BusinessProfile(id) ON DELETE CASCADE,
+        FOREIGN KEY (use_case_id) REFERENCES UseCases(id) ON DELETE CASCADE,
+        UNIQUE(business_profile_id, use_case_id)
+    )
+    """)
+    print("DEBUG_INIT_DB: Table BusinessUseCases created or exists.")
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS BusinessSelectedDocuments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_profile_id INTEGER NOT NULL,
+        document_type_id INTEGER NOT NULL,
+        FOREIGN KEY (business_profile_id) REFERENCES BusinessProfile(id) ON DELETE CASCADE,
+        FOREIGN KEY (document_type_id) REFERENCES DocumentTypes(id) ON DELETE CASCADE,
+        UNIQUE(business_profile_id, document_type_id)
+    )
+    """)
+    print("DEBUG_INIT_DB: Table BusinessSelectedDocuments created or exists.")
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS MenuConfiguration (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL, -- Corresponds to Users.user_id (TEXT)
+        item_name TEXT NOT NULL,
+        item_order INTEGER NOT NULL,
+        is_visible BOOLEAN DEFAULT TRUE,
+        module_identifier TEXT,
+        parent_id INTEGER,
+        FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE,
+        FOREIGN KEY (parent_id) REFERENCES MenuConfiguration(id) ON DELETE CASCADE
+    )
+    """)
+    print("DEBUG_INIT_DB: Table MenuConfiguration created or exists.")
+
+    # --- User Profile Management Indexes ---
+    print("DEBUG_INIT_DB: Creating User Profile Management Indexes...")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessprofile_user_id ON BusinessProfile(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessprofile_sector_id ON BusinessProfile(sector_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessusecases_profile_id ON BusinessUseCases(business_profile_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessusecases_case_id ON BusinessUseCases(use_case_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessselecteddocs_profile_id ON BusinessSelectedDocuments(business_profile_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_businessselecteddocs_doc_id ON BusinessSelectedDocuments(document_type_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_menuconfiguration_user_id ON MenuConfiguration(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_menuconfiguration_parent_id ON MenuConfiguration(parent_id)")
+    print("DEBUG_INIT_DB: User Profile Management Indexes created or exist.")
+    # --- End User Profile Management Indexes ---
+    # --- End User Profile Management Tables (Initial Set) ---
+    # --- User Session Tokens Table (for Secure Remember Me) ---
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS UserSessionTokens (
+        token_id TEXT PRIMARY KEY, -- UUID for the record itself
+        user_id TEXT NOT NULL,
+        token_hash TEXT NOT NULL UNIQUE, -- Hash of the actual token stored on client
+        device_identifier TEXT, -- Optional, for scoping token to a device
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_used_at TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
+    )
+    """)
+    print("DEBUG_INIT_DB: Table UserSessionTokens created or exists.")
+
+    # Indexes for UserSessionTokens Table
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usersessiontokens_user_id ON UserSessionTokens(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usersessiontokens_token_hash ON UserSessionTokens(token_hash)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usersessiontokens_expires_at ON UserSessionTokens(expires_at)")
+    print("DEBUG_INIT_DB: Indexes for UserSessionTokens table created or exists.")
+    # --- End User Session Tokens Table ---
+
+    # --- Password Reset Tokens Table ---
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS PasswordResetTokens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        token_hash TEXT NOT NULL UNIQUE, -- Hash of the actual reset token
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        used_at TIMESTAMP, -- Timestamp when the token was used
+        FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
+    )
+    """)
+    print("DEBUG_INIT_DB: Table PasswordResetTokens created or exists.")
+
+    # Indexes for PasswordResetTokens Table
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_passwordresettokens_user_id ON PasswordResetTokens(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_passwordresettokens_token_hash ON PasswordResetTokens(token_hash)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_passwordresettokens_expires_at ON PasswordResetTokens(expires_at)")
+    print("DEBUG_INIT_DB: Indexes for PasswordResetTokens table created or exists.")
+    # --- End Password Reset Tokens Table ---
+
+    # --- UseCases Table (for MyBusinessWidget) ---
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS UseCases (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    print("DEBUG_INIT_DB: Table UseCases created or exists.")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usecases_name ON UseCases(name)")
+    print("DEBUG_INIT_DB: Index for UseCases table created or exists.")
+    # --- End UseCases Table ---
+
+
     # Commit schema changes made via raw SQLite connection before proceeding to SQLAlchemy part
     try:
         logging.info("DEBUG_INIT_DB: Committing main schema/index changes before accounting module DDL.")
@@ -2613,15 +2820,14 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         # If truly needing separate schema for other DBs, that's a DB-level command.
 
         # Use the SQLAlchemy engine for table creation
-    # Ensure main_engine (from db.connection) is used here, as it's initialized with app_config
-    if MAIN_SQLALCHEMY_COMPONENTS_LOADED and main_engine:
-        acc_models.Base.metadata.create_all(bind=main_engine, checkfirst=True)
-    elif not MAIN_SQLALCHEMY_COMPONENTS_LOADED:
-        logger.error("Skipping acc_models.Base.metadata.create_all because MAIN_SQLALCHEMY_COMPONENTS_LOADED is false.")
-    elif not main_engine:
-        logger.error("Skipping acc_models.Base.metadata.create_all because main_engine is None (not initialized).")
-
-
+        # Ensure actual_main_engine (from db.connection, fetched after initialization) is used here.
+        if MAIN_SQLALCHEMY_COMPONENTS_LOADED and actual_main_engine:
+            acc_models.Base.metadata.create_all(bind=actual_main_engine, checkfirst=True)
+            print("DEBUG_INIT_DB: Accounting Module Tables creation attempted using SQLAlchemy engine (with actual_main_engine).")
+        elif not MAIN_SQLALCHEMY_COMPONENTS_LOADED:
+            logging.error("Skipping acc_models.Base.metadata.create_all because MAIN_SQLALCHEMY_COMPONENTS_LOADED is false.")
+        elif not actual_main_engine:
+            logging.error("Skipping acc_models.Base.metadata.create_all because actual_main_engine is None (not initialized).")
 
         # print("DEBUG_INIT_DB: Table acc_fiscal_years created or exists.")
         # print("DEBUG_INIT_DB: Table acc_currencies created or exists.")
@@ -2630,8 +2836,6 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         # print("DEBUG_INIT_DB: Table acc_journal_entries created or exists.")
         # print("DEBUG_INIT_DB: Table acc_journal_items created or exists.")
         # print("DEBUG_INIT_DB: Table acc_financial_statements created or exists.")
-
-        print("DEBUG_INIT_DB: Accounting Module Tables creation attempted using SQLAlchemy engine.")
 
         # --- Indexes for Accounting Module (still use raw conn and cursor for these IF NOT managed by SQLAlchemy models) ---
         # If indexes are part of SQLAlchemy model definitions (e.g., index=True on Column),
@@ -2668,13 +2872,12 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fin_stmt_fy_id ON acc_financial_statements(fiscal_year_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_acc_fin_stmt_period_end ON acc_financial_statements(period_end_date)")
         print("DEBUG_INIT_DB: Accounting Module Indexes creation attempted.")
-        conn.commit() # Commit schema changes including manual indexes for accounting
-        print("DEBUG_INIT_DB: Accounting Module Indexes creation attempted and committed.")
-
+        # Removed conn.commit() here as it should be part of the larger transaction managed by the try block
+        # print("DEBUG_INIT_DB: Accounting Module Indexes creation attempted and committed.") # Commented out as commit is deferred
 
     except Exception as e_acc_schema:
         print(f"CRITICAL ERROR during Accounting module schema/index creation: {e_acc_schema}")
-        conn.rollback() # Rollback if using raw conn for anything in this block
+        # conn.rollback() # Rollback should be handled by the main try-except-finally for the whole function
     # --- End Accounting Module Tables and Indexes (This section will be moved and handled with a new connection) ---
 
     # Commit and close the main raw connection used for most schema setup up to this point
@@ -2700,9 +2903,20 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         # Use app_config for the database path
         engine_acc = create_engine(f"sqlite:///{app_config['database_path']}")
 
+        # This call is likely redundant if accounting models use the same Base as MainBase
+        # and are imported before MainBase.metadata.create_all().
+        # The original error occurred here, implying acc_models.Base was trying to create
+        # restaurant_lignes_commande which depends on Products, and Products wasn't found.
+        # By defining Products as an SQLAlchemy model and ensuring all models are known to MainBase,
+        # the single MainBase.metadata.create_all() later should suffice.
+        # acc_models.Base.metadata.create_all(bind=engine_acc, checkfirst=True)
+        # print("DEBUG_INIT_DB: Accounting Module Tables creation attempt using SQLAlchemy engine (engine_acc) was here (now commented out).")
+        # The tables for accounting models (sharing MainBase) should be created by the call
+        # MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True)
+        # provided `accounting.models` is imported before that.
+        # The import `from accounting import models as acc_models` is indeed present earlier.
 
-        acc_models.Base.metadata.create_all(bind=engine_acc, checkfirst=True)
-        print("DEBUG_INIT_DB: Accounting Module Tables creation attempted using SQLAlchemy engine.")
+        print("DEBUG_INIT_DB: Accounting Module Tables should be created by an earlier or later MainBase.metadata.create_all call.")
 
         # Seed Accounting Data
         with Session(engine_acc) as session_acc:
@@ -2839,18 +3053,101 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         print("DEBUG_INIT_DB: Raw SQLite connection for Calendar module closed.")
     # --- End Calendar Module Tables ---
 
-    # --- Create tables for MainBase (e.g., CalculatorHistory) ---
-    # This needs to happen after the main 'conn' is closed if 'main_engine' uses a new connection.
-    if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None and main_engine is not None:
+    # --- Create tables for MainBase (e.g., CalculatorHistory, Products, Accounting tables) ---
+    # This needs to happen after the main 'conn' is closed if 'actual_main_engine' uses a new connection.
+    # The 'Users' table (created by raw SQL) needs to be known to MainBase.metadata for FKs.
+    if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None and actual_main_engine is not None:
+        logging.info("DEBUG_INIT_DB: Preparing to call MainBase.metadata.create_all().")
         try:
-            logging.info("DEBUG_INIT_DB: Creating tables for MainBase (e.g., CalculatorHistory) using SQLAlchemy main_engine.")
-            MainBase.metadata.create_all(bind=main_engine, checkfirst=True)
+            # Explicitly reflect the 'Users' table if it's created by raw SQL and other SQLAlchemy models depend on it.
+            # This makes SQLAlchemy's metadata aware of the 'Users' table structure.
+            # Ensure this happens after 'Users' table is created and committed by raw SQL,
+            # and actual_main_engine is initialized.
+            logging.info("DEBUG_INIT_DB: Attempting to reflect 'Users' table into MainBase.metadata.")
+            # We define the primary key column and type explicitly for robust reflection.
+            # Other columns will be autoloaded.
+            users_table_for_reflection = Table('Users', MainBase.metadata,
+                                               Column('user_id', Text, primary_key=True),
+                                               autoload_with=actual_main_engine,
+                                               extend_existing=True) # Important if other parts of code might also define 'Users'
+            logging.info(f"DEBUG_INIT_DB: 'Users' table reflected. Columns: {users_table_for_reflection.columns.keys()}")
+        except Exception as e_reflect_users:
+            logging.error(f"DEBUG_INIT_DB: Error reflecting 'Users' table: {e_reflect_users}. Proceeding with create_all, but FK issues might persist.", exc_info=True)
+
+        try:
+            # Import B2C restaurant models to register them with MainBase before create_all
+            # This ensures that if b2c.ges_restaurant.models uses the same MainBase, its tables are included.
+            import b2c.ges_restaurant.models # This registers restaurant models with MainBase
+            logging.info("DEBUG_INIT_DB: Imported b2c.ges_restaurant.models for schema creation with MainBase.")
+            # Also ensure accounting models are imported if they share MainBase
+            import accounting.models # This registers accounting models with MainBase
+            logging.info("DEBUG_INIT_DB: Imported accounting.models for schema creation with MainBase.")
+        except ImportError as e_import_models_for_mainbase:
+            logging.error(f"DEBUG_INIT_DB: Failed to import additional models (b2c or accounting) for MainBase: {e_import_models_for_mainbase}")
+        except Exception as e_generic_import_for_mainbase:
+            logging.error(f"DEBUG_INIT_DB: An unexpected error occurred during import of additional models for MainBase: {e_generic_import_for_mainbase}", exc_info=True)
+
+        try:
+            logging.info("DEBUG_INIT_DB: Creating tables for MainBase (e.g., CalculatorHistory, Products, Accounting, Restaurant*) using SQLAlchemy actual_main_engine.")
+            MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True)
             logging.info("DEBUG_INIT_DB: Tables for MainBase created successfully.")
+
+            # Diagnostic: Check Products table schema right after creation by SQLAlchemy
+            try:
+                logging.info("DEBUG_INIT_DB: Checking 'Products' table schema immediately after MainBase.metadata.create_all()...")
+                # Use the existing raw cursor 'cursor' which is still associated with 'conn'
+                # Ensure 'conn' is still open and valid here.
+                # Based on code flow, 'conn' is closed much later in the finally block of initialize_database.
+                products_pragma_cursor = conn.cursor() # Create a new cursor instance from conn
+                products_pragma_cursor.execute("PRAGMA table_info(Products)")
+                products_columns_info = products_pragma_cursor.fetchall()
+                if products_columns_info:
+                    col_details = []
+                    for col in products_columns_info:
+                        # col is a sqlite3.Row object if conn.row_factory was set, or tuple
+                        # Assuming conn.row_factory = sqlite3.Row is active on 'conn'
+                        col_details.append(f"Name: {col['name']}, Type: {col['type']}, PK: {col['pk']}")
+                    logging.info(f"DEBUG_INIT_DB: 'Products' table schema: {', '.join(col_details)}")
+                else:
+                    logging.warning("DEBUG_INIT_DB: 'Products' table not found or no schema info via PRAGMA after create_all.")
+                products_pragma_cursor.close() # Close the temporary cursor
+            except Exception as e_pragma_check:
+                logging.error(f"DEBUG_INIT_DB: Error checking 'Products' table schema with PRAGMA: {e_pragma_check}", exc_info=True)
+
         except Exception as e_main_base_create:
+            # This is where the original "NoReferencedTableError" for Products.created_by_user_id occurred.
             logging.error(f"DEBUG_INIT_DB: Error creating tables for MainBase: {e_main_base_create}", exc_info=True)
-            # Decide if this is critical enough to rollback or raise. For now, logging error.
+
+        # --- Manual check and addition for Products.product_code ---
+        # This is a short-term fix. Alembic should be used for migrations.
+        try:
+            logging.info("DEBUG_INIT_DB: Checking for 'product_code' column in 'Products' table...")
+            cursor.execute("PRAGMA table_info(Products)")
+            products_columns_info = cursor.fetchall()
+            products_column_names = [info['name'] for info in products_columns_info]
+
+            if 'product_code' not in products_column_names:
+                logging.warning("DEBUG_INIT_DB: 'product_code' column NOT FOUND in 'Products' table. Attempting to add it.")
+                try:
+                    cursor.execute("ALTER TABLE Products ADD COLUMN product_code TEXT")
+                    # The SQLAlchemy model defines unique=True, nullable=True.
+                    # The UNIQUE constraint would ideally be added too, but ALTER TABLE for constraints is limited in SQLite.
+                    # For new inserts, SQLAlchemy will respect the model's uniqueness.
+                    # For existing data, this just adds the column.
+                    conn.commit() # Commit this change immediately
+                    logging.info("DEBUG_INIT_DB: Successfully ADDED 'product_code' column to 'Products' table.")
+                except sqlite3.Error as e_alter_products:
+                    logging.error(f"DEBUG_INIT_DB: FAILED to add 'product_code' column to 'Products' table: {e_alter_products}", exc_info=True)
+                    conn.rollback() # Rollback if alter fails
+            else:
+                logging.info("DEBUG_INIT_DB: 'product_code' column already exists in 'Products' table.")
+        except sqlite3.Error as e_check_products:
+            # This might happen if Products table itself doesn't exist, though create_all should have handled it.
+            logging.error(f"DEBUG_INIT_DB: Error checking 'Products' table schema for 'product_code': {e_check_products}", exc_info=True)
+        # --- End manual check for Products.product_code ---
+
     else:
-        logging.warning("DEBUG_INIT_DB: Main SQLAlchemy components (MainBase, main_engine) not loaded. Skipping MainBase.metadata.create_all().")
+        logging.warning("DEBUG_INIT_DB: Main SQLAlchemy components (MainBase, actual_main_engine) not loaded or actual_main_engine is None. Skipping MainBase.metadata.create_all().")
 
 
     # --- Seed Data (from db/schema.py, ensuring use of db_config) ---
@@ -2945,6 +3242,54 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         print(f"DEBUG_INIT_DB: Total of {seeded_other_role_permissions_count} role-permission links added/verified for non-Admin roles from PERMISSION_MAP.")
         # --- End Seed Permissions and RolePermissions ---
 
+        # --- Seed Data for User Profile Management ---
+        print("DEBUG_INIT_DB: Seeding User Profile Management Data (Sectors, UseCases, DocumentTypes)...")
+        # Seed DocumentTypes
+        document_types_seed = [
+            ('Facture', 'Document de facturation standard'),
+            ('Devis', 'Proposition commerciale détaillée'),
+            ('Bon de Commande', 'Document officiel d\'achat par un client'),
+            ('Reçu', 'Preuve de paiement'),
+            ('Bon de Livraison', 'Document attestant la livraison de marchandises'),
+            ('Avoir', 'Note de crédit'),
+            ('Facture Proforma', 'Facture préliminaire sans valeur comptable')
+        ]
+        cursor.executemany("INSERT OR IGNORE INTO DocumentTypes (name, description) VALUES (?, ?)", document_types_seed)
+        print(f"DEBUG_INIT_DB: {len(document_types_seed)} DocumentTypes seeded or ignored.")
+
+        # Seed Sectors
+        sectors_seed = [
+            ('Import/Export', 'B2B'), ('Fabrication Industrielle', 'B2B'),
+            ('Services aux Entreprises', 'B2B'), ('Grossiste et Distribution', 'B2B'),
+            ('Technologie et Informatique (B2B)', 'B2B'), ('Construction (Grands Projets)', 'B2B'),
+            ('Logistique et Transport de Marchandises', 'B2B'),
+            ('Commerce de Détail (Physique)', 'B2C'), ('Restauration et Hôtellerie', 'B2C'),
+            ('Services à la Personne (Coiffure, Esthétique, etc.)', 'B2C'),
+            ('E-commerce (Vente en ligne aux particuliers)', 'B2C'), ('Artisanat (Vente directe)', 'B2C'),
+            ('Santé et Bien-être (Praticiens indépendants)', 'B2C'),
+            ('Éducation et Formation (Cours particuliers, écoles privées)', 'B2C'),
+            ('Automobile (Vente et Réparation)', 'BOTH'), ('Immobilier (Agences)', 'BOTH'),
+            ('Conseil (Petites entreprises et Particuliers)', 'BOTH')
+        ]
+        cursor.executemany("INSERT OR IGNORE INTO Sectors (name, type_association) VALUES (?, ?)", sectors_seed)
+        print(f"DEBUG_INIT_DB: {len(sectors_seed)} Sectors seeded or ignored.")
+
+        # Seed UseCases
+        use_cases_seed = [
+            ('Gestion des Clients (CRM)', 'Suivi des interactions, historique, segmentation.'),
+            ('Gestion des Commandes', 'Création, suivi, et gestion du cycle de vie des commandes.'),
+            ('Facturation et Paiements', 'Émission de factures, suivi des paiements, relances.'),
+            ('Gestion des Produits/Services', 'Catalogue produits, gestion des prix, descriptions.'),
+            ('Gestion des Stocks', 'Suivi des niveaux de stock, alertes de réapprovisionnement.'),
+            ('Production de Documents Commerciaux', 'Génération de devis, bons de commande, factures, etc.'),
+            ('Rapports et Analyses de Vente', 'Tableaux de bord, analyse des performances.'),
+            ('Gestion de Projet Simplifiée', 'Suivi des tâches et des échéances pour des petits projets.'),
+            ('SAV et Support Client', 'Gestion des tickets de support, base de connaissances.'),
+            ('Gestion des Fournisseurs', 'Base de données fournisseurs, suivi des achats.')
+        ]
+        cursor.executemany("INSERT OR IGNORE INTO UseCases (name, description) VALUES (?, ?)", use_cases_seed)
+        print(f"DEBUG_INIT_DB: {len(use_cases_seed)} UseCases seeded or ignored.")
+        # --- End Seed Data for User Profile Management ---
 
         # Accounting Module Seeding (example: base currency, default fiscal year)
         try:
@@ -2953,7 +3298,8 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
             from sqlalchemy.orm import Session
 
             # Use a SQLAlchemy session for CRUD operations
-            with Session(engine) as session:
+            # FIX: Use engine_acc which is defined for accounting, instead of undefined 'engine'
+            with Session(engine_acc) as session:
                 base_curr = acc_cruds.currency.get_base_currency(db=session)
                 if not base_curr:
                     print("DEBUG_INIT_DB: No base currency found. Seeding USD as base.")
@@ -3080,6 +3426,14 @@ if __name__ == '__main__':
         # "DEFAULT_ADMIN_PASSWORD": "password_standalone_test"
     }
     print(f"Using mock database path for standalone test: {mock_app_config['database_path']}")
+
+    # Ensure a clean state by deleting the test database file if it exists
+    if os.path.exists(mock_app_config["database_path"]):
+        try:
+            os.remove(mock_app_config["database_path"])
+            print(f"Deleted existing test database: {mock_app_config['database_path']}")
+        except OSError as e:
+            print(f"Error deleting test database {mock_app_config['database_path']}: {e}. Proceeding might use old data or fail.")
 
     # Ensure the directory for the mock database exists
     _test_db_dir = os.path.dirname(mock_app_config["database_path"])

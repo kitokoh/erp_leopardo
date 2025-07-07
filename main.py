@@ -12,9 +12,9 @@ elif sys.path[0] != PROJECT_ROOT:
     sys.path.insert(0, PROJECT_ROOT)
 
 # Ensure this debug print is AFTER the sys.path modification and BEFORE any project imports
-print(f"DEBUG main.py: Initial PROJECT_ROOT: {PROJECT_ROOT}")
-print(f"DEBUG main.py: sys.path after modification in main.py: {sys.path}")
-print(f"DEBUG main.py: current working directory: {os.getcwd()}")
+# print(f"DEBUG main.py: Initial PROJECT_ROOT: {PROJECT_ROOT}")
+# print(f"DEBUG main.py: sys.path after modification in main.py: {sys.path}")
+# print(f"DEBUG main.py: current working directory: {os.getcwd()}")
 
 # Now, other imports can follow
 import logging # For main.py's own logging needs, and for translator parts if setup_logging isn't called first
@@ -49,6 +49,8 @@ from db.cruds import users_crud # Corrected import for users_crud
 # from auth.login_window import LoginWindow # Replaced by LoginDialog
 from dialogs.login_dialog import LoginDialog # New LoginDialog
 from auth import authentication as auth_service # Import the auth service
+from user_profile_management.database_setup import create_tables as create_user_profile_tables
+from user_profile_management.database_setup import seed_data as seed_user_profile_data
 
 from PyQt5.QtWidgets import QDialog # Required for QDialog.Accepted check (already present, but good to note)
 # from initial_setup_dialog import InitialSetupDialog # Redundant import, already imported above
@@ -57,19 +59,37 @@ from notifications import NotificationManager # Added for notifications
 # from db.cruds.users_crud import users_crud_instance # users_crud is used directly by auth_service
 from PyQt5.QtWidgets import QMessageBox # Added for error dialog
 from PyQt5.QtWidgets import QSplashScreen
-import sys
-import os
+
+# --- Direct Re-calculation and Re-insertion of Project Root before gui.main_window import ---
+# This is a more direct attempt to ensure the path is correct right before the import.
+# os and sys modules should already be imported at the top of main.py.
+current_file_path_for_gui_import = os.path.abspath(__file__)
+project_root_calculated_for_gui_import = os.path.dirname(current_file_path_for_gui_import)
+
+if project_root_calculated_for_gui_import not in sys.path:
+    sys.path.insert(0, project_root_calculated_for_gui_import)
+    logging.debug(f"main.py (PRE-GUI IMPORT): Inserted project root {project_root_calculated_for_gui_import}. New sys.path: {sys.path}")
+elif sys.path[0] != project_root_calculated_for_gui_import:
+    if project_root_calculated_for_gui_import in sys.path: # Check before removing
+        sys.path.remove(project_root_calculated_for_gui_import)
+    sys.path.insert(0, project_root_calculated_for_gui_import)
+    logging.debug(f"main.py (PRE-GUI IMPORT): Moved project root {project_root_calculated_for_gui_import} to start. New sys.path: {sys.path}")
+else:
+    logging.debug(f"main.py (PRE-GUI IMPORT): Project root {project_root_calculated_for_gui_import} already correctly at sys.path[0]. Current sys.path: {sys.path}")
+# --- End Direct Re-calculation ---
+
 # PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__)) # Redundant: PROJECT_ROOT already defined and sys.path modified at the top
 # if PROJECT_ROOT not in sys.path: # Redundant
 #     sys.path.insert(0, PROJECT_ROOT) # Redundant
 
-# print(f"DEBUG main.py: sys.path is now: {sys.path}") # Redundant: sys.path printed after initial modification
-# print(f"DEBUG main.py: current working directory is: {os.getcwd()}") # Redundant: CWD printed after initial modification
+# logging.debug(f"main.py: sys.path is now: {sys.path}") # Redundant: sys.path printed after initial modification
+# logging.debug(f"main.py: current working directory is: {os.getcwd()}") # Redundant: CWD printed after initial modification
 
 # --- Le reste de vos imports dans main.py commence ici ---
 # Par exemple:
 # from some_module import something
 # from gui.main_window import DocumentManager 
+from gui.main_window import DocumentManager
 import datetime # Added for session timeout
 from PyQt5.QtCore import QSettings # Added for Remember Me
 
@@ -235,20 +255,41 @@ def main():
     atexit.register(logging.shutdown)
     logging.info("logging.shutdown registered with atexit.")
 
-    # Register logging.shutdown() to be called on exit to properly close handlers
-    atexit.register(logging.shutdown)
-    logging.info("logging.shutdown registered with atexit.")
-
-    # Register logging.shutdown() to be called on exit to properly close handlers
-    atexit.register(logging.shutdown)
-    logging.info("logging.shutdown registered with atexit.")
-
-    # Register logging.shutdown() to be called on exit to properly close handlers
-    atexit.register(logging.shutdown)
-    logging.info("logging.shutdown registered with atexit.")
-
     # Initialize database after logging and API server start attempt
     db.initialize_database(CONFIG) # Pass CONFIG here
+
+    # Apply Alembic migrations
+    try:
+        from alembic.config import Config as AlembicConfig
+        from alembic import command as alembic_command
+        # os is imported globally, no need for local import here.
+
+        # Construct the path to alembic.ini relative to the project root
+        # PROJECT_ROOT is defined at the top of main.py
+        alembic_ini_path = os.path.join(PROJECT_ROOT, 'alembic.ini')
+
+        if not os.path.exists(alembic_ini_path):
+            logging.error(f"Alembic configuration file not found at: {alembic_ini_path}")
+        else:
+            logging.info(f"Found Alembic config at: {alembic_ini_path}")
+            alembic_cfg = AlembicConfig(alembic_ini_path)
+
+            # Set the script location programmatically to avoid issues with relative paths in alembic.ini
+            # when alembic is called from a different directory.
+            # The 'here' variable in alembic.ini refers to the location of alembic.ini itself.
+            # So, if alembic.ini correctly sets script_location = %(here)s/alembic, this might not be strictly needed
+            # but can make it more robust if alembic commands are run from various places.
+            # alembic_cfg.set_main_option("script_location", os.path.join(PROJECT_ROOT, "alembic"))
+
+            logging.info("Attempting to upgrade database schema to head using Alembic...")
+            alembic_command.upgrade(alembic_cfg, "head")
+            logging.info("Alembic upgrade head command completed.")
+    except ImportError:
+        logging.error("Alembic is not installed. Skipping database migrations. Please install alembic.")
+    except Exception as e_alembic:
+        logging.error(f"An error occurred during Alembic migration: {e_alembic}", exc_info=True)
+        # Depending on the severity, you might want to show an error to the user or exit.
+        # For now, just logging.
 
     # Set the database configuration for db.connection module
     # This must be done after app_setup.CONFIG is loaded and db structure might be initialized
@@ -286,6 +327,43 @@ def main():
         logging.error(f"An unexpected error occurred when calling run_seed(): {e_seed_run}", exc_info=True)
         # Depending on severity, might want to sys.exit(1) here if seeding is critical for app function
     # --- End Coordinated Data Seeding ---
+
+    # --- Initialize User Profile Management Database ---
+    try:
+        logging.info("Attempting to initialize user profile management database...")
+        create_user_profile_tables()
+        seed_user_profile_data()
+        logging.info("User profile management database initialized and seeded successfully.")
+    except Exception as e_user_profile_db:
+        logging.error(f"Error initializing user profile management database: {e_user_profile_db}", exc_info=True)
+        # Depending on severity, you might want to show an error to the user or exit.
+        # For now, just logging the error.
+    # --- End User Profile Management Database Initialization ---
+
+    # --- Token Cleanup on Startup ---
+    conn_cleanup = None
+    try:
+        conn_cleanup = get_db_connection() # Get a connection for cleanup tasks
+        if conn_cleanup:
+            from db.cruds import user_session_tokens_crud, password_reset_tokens_crud
+
+            cleaned_session_tokens = user_session_tokens_crud.cleanup_expired_tokens(conn_cleanup)
+            logging.info(f"Cleaned up {cleaned_session_tokens} expired 'Remember Me' session tokens on startup.")
+
+            cleaned_reset_tokens = password_reset_tokens_crud.cleanup_expired_or_used_tokens(conn_cleanup)
+            logging.info(f"Cleaned up {cleaned_reset_tokens} expired/used password reset tokens on startup.")
+
+            conn_cleanup.commit() # Commit changes from cleanup
+        else:
+            logging.error("Could not get DB connection for token cleanup on startup.")
+    except Exception as e_cleanup:
+        logging.error(f"Error during token cleanup on startup: {e_cleanup}", exc_info=True)
+        if conn_cleanup:
+            conn_cleanup.rollback() # Rollback if error during cleanup
+    finally:
+        if conn_cleanup:
+            conn_cleanup.close()
+    # --- End Token Cleanup ---
 
     # Log the configured session timeout value
     logging.info(f"Session timeout is set to: {SESSION_TIMEOUT_SECONDS // 60} minutes ({SESSION_TIMEOUT_SECONDS} seconds).")
@@ -587,64 +665,45 @@ def main():
     logged_in_user_info = None # To store user details after successful login
     current_license_info = None # Pour stocker les détails de la licence
 
-    # --- Remember Me - Attempt Auto Login ---
-    remembered_username = auth_service.get_remembered_user()
-    if remembered_username:
-        logging.info(f"Attempting auto-login for remembered user: {remembered_username}")
-        # In a real token system, we'd validate the token here.
-        # For this simplified version, we fetch user details directly.
-        # This assumes the user still exists and is active.
-        user_details = users_crud.get_user_by_username(remembered_username)
+    # --- Remember Me - Attempt Auto Login with Token ---
+    remembered_token = auth_service.get_remembered_token_from_settings()
+    if remembered_token:
+        logging.info("Attempting auto-login with session token.")
+        # login_with_session_token returns: (success, message, user_data, license_info)
+        token_auth_success, token_auth_message, token_user_info, token_license_info = auth_service.login_with_session_token(remembered_token)
 
-        if user_details and user_details.get('is_active'):
-            auth_service.set_current_user(user_details)
-            logged_in_user_info = user_details
-            logging.info(f"Auto-login (authentification) successful for user: {remembered_username}")
+        if token_auth_success and token_user_info:
+            logged_in_user_info = token_user_info
+            current_license_info = token_license_info # This now includes allowed_features
+            logging.info(f"Auto-login with token successful for user: {logged_in_user_info.get('username')}")
             SESSION_START_TIME = datetime.datetime.now()
 
-            # Vérification de la licence pour l'auto-connexion
-            conn_lic_auto = None
-            try:
-                conn_lic_auto = get_db_connection()
-                is_license_valid, license_msg, lic_details = license_manager.check_license_validity(conn_lic_auto, logged_in_user_info['user_id'])
-                current_license_info = lic_details # Peut être None ou contenir des infos sur l'invalidité
-
-                if is_license_valid:
-                    logging.info(f"Licence valide pour l'auto-connexion de {remembered_username}.")
-                    proceed_to_main_app = True
-                else:
-                    logging.warning(f"Auto-login pour {remembered_username}, mais licence invalide: {license_msg}")
-                    # Ne pas aller à l'application principale, forcer la boîte de dialogue de licence/login.
-                    proceed_to_main_app = False
-                    # Afficher un message à l'utilisateur avant de retomber sur le login manuel
-                    QMessageBox.warning(None, "Licence Requise", f"Votre session a été restaurée, mais votre licence n'est plus valide : {license_msg}\nVeuillez vous reconnecter.")
-                    auth_service.logout() # Effacer la session auto-logguée pour forcer le login manuel
-                    logged_in_user_info = None # Réinitialiser
-                    current_license_info = None
-                    # La boucle while de login manuel prendra le relais
-            except Exception as e_lic_auto:
-                logging.error(f"Erreur de vérification de licence pendant l'auto-login pour {remembered_username}: {e_lic_auto}", exc_info=True)
-                proceed_to_main_app = False
-                QMessageBox.critical(None, "Erreur de Licence", "Une erreur critique est survenue lors de la vérification de votre licence.")
-                auth_service.logout()
+            if token_license_info and token_license_info.get('is_active'):
+                logging.info(f"License is valid for token auto-login of {logged_in_user_info.get('username')}.")
+                proceed_to_main_app = True
+            else: # License is invalid or missing after token login
+                license_issue_msg = token_auth_message or "Votre licence n'est plus valide."
+                logging.warning(f"Token auto-login for {logged_in_user_info.get('username')} successful, but license is invalid: {license_issue_msg}")
+                QMessageBox.warning(None, "Licence Requise", f"Votre session a été restaurée, mais votre licence n'est plus valide : {license_issue_msg}\nVeuillez vous reconnecter.")
+                auth_service.logout() # This will clear QSettings token and attempt to clear DB token
                 logged_in_user_info = None
                 current_license_info = None
-            finally:
-                if conn_lic_auto:
-                    conn_lic_auto.close()
-        else: # user_details non valides ou inactifs
-            logging.warning(f"Auto-login failed for remembered user: {remembered_username}. User not found or inactive. Clearing preference.")
-            auth_service.clear_remember_me_preference()
+                proceed_to_main_app = False # Fall through to manual login
+        else: # Token login failed (e.g. token invalid, expired, user inactive)
+            logging.warning(f"Auto-login with token failed: {token_auth_message or 'Token invalid/expired'}. Proceeding to manual login.")
+            # auth_service.login_with_session_token should have cleared the invalid token from QSettings.
             proceed_to_main_app = False
-    else: # Pas d'utilisateur mémorisé
+    else: # No token remembered
         proceed_to_main_app = False
 
-    if not proceed_to_main_app: # Si auto-login n'a pas abouti à une licence valide
-        auth_service.logout() # S'assurer que toute session d'auto-login est nettoyée
+    if not proceed_to_main_app:
+        # Ensure any partial session from failed token login is cleared before manual login
+        if auth_service.get_current_user(): # If _current_user_data was set by a failed token login path
+            auth_service.logout()
         logged_in_user_info = None
         current_license_info = None
 
-        while True: # Boucle pour login manuel et gestion de licence
+        while True: # Loop for manual login and license management
             login_dialog = LoginDialog()
             login_dialog_result = login_dialog.exec_()
 

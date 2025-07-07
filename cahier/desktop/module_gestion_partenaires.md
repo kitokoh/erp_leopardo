@@ -72,7 +72,7 @@ Le module de Gestion des Partenaires de ClientDocManager a pour but de permettre
 *   **Gestion des Produits**: Certains partenaires peuvent être des fournisseurs de produits listés dans le catalogue. Une liaison pourrait exister.
 *   **Gestion des Actifs/Inventaire**: Les fournisseurs d'actifs sont des partenaires.
 *   **Gestion de Projet**: Des partenaires peuvent être des sous-traitants sur des projets.
-*   **Gestion des Documents**: Des contrats ou d'autres documents peuvent être liés aux partenaires.
+*   **Gestion Client (pour la partie documents)**: Des contrats ou d'autres documents peuvent être liés aux partenaires et gérés via le module "Gestion Client" si pertinent (par exemple, si le partenaire est aussi un client ou si le document est fortement lié à une interaction client impliquant ce partenaire). Sinon, un système de gestion documentaire spécifique aux partenaires pourrait être envisagé.
 *   **Gestion des Contacts**: Les personnes de contact chez les partenaires sont gérées via le [Module Gestion des Contacts](./module_gestion_contacts.md) et peuvent être liées aux fiches partenaires.
 *   **Comptabilité/Finances**: Les factures fournisseurs (si gérées dans le [Module Facturation et Paiements](./module_facturation_paiements.md) sous "Dépenses") seraient liées à des partenaires de type fournisseur.
     *   Les `client_freight_forwarders_crud.py`, `client_money_transfer_agents_crud.py`, `client_transporters_crud.py` suggèrent que des transitaires, agents de transfert d'argent, et transporteurs peuvent être des types spécifiques de partenaires, et qu'ils peuvent être liés directement à des clients pour des opérations spécifiques. Ce module "Partenaires" pourrait servir de référentiel central pour ces entités.

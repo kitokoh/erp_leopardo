@@ -11,11 +11,13 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QUrl
 from PyQt5.QtGui import QDesktopServices
+from PyQt5.QtWidgets import QDialog
 
 
 
 import db
 from db.cruds import commandes_crud # Assuming this will be created with necessary functions
+from config import CONFIG
 
 # Placeholder for CommandeDialog - will be in commande_dialog.py
 # from .commande_dialog import CommandeDialog
@@ -36,51 +38,78 @@ class CommandeWidget(QWidget):
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(10)
 
-        # Header
-        header_layout = QHBoxLayout()
-        title_label = QLabel(f"Commandes pour {self.client_info.get('client_name', 'N/A')}")
-        title_label.setStyleSheet("font-size: 16pt; font-weight: bold;")
-        header_layout.addWidget(title_label)
-        header_layout.addStretch()
-        main_layout.addLayout(header_layout)
+        # Layout for filters and action buttons
+        top_bar_layout = QHBoxLayout()
+        top_bar_layout.setSpacing(10)
 
-        # Filters (Placeholder)
-        filter_layout = QHBoxLayout()
-        filter_layout.addWidget(QLabel("Filtrer par Statut:"))
+        filter_label = QLabel(self.tr("Filtrer par Statut:"))
+        filter_label.setStyleSheet("font-weight: bold;")
+        top_bar_layout.addWidget(filter_label)
+
         self.status_filter_combo = QComboBox()
-        self.populate_status_filters() # Populate statuses
-        self.status_filter_combo.currentIndexChanged.connect(self.load_commandes) # Connect filter
-        filter_layout.addWidget(self.status_filter_combo)
-        filter_layout.addStretch()
-        main_layout.addLayout(filter_layout)
+        self.status_filter_combo.setMinimumWidth(150)
+        self.status_filter_combo.setStyleSheet("QComboBox { padding: 4px; }")
+        self.populate_status_filters()
+        self.status_filter_combo.currentIndexChanged.connect(self.load_commandes)
+        top_bar_layout.addWidget(self.status_filter_combo)
+
+        top_bar_layout.addStretch(1)
+
+        self.add_commande_btn = QPushButton(QIcon(":/icons/plus-circle.svg"), self.tr("Nouvelle Commande"))
+        self.add_commande_btn.setObjectName("primaryButton")
+        self.add_commande_btn.setToolTip(self.tr("Créer une nouvelle commande pour ce client"))
+        self.add_commande_btn.clicked.connect(self.add_new_commande)
+        top_bar_layout.addWidget(self.add_commande_btn)
+
+        self.refresh_btn = QPushButton(QIcon(":/icons/refresh-cw.svg"), self.tr("Actualiser"))
+        self.refresh_btn.setObjectName("secondaryButton")
+        self.refresh_btn.setToolTip(self.tr("Actualiser la liste des commandes"))
+        self.refresh_btn.clicked.connect(self.load_commandes)
+        top_bar_layout.addWidget(self.refresh_btn)
+
+        main_layout.addLayout(top_bar_layout)
 
         # Table for Commandes
         self.commandes_table = QTableWidget()
-        self.commandes_table.setColumnCount(7) # Example columns
+        self.commandes_table.setObjectName("commandesTable")
+        self.commandes_table.setColumnCount(7)
         self.commandes_table.setHorizontalHeaderLabels([
-            "Référence", "Date", "Description", "Statut", "Total HT", "Total TTC", "Actions"
+            self.tr("Référence"), self.tr("Date"), self.tr("Description"),
+            self.tr("Statut"), self.tr("Total HT"), self.tr("Total TTC"), self.tr("Actions")
         ])
-        self.commandes_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        # Style de l'en-tête
+        header_style = """
+            QHeaderView::section {
+                background-color: #4a5568; /* Equivalent de Tailwind bg-gray-700 */
+                color: white;
+                padding: 6px;
+                border: 1px solid #ddd;
+                font-weight: bold;
+                font-size: 9pt;
+            }
+        """
+        self.commandes_table.horizontalHeader().setStyleSheet(header_style)
+        self.commandes_table.verticalHeader().setVisible(False)
+        self.commandes_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch) # Default
+        self.commandes_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents) # Référence
+        self.commandes_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents) # Date
+        self.commandes_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents) # Statut
+        self.commandes_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents) # Total HT
+        self.commandes_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents) # Total TTC
+        self.commandes_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeToContents) # Actions
+
         self.commandes_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.commandes_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.commandes_table.setAlternatingRowColors(True)
+        self.commandes_table.setSortingEnabled(True)
         self.commandes_table.itemDoubleClicked.connect(self.view_edit_commande)
+
         main_layout.addWidget(self.commandes_table)
 
-        # Action Buttons
-        buttons_layout = QHBoxLayout()
-        self.add_commande_btn = QPushButton(QIcon.fromTheme("document-new"), "Nouvelle Commande")
-        self.add_commande_btn.clicked.connect(self.add_new_commande)
-        buttons_layout.addWidget(self.add_commande_btn)
-
-        self.refresh_btn = QPushButton(QIcon.fromTheme("view-refresh"), "Actualiser")
-        self.refresh_btn.clicked.connect(self.load_commandes)
-        buttons_layout.addWidget(self.refresh_btn)
-
-        buttons_layout.addStretch()
-        main_layout.addLayout(buttons_layout)
-
+        # Note: The duplicated action buttons layout was removed. The buttons are now in top_bar_layout.
         self.setLayout(main_layout)
-        self.populate_status_filters() # Populate filters on init
+        # self.populate_status_filters() # Already called in setup_ui
 
 
     def load_commandes(self):
@@ -122,7 +151,8 @@ class CommandeWidget(QWidget):
                 date_str = commande_data.get("commande_date", "")
                 if date_str:
                     try:
-                        dt_obj = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                        # Ensure datetime.datetime is used for fromisoformat
+                        dt_obj = datetime.datetime.fromisoformat(date_str.replace('Z', '+00:00'))
                         date_formatted = dt_obj.strftime('%Y-%m-%d %H:%M')
                     except ValueError:
                         date_formatted = date_str
@@ -151,24 +181,28 @@ class CommandeWidget(QWidget):
                 actions_layout.setContentsMargins(0,0,0,0)
                 actions_layout.setSpacing(5)
 
-                view_btn = QPushButton(QIcon.fromTheme("document-open"), "")
+                view_btn = QPushButton(QIcon(":/icons/eye.svg"), "")
                 view_btn.setToolTip("Voir/Modifier Commande")
+                view_btn.setProperty("class", "tableActionButton")
                 view_btn.clicked.connect(lambda ch, cmd_id=commande_data.get("commande_id"): self.view_edit_commande(cmd_id=cmd_id))
                 actions_layout.addWidget(view_btn)
 
-                proforma_btn = QPushButton(QIcon.fromTheme("document-export"), "") # Placeholder icon
+                proforma_btn = QPushButton(QIcon(":/icons/file-text.svg"), "")
                 proforma_btn.setToolTip("Générer Facture Proforma")
+                proforma_btn.setProperty("class", "tableActionButton")
                 proforma_btn.clicked.connect(lambda ch, cmd_id=commande_data.get("commande_id"): self.handle_generate_proforma_for_commande(cmd_id))
                 actions_layout.addWidget(proforma_btn)
 
-
-                delete_btn = QPushButton(QIcon.fromTheme("edit-delete"), "")
+                delete_btn = QPushButton(QIcon(":/icons/trash-2.svg"), "")
                 delete_btn.setToolTip("Supprimer Commande")
+                delete_btn.setProperty("class", "dangerButtonTable")
                 delete_btn.clicked.connect(lambda ch, cmd_id=commande_data.get("commande_id"): self.delete_selected_commande(cmd_id))
                 actions_layout.addWidget(delete_btn)
 
                 actions_layout.addStretch()
                 self.commandes_table.setCellWidget(row_idx, 6, actions_widget)
+
+            self.commandes_table.resizeRowsToContents()
 
         except Exception as e:
             self.logger.error(f"Error loading commandes for client {self.client_id}: {e}", exc_info=True)
@@ -296,7 +330,7 @@ class CommandeWidget(QWidget):
             # client_info for proforma generation should be fetched fresh
             # It's available in self.client_info if this widget is for a single client,
             # but it's better to fetch to ensure it's the most up-to-date for the document.
-            client_info_for_doc = db.clients_crud_instance.get_client_by_id(client_id)
+            client_info_for_doc = db.get_client_by_id(client_id) # Use direct import from db
             if not client_info_for_doc:
                 QMessageBox.warning(self, "Erreur", f"Impossible de trouver les détails du client ID: {client_id}")
                 return
@@ -320,7 +354,7 @@ class CommandeWidget(QWidget):
                     QMessageBox.critical(self, "Erreur Configuration", "Chemin racine de l'application non défini.")
                     return
 
-                clients_base_subdir = db_manager.CONFIG.get('clients_dir', 'clients')
+                clients_base_subdir = CONFIG.get('clients_dir', 'clients')
                 relative_folder = os.path.join(clients_base_subdir, f"{sane_client_name}_{client_id_for_folder[:8]}")
                 client_info_for_doc["default_base_folder_path"] = os.path.join(app_root_dir, relative_folder)
                 # We also need the relative path for DB storage later

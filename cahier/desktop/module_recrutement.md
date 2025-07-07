@@ -91,7 +91,7 @@ Le module de Recrutement de ClientDocManager a pour objectif de structurer et de
 *   **Gestion des Employés (HR)**: Si un candidat est embauché, ses informations peuvent être transférées ou utilisées pour créer un profil employé dans le module RH (pas encore documenté, mais suggéré par `employees_crud.py`, `employee_documents_crud.py`).
 *   **Calendrier/Agenda**: Les entretiens planifiés pourraient s'intégrer au module Calendrier pour les recruteurs et les interviewers.
 *   **Notifications**: Pour alerter les recruteurs des nouvelles candidatures, les interviewers des entretiens planifiés, ou les candidats des changements de statut (si communication externe).
-*   **Gestion des Documents**: Les CV, lettres de motivation, et autres documents des candidats sont gérés et stockés.
+*   **Gestion Client (pour la partie documents, si applicable et centralisé)**: Les CV, lettres de motivation, et autres documents des candidats sont gérés et stockés. Si une politique de centralisation documentaire via "Gestion Client" est adoptée, ce module pourrait être utilisé. Sinon, le module Recrutement gère ses propres documents liés aux candidats.
 *   **Authentification et Gestion des Utilisateurs**: Les recruteurs, managers, et interviewers sont des utilisateurs de l'application avec des permissions spécifiques pour accéder aux fonctionnalités de recrutement.
 *   **Base de Données**: Stocke toutes les données relatives aux offres d'emploi, candidats, entretiens, et progression dans le processus.
 

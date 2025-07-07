@@ -4,15 +4,18 @@ from datetime import datetime
 
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QTableWidget,
-    QTableWidgetItem, QHeaderView, QAbstractItemView, QMessageBox, QApplication # QDialog removed
+    QTableWidgetItem, QHeaderView, QAbstractItemView, QMessageBox, QApplication
 )
 from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QLocale, QDate # Added QLocale, QDate
 
 import db as db_manager
 # SAVTicketDialog will be imported locally or passed if it's a shared component.
 # For now, assume it might be imported locally if specific to SAV.
 # from sav.ticket_dialog import SAVTicketDialog # Placeholder
+from PyQt5.QtWidgets import QGroupBox
+from PyQt5.QtCore import QDateTime
+from PyQt5.QtWidgets import QDialog
 
 class SAVTab(QWidget):
     def __init__(self, client_info: dict, current_user_info: dict,
@@ -50,62 +53,102 @@ class SAVTab(QWidget):
 
     def _setup_ui(self):
         logging.info("SAVTab._setup_ui: Starting setup...")
-        self.main_sav_layout = QVBoxLayout(self) # Main layout for the tab
+        self.main_sav_layout = QVBoxLayout(self)
+        self.main_sav_layout.setSpacing(10)
+        self.main_sav_layout.setContentsMargins(5, 5, 5, 5)
 
-        # Placeholder for when SAV is not applicable
-        self.placeholder_label = QLabel(self.tr("La section SAV n'est pas applicable pour le statut actuel de ce client."))
+        self.placeholder_label = QLabel(self.tr("La section SAV n'est pas applicable pour le statut actuel de ce client (doit être 'Vendu')."))
         self.placeholder_label.setAlignment(Qt.AlignCenter)
+        self.placeholder_label.setStyleSheet("font-style: italic; color: #718096; font-size: 10pt; padding: 20px;")
         self.main_sav_layout.addWidget(self.placeholder_label)
 
-        # Container for actual SAV content (initially hidden)
         self.sav_content_widget = QWidget()
         sav_content_layout = QVBoxLayout(self.sav_content_widget)
         sav_content_layout.setContentsMargins(0,0,0,0)
+        sav_content_layout.setSpacing(10)
 
-        sav_content_layout.addWidget(QLabel("<h3>" + self.tr("Historique des Achats") + "</h3>"))
+        header_style = """
+            QHeaderView::section {
+                background-color: #4a5568; color: white; padding: 6px;
+                border: 1px solid #ddd; font-weight: bold; font-size: 9pt;
+            }
+        """
+
+        # Purchase History Section
+        purchase_group = QGroupBox(self.tr("Historique des Achats et Numéros de Série"))
+        purchase_group_layout = QVBoxLayout(purchase_group)
+
         self.purchase_history_table = QTableWidget()
-        self.purchase_history_table.setColumnCount(6) # ID CPP (Hidden), Produit, Quantité, Numéro de Série, Date d'Achat, Actions
+        self.purchase_history_table.setObjectName("purchaseHistoryTable")
+        self.purchase_history_table.setColumnCount(6)
         self.purchase_history_table.setHorizontalHeaderLabels([
-            self.tr("ID CPP (Hidden)"), self.tr("Produit"), self.tr("Quantité"),
-            self.tr("Numéro de Série"), self.tr("Date d'Achat"), self.tr("Actions")
+            self.tr("ID CPP (Hidden)"), self.tr("Produit Acheté"), self.tr("Quantité"),
+            self.tr("Numéro de Série"), self.tr("Date d'Achat"), self.tr("Ouvrir Ticket")
         ])
         self.purchase_history_table.setColumnHidden(0, True)
-        self.purchase_history_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.purchase_history_table.horizontalHeader().setStyleSheet(header_style)
+        self.purchase_history_table.verticalHeader().setVisible(False)
+        self.purchase_history_table.setAlternatingRowColors(True)
+        self.purchase_history_table.setSortingEnabled(True)
         self.purchase_history_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.purchase_history_table.itemChanged.connect(self.handle_purchase_history_item_changed)
-        sav_content_layout.addWidget(self.purchase_history_table)
+        self.purchase_history_table.itemChanged.connect(self.handle_purchase_history_item_changed) # For serial number edit
 
-        self.refresh_purchase_history_btn = QPushButton(self.tr("Rafraîchir l'historique"))
-        self.refresh_purchase_history_btn.setIcon(QIcon.fromTheme("view-refresh"))
+        self.purchase_history_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch) # Produit
+        self.purchase_history_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents) # Quantité
+        self.purchase_history_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive) # Numéro de Série (Editable)
+        self.purchase_history_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents) # Date d'Achat
+        self.purchase_history_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents) # Actions (Ouvrir Ticket)
+        self.purchase_history_table.setColumnWidth(3, 150) # Initial width for Serial Number
+
+        purchase_group_layout.addWidget(self.purchase_history_table)
+
+        self.refresh_purchase_history_btn = QPushButton(QIcon(":/icons/refresh-cw.svg"), self.tr("Actualiser Historique"))
+        self.refresh_purchase_history_btn.setObjectName("secondaryButton")
         self.refresh_purchase_history_btn.clicked.connect(self.load_purchase_history_table)
-        sav_content_layout.addWidget(self.refresh_purchase_history_btn)
+        purchase_group_layout.addWidget(self.refresh_purchase_history_btn, 0, Qt.AlignRight)
+        sav_content_layout.addWidget(purchase_group)
+
 
         # SAV Tickets Section
-        sav_content_layout.addWidget(QLabel("<h3>" + self.tr("Tickets SAV") + "</h3>"))
+        tickets_group = QGroupBox(self.tr("Tickets SAV Associés au Client"))
+        tickets_group_layout = QVBoxLayout(tickets_group)
+
         self.sav_tickets_table = QTableWidget()
-        self.sav_tickets_table.setColumnCount(7) # ID (Hidden), Produit, Description, Statut, Ouvert le, Technicien, Actions
+        self.sav_tickets_table.setObjectName("savTicketsTable")
+        self.sav_tickets_table.setColumnCount(7)
         self.sav_tickets_table.setHorizontalHeaderLabels([
             self.tr("ID Ticket (Hidden)"), self.tr("Produit Concerné"), self.tr("Description Problème"),
-            self.tr("Statut"), self.tr("Date Ouverture"), self.tr("Technicien Assigné"), self.tr("Actions")
+            self.tr("Statut"), self.tr("Date Ouverture"), self.tr("Technicien"), self.tr("Actions")
         ])
         self.sav_tickets_table.setColumnHidden(0, True)
-        self.sav_tickets_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        self.sav_tickets_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        self.sav_tickets_table.horizontalHeader().setStyleSheet(header_style)
+        self.sav_tickets_table.verticalHeader().setVisible(False)
+        self.sav_tickets_table.setAlternatingRowColors(True)
+        self.sav_tickets_table.setSortingEnabled(True)
         self.sav_tickets_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.sav_tickets_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        sav_content_layout.addWidget(self.sav_tickets_table)
+
+        self.sav_tickets_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents) # Produit
+        self.sav_tickets_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch) # Description
+        self.sav_tickets_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents) # Statut
+        self.sav_tickets_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents) # Date Ouverture
+        self.sav_tickets_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents) # Technicien
+        self.sav_tickets_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeToContents) # Actions
+        tickets_group_layout.addWidget(self.sav_tickets_table)
 
         sav_tickets_buttons_layout = QHBoxLayout()
-        self.add_sav_ticket_btn = QPushButton(self.tr("Nouveau Ticket SAV"))
-        self.add_sav_ticket_btn.setIcon(QIcon.fromTheme("document-new"))
-        self.add_sav_ticket_btn.clicked.connect(self.open_new_sav_ticket_dialog)
-        sav_tickets_buttons_layout.addWidget(self.add_sav_ticket_btn)
+        self.add_sav_ticket_btn = QPushButton(QIcon(":/icons/plus-circle.svg"), self.tr("Nouveau Ticket SAV (Général)"))
+        self.add_sav_ticket_btn.setObjectName("primaryButton")
+        self.add_sav_ticket_btn.setToolTip(self.tr("Ouvrir un nouveau ticket SAV non lié à un achat spécifique de l'historique"))
+        self.add_sav_ticket_btn.clicked.connect(lambda: self.open_new_sav_ticket_dialog(client_project_product_id=None)) # General ticket
         sav_tickets_buttons_layout.addStretch()
-        sav_content_layout.addLayout(sav_tickets_buttons_layout)
+        sav_tickets_buttons_layout.addWidget(self.add_sav_ticket_btn)
+        tickets_group_layout.addLayout(sav_tickets_buttons_layout)
+        sav_content_layout.addWidget(tickets_group)
 
         sav_content_layout.addStretch()
         self.main_sav_layout.addWidget(self.sav_content_widget)
-        self.sav_content_widget.hide() # Initially hidden
+        self.sav_content_widget.hide()
 
     def update_sav_tab_visibility_and_load_data(self):
         client_status_id = self.client_info.get('status_id')
@@ -155,51 +198,70 @@ class SAVTab(QWidget):
             # Placeholder - replace with actual DB call
             # purchased_products = db_manager.get_client_purchase_history(client_id) or []
             purchased_products = [] # Actual DB call needed
-            # Example structure: [{'client_project_product_id': 1, 'product_name': 'Prod A', 'quantity': 2, 'serial_number': 'SN123', 'purchase_date': '2023-01-01'}]
+            purchased_products = db_manager.get_client_purchase_history(client_id) or []
 
+            if not purchased_products:
+                self.purchase_history_table.hide() # Keep hidden if no data
+                # Optionally, show a specific label for no purchase history if different from general SAV placeholder
+            else:
+                self.purchase_history_table.show()
+                self.purchase_history_table.setRowCount(len(purchased_products))
+                for row, item in enumerate(purchased_products):
+                    cpp_id = item.get('client_project_product_id')
+                    cpp_id_item = QTableWidgetItem(str(cpp_id))
+                    cpp_id_item.setData(Qt.UserRole, cpp_id)
+                    self.purchase_history_table.setItem(row, 0, cpp_id_item) # Hidden
 
-            # Temporarily using get_products_for_client_or_project for structure, but this is not correct for purchase history
-            temp_products = db_manager.get_products_for_client_or_project(client_id, project_id=None) or []
-            for prod in temp_products:
-                # This is a HACK - needs proper purchase data
-                if prod.get('purchase_confirmed_at'): # Or some other indicator of purchase
-                     purchased_products.append({
-                         'client_project_product_id': prod.get('client_project_product_id'),
-                         'product_name': prod.get('product_name'),
-                         'quantity': prod.get('quantity'),
-                         'serial_number': prod.get('serial_number', ''), # Assuming serial_number is on client_project_products
-                         'purchase_date': prod.get('purchase_confirmed_at') # Or a specific purchase_date
-                     })
+                    self.purchase_history_table.setItem(row, 1, QTableWidgetItem(item.get('product_name', self.tr('N/A'))))
+                    self.purchase_history_table.setItem(row, 2, QTableWidgetItem(str(item.get('quantity', '0'))))
 
+                    sn_item = QTableWidgetItem(item.get('serial_number', ''))
+                    sn_item.setFlags(sn_item.flags() | Qt.ItemIsEditable) # Serial number is editable
+                    self.purchase_history_table.setItem(row, 3, sn_item)
 
-            self.purchase_history_table.setRowCount(len(purchased_products))
-            for row, item in enumerate(purchased_products):
-                cpp_id_item = QTableWidgetItem(str(item.get('client_project_product_id')))
-                cpp_id_item.setData(Qt.UserRole, item.get('client_project_product_id'))
-                self.purchase_history_table.setItem(row, 0, cpp_id_item) # Hidden
-                self.purchase_history_table.setItem(row, 1, QTableWidgetItem(item.get('product_name')))
-                self.purchase_history_table.setItem(row, 2, QTableWidgetItem(str(item.get('quantity'))))
+                    purchase_date_str = item.get('purchase_date', '')
+                    date_display = self.tr("N/A")
+                    if purchase_date_str:
+                        locale = QLocale()
+                        # Attempt to parse as ISO date (common from DB) then format
+                        q_date = QDate.fromString(str(purchase_date_str).split('T')[0], Qt.ISODate)
+                        if q_date.isValid():
+                            date_display = locale.toString(q_date, QLocale.ShortFormat)
+                        else: # Fallback if not ISO or parsing fails
+                            try: # Try parsing with datetime for more complex ISO (with Z)
+                                dt_obj = datetime.fromisoformat(str(purchase_date_str).replace('Z', '+00:00'))
+                                q_date_from_dt = QDate(dt_obj.year, dt_obj.month, dt_obj.day)
+                                date_display = locale.toString(q_date_from_dt, QLocale.ShortFormat)
+                            except ValueError:
+                                date_display = str(purchase_date_str).split('T')[0] # Last resort: show date part as is
+                    self.purchase_history_table.setItem(row, 4, QTableWidgetItem(date_display))
 
-                sn_item = QTableWidgetItem(item.get('serial_number', ''))
-                # Make serial number editable
-                sn_item.setFlags(sn_item.flags() | Qt.ItemIsEditable)
-                self.purchase_history_table.setItem(row, 3, sn_item)
+                    # Actions: Button to open new SAV ticket for this specific item
+                    actions_widget = QWidget()
+                    actions_layout = QHBoxLayout(actions_widget)
+                    actions_layout.setContentsMargins(0,0,0,0)
+                    actions_layout.setSpacing(5)
 
-                purchase_date_str = item.get('purchase_date', '')
-                date_display = ""
-                if purchase_date_str:
-                    try:
-                        dt_obj = datetime.fromisoformat(str(purchase_date_str).replace('Z', '+00:00'))
-                        date_display = dt_obj.strftime('%Y-%m-%d')
-                    except ValueError: date_display = str(purchase_date_str)
-                self.purchase_history_table.setItem(row, 4, QTableWidgetItem(date_display))
-                # Actions (e.g., link to SAV ticket for this item) - Placeholder
-                # actions_widget = QWidget(); QHBoxLayout(actions_widget) # ...
-                # self.purchase_history_table.setCellWidget(row, 5, actions_widget)
+                    open_ticket_btn = QPushButton(QIcon(":/icons/file-plus.svg"), "") # Using file-plus for "new ticket"
+                    open_ticket_btn.setToolTip(self.tr("Ouvrir un ticket SAV pour ce produit/achat"))
+                    open_ticket_btn.setProperty("class", "tableActionButton")
+                    open_ticket_btn.clicked.connect(lambda checked, c=cpp_id: self.open_new_sav_ticket_dialog(client_project_product_id=c))
+                    actions_layout.addWidget(open_ticket_btn)
+                    actions_layout.addStretch()
+                    self.purchase_history_table.setCellWidget(row, 5, actions_widget)
+                self.purchase_history_table.resizeRowsToContents()
 
         except Exception as e:
-            logging.error(f"Error loading purchase history: {e}", exc_info=True)
-            QMessageBox.critical(self, self.tr("Erreur"), self.tr("Impossible de charger l'historique des achats."))
+            logging.error(f"Error loading purchase history for client {client_id}: {e}", exc_info=True)
+            if self.notification_manager:
+                self.notification_manager.show_notification(
+                    self.tr("Erreur Historique Achats"),
+                    self.tr("Impossible de charger l'historique des achats. Détails: {0}").format(str(e)),
+                    'ERROR'
+                )
+            else:
+                QMessageBox.critical(self, self.tr("Erreur"), self.tr("Impossible de charger l'historique des achats."))
+            # Optionally, display an error message in the table area or a label
 
     def handle_purchase_history_item_changed(self, item: QTableWidgetItem):
         if item.column() == 3: # Serial Number column
@@ -224,27 +286,185 @@ class SAVTab(QWidget):
     def load_sav_tickets_table(self):
         # (Implementation is similar to ClientMainWidget's version, adapted for SAVTab class)
         # ... (Ensure self.sav_tickets_table exists)
-        # ... (Fetch tickets using db_manager.get_sav_tickets_for_client(client_id))
-        # ... (Populate self.sav_tickets_table)
-        # ... (Connect view/edit buttons to self.view_edit_sav_ticket_dialog)
-        pass # Placeholder - full implementation to be added
-
-    def open_new_sav_ticket_dialog(self):
-        if not self.SAVTicketDialog:
-            QMessageBox.critical(self, self.tr("Erreur"), self.tr("Dialogue de ticket SAV non chargé."))
+        self.sav_tickets_table.setRowCount(0)
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        client_id = self.client_info.get('client_id')
+        if not client_id:
+            QApplication.restoreOverrideCursor()
             return
-        # ... (rest of the logic from ClientMainWidget.open_new_sav_ticket_dialog, adapted)
-        pass # Placeholder
+        try:
+            tickets = db_manager.get_sav_tickets_for_client(client_id)
+            if tickets is None: tickets = [] # Ensure tickets is an iterable
+
+            self.sav_tickets_table.setRowCount(len(tickets))
+            for row_idx, ticket in enumerate(tickets):
+                ticket_id = ticket.get('ticket_id')
+
+                id_item = QTableWidgetItem(str(ticket_id)) # For internal use if needed, though column is hidden
+                id_item.setData(Qt.UserRole, ticket_id)
+                self.sav_tickets_table.setItem(row_idx, 0, id_item) # Hidden column
+
+                # Use pre-joined data from get_sav_tickets_for_client
+                product_name_display = ticket.get('linked_product_name', self.tr("N/A (Ticket Général)"))
+                self.sav_tickets_table.setItem(row_idx, 1, QTableWidgetItem(product_name_display))
+
+                issue_desc = ticket.get('issue_description', '')
+                self.sav_tickets_table.setItem(row_idx, 2, QTableWidgetItem(issue_desc[:100] + ('...' if len(issue_desc) > 100 else '')))
+
+                status_name = ticket.get('status_name', self.tr("Statut Inconnu"))
+                self.sav_tickets_table.setItem(row_idx, 3, QTableWidgetItem(status_name))
+
+                opened_at_str = ticket.get('opened_at', '')
+                opened_at_display = self.tr('N/A')
+                if opened_at_str:
+                    locale = QLocale()
+                    try:
+                        # QDateTime can parse ISO strings directly
+                        q_datetime = QDateTime.fromString(opened_at_str, Qt.ISODate)
+                        if not q_datetime.isValid(): # Try with explicit timezone
+                             q_datetime = QDateTime.fromString(opened_at_str.replace('Z', '+00:00'), Qt.ISODate)
+
+                        if q_datetime.isValid():
+                            opened_at_display = locale.toString(q_datetime, QLocale.ShortFormat)
+                        else: # Fallback for Python's datetime if QDateTime fails
+                            dt_obj = datetime.fromisoformat(opened_at_str.replace('Z', '+00:00'))
+                            q_dt_from_py = QDateTime(dt_obj.year, dt_obj.month, dt_obj.day, dt_obj.hour, dt_obj.minute, dt_obj.second, Qt.UTC)
+                            opened_at_display = locale.toString(q_dt_from_py.toLocalTime(), QLocale.ShortFormat)
+                    except ValueError:
+                        opened_at_display = opened_at_str # Show raw if all parsing fails
+                self.sav_tickets_table.setItem(row_idx, 4, QTableWidgetItem(opened_at_display))
+
+                tech_name = ticket.get('technician_name', self.tr("Non assigné"))
+                self.sav_tickets_table.setItem(row_idx, 5, QTableWidgetItem(tech_name))
+
+                actions_widget = QWidget()
+                actions_layout = QHBoxLayout(actions_widget)
+                actions_layout.setContentsMargins(0,0,0,0); actions_layout.setSpacing(5)
+
+                view_edit_button = QPushButton(QIcon(":/icons/edit-2.svg"), "") # Or eye.svg
+                view_edit_button.setToolTip(self.tr("Voir/Modifier Ticket SAV"))
+                view_edit_button.setProperty("class", "tableActionButton")
+                view_edit_button.clicked.connect(lambda checked, t_id=ticket_id: self.view_edit_sav_ticket_dialog(t_id))
+                actions_layout.addWidget(view_edit_button)
+                actions_layout.addStretch()
+                self.sav_tickets_table.setCellWidget(row_idx, 6, actions_widget)
+
+            self.sav_tickets_table.resizeRowsToContents()
+
+        except Exception as e:
+            logging.error(f"Error loading SAV tickets for client {client_id}: {e}", exc_info=True)
+            if self.notification_manager:
+                self.notification_manager.show_notification(
+                    self.tr("Erreur Chargement Tickets"),
+                    self.tr("Impossible de charger la liste des tickets SAV. Détails: {0}").format(str(e)),
+                    'ERROR'
+                )
+            else:
+                QMessageBox.critical(self, self.tr("Erreur"), self.tr("Impossible de charger les tickets SAV: {0}").format(str(e)))
+            # Optionally, display an error message in the SAV tickets table area
+        finally:
+            QApplication.restoreOverrideCursor()
+
+
+    def open_new_sav_ticket_dialog(self, client_project_product_id=None): # Added param
+        if not self.SAVTicketDialog:
+            QMessageBox.critical(self, self.tr("Erreur Composant"), self.tr("Le dialogue de ticket SAV n'est pas correctement chargé."))
+            return
+
+        client_id = self.client_info.get('client_id')
+        if not client_id:
+            QMessageBox.warning(self, self.tr("Erreur Client"), self.tr("ID Client non disponible pour créer un ticket SAV."))
+            return
+
+        # Fetch purchased items for the dialog's dropdown, regardless of whether this ticket is for a specific one
+        # This list is used by SAVTicketDialog to populate its "Product" dropdown.
+        try:
+            # Assuming get_client_purchase_history returns items suitable for the dropdown
+            # Each item should ideally have 'client_project_product_id' and a display 'name'
+            purchased_items_for_dialog = db_manager.get_client_purchase_history(client_id) or []
+            # Reformat if necessary for SAVTicketDialog's expected 'purchased_products' structure
+            # SAVTicketDialog expects list of dicts with 'name' and 'client_project_product_id'
+            formatted_purchased_items = [
+                {'name': item.get('product_name', 'N/A'), 'client_project_product_id': item.get('client_project_product_id')}
+                for item in purchased_items_for_dialog
+            ]
+
+        except Exception as e:
+            logging.error(f"Error fetching purchased items for SAV dialog: {e}", exc_info=True)
+            QMessageBox.warning(self, self.tr("Erreur Données"), self.tr("Impossible de charger l'historique des achats pour le dialogue SAV."))
+            formatted_purchased_items = [] # Proceed with empty list if fetch fails
+
+        dialog = self.SAVTicketDialog(
+            client_id=client_id,
+            purchased_products=formatted_purchased_items,
+            ticket_data=None, # New ticket
+            # If client_project_product_id is provided, SAVTicketDialog should pre-select it
+            selected_client_project_product_id=client_project_product_id,
+            parent=self
+        )
+        if dialog.exec_() == QDialog.Accepted:
+            self.load_sav_tickets_table() # Refresh the list of tickets
+            if self.notification_manager:
+                self.notification_manager.show(self.tr("Succès"), self.tr("Nouveau ticket SAV créé."), type='SUCCESS')
+
 
     def view_edit_sav_ticket_dialog(self, ticket_id):
         if not self.SAVTicketDialog:
-            QMessageBox.critical(self, self.tr("Erreur"), self.tr("Dialogue de ticket SAV non chargé."))
+            QMessageBox.critical(self, self.tr("Erreur Composant"), self.tr("Le dialogue de ticket SAV n'est pas correctement chargé."))
             return
-        # ... (rest of the logic from ClientMainWidget.view_edit_sav_ticket_dialog, adapted)
-        pass # Placeholder
+
+        client_id = self.client_info.get('client_id') # Needed for context, e.g. fetching purchased items for dialog
+        if not client_id:
+             QMessageBox.warning(self, self.tr("Erreur Client"), self.tr("ID Client non disponible."))
+             return
+
+        ticket_data = db_manager.get_sav_ticket_by_id(ticket_id) # This DB function needs to exist
+        if not ticket_data:
+            QMessageBox.warning(self, self.tr("Erreur"), self.tr("Ticket SAV (ID: {0}) non trouvé.").format(ticket_id))
+            return
+
+        try:
+            purchased_items_for_dialog = db_manager.get_client_purchase_history(client_id) or []
+            formatted_purchased_items = [
+                {'name': item.get('product_name', 'N/A'), 'client_project_product_id': item.get('client_project_product_id')}
+                for item in purchased_items_for_dialog
+            ]
+        except Exception as e:
+            logging.error(f"Error fetching purchased items for SAV dialog (edit mode): {e}", exc_info=True)
+            formatted_purchased_items = []
+
+
+        dialog = self.SAVTicketDialog(
+            client_id=client_id,
+            purchased_products=formatted_purchased_items, # For the dropdown
+            ticket_data=ticket_data, # Existing ticket data to populate fields
+            selected_client_project_product_id=ticket_data.get('client_project_product_id'), # Pre-select linked product
+            parent=self
+        )
+        if dialog.exec_() == QDialog.Accepted:
+            self.load_sav_tickets_table()
+            if self.notification_manager:
+                 self.notification_manager.show(self.tr("Succès"), self.tr("Ticket SAV mis à jour."), type='SUCCESS')
+
 
     def apply_permissions_to_tab(self):
         # Example: if adding SAV tickets has a specific permission
+        # from auth.permissions import P_MANAGE_SAV_TICKETS # Define this permission constant
+        can_manage_sav = False
+        if hasattr(self.parent_widget, 'current_user_info'):
+            role_name = self.parent_widget.current_user_info.get('role_name')
+            if role_name:
+                # Use a placeholder permission for now, replace with actual P_MANAGE_SAV_TICKETS
+                can_manage_sav = has_permission(role_name, P_MANAGE_CLIENT_DOCUMENTS)
+
+        self.add_sav_ticket_btn.setEnabled(can_manage_sav)
+        self.refresh_purchase_history_btn.setEnabled(can_manage_sav) # Or a view permission
+        # Permissions for inline actions in tables are handled during table population
+        # based on 'can_manage_sav' or similar logic.
+        # We might need to re-populate tables if permissions change dynamically,
+        # but for now, this is set on tab load.
+        self.load_purchase_history_table() # Reload to apply action button visibility if needed
+        self.load_sav_tickets_table()      # Reload to apply action button visibility if needed
         # role_name = self.current_user_info.get('role_name')
         # can_add_sav_ticket = has_permission(role_name, P_ADD_SAV_TICKET) # Define this permission
         # self.add_sav_ticket_btn.setEnabled(can_add_sav_ticket)

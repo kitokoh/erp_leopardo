@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  postgres_test_db:
+    image: postgres:13-alpine
+    container_name: leo_erp_postgres_test
+    environment:
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpassword
+      POSTGRES_DB: testdb_app
+    ports:
+      - "5433:5432" # Expose on host port 5433 to avoid conflict with local dev instances
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser -d testdb_app"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_test_data:
+    driver: local

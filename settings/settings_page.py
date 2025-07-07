@@ -304,15 +304,22 @@ except ImportError:
 # This requires gui.main_window to be importable.
 # If running settings_page.py standalone, this might need careful handling or mocking.
 try:
-    from gui.main_window import CONFIGURABLE_MODULES
+    from utils.app_constants import CONFIGURABLE_MODULES # Import from new location
 except ImportError as e_configurable_modules:
-    print(f"ERROR settings_page.py: Could not import CONFIGURABLE_MODULES from gui.main_window: {e_configurable_modules}")
+    print(f"ERROR settings_page.py: Could not import CONFIGURABLE_MODULES from utils.app_constants: {e_configurable_modules}")
     CONFIGURABLE_MODULES = [] # Fallback to empty list
 
 from dialogs.transporter_dialog import TransporterDialog
 from dialogs.freight_forwarder_dialog import FreightForwarderDialog
 from company_management import CompanyTabWidget
-from security_settings_page import SecuritySettingsPage # Import de la nouvelle page
+from securite.security_settings_page import SecuritySettingsPage # Import de la nouvelle page
+try:
+    from user_profile_management.my_business_widget import MyBusinessWidget
+    USER_PROFILE_MODULE_AVAILABLE = True
+except ImportError as e_user_profile:
+    print(f"WARNING: Could not import MyBusinessWidget: {e_user_profile}. 'My Business' tab will be unavailable.")
+    MyBusinessWidget = None # Placeholder
+    USER_PROFILE_MODULE_AVAILABLE = False
 
 class ImportInstructionsDialog(QDialog):
     def __init__(self, parent=None):
@@ -439,6 +446,7 @@ class SettingsPage(QWidget):
         self._setup_document_customization_tab()
         self._setup_menu_customization_tab() # New tab for menu customization
         self._setup_security_tab()
+        self._setup_my_business_tab() # New tab for "My Business"
 
 
         main_layout.addWidget(self.tabs_widget)
@@ -649,11 +657,83 @@ class SettingsPage(QWidget):
         self.db_type_combo.addItem("SQLite", "sqlite")
         # Add future options as disabled for now
         self.db_type_combo.addItem("PostgreSQL (experimental)", "postgresql")
-        self.db_type_combo.model().item(self.db_type_combo.count() - 1).setEnabled(False)
+        # self.db_type_combo.model().item(self.db_type_combo.count() - 1).setEnabled(False) # Temporarily enable for development
         self.db_type_combo.addItem("MySQL (experimental)", "mysql")
         self.db_type_combo.model().item(self.db_type_combo.count() - 1).setEnabled(False)
         db_form_layout.addRow(self.tr("Database Type:"), self.db_type_combo)
+
+        # --- PostgreSQL Specific Settings (initially hidden) ---
+        self.pg_settings_group = QGroupBox(self.tr("PostgreSQL Connection Details"))
+        pg_settings_layout = QFormLayout(self.pg_settings_group)
+        pg_settings_layout.setSpacing(10)
+
+        self.pg_host_input = QLineEdit()
+        self.pg_host_input.setPlaceholderText(self.tr("e.g., localhost or IP address"))
+        pg_settings_layout.addRow(self.tr("PostgreSQL Host:"), self.pg_host_input)
+
+        self.pg_port_spinbox = QSpinBox()
+        self.pg_port_spinbox.setRange(1, 65535)
+        self.pg_port_spinbox.setToolTip(self.tr("Default PostgreSQL port is 5432."))
+        pg_settings_layout.addRow(self.tr("PostgreSQL Port:"), self.pg_port_spinbox)
+
+        self.pg_user_input = QLineEdit()
+        self.pg_user_input.setPlaceholderText(self.tr("Your PostgreSQL username"))
+        pg_settings_layout.addRow(self.tr("PostgreSQL User:"), self.pg_user_input)
+
+        self.pg_password_input = QLineEdit()
+        self.pg_password_input.setEchoMode(QLineEdit.Password)
+        self.pg_password_input.setPlaceholderText(self.tr("Your PostgreSQL password"))
+        pg_settings_layout.addRow(self.tr("PostgreSQL Password:"), self.pg_password_input)
+
+        self.pg_dbname_input = QLineEdit()
+        self.pg_dbname_input.setPlaceholderText(self.tr("Name of the PostgreSQL database"))
+        pg_settings_layout.addRow(self.tr("PostgreSQL Database Name:"), self.pg_dbname_input)
+
+        # SSL Mode
+        self.pg_ssl_mode_combo = QComboBox()
+        self.pg_ssl_mode_combo.addItems(["disable", "allow", "prefer", "require", "verify-ca", "verify-full"])
+        self.pg_ssl_mode_combo.setToolTip(self.tr("SSL connection mode. 'disable' for no SSL, 'require' for mandatory SSL."))
+        pg_settings_layout.addRow(self.tr("PostgreSQL SSL Mode:"), self.pg_ssl_mode_combo)
+
+        # SSL Root Certificate
+        self.pg_ssl_rootcert_input = QLineEdit()
+        self.pg_ssl_rootcert_input.setPlaceholderText(self.tr("Path to SSL root CA certificate file (optional)"))
+        pg_ssl_rootcert_browse_btn = QPushButton(self.tr("Browse..."))
+        pg_ssl_rootcert_browse_btn.clicked.connect(lambda: self._browse_file(self.pg_ssl_rootcert_input, self.tr("Select SSL Root CA File")))
+        pg_ssl_rootcert_layout = QHBoxLayout()
+        pg_ssl_rootcert_layout.addWidget(self.pg_ssl_rootcert_input)
+        pg_ssl_rootcert_layout.addWidget(pg_ssl_rootcert_browse_btn)
+        pg_settings_layout.addRow(self.tr("PostgreSQL SSL Root CA:"), pg_ssl_rootcert_layout)
+
+        # SSL Client Certificate
+        self.pg_ssl_clientcert_input = QLineEdit()
+        self.pg_ssl_clientcert_input.setPlaceholderText(self.tr("Path to SSL client certificate file (optional)"))
+        pg_ssl_clientcert_browse_btn = QPushButton(self.tr("Browse..."))
+        pg_ssl_clientcert_browse_btn.clicked.connect(lambda: self._browse_file(self.pg_ssl_clientcert_input, self.tr("Select SSL Client Certificate File")))
+        pg_ssl_clientcert_layout = QHBoxLayout()
+        pg_ssl_clientcert_layout.addWidget(self.pg_ssl_clientcert_input)
+        pg_ssl_clientcert_layout.addWidget(pg_ssl_clientcert_browse_btn)
+        pg_settings_layout.addRow(self.tr("PostgreSQL SSL Client Cert:"), pg_ssl_clientcert_layout)
+
+        # SSL Client Key
+        self.pg_ssl_clientkey_input = QLineEdit()
+        self.pg_ssl_clientkey_input.setPlaceholderText(self.tr("Path to SSL client key file (optional)"))
+        pg_ssl_clientkey_browse_btn = QPushButton(self.tr("Browse..."))
+        pg_ssl_clientkey_browse_btn.clicked.connect(lambda: self._browse_file(self.pg_ssl_clientkey_input, self.tr("Select SSL Client Key File")))
+        pg_ssl_clientkey_layout = QHBoxLayout()
+        pg_ssl_clientkey_layout.addWidget(self.pg_ssl_clientkey_input)
+        pg_ssl_clientkey_layout.addWidget(pg_ssl_clientkey_browse_btn)
+        pg_settings_layout.addRow(self.tr("PostgreSQL SSL Client Key:"), pg_ssl_clientkey_layout)
+
+
+
+        db_form_layout.addRow(self.pg_settings_group) # Add the group to the main DB form layout
+        self.pg_settings_group.setVisible(False) # Initially hidden
+
+        self.db_type_combo.currentIndexChanged.connect(self._toggle_pg_settings_visibility) # Connect signal
+
         main_layout.addWidget(db_group)
+
 
         # --- Data Import/Export Group ---
         data_ops_group = QGroupBox(self.tr("Data Import & Export"))
@@ -661,7 +741,7 @@ class SettingsPage(QWidget):
         data_ops_layout.setSpacing(10)
 
         self.import_products_btn = QPushButton(self.tr("Import Products from CSV"))
-        self.import_products_btn.setIcon(QIcon(":/icons/upload.svg")) # Suggest icon
+        self.import_products_btn.setIcon(QIcon(":/icons/file-plus.svg")) # Replaced missing icon
         self.import_products_btn.setToolTip(self.tr("Import product data from a CSV file."))
         self.import_products_btn.clicked.connect(self._handle_import_products)
         data_ops_layout.addWidget(self.import_products_btn)
@@ -717,7 +797,7 @@ class SettingsPage(QWidget):
 
         self.run_backup_button = QPushButton(self.tr("Run Manual Backup Now"))
         self.run_backup_button.setObjectName("primaryButton")
-        self.run_backup_button.setIcon(QIcon(":/icons/upload-cloud.svg")) # Suggest icon
+        self.run_backup_button.setIcon(QIcon(":/icons/save.svg")) # Replaced missing icon
         self.run_backup_button.setToolTip(self.tr("Initiates a manual backup to the configured remote server."))
         self.run_backup_button.clicked.connect(self._handle_run_backup)
         backup_form_layout.addRow(self.run_backup_button) # Add button to the form for alignment
@@ -1471,7 +1551,31 @@ class SettingsPage(QWidget):
         self.backup_port_input.setText(self.main_config.get("backup_port", "")) # Port is QLineEdit
         self.backup_username_input.setText(self.main_config.get("backup_username", ""))
         self.backup_password_input.setText(self.main_config.get("backup_password", ""))
+
+        # Load PostgreSQL specific settings
+        self.pg_host_input.setText(self.main_config.get("postgresql_host", "localhost"))
+        self.pg_port_spinbox.setValue(self.main_config.get("postgresql_port", 5432))
+        self.pg_user_input.setText(self.main_config.get("postgresql_user", ""))
+        self.pg_password_input.setText(self.main_config.get("postgresql_password", ""))
+        self.pg_dbname_input.setText(self.main_config.get("postgresql_dbname", ""))
+
+        # Load PostgreSQL SSL settings
+        self.pg_ssl_mode_combo.setCurrentText(self.main_config.get("postgresql_ssl_mode", "disable"))
+        self.pg_ssl_rootcert_input.setText(self.main_config.get("postgresql_ssl_rootcert", ""))
+        self.pg_ssl_clientcert_input.setText(self.main_config.get("postgresql_ssl_clientcert", ""))
+        self.pg_ssl_clientkey_input.setText(self.main_config.get("postgresql_ssl_clientkey", ""))
+
+
+        self._toggle_pg_settings_visibility() # Ensure correct visibility on load
         print("Data & Backup tab settings loaded.")
+
+    def _toggle_pg_settings_visibility(self):
+        selected_db_type = self.db_type_combo.currentData()
+        is_pg_selected = selected_db_type == "postgresql"
+        self.pg_settings_group.setVisible(is_pg_selected)
+        # Adjust dialog size if necessary, though often Qt handles this
+        # if self.pg_settings_group.isVisible():
+        #     self.parentWidget().parentWidget().adjustSize() # May need to find the top-level dialog/window
 
     def _load_document_templates_tab_data(self):
         self.templates_dir_input.setText(self.main_config.get("templates_dir", ""))
@@ -1491,6 +1595,12 @@ class SettingsPage(QWidget):
         current_path = line_edit_target.text()
         start_dir = os.path.dirname(current_path) if current_path and os.path.exists(os.path.dirname(current_path)) else os.path.expanduser('~')
         file_path, _ = QFileDialog.getOpenFileName(self, self.tr("Select Database File"), start_dir, self.tr("Database Files (*.db *.sqlite *.sqlite3);;All Files (*.*)"))
+        if file_path: line_edit_target.setText(file_path)
+
+    def _browse_file(self, line_edit_target, dialog_title, file_filter="All Files (*.*)"):
+        current_path = line_edit_target.text()
+        start_dir = os.path.dirname(current_path) if current_path and os.path.exists(os.path.dirname(current_path)) else os.path.expanduser('~')
+        file_path, _ = QFileDialog.getOpenFileName(self, dialog_title, start_dir, file_filter)
         if file_path: line_edit_target.setText(file_path)
 
     def get_general_settings_data(self):
@@ -1525,7 +1635,21 @@ class SettingsPage(QWidget):
             "backup_server_address": self.backup_server_address_input.text().strip(),
             "backup_port": self.backup_port_input.text().strip(), # Port is QLineEdit
             "backup_username": self.backup_username_input.text().strip(),
-            "backup_password": self.backup_password_input.text() # Password not stripped
+            "backup_password": self.backup_password_input.text(), # Password not stripped
+
+            # PostgreSQL specific settings
+            "postgresql_host": self.pg_host_input.text().strip(),
+            "postgresql_port": self.pg_port_spinbox.value(),
+            "postgresql_user": self.pg_user_input.text().strip(),
+            "postgresql_password": self.pg_password_input.text(), # Password not stripped
+            "postgresql_dbname": self.pg_dbname_input.text().strip(),
+
+            # PostgreSQL SSL Settings
+            "postgresql_ssl_mode": self.pg_ssl_mode_combo.currentText(),
+            "postgresql_ssl_rootcert": self.pg_ssl_rootcert_input.text().strip(),
+            "postgresql_ssl_clientcert": self.pg_ssl_clientcert_input.text().strip(),
+            "postgresql_ssl_clientkey": self.pg_ssl_clientkey_input.text().strip()
+
         }
 
     def get_document_templates_settings_data(self):
@@ -2082,6 +2206,23 @@ class SettingsPage(QWidget):
         # for its current functionality (testing biometric simulations).
         self.security_test_page = SecuritySettingsPage()
         self.tabs_widget.addTab(self.security_test_page, self.tr("Security (Biometric Test)"))
+
+    def _setup_my_business_tab(self):
+        if USER_PROFILE_MODULE_AVAILABLE and MyBusinessWidget is not None:
+            # Assuming current_user_id is available in self
+            # If MyBusinessWidget needs the main_config or app_root_dir, pass them as well.
+            # For now, it only seems to need user_id.
+            self.my_business_widget_instance = MyBusinessWidget(user_id=self.current_user_id, parent=self)
+            self.tabs_widget.addTab(self.my_business_widget_instance, self.tr("Mon Entreprise (Profil)"))
+        else:
+            # Create a placeholder tab indicating the module is unavailable
+            unavailable_tab = QWidget()
+            layout = QVBoxLayout(unavailable_tab)
+            label = QLabel(self.tr("The 'My Business' module is currently unavailable.\nPlease check the application logs for more details (ImportError)."))
+            label.setAlignment(Qt.AlignCenter)
+            label.setWordWrap(True)
+            layout.addWidget(label)
+            self.tabs_widget.addTab(unavailable_tab, self.tr("Mon Entreprise (Profil) - Erreur"))
 
 
 if __name__ == '__main__':

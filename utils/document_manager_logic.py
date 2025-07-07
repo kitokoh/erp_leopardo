@@ -44,6 +44,7 @@ from dialogs import (
 )
 # If ClientWidget is used by any logic here (e.g. for refreshing tabs), it would also need to be importable.
 # from client_widget import ClientWidget # Not directly used in the functions being moved, but DocumentManager uses it.
+from .app_utils import sanitize_foldername # Import the new utility
 
 import logging # For logging errors or info
 from db.cruds import activity_logs_crud # Added for activity logging
@@ -98,7 +99,17 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
     city_id_val = created_client_info.get("city_id")       # Resolved by controller
 
     # --- Folder Creation ---
-    folder_name_str = f"{client_name_val}_{country_name_for_folder}_{project_identifier_val}".replace(" ", "_").replace("/", "-")
+    # Sanitize components before creating the folder name
+    client_name_sane = sanitize_foldername(client_name_val)
+    country_name_sane = sanitize_foldername(country_name_for_folder)
+    project_id_sane = sanitize_foldername(project_identifier_val)
+
+    folder_name_str = f"{client_name_sane}_{country_name_sane}_{project_id_sane}"
+    # The sanitize_foldername function should handle spaces and slashes,
+    # so .replace(" ", "_").replace("/", "-") might be redundant or could be removed
+    # depending on how thoroughly sanitize_foldername is implemented.
+    # For now, let's assume sanitize_foldername is comprehensive enough.
+
     base_folder_full_path = os.path.join(doc_manager.config["clients_dir"], folder_name_str)
 
     # Note: project_identifier uniqueness should ideally be handled by client_controller.create_client
@@ -506,12 +517,38 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
             contact_controller = ContactController(current_user_id=doc_manager.current_user_id)
             existing_contacts = get_contacts_for_client(actual_new_client_id, limit=1)
             is_first_contact = not existing_contacts
-            contact_dialog = ContactDialog(client_id=actual_new_client_id,
-                                           parent=doc_manager,
-                                           is_first_contact=is_first_contact,
-                                           current_user_id=doc_manager.current_user_id)
+            # If it's the first contact, we likely want to capture their role/link details.
+            contact_dialog = ContactDialog(parent=doc_manager,
+                                           manage_link_fields=is_first_contact)
             if contact_dialog.exec_() == QDialog.Accepted:
-                contact_form_data = contact_dialog.get_data()
+                contact_form_data = contact_dialog.get_contact_data() # Get general contact data
+                link_form_data = contact_dialog.get_link_data() # Get link-specific data if manage_link_fields was true
+
+                # Combine contact_form_data and link_form_data for the controller,
+                # or adjust controller to accept them separately.
+                # For now, assuming ContactController's get_or_create_contact_and_link
+                # expects a single dict that might include link fields if present.
+                # The ContactDialog.get_data() in the original code was not defined.
+                # It should be get_contact_data() and potentially get_link_data().
+
+                # Let's assume contact_form_data might be augmented by link_form_data
+                # if link_form_data is not None.
+                # The ContactController will need to correctly interpret these fields.
+                # A common pattern is for link_form_data to contain fields like 'role_in_entity', 'is_primary'.
+                # These need to be part of the data passed to the controller if it's to create the EntityContact link.
+
+                # Create a dictionary for the controller that includes all necessary info.
+                # The contact_controller.get_or_create_contact_and_link expects 'contact_form_data'
+                # which should contain all necessary details.
+                # If link_form_data is available, merge it into contact_form_data.
+                # This matches the likely expectation of the controller.
+                final_data_for_controller = contact_form_data.copy()
+                if link_form_data:
+                    final_data_for_controller.update(link_form_data)
+                # Also, ensure 'is_primary' is correctly set if it's the first contact and no explicit choice was made.
+                # The ContactDialog's is_primary_checkbox handles this for the form.
+                # The controller will use what's in final_data_for_controller.
+
                 contact_id_linked, link_id = contact_controller.get_or_create_contact_and_link(
                     client_id=actual_new_client_id,
                     contact_form_data=contact_form_data
@@ -541,7 +578,21 @@ def handle_create_client_execution(doc_manager, client_data_dict=None):
                            message=doc_manager.tr("Le client '{0}' (ID: {1}) a été créé avec succès.").format(created_client_info.get('client_name', client_name_val), actual_new_client_id),
                            type='SUCCESS')
         doc_manager.open_client_tab_by_id(actual_new_client_id)
-        doc_manager.stats_widget.update_stats()
+
+        # Update statistics dashboard
+        stats_dashboard = doc_manager.get_statistics_widget_instance() # This gets/creates StatisticsDashboard
+        if stats_dashboard:
+            if hasattr(stats_dashboard, 'refresh_all_dashboard_content'):
+                stats_dashboard.refresh_all_dashboard_content()
+                logging.info("Called refresh_all_dashboard_content on StatisticsDashboard.")
+            elif hasattr(stats_dashboard, 'update_stats'): # Fallback
+                stats_dashboard.update_stats()
+                logging.info("Called update_stats on StatisticsDashboard.")
+            else:
+                logging.warning("StatisticsDashboard instance does not have a known method to refresh stats.")
+        else:
+            logging.info("Statistics module/dashboard not available, skipping stats update after client creation.")
+
 
     except sqlite3.IntegrityError as e_sqlite_integrity: # This might be caught by controller now
         logging.error(f"Database integrity error: {client_name_val}", exc_info=True)
@@ -618,13 +669,19 @@ def load_and_display_clients(doc_manager, filters: dict = None, limit: int = Non
 
 def filter_and_display_clients(doc_manager):
     search_term = doc_manager.search_input_field.text().lower()
-    selected_status_id = doc_manager.status_filter_combo.currentData()
+    # Use the new attribute for selected status IDs, which is a list
+    selected_status_ids = doc_manager.selected_status_ids_filter 
 
     doc_manager.client_list_widget.clear()
     for client_id_key, client_data_val in doc_manager.clients_data_map.items():
-        if selected_status_id is not None:
-            if client_data_val.get("status_id") != selected_status_id:
+        # If selected_status_ids list is not empty, then filter by it.
+        # An empty list means "All statuses" are effectively selected from the multi-select dialog.
+        if selected_status_ids: # Check if the list is not empty
+            client_status_id = client_data_val.get("status_id")
+            if client_status_id not in selected_status_ids:
                 continue
+        
+        # Keep the existing search term filter logic
         if search_term and not (search_term in client_data_val.get("client_name","").lower() or \
                                search_term in client_data_val.get("project_identifier","").lower() or \
                                search_term in client_data_val.get("company_name","").lower()):

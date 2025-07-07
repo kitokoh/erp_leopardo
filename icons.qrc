@@ -73,5 +73,7 @@
     <file alias="save.svg">resources/icons/placeholder_icon.svg</file>
     <file alias="refresh.svg">resources/icons/refresh-cw.svg</file>
     <file alias="settings-gear.svg">resources/icons/settings.svg</file>
+    <file alias="copy.svg">resources/icons/copy.svg</file>
+    <file alias="trash-2.svg">resources/icons/trash-2.svg</file>
 </qresource>
 </RCC>

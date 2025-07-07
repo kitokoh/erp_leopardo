@@ -13,15 +13,25 @@ through Windows Settings by the user. This handler primarily focuses on:
 """
 import ctypes
 import logging
+import sys # Import sys module
 
 logger = logging.getLogger(__name__)
 
 winbio_dll = None
-try:
-    winbio_dll = ctypes.WinDLL('winbio.dll')
-    logger.info("winbio.dll loaded successfully.")
-except OSError:
-    logger.error("winbio.dll not found. Windows Biometric Framework will not be available.")
+# Only attempt to load winbio.dll on Windows platforms
+if sys.platform == "win32":
+    try:
+        winbio_dll = ctypes.WinDLL('winbio.dll')
+        logger.info("winbio.dll loaded successfully.")
+    except OSError:
+        logger.error("winbio.dll not found on Windows. Windows Biometric Framework will not be available.")
+    except AttributeError:
+        # This might happen if ctypes itself is incomplete, though unlikely for WinDLL.
+        # More relevant if we were using ctypes.windll.winbio
+        logger.error("ctypes.WinDLL attribute not found, cannot load winbio.dll.")
+        winbio_dll = None # Ensure it's None
+else:
+    logger.info("Not on Windows platform. winbio.dll will not be loaded.")
 
 # --- WBF Constants ---
 WINBIO_TYPE_FINGERPRINT = 0x00000008

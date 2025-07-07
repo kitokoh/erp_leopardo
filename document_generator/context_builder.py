@@ -9,6 +9,8 @@ from decimal import Decimal, ROUND_HALF_UP
 from db.cruds import (
     get_company_by_id,
     get_client_by_id,
+    # Make sure referents_crud is imported if not available through the main __init__
+    referents_crud, # Added for referents report
     get_product_by_id,
     get_products_for_client_or_project,
     get_contacts_for_client,
@@ -506,16 +508,16 @@ def get_document_context(
         vat_amount = subtotal_after_discount * context["doc"]["vat_rate"]
         grand_total = subtotal_after_discount + vat_amount
 
-        context["doc"]["subtotal_amount_raw"] = subtotal
+        context["doc"]["subtotal_amount_raw"] = subtotal_ht # Corrected: was subtotal
         context["doc"]["discount_amount_raw"] = discount_amount
         context["doc"]["vat_amount_raw"] = vat_amount
         context["doc"]["grand_total_amount_raw"] = grand_total
 
         cs = context["doc"]["currency_symbol"]
-        context["doc"]["subtotal_amount"] = format_currency(subtotal, cs)
-        context["doc"]["discount_amount"] = format_currency(discount_amount, cs)
-        context["doc"]["vat_amount"] = format_currency(vat_amount, cs)
-        context["doc"]["grand_total_amount"] = format_currency(grand_total, cs)
+        context["doc"]["subtotal_amount"] = format_currency(subtotal_ht, cs, language_code=language_code) # Corrected: was subtotal, added language_code
+        context["doc"]["discount_amount"] = format_currency(discount_amount, cs, language_code=language_code)
+        context["doc"]["vat_amount"] = format_currency(vat_amount, cs, language_code=language_code)
+        context["doc"]["grand_total_amount"] = format_currency(grand_total, cs, language_code=language_code)
 
         doc_type_for_notes = additional_data.get("current_document_type_for_notes", document_type) # Use the key passed from create_document_dialog
         if doc_type_for_notes and client_id and language_code:
@@ -548,6 +550,91 @@ def get_document_context(
         context["placeholders"]["GRAND_TOTAL_AMOUNT"] = context["doc"]["grand_total_amount"]
         context["placeholders"]["SUBTOTAL_AMOUNT"] = context["doc"]["subtotal_amount"]
         context["placeholders"]["CURRENCY_SYMBOL"] = context["doc"]["currency_symbol"]
+
+
+        # <<< DEBUT SECTION POUR REFERENTS REPORT >>>
+        if document_type == 'referents_report':
+            logger.info(f"Building context for referents_report for client_id: {client_id}")
+
+            target_client_info = {}
+            # client_data_raw already contains info from get_client_by_id if client_id was valid
+            client_data_raw_for_target = get_client_by_id(client_id) # Ensure fresh full data for IDs
+
+            if client_data_raw_for_target:
+                target_client_info['full_name'] = client_data_raw_for_target.get("company_name") or client_data_raw_for_target.get("client_name")
+                target_client_info['company_name'] = client_data_raw_for_target.get("company_name")
+
+                target_client_country_id = client_data_raw_for_target.get("country_id")
+                target_client_city_id = client_data_raw_for_target.get("city_id")
+                # Assuming region_id might be directly on client or derived if needed later
+                # target_client_region_id = client_data_raw_for_target.get("region_id")
+
+                target_client_info['country_id'] = target_client_country_id
+                target_client_info['city_id'] = target_client_city_id
+                # target_client_info['region_id'] = target_client_region_id
+
+                # Get city and country names using existing CRUDs if IDs are present
+                if target_client_city_id:
+                    city_obj = get_city_by_id(target_client_city_id)
+                    target_client_info['city'] = city_obj.get("name") if city_obj else None
+                if target_client_country_id:
+                    country_obj = get_country_by_id(target_client_country_id)
+                    target_client_info['country'] = country_obj.get("name") if country_obj else None
+            else: # Fallback if client_data_raw_for_target is None
+                target_client_info['full_name'] = context.get("client", {}).get("display_name")
+                target_client_info['company_name'] = context.get("client", {}).get("company_name")
+                target_client_info['city'] = context.get("client", {}).get("city")
+                target_client_info['country'] = context.get("client", {}).get("country")
+                target_client_country_id = context.get("client", {}).get("country_id") # Might be missing if client not found initially
+                target_client_city_id = context.get("client", {}).get("city_id")
+
+
+            context['target_client'] = target_client_info
+
+            # Récupérer les référents locaux
+            local_referents_list = []
+            if target_client_country_id:
+                local_filters = {'country_id': target_client_country_id}
+                # Optionnel: affiner par ville si disponible
+                # if target_client_city_id: # This might be too restrictive, country level is often enough for "local"
+                #     local_filters['city_id'] = target_client_city_id
+
+                all_local_raw = referents_crud.get_all_referents(filters=local_filters, include_inactive=False)
+                for ref_raw in all_local_raw:
+                    if ref_raw.get('client_id') == client_id: # Exclude the target client itself
+                        continue
+                    local_referents_list.append({
+                        'full_name': ref_raw.get('client_name'), # From joined Clients table
+                        'company_name': ref_raw.get('company_name'), # From joined Clients table
+                        'city': ref_raw.get('city_name'), # From joined Cities table
+                        'region_name': ref_raw.get('region_name'), # From joined Regions table
+                        'country': ref_raw.get('country_name') # From joined Countries table
+                    })
+            context['local_referents'] = local_referents_list
+            logger.info(f"Found {len(local_referents_list)} local referents for country_id {target_client_country_id}.")
+
+            # Récupérer les référents globaux (tous les référents actifs)
+            global_referents_list = []
+            all_global_raw = referents_crud.get_all_referents(include_inactive=False)
+            for ref_raw in all_global_raw:
+                if ref_raw.get('client_id') == client_id: # Exclude the target client itself
+                    continue
+                global_referents_list.append({
+                    'full_name': ref_raw.get('client_name'),
+                    'company_name': ref_raw.get('company_name'),
+                    'city': ref_raw.get('city_name'),
+                    'region_name': ref_raw.get('region_name'),
+                    'country': ref_raw.get('country_name')
+                })
+            context['global_referents'] = global_referents_list
+            logger.info(f"Found {len(global_referents_list)} global referents.")
+
+            # Assurer la présence des autres champs attendus par le template
+            # These are already populated earlier in the function for seller and doc sections.
+            context['company_logo_path'] = context.get('seller', {}).get('logo_url')
+            context['generation_date'] = context.get('doc', {}).get('current_date_formatted')
+            context['company_details'] = context.get('seller')
+        # <<< FIN SECTION POUR REFERENTS REPORT >>>
 
         # 7. Footer Notes
         custom_footer_notes = additional_data.get('footer_notes')

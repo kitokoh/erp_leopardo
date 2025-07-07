@@ -7,7 +7,7 @@ from datetime import datetime
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLineEdit,
     QPushButton, QDialogButtonBox, QMessageBox, QLabel,
-    QListWidget, QListWidgetItem, QComboBox, QGroupBox, QWidget, QApplication
+    QListWidget, QListWidgetItem, QComboBox, QGroupBox, QWidget, QApplication, QTextEdit
 )
 from PyQt5.QtGui import QIcon, QColor, QDesktopServices # QColor was used for item background (optional)
 from PyQt5.QtCore import Qt, QUrl # Qt is used for e.g. Qt.UserRole
@@ -54,19 +54,20 @@ class CreateDocumentDialog(QDialog):
         "TECHNICAL_SPECIFICATIONS_EXCEL": {"name": "Spécifications Techniques (Excel)", "template_type_filter": "TECHNICAL_SPECIFICATIONS_EXCEL"},
     }
 
-    def __init__(self, client_info, config, current_user_id, parent=None, template_data=None, old_document_id_to_version=None):
+    def __init__(self, client_info, config, current_user_id, parent=None, template_data=None, old_document_id_to_version=None, order_identifier=None):
         super().__init__(parent)
         self.client_info = client_info
         self.config = config
         self.app_root_dir = config.get("app_root_dir", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         self.current_user_id = current_user_id
         self.pre_selected_template_id = template_data.get('template_id') if template_data else None
-        self.old_document_id_to_version = old_document_id_to_version # Store for versioning
+        self.old_document_id_to_version = old_document_id_to_version
+        self.order_identifier = order_identifier # Store the passed order_identifier
 
         self.setWindowTitle(self.tr("Générer Document(s) Client via Modèle"))
         if self.old_document_id_to_version:
             self.setWindowTitle(self.tr("Créer une Nouvelle Version du Document"))
-        self.setMinimumSize(600, 400) # Adjusted size
+        self.setMinimumSize(600, 400)
         self._init_ui()
         if self.pre_selected_template_id:
             self._select_and_load_pre_selected_template()
@@ -451,7 +452,7 @@ class CreateDocumentDialog(QDialog):
 
 
                 # Convert HTML to PDF
-                from html_to_pdf_util import convert_html_to_pdf # Local import
+                from utils.html_to_pdf_util import convert_html_to_pdf # Corrected import
                 pdf_output_filename = f"{output_filename_base}.pdf"
                 pdf_output_path = os.path.join(target_doc_folder, pdf_output_filename)
                 base_url_for_pdf = QUrl.fromLocalFile(os.path.dirname(template_file_on_disk_abs)).toString() # Base URL from original template location for relative assets
@@ -570,8 +571,8 @@ class CreateDocumentDialog(QDialog):
         relative_path_for_db = os.path.relpath(final_generated_file_path, client_base_folder)
         doc_db_data = {
             'client_id': client_id_for_context,
-            'project_id': project_id_for_context_arg,
-            'order_identifier': document_context.get('order_identifier'),
+            'project_id': project_id_for_context_arg, # This might need to be derived if order_identifier is present
+            'order_identifier': self.order_identifier if self.order_identifier else document_context.get('order_identifier'), # Prioritize passed identifier
 
             'document_name': final_output_filename,
             'file_name_on_disk': final_output_filename,
