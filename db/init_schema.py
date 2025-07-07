@@ -43,6 +43,7 @@ except ImportError as e_main_sqlalchemy:
     MainBase = None # Ensure it's None so later checks don't fail with NameError
     # main_engine = None # No longer importing main_engine directly at the top
 
+from sqlalchemy import Table, Column, Text # Added for reflecting Users table more explicitly
 
 from auth.roles import SUPER_ADMIN
 
@@ -119,6 +120,19 @@ def initialize_database(app_config):
         raise ValueError("app_config with database_path is required for initialize_database.")
 
     database_path = app_config['database_path']
+
+    # --- TEMPORARY: Force delete database for clean schema generation during debugging ---
+    # In a production environment, this should be handled by migrations or conditional logic.
+    if os.path.exists(database_path):
+        try:
+            os.remove(database_path)
+            logging.warning(f"DEBUG_INIT_DB: TEMPORARILY DELETED existing database file for fresh schema: {database_path}")
+        except OSError as e:
+            logging.error(f"DEBUG_INIT_DB: Error deleting database file {database_path}: {e}. Proceeding might use old data or fail.")
+    else:
+        logging.info(f"DEBUG_INIT_DB: Database file {database_path} not found, will create anew.")
+    # --- END TEMPORARY DELETE ---
+
     # Ensure the directory for the database exists
     db_dir = os.path.dirname(database_path)
     if db_dir and not os.path.exists(db_dir):
@@ -3039,25 +3053,69 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         print("DEBUG_INIT_DB: Raw SQLite connection for Calendar module closed.")
     # --- End Calendar Module Tables ---
 
-    # --- Create tables for MainBase (e.g., CalculatorHistory) ---
+    # --- Create tables for MainBase (e.g., CalculatorHistory, Products, Accounting tables) ---
     # This needs to happen after the main 'conn' is closed if 'actual_main_engine' uses a new connection.
+    # The 'Users' table (created by raw SQL) needs to be known to MainBase.metadata for FKs.
     if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None and actual_main_engine is not None:
+        logging.info("DEBUG_INIT_DB: Preparing to call MainBase.metadata.create_all().")
+        try:
+            # Explicitly reflect the 'Users' table if it's created by raw SQL and other SQLAlchemy models depend on it.
+            # This makes SQLAlchemy's metadata aware of the 'Users' table structure.
+            # Ensure this happens after 'Users' table is created and committed by raw SQL,
+            # and actual_main_engine is initialized.
+            logging.info("DEBUG_INIT_DB: Attempting to reflect 'Users' table into MainBase.metadata.")
+            # We define the primary key column and type explicitly for robust reflection.
+            # Other columns will be autoloaded.
+            users_table_for_reflection = Table('Users', MainBase.metadata,
+                                               Column('user_id', Text, primary_key=True),
+                                               autoload_with=actual_main_engine,
+                                               extend_existing=True) # Important if other parts of code might also define 'Users'
+            logging.info(f"DEBUG_INIT_DB: 'Users' table reflected. Columns: {users_table_for_reflection.columns.keys()}")
+        except Exception as e_reflect_users:
+            logging.error(f"DEBUG_INIT_DB: Error reflecting 'Users' table: {e_reflect_users}. Proceeding with create_all, but FK issues might persist.", exc_info=True)
+
         try:
             # Import B2C restaurant models to register them with MainBase before create_all
             # This ensures that if b2c.ges_restaurant.models uses the same MainBase, its tables are included.
-            import b2c.ges_restaurant.models
+            import b2c.ges_restaurant.models # This registers restaurant models with MainBase
             logging.info("DEBUG_INIT_DB: Imported b2c.ges_restaurant.models for schema creation with MainBase.")
-        except ImportError as e_import_b2c_for_mainbase:
-            logging.error(f"DEBUG_INIT_DB: Failed to import b2c.ges_restaurant.models for MainBase, restaurant tables might not be created if they share MainBase: {e_import_b2c_for_mainbase}")
-        except Exception as e_b2c_generic_for_mainbase:
-            logging.error(f"DEBUG_INIT_DB: An unexpected error occurred during import of b2c.ges_restaurant.models for MainBase: {e_b2c_generic_for_mainbase}", exc_info=True)
+            # Also ensure accounting models are imported if they share MainBase
+            import accounting.models # This registers accounting models with MainBase
+            logging.info("DEBUG_INIT_DB: Imported accounting.models for schema creation with MainBase.")
+        except ImportError as e_import_models_for_mainbase:
+            logging.error(f"DEBUG_INIT_DB: Failed to import additional models (b2c or accounting) for MainBase: {e_import_models_for_mainbase}")
+        except Exception as e_generic_import_for_mainbase:
+            logging.error(f"DEBUG_INIT_DB: An unexpected error occurred during import of additional models for MainBase: {e_generic_import_for_mainbase}", exc_info=True)
 
         try:
-            logging.info("DEBUG_INIT_DB: Creating tables for MainBase (e.g., CalculatorHistory, Restaurant*) using SQLAlchemy actual_main_engine.")
+            logging.info("DEBUG_INIT_DB: Creating tables for MainBase (e.g., CalculatorHistory, Products, Accounting, Restaurant*) using SQLAlchemy actual_main_engine.")
             MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True)
-
             logging.info("DEBUG_INIT_DB: Tables for MainBase created successfully.")
+
+            # Diagnostic: Check Products table schema right after creation by SQLAlchemy
+            try:
+                logging.info("DEBUG_INIT_DB: Checking 'Products' table schema immediately after MainBase.metadata.create_all()...")
+                # Use the existing raw cursor 'cursor' which is still associated with 'conn'
+                # Ensure 'conn' is still open and valid here.
+                # Based on code flow, 'conn' is closed much later in the finally block of initialize_database.
+                products_pragma_cursor = conn.cursor() # Create a new cursor instance from conn
+                products_pragma_cursor.execute("PRAGMA table_info(Products)")
+                products_columns_info = products_pragma_cursor.fetchall()
+                if products_columns_info:
+                    col_details = []
+                    for col in products_columns_info:
+                        # col is a sqlite3.Row object if conn.row_factory was set, or tuple
+                        # Assuming conn.row_factory = sqlite3.Row is active on 'conn'
+                        col_details.append(f"Name: {col['name']}, Type: {col['type']}, PK: {col['pk']}")
+                    logging.info(f"DEBUG_INIT_DB: 'Products' table schema: {', '.join(col_details)}")
+                else:
+                    logging.warning("DEBUG_INIT_DB: 'Products' table not found or no schema info via PRAGMA after create_all.")
+                products_pragma_cursor.close() # Close the temporary cursor
+            except Exception as e_pragma_check:
+                logging.error(f"DEBUG_INIT_DB: Error checking 'Products' table schema with PRAGMA: {e_pragma_check}", exc_info=True)
+
         except Exception as e_main_base_create:
+            # This is where the original "NoReferencedTableError" for Products.created_by_user_id occurred.
             logging.error(f"DEBUG_INIT_DB: Error creating tables for MainBase: {e_main_base_create}", exc_info=True)
     else:
         logging.warning("DEBUG_INIT_DB: Main SQLAlchemy components (MainBase, actual_main_engine) not loaded or actual_main_engine is None. Skipping MainBase.metadata.create_all().")
@@ -3339,6 +3397,14 @@ if __name__ == '__main__':
         # "DEFAULT_ADMIN_PASSWORD": "password_standalone_test"
     }
     print(f"Using mock database path for standalone test: {mock_app_config['database_path']}")
+
+    # Ensure a clean state by deleting the test database file if it exists
+    if os.path.exists(mock_app_config["database_path"]):
+        try:
+            os.remove(mock_app_config["database_path"])
+            print(f"Deleted existing test database: {mock_app_config['database_path']}")
+        except OSError as e:
+            print(f"Error deleting test database {mock_app_config['database_path']}: {e}. Proceeding might use old data or fail.")
 
     # Ensure the directory for the mock database exists
     _test_db_dir = os.path.dirname(mock_app_config["database_path"])

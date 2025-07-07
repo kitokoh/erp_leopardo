@@ -329,4 +329,3 @@ class PasswordResetService:
 # Or keep as a class and instantiate where needed.
 # For now, let's assume it will be instantiated on demand or be part of a larger auth service object.
 # password_reset_service_instance = PasswordResetService()
-"""
