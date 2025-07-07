@@ -832,6 +832,42 @@ def initialize_database(app_config):
     # The raw SQL creation and ALTER TABLE statements for Products are removed.
     logging.info("DEBUG_INIT_DB: Products table creation will be handled by SQLAlchemy MainBase.metadata.create_all().")
 
+    # --- START DEBUGGING: Check if Products table exists before DROP ---
+    try:
+        with actual_main_engine.connect() as connection:
+            result = connection.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='Products'")).fetchone()
+            if result:
+                logging.info(f"DEBUG_INIT_DB: PRE-DROP CHECK: 'Products' table FOUND by sqlite_master query on actual_main_engine.")
+            else:
+                logging.info(f"DEBUG_INIT_DB: PRE-DROP CHECK: 'Products' table NOT FOUND by sqlite_master query on actual_main_engine.")
+    except Exception as e_check_before_drop:
+        logging.error(f"DEBUG_INIT_DB: Error checking Products table existence before drop: {e_check_before_drop}", exc_info=True)
+    # --- END DEBUGGING ---
+
+    # --- DEBUGGING STEP for "Products already exists" ---
+    # Ensure this DROP is effective on the same engine that create_all uses.
+    logging.info("DEBUG_INIT_DB: Attempting to DROP Products table IF IT EXISTS using actual_main_engine...")
+    try:
+        with actual_main_engine.connect() as connection:
+            connection.execute(text("DROP TABLE IF EXISTS Products"))
+            connection.commit() # Commit the drop
+        logging.info("DEBUG_INIT_DB: Products table (if it existed) dropped successfully using actual_main_engine.")
+    except Exception as e_drop:
+        logging.error(f"DEBUG_INIT_DB: Error trying to DROP Products table with actual_main_engine: {e_drop}", exc_info=True)
+    # --- END DEBUGGING STEP ---
+
+    # --- START DEBUGGING: Check if Products table exists AFTER DROP ---
+    try:
+        with actual_main_engine.connect() as connection:
+            result = connection.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='Products'")).fetchone()
+            if result:
+                logging.info(f"DEBUG_INIT_DB: POST-DROP CHECK: 'Products' table STILL FOUND by sqlite_master query on actual_main_engine. This is unexpected if DROP was successful.")
+            else:
+                logging.info(f"DEBUG_INIT_DB: POST-DROP CHECK: 'Products' table NOT FOUND by sqlite_master query on actual_main_engine. This is expected if DROP was successful.")
+    except Exception as e_check_after_drop:
+        logging.error(f"DEBUG_INIT_DB: Error checking Products table existence after drop: {e_check_after_drop}", exc_info=True)
+    # --- END DEBUGGING ---
+
     # Create ProductDimensions table (from ca.py)
     # This table depends on Products.product_id.
     # If Products is created by SQLAlchemy, ProductDimensions should also ideally be an SQLAlchemy model
@@ -2795,6 +2831,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
             except Exception as e_drop_all:
                 logging.error(f"DEBUG_INIT_DB: Error trying to DROP tables managed by MainBase: {e_drop_all}", exc_info=True)
             # --- END Enhanced DEBUGGING/CLEANUP STEP ---
+
 
             logging.info("DEBUG_INIT_DB: Creating all tables for MainBase using SQLAlchemy actual_main_engine (checkfirst=True).")
             # Setting checkfirst=False now as we've manually ensured tables are dropped.
