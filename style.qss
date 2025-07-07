@@ -1303,6 +1303,147 @@ QPushButton#userMenuButton::menu-indicator {
     image: none; /* Hide default menu indicator arrow */
 }
 
+/* === Specific styles for DocumentManager Left Pane === */
+QWidget#leftPaneWidget {
+    background-color: #F5F7FA; /* A light background for the entire pane */
+    border-right: 1px solid #DDE2E6; /* Add a subtle border to separate from right pane */
+}
+
+QGroupBox#filterSearchGroup {
+    font-weight: bold; /* Already set in global QGroupBox, but can be fine-tuned */
+    border: 1px solid #DDE2E6; /* Consistent border */
+    border-radius: 6px;
+    margin-top: 0; /* No top margin if it's the first element in leftPaneWidget */
+    background-color: #FFFFFF; /* White background for the filter area */
+}
+
+QGroupBox#filterSearchGroup::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    padding: 6px 12px; /* Slightly more padding for the title */
+    left: 10px;
+    background-color: transparent; /* Ensure it's transparent */
+    color: #007BFF; /* Accent color for the title */
+    font-size: 10pt;
+    font-weight: bold;
+}
+
+/* Targeting QLineEdit and QComboBox specifically within the left pane */
+QWidget#leftPaneWidget QLineEdit,
+QWidget#leftPaneWidget QComboBox {
+    padding: 7px 10px; /* Increased padding for a more modern feel */
+    border: 1px solid #DDE2E6; /* Standard border */
+    border-radius: 4px;
+    background-color: #FFFFFF;
+    min-height: 30px; /* Consistent height for inputs */
+    font-size: 9pt;
+}
+QWidget#leftPaneWidget QLabel { /* Labels within the left pane, e.g., for filters */
+    font-size: 9pt;
+    color: #343a40;
+    padding-top: 4px; /* Align with input fields better */
+    margin-bottom: 2px; /* Small space below label */
+    background-color: transparent;
+}
+
+
+QWidget#leftPaneWidget QLineEdit:focus,
+QWidget#leftPaneWidget QComboBox:focus {
+    border-color: #007BFF; /* Highlight focus with accent color */
+}
+
+QWidget#leftPaneWidget QComboBox::drop-down {
+    border-left: 1px solid #DDE2E6;
+    padding: 0px 6px; /* Space for the arrow */
+    width: 20px; /* Explicit width for dropdown button area */
+}
+
+QWidget#leftPaneWidget QComboBox::down-arrow {
+    image: url(:/icons/chevron-down.svg); /* Ensure this icon is available */
+    width: 10px; /* Smaller arrow */
+    height: 10px;
+}
+
+/* Client List Specific Styling */
+QListWidget#clientListWidget {
+    border: 1px solid #DDE2E6; /* Consistent border */
+    border-radius: 4px;
+    background-color: #FFFFFF; /* White background for the list */
+    padding: 5px; /* Small padding around the list items */
+}
+
+/* Remove default item padding if ClientListItemWidget handles all its spacing */
+QListWidget#clientListWidget::item {
+    padding: 0px;
+    margin: 3px 0px; /* Add a small vertical margin between items for separation */
+    border: none; /* Ensure no default item border from QListWidget */
+    /* background-color: transparent; Let ClientListItemWidget handle its own bg/hover */
+}
+QListWidget#clientListWidget::item:selected {
+    background-color: transparent; /* Override default selection, ClientListItemWidget could show selection */
+    /* Or, if you want QListWidget to show selection: */
+    /* background-color: #E3F2FD; */ /* Light blue selection */
+    /* border: 1px solid #007BFF; */
+}
+
+
+/* Buttons at the bottom of the left pane */
+QWidget#leftPaneWidget QPushButton {
+    padding: 8px 12px;
+    min-height: 32px; /* Standard height */
+    font-size: 10pt; /* Slightly larger font for main action buttons */
+    font-weight: 500; /* Medium weight */
+    border-radius: 4px;
+}
+
+/* Primary button in left pane (e.g., Add New Client) */
+QWidget#leftPaneWidget QPushButton#primaryButton {
+    background-color: #007BFF;
+    color: white;
+    border: 1px solid #007BFF;
+}
+QWidget#leftPaneWidget QPushButton#primaryButton:hover {
+    background-color: #0069d9;
+    border-color: #0062cc;
+}
+QWidget#leftPaneWidget QPushButton#primaryButton:disabled {
+    background-color: #a0cfff;
+    border-color: #a0cfff;
+    color: #e0e0e0;
+}
+
+/* Pagination buttons */
+/* Assuming QPushButton objectNames: prevPageButton, nextPageButton */
+/* And QLabel objectName: pageInfoLabel */
+QWidget#leftPaneWidget QPushButton#prevPageButton,
+QWidget#leftPaneWidget QPushButton#nextPageButton {
+    padding: 6px 10px;
+    font-size: 9pt;
+    min-width: 70px; /* Slightly wider for better text fit */
+    background-color: #FFFFFF;
+    color: #007BFF;
+    border: 1px solid #007BFF;
+}
+QWidget#leftPaneWidget QPushButton#prevPageButton:hover,
+QWidget#leftPaneWidget QPushButton#nextPageButton:hover {
+    background-color: #E3F2FD;
+}
+QWidget#leftPaneWidget QPushButton#prevPageButton:disabled,
+QWidget#leftPaneWidget QPushButton#nextPageButton:disabled {
+    background-color: #F5F7FA;
+    color: #B0BEC5;
+    border-color: #DDE2E6;
+}
+
+QWidget#leftPaneWidget QLabel#pageInfoLabel {
+    font-size: 9pt;
+    color: #546E7A;
+    padding: 5px;
+    background-color: transparent;
+    border: none;
+}
+/* === END of Specific styles for DocumentManager Left Pane === */
+
 /* User Menu Button in Menu Bar */
 QPushButton#userMenuButton {
     background-color: transparent;
