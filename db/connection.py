@@ -172,7 +172,7 @@ def initialize_engine_and_session(app_config_param):
 
             logging.info(f"db.connection: SQLAlchemy engine connecting to: {engine_url}")
             try:
-                engine = create_engine(engine_url, connect_args={"check_same_thread": False})
+                engine = create_engine(engine_url, connect_args={"check_same_thread": False, "timeout": 10}) # Increased timeout
                 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
                 logging.info("db.connection: SQLAlchemy engine and SessionLocal created successfully for SQLite.")
             except Exception as e:
