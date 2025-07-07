@@ -308,3 +308,85 @@ def client_update_view(request, client_id):
         'client_id': client_id # Pour l'URL du formulaire si besoin (pas pour POST car déjà dans l'URL)
     }
     return render(request, 'clients/client_form.html', context)
+
+
+@login_required
+def client_deactivate_view(request, client_id):
+    api_auth_token = request.session.get('api_auth_token')
+    active_company_id = request.session.get('active_company_id') # Vérification de la société active
+    active_company_name = request.session.get('active_company_name', 'N/A')
+
+    if not api_auth_token:
+        messages.error(request, "Erreur d'authentification API. Veuillez vous reconnecter.")
+        return redirect('users:login')
+
+    if not active_company_id:
+        messages.warning(request, "Veuillez sélectionner une société active.")
+        return redirect(getattr(settings, 'LOGIN_REDIRECT_URL', 'dashboard:main'))
+
+    headers = {'Authorization': f'Token {api_auth_token}'}
+    client_api_url = f"{API_BASE_URL}/clients/{client_id}/" # Endpoint de détail/update/patch
+
+    # Récupérer les infos du client pour la page de confirmation (en GET)
+    client_data = None
+    if request.method == 'GET':
+        try:
+            response_get = requests.get(client_api_url, headers=headers)
+            response_get.raise_for_status()
+            client_data = response_get.json()
+            if not client_data.get('is_active', True): # Si déjà inactif
+                messages.info(request, f"Le client '{client_data.get('client_name')}' est déjà inactif.")
+                return redirect('clients:detail', client_id=client_id)
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                messages.error(request, "Client non trouvé ou non autorisé.")
+            else:
+                messages.error(request, f"Erreur API ({e.response.status_code}) lors de la récupération du client pour désactivation.")
+            return redirect('clients:list')
+        except requests.exceptions.RequestException:
+            messages.error(request, "Erreur de communication pour récupérer les détails du client.")
+            return redirect('clients:list')
+        except ValueError:
+            messages.error(request, "Réponse invalide du service client.")
+            return redirect('clients:list')
+
+
+    if request.method == 'POST':
+        try:
+            payload = {'is_active': False}
+            response_patch = requests.patch(client_api_url, headers=headers, json=payload)
+            response_patch.raise_for_status()
+
+            # Récupérer le nom du client depuis la réponse PATCH ou refaire un GET si nécessaire
+            # Pour simplifier, on peut utiliser le nom passé en session ou un nom générique.
+            # Idéalement, le nom est dans client_data si on vient du GET de confirmation.
+            client_name_display = client_data.get('client_name', 'Le client') if client_data else 'Le client'
+            if response_patch.status_code == 200: # OK pour PATCH
+                 client_name_display = response_patch.json().get('client_name', client_name_display)
+
+            messages.success(request, f"Le client '{client_name_display}' a été désactivé avec succès.")
+
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                messages.error(request, "Client non trouvé ou non autorisé pour la désactivation.")
+            elif e.response.status_code == 400:
+                 error_data = e.response.json()
+                 for field, errors in error_data.items():
+                     for error in errors if isinstance(errors, list) else [errors]:
+                        messages.error(request, f"Erreur API ({field}): {error}")
+            else:
+                messages.error(request, f"Erreur API ({e.response.status_code}) lors de la désactivation du client.")
+        except requests.exceptions.RequestException:
+            messages.error(request, "Erreur de communication lors de la désactivation du client.")
+        except ValueError:
+            messages.error(request, "Réponse invalide du service lors de la désactivation.")
+
+        return redirect('clients:list') # Toujours rediriger après un POST
+
+    # Contexte pour la page de confirmation (GET)
+    context = {
+        'client': client_data, # client_data peut être None si le GET initial échoue, le template doit gérer ça
+        'page_title': f"Désactiver le Client : {client_data.get('client_name', '') if client_data else 'Client'}",
+        'active_company_name': active_company_name,
+    }
+    return render(request, 'clients/client_confirm_deactivate.html', context)

@@ -8,4 +8,5 @@ urlpatterns = [
     path('add/', views.client_create_view, name='create'),
     path('<uuid:client_id>/', views.client_detail_view, name='detail'),
     path('<uuid:client_id>/edit/', views.client_update_view, name='update'),
+    path('<uuid:client_id>/deactivate/', views.client_deactivate_view, name='deactivate'),
 ]

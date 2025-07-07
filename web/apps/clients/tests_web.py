@@ -3,6 +3,7 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from apps.users.models import Company # Pour créer une société de test
 from unittest.mock import patch, MagicMock # Pour mocker requests.get
+import requests # Ajouté pour requests.exceptions.HTTPError
 
 User = get_user_model()
 
@@ -641,3 +642,133 @@ class ClientUpdateViewWebTests(TestCase):
         self.assertRedirects(response, self.list_url)
         messages_list = list(get_messages(response.wsgi_request))
         self.assertTrue(any("Client non trouvé ou non autorisé" in str(m) for m in messages_list))
+
+
+class ClientDeactivateViewWebTests(TestCase):
+    def setUp(self):
+        self.django_client = DjangoClient()
+        self.login_url = reverse('users:login')
+        self.list_url = reverse('clients:list')
+
+        self.test_user = User.objects.create_user(
+            username='deactivateclientuser',
+            email='deactivateclientuser@example.com',
+            password='password123'
+        )
+        self.test_company = Company.objects.create(name="Deactivate Client Test Co", owner=self.test_user)
+
+        self.active_client = Client.objects.create(
+            company_account=self.test_company,
+            client_name="Client To Deactivate",
+            is_active=True
+        )
+        self.inactive_client = Client.objects.create(
+            company_account=self.test_company,
+            client_name="Already Inactive Client",
+            is_active=False
+        )
+        self.deactivate_url_active = reverse('clients:deactivate', kwargs={'client_id': self.active_client.id})
+        self.deactivate_url_inactive = reverse('clients:deactivate', kwargs={'client_id': self.inactive_client.id})
+
+
+        # Connexion et setup session
+        self.django_client.login(username='deactivateclientuser@example.com', password='password123')
+        session = self.django_client.session
+        session['api_auth_token'] = 'faketesttoken_deactivate123'
+        session['active_company_id'] = str(self.test_company.id)
+        session['active_company_name'] = self.test_company.name
+        session.save()
+
+        self.mock_api_get_client_active_response = { "id": str(self.active_client.id), "client_name": "Client To Deactivate", "is_active": True }
+        self.mock_api_get_client_inactive_response = { "id": str(self.inactive_client.id), "client_name": "Already Inactive Client", "is_active": False }
+        self.mock_api_patch_success_response = { "id": str(self.active_client.id), "client_name": "Client To Deactivate", "is_active": False }
+
+    @patch('requests.get')
+    def test_deactivate_view_get_displays_confirmation(self, mock_api_get):
+        mock_response_get = MagicMock()
+        mock_response_get.status_code = 200
+        mock_response_get.json.return_value = self.mock_api_get_client_active_response
+        mock_api_get.return_value = mock_response_get
+
+        response = self.django_client.get(self.deactivate_url_active)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'clients/client_confirm_deactivate.html')
+        self.assertContains(response, "Confirmer la Désactivation")
+        self.assertContains(response, self.active_client.client_name)
+        mock_api_get.assert_called_once()
+
+    @patch('requests.get') # Pour le GET initial de la page de confirmation
+    @patch('requests.patch') # Pour le POST de désactivation
+    def test_deactivate_view_post_success(self, mock_api_patch, mock_api_get_confirm):
+        # Mock pour le GET de la page de confirmation
+        mock_response_get = MagicMock()
+        mock_response_get.status_code = 200
+        mock_response_get.json.return_value = self.mock_api_get_client_active_response # Client est actif
+        mock_api_get_confirm.return_value = mock_response_get
+
+        # Mock pour l'appel PATCH de l'API
+        mock_response_patch = MagicMock()
+        mock_response_patch.status_code = 200 # Succès de la mise à jour partielle
+        mock_response_patch.json.return_value = self.mock_api_patch_success_response
+        mock_api_patch.return_value = mock_response_patch
+
+        response = self.django_client.post(self.deactivate_url_active)
+        self.assertRedirects(response, self.list_url)
+        messages_list = list(get_messages(response.wsgi_request))
+        self.assertTrue(any(f"Le client '{self.active_client.client_name}' a été désactivé avec succès." in str(m) for m in messages_list))
+
+        expected_api_url = f"http://localhost:8000/api/v1/clients/{self.active_client.id}/"
+        mock_api_patch.assert_called_once_with(
+            expected_api_url,
+            headers={'Authorization': f'Token faketesttoken_deactivate123'},
+            json={'is_active': False}
+        )
+
+    @patch('requests.get')
+    def test_deactivate_view_get_for_already_inactive_client_redirects(self, mock_api_get):
+        mock_response_get = MagicMock()
+        mock_response_get.status_code = 200
+        mock_response_get.json.return_value = self.mock_api_get_client_inactive_response # Client est déjà inactif
+        mock_api_get.return_value = mock_response_get
+
+        response = self.django_client.get(self.deactivate_url_inactive)
+        detail_url_inactive = reverse('clients:detail', kwargs={'client_id': self.inactive_client.id})
+        self.assertRedirects(response, detail_url_inactive)
+        messages_list = list(get_messages(response.wsgi_request))
+        self.assertTrue(any(f"Le client '{self.inactive_client.client_name}' est déjà inactif." in str(m) for m in messages_list))
+
+
+    @patch('requests.get') # Pour le GET de confirmation
+    @patch('requests.patch') # Pour le POST
+    def test_deactivate_view_api_patch_fails(self, mock_api_patch, mock_api_get_confirm):
+        mock_response_get = MagicMock()
+        mock_response_get.status_code = 200
+        mock_response_get.json.return_value = self.mock_api_get_client_active_response
+        mock_api_get_confirm.return_value = mock_response_get
+
+        mock_response_patch = MagicMock()
+        mock_response_patch.status_code = 400 # Erreur de l'API
+        mock_response_patch.json.return_value = {"detail": "Erreur API lors de la désactivation."}
+        mock_response_patch.raise_for_status.side_effect = requests.exceptions.HTTPError(response=mock_response_patch)
+        mock_api_patch.return_value = mock_response_patch
+
+        response = self.django_client.post(self.deactivate_url_active)
+        self.assertRedirects(response, self.list_url) # Redirige toujours vers la liste
+        messages_list = list(get_messages(response.wsgi_request))
+        # Le message exact dépend de la gestion d'erreur dans la vue
+        self.assertTrue(any("Erreur API" in str(m) for m in messages_list))
+
+    def test_deactivate_view_unauthenticated(self):
+        self.django_client.logout()
+        response_get = self.django_client.get(self.deactivate_url_active)
+        self.assertRedirects(response_get, f"{self.login_url}?next={self.deactivate_url_active}")
+        response_post = self.django_client.post(self.deactivate_url_active)
+        self.assertRedirects(response_post, f"{self.login_url}?next={self.deactivate_url_active}")
+
+    def test_deactivate_view_no_active_company(self):
+        session = self.django_client.session
+        del session['active_company_id']
+        session.save()
+
+        response = self.django_client.get(self.deactivate_url_active)
+        self.assertRedirects(response, reverse(settings.LOGIN_REDIRECT_URL))
