@@ -56,11 +56,7 @@ from .cruds.users_crud import (
     get_user_by_id,
     list_users, # Changed from get_all_users
     update_user_password, # Changed from update_user
-<<<<<<< HEAD
-    # verify_password, # Removed as it's not directly in users_crud anymore
-=======
     # verify_password, # Changed from verify_user_password ### REMOVED - erroneous import
->>>>>>> 0c69b5aff7a65cb90e062c29962798001ba14f54
     add_user as add_user_crud, # Alias to avoid conflict if main has add_user
 
     verify_user_password, # This is the correct one to use for full verification
