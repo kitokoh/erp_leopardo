@@ -3337,6 +3337,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
                 # if it rolls back unrelated changes. If actual_main_engine is None, this block is skipped,
                 # so the rollback in the outer try/except for e_acc_seed won't be triggered by this specific path.
 
+
         except ImportError:
             print("DEBUG_INIT_DB: Could not import accounting cruds/models for seeding. Skipping accounting seed data.")
         except Exception as e_acc_seed:
@@ -3348,6 +3349,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
             # (like Users table creation) if the accounting seed fails.
             print("DEBUG_INIT_DB: Error occurred during accounting seeding. SQLAlchemy session should handle its own rollback.")
             # If actual_main_engine was None, this block wouldn't have been entered, so no specific handling needed here for that.
+
 
 
         # User Seeding (Admin user) - This initial seeding attempt is now handled by db_seed.py
