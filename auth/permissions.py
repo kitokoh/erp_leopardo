@@ -167,9 +167,10 @@ def has_permission(user_role_name: str, required_permission_key: str) -> bool:
 
     # SUPER_ADMIN role bypasses individual permission checks and always has all permissions.
     # Ensure SUPER_ADMIN is imported or defined in this scope.
-    from .roles import SUPER_ADMIN as SUPER_ADMIN_ROLE_CONSTANT
-    if user_role_name == SUPER_ADMIN_ROLE_CONSTANT:
-        logger.debug(f"Permission check for SUPER_ADMIN ('{user_role_name}') for key '{required_permission_key}': GRANTED (superuser).")
+    # Using .roles constants directly might be cleaner if they are simple strings.
+    from .roles import SUPER_ADMIN as SUPER_ADMIN_ROLE_CONSTANT # Assuming SUPER_ADMIN is "super_admin"
+    if user_role_name == SUPER_ADMIN_ROLE_CONSTANT: # Check against the constant
+        logger.debug(f"Permission check for role '{user_role_name}' (SUPER_ADMIN) for key '{required_permission_key}': GRANTED (superuser).")
         return True
 
     if not required_permission_key:
