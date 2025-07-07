@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 import logging
-
-
+import os # Added os import
 import datetime
 
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QTableWidget,
-    QTableWidgetItem, QHeaderView, QAbstractItemView, QMessageBox, QComboBox
+    QTableWidgetItem, QHeaderView, QAbstractItemView, QMessageBox, QComboBox,
+    QInputDialog # Added QInputDialog
 )
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QUrl
@@ -460,20 +460,56 @@ class CommandeWidget(QWidget):
             self.logger.info(f"Context préparé pour la proforma : {document_context}")
 
             # 5. Selecting the appropriate proforma template.
-            # Determine target language (e.g., first selected language of the client, or default)
-            target_lang_code = 'fr' # Default
+            # --- Language Selection ---
+            SUPPORTED_LANGUAGES_FOR_PROFORMA = {
+                "en": "English",
+                "fr": "French",
+                "ar": "Arabic",
+                "tr": "Turkish",
+                "pt": "Portuguese",
+                "ru": "Russian"
+                # Add more languages as templates become available
+            }
+
+            # Determine default language for dialog
+            client_pref_lang = 'fr' # Default to French
             if client_info_for_doc.get('selected_languages'):
                 try:
-                    # Assuming selected_languages is a comma-separated string or a list
                     langs = client_info_for_doc['selected_languages']
                     if isinstance(langs, str):
                         langs = [lang.strip() for lang in langs.split(',') if lang.strip()]
-                    if langs:
-                        target_lang_code = langs[0]
+                    if langs and langs[0] in SUPPORTED_LANGUAGES_FOR_PROFORMA:
+                        client_pref_lang = langs[0]
                 except Exception as lang_ex:
-                    self.logger.warning(f"Could not determine client's preferred language, defaulting to 'fr'. Error: {lang_ex}")
+                    self.logger.warning(f"Could not determine client's preferred language for dialog, defaulting to 'fr'. Error: {lang_ex}")
 
-            self.logger.info(f"Target language for Proforma template: {target_lang_code}")
+            language_items = [f"{name} ({code})" for code, name in SUPPORTED_LANGUAGES_FOR_PROFORMA.items()]
+
+            # Find default index for QInputDialog
+            default_lang_item_str = f"{SUPPORTED_LANGUAGES_FOR_PROFORMA.get(client_pref_lang, 'French')} ({client_pref_lang})"
+            try:
+                default_selection_idx = language_items.index(default_lang_item_str)
+            except ValueError:
+                default_selection_idx = language_items.index("French (fr)") # Fallback if client_pref_lang not in list
+
+            selected_lang_display, lang_ok = QInputDialog.getItem(
+                self,
+                self.tr("Sélectionner la Langue du Proforma"),
+                self.tr("Langue pour la génération du document proforma :"),
+                language_items,
+                default_selection_idx, # Set default selection
+                False # Not editable
+            )
+
+            if not lang_ok or not selected_lang_display:
+                self.logger.info("Génération de proforma annulée par l'utilisateur (sélection de langue).")
+                return # User cancelled
+
+            # Extract code from "Name (code)"
+            target_lang_code = selected_lang_display.split('(')[-1].replace(')', '').strip()
+            self.logger.info(f"Langue sélectionnée pour la Proforma: {target_lang_code} ({selected_lang_display})")
+
+            # --- End Language Selection ---
 
             from db.cruds import templates_crud # Local import for clarity
             # Assuming "HTML_PROFORMA" is the template_type for proforma invoices. This might need adjustment.
