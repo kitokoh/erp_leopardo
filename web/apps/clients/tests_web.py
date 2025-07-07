@@ -213,3 +213,149 @@ class ClientListViewWebTests(TestCase):
 
     # Ajouter des tests pour le ClientFilterForm si besoin (ex: validation, champs)
     # Ajouter des tests pour la vue de création quand elle sera implémentée.
+
+class ClientCreateViewWebTests(TestCase):
+    def setUp(self):
+        self.django_client = DjangoClient()
+        self.create_url = reverse('clients:create')
+        self.list_url = reverse('clients:list')
+        self.login_url = reverse('users:login')
+
+        self.test_user = User.objects.create_user(
+            username='createclientuser',
+            email='createclientuser@example.com',
+            password='password123'
+        )
+        self.test_company = Company.objects.create(name="Create Client Test Co", owner=self.test_user)
+
+        # Connexion et setup session
+        self.django_client.login(username='createclientuser@example.com', password='password123')
+        session = self.django_client.session
+        session['api_auth_token'] = 'faketesttoken_create123'
+        session['active_company_id'] = str(self.test_company.id)
+        session['active_company_name'] = self.test_company.name
+        session.save()
+
+        self.client_form_data = {
+            'client_name': 'New Web Client',
+            'email': 'newweb@example.com',
+            'phone': '1234567890',
+            'address': '123 Web St',
+            'contact_person_name': 'Web Contact',
+            'contact_person_email': 'webcontact@example.com',
+            'contact_person_phone': '0987654321',
+            'notes': 'Test note for web creation',
+            'is_active': True,
+        }
+        # Réponse API mockée pour une création réussie
+        self.mock_api_create_success_response = {
+            "id": "new-client-uuid",
+            "client_name": "New Web Client",
+            "email": "newweb@example.com",
+            # ... autres champs ...
+        }
+        # Réponse API mockée pour une erreur de validation
+        self.mock_api_create_fail_validation_response = {
+            "client_name": ["Ce nom de client existe déjà pour cette société."],
+            "email": ["Entrez une adresse email valide."]
+        }
+
+    def test_client_create_view_get_displays_form(self):
+        response = self.django_client.get(self.create_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'clients/client_form.html')
+        self.assertIn('form', response.context)
+        self.assertIsInstance(response.context['form'], ClientForm) # Assurez-vous d'importer ClientForm
+        self.assertEqual(response.context['page_title'], 'Ajouter un Nouveau Client')
+
+    @patch('requests.post')
+    def test_client_create_view_post_success(self, mock_api_post):
+        mock_response = MagicMock()
+        mock_response.status_code = 201 # Création réussie
+        mock_response.json.return_value = self.mock_api_create_success_response
+        mock_api_post.return_value = mock_response
+
+        response = self.django_client.post(self.create_url, self.client_form_data)
+
+        self.assertRedirects(response, self.list_url)
+        messages = list(get_messages(response.wsgi_request))
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(str(messages[0]), "Client 'New Web Client' créé avec succès.")
+
+        expected_api_url = f"http://localhost:8000/api/v1/clients/"
+        # Vérifier que l'appel API a été fait avec les bonnes données (sans company_account car géré par API)
+        # Le ClientForm n'a pas company_account, donc il ne sera pas dans form.cleaned_data
+        # Le ViewSet API ClientViewSet doit l'assigner.
+        mock_api_post.assert_called_once_with(
+            expected_api_url,
+            headers={'Authorization': f'Token faketesttoken_create123'},
+            json=self.client_form_data # Les données envoyées à l'API sont celles du formulaire validé
+        )
+
+    def test_client_create_view_form_invalid(self):
+        # Soumettre des données qui feront échouer la validation du ClientForm
+        invalid_data = self.client_form_data.copy()
+        invalid_data['client_name'] = '' # Nom de client vide
+        response = self.django_client.post(self.create_url, invalid_data)
+
+        self.assertEqual(response.status_code, 200) # Reste sur la page du formulaire
+        self.assertTemplateUsed(response, 'clients/client_form.html')
+        self.assertFormError(response, 'form', 'client_name', 'Ce champ est obligatoire.') # Ou le message de votre clean_client_name
+        messages_list = list(get_messages(response.wsgi_request))
+        self.assertTrue(any("Veuillez corriger les erreurs" in str(m) for m in messages_list))
+
+
+    @patch('requests.post')
+    def test_client_create_view_api_validation_error(self, mock_api_post):
+        mock_response = MagicMock()
+        mock_response.status_code = 400 # Erreur de validation de l'API
+        mock_response.json.return_value = self.mock_api_create_fail_validation_response
+        # Simuler l'effet de raise_for_status()
+        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(response=mock_response)
+        mock_api_post.return_value = mock_response
+
+        response = self.django_client.post(self.create_url, self.client_form_data)
+        self.assertEqual(response.status_code, 200) # Reste sur la page du formulaire
+        self.assertTemplateUsed(response, 'clients/client_form.html')
+        # Vérifier que les erreurs de l'API sont ajoutées au formulaire
+        self.assertFormError(response, 'form', 'client_name', "Ce nom de client existe déjà pour cette société.")
+        self.assertFormError(response, 'form', 'email', "Entrez une adresse email valide.")
+
+
+    @patch('requests.post')
+    def test_client_create_view_api_server_error(self, mock_api_post):
+        mock_response = MagicMock()
+        mock_response.status_code = 500 # Erreur serveur de l'API
+        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(response=mock_response)
+        mock_api_post.return_value = mock_response
+
+        response = self.django_client.post(self.create_url, self.client_form_data)
+        self.assertEqual(response.status_code, 200) # Reste sur la page
+        messages_list = list(get_messages(response.wsgi_request))
+        self.assertTrue(any("Erreur API 500" in str(m) for m in messages_list))
+
+
+    def test_client_create_view_unauthenticated(self):
+        self.django_client.logout()
+        response = self.django_client.get(self.create_url)
+        self.assertRedirects(response, f"{self.login_url}?next={self.create_url}")
+        response_post = self.django_client.post(self.create_url, self.client_form_data)
+        self.assertRedirects(response_post, f"{self.login_url}?next={self.create_url}")
+
+    def test_client_create_view_no_active_company(self):
+        session = self.django_client.session
+        del session['active_company_id']
+        session.save()
+
+        response = self.django_client.get(self.create_url)
+        self.assertRedirects(response, reverse(settings.LOGIN_REDIRECT_URL)) # Redirige vers dashboard par défaut
+        messages_list = list(get_messages(response.wsgi_request))
+        # Le message est sur la requête *avant* la redirection. Il faut suivre la redirection pour le voir.
+        # Alternative: response = self.django_client.get(self.create_url, follow=True)
+        # Pour l'instant, on vérifie juste la redirection.
+
+# Nécessaire pour récupérer les messages après une redirection
+from django.contrib.messages import get_messages
+# Importer ClientForm depuis le bon endroit
+from .forms import ClientForm
+from django.conf import settings

@@ -18,8 +18,7 @@
                 <small class="text-muted fs-5">- {{ request.session.active_company_name }}</small>
             {% endif %}
         </h2>
-        {# <a href="{% url 'clients:create' %}" class="btn btn-primary"> #}
-        <a href="#" class="btn btn-primary"> {# URL de création à définir plus tard #}
+        <a href="{% url 'clients:create' %}" class="btn btn-primary">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-plus-circle-fill" viewBox="0 0 16 16">
                 <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8.5 4.5a.5.5 0 0 0-1 0v3h-3a.5.5 0 0 0 0 1h3v3a.5.5 0 0 0 1 0v-3h3a.5.5 0 0 0 0-1h-3v-3z"/>
             </svg>

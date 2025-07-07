@@ -84,30 +84,80 @@ def client_list_view(request):
 
     return render(request, template_name, context)
 
+from .forms import ClientForm # Importer ClientForm
 
-# Les vues pour create, detail, update, delete seront ajoutées ici plus tard.
-# Exemple pour client_create_view:
-# from .forms import ClientForm
-# @login_required
-# def client_create_view(request):
-#     api_auth_token = request.session.get('api_auth_token')
-#     active_company_id = request.session.get('active_company_id')
-#     # ... (vérifications token et company_id) ...
-#     headers = {'Authorization': f'Token {api_auth_token}'}
-#     form = ClientForm(request.POST or None)
-#     if request.method == 'POST' and form.is_valid():
-#         api_data = form.cleaned_data.copy() # Adapter les champs si nécessaire
-#         api_data['company_account'] = active_company_id # Assigner la société active
-#         create_api_url = f"{API_BASE_URL}/clients/"
-#         try:
-#             response = requests.post(create_api_url, headers=headers, json=api_data) # Utiliser json= pour POST/PUT/PATCH
-#             response.raise_for_status()
-#             messages.success(request, "Client créé avec succès.")
-#             return redirect('clients:list') # Assurez-vous que cette URL est correcte
-#         except requests.exceptions.HTTPError as e:
-#             # Gérer les erreurs de l'API et les ajouter au formulaire ou aux messages
-#             # ...
-#         except requests.exceptions.RequestException:
-#             # ...
-#     context = {'form': form, 'page_title': 'Ajouter un Client'}
-#     return render(request, 'clients/client_form.html', context)
+@login_required
+def client_create_view(request):
+    api_auth_token = request.session.get('api_auth_token')
+    active_company_id = request.session.get('active_company_id')
+    active_company_name = request.session.get('active_company_name', 'N/A')
+
+    if not api_auth_token:
+        messages.error(request, "Erreur d'authentification API. Veuillez vous reconnecter.")
+        return redirect('users:login')
+
+    if not active_company_id:
+        messages.warning(request, "Veuillez sélectionner une société active pour ajouter un client.")
+        return redirect(getattr(settings, 'LOGIN_REDIRECT_URL', 'dashboard:main'))
+
+    headers = {'Authorization': f'Token {api_auth_token}'}
+    form = ClientForm(request.POST or None) # Initialiser avec request.POST si method est POST, sinon None
+
+    if request.method == 'POST':
+        if form.is_valid():
+            api_data = form.cleaned_data.copy()
+            # La company_account sera gérée par le ViewSet API basé sur l'utilisateur authentifié
+            # et sa société active. On n'a pas besoin de la passer explicitement ici si le ViewSet
+            # est bien configuré pour la déduire de request.user ou d'une company_id passée en paramètre
+            # que la permission validerait.
+            # Pour le moment, on suppose que le ViewSet ClientViewSet.perform_create s'en charge.
+
+            create_api_url = f"{API_BASE_URL}/clients/" # URL de l'endpoint de création de l'API
+
+            try:
+                # Utiliser json= pour envoyer les données en JSON pour POST/PUT/PATCH avec DRF
+                response = requests.post(create_api_url, headers=headers, json=api_data)
+                response.raise_for_status() # Lève une exception pour les codes d'erreur HTTP 4xx/5xx
+
+                created_client_data = response.json() # Récupérer les données du client créé depuis l'API
+                messages.success(request, f"Client '{created_client_data.get('client_name', '')}' créé avec succès.")
+                # Rediriger vers la liste des clients ou le détail du client nouvellement créé
+                return redirect('clients:list') # Assurez-vous que 'clients:list' est le nom d'URL correct
+
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 400: # Erreur de validation de l'API
+                    error_data = e.response.json()
+                    # Parcourir les erreurs retournées par l'API et les ajouter au formulaire Django
+                    for field, errors in error_data.items():
+                        if field in form.fields: # Si l'erreur de l'API concerne un champ du formulaire
+                            for error in errors if isinstance(errors, list) else [errors]:
+                                form.add_error(field, error)
+                        # Gérer les erreurs non liées à un champ (non_field_errors de DRF)
+                        # ou les erreurs de champs API qui n'existent pas dans le form Django
+                        elif field == 'detail' or field == 'non_field_errors':
+                             for error in errors if isinstance(errors, list) else [errors]:
+                                messages.error(request, error) # Afficher comme message global
+                        else: # Erreur de champ API non mappée directement au formulaire
+                            for error in errors if isinstance(errors, list) else [errors]:
+                                messages.error(request, f"Erreur API pour '{field}': {error}")
+                elif e.response.status_code == 401: # Non autorisé par l'API (token invalide/expiré)
+                     messages.error(request, "Session API invalide ou expirée. Veuillez vous reconnecter.")
+                     return redirect('users:login')
+                elif e.response.status_code == 403: # Interdit (droits insuffisants)
+                     messages.error(request, "Action non autorisée par l'API pour créer ce client.")
+                else: # Autre erreur HTTP de l'API
+                    messages.error(request, f"Une erreur s'est produite lors de la création du client (Erreur API {e.response.status_code}).")
+            except requests.exceptions.RequestException: # Erreur de connexion à l'API
+                messages.error(request, "Erreur de communication avec le service des clients. Veuillez réessayer plus tard.")
+            except ValueError: # Erreur de décodage JSON de la réponse de l'API
+                messages.error(request, "Réponse invalide ou mal formatée reçue du service des clients.")
+        else: # Le formulaire Django n'est pas valide (validation côté client/Django avant appel API)
+            messages.warning(request, "Veuillez corriger les erreurs indiquées dans le formulaire.")
+
+    context = {
+        'form': form,
+        'page_title': 'Ajouter un Nouveau Client',
+        'active_company_name': active_company_name, # Pour l'affichage dans le template
+        'submit_button_text': 'Enregistrer le Client' # Texte pour le bouton de soumission
+    }
+    return render(request, 'clients/client_form.html', context)
