@@ -192,15 +192,15 @@ class RestaurantPaiement(Base):
     # If the application's `db.initialize_database()` calls `Base.metadata.create_all(engine)`,
     # and this `models.py` file is imported *before* that call, these tables will be created.
     # This is a common pattern for SQLAlchemy applications.
-```
+# ```
 
-J'ai ajouté des commentaires dans le code pour souligner les points d'intégration importants, notamment l'utilisation de `Base` de `db.connection` et la référence à la table `Products` existante.
+# J'ai ajouté des commentaires dans le code pour souligner les points d'intégration importants, notamment l'utilisation de `Base` de `db.connection` et la référence à la table `Products` existante.
 
-**2. `b2c/ges_restaurant/schemas.py` (Pydantic - Optionnel mais recommandé)**
+# **2. `b2c/ges_restaurant/schemas.py` (Pydantic - Optionnel mais recommandé)**
 
-Pour la validation des données, surtout si on envisage une API plus tard, ou pour structurer les données passées entre les fonctions :
+# Pour la validation des données, surtout si on envisage une API plus tard, ou pour structurer les données passées entre les fonctions :
 
-```python
+# ```python
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
@@ -310,5 +310,5 @@ class RestaurantCommandeInDB(RestaurantCommandeBase):
     class Config:
         orm_mode = True
 
-```
-Je vais créer ce fichier également.
+# ```
+# Je vais créer ce fichier également.

@@ -13,6 +13,9 @@ import db as db_manager
 # SAVTicketDialog will be imported locally or passed if it's a shared component.
 # For now, assume it might be imported locally if specific to SAV.
 # from sav.ticket_dialog import SAVTicketDialog # Placeholder
+from PyQt5.QtWidgets import QGroupBox
+from PyQt5.QtCore import QDateTime
+from PyQt5.QtWidgets import QDialog
 
 class SAVTab(QWidget):
     def __init__(self, client_info: dict, current_user_info: dict,

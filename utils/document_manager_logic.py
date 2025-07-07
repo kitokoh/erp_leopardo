@@ -669,13 +669,19 @@ def load_and_display_clients(doc_manager, filters: dict = None, limit: int = Non
 
 def filter_and_display_clients(doc_manager):
     search_term = doc_manager.search_input_field.text().lower()
-    selected_status_id = doc_manager.status_filter_combo.currentData()
+    # Use the new attribute for selected status IDs, which is a list
+    selected_status_ids = doc_manager.selected_status_ids_filter 
 
     doc_manager.client_list_widget.clear()
     for client_id_key, client_data_val in doc_manager.clients_data_map.items():
-        if selected_status_id is not None:
-            if client_data_val.get("status_id") != selected_status_id:
+        # If selected_status_ids list is not empty, then filter by it.
+        # An empty list means "All statuses" are effectively selected from the multi-select dialog.
+        if selected_status_ids: # Check if the list is not empty
+            client_status_id = client_data_val.get("status_id")
+            if client_status_id not in selected_status_ids:
                 continue
+        
+        # Keep the existing search term filter logic
         if search_term and not (search_term in client_data_val.get("client_name","").lower() or \
                                search_term in client_data_val.get("project_identifier","").lower() or \
                                search_term in client_data_val.get("company_name","").lower()):

@@ -5,6 +5,9 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLa
                              QSizePolicy)
 from PyQt5.QtCore import Qt, pyqtSignal, QSize, QFile, QTextStream # Added QFile, QTextStream
 from PyQt5.QtGui import QIcon, QPalette, QColor
+from typing import Optional
+from typing import Dict
+from typing import Any
 
 # Assuming cruds are in the parent directory of ui (ges_restaurant.cruds)
 # This needs careful path management when integrated into the main app.
