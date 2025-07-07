@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, Numeric, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, Numeric, ForeignKey, UniqueConstraint, Index
 from sqlalchemy.sql import func
 # from sqlalchemy.orm import relationship # Not strictly needed for this specific model to solve the FK issue
 
@@ -11,13 +11,13 @@ class Products(Base):
     product_name = Column(String, nullable=False)
     product_code = Column(String, unique=True, nullable=True)
     description = Column(Text, nullable=True)
-    category = Column(String, nullable=True)
+    category = Column(String, nullable=True, index=True) # Simple index via index=True
     language_code = Column(String, default='fr', nullable=True)
     base_unit_price = Column(Numeric(precision=18, scale=2), nullable=False)
     unit_of_measure = Column(String, nullable=True)
     weight = Column(Numeric(precision=10, scale=2), nullable=True)
     dimensions = Column(Text, nullable=True)
-    is_active = Column(Boolean, default=True, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False, index=True) # Simple index via index=True
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     is_deleted = Column(Integer, default=0, nullable=False)
@@ -26,6 +26,8 @@ class Products(Base):
 
     __table_args__ = (
         UniqueConstraint('product_name', 'language_code', name='uq_products_product_name_language_code'),
+        # Index('idx_products_category', 'category'), # Using index=True on column def is preferred for single columns
+        # Index('idx_products_is_active', 'is_active'), # Using index=True on column def is preferred for single columns
     )
 
     def __repr__(self):
