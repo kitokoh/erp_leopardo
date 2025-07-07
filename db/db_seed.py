@@ -18,6 +18,7 @@ import importlib
 # Assuming config.py is in the parent directory (root)
 from config import DATABASE_PATH, DEFAULT_ADMIN_USERNAME
 from app_setup import CONFIG
+from auth.roles import SUPER_ADMIN as SUPER_ADMIN_ROLE_NAME
 
 
 # Import necessary functions directly from their new CRUD module locations
@@ -136,7 +137,6 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         # 1. Users - Seed initial Admin User (now 'admin' with SUPER_ADMIN role)
         super_admin_user_id = None # Initialize
     # Fetch SUPER_ADMIN role_id
-    from auth.roles import SUPER_ADMIN as SUPER_ADMIN_ROLE_NAME # Import the role name
     super_admin_role_dict = crud_get_role_by_name(SUPER_ADMIN_ROLE_NAME, conn=conn)
     if not super_admin_role_dict:
         logger.info(f"Role '{SUPER_ADMIN_ROLE_NAME}' not found, creating it...")
