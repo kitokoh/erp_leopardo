@@ -3342,13 +3342,14 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
             print("DEBUG_INIT_DB: Could not import accounting cruds/models for seeding. Skipping accounting seed data.")
         except Exception as e_acc_seed:
             logging.error(f"DEBUG_INIT_DB: Error during accounting data seeding: {e_acc_seed}", exc_info=True) # Log with traceback
-            # Only rollback 'conn' if the error is truly from this block's operations,
-            # not if actual_main_engine was None from the start.
-            if actual_main_engine: # Check if we even attempted operations that might need rollback on 'conn'
-                conn.rollback()
-                print("DEBUG_INIT_DB: Rollback on 'conn' due to accounting seeding error.")
-            else:
-                print("DEBUG_INIT_DB: Accounting seeding skipped due to missing actual_main_engine, no rollback on 'conn' from this point.")
+            # CRITICAL CHANGE: Removed conn.rollback() here.
+            # The SQLAlchemy session 'session' (or 'session_acc_seed') within the 'with' block
+            # will automatically rollback if an unhandled exception occurs within it.
+            # Rolling back the outer 'conn' here could discard valid operations
+            # (like Users table creation) if the accounting seed fails.
+            print("DEBUG_INIT_DB: Error occurred during accounting seeding. SQLAlchemy session should handle its own rollback.")
+            # If actual_main_engine was None, this block wouldn't have been entered, so no specific handling needed here for that.
+
 
 
         # User Seeding (Admin user) - This initial seeding attempt is now handled by db_seed.py
