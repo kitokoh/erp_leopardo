@@ -258,23 +258,60 @@ class GenericCRUD:
                 conditions.append(f"{key} = ?")
                 values.append(value)
 
-        if not conditions: # Should not happen if attributes is not empty, but as a safe guard.
-             return self.get_all(table_name=_table_name, conn=conn, order_by=order_by)
-
-        where_clause = f" {logical_operator.upper()} ".join(conditions)
-        # query will use '?' placeholders as constructed.
-        query = f"SELECT * FROM {_table_name} WHERE {where_clause}"
+        if not conditions: # This case means all attributes were None, or attributes was empty.
+            # If attributes was empty, it's handled by the initial check.
+            # If all attributes are None, values list is empty.
+            where_clause = f" {logical_operator.upper()} ".join(conditions) # e.g. "col1 IS NULL AND col2 IS NULL"
+            query = f"SELECT * FROM {_table_name} WHERE {where_clause}"
+            # values is [], so tuple(values) is ()
+        else:
+            where_clause = f" {logical_operator.upper()} ".join(conditions)
+            query = f"SELECT * FROM {_table_name} WHERE {where_clause}"
 
         if order_by:
             query += f" ORDER BY {order_by}" # Assuming order_by is safe
 
         rows = []
         if _is_sqlalchemy_obj(conn):
-            # For SA with '?' placeholders (qmark style), pass 'values' as a tuple.
-            result = conn.execute(sqlalchemy_text(query), tuple(values))
+            # Change to use named parameters for SQLAlchemy to be more robust
+            # This requires re-evaluating conditions and values for named params
+            named_conditions = []
+            params_dict = {}
+            i = 0
+            for key, value_attr in attributes.items(): # Iterate original attributes again
+                if value_attr is None:
+                    named_conditions.append(f"{key} IS NULL")
+                else:
+                    param_name = f"gen_param_{i}"
+                    named_conditions.append(f"{key} = :{param_name}")
+                    params_dict[param_name] = value_attr
+                    i += 1
 
+            if not named_conditions and not attributes: # Attributes was empty from start
+                 return self.get_all(table_name=_table_name, conn=conn, order_by=order_by)
+
+            final_where_clause = f" {logical_operator.upper()} ".join(named_conditions)
+            if not final_where_clause and attributes: # All attributes were IS NULL
+                # This means named_conditions contains only IS NULL parts, params_dict is empty
+                # Example: attr = {'name':None}, named_conditions = ["name IS NULL"], params_dict = {}
+                # This is fine, query will have WHERE name IS NULL, params_dict is {}
+                 pass # params_dict is correctly empty.
+            elif not final_where_clause and not attributes: # Should be caught by get_all return
+                # This case indicates empty attributes dict, should have returned get_all earlier
+                # For safety, return get_all if somehow reached here.
+                return self.get_all(table_name=_table_name, conn=conn, order_by=order_by)
+
+
+            query_final_sa = f"SELECT * FROM {_table_name}"
+            if final_where_clause: # Only add WHERE if there are conditions
+                query_final_sa += f" WHERE {final_where_clause}"
+
+            if order_by:
+                query_final_sa += f" ORDER BY {order_by}"
+
+            result = conn.execute(sqlalchemy_text(query_final_sa), params_dict)
             rows = result.fetchall()
-        else:
+        else: # sqlite3 path (original logic with '?' and list of values)
             original_row_factory = None
             if hasattr(conn, 'row_factory') and conn.row_factory != sqlite3.Row:
                 original_row_factory = conn.row_factory

@@ -30,7 +30,10 @@ def get_role_by_id(role_id: int, conn: sqlite3.Connection = None) -> dict | None
         cursor = conn.cursor()
         cursor.execute(sql, (role_id,))
         row = cursor.fetchone()
-        return dict(row) if row else None
+        if row:
+            column_names = [desc[0] for desc in cursor.description]
+            return dict(zip(column_names, row))
+        return None
     except sqlite3.Error as e:
         logger.error(f"Database error fetching role ID {role_id}: {e}", exc_info=True)
         return None
@@ -43,7 +46,10 @@ def get_role_by_name(role_name: str, conn: sqlite3.Connection = None) -> dict | 
         cursor = conn.cursor()
         cursor.execute(sql, (role_name,))
         row = cursor.fetchone()
-        return dict(row) if row else None
+        if row:
+            column_names = [desc[0] for desc in cursor.description]
+            return dict(zip(column_names, row))
+        return None
     except sqlite3.Error as e:
         logger.error(f"Database error fetching role by name '{role_name}': {e}", exc_info=True)
         return None
@@ -55,7 +61,11 @@ def list_roles(conn: sqlite3.Connection = None) -> list[dict]:
     try:
         cursor = conn.cursor()
         cursor.execute(sql)
-        return [dict(row) for row in cursor.fetchall()]
+        rows = cursor.fetchall()
+        if not rows:
+            return []
+        column_names = [desc[0] for desc in cursor.description]
+        return [dict(zip(column_names, row)) for row in rows]
     except sqlite3.Error as e:
         logger.error(f"Database error listing roles: {e}", exc_info=True)
         return []
