@@ -44,14 +44,26 @@ class GlobalProductEditDialog(QDialog):
         form_layout.setSpacing(10)
 
         self.name_input = QLineEdit()
-        form_layout.addRow(self.tr("Nom du Produit *:"), self.name_input)
+        name_layout = QHBoxLayout()
+        name_layout.addWidget(self.name_input)
+        self.suggest_name_translation_button = QPushButton(QIcon.fromTheme("text-x-generic"), self.tr("Suggérer"))
+        self.suggest_name_translation_button.setToolTip(self.tr("Suggérer une traduction pour le nom du produit"))
+        self.suggest_name_translation_button.clicked.connect(lambda: self._handle_suggest_translation("name"))
+        name_layout.addWidget(self.suggest_name_translation_button)
+        form_layout.addRow(self.tr("Nom du Produit *:"), name_layout)
 
         self.code_input = QLineEdit()
         form_layout.addRow(self.tr("Code Produit (SKU) *:"), self.code_input)
 
         self.description_input = QTextEdit()
         self.description_input.setFixedHeight(80)
-        form_layout.addRow(self.tr("Description:"), self.description_input)
+        description_layout = QHBoxLayout()
+        description_layout.addWidget(self.description_input)
+        self.suggest_desc_translation_button = QPushButton(QIcon.fromTheme("text-x-generic"), self.tr("Suggérer"))
+        self.suggest_desc_translation_button.setToolTip(self.tr("Suggérer une traduction pour la description"))
+        self.suggest_desc_translation_button.clicked.connect(lambda: self._handle_suggest_translation("description"))
+        description_layout.addWidget(self.suggest_desc_translation_button)
+        form_layout.addRow(self.tr("Description:"), description_layout)
 
         self.category_input = QLineEdit()
         form_layout.addRow(self.tr("Catégorie:"), self.category_input)

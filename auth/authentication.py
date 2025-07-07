@@ -51,15 +51,15 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
         user = users_crud.get_user_by_username(username)
         if not user:
             logger.warning(f"Login attempt failed: User '{username}' not found.")
-            save_remember_me_preference(username, False) # Clear on failure
-            return False, "Nom d'utilisateur ou mot de passe incorrect.", None
+            # save_remember_me_preference(username, False) # This function was removed, token handling is direct now
+            return False, "Nom d'utilisateur ou mot de passe incorrect.", None, None
 
         if not user.get('is_active'):
             logger.warning(f"Login attempt failed: User '{username}' is inactive.")
-            save_remember_me_preference(username, False) # Clear on failure
-            return False, "Ce compte utilisateur est désactivé.", None
+            # save_remember_me_preference(username, False) # This function was removed
+            return False, "Ce compte utilisateur est désactivé.", None, None
 
-        # Corrected function call: users_crud.util_verify_password
+        # Password verification using users_crud.util_verify_password
         # The users_crud module imports verify_password as util_verify_password from utils
         # and then has its own wrapper verify_user_password.
         # However, the original error indicates a direct call to a function named verify_password
@@ -86,11 +86,10 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
                 'role_id': user['role_id'],
                 'role_name': user.get('role_name')
             }
-            # This is where we'd actually get 'remember_me' from the call
-            # For now, let's assume it's passed. We'll modify LoginDialog next.
-            save_remember_me_preference(username, remember_me) # Save preference on successful login
+            # Token handling is now done in the updated login function below.
+            # save_remember_me_preference(username, remember_me) # This function was removed
 
-            # Vérification de la licence
+            # License verification
             conn = None
             try:
                 conn = get_db_connection()
@@ -130,7 +129,7 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
                 logger.error(f"Erreur lors de la vérification de la licence pour {username}: {e_lic}", exc_info=True)
                 # Si la vérification de licence échoue critiquement, on peut considérer le login comme échoué
                 # ou retourner un statut spécial. Pour l'instant, on propage une erreur.
-                save_remember_me_preference(username, False) # Effacer remember_me en cas d'erreur critique de licence
+                # save_remember_me_preference(username, False) # This function was removed
                 _current_user_data = None # Ne pas considérer l'utilisateur comme loggué
                 return False, "Erreur critique lors de la vérification de la licence.", None, None
             finally:
@@ -139,26 +138,24 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
 
         else: # Mot de passe incorrect
             logger.warning(f"Login attempt failed: Invalid password for user '{username}'.")
-            save_remember_me_preference(username, False) # Clear on failure
+            # save_remember_me_preference(username, False) # This function was removed
             return False, "Nom d'utilisateur ou mot de passe incorrect.", None, None
 
     except Exception as e: # Erreur générale pendant le login (avant la licence)
         logger.error(f"Error during login for user '{username}': {e}", exc_info=True)
-        save_remember_me_preference(username, False) # Clear on exception
+        # save_remember_me_preference(username, False) # This function was removed
         return False, "Une erreur est survenue lors de la connexion.", None, None
 
-def logout():
-    """Logs out the current user."""
-    global _current_user_data
-    if _current_user_data:
-        logger.info(f"User '{_current_user_data.get('username')}' logged out.")
-        _current_user_data = None
-        clear_remember_me_preference() # Clear remember me on explicit logout
-    else:
-        logger.info("Logout called but no user was logged in.")
-        # Optionally, clear remember me even if no user was logged in,
-        # as a safety measure if logout is called unexpectedly.
-        clear_remember_me_preference()
+# def logout(): # This version of logout is superseded by the one below that handles tokens
+#     """Logs out the current user."""
+#     global _current_user_data
+#     if _current_user_data:
+#         logger.info(f"User '{_current_user_data.get('username')}' logged out.")
+#         _current_user_data = None
+#         # clear_remember_me_preference() # This function was removed, token clearing is handled in new logout
+#     else:
+#         logger.info("Logout called but no user was logged in.")
+#         # clear_remember_me_preference()
 
 def get_current_user() -> dict | None:
     """
@@ -251,17 +248,28 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
     # or when a new token is successfully generated for the same user.
 
     try:
+        logger.info(f"AUTH_LOGIN: Attempting login for username: '{username}'")
         user = users_crud.get_user_by_username(username)
+
         if not user:
-            logger.warning(f"Login attempt failed: User '{username}' not found.")
+            logger.warning(f"AUTH_LOGIN: User '{username}' not found in database.")
             return False, "Nom d'utilisateur ou mot de passe incorrect.", None, None
+        
+        logger.info(f"AUTH_LOGIN: User '{username}' found. User data: ID={user.get('user_id')}, RoleName={user.get('role_name')}, HashedPW={user.get('hashed_password')}")
+
+        logger.info(f"AUTH_LOGIN: User '{username}' found. User data: ID={user.get('user_id')}, RoleName={user.get('role_name')}, HashedPW={user.get('hashed_password')}")
+
+        logger.info(f"AUTH_LOGIN: User '{username}' found. User data: ID={user.get('user_id')}, RoleName={user.get('role_name')}, HashedPW={user.get('hashed_password')}")
 
         if not user.get('is_active'):
-            logger.warning(f"Login attempt failed: User '{username}' is inactive.")
+            logger.warning(f"AUTH_LOGIN: User '{username}' is inactive.")
             return False, "Ce compte utilisateur est désactivé.", None, None
 
-        if users_crud.util_verify_password(password, user['hashed_password'])[0]:
-            logger.info(f"User '{username}' logged in successfully.")
+        password_verified, new_hash_if_needed = users_crud.util_verify_password(password, user['hashed_password'])
+        logger.info(f"AUTH_LOGIN: Password verification result for '{username}': {password_verified}")
+
+        if password_verified:
+            logger.info(f"AUTH_LOGIN: User '{username}' logged in successfully (password verified).")
             users_crud.record_login_time(user['user_id'])
 
             _current_user_data = {
