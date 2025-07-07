@@ -126,52 +126,79 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
             # Depending on policy, might raise an error or try to proceed if other roles are vital.
             # For now, log critical and proceed, other parts of seeding might still be useful.
 
-        # 1. Users - Seed initial Admin User
-        admin_user_id = None # Initialize
-        if admin_role_id: # Only proceed if Admin role exists
-            logger.info(f"Checking for default admin user '{DEFAULT_ADMIN_USERNAME}'...")
-            admin_user_dict = users_crud.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn, logger_passed=logger)
-            temp_admin_password = "admin" # Known default password
+    # 1. Users - Seed initial Admin User (now 'admin' with SUPER_ADMIN role)
+    super_admin_user_id = None # Initialize
+    # Fetch SUPER_ADMIN role_id
+    from auth.roles import SUPER_ADMIN as SUPER_ADMIN_ROLE_NAME # Import the role name
+    super_admin_role_dict = crud_get_role_by_name(SUPER_ADMIN_ROLE_NAME, conn=conn)
+    if not super_admin_role_dict:
+        logger.info(f"Role '{SUPER_ADMIN_ROLE_NAME}' not found, creating it...")
+        super_admin_role_id_new = crud_add_role(SUPER_ADMIN_ROLE_NAME, "Super administrator with all permissions.", conn=conn)
+        if super_admin_role_id_new:
+            super_admin_role_id = super_admin_role_id_new
+            logger.info(f"Role '{SUPER_ADMIN_ROLE_NAME}' created with ID {super_admin_role_id}.")
+        else:
+            logger.error(f"Failed to create role '{SUPER_ADMIN_ROLE_NAME}'. Cannot create super_admin user.")
+            super_admin_role_id = None # Ensure it's None if creation failed
+    else:
+        super_admin_role_id = super_admin_role_dict['role_id']
+        logger.info(f"Role '{SUPER_ADMIN_ROLE_NAME}' found with ID {super_admin_role_id}.")
+
+
+    if super_admin_role_id: # Only proceed if SUPER_ADMIN role exists/was created
+        target_admin_username = "admin" # Explicitly "admin"
+        logger.info(f"Checking for default super admin user '{target_admin_username}'...")
+        admin_user_dict = users_crud.get_user_by_username(target_admin_username, conn=conn, logger_passed=logger)
+        temp_admin_password = "admin" # Explicitly "admin"
 
             if admin_user_dict:
-                admin_user_id = admin_user_dict['user_id']
-                logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' (ID: {admin_user_id}) exists. Forcing password update to default to ensure bcrypt hash.")
-                update_success = users_crud.update_user_password(admin_user_id, temp_admin_password, conn=conn, logger_passed=logger)
+            super_admin_user_id = admin_user_dict['user_id']
+            logger.info(f"Default super admin user '{target_admin_username}' (ID: {super_admin_user_id}) exists.")
+            # Ensure role is SUPER_ADMIN
+            if admin_user_dict.get('role_id') != super_admin_role_id:
+                logger.info(f"User '{target_admin_username}' exists but does not have SUPER_ADMIN role. Updating role...")
+                users_crud.update_user_role(super_admin_user_id, super_admin_role_id, conn=conn, logger_passed=logger)
+            # Force password update to default "admin" to ensure it's current and hash is updated if needed
+            logger.info(f"Forcing password update for '{target_admin_username}' to default to ensure bcrypt hash and correct password.")
+            update_success = users_crud.update_user_password(super_admin_user_id, temp_admin_password, conn=conn, logger_passed=logger)
                 if update_success:
-                    logger.info(f"Password for default admin user '{DEFAULT_ADMIN_USERNAME}' (ID: {admin_user_id}) reset/updated successfully.")
-                    # Re-fetch to log the hash that's now in DB
-                    updated_admin_info = users_crud.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn, logger_passed=logger)
+                logger.info(f"Password for super admin user '{target_admin_username}' (ID: {super_admin_user_id}) reset/updated successfully.")
+                updated_admin_info = users_crud.get_user_by_username(target_admin_username, conn=conn, logger_passed=logger)
                     if updated_admin_info:
-                        logger.info(f"Hash for '{DEFAULT_ADMIN_USERNAME}' in DB after update: {updated_admin_info.get('hashed_password')}")
-                    else:
-                        logger.error(f"Could not re-fetch admin user '{DEFAULT_ADMIN_USERNAME}' after password update.")
+                    logger.info(f"Hash for '{target_admin_username}' in DB after update: {updated_admin_info.get('hashed_password')}")
                 else:
-                    logger.error(f"Failed to update password for default admin user '{DEFAULT_ADMIN_USERNAME}' (ID: {admin_user_id}). This is critical for login.")
+                logger.error(f"Failed to update password for super admin user '{target_admin_username}' (ID: {super_admin_user_id}). This is critical for login.")
             else:
-                logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' not found. Creating with password '{temp_admin_password}'...")
-
+            logger.info(f"Default super admin user '{target_admin_username}' not found. Creating with password '{temp_admin_password}'...")
                 new_admin_id = users_crud.add_user(
-                    username=DEFAULT_ADMIN_USERNAME,
-                    password=temp_admin_password, # crud_add_user logs the hash used
-                    role_id=admin_role_id,
-                    full_name="Default Administrator",
-                    email="admin@example.local",
+                username=target_admin_username,
+                password=temp_admin_password,
+                role_id=super_admin_role_id,
+                full_name="Super Administrator",
+                email="superadmin@example.local", # Changed email for distinction
                     conn=conn,
                     logger_passed=logger
                 )
                 if new_admin_id:
-                    admin_user_id = new_admin_id
-                    logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' created with ID {admin_user_id}. PLEASE CHANGE THE DEFAULT PASSWORD IMMEDIATELY.")
-                    # Re-fetch to log the hash that's now in DB
-                    created_admin_info = users_crud.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn, logger_passed=logger)
+                super_admin_user_id = new_admin_id
+                logger.info(f"Default super admin user '{target_admin_username}' created with ID {super_admin_user_id}. PLEASE CHANGE THE DEFAULT PASSWORD IMMEDIATELY.")
+                created_admin_info = users_crud.get_user_by_username(target_admin_username, conn=conn, logger_passed=logger)
                     if created_admin_info:
-                        logger.info(f"Hash for new admin '{DEFAULT_ADMIN_USERNAME}' in DB: {created_admin_info.get('hashed_password')}")
-                    else:
-                        logger.error(f"Could not re-fetch admin user '{DEFAULT_ADMIN_USERNAME}' after creation.")
+                    logger.info(f"Hash for new super admin '{target_admin_username}' in DB: {created_admin_info.get('hashed_password')}")
                 else:
-                    logger.error(f"Failed to create default admin user '{DEFAULT_ADMIN_USERNAME}'.")
-        else: # admin_role_id was not found/created
-            logger.warning(f"Cannot seed default admin user because Administrator role ID is missing.")
+                logger.error(f"Failed to create default super admin user '{target_admin_username}'.")
+    else:
+        logger.warning(f"Cannot seed default super admin user because SUPER_ADMIN role ID is missing.")
+
+    # Preserve admin_user_id for compatibility with other seeding parts if they expect it.
+    # If super_admin_user_id was set, use it. Otherwise, try to use the old admin_role_id path if it exists.
+    admin_user_id = super_admin_user_id if super_admin_user_id else None
+    if not admin_user_id and admin_role_id: # Fallback for original admin user if super_admin failed but old admin might exist
+        logger.warning("Super admin seeding had issues, checking for original default admin user for compatibility.")
+        original_admin_user_dict = users_crud.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn, logger_passed=logger)
+        if original_admin_user_dict:
+            admin_user_id = original_admin_user_dict['user_id']
+            logger.info(f"Found original default admin user '{DEFAULT_ADMIN_USERNAME}' with ID {admin_user_id} for compatibility.")
 
 
         # 2. Companies (uses admin_user_id if available for created_by or similar in future)

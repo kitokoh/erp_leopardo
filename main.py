@@ -12,9 +12,9 @@ elif sys.path[0] != PROJECT_ROOT:
     sys.path.insert(0, PROJECT_ROOT)
 
 # Ensure this debug print is AFTER the sys.path modification and BEFORE any project imports
-print(f"DEBUG main.py: Initial PROJECT_ROOT: {PROJECT_ROOT}")
-print(f"DEBUG main.py: sys.path after modification in main.py: {sys.path}")
-print(f"DEBUG main.py: current working directory: {os.getcwd()}")
+# print(f"DEBUG main.py: Initial PROJECT_ROOT: {PROJECT_ROOT}")
+# print(f"DEBUG main.py: sys.path after modification in main.py: {sys.path}")
+# print(f"DEBUG main.py: current working directory: {os.getcwd()}")
 
 # Now, other imports can follow
 import logging # For main.py's own logging needs, and for translator parts if setup_logging isn't called first
@@ -68,22 +68,22 @@ project_root_calculated_for_gui_import = os.path.dirname(current_file_path_for_g
 
 if project_root_calculated_for_gui_import not in sys.path:
     sys.path.insert(0, project_root_calculated_for_gui_import)
-    print(f"DEBUG main.py (PRE-GUI IMPORT): Inserted project root {project_root_calculated_for_gui_import}. New sys.path: {sys.path}")
+    logging.debug(f"main.py (PRE-GUI IMPORT): Inserted project root {project_root_calculated_for_gui_import}. New sys.path: {sys.path}")
 elif sys.path[0] != project_root_calculated_for_gui_import:
     if project_root_calculated_for_gui_import in sys.path: # Check before removing
         sys.path.remove(project_root_calculated_for_gui_import)
     sys.path.insert(0, project_root_calculated_for_gui_import)
-    print(f"DEBUG main.py (PRE-GUI IMPORT): Moved project root {project_root_calculated_for_gui_import} to start. New sys.path: {sys.path}")
+    logging.debug(f"main.py (PRE-GUI IMPORT): Moved project root {project_root_calculated_for_gui_import} to start. New sys.path: {sys.path}")
 else:
-    print(f"DEBUG main.py (PRE-GUI IMPORT): Project root {project_root_calculated_for_gui_import} already correctly at sys.path[0]. Current sys.path: {sys.path}")
+    logging.debug(f"main.py (PRE-GUI IMPORT): Project root {project_root_calculated_for_gui_import} already correctly at sys.path[0]. Current sys.path: {sys.path}")
 # --- End Direct Re-calculation ---
 
 # PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__)) # Redundant: PROJECT_ROOT already defined and sys.path modified at the top
 # if PROJECT_ROOT not in sys.path: # Redundant
 #     sys.path.insert(0, PROJECT_ROOT) # Redundant
 
-# print(f"DEBUG main.py: sys.path is now: {sys.path}") # Redundant: sys.path printed after initial modification
-# print(f"DEBUG main.py: current working directory is: {os.getcwd()}") # Redundant: CWD printed after initial modification
+# logging.debug(f"main.py: sys.path is now: {sys.path}") # Redundant: sys.path printed after initial modification
+# logging.debug(f"main.py: current working directory is: {os.getcwd()}") # Redundant: CWD printed after initial modification
 
 # --- Le reste de vos imports dans main.py commence ici ---
 # Par exemple:
@@ -251,18 +251,6 @@ def main():
     # we attempt to clean it up.
     atexit.register(stop_api_server)
     
-    # Register logging.shutdown() to be called on exit to properly close handlers
-    atexit.register(logging.shutdown)
-    logging.info("logging.shutdown registered with atexit.")
-
-    # Register logging.shutdown() to be called on exit to properly close handlers
-    atexit.register(logging.shutdown)
-    logging.info("logging.shutdown registered with atexit.")
-
-    # Register logging.shutdown() to be called on exit to properly close handlers
-    atexit.register(logging.shutdown)
-    logging.info("logging.shutdown registered with atexit.")
-
     # Register logging.shutdown() to be called on exit to properly close handlers
     atexit.register(logging.shutdown)
     logging.info("logging.shutdown registered with atexit.")
