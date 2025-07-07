@@ -85,6 +85,11 @@ def _seed_default_partner_categories(cursor: sqlite3.Cursor, conn: sqlite3.Conne
 def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
     logger = logger_passed
 
+    # Ensure the connection uses sqlite3.Row for dictionary-like access to rows
+    if conn and not isinstance(conn.row_factory, sqlite3.Row):
+        conn.row_factory = sqlite3.Row
+        logger.info("Applied sqlite3.Row factory to connection in _original_seed_initial_data_func_placeholder.")
+
     # Import here to avoid circular dependencies if roles_crud uses get_db_connection
     # Alias imports to avoid conflict with the 'logger' variable in this function's scope.
     from db.cruds.roles_crud import add_role as crud_add_role, get_role_by_name as crud_get_role_by_name
