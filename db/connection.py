@@ -34,6 +34,30 @@ def set_db_config(config):
     _db_config = config
     logging.info("db.connection: Database configuration has been set.")
 
+def get_raw_sqlite_connection(db_path_override=None) -> sqlite3.Connection:
+    """
+    Explicitly returns a raw sqlite3.Connection.
+    Uses _db_config if set, otherwise relies on db_path_override.
+    """
+    global _db_config
+    path_to_connect = db_path_override
+
+    if not path_to_connect:
+        if _db_config is None or _db_config.get('database_type') != 'sqlite':
+            logging.critical(
+                "CRITICAL: get_raw_sqlite_connection requires a db_path_override or a valid SQLite configuration via set_db_config()."
+            )
+            raise ValueError("Cannot establish raw SQLite connection without path or valid config.")
+        path_to_connect = _db_config.get('database_path')
+        if not path_to_connect:
+            raise ValueError("SQLite database path not found in application configuration for raw connection.")
+
+    logging.info(f"db.connection (get_raw_sqlite_connection): Attempting raw SQLite connection to: {path_to_connect}")
+    conn = sqlite3.connect(path_to_connect, timeout=10) # Added timeout
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON;")
+    return conn
+
 def get_db_connection(db_path_override=None) -> Union[sqlite3.Connection, Session]: # Modified return type hint
     """
     Returns a database connection object.
