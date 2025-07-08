@@ -10,7 +10,6 @@ def get_country_by_name(name: str, conn: sqlite3.Connection = None) -> dict | No
     try:
         cursor.execute("SELECT * FROM Countries WHERE country_name = ?",(name,))
         row=cursor.fetchone()
-        # return dict(row) if row else None
         return {key: row[key] for key in row.keys()} if row else None
     except sqlite3.Error as e:
         logging.error(f"Error getting country by name '{name}': {e}")
@@ -39,7 +38,6 @@ def get_or_add_country(country_name: str, conn: sqlite3.Connection = None) -> di
         cursor.execute("SELECT * FROM Countries WHERE country_name = ?", (country_name,))
         row = cursor.fetchone()
         if row:
-            # return dict(row)
             return {key: row[key] for key in row.keys()} if row else None
         else:
             now = datetime.utcnow().isoformat() + "Z"
@@ -49,8 +47,8 @@ def get_or_add_country(country_name: str, conn: sqlite3.Connection = None) -> di
             new_country_id = cursor.lastrowid
             if new_country_id:
                 return {'country_id': new_country_id, 'country_name': country_name, 'created_at': now, 'updated_at': now}
-            else: # Should not happen if insert was successful
-                logging.error(f"Failed to get lastrowid after inserting country: {country_name}")
+            else:
+                logging.error(f"Failed to get lastrowid after inserting country: {country_name}") # Kept error log
                 return None
     except sqlite3.IntegrityError: # country_name likely has a UNIQUE constraint, race condition?
         logging.warning(f"Integrity error adding country '{country_name}', trying to fetch again.")

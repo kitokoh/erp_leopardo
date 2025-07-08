@@ -20,16 +20,20 @@ def get_status_setting_by_name(name: str, type: str, conn: sqlite3.Connection = 
                 f"Failed to recover a string status from dict['status'] for type 'Client'. "
                 f"Dict['status'] was: {status_from_dict}. Proceeding with original dict, which will likely fail."
             )
-            # name remains original_name_param (the dict) to reproduce original error if recovery fails
-            name = original_name_param # Explicitly set to original problematic dict
+            name = original_name_param
 
     cursor=conn.cursor()
+    # logger_crud = logging.getLogger(__name__)
+    # logger_crud.warning(f"get_status_setting_by_name: Querying for Name='{name}', Type='{type}'")
     try:
         cursor.execute("SELECT * FROM StatusSettings WHERE status_name = ? AND status_type = ?",(name,type))
         row=cursor.fetchone()
+        # if row:
+            # logger_crud.warning(f"get_status_setting_by_name: Found status: {dict(row)}")
+        # else:
+            # logger_crud.warning(f"get_status_setting_by_name: Status NOT FOUND for Name='{name}', Type='{type}'")
         return dict(row) if row else None
     except sqlite3.Error as e:
-        # Log the 'name' that was actually used in the query, which might be the recovered string or the original dict
         logging.error(f"Error getting status setting by name '{name}' (original_param_type: {type(original_name_param).__name__}) and type '{type}': {e}")
         return None
 
