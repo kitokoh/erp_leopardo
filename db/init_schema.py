@@ -37,9 +37,13 @@ try:
     from calculator.models import CalculationHistory
     # from other_module.models import OtherModelUsingMainBase # Example for future models
     from db.common_models import Products # Import the Products SQLAlchemy model
+    # IMPORTANT: Ensure the User model (SQLAlchemy definition) is imported here as well.
+    # For example, if it's in db.common_models:
+    # from db.common_models import User # Or from auth.models import User, etc.
+    # This is critical for SQLAlchemy to correctly handle tables referencing Users.
     MAIN_SQLALCHEMY_COMPONENTS_LOADED = True
 except ImportError as e_main_sqlalchemy:
-    logging.error(f"db.init_schema: Could not import MainBase or initialize_engine_and_session from db.connection: {e_main_sqlalchemy}. Tables using MainBase (e.g., CalculatorHistory) might not be created by this script.")
+    logging.error(f"db.init_schema: Could not import MainBase, initialize_engine_and_session, or required SQLAlchemy models from db.connection/common_models: {e_main_sqlalchemy}. Tables using MainBase might not be created by this script.")
     MAIN_SQLALCHEMY_COMPONENTS_LOADED = False
     MainBase = None # Ensure it's None so later checks don't fail with NameError
     # main_engine = None # No longer importing main_engine directly at the top
@@ -2230,6 +2234,30 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clients_created_at ON Clients(created_at)") # Added
 
 
+    # Projects
+    # === DIAGNOSTIC START: Check Projects table schema before creating status_id index ===
+    try:
+        logging.info("DEBUG_INIT_DB: Executing PRAGMA table_info(Projects) before creating idx_projects_status_id...")
+        pragma_cursor_projects = conn.cursor()
+        pragma_cursor_projects.execute("PRAGMA table_info(Projects);")
+        columns_info_projects = pragma_cursor_projects.fetchall()
+        if columns_info_projects:
+            col_details_projects = []
+            for col in columns_info_projects:
+                col_details_projects.append(f"Name: {col['name']}, Type: {col['type']}, PK: {col['pk']}, NotNull: {col['notnull']}, Default: {col['dflt_value']}")
+            logging.info(f"DEBUG_INIT_DB: PRAGMA table_info(Projects) output: [{'; '.join(col_details_projects)}]")
+        else:
+            logging.warning("DEBUG_INIT_DB: PRAGMA table_info(Projects) returned no information. Table might not exist or schema is empty.")
+        pragma_cursor_projects.close()
+    except Exception as e_pragma_projects:
+        logging.error(f"DEBUG_INIT_DB: Error executing PRAGMA table_info(Projects): {e_pragma_projects}", exc_info=True)
+    # === DIAGNOSTIC END ===
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_projects_client_id ON Projects(client_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_projects_status_id ON Projects(status_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_projects_manager_team_member_id ON Projects(manager_team_member_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_projects_priority ON Projects(priority)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_projects_deadline_date ON Projects(deadline_date)")
+
     # ReportConfigurations Indexes
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_reportconfigurations_report_name ON ReportConfigurations(report_name)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_reportconfigurations_target_entity ON ReportConfigurations(target_entity)")
@@ -2869,16 +2897,18 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         raise # Re-raise to stop initialization if this fundamental part fails
 
     # Reflect critical tables like Users for SQLAlchemy
-    if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None and actual_main_engine is not None:
-        try:
-            logging.info("DEBUG_INIT_DB: Attempting to reflect 'Users' table into MainBase.metadata for SQLAlchemy.")
-            Table('Users', MainBase.metadata, Column('user_id', Text, primary_key=True), autoload_with=actual_main_engine, extend_existing=True)
-            logging.info("DEBUG_INIT_DB: 'Users' table reflected successfully.")
-        except Exception as e_reflect_users:
-            logging.error(f"DEBUG_INIT_DB: Error reflecting 'Users' table: {e_reflect_users}. SQLAlchemy models depending on Users might fail.", exc_info=True)
-            # This is a critical failure point for dependent SQLAlchemy models.
-            # Depending on policy, might raise an error here or try to proceed.
-            # For now, log and proceed, but expect potential downstream errors.
+    # This explicit reflection is removed. If 'Users' is an SQLAlchemy model,
+    # it should be imported and registered with MainBase.metadata directly.
+    # If 'Users' is purely raw SQL and needs to be referenced by SQLAlchemy models,
+    # then its schema must be stable and known. The best practice is to define all
+    # inter-dependent tables within SQLAlchemy if possible.
+    # if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None and actual_main_engine is not None:
+    #     try:
+    #         logging.info("DEBUG_INIT_DB: Attempting to reflect 'Users' table into MainBase.metadata for SQLAlchemy.")
+    #         Table('Users', MainBase.metadata, Column('user_id', Text, primary_key=True), autoload_with=actual_main_engine, extend_existing=True)
+    #         logging.info("DEBUG_INIT_DB: 'Users' table reflected successfully.")
+    #     except Exception as e_reflect_users:
+    #         logging.error(f"DEBUG_INIT_DB: Error reflecting 'Users' table: {e_reflect_users}. SQLAlchemy models depending on Users might fail.", exc_info=True)
 
     # Import all SQLAlchemy model modules to register them with MainBase
     # This ensures MainBase.metadata.create_all() knows about them.
@@ -3180,21 +3210,22 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     # The 'Users' table (created by raw SQL) needs to be known to MainBase.metadata for FKs.
     if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None and actual_main_engine is not None:
         logging.info("DEBUG_INIT_DB: Preparing to call MainBase.metadata.create_all().")
-        try:
+        # try: # Commenting out the problematic try block for Users table reflection
             # Explicitly reflect the 'Users' table if it's created by raw SQL and other SQLAlchemy models depend on it.
             # This makes SQLAlchemy's metadata aware of the 'Users' table structure.
             # Ensure this happens after 'Users' table is created and committed by raw SQL,
             # and actual_main_engine is initialized.
-            logging.info("DEBUG_INIT_DB: Attempting to reflect 'Users' table into MainBase.metadata.")
-            # We define the primary key column and type explicitly for robust reflection.
-            # Other columns will be autoloaded.
-            users_table_for_reflection = Table('Users', MainBase.metadata,
-                                               Column('user_id', Text, primary_key=True),
-                                               autoload_with=actual_main_engine,
-                                               extend_existing=True) # Important if other parts of code might also define 'Users'
-            logging.info(f"DEBUG_INIT_DB: 'Users' table reflected. Columns: {users_table_for_reflection.columns.keys()}")
-        except Exception as e_reflect_users:
-            logging.error(f"DEBUG_INIT_DB: Error reflecting 'Users' table: {e_reflect_users}. Proceeding with create_all, but FK issues might persist.", exc_info=True)
+            # The explicit reflection of 'Users' table has been removed.
+            # If 'Users' is an SQLAlchemy model, its import and registration with MainBase
+            # is handled by the standard model import process.
+            # logging.info("DEBUG_INIT_DB: Attempting to reflect 'Users' table into MainBase.metadata.")
+            # users_table_for_reflection = Table('Users', MainBase.metadata,
+            #                                    Column('user_id', Text, primary_key=True),
+            #                                    autoload_with=actual_main_engine,
+            #                                    extend_existing=True)
+            # logging.info(f"DEBUG_INIT_DB: 'Users' table reflected. Columns: {users_table_for_reflection.columns.keys()}")
+        # except Exception as e_reflect_users:
+            # logging.error(f"DEBUG_INIT_DB: Error reflecting 'Users' table: {e_reflect_users}. Proceeding with create_all, but FK issues might persist.", exc_info=True)
 
         try:
             # Import B2C restaurant models to register them with MainBase before create_all
