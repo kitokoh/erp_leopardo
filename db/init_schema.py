@@ -2119,7 +2119,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_templates_category_id ON Templates(category_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_templates_is_default_for_type_lang ON Templates(is_default_for_type_lang)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_templates_client_id ON Templates(client_id)") # Index for the new column
-
+    
     # Invoices (Assuming Invoices is NOT primarily an Alembic/SQLAlchemy model for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_invoices_client_id ON Invoices(client_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_invoices_project_id ON Invoices(project_id)")
@@ -2127,77 +2127,77 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_invoices_payment_status ON Invoices(payment_status)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_invoices_invoice_number ON Invoices(invoice_number)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_invoices_issue_date ON Invoices(issue_date)") # Added
-
+    
     # TeamMembers (Assuming TeamMembers is NOT primarily an Alembic/SQLAlchemy model for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_teammembers_user_id ON TeamMembers(user_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_teammembers_is_active ON TeamMembers(is_active)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_teammembers_department ON TeamMembers(department)")
-
+    
     # ClientContacts (Assuming ClientContacts is NOT primarily an Alembic/SQLAlchemy model for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientcontacts_contact_id ON ClientContacts(contact_id)")
-
+    
     # ProductEquivalencies (Assuming ProductEquivalencies is NOT primarily an Alembic/SQLAlchemy model for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_productequivalencies_product_id_b ON ProductEquivalencies(product_id_b)")
-
+    
     # ClientProjectProducts (Assuming ClientProjectProducts is NOT primarily an Alembic/SQLAlchemy model for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientprojectproducts_product_id ON ClientProjectProducts(product_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientprojectproducts_client_project ON ClientProjectProducts(client_id, project_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_cpp_purchase_confirmed_at ON ClientProjectProducts(purchase_confirmed_at)") # Added
-
+    
     # ActivityLog (Assuming ActivityLog is NOT primarily an Alembic/SQLAlchemy model for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_activitylog_user_id ON ActivityLog(user_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_activitylog_created_at ON ActivityLog(created_at)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_activitylog_action_type ON ActivityLog(action_type)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_activitylog_related_entity ON ActivityLog(related_entity_type, related_entity_id)")
-
+    
     # ScheduledEmails (Assuming ScheduledEmails is NOT primarily an Alembic/SQLAlchemy model for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_scheduledemails_status_time ON ScheduledEmails(status, scheduled_send_at)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_scheduledemails_related_client_id ON ScheduledEmails(related_client_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_scheduledemails_related_project_id ON ScheduledEmails(related_project_id)")
-
+    
     # StatusSettings (Created by raw SQL, indexes are fine here)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_statussettings_type ON StatusSettings(status_type)")
-
+    
     # SAVTickets (Assuming SAVTickets is NOT primarily an Alembic/SQLAlchemy model for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_savtickets_client_id ON SAVTickets(client_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_savtickets_status_id ON SAVTickets(status_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_savtickets_assigned_technician_id ON SAVTickets(assigned_technician_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_savtickets_opened_at ON SAVTickets(opened_at)") # Added
-
+    
     # ImportantDates (Assuming ImportantDates is NOT primarily an Alembic/SQLAlchemy model for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_importantdates_date_value ON ImportantDates(date_value)")
-
+    
     # Transporters (Assuming Transporters is NOT primarily an Alembic/SQLAlchemy model for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_transporters_name ON Transporters(name)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_transporters_service_area ON Transporters(service_area)")
-
+    
     # FreightForwarders (Assuming FreightForwarders is NOT primarily an Alembic/SQLAlchemy model for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_freightforwarders_name ON FreightForwarders(name)")
-
+    
     # Client_AssignedPersonnel (Assuming Client_AssignedPersonnel is NOT an Alembic/SQLAlchemy model for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientassignedpersonnel_client_id ON Client_AssignedPersonnel(client_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientassignedpersonnel_personnel_id ON Client_AssignedPersonnel(personnel_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientassignedpersonnel_role ON Client_AssignedPersonnel(role_in_project)")
-
+    
     # Client_Transporters (Assuming Client_Transporters is NOT an Alembic/SQLAlchemy model for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clienttransporters_client_id ON Client_Transporters(client_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clienttransporters_transporter_id ON Client_Transporters(transporter_id)")
-
+    
     # Client_FreightForwarders (Assuming Client_FreightForwarders is NOT an Alembic/SQLAlchemy model for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientfreightforwarders_client_id ON Client_FreightForwarders(client_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientfreightforwarders_forwarder_id ON Client_FreightForwarders(forwarder_id)")
-
+    
     # CompanyPersonnelContacts (Assuming CompanyPersonnelContacts is NOT an Alembic/SQLAlchemy model for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_companypersonnelcontacts_personnel_id ON CompanyPersonnelContacts(personnel_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_companypersonnelcontacts_contact_id ON CompanyPersonnelContacts(contact_id)")
-
+    
     # Partner Tables (Assuming these are NOT primarily Alembic/SQLAlchemy models for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_partners_email ON Partners(email)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_partnercontacts_partner_id ON PartnerContacts(partner_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_partnercategorylink_partner_category_id ON PartnerCategoryLink(partner_category_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_partnerdocuments_partner_id ON PartnerDocuments(partner_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_partnercategories_category_name ON PartnerCategories(category_name)")
-
+    
     # MediaItems, Tags, etc. (Assuming these are NOT primarily Alembic/SQLAlchemy models for now)
     cursor.execute('''CREATE INDEX IF NOT EXISTS idx_mediaitems_item_type ON MediaItems(item_type);''')
     cursor.execute('''CREATE INDEX IF NOT EXISTS idx_mediaitems_uploader_user_id ON MediaItems(uploader_user_id);''')
@@ -2208,7 +2208,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute('''CREATE INDEX IF NOT EXISTS idx_playlists_user_id ON Playlists(user_id);''')
     cursor.execute('''CREATE INDEX IF NOT EXISTS idx_playlistitems_playlist_id ON PlaylistItems(playlist_id);''')
     cursor.execute('''CREATE INDEX IF NOT EXISTS idx_playlistitems_media_item_id ON PlaylistItems(media_item_id);''')
-
+    
     # ProductMediaLinks (Assuming ProductMediaLinks is NOT primarily an Alembic/SQLAlchemy model for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_productmedialinks_product_id ON ProductMediaLinks(product_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_productmedialinks_media_item_id ON ProductMediaLinks(media_item_id)")
@@ -2232,14 +2232,14 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_interviews_interviewer_team_member_id ON Interviews(interviewer_team_member_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_interviews_scheduled_at ON Interviews(scheduled_at)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_interviews_status_id ON Interviews(status_id)")
-
+    
     # ItemLocations, InternalStockItems, etc. (Assuming these are NOT Alembic/SQLAlchemy models for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_itemlocations_parent_id ON ItemLocations(parent_location_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_itemlocations_type ON ItemLocations(location_type)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_internalstockitems_item_name ON InternalStockItems(item_name)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_internalstockitems_item_code ON InternalStockItems(item_code)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_internalstockitems_category ON InternalStockItems(category)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_itemstoragelocations_item_id ON ItemStorageLocations(item_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_itemstoragelocations_item_id ON ItemStorageLocations(item_id)") 
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_itemstoragelocations_location_id ON ItemStorageLocations(location_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_productstoragelocations_product_id ON ProductStorageLocations(product_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_productstoragelocations_location_id ON ProductStorageLocations(location_id)")
@@ -2758,7 +2758,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
             # Setting checkfirst=True to handle cases where tables might exist,
             # especially if the manual drop loop had issues or for general robustness.
             # logging.critical("DEBUG_INIT_DB: INTENTIONALLY SKIPPING MainBase.metadata.create_all() HERE TO LET ALEMBIC HANDLE IT.")
-
+            
             # --- DEBUG: Explicitly drop problematic tables before MainBase.create_all ---
             if actual_main_engine:
                 try:
@@ -2774,7 +2774,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
                     logging.error(f"DEBUG_INIT_DB: Error explicitly dropping targeted tables: {e_drop_specific}", exc_info=True)
             # --- END DEBUG ---
             logging.critical("DEBUG_INIT_DB: SKIPPING MainBase.metadata.create_all() - Alembic should handle SQLAlchemy model tables.")
-            # MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True)
+            # MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True) 
             # logging.info("DEBUG_INIT_DB: MainBase.metadata.create_all() EXECUTED.")
             # logging.info("DEBUG_INIT_DB: All tables for MainBase created successfully by SQLAlchemy (using checkfirst=True).")
             # At this point, tables like Products, acc_currencies, etc., should exist if defined via SQLAlchemy.
@@ -2912,11 +2912,11 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS CompanyCalendarSettings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT NOT NULL UNIQUE,
-            business_type TEXT,
+            user_id TEXT NOT NULL UNIQUE, 
+            business_type TEXT, 
             activity_category TEXT,
-            country_iso TEXT NOT NULL,
-            region TEXT,
+            country_iso TEXT NOT NULL, 
+            region TEXT, 
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
@@ -2927,9 +2927,9 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS UserCalendarEvents (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT NOT NULL,
+            user_id TEXT NOT NULL, 
             event_date DATE NOT NULL,
-            event_type TEXT NOT NULL,
+            event_type TEXT NOT NULL, 
             description TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -3095,7 +3095,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
                 try:
                     cursor.execute("INSERT OR IGNORE INTO RolePermissions (role_id, permission_key) VALUES (?, ?)",
                                    (admin_role_id, p_key))
-                    if cursor.rowcount > 0:
+                    if cursor.rowcount > 0: 
                         admin_perms_added_count += 1
                 except sqlite3.IntegrityError:
                     print(f"DEBUG_INIT_DB: IntegrityError (ou permission non trouvée dans Permissions table) en essayant d'ajouter {p_key} pour Admin ID {admin_role_id}. Skipping.")
@@ -3106,7 +3106,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         # 1b. Seed SUPER_ADMIN with ALL permissions (for data consistency, though code bypasses check)
         # SUPER_ADMIN_ROLE_NAME is "super_admin"
         from auth.roles import SUPER_ADMIN as SUPER_ADMIN_ROLE_NAME_CONST # Defined as "super_admin"
-
+        
         # Ensure "super_admin" role exists in Roles table first (it should be added by db_seed.py if not present)
         # For safety, we can add it here too if not found, though db_seed.py is primary for user/role creation
         super_admin_role_id_check = role_id_map.get(SUPER_ADMIN_ROLE_NAME_CONST)
