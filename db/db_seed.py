@@ -318,6 +318,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                      logger.error(f"Failed to get or add country '{country_name}'. Cannot add city '{city_name}'.")
             logger.info(f"Finished attempt to seed {len(countries_cities)} countries/cities.")
 
+
             # 7. Clients & 8. Projects (Simplified)
             logger.info("Seeding sample client and project...")
             cursor.execute("SELECT COUNT(*) FROM Clients")

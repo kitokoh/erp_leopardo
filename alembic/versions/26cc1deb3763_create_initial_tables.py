@@ -67,6 +67,7 @@ def upgrade() -> None:
         sa.UniqueConstraint('role_name')
     )
 
+
     op.create_table('acc_chart_of_accounts',
     sa.Column('id', sa.String(), nullable=False),
     sa.Column('code', sa.String(), nullable=False),
@@ -325,6 +326,7 @@ def upgrade() -> None:
         sa.Column('face_template_id', sa.Text(), nullable=True), # Changed String to Text
         sa.Column('is_voice_auth_enabled', sa.Boolean(), server_default=sa.false(), nullable=True),
         sa.Column('voice_profile_id', sa.Text(), nullable=True), # Changed String to Text
+
         sa.PrimaryKeyConstraint('user_id'),
         sa.ForeignKeyConstraint(['role_id'], ['Roles.role_id'], ),
         sa.UniqueConstraint('email'),
