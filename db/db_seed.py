@@ -190,7 +190,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
     logger.info(f"Checking for default operational user '{DEFAULT_OPERATIONAL_USERNAME}'...")
     existing_operational_user = users_crud.get_user_by_username(DEFAULT_OPERATIONAL_USERNAME, conn=conn, logger_passed=logger)
     if not existing_operational_user:
-        operator_role_id_for_op_user = role_id_map_for_permissions.get(OPERATOR)
+        operator_role_id_for_op_user = current_role_ids.get(OPERATOR) # Corrected variable name
         if operator_role_id_for_op_user:
             logger.info(f"Creating default operational user '{DEFAULT_OPERATIONAL_USERNAME}' with role '{OPERATOR}'.")
             op_user_id = users_crud.add_user(
@@ -345,7 +345,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
             if existing_operational_user is None:
                 logger.info(f"Creating default operational user '{DEFAULT_OPERATIONAL_USERNAME}'...")
                 # Fetch OPERATOR role_id
-                operator_role_id = role_ids.get(OPERATOR) # Get OPERATOR role_id from seeded roles
+                operator_role_id = current_role_ids.get(OPERATOR) # Get OPERATOR role_id from seeded roles
                 if operator_role_id:
                     op_user_data = {
                         'username': DEFAULT_OPERATIONAL_USERNAME,
