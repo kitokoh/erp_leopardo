@@ -201,109 +201,112 @@ def initialize_database(app_config):
     print("DEBUG_INIT_DB: Default roles seeded or already exist.")
 
 
-    # Create Users table (modified)
-    # - Changed 'role' to 'role_id' with FOREIGN KEY
-    # - Renamed 'password_hash' to 'hashed_password'
-    # - Removed 'salt' column (assuming werkzeug handles salt within the hash)
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS Users (
-        user_id TEXT PRIMARY KEY,
-        username TEXT NOT NULL UNIQUE,
-        hashed_password TEXT NOT NULL,
-        full_name TEXT,
-        email TEXT NOT NULL UNIQUE,
-        role_id INTEGER NOT NULL,
-        is_active BOOLEAN DEFAULT TRUE,
-        is_deleted INTEGER DEFAULT 0,
-        deleted_at TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        last_login_at TIMESTAMP,
-        -- Nouveaux champs pour l'authentification biométrique
-        is_fingerprint_auth_enabled BOOLEAN DEFAULT FALSE,
-        fingerprint_template_id TEXT, -- Pourrait être utilisé par l'OS ou une lib
-        is_face_auth_enabled BOOLEAN DEFAULT FALSE,
-        face_template_id TEXT,
-        is_voice_auth_enabled BOOLEAN DEFAULT FALSE,
-        voice_profile_id TEXT,
-        FOREIGN KEY (role_id) REFERENCES Roles (role_id)
-    )
-    """)
-    print("DEBUG_INIT_DB: Table Users created or exists (with role_id FK and biometric fields).")
+    # --- Users table is now managed by SQLAlchemy ---
+    # The raw SQL CREATE TABLE IF NOT EXISTS Users and subsequent ALTER TABLE statements
+    # have been removed to centralize schema management under SQLAlchemy.
+    # Ensure a User model is defined in SQLAlchemy (e.g., in db/common_models.py or auth/models.py)
+    # and is registered with MainBase.metadata.
+    logging.info("DEBUG_INIT_DB: Users table creation and alteration are now handled by SQLAlchemy MainBase.metadata.create_all().")
+    # cursor.execute("""
+    # CREATE TABLE IF NOT EXISTS Users (
+    #     user_id TEXT PRIMARY KEY,
+    #     username TEXT NOT NULL UNIQUE,
+    #     hashed_password TEXT NOT NULL,
+    #     full_name TEXT,
+    #     email TEXT NOT NULL UNIQUE,
+    #     role_id INTEGER NOT NULL,
+    #     is_active BOOLEAN DEFAULT TRUE,
+    #     is_deleted INTEGER DEFAULT 0,
+    #     deleted_at TEXT,
+    #     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    #     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    #     last_login_at TIMESTAMP,
+    #     -- Nouveaux champs pour l'authentification biométrique
+    #     is_fingerprint_auth_enabled BOOLEAN DEFAULT FALSE,
+    #     fingerprint_template_id TEXT, -- Pourrait être utilisé par l'OS ou une lib
+    #     is_face_auth_enabled BOOLEAN DEFAULT FALSE,
+    #     face_template_id TEXT,
+    #     is_voice_auth_enabled BOOLEAN DEFAULT FALSE,
+    #     voice_profile_id TEXT,
+    #     FOREIGN KEY (role_id) REFERENCES Roles (role_id)
+    # )
+    # """)
+    # print("DEBUG_INIT_DB: Table Users created or exists (with role_id FK and biometric fields).")
 
-    # Ensure is_deleted, and deleted_at columns exist in Users table (for migration from older schemas)
-    # This ALTER TABLE logic is for migrating existing databases. For new DBs, it's not strictly needed.
-    cursor.execute("PRAGMA table_info(Users)")
-    users_columns_info = cursor.fetchall()
-    users_column_names = [info['name'] for info in users_columns_info]
+    # # Ensure is_deleted, and deleted_at columns exist in Users table (for migration from older schemas)
+    # # This ALTER TABLE logic is for migrating existing databases. For new DBs, it's not strictly needed.
+    # cursor.execute("PRAGMA table_info(Users)")
+    # users_columns_info = cursor.fetchall()
+    # users_column_names = [info['name'] for info in users_columns_info]
 
-    # Migration for 'salt' and 'role' columns if they exist from an old schema:
-    # This is complex. For now, we assume a fresh setup or that users_crud handles the new schema.
-    # If 'salt' column exists and needs removal, or 'role' text column needs migration to 'role_id',
-    # that would require more complex ALTER TABLE (rename, create new, copy data, drop old)
-    # which is too risky without knowing existing data.
-    # The CREATE TABLE above defines the target schema.
+    # # Migration for 'salt' and 'role' columns if they exist from an old schema:
+    # # This is complex. For now, we assume a fresh setup or that users_crud handles the new schema.
+    # # If 'salt' column exists and needs removal, or 'role' text column needs migration to 'role_id',
+    # # that would require more complex ALTER TABLE (rename, create new, copy data, drop old)
+    # # which is too risky without knowing existing data.
+    # # The CREATE TABLE above defines the target schema.
 
-    if 'is_deleted' not in users_column_names:
-        try:
-            cursor.execute("ALTER TABLE Users ADD COLUMN is_deleted INTEGER DEFAULT 0")
-            print("Added 'is_deleted' column to Users table.")
-        except sqlite3.Error as e_alter_is_deleted:
-            print(f"Error adding 'is_deleted' column to Users table: {e_alter_is_deleted}")
+    # if 'is_deleted' not in users_column_names:
+    #     try:
+    #         cursor.execute("ALTER TABLE Users ADD COLUMN is_deleted INTEGER DEFAULT 0")
+    #         print("Added 'is_deleted' column to Users table.")
+    #     except sqlite3.Error as e_alter_is_deleted:
+    #         print(f"Error adding 'is_deleted' column to Users table: {e_alter_is_deleted}")
 
-    if 'deleted_at' not in users_column_names:
-        try:
-            cursor.execute("ALTER TABLE Users ADD COLUMN deleted_at TEXT")
-            print("Added 'deleted_at' column to Users table.")
-        except sqlite3.Error as e_alter_deleted_at:
-            print(f"Error adding 'deleted_at' column to Users table: {e_alter_deleted_at}")
+    # if 'deleted_at' not in users_column_names:
+    #     try:
+    #         cursor.execute("ALTER TABLE Users ADD COLUMN deleted_at TEXT")
+    #         print("Added 'deleted_at' column to Users table.")
+    #     except sqlite3.Error as e_alter_deleted_at:
+    #         print(f"Error adding 'deleted_at' column to Users table: {e_alter_deleted_at}")
 
-    # Assurer que les nouveaux champs biométriques existent pour les bases de données existantes
-    cursor.execute("PRAGMA table_info(Users)")
-    users_columns_info_bio = cursor.fetchall() # Utiliser un nouveau nom de variable
-    users_column_names_bio = [info['name'] for info in users_columns_info_bio]
+    # # Assurer que les nouveaux champs biométriques existent pour les bases de données existantes
+    # cursor.execute("PRAGMA table_info(Users)")
+    # users_columns_info_bio = cursor.fetchall() # Utiliser un nouveau nom de variable
+    # users_column_names_bio = [info['name'] for info in users_columns_info_bio]
 
-    if 'is_fingerprint_auth_enabled' not in users_column_names_bio:
-        try:
-            cursor.execute("ALTER TABLE Users ADD COLUMN is_fingerprint_auth_enabled BOOLEAN DEFAULT FALSE")
-            print("Added 'is_fingerprint_auth_enabled' column to Users table.")
-        except sqlite3.Error as e_alter_bio:
-            print(f"Error adding 'is_fingerprint_auth_enabled' column to Users table: {e_alter_bio}")
+    # if 'is_fingerprint_auth_enabled' not in users_column_names_bio:
+    #     try:
+    #         cursor.execute("ALTER TABLE Users ADD COLUMN is_fingerprint_auth_enabled BOOLEAN DEFAULT FALSE")
+    #         print("Added 'is_fingerprint_auth_enabled' column to Users table.")
+    #     except sqlite3.Error as e_alter_bio:
+    #         print(f"Error adding 'is_fingerprint_auth_enabled' column to Users table: {e_alter_bio}")
 
-    if 'fingerprint_template_id' not in users_column_names_bio:
-        try:
-            cursor.execute("ALTER TABLE Users ADD COLUMN fingerprint_template_id TEXT")
-            print("Added 'fingerprint_template_id' column to Users table.")
-        except sqlite3.Error as e_alter_bio:
-            print(f"Error adding 'fingerprint_template_id' column to Users table: {e_alter_bio}")
+    # if 'fingerprint_template_id' not in users_column_names_bio:
+    #     try:
+    #         cursor.execute("ALTER TABLE Users ADD COLUMN fingerprint_template_id TEXT")
+    #         print("Added 'fingerprint_template_id' column to Users table.")
+    #     except sqlite3.Error as e_alter_bio:
+    #         print(f"Error adding 'fingerprint_template_id' column to Users table: {e_alter_bio}")
 
-    if 'is_face_auth_enabled' not in users_column_names_bio:
-        try:
-            cursor.execute("ALTER TABLE Users ADD COLUMN is_face_auth_enabled BOOLEAN DEFAULT FALSE")
-            print("Added 'is_face_auth_enabled' column to Users table.")
-        except sqlite3.Error as e_alter_bio:
-            print(f"Error adding 'is_face_auth_enabled' column to Users table: {e_alter_bio}")
+    # if 'is_face_auth_enabled' not in users_column_names_bio:
+    #     try:
+    #         cursor.execute("ALTER TABLE Users ADD COLUMN is_face_auth_enabled BOOLEAN DEFAULT FALSE")
+    #         print("Added 'is_face_auth_enabled' column to Users table.")
+    #     except sqlite3.Error as e_alter_bio:
+    #         print(f"Error adding 'is_face_auth_enabled' column to Users table: {e_alter_bio}")
 
-    if 'face_template_id' not in users_column_names_bio:
-        try:
-            cursor.execute("ALTER TABLE Users ADD COLUMN face_template_id TEXT")
-            print("Added 'face_template_id' column to Users table.")
-        except sqlite3.Error as e_alter_bio:
-            print(f"Error adding 'face_template_id' column to Users table: {e_alter_bio}")
+    # if 'face_template_id' not in users_column_names_bio:
+    #     try:
+    #         cursor.execute("ALTER TABLE Users ADD COLUMN face_template_id TEXT")
+    #         print("Added 'face_template_id' column to Users table.")
+    #     except sqlite3.Error as e_alter_bio:
+    #         print(f"Error adding 'face_template_id' column to Users table: {e_alter_bio}")
 
-    if 'is_voice_auth_enabled' not in users_column_names_bio:
-        try:
-            cursor.execute("ALTER TABLE Users ADD COLUMN is_voice_auth_enabled BOOLEAN DEFAULT FALSE")
-            print("Added 'is_voice_auth_enabled' column to Users table.")
-        except sqlite3.Error as e_alter_bio:
-            print(f"Error adding 'is_voice_auth_enabled' column to Users table: {e_alter_bio}")
+    # if 'is_voice_auth_enabled' not in users_column_names_bio:
+    #     try:
+    #         cursor.execute("ALTER TABLE Users ADD COLUMN is_voice_auth_enabled BOOLEAN DEFAULT FALSE")
+    #         print("Added 'is_voice_auth_enabled' column to Users table.")
+    #     except sqlite3.Error as e_alter_bio:
+    #         print(f"Error adding 'is_voice_auth_enabled' column to Users table: {e_alter_bio}")
 
-    if 'voice_profile_id' not in users_column_names_bio:
-        try:
-            cursor.execute("ALTER TABLE Users ADD COLUMN voice_profile_id TEXT")
-            print("Added 'voice_profile_id' column to Users table.")
-        except sqlite3.Error as e_alter_bio:
-            print(f"Error adding 'voice_profile_id' column to Users table: {e_alter_bio}")
+    # if 'voice_profile_id' not in users_column_names_bio:
+    #     try:
+    #         cursor.execute("ALTER TABLE Users ADD COLUMN voice_profile_id TEXT")
+    #         print("Added 'voice_profile_id' column to Users table.")
+    #     except sqlite3.Error as e_alter_bio:
+    #         print(f"Error adding 'voice_profile_id' column to Users table: {e_alter_bio}")
+    # --- End of SQLAlchemy managed Users table section ---
 
     # Create Companies table (base from ca.py)
     cursor.execute("""
@@ -658,6 +661,66 @@ def initialize_database(app_config):
             # For existing tables in older SQLite, this adds the column, and app logic relies on the schema's FK definition.
         except sqlite3.Error as e_alter_default_template_id:
             print(f"Error adding 'default_template_id' column to Clients table: {e_alter_default_template_id}")
+
+    # Ensure status_id column exists (as it's crucial for FK and index)
+    # This is particularly important if an old schema of Clients table existed without status_id
+    cursor.execute("PRAGMA table_info(Clients)")
+    clients_columns_info_status_id_check = cursor.fetchall()
+    clients_column_names_status_id_check = [info['name'] for info in clients_columns_info_status_id_check]
+
+    if 'status_id' not in clients_column_names_status_id_check:
+        try:
+            # Adding with FOREIGN KEY constraint via ALTER TABLE is not directly supported in all SQLite versions for all cases.
+            # The FK is in the main CREATE TABLE. This just ensures the column exists.
+            # The FK relationship relies on the main CREATE TABLE for new DBs or PRAGMA foreign_keys=ON.
+            cursor.execute("ALTER TABLE Clients ADD COLUMN status_id INTEGER REFERENCES StatusSettings(status_id)")
+            print("DEBUG_INIT_DB: Added missing 'status_id' column to Clients table.")
+        except sqlite3.Error as e_alter_status_id:
+            print(f"DEBUG_INIT_DB: Error adding 'status_id' column to Clients table: {e_alter_status_id}")
+    else:
+        # Verify if the existing status_id column has the FK if possible, though PRAGMA foreign_key_list is complex.
+        # For now, assume if status_id exists, it's likely from the proper CREATE TABLE.
+        pass
+
+    # Ensure other columns from the main CREATE TABLE Clients definition are present
+    # This makes the schema robust if an older DB file is used.
+    columns_to_ensure_in_clients = {
+        "client_name": "TEXT NOT NULL", # Key field, usually present
+        "company_name": "TEXT",
+        "primary_need_description": "TEXT",
+        "project_identifier": "TEXT NOT NULL", # Key field
+        "country_id": "INTEGER REFERENCES Countries(country_id)",
+        "city_id": "INTEGER REFERENCES Cities(city_id)",
+        "default_base_folder_path": "TEXT UNIQUE",
+        "selected_languages": "TEXT",
+        "price": "REAL DEFAULT 0",
+        "notes": "TEXT", # This is for Client notes, distinct from ClientNotes table
+        "category": "TEXT",
+        # distributor_specific_info is already handled by an explicit ALTER block
+        # default_template_id is already handled
+        "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        "updated_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        "created_by_user_id": "TEXT REFERENCES Users(user_id)",
+        # is_deleted is already handled
+        # deleted_at is already handled
+        # status_id is already handled
+        # lead_source is handled by its own specific ALTER block as it wasn't in original CREATE
+    }
+
+    cursor.execute("PRAGMA table_info(Clients)")
+    clients_existing_columns_info = cursor.fetchall()
+    clients_existing_column_names = [info['name'] for info in clients_existing_columns_info]
+
+    for col_name, col_definition in columns_to_ensure_in_clients.items():
+        if col_name not in clients_existing_column_names:
+            try:
+                cursor.execute(f"ALTER TABLE Clients ADD COLUMN {col_name} {col_definition}")
+                print(f"DEBUG_INIT_DB: Added missing column '{col_name}' to Clients table.")
+            except sqlite3.Error as e_alter_generic:
+                print(f"DEBUG_INIT_DB: Error adding column '{col_name}' to Clients table: {e_alter_generic}")
+        # else:
+            # print(f"DEBUG_INIT_DB: Column '{col_name}' already exists in Clients table.")
+
 
     # Create ClientNotes table (base from ca.py)
     cursor.execute("""
