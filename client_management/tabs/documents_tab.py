@@ -40,11 +40,11 @@ class DocumentsTab(QWidget):
 
         self.CreateDocumentDialog = main_module_create_document_dialog
         self.CompilePdfDialog = main_module_compile_pdf_dialog
-        self.generate_pdf_for_document = main_module_generate_pdf_for_document
+        self.generate_pdf_for_document = main_module_generate_pdf_for_document # Garder pour génération PDF directe si utilisée ailleurs
 
         self.parent_widget = parent_widget
         self._is_populating_docs = False
-        self.can_manage_documents_permission = False
+        self.can_manage_documents_permission = False # Sera mis à jour par apply_permissions_to_tab
 
         self._setup_ui()
         self.populate_doc_table()
@@ -58,8 +58,8 @@ class DocumentsTab(QWidget):
     def _setup_ui(self):
         logging.info("DocumentsTab._setup_ui: Starting setup for Documents Tab Structure...")
         docs_layout = QVBoxLayout(self)
-        docs_layout.setContentsMargins(5,5,5,5) # Reduced margins for a tighter look
-        docs_layout.setSpacing(8) # Reduced spacing
+        docs_layout.setContentsMargins(5,5,5,5)
+        docs_layout.setSpacing(8)
 
         self.doc_filter_layout_widget = QWidget()
         doc_filter_layout = QHBoxLayout(self.doc_filter_layout_widget)
@@ -80,9 +80,8 @@ class DocumentsTab(QWidget):
         self.doc_language_filter_combo = QComboBox()
         self.doc_language_filter_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.doc_language_filter_combo.addItem(self.tr("Toutes"), "ALL")
-        # Iterate over dictionary items (code, name) from imported constant
-        for lang_code, lang_name in SUPPORTED_LANGUAGES.items(): # SUPPORTED_LANGUAGES est maintenant importé
-            self.doc_language_filter_combo.addItem(self.tr(lang_name), lang_code) # Display translated name, store code
+        for lang_code, lang_name in SUPPORTED_LANGUAGES.items():
+            self.doc_language_filter_combo.addItem(self.tr(lang_name), lang_code)
         self.doc_language_filter_combo.currentIndexChanged.connect(self.populate_doc_table)
         doc_filter_layout.addWidget(self.doc_language_filter_combo)
         doc_filter_layout.addSpacing(10)
@@ -94,6 +93,7 @@ class DocumentsTab(QWidget):
         self.doc_type_filter_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.doc_type_filter_combo.addItem(self.tr("Tous"), "ALL")
         self.doc_type_filter_combo.addItem("HTML", "HTML")
+        self.doc_type_filter_combo.addItem("EDITABLE_HTML", "EDITABLE_HTML") # Ajout du nouveau type
         self.doc_type_filter_combo.addItem("PDF", "PDF")
         self.doc_type_filter_combo.addItem("XLSX", "XLSX")
         self.doc_type_filter_combo.addItem("DOCX", "DOCX")
@@ -102,7 +102,7 @@ class DocumentsTab(QWidget):
         doc_filter_layout.addWidget(self.doc_type_filter_combo)
 
         docs_layout.addWidget(self.doc_filter_layout_widget)
-        self.doc_filter_layout_widget.setVisible(True)
+        # self.doc_filter_layout_widget.setVisible(True) # Déjà visible par défaut
 
         self.documents_empty_label = QLabel(self.tr("Aucun document trouvé pour ce client.\nUtilisez les boutons ci-dessous pour ajouter ou générer des documents."))
         self.documents_empty_label.setAlignment(Qt.AlignCenter)
@@ -298,9 +298,55 @@ class DocumentsTab(QWidget):
 
     def _handle_generate_via_template_action(self):
         logging.info("Action: Générer un document via modèle selected.")
-        # This can reuse the existing self.add_document_from_template_action() method.
-        self.add_document_from_template_action()
+        # Appel de la nouvelle méthode qui gère le choix pour les HTML
+        self.add_document_from_template_action_with_choice()
 
+
+    def add_document_from_template_action_with_choice(self):
+        if not self.CreateDocumentDialog: # CreateDocumentDialog est une référence à la classe du dialogue
+            self.notify(self.tr("Erreur"), self.tr("Le composant de création de document n'est pas chargé."), type='CRITICAL')
+            return
+
+        current_order_identifier = self.doc_order_filter_combo.currentData()
+        if current_order_identifier == "ALL" or current_order_identifier == "NONE":
+            current_order_identifier = None
+
+        # self.app_root_dir doit être correctement initialisé dans __init__ de DocumentsTab
+        if not hasattr(self, 'app_root_dir') or not self.app_root_dir:
+            logging.error("DocumentsTab: app_root_dir non initialisé. Impossible de continuer.")
+            self.notify(self.tr("Erreur Configuration"), self.tr("Chemin racine de l'application non configuré."), type='CRITICAL')
+            return
+
+        create_doc_dialog = self.CreateDocumentDialog(
+            client_info=self.client_info,
+            config=self.config,
+            app_root_dir=self.app_root_dir, # Passer app_root_dir
+            current_user_id=self.current_user_id,
+            order_identifier=current_order_identifier,
+            parent=self
+        )
+
+        if create_doc_dialog.exec_() == QDialog.Accepted:
+            self.populate_doc_table()
+            # Les notifications sont maintenant plus granulaires et gérées par CreateDocumentDialog
+            # ou basées sur l'action retournée.
+            action_performed = create_doc_dialog.get_action_performed()
+            # Importer les constantes ACTION_COPY_RAW, ACTION_GENERATE_DIRECT
+            # from dialogs import ACTION_COPY_RAW, ACTION_GENERATE_DIRECT # Ou les définir localement/globalement
+
+            # Pour éviter un import cyclique potentiel si dialogs.__init__ importe depuis DocumentsTab
+            # On peut utiliser les chaînes directement ou s'assurer que les constantes sont accessibles
+            # d'une manière non cyclique (par exemple, un fichier constants.py).
+            # Pour l'instant, utilisons les chaînes directes, en supposant qu'elles correspondent.
+            ACTION_COPY_RAW_CONST = "copy_raw"
+            ACTION_GENERATE_DIRECT_CONST = "generate_direct"
+
+            if action_performed == ACTION_COPY_RAW_CONST:
+                self.notify(self.tr("Succès"), self.tr("Modèle HTML brut copié avec succès dans le dossier client."), type='SUCCESS')
+            elif action_performed == ACTION_GENERATE_DIRECT_CONST:
+                 self.notify(self.tr("Succès"), self.tr("Document généré avec succès à partir du modèle."), type='SUCCESS')
+            # else: l'utilisateur a peut-être annulé le dialogue de choix ou le dialogue principal.
+            # Aucune notification de succès spécifique n'est nécessaire si rien n'a été fait.
 
     def _load_order_filters(self):
         self.doc_order_filter_combo.blockSignals(True)
@@ -447,13 +493,24 @@ class DocumentsTab(QWidget):
 
                         delete_btn = QPushButton(QIcon(":/icons/trash-2.svg"), "") # Standardized delete icon
                         delete_btn.setToolTip(self.tr("Supprimer Document"))
-                        delete_btn.setProperty("class", "dangerButtonTable") # Specific style for danger actions in table
+                        delete_btn.setProperty("class", "dangerButtonTable")
                         delete_btn.clicked.connect(lambda checked, d_id=doc_id, p=full_file_path: self.delete_client_document_entry(d_id, p))
                         actions_layout.addWidget(delete_btn)
 
-                    # Bouton "Convertir en Facture" pour les Proformas PDF
-                    if doc.get("document_type_generated") == "PROFORMA_PDF" and can_manage: # PROFORMA_PDF est une constante de app_constants
-                        convert_btn = QPushButton(QIcon(":/icons/share.svg"), "") # Utiliser une icône appropriée, share comme placeholder
+                    # Bouton "Générer document final" pour les EDITABLE_HTML
+                    if doc.get("document_type_generated") == "EDITABLE_HTML" and can_manage:
+                        generate_from_raw_btn = QPushButton(QIcon(":/icons/file-plus.svg"), "") # Utiliser une icône appropriée
+                        generate_from_raw_btn.setToolTip(self.tr("Générer un document final à partir de ce HTML"))
+                        generate_from_raw_btn.setProperty("class", "tableActionButton")
+                        generate_from_raw_btn.clicked.connect(
+                            lambda checked, raw_doc_id=doc_id, raw_html_p=full_file_path, src_tpl_id=doc.get("source_template_id"): \
+                            self.handle_generate_from_raw_html_action(raw_doc_id, raw_html_p, src_tpl_id)
+                        )
+                        actions_layout.addWidget(generate_from_raw_btn)
+
+
+                    if doc.get("document_type_generated") == "PROFORMA_PDF" and can_manage:
+                        convert_btn = QPushButton(QIcon(":/icons/share.svg"), "")
                         convert_btn.setToolTip(self.tr("Convertir en Facture"))
                         convert_btn.setProperty("class", "tableActionButton")
                         convert_btn.clicked.connect(lambda checked, doc_id_proforma=doc_id: self.handle_convert_proforma_to_invoice(doc_id_proforma))
@@ -461,7 +518,7 @@ class DocumentsTab(QWidget):
 
                     actions_layout.addStretch()
                     self.doc_table.setCellWidget(row_idx, 5, actions_widget)
-                self.doc_table.resizeRowsToContents() # Adjust row height for styled buttons
+                self.doc_table.resizeRowsToContents()
         except Exception as e:
             logging.error(f"Error populating documents table: {e}", exc_info=True)
             QMessageBox.critical(self, self.tr("Erreur Chargement"), self.tr("Impossible de charger les documents: {0}").format(str(e)))
@@ -471,10 +528,10 @@ class DocumentsTab(QWidget):
 
     def add_document(self):
         language_items_for_dialog = [f"{self.tr(name)} ({code})" for code, name in SUPPORTED_LANGUAGES.items()]
-        default_lang_code = 'fr' # Ou une autre logique pour le défaut
+        default_lang_code = 'fr'
         default_idx = 0
         for i, item_str in enumerate(language_items_for_dialog):
-            if f"({default_lang_code})" in item_str: # Cherche "(fr)" par exemple
+            if f"({default_lang_code})" in item_str:
                 default_idx = i
                 break
 
@@ -489,14 +546,12 @@ class DocumentsTab(QWidget):
 
         selected_doc_language_code = ""
         try:
-            # Extract code from "Name (code)" format
             start_idx = selected_lang_item_str.rfind('(')
             end_idx = selected_lang_item_str.rfind(')')
             if start_idx != -1 and end_idx != -1 and start_idx < end_idx:
                  selected_doc_language_code = selected_lang_item_str[start_idx+1:end_idx]
-            else: # Should not happen if items are formatted correctly
+            else:
                  raise ValueError("Format de l'item de langue inattendu.")
-
             if selected_doc_language_code not in SUPPORTED_LANGUAGES:
                 raise ValueError(f"Code langue '{selected_doc_language_code}' non supporté.")
         except ValueError as e:
@@ -517,18 +572,16 @@ class DocumentsTab(QWidget):
                     self.notify(self.tr("Erreur Dossier Client"), self.tr("Le chemin du dossier de base du client n'est pas configuré."), type='ERROR')
                     return
 
-                # Construct absolute base path for the client
                 client_abs_base_path = os.path.join(self.app_root_dir, client_relative_base_path)
+                target_lang_dir_abs = os.path.join(client_abs_base_path, selected_doc_language_code)
 
-                target_lang_dir_abs = os.path.join(client_abs_base_path, selected_doc_language_code) # Utiliser le code extrait
-
-                # Handle order identifier for subfolder structure
                 order_identifier = None
                 current_order_data = self.doc_order_filter_combo.currentData()
+                safe_order_subfolder = None # Initialiser safe_order_subfolder
                 if current_order_data not in ["ALL", "NONE"] and current_order_data is not None:
                     order_identifier = current_order_data
                     safe_order_subfolder = order_identifier.replace(':', '_').replace('/', '_').replace('\\', '_').replace(' ', '_')
-                    target_lang_dir_abs = os.path.join(client_abs_base_path, safe_order_subfolder, selected_doc_language_code) # Utiliser le code extrait
+                    target_lang_dir_abs = os.path.join(client_abs_base_path, safe_order_subfolder, selected_doc_language_code)
 
                 os.makedirs(target_lang_dir_abs, exist_ok=True)
                 file_name = os.path.basename(selected_file_path)
@@ -549,18 +602,19 @@ class DocumentsTab(QWidget):
                 doc_type_map = {".html": "HTML", ".pdf": "PDF", ".xlsx": "XLSX", ".docx": "DOCX"}
                 document_type_generated = doc_type_map.get(ext, ext.upper().replace(".", "") or "OTHER")
 
-                # File path relative to client's base folder
-                file_path_relative_to_client_base = os.path.join(
-                    (os.path.join(safe_order_subfolder, selected_doc_language_code) if order_identifier else selected_doc_language_code), # Utiliser le code extrait
-                    file_name
-                )
+                path_parts_for_relative = []
+                if safe_order_subfolder: path_parts_for_relative.append(safe_order_subfolder)
+                path_parts_for_relative.append(selected_doc_language_code)
+                path_parts_for_relative.append(file_name)
+                file_path_relative_to_client_base = os.path.join(*path_parts_for_relative)
+
 
                 doc_db_data = {
                     "client_id": client_id, "document_name": file_name,
-                    "file_name_on_disk": file_name, # Storing just filename, path is derived
+                    "file_name_on_disk": file_name,
                     "file_path_relative": file_path_relative_to_client_base,
                     "document_type_generated": document_type_generated,
-                    "language_code": selected_doc_language_code, "source_template_id": None, # Utiliser le code extrait
+                    "language_code": selected_doc_language_code, "source_template_id": None,
                     "order_identifier": order_identifier, "user_id": self.current_user_id,
                     "notes": None, "version_tag": "1.0"
                 }
@@ -610,8 +664,12 @@ class DocumentsTab(QWidget):
             self.notify(self.tr("Erreur"), self.tr("Impossible d'ouvrir le dialogue de compilation PDF."), type='ERROR')
 
     def handle_edit_html_action(self, file_path, document_id):
+        # S'assurer que HtmlEditor est importé
+        from gui.widgets.html_editor import HtmlEditor
         if file_path and os.path.exists(file_path):
-            editor = HtmlEditor(file_path, document_id, self) # Pass self (DocumentsTab) as parent
+            # Le document_id passé ici est celui de l'enregistrement ClientDocument
+            # HtmlEditor peut l'utiliser pour des opérations spécifiques si nécessaire (ex: mise à jour de notes)
+            editor = HtmlEditor(file_path=file_path, client_data={"document_id": document_id}, parent=self)
             if editor.exec_() == QDialog.Accepted:
                 self.populate_doc_table()
                 self.notify(self.tr("HTML Modifié"), self.tr("Le document HTML a été sauvegardé."), type='SUCCESS')
@@ -619,8 +677,10 @@ class DocumentsTab(QWidget):
             self.notify(self.tr("Fichier Introuvable"), self.tr("Le fichier HTML est introuvable:\n{0}").format(file_path), type='WARNING')
 
     def handle_edit_excel_action(self, file_path, document_id):
+        # S'assurer que ExcelEditor est importé
+        # from excel_editor import ExcelEditor # Déjà importé en haut du fichier
         if file_path and os.path.exists(file_path):
-            editor = ExcelEditor(file_path, document_id, self) # Pass self (DocumentsTab) as parent
+            editor = ExcelEditor(file_path, document_id, self)
             if editor.exec_() == QDialog.Accepted:
                 self.populate_doc_table()
                 self.notify(self.tr("Excel Modifié"), self.tr("Le document Excel a été sauvegardé."), type='SUCCESS')
@@ -646,9 +706,13 @@ class DocumentsTab(QWidget):
             self.notify(self.tr("Erreur Composant"), self.tr("Le composant de création de document n'est pas chargé."), type='CRITICAL')
             return
 
+        # S'assurer que app_root_dir est passé à CreateDocumentDialog
         dialog = self.CreateDocumentDialog(
-            client_info=self.client_info, config=self.config,
-            current_user_id=self.current_user_id, parent=self,
+            client_info=self.client_info,
+            config=self.config,
+            app_root_dir=self.app_root_dir, # Ajout de app_root_dir
+            current_user_id=self.current_user_id,
+            parent=self,
             template_data={'template_id': source_template_id},
             old_document_id_to_version=old_document_id
         )
@@ -668,10 +732,7 @@ class DocumentsTab(QWidget):
         if reply == QMessageBox.Yes:
             QApplication.setOverrideCursor(Qt.WaitCursor)
             try:
-                # Fetch the document to get its relative path for DB consistency if needed,
-                # though delete_client_document should handle this.
-                # For file deletion, file_path_abs is already what we need.
-                db_deleted = client_documents_crud.delete_client_document(document_id) # Use the specific CRUD
+                db_deleted = client_documents_crud.delete_client_document(document_id)
                 if db_deleted:
                     if file_path_abs and os.path.exists(file_path_abs):
                         try:
@@ -680,7 +741,7 @@ class DocumentsTab(QWidget):
                         except OSError as e_file:
                             self.notify(self.tr("Erreur Fichier"), self.tr("DB supprimé, échec suppression fichier: {0}").format(str(e_file)), type='ERROR')
                     else:
-                         self.notify(self.tr("Succès (Partiel)"), self.tr("DB supprimé. Fichier non trouvé sur le disque."), type='WARNING')
+                         self.notify(self.tr("Succès (Partiel)"), self.tr("DB supprimé. Fichier non trouvé sur le disque ou chemin non fourni."), type='WARNING')
                 else:
                     self.notify(self.tr("Erreur DB"), self.tr("Échec suppression DB."), type='ERROR')
             except Exception as e:
@@ -704,99 +765,244 @@ class DocumentsTab(QWidget):
     def apply_permissions_to_tab(self, can_manage_documents: bool):
         if hasattr(self, 'main_add_doc_action_btn'):
             self.main_add_doc_action_btn.setEnabled(can_manage_documents)
-        # Old buttons self.add_doc_btn and self.add_template_btn are removed,
-        # so no need to manage their state here anymore.
 
         self.can_manage_documents_permission = can_manage_documents
-        # Row actions in populate_doc_table already use self.can_manage_documents_permission
-        # Calling populate_doc_table() here is good to refresh row action visibility
-        # if permissions change while the tab is visible.
+        self.populate_doc_table() # Rafraîchir pour appliquer les permissions aux actions de ligne
+
+    def handle_generate_from_raw_html_action(self, raw_document_id: str, raw_html_file_path: str, source_template_id: Optional[str]):
+        """
+        Gère la génération d'un document final (PDF/HTML rempli)
+        à partir d'un fichier HTML brut existant dans le dossier client.
+        """
+        from typing import Optional # Assurez-vous que Optional est importé si ce n'est pas déjà fait en haut
+        from PyQt5.QtCore import QUrl # Pour base_url Weasyprint
+        # Importer HtmlEditor pour populate_html_content statique
+        from gui.widgets.html_editor import HtmlEditor
+        # Importer convert_html_to_pdf et WeasyPrintError
+        from utils.html_to_pdf_util import convert_html_to_pdf, WeasyPrintError
+
+
+        logging.info(f"Demande de génération depuis HTML brut: ID={raw_document_id}, Path='{raw_html_file_path}', SourceTemplateID='{source_template_id}'")
+
+        if not raw_html_file_path or not os.path.exists(raw_html_file_path):
+            self.notify(self.tr("Fichier Introuvable"), self.tr("Le fichier HTML brut source est introuvable :\n{0}").format(raw_html_file_path), type='WARNING')
+            return
+
+        try:
+            with open(raw_html_file_path, 'r', encoding='utf-8') as f:
+                raw_html_content = f.read()
+        except IOError as e:
+            self.notify(self.tr("Erreur Lecture"), self.tr("Impossible de lire le fichier HTML brut :\n{0}").format(e), type='ERROR')
+            return
+
+        if not raw_html_content.strip(): # Vérifier si le contenu est vide ou juste des espaces
+            self.notify(self.tr("Contenu Vide"), self.tr("Le fichier HTML brut est vide."), type='WARNING')
+            return
+
+        raw_doc_db_details = client_documents_crud.get_document_by_id(raw_document_id)
+        if not raw_doc_db_details:
+            self.notify(self.tr("Erreur DB"), self.tr("Impossible de récupérer les détails du document HTML brut."), type='ERROR')
+            return
+
+        language_code_for_context = raw_doc_db_details.get('language_code', self.client_info.get('selected_languages', ['fr'])[0])
+        original_template_name = "Document_HTML_Brut"
+        original_template_type_base = "RAW_HTML_CONTENT" # Fallback si source_template_id n'est pas trouvé
+
+        if source_template_id:
+            template_info = db_manager.get_template_by_id(source_template_id)
+            if template_info:
+                original_template_name = template_info.get('template_name', original_template_name)
+                original_template_type_base = template_info.get('template_type', original_template_type_base)
+                # Nettoyer _HTML du type de base pour former le type final
+                if original_template_type_base.endswith("_HTML"):
+                    original_template_type_base = original_template_type_base[:-5]
+
+
+        # S'assurer que default_company est bien récupéré
+        default_company = db_manager.get_default_company()
+        if not default_company or not default_company.get('company_id'):
+            self.notify(self.tr("Erreur Configuration"), self.tr("Société par défaut non configurée."), type='ERROR')
+            return
+
+        document_context = db_manager.get_document_context_data(
+            client_id=self.client_info.get('client_id'),
+            company_id=default_company['company_id'],
+            target_language_code=language_code_for_context,
+            project_id=raw_doc_db_details.get('project_id'),
+            order_id=raw_doc_db_details.get('order_identifier'),
+            document_type=f"GENERATED_FROM_{raw_doc_db_details.get('document_type_generated')}",
+            additional_context=self.client_info,
+            app_root_dir=self.app_root_dir
+        )
+
+        if not document_context:
+            self.notify(self.tr("Erreur Contexte"), self.tr("Impossible de générer le contexte pour le document."), type='ERROR')
+            return
+
+        populated_html = HtmlEditor.populate_html_content(raw_html_content, document_context)
+
+        client_abs_base_path = os.path.join(self.app_root_dir, self.client_info.get("base_folder_path") or self.client_info.get("default_base_folder_path",""))
+
+        doc_type_name_for_folder = original_template_name.replace(" ", "_").replace("/", "_") + "_Final"
+        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        final_doc_folder_level_parts = [language_code_for_context, doc_type_name_for_folder]
+        if raw_doc_db_details.get('order_identifier'):
+            safe_order_subfolder = raw_doc_db_details.get('order_identifier').replace(':', '_').replace('/', '_').replace('\\', '_').replace(' ', '_')
+            final_doc_folder_level_parts.insert(0, safe_order_subfolder)
+
+        final_doc_folder_abs = os.path.join(client_abs_base_path, *final_doc_folder_level_parts)
+        os.makedirs(final_doc_folder_abs, exist_ok=True)
+
+        base_final_filename = f"{os.path.splitext(raw_doc_db_details.get('file_name_on_disk'))[0]}_final_{timestamp_str}"
+
+        final_generated_file_path = None
+        final_output_filename = None
+        final_document_type_for_db = None
+        base_url_for_pdf = QUrl.fromLocalFile(os.path.dirname(raw_html_file_path)).toString()
+
+        try:
+            pdf_bytes = convert_html_to_pdf(populated_html, base_url=base_url_for_pdf)
+            if pdf_bytes:
+                final_output_filename = f"{base_final_filename}.pdf"
+                final_generated_file_path = os.path.join(final_doc_folder_abs, final_output_filename)
+                with open(final_generated_file_path, 'wb') as f_pdf: f_pdf.write(pdf_bytes)
+                final_document_type_for_db = original_template_type_base + "_PDF"
+                logging.info(f"Document PDF généré avec succès : {final_generated_file_path}")
+            else:
+                raise WeasyPrintError("La conversion PDF a retourné None.")
+        except WeasyPrintError as e_pdf:
+            logging.warning(f"Échec de la conversion PDF depuis HTML brut : {e_pdf}. Sauvegarde en HTML rempli.")
+            self.notify(self.tr("Avertissement PDF"), self.tr("La conversion en PDF a échoué ({0}). Le document sera sauvegardé en HTML rempli.").format(str(e_pdf)[:100]), type='WARNING')
+
+            final_output_filename = f"{base_final_filename}_populated.html"
+            final_generated_file_path = os.path.join(final_doc_folder_abs, final_output_filename)
+            try:
+                with open(final_generated_file_path, 'w', encoding='utf-8') as f_html_pop: f_html_pop.write(populated_html)
+                final_document_type_for_db = original_template_type_base + "_HTML_POPULATED"
+                logging.info(f"Document HTML rempli sauvegardé : {final_generated_file_path}")
+            except IOError as e_io_save_html:
+                self.notify(self.tr("Erreur Sauvegarde HTML"), self.tr("Impossible de sauvegarder le HTML rempli : {0}").format(e_io_save_html), type='ERROR')
+                return
+
+        if not final_generated_file_path or not final_output_filename:
+            self.notify(self.tr("Erreur Génération"), self.tr("Aucun fichier final n'a pu être généré."), type='ERROR')
+            return
+
+        final_file_path_relative_to_client_base = os.path.relpath(final_generated_file_path, client_abs_base_path)
+
+        final_doc_db_data = {
+            "client_id": self.client_info.get('client_id'),
+            "document_name": final_output_filename,
+            "file_name_on_disk": final_output_filename,
+            "file_path_relative": final_file_path_relative_to_client_base,
+            "document_type_generated": final_document_type_for_db,
+            "language_code": language_code_for_context,
+            "source_template_id": source_template_id,
+            "parent_document_id": raw_document_id, # Lier au document HTML brut source
+            "order_identifier": raw_doc_db_details.get('order_identifier'),
+            "user_id": self.current_user_id,
+            "notes": f"Généré à partir du document HTML brut ID: {raw_document_id}.",
+            "version_tag": "1.0_generated"
+        }
+
+        new_final_doc_id = client_documents_crud.add_client_document(final_doc_db_data)
+        if not new_final_doc_id:
+            self.notify(self.tr("Erreur DB"), self.tr("Échec de l'enregistrement du document final généré en base de données."), type='ERROR')
+            try:
+                if final_generated_file_path and os.path.exists(final_generated_file_path):
+                    os.remove(final_generated_file_path)
+            except OSError: logging.warning(f"Impossible de supprimer {final_generated_file_path} après échec DB.")
+            return
+
+        self.notify(self.tr("Succès"), self.tr("Document final '{0}' généré avec succès.").format(final_output_filename), type='SUCCESS')
         self.populate_doc_table()
 
-    def handle_convert_proforma_to_invoice(self, proforma_document_id: str):
-        self.notify(self.tr("Information"), self.tr(f"Conversion de proforma ID {proforma_document_id} en facture demandée. Cette fonctionnalité est en cours de développement."), type='INFO')
-        logging.info(f"Conversion de proforma ID {proforma_document_id} en facture demandée.")
 
-        # 1. Récupérer les détails du document proforma
+    def handle_convert_proforma_to_invoice(self, proforma_document_id: str):
+        # self.notify(self.tr("Information"), self.tr(f"Conversion de proforma ID {proforma_document_id} en facture demandée. Cette fonctionnalité est en cours de développement."), type='INFO')
+        # logging.info(f"Conversion de proforma ID {proforma_document_id} en facture demandée.")
+        # Implémentation réelle de la conversion proforma en facture
         proforma_doc = client_documents_crud.get_document_by_id(proforma_document_id)
         if not proforma_doc:
             self.notify(self.tr("Erreur"), self.tr("Document proforma non trouvé."), type='ERROR')
             return
 
-        commande_id = proforma_doc.get('commande_id')
-        if not commande_id:
-            self.notify(self.tr("Erreur"), self.tr("Aucune commande n'est liée à cette proforma. Conversion manuelle requise."), type='WARNING')
+        # Vérifier si le document est bien une proforma (PDF ou autre type désigné)
+        if "PROFORMA" not in proforma_doc.get("document_type_generated", "").upper():
+            self.notify(self.tr("Type Incorrect"), self.tr("Ce document n'est pas une facture proforma valide pour la conversion."), type='WARNING')
             return
 
-        # 2. Récupérer les détails de la commande et ses items
-        # Assurez-vous que commandes_crud est importé ou accessible via db_manager
-        commande_details = db_manager.commandes_crud.get_commande_by_id(commande_id)
+        commande_id = proforma_doc.get('order_identifier') # Souvent, l'ID de commande est dans order_identifier pour les proformas
+        # Ou proforma_doc.get('commande_id') si ce champ existe et est peuplé
+
+        if not commande_id: # Si commande_id n'est pas directement sur le doc, essayer de le déduire autrement si possible
+             # Pour cette version, on exige que la proforma soit liée à une commande via order_identifier ou un champ commande_id
+            self.notify(self.tr("Erreur"), self.tr("Aucune commande n'est directement liée à cette proforma pour une conversion automatique. Conversion manuelle requise."), type='WARNING')
+            return
+
+        commande_details = db_manager.commandes_crud.get_commande_by_id(commande_id) # ou get_commande_by_reference si commande_id est une référence
         if not commande_details:
-            self.notify(self.tr("Erreur"), self.tr(f"Détails de la commande ID {commande_id} non trouvés."), type='ERROR')
+            self.notify(self.tr("Erreur"), self.tr(f"Détails de la commande Réf/ID '{commande_id}' non trouvés."), type='ERROR')
             return
 
-        commande_items = db_manager.commandes_crud.get_items_for_commande(commande_id)
-        if commande_items is None: # Peut retourner None en cas d'erreur DB
-            self.notify(self.tr("Erreur"), self.tr(f"Articles pour la commande ID {commande_id} non trouvés."), type='ERROR')
+        # S'assurer que commande_id est bien l'ID PK pour get_items_for_commande
+        actual_commande_pk_id = commande_details.get("commande_id")
+        commande_items = db_manager.commandes_crud.get_items_for_commande(actual_commande_pk_id)
+        if commande_items is None: # Peut retourner None en cas d'erreur DB ou si aucun item
+            self.notify(self.tr("Erreur"), self.tr(f"Articles pour la commande ID {actual_commande_pk_id} non trouvés ou erreur DB."), type='ERROR')
             return
 
-        # 3. Préparer les données pour le dialogue de facture
-        # La structure exacte dépendra de ce que ManualInvoiceDialog attend
         invoice_data_prefill = {
             "client_id": commande_details.get("client_id"),
             "project_id": commande_details.get("project_id"),
-            "commande_id_source": commande_id, # Pour référence
+            "commande_id_source": actual_commande_pk_id,
             "currency": commande_details.get("currency", "EUR"),
             "items": [],
-            "notes": f"Basé sur la Proforma Doc ID: {proforma_document_id}, Commande Réf: {commande_details.get('commande_reference')}"
-            # D'autres champs comme les termes de paiement pourraient être copiés de la commande/proforma
+            "notes": self.tr("Basé sur la Proforma Doc ID: {0}, Commande Réf: {1}").format(proforma_document_id, commande_details.get('commande_reference'))
         }
 
         for item in commande_items:
             invoice_data_prefill["items"].append({
                 "product_id": item.get("product_id"),
-                "description": item.get("description_item"), # Ou product_name si description_item est vide
+                "description": item.get("description_item") or item.get("product_name"), # Utiliser product_name si description_item est vide
                 "quantity": item.get("quantity"),
                 "unit_price": item.get("unit_price_ht"),
-                "vat_rate": item.get("vat_rate", 0.0) # Le dialogue de facture gérera probablement le %
-                # ... autres champs que ManualInvoiceDialog pourrait attendre pour les items
+                "vat_rate": item.get("vat_rate", 0.0)
             })
 
-        # 4. Ouvrir le dialogue de création de facture
         try:
-            from invoicing.manual_invoice_dialog import ManualInvoiceDialog # Importation locale
-            # Il faut s'assurer que ManualInvoiceDialog peut accepter des données pré-remplies
-            # Par exemple, via un paramètre `prefill_data` ou des setters.
-            # Ceci est une supposition sur le fonctionnement de ManualInvoiceDialog.
+            from invoicing.manual_invoice_dialog import ManualInvoiceDialog
             invoice_dialog = ManualInvoiceDialog(
                 client_id=invoice_data_prefill["client_id"],
                 current_user_id=self.current_user_id,
-                prefill_data=invoice_data_prefill, # Paramètre hypothétique
+                prefill_data=invoice_data_prefill,
                 parent=self
             )
 
             if invoice_dialog.exec_() == QDialog.Accepted:
-                new_invoice_id = invoice_dialog.get_created_invoice_id() # Méthode hypothétique
+                new_invoice_id = invoice_dialog.get_created_invoice_id()
                 if new_invoice_id:
                     self.notify(self.tr("Succès"), self.tr(f"Facture ID {new_invoice_id} créée avec succès à partir de la proforma."), type='SUCCESS')
 
-                    # 5. Mettre à jour la proforma (par exemple, ajouter une note)
                     updated_proforma_notes = proforma_doc.get("notes", "") or ""
-                    updated_proforma_notes += f"\nConvertie en Facture ID: {new_invoice_id} le {datetime.now().strftime('%Y-%m-%d %H:%M')}."
-
+                    datetime_str = datetime.now().strftime('%Y-%m-%d %H:%M')
+                    updated_proforma_notes += f"\n{self.tr('Convertie en Facture ID')}: {new_invoice_id} {self.tr('le')} {datetime_str}."
                     client_documents_crud.update_client_document_notes(proforma_document_id, updated_proforma_notes.strip())
-                    # Idéalement, il y aurait un champ `linked_invoice_id` sur la table ClientDocuments ou ProformaInvoices.
-                    # Ou un statut "Convertie" pour la proforma.
 
-                    self.populate_doc_table() # Rafraîchir la liste des documents
+                    # Mettre à jour le statut de la proforma (si un tel champ existe)
+                    # client_documents_crud.update_document_status(proforma_document_id, "CONVERTED_TO_INVOICE")
+
+                    self.populate_doc_table()
                 else:
                     self.notify(self.tr("Information"), self.tr("La facture a été créée mais son ID n'a pas pu être récupéré."), type='INFO')
             else:
                 self.notify(self.tr("Annulé"), self.tr("Conversion en facture annulée."), type='INFO')
 
         except ImportError:
-            self.logger.error("ManualInvoiceDialog n'a pas pu être importé.")
+            # self.logger.error("ManualInvoiceDialog n'a pas pu être importé.") # self.logger n'existe pas
+            logging.error("ManualInvoiceDialog n'a pas pu être importé dans DocumentsTab.")
             self.notify(self.tr("Erreur"), self.tr("Le module de facturation n'est pas disponible."), type='CRITICAL')
         except Exception as e:
-            self.logger.error(f"Erreur lors de la conversion proforma en facture : {e}", exc_info=True)
+            logging.error(f"Erreur lors de la conversion proforma en facture : {e}", exc_info=True)
             self.notify(self.tr("Erreur Inattendue"), str(e), type='CRITICAL')
