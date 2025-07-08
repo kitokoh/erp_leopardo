@@ -682,6 +682,46 @@ def initialize_database(app_config):
         # For now, assume if status_id exists, it's likely from the proper CREATE TABLE.
         pass
 
+    # Ensure other columns from the main CREATE TABLE Clients definition are present
+    # This makes the schema robust if an older DB file is used.
+    columns_to_ensure_in_clients = {
+        "client_name": "TEXT NOT NULL", # Key field, usually present
+        "company_name": "TEXT",
+        "primary_need_description": "TEXT",
+        "project_identifier": "TEXT NOT NULL", # Key field
+        "country_id": "INTEGER REFERENCES Countries(country_id)",
+        "city_id": "INTEGER REFERENCES Cities(city_id)",
+        "default_base_folder_path": "TEXT UNIQUE",
+        "selected_languages": "TEXT",
+        "price": "REAL DEFAULT 0",
+        "notes": "TEXT", # This is for Client notes, distinct from ClientNotes table
+        "category": "TEXT",
+        # distributor_specific_info is already handled by an explicit ALTER block
+        # default_template_id is already handled
+        "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        "updated_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        "created_by_user_id": "TEXT REFERENCES Users(user_id)",
+        # is_deleted is already handled
+        # deleted_at is already handled
+        # status_id is already handled
+        # lead_source is handled by its own specific ALTER block as it wasn't in original CREATE
+    }
+
+    cursor.execute("PRAGMA table_info(Clients)")
+    clients_existing_columns_info = cursor.fetchall()
+    clients_existing_column_names = [info['name'] for info in clients_existing_columns_info]
+
+    for col_name, col_definition in columns_to_ensure_in_clients.items():
+        if col_name not in clients_existing_column_names:
+            try:
+                cursor.execute(f"ALTER TABLE Clients ADD COLUMN {col_name} {col_definition}")
+                print(f"DEBUG_INIT_DB: Added missing column '{col_name}' to Clients table.")
+            except sqlite3.Error as e_alter_generic:
+                print(f"DEBUG_INIT_DB: Error adding column '{col_name}' to Clients table: {e_alter_generic}")
+        # else:
+            # print(f"DEBUG_INIT_DB: Column '{col_name}' already exists in Clients table.")
+
+
 
     # Create ClientNotes table (base from ca.py)
     cursor.execute("""
