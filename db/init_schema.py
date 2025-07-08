@@ -185,16 +185,10 @@ def initialize_database(app_config):
 
     # Populate Roles table (ensure default roles exist) - REMOVED
     # This is now handled by db_seed.py after Alembic creates the Roles table.
-    # default_roles = [
-    #     {"role_name": "Administrator", "description": "Full system access."},
-    #     {"role_name": "Team Lead", "description": "Manages projects and teams."},
-    #     {"role_name": "Operator", "description": "Standard user with operational access."}
-    # ]
-    # for role_data in default_roles:
-    #     cursor.execute("INSERT OR IGNORE INTO Roles (role_name, description) VALUES (?, ?)",
-    #                    (role_data["role_name"], role_data["description"]))
-    # print("DEBUG_INIT_DB: Default roles seeded or already exist.") # Keep print for now, or change to indicate skip
     print("DEBUG_INIT_DB: Default roles seeding (Administrator, Team Lead, Operator) in init_schema.py SKIPPED - Handled by db_seed.py.")
+
+    # Seeding of Permissions and RolePermissions is also MOVED to db_seed.py
+    print("DEBUG_INIT_DB: Seeding of Permissions and RolePermissions in init_schema.py SKIPPED - Handled by db_seed.py.")
 
 
 
@@ -2923,7 +2917,6 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         )
         """)
         print("DEBUG_INIT_DB: Table CompanyCalendarSettings created or exists.")
-
 
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS UserCalendarEvents (

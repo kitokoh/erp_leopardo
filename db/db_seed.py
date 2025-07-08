@@ -100,68 +100,146 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
     from db.cruds.roles_crud import add_role as crud_add_role, get_role_by_name as crud_get_role_by_name
     # users_crud functions now accept logger_passed
     from db.cruds import users_crud # Keep direct import for users_crud
-    from auth.permissions import ADMINISTRATOR, TEAM_LEAD, OPERATOR # Role names
+    from auth.permissions import ADMINISTRATOR, TEAM_LEAD, OPERATOR, ALL_PERMISSIONS, PERMISSION_MAP # Role names and permission map
+    # Permissions and PERMISSION_MAP will be imported by the function that uses them (_seed_permissions_and_role_permissions)
 
-    try:
-        # Seed Roles
-        logger.info("Seeding default roles...")
-        roles_to_seed = {
-            ADMINISTRATOR: "Full application access and user management.",
-            TEAM_LEAD: "Manages projects and teams, advanced client/product operations.",
-            OPERATOR: "Standard user for daily operations, data entry, document generation."
-        }
-        role_ids = {}
-        for role_name, desc in roles_to_seed.items():
-            existing_role = crud_get_role_by_name(role_name, conn=conn)
-            if existing_role:
-                role_ids[role_name] = existing_role['role_id']
-                logger.info(f"Role '{role_name}' already exists with ID {role_ids[role_name]}.")
-            else:
-                new_role_id = crud_add_role(role_name, desc, conn=conn)
-                if new_role_id:
-                    role_ids[role_name] = new_role_id
-                    logger.info(f"Role '{role_name}' added with ID {new_role_id}.")
-                else:
-                    logger.error(f"Failed to add role '{role_name}'.")
+    # --- Seed Roles (Administrator, Team Lead, Operator) ---
+    # This must happen after Roles table is created by Alembic.
+    logger.info("Seeding default roles (Administrator, Team Lead, Operator)...")
+    roles_to_seed_map = { # Renamed to avoid conflict with a potential 'roles_to_seed' variable later
+        ADMINISTRATOR: "Full application access and user management.",
+        TEAM_LEAD: "Manages projects and teams, advanced client/product operations.",
+        OPERATOR: "Standard user for daily operations, data entry, document generation."
+    }
+    if SUPER_ADMIN_ROLE_NAME not in roles_to_seed_map:
+        roles_to_seed_map[SUPER_ADMIN_ROLE_NAME] = "Super administrator with all system privileges."
 
-        # Ensure Administrator role ID was obtained
-        admin_role_id = role_ids.get(ADMINISTRATOR)
-        if not admin_role_id:
-            logger.critical(f"Administrator role ('{ADMINISTRATOR}') could not be seeded or found. Cannot create default admin user.")
-        # print("DEBUG_DB_SEED: CHECKPOINT 1 - After Role seeding", flush=True) # Removed
-    except Exception as e_roles:
-        logger.error(f"An error occurred during role seeding: {e_roles}", exc_info=True)
-        # This error will be logged, and the broader seeding process might continue or be caught by an outer try-except.
-    finally:
-        # This block is executed regardless of whether an exception occurred in the try block.
-        pass
-
-    try:
-        # 1. Users - Seed initial Admin User (now 'admin' with SUPER_ADMIN role)
-        super_admin_user_id = None # Initialize
-    # Fetch SUPER_ADMIN role_id
-        # Ensure SUPER_ADMIN_ROLE_NAME is defined or imported, e.g. from auth.roles
-        super_admin_role_dict = crud_get_role_by_name(SUPER_ADMIN_ROLE_NAME, conn=conn)
-        if not super_admin_role_dict:
-            logger.info(f"Role '{SUPER_ADMIN_ROLE_NAME}' not found, creating it...")
-            # Ensure crud_add_role is available
-            super_admin_role_id_new = crud_add_role(SUPER_ADMIN_ROLE_NAME, "Super administrator with all permissions.", conn=conn)
-            if super_admin_role_id_new:
-                super_admin_role_id = super_admin_role_id_new
-                logger.info(f"Role '{SUPER_ADMIN_ROLE_NAME}' created with ID {super_admin_role_id}.")
-            else:
-                logger.error(f"Failed to create role '{SUPER_ADMIN_ROLE_NAME}'. Cannot create super_admin user.")
-                super_admin_role_id = None
+    current_role_ids = {} # Will store role_name: role_id
+    for role_name_str, desc_str in roles_to_seed_map.items():
+        existing_role = crud_get_role_by_name(role_name_str, conn=conn)
+        if existing_role:
+            current_role_ids[role_name_str] = existing_role['role_id']
+            logger.info(f"Role '{role_name_str}' already exists with ID {existing_role['role_id']}.")
         else:
-            super_admin_role_id = super_admin_role_dict['role_id']
-            logger.info(f"Role '{SUPER_ADMIN_ROLE_NAME}' found with ID {super_admin_role_id}.")
+            new_role_id = crud_add_role(role_name_str, desc_str, conn=conn)
+            if new_role_id:
+                current_role_ids[role_name_str] = new_role_id
+                logger.info(f"Role '{role_name_str}' added with ID {new_role_id}.")
+            else:
+                logger.error(f"Failed to add role '{role_name_str}'.")
+    # and `current_role_ids` map populated above.
+    # _seed_permissions_and_role_permissions(cursor, conn, logger, current_role_ids) # This was called too early.
 
-        if super_admin_role_id:
-            target_admin_username = "admin"
-            temp_admin_password = "admin" # Explicitly "admin"
-            logger.info(f"Ensuring super admin user '{target_admin_username}' exists with password '{temp_admin_password}' and role '{SUPER_ADMIN_ROLE_NAME}'...")
+    # --- Seed Admin User ---
+    # This must happen after roles (especially SUPER_ADMIN_ROLE_NAME) are available in current_role_ids
+    super_admin_user_id = None
+    super_admin_role_id = current_role_ids.get(SUPER_ADMIN_ROLE_NAME)
 
-            admin_user_dict = users_crud.get_user_by_username(target_admin_username, conn=conn, logger_passed=logger)
+    if super_admin_role_id:
+        target_admin_username = "admin"
+        temp_admin_password = "admin" # Ensure this is the desired default password
+        logger.info(f"Ensuring super admin user '{target_admin_username}' exists with password (hidden) and role '{SUPER_ADMIN_ROLE_NAME}' (Role ID: {super_admin_role_id})...")
+
+        admin_user_dict = users_crud.get_user_by_username(target_admin_username, conn=conn, logger_passed=logger)
+        if admin_user_dict:
+            super_admin_user_id = admin_user_dict['user_id']
+            logger.info(f"User '{target_admin_username}' (ID: {super_admin_user_id}) exists. Verifying role and password.")
+            if admin_user_dict.get('role_id') != super_admin_role_id:
+                logger.info(f"User '{target_admin_username}' does not have role '{SUPER_ADMIN_ROLE_NAME}'. Updating role...")
+                users_crud.update_user_role(super_admin_user_id, super_admin_role_id, conn=conn, logger_passed=logger)
+
+            logger.info(f"Updating password for '{target_admin_username}' to ensure it is '{temp_admin_password}'.")
+            update_success = users_crud.update_user_password(super_admin_user_id, temp_admin_password, conn=conn, logger_passed=logger)
+            if update_success: logger.info(f"Password for user '{target_admin_username}' updated successfully.")
+            else: logger.error(f"Failed to update password for user '{target_admin_username}'. This is critical.")
+        else:
+            logger.info(f"User '{target_admin_username}' not found. Creating with password '{temp_admin_password}' and role '{SUPER_ADMIN_ROLE_NAME}'.")
+            new_admin_id = users_crud.add_user(
+                username=target_admin_username, password=temp_admin_password, role_id=super_admin_role_id,
+                full_name="Super Administrator", email="superadmin@example.local",
+                conn=conn, logger_passed=logger
+            )
+            if new_admin_id:
+                super_admin_user_id = new_admin_id
+                logger.info(f"User '{target_admin_username}' created with ID {super_admin_user_id}.")
+
+            else:
+                logger.error(f"Failed to create user '{target_admin_username}'.")
+                super_admin_user_id = None
+    else:
+        logger.critical(f"Role '{SUPER_ADMIN_ROLE_NAME}' ID not found in role_id_map_for_permissions. Cannot ensure super admin user '{target_admin_username}'.")
+        super_admin_user_id = None
+    # --- End Seed Admin User ---
+
+    # Preserve admin_user_id for compatibility if other parts expect 'admin_user_id' to refer to the general admin
+    # For now, 'admin_user_id' will be the super_admin_user_id
+    admin_user_id = super_admin_user_id
+
+
+    # Fallback for original DEFAULT_ADMIN_USERNAME if that's different and was used elsewhere
+    # This part might be less relevant if target_admin_username ("admin") is the one true admin.
+    if DEFAULT_ADMIN_USERNAME != "admin":
+        logger.info(f"Checking for original default admin user '{DEFAULT_ADMIN_USERNAME}' for compatibility...")
+        original_admin_user_dict = users_crud.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn, logger_passed=logger)
+        if original_admin_user_dict:
+            logger.info(f"Found original default admin user '{DEFAULT_ADMIN_USERNAME}' with ID {original_admin_user_dict['user_id']}. Note: 'admin_user_id' in this script now refers to the user 'admin' with role '{SUPER_ADMIN_ROLE_NAME}'.")
+
+
+    # Seed Default Operational User (depends on 'Operator' role_id from role_id_map_for_permissions)
+    DEFAULT_OPERATIONAL_USERNAME = "default_operational_user"
+    logger.info(f"Checking for default operational user '{DEFAULT_OPERATIONAL_USERNAME}'...")
+    existing_operational_user = users_crud.get_user_by_username(DEFAULT_OPERATIONAL_USERNAME, conn=conn, logger_passed=logger)
+    if not existing_operational_user:
+        operator_role_id_for_op_user = role_id_map_for_permissions.get(OPERATOR)
+        if operator_role_id_for_op_user:
+            logger.info(f"Creating default operational user '{DEFAULT_OPERATIONAL_USERNAME}' with role '{OPERATOR}'.")
+            op_user_id = users_crud.add_user(
+                username=DEFAULT_OPERATIONAL_USERNAME, password=uuid.uuid4().hex, role_id=operator_role_id_for_op_user,
+                full_name="Default Operational User", email=f"{DEFAULT_OPERATIONAL_USERNAME}@example.local",
+                conn=conn, logger_passed=logger
+            )
+            if op_user_id: logger.info(f"Created default operational user ID: {op_user_id}.")
+            else: logger.error(f"Failed to create default operational user: {DEFAULT_OPERATIONAL_USERNAME}")
+        else:
+            logger.error(f"Could not find role_id for '{OPERATOR}'. Cannot create default operational user.")
+    else:
+        logger.info(f"Default operational user '{DEFAULT_OPERATIONAL_USERNAME}' already exists.")
+
+    # --- Seed Permissions and RolePermissions (Moved from init_schema.py) ---
+    # This uses the 'cursor' and 'conn' from _original_seed_initial_data_func_placeholder
+    # and `current_role_ids` map populated above. This needs to run *after* roles are created
+    # and *after* the admin user (who might be associated with a role) is processed.
+    # More accurately, it needs role_ids from current_role_ids.
+    _seed_permissions_and_role_permissions(cursor, conn, logger, current_role_ids)
+    # --- End Seed Permissions and RolePermissions ---
+
+    # Ensure the rest of the function uses the 'conn' passed in, not 'cursor' directly for write ops unless it's a read.
+    # The cursor object is still valid for SELECTs if needed.
+    try:
+        # 2. Companies (uses admin_user_id if available for created_by or similar in future)
+        default_company_id = None # Renamed from default_company_id to avoid conflict
+        cursor.execute("SELECT COUNT(*) FROM companies")
+        if cursor.fetchone()[0] == 0:
+            default_company_id = str(uuid.uuid4())
+            cursor.execute("INSERT OR IGNORE INTO companies (company_id, company_name, address, is_default) VALUES (?, ?, ?, ?)",
+                               (default_company_id, "Default Company Inc.", "123 Default Street", True))
+            logger.info("Seeded default company.")
+        else:
+            cursor.execute("SELECT company_id FROM companies WHERE is_default = TRUE")
+            row = cursor.fetchone()
+            if row: default_company_id = row[0]
+
+        # 3. CompanyPersonnel
+        if default_company_id:
+            cursor.execute("SELECT COUNT(*) FROM CompanyPersonnel WHERE company_id = ?", (default_company_id,))
+            if cursor.fetchone()[0] == 0:
+                cursor.execute("INSERT OR IGNORE INTO CompanyPersonnel (company_id, name, role, email, phone) VALUES (?, ?, ?, ?, ?)",
+                               (default_company_id, "Admin Contact", "Administrator", "contact@defaultcomp.com", "123-456-7890"))
+                logger.info("Seeded default company personnel.")
+
+        # 4. TeamMembers
+        if admin_user_id:
+            admin_user_for_tm_dict = users_crud.get_user_by_id(admin_user_id, conn=conn, logger_passed=logger)
 
             if admin_user_dict:
                 super_admin_user_id = admin_user_dict['user_id']
