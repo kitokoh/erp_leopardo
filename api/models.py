@@ -16,23 +16,47 @@ from db.connection import Base # Use the central Base
 # These should be replaced with actual definitions if they exist elsewhere
 # or be fully defined here.
 
-class User(Base): # Assuming User model might be needed for created_by/modified_by later
+class User(Base):
     __tablename__ = "users"
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4())) # user_id in schema is TEXT
-    username = Column(String, unique=True, nullable=False)
-    email = Column(String, unique=True, nullable=False) # Changed nullable to False
-    password_hash = Column(String, nullable=False)
-    salt = Column(String, nullable=False)
+
+    user_id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    username = Column(String, unique=True, nullable=False, index=True)
+    email = Column(String, unique=True, nullable=False, index=True)
+    hashed_password = Column(String, nullable=False) # passlib stores salt within this hash
+    # salt column removed as passlib handles it
     full_name = Column(String, nullable=True)
-    role = Column(String, nullable=False)
+
+    role_id = Column(Integer, ForeignKey("Roles.role_id"), nullable=True)
+
     is_active = Column(Boolean, default=True, nullable=False)
-    is_deleted = Column(Integer, default=0, nullable=False)
-    deleted_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
-    last_login_at = Column(DateTime, nullable=True)
-    # Example relationship (if users create proformas, not directly requested but good for structure)
-    # proforma_invoices_created = relationship("ProformaInvoice", back_populates="created_by_user")
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    is_deleted = Column(Integer, default=0, nullable=False, index=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Biometric fields
+    is_fingerprint_auth_enabled = Column(Boolean, default=False)
+    fingerprint_template_id = Column(Text, nullable=True)
+    is_face_auth_enabled = Column(Boolean, default=False)
+    face_template_id = Column(Text, nullable=True)
+    is_voice_auth_enabled = Column(Boolean, default=False)
+    voice_profile_id = Column(Text, nullable=True)
+
+    # Relationships (adjust as needed based on other models)
+    # Example: if LeaveRequest model has 'approved_by = relationship("User")'
+    # leave_requests_approved = relationship("LeaveRequest", foreign_keys="[LeaveRequest.approved_by_id]", back_populates="approved_by")
+    # goals_set = relationship("Goal", foreign_keys="[Goal.set_by_id]", back_populates="set_by")
+    # reviews_conducted = relationship("PerformanceReview", foreign_keys="[PerformanceReview.reviewer_id]", back_populates="reviewer")
+    # documents_uploaded = relationship("EmployeeDocument", foreign_keys="[EmployeeDocument.uploaded_by_id]", back_populates="uploaded_by")
+
+    # If Roles table is also an SQLAlchemy model, the relationship would be:
+    role = relationship("Role") # Assuming a Role model is defined and related via role_id
+
+    def __repr__(self):
+        return f"<User(user_id='{self.user_id}', username='{self.username}', role_id={self.role_id})>"
 
 
 class Client(Base):
@@ -247,7 +271,7 @@ class LeaveRequest(Base):
     reason = Column(Text, nullable=True)
     num_days = Column(Float, nullable=False) # Calculated, can be stored or computed
     request_date = Column(DateTime, server_default=func.now(), nullable=False)
-    approved_by_id = Column(String, ForeignKey("users.id"), nullable=True) # Assuming User model exists
+    approved_by_id = Column(String, ForeignKey("users.user_id"), nullable=True) # Changed users.id to users.user_id
     processed_date = Column(DateTime, nullable=True)
     comments = Column(Text, nullable=True) # For approver's comments
 
@@ -272,7 +296,7 @@ class Goal(Base):
     __tablename__ = "goals"
     id = Column(Integer, primary_key=True, autoincrement=True)
     employee_id = Column(String, ForeignKey("employees.id"), nullable=False, index=True)
-    set_by_id = Column(String, ForeignKey("users.id"), nullable=True) # Manager/user who set the goal
+    set_by_id = Column(String, ForeignKey("users.user_id"), nullable=True) # Changed users.id to users.user_id
     title = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     due_date = Column(Date, nullable=True)
@@ -315,7 +339,7 @@ class PerformanceReview(Base):
     __tablename__ = "performance_reviews"
     id = Column(Integer, primary_key=True, autoincrement=True)
     employee_id = Column(String, ForeignKey("employees.id"), nullable=False, index=True)
-    reviewer_id = Column(String, ForeignKey("users.id"), nullable=True) # Typically the manager
+    reviewer_id = Column(String, ForeignKey("users.user_id"), nullable=True) # Changed users.id to users.user_id
     review_cycle_id = Column(Integer, ForeignKey("review_cycles.id"), nullable=True)
     review_date = Column(Date, nullable=True) # Date of the review meeting/finalization
     overall_rating = Column(Integer, nullable=True) # E.g., 1-5 scale
@@ -360,7 +384,7 @@ class EmployeeDocument(Base):
 
     description = Column(Text, nullable=True)   # User-provided description
     uploaded_at = Column(DateTime, server_default=func.now(), nullable=False)
-    uploaded_by_id = Column(String, ForeignKey("users.id"), nullable=True)
+    uploaded_by_id = Column(String, ForeignKey("users.user_id"), nullable=True) # Changed users.id to users.user_id
 
     employee = relationship("Employee")
     document_category = relationship("DocumentCategory")

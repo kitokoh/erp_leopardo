@@ -6,12 +6,19 @@ from .generic_crud import _manage_conn # get_db_connection is not used directly
 # --- Countries CRUD ---
 @_manage_conn
 def get_country_by_name(name: str, conn: sqlite3.Connection = None) -> dict | None:
+    logger_crud = logging.getLogger(__name__) # Use specific logger for this CRUD
     cursor=conn.cursor()
     try:
+        logger_crud.info(f"locations_crud.get_country_by_name: Querying for Name='{name}'")
         cursor.execute("SELECT * FROM Countries WHERE country_name = ?",(name,))
         row=cursor.fetchone()
-        # return dict(row) if row else None
-        return {key: row[key] for key in row.keys()} if row else None
+        if row:
+            logger_crud.info(f"locations_crud.get_country_by_name: Found country '{name}' with data: {dict(row)}")
+            return {key: row[key] for key in row.keys()}
+        else:
+            logger_crud.warning(f"locations_crud.get_country_by_name: Country '{name}' NOT found.")
+            return None
+
     except sqlite3.Error as e:
         logging.error(f"Error getting country by name '{name}': {e}")
         return None
@@ -31,35 +38,45 @@ def get_country_by_id(id: int, conn: sqlite3.Connection = None) -> dict | None:
 @_manage_conn
 def get_or_add_country(country_name: str, conn: sqlite3.Connection = None) -> dict | None:
     if not country_name:
-        logging.warning("get_or_add_country: country_name is required.")
+        logging.warning("locations_crud.get_or_add_country: country_name is required.")
         return None
 
+    logger_crud = logging.getLogger(__name__)
+    logger_crud.info(f"locations_crud.get_or_add_country: Processing country: '{country_name}'")
     cursor = conn.cursor()
     try:
         cursor.execute("SELECT * FROM Countries WHERE country_name = ?", (country_name,))
         row = cursor.fetchone()
         if row:
-            # return dict(row)
-            return {key: row[key] for key in row.keys()} if row else None
+            logger_crud.info(f"locations_crud.get_or_add_country: Found existing country '{country_name}' with data: {dict(row)}")
+            return {key: row[key] for key in row.keys()}
+
         else:
             now = datetime.utcnow().isoformat() + "Z"
+            logger_crud.info(f"locations_crud.get_or_add_country: Country '{country_name}' not found, adding it now at {now}.")
             sql = "INSERT INTO Countries (country_name, created_at, updated_at) VALUES (?, ?, ?)"
             params = (country_name, now, now)
             cursor.execute(sql, params)
             new_country_id = cursor.lastrowid
             if new_country_id:
+                logger_crud.info(f"locations_crud.get_or_add_country: Successfully added '{country_name}', new ID: {new_country_id}")
                 return {'country_id': new_country_id, 'country_name': country_name, 'created_at': now, 'updated_at': now}
-            else: # Should not happen if insert was successful
-                logging.error(f"Failed to get lastrowid after inserting country: {country_name}")
+            else:
+                logger_crud.error(f"locations_crud.get_or_add_country: Failed to get lastrowid after inserting country: {country_name}")
+
                 return None
-    except sqlite3.IntegrityError: # country_name likely has a UNIQUE constraint, race condition?
-        logging.warning(f"Integrity error adding country '{country_name}', trying to fetch again.")
+    except sqlite3.IntegrityError:
+        logger_crud.warning(f"locations_crud.get_or_add_country: Integrity error (likely UNIQUE constraint) adding country '{country_name}', trying to fetch again.")
         cursor.execute("SELECT * FROM Countries WHERE country_name = ?", (country_name,))
         row_after_error = cursor.fetchone()
-        # return dict(row_after_error) if row_after_error else None
-        return {key: row_after_error[key] for key in row_after_error.keys()} if row_after_error else None
+        if row_after_error:
+            logger_crud.info(f"locations_crud.get_or_add_country: Fetched country '{country_name}' after IntegrityError: {dict(row_after_error)}")
+            return {key: row_after_error[key] for key in row_after_error.keys()}
+        else:
+            logger_crud.error(f"locations_crud.get_or_add_country: Failed to fetch country '{country_name}' even after IntegrityError recovery attempt.")
+            return None
     except sqlite3.Error as e_general:
-        logging.error(f"General SQLite error in get_or_add_country for '{country_name}': {e_general}")
+        logger_crud.error(f"locations_crud.get_or_add_country: General SQLite error for '{country_name}': {e_general}")
         return None
 
 @_manage_conn

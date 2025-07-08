@@ -175,6 +175,7 @@
                 <p>{{ labels.contact | default('Contact:') }} {{ client.representative_name | default('N/A') }}</p>
                 <p>{{ labels.email | default('Email:') }} {{ client.email | default('N/A') }}</p>
                 <p>{{ labels.vat_id | default('N° TVA:') }} {{ client.vat_id | default('N/A') }}</p>
+
             </div>
         </div>
 
@@ -186,6 +187,7 @@
             <p><strong>{{ labels.delivery_terms_label | default('Conditions de Livraison :') }}</strong> {{ doc.delivery_terms | default('N/A') }}</p>
             {% if doc.incoterms and doc.incoterms != 'N/A' %}
             <p><strong>{{ labels.incoterms | default('Incoterms :') }}</strong> {{ doc.incoterms }}{% if doc.named_place_of_delivery and doc.named_place_of_delivery != 'N/A' %} - {{ doc.named_place_of_delivery }}{% endif %}</p>
+
             {% endif %}
         </div>
 
@@ -241,6 +243,7 @@
             {{/if}}
             <p>{{ labels.vat | default('TVA') }} ({{ doc.vat_rate }}%) : {{ doc.vat_amount }}</p>
             <h3><strong>{{ labels.grand_total | default('Montant Total :') }}</strong> {{ doc.grand_total_amount }}</h3>
+
             <!-- {{#if doc.grand_total_amount_words}}
             <p>({{ doc.grand_total_amount_words }})</p>
             {{/if}} -->
@@ -249,6 +252,7 @@
         {{#if doc.additional_notes}} <!-- Assuming proforma_notes might be in additional_notes or a specific key -->
         <div class="notes-section" style="margin-top:20px; margin-bottom:20px; padding:10px; background-color:#f9f9f9; border-radius:5px;">
             <h4>{{ labels.notes | default('Notes :') }}</h4>
+
             <p>{{ doc.additional_notes }}</p> <!-- Basic display, no complex replace or safe filters -->
         </div>
         {{/if}}
@@ -260,6 +264,7 @@
             <p>{{ labels.iban | default('IBAN :') }} {{ seller.bank_iban }}</p>
             <p>{{ labels.swift_bic | default('SWIFT/BIC :') }} {{ seller.bank_swift_bic }}</p>
             <p>{{ labels.bank_address | default('Adresse de la banque :') }} {{ seller.bank_address }}</p>
+
             <hr>
             {{#each doc.client_specific_notes}}
             <p>{{this}}</p> <!-- Assuming client_specific_notes is a list of strings -->
@@ -267,6 +272,7 @@
             <p style="margin-top: 10px;"><em>{{ labels.proforma_notice | default('Ceci est une facture proforma et ne constitue pas une demande de paiement.') }}</em></p>
             <p><em>{{ labels.thank_you_message | default('Merci de votre confiance !') }}</em></p>
             <p style="font-size: 0.8em; color: #999; margin-top: 20px;">{{ seller.name }} - {{ seller.address_full }} - {{ labels.vat_id | default('N° TVA:') }} {{ seller.vat_id }} - {{ labels.reg_number | default('N° de registre:') }} {{ seller.registration_number }}</p>
+
         </div>
     </div>
 </body>

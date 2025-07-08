@@ -34,6 +34,30 @@ def set_db_config(config):
     _db_config = config
     logging.info("db.connection: Database configuration has been set.")
 
+def get_raw_sqlite_connection(db_path_override=None) -> sqlite3.Connection:
+    """
+    Explicitly returns a raw sqlite3.Connection.
+    Uses _db_config if set, otherwise relies on db_path_override.
+    """
+    global _db_config
+    path_to_connect = db_path_override
+
+    if not path_to_connect:
+        if _db_config is None or _db_config.get('database_type') != 'sqlite':
+            logging.critical(
+                "CRITICAL: get_raw_sqlite_connection requires a db_path_override or a valid SQLite configuration via set_db_config()."
+            )
+            raise ValueError("Cannot establish raw SQLite connection without path or valid config.")
+        path_to_connect = _db_config.get('database_path')
+        if not path_to_connect:
+            raise ValueError("SQLite database path not found in application configuration for raw connection.")
+
+    logging.info(f"db.connection (get_raw_sqlite_connection): Attempting raw SQLite connection to: {path_to_connect}")
+    conn = sqlite3.connect(path_to_connect, timeout=10) # Added timeout
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON;")
+    return conn
+
 def get_db_connection(db_path_override=None) -> Union[sqlite3.Connection, Session]: # Modified return type hint
     """
     Returns a database connection object.
@@ -46,11 +70,15 @@ def get_db_connection(db_path_override=None) -> Union[sqlite3.Connection, Sessio
     # Prioritize SQLAlchemy session if SessionLocal is available
     if SessionLocal:
         db_session = SessionLocal()
-        logging.debug("db.connection: Provided SQLAlchemy session from SessionLocal.")
+        # Log the engine URL associated with this SessionLocal to know which DB it's for
+        if db_session.bind:
+            logging.info(f"db.connection (get_db_connection - SQLAlchemy Session): Providing SQLAlchemy session linked to engine: {db_session.bind.url}")
+        else:
+            logging.warning("db.connection (get_db_connection - SQLAlchemy Session): SessionLocal is available but not bound to an engine.")
         return db_session
 
     # Fallback to original logic if SessionLocal is not initialized
-    logging.warning("db.connection: SessionLocal not initialized. Falling back to raw connection. Ensure initialize_engine_and_session is called for ORM features.")
+    logging.warning("db.connection (get_db_connection - Fallback): SessionLocal not initialized. Falling back to raw connection. Ensure initialize_engine_and_session is called for ORM features.")
 
     if db_path_override:
         path_to_connect = db_path_override
@@ -76,7 +104,8 @@ def get_db_connection(db_path_override=None) -> Union[sqlite3.Connection, Sessio
     if database_type == 'sqlite':
         if not path_to_connect: # Should be caught above if not overridden, but double check
             raise ValueError("SQLite connection requires a valid database path.")
-        logging.debug(f"db.connection: Providing raw sqlite3 connection to {path_to_connect}.")
+        # Log specifically for raw SQLite connection path
+        logging.info(f"db.connection (get_db_connection - raw sqlite): Attempting to connect to SQLite DB at: {path_to_connect}")
         conn = sqlite3.connect(path_to_connect)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON;")
@@ -167,7 +196,7 @@ def initialize_engine_and_session(app_config_param):
 
             logging.info(f"db.connection: SQLAlchemy engine connecting to: {engine_url}")
             try:
-                engine = create_engine(engine_url, connect_args={"check_same_thread": False})
+                engine = create_engine(engine_url, connect_args={"check_same_thread": False, "timeout": 10}) # Increased timeout
                 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
                 logging.info("db.connection: SQLAlchemy engine and SessionLocal created successfully for SQLite.")
             except Exception as e:
