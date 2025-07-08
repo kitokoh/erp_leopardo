@@ -253,13 +253,33 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
             )
             if new_admin_id:
                 super_admin_user_id = new_admin_id
-                logger.info(f"User '{target_admin_username}' created with ID {super_admin_user_id}.")
-
-            else:
-                logger.error(f"Failed to create user '{target_admin_username}'.")
-                super_admin_user_id = None
+                logger.info(f"User '{target_admin_username}' created successfully with ID {super_admin_user_id}.")
+            else: # add_user returned None, possibly due to IntegrityError
+                logger.warning(f"Initial attempt to add user '{target_admin_username}' failed. Checking if an inactive user exists.")
+                # Try to get any user (active, inactive, or deleted) by that username
+                any_admin_user_dict = users_crud.get_any_user_by_username(target_admin_username, conn=conn, logger_passed=logger)
+                if any_admin_user_dict:
+                    logger.info(f"Found existing user '{target_admin_username}' (ID: {any_admin_user_dict['user_id']}) with potentially non-active status. Attempting to activate and update.")
+                    update_success = users_crud.activate_and_update_user_details(
+                        user_id=any_admin_user_dict['user_id'],
+                        role_id=super_admin_role_id,
+                        password=temp_admin_password,
+                        full_name="Super Administrator (Activated)", # Indicate it was updated
+                        email="superadmin@example.local", # Ensure email is consistent
+                        conn=conn,
+                        logger_passed=logger
+                    )
+                    if update_success:
+                        super_admin_user_id = any_admin_user_dict['user_id']
+                        logger.info(f"Successfully activated and updated existing user '{target_admin_username}' to be super admin (ID: {super_admin_user_id}).")
+                    else:
+                        logger.error(f"Failed to activate and update existing user '{target_admin_username}' (ID: {any_admin_user_dict['user_id']}).")
+                        super_admin_user_id = None
+                else:
+                    logger.error(f"Failed to create user '{target_admin_username}' and no existing user (active or inactive) found by that username.")
+                    super_admin_user_id = None
     else:
-        logger.critical(f"Role '{SUPER_ADMIN_ROLE_NAME}' ID not found in role_id_map_for_permissions. Cannot ensure super admin user '{target_admin_username}'.")
+        logger.critical(f"Role '{SUPER_ADMIN_ROLE_NAME}' ID not found in current_role_ids. Cannot ensure super admin user '{target_admin_username}'.")
         super_admin_user_id = None
     # --- End Seed Admin User ---
 
