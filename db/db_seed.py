@@ -162,6 +162,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
             if new_admin_id:
                 super_admin_user_id = new_admin_id
                 logger.info(f"User '{target_admin_username}' created with ID {super_admin_user_id}.")
+
             else:
                 logger.error(f"Failed to create user '{target_admin_username}'.")
                 super_admin_user_id = None
@@ -394,6 +395,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                 else: # get_or_add_country returned None
                      logger.error(f"Failed to get or add country '{country_name}'. Cannot add city '{city_name}'.")
             logger.info(f"Finished attempt to seed {len(countries_cities)} countries/cities.")
+
 
             # 7. Clients & 8. Projects (Simplified)
             logger.info("Seeding sample client and project...")

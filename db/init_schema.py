@@ -160,6 +160,7 @@ def initialize_database(app_config):
     # logging.info("DEBUG_INIT_DB: Roles table creation SKIPPED - Handled by Alembic.")
     print("DEBUG_INIT_DB: Table Roles (raw SQL) creation SKIPPED - Handled by Alembic.") # Keep print for now
 
+
     # --- Permissions and RolePermissions Tables (New for dynamic permissions) ---
     # These are still created with raw SQL as they are not (yet) SQLAlchemy models.
     cursor.execute("""
@@ -188,6 +189,7 @@ def initialize_database(app_config):
 
     # Seeding of Permissions and RolePermissions is also MOVED to db_seed.py
     print("DEBUG_INIT_DB: Seeding of Permissions and RolePermissions in init_schema.py SKIPPED - Handled by db_seed.py.")
+
 
 
     # Table Users (raw SQL) creation REMOVED - Handled by Alembic.
@@ -2126,6 +2128,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     # ProductEquivalencies (Assuming ProductEquivalencies is NOT primarily an Alembic/SQLAlchemy model for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_productequivalencies_product_id_b ON ProductEquivalencies(product_id_b)")
 
+
     # ClientProjectProducts (Assuming ClientProjectProducts is NOT primarily an Alembic/SQLAlchemy model for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientprojectproducts_product_id ON ClientProjectProducts(product_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientprojectproducts_client_project ON ClientProjectProducts(client_id, project_id)")
@@ -2145,6 +2148,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     # StatusSettings (Created by raw SQL, indexes are fine here)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_statussettings_type ON StatusSettings(status_type)")
 
+
     # SAVTickets (Assuming SAVTickets is NOT primarily an Alembic/SQLAlchemy model for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_savtickets_client_id ON SAVTickets(client_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_savtickets_status_id ON SAVTickets(status_id)")
@@ -2160,6 +2164,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
 
     # FreightForwarders (Assuming FreightForwarders is NOT primarily an Alembic/SQLAlchemy model for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_freightforwarders_name ON FreightForwarders(name)")
+
 
     # Client_AssignedPersonnel (Assuming Client_AssignedPersonnel is NOT an Alembic/SQLAlchemy model for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientassignedpersonnel_client_id ON Client_AssignedPersonnel(client_id)")
@@ -2177,6 +2182,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     # CompanyPersonnelContacts (Assuming CompanyPersonnelContacts is NOT an Alembic/SQLAlchemy model for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_companypersonnelcontacts_personnel_id ON CompanyPersonnelContacts(personnel_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_companypersonnelcontacts_contact_id ON CompanyPersonnelContacts(contact_id)")
+
 
     # Partner Tables (Assuming these are NOT primarily Alembic/SQLAlchemy models for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_partners_email ON Partners(email)")
@@ -2227,6 +2233,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_internalstockitems_item_code ON InternalStockItems(item_code)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_internalstockitems_category ON InternalStockItems(category)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_itemstoragelocations_item_id ON ItemStorageLocations(item_id)")
+
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_itemstoragelocations_location_id ON ItemStorageLocations(location_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_productstoragelocations_product_id ON ProductStorageLocations(product_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_productstoragelocations_location_id ON ProductStorageLocations(location_id)")
@@ -2761,7 +2768,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
                     logging.error(f"DEBUG_INIT_DB: Error explicitly dropping targeted tables: {e_drop_specific}", exc_info=True)
             # --- END DEBUG ---
             logging.critical("DEBUG_INIT_DB: SKIPPING MainBase.metadata.create_all() - Alembic should handle SQLAlchemy model tables.")
-            # MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True)
+
             # logging.info("DEBUG_INIT_DB: MainBase.metadata.create_all() EXECUTED.")
             # logging.info("DEBUG_INIT_DB: All tables for MainBase created successfully by SQLAlchemy (using checkfirst=True).")
             # At this point, tables like Products, acc_currencies, etc., should exist if defined via SQLAlchemy.
@@ -2925,6 +2932,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         """)
         print("DEBUG_INIT_DB: Table UserCalendarEvents created or exists.")
 
+
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_companycalendarsettings_user_id ON CompanyCalendarSettings(user_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_user_id ON UserCalendarEvents(user_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_usercalendarevents_event_date ON UserCalendarEvents(event_date)")
@@ -3083,6 +3091,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
                     cursor.execute("INSERT OR IGNORE INTO RolePermissions (role_id, permission_key) VALUES (?, ?)",
                                    (admin_role_id, p_key))
                     if cursor.rowcount > 0:
+
                         admin_perms_added_count += 1
                 except sqlite3.IntegrityError:
                     print(f"DEBUG_INIT_DB: IntegrityError (ou permission non trouvée dans Permissions table) en essayant d'ajouter {p_key} pour Admin ID {admin_role_id}. Skipping.")
