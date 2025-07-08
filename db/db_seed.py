@@ -55,7 +55,10 @@ from db.cruds.templates_crud import add_template, get_filtered_templates, add_de
 # Ensure set_setting is imported if used by seed_initial_data directly
 # (It is used, so ensure it's available from db.cruds.application_settings_crud)
 from db.cruds.application_settings_crud import get_setting, set_setting
-from db.connection import engine as main_sqlalchemy_engine # Import the main engine
+# from db.connection import engine as main_sqlalchemy_engine # Import the main engine - will get it dynamically
+
+# Import the connection module itself to access the engine dynamically
+from db import connection as db_connection_module
 
 
 def _seed_default_partner_categories(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
@@ -85,6 +88,7 @@ def _seed_default_partner_categories(cursor: sqlite3.Cursor, conn: sqlite3.Conne
 
 def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
     logger = logger_passed
+    # print("DEBUG_DB_SEED: TOP OF _original_seed_initial_data_func_placeholder try block", flush=True) # Removed
 
     # Ensure the connection uses sqlite3.Row for dictionary-like access to rows
     if conn and not isinstance(conn.row_factory, sqlite3.Row):
@@ -96,69 +100,145 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
     from db.cruds.roles_crud import add_role as crud_add_role, get_role_by_name as crud_get_role_by_name
     # users_crud functions now accept logger_passed
     from db.cruds import users_crud # Keep direct import for users_crud
-    from auth.permissions import ADMINISTRATOR, TEAM_LEAD, OPERATOR # Role names
+    from auth.permissions import ADMINISTRATOR, TEAM_LEAD, OPERATOR, ALL_PERMISSIONS, PERMISSION_MAP # Role names and permission map
+    # Permissions and PERMISSION_MAP will be imported by the function that uses them (_seed_permissions_and_role_permissions)
 
-    try:
-        # Seed Roles
-        logger.info("Seeding default roles...")
-        roles_to_seed = {
-            ADMINISTRATOR: "Full application access and user management.",
-            TEAM_LEAD: "Manages projects and teams, advanced client/product operations.",
-            OPERATOR: "Standard user for daily operations, data entry, document generation."
-        }
-        role_ids = {}
-        for role_name, desc in roles_to_seed.items():
-            existing_role = crud_get_role_by_name(role_name, conn=conn)
-            if existing_role:
-                role_ids[role_name] = existing_role['role_id']
-                logger.info(f"Role '{role_name}' already exists with ID {role_ids[role_name]}.")
-            else:
-                new_role_id = crud_add_role(role_name, desc, conn=conn)
-                if new_role_id:
-                    role_ids[role_name] = new_role_id
-                    logger.info(f"Role '{role_name}' added with ID {new_role_id}.")
-                else:
-                    logger.error(f"Failed to add role '{role_name}'.")
+    # --- Seed Roles (Administrator, Team Lead, Operator) ---
+    # This must happen after Roles table is created by Alembic.
+    logger.info("Seeding default roles (Administrator, Team Lead, Operator)...")
+    roles_to_seed_map = { # Renamed to avoid conflict with a potential 'roles_to_seed' variable later
+        ADMINISTRATOR: "Full application access and user management.",
+        TEAM_LEAD: "Manages projects and teams, advanced client/product operations.",
+        OPERATOR: "Standard user for daily operations, data entry, document generation."
+    }
+    if SUPER_ADMIN_ROLE_NAME not in roles_to_seed_map:
+        roles_to_seed_map[SUPER_ADMIN_ROLE_NAME] = "Super administrator with all system privileges."
 
-        # Ensure Administrator role ID was obtained
-        admin_role_id = role_ids.get(ADMINISTRATOR)
-        if not admin_role_id:
-            logger.critical(f"Administrator role ('{ADMINISTRATOR}') could not be seeded or found. Cannot create default admin user.")
-            # Depending on policy, might raise an error or try to proceed if other roles are vital.
-            # For now, log critical and proceed, other parts of seeding might still be useful.
-    except Exception as e_roles:
-        logger.error(f"An error occurred during role seeding: {e_roles}", exc_info=True)
-        # This error will be logged, and the broader seeding process might continue or be caught by an outer try-except.
-    finally:
-        # This block is executed regardless of whether an exception occurred in the try block.
-        pass
-
-    try:
-        # 1. Users - Seed initial Admin User (now 'admin' with SUPER_ADMIN role)
-        super_admin_user_id = None # Initialize
-    # Fetch SUPER_ADMIN role_id
-        # Ensure SUPER_ADMIN_ROLE_NAME is defined or imported, e.g. from auth.roles
-        super_admin_role_dict = crud_get_role_by_name(SUPER_ADMIN_ROLE_NAME, conn=conn)
-        if not super_admin_role_dict:
-            logger.info(f"Role '{SUPER_ADMIN_ROLE_NAME}' not found, creating it...")
-            # Ensure crud_add_role is available
-            super_admin_role_id_new = crud_add_role(SUPER_ADMIN_ROLE_NAME, "Super administrator with all permissions.", conn=conn)
-            if super_admin_role_id_new:
-                super_admin_role_id = super_admin_role_id_new
-                logger.info(f"Role '{SUPER_ADMIN_ROLE_NAME}' created with ID {super_admin_role_id}.")
-            else:
-                logger.error(f"Failed to create role '{SUPER_ADMIN_ROLE_NAME}'. Cannot create super_admin user.")
-                super_admin_role_id = None
+    current_role_ids = {} # Will store role_name: role_id
+    for role_name_str, desc_str in roles_to_seed_map.items():
+        existing_role = crud_get_role_by_name(role_name_str, conn=conn)
+        if existing_role:
+            current_role_ids[role_name_str] = existing_role['role_id']
+            logger.info(f"Role '{role_name_str}' already exists with ID {existing_role['role_id']}.")
         else:
-            super_admin_role_id = super_admin_role_dict['role_id']
-            logger.info(f"Role '{SUPER_ADMIN_ROLE_NAME}' found with ID {super_admin_role_id}.")
+            new_role_id = crud_add_role(role_name_str, desc_str, conn=conn)
+            if new_role_id:
+                current_role_ids[role_name_str] = new_role_id
+                logger.info(f"Role '{role_name_str}' added with ID {new_role_id}.")
+            else:
+                logger.error(f"Failed to add role '{role_name_str}'.")
+    # and `current_role_ids` map populated above.
+    # _seed_permissions_and_role_permissions(cursor, conn, logger, current_role_ids) # This was called too early.
 
-        if super_admin_role_id:
-            target_admin_username = "admin"
-            temp_admin_password = "admin" # Explicitly "admin"
-            logger.info(f"Ensuring super admin user '{target_admin_username}' exists with password '{temp_admin_password}' and role '{SUPER_ADMIN_ROLE_NAME}'...")
+    # --- Seed Admin User ---
+    # This must happen after roles (especially SUPER_ADMIN_ROLE_NAME) are available in current_role_ids
+    super_admin_user_id = None
+    super_admin_role_id = current_role_ids.get(SUPER_ADMIN_ROLE_NAME)
 
-            admin_user_dict = users_crud.get_user_by_username(target_admin_username, conn=conn, logger_passed=logger)
+    if super_admin_role_id:
+        target_admin_username = "admin"
+        temp_admin_password = "admin" # Ensure this is the desired default password
+        logger.info(f"Ensuring super admin user '{target_admin_username}' exists with password (hidden) and role '{SUPER_ADMIN_ROLE_NAME}' (Role ID: {super_admin_role_id})...")
+
+        admin_user_dict = users_crud.get_user_by_username(target_admin_username, conn=conn, logger_passed=logger)
+        if admin_user_dict:
+            super_admin_user_id = admin_user_dict['user_id']
+            logger.info(f"User '{target_admin_username}' (ID: {super_admin_user_id}) exists. Verifying role and password.")
+            if admin_user_dict.get('role_id') != super_admin_role_id:
+                logger.info(f"User '{target_admin_username}' does not have role '{SUPER_ADMIN_ROLE_NAME}'. Updating role...")
+                users_crud.update_user_role(super_admin_user_id, super_admin_role_id, conn=conn, logger_passed=logger)
+
+            logger.info(f"Updating password for '{target_admin_username}' to ensure it is '{temp_admin_password}'.")
+            update_success = users_crud.update_user_password(super_admin_user_id, temp_admin_password, conn=conn, logger_passed=logger)
+            if update_success: logger.info(f"Password for user '{target_admin_username}' updated successfully.")
+            else: logger.error(f"Failed to update password for user '{target_admin_username}'. This is critical.")
+        else:
+            logger.info(f"User '{target_admin_username}' not found. Creating with password '{temp_admin_password}' and role '{SUPER_ADMIN_ROLE_NAME}'.")
+            new_admin_id = users_crud.add_user(
+                username=target_admin_username, password=temp_admin_password, role_id=super_admin_role_id,
+                full_name="Super Administrator", email="superadmin@example.local",
+                conn=conn, logger_passed=logger
+            )
+            if new_admin_id:
+                super_admin_user_id = new_admin_id
+                logger.info(f"User '{target_admin_username}' created with ID {super_admin_user_id}.")
+            else:
+                logger.error(f"Failed to create user '{target_admin_username}'.")
+                super_admin_user_id = None
+    else:
+        logger.critical(f"Role '{SUPER_ADMIN_ROLE_NAME}' ID not found in role_id_map_for_permissions. Cannot ensure super admin user '{target_admin_username}'.")
+        super_admin_user_id = None
+    # --- End Seed Admin User ---
+
+    # Preserve admin_user_id for compatibility if other parts expect 'admin_user_id' to refer to the general admin
+    # For now, 'admin_user_id' will be the super_admin_user_id
+    admin_user_id = super_admin_user_id
+
+
+    # Fallback for original DEFAULT_ADMIN_USERNAME if that's different and was used elsewhere
+    # This part might be less relevant if target_admin_username ("admin") is the one true admin.
+    if DEFAULT_ADMIN_USERNAME != "admin":
+        logger.info(f"Checking for original default admin user '{DEFAULT_ADMIN_USERNAME}' for compatibility...")
+        original_admin_user_dict = users_crud.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn, logger_passed=logger)
+        if original_admin_user_dict:
+            logger.info(f"Found original default admin user '{DEFAULT_ADMIN_USERNAME}' with ID {original_admin_user_dict['user_id']}. Note: 'admin_user_id' in this script now refers to the user 'admin' with role '{SUPER_ADMIN_ROLE_NAME}'.")
+
+
+    # Seed Default Operational User (depends on 'Operator' role_id from role_id_map_for_permissions)
+    DEFAULT_OPERATIONAL_USERNAME = "default_operational_user"
+    logger.info(f"Checking for default operational user '{DEFAULT_OPERATIONAL_USERNAME}'...")
+    existing_operational_user = users_crud.get_user_by_username(DEFAULT_OPERATIONAL_USERNAME, conn=conn, logger_passed=logger)
+    if not existing_operational_user:
+        operator_role_id_for_op_user = role_id_map_for_permissions.get(OPERATOR)
+        if operator_role_id_for_op_user:
+            logger.info(f"Creating default operational user '{DEFAULT_OPERATIONAL_USERNAME}' with role '{OPERATOR}'.")
+            op_user_id = users_crud.add_user(
+                username=DEFAULT_OPERATIONAL_USERNAME, password=uuid.uuid4().hex, role_id=operator_role_id_for_op_user,
+                full_name="Default Operational User", email=f"{DEFAULT_OPERATIONAL_USERNAME}@example.local",
+                conn=conn, logger_passed=logger
+            )
+            if op_user_id: logger.info(f"Created default operational user ID: {op_user_id}.")
+            else: logger.error(f"Failed to create default operational user: {DEFAULT_OPERATIONAL_USERNAME}")
+        else:
+            logger.error(f"Could not find role_id for '{OPERATOR}'. Cannot create default operational user.")
+    else:
+        logger.info(f"Default operational user '{DEFAULT_OPERATIONAL_USERNAME}' already exists.")
+
+    # --- Seed Permissions and RolePermissions (Moved from init_schema.py) ---
+    # This uses the 'cursor' and 'conn' from _original_seed_initial_data_func_placeholder
+    # and `current_role_ids` map populated above. This needs to run *after* roles are created
+    # and *after* the admin user (who might be associated with a role) is processed.
+    # More accurately, it needs role_ids from current_role_ids.
+    _seed_permissions_and_role_permissions(cursor, conn, logger, current_role_ids)
+    # --- End Seed Permissions and RolePermissions ---
+
+    # Ensure the rest of the function uses the 'conn' passed in, not 'cursor' directly for write ops unless it's a read.
+    # The cursor object is still valid for SELECTs if needed.
+    try:
+        # 2. Companies (uses admin_user_id if available for created_by or similar in future)
+        default_company_id = None # Renamed from default_company_id to avoid conflict
+        cursor.execute("SELECT COUNT(*) FROM companies")
+        if cursor.fetchone()[0] == 0:
+            default_company_id = str(uuid.uuid4())
+            cursor.execute("INSERT OR IGNORE INTO companies (company_id, company_name, address, is_default) VALUES (?, ?, ?, ?)",
+                               (default_company_id, "Default Company Inc.", "123 Default Street", True))
+            logger.info("Seeded default company.")
+        else:
+            cursor.execute("SELECT company_id FROM companies WHERE is_default = TRUE")
+            row = cursor.fetchone()
+            if row: default_company_id = row[0]
+
+        # 3. CompanyPersonnel
+        if default_company_id:
+            cursor.execute("SELECT COUNT(*) FROM CompanyPersonnel WHERE company_id = ?", (default_company_id,))
+            if cursor.fetchone()[0] == 0:
+                cursor.execute("INSERT OR IGNORE INTO CompanyPersonnel (company_id, name, role, email, phone) VALUES (?, ?, ?, ?, ?)",
+                               (default_company_id, "Admin Contact", "Administrator", "contact@defaultcomp.com", "123-456-7890"))
+                logger.info("Seeded default company personnel.")
+
+        # 4. TeamMembers
+        if admin_user_id:
+            admin_user_for_tm_dict = users_crud.get_user_by_id(admin_user_id, conn=conn, logger_passed=logger)
 
             if admin_user_dict:
                 super_admin_user_id = admin_user_dict['user_id']
@@ -200,6 +280,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         else:
             logger.critical(f"SUPER_ADMIN role ID not available. Cannot ensure super admin user '{target_admin_username}'.")
             super_admin_user_id = None
+        # print("DEBUG_DB_SEED: CHECKPOINT 2 - After Super Admin user seeding", flush=True) # Removed
 
         # Preserve admin_user_id for compatibility with other seeding parts if they expect it.
         admin_user_id = super_admin_user_id # This is the ID of the "admin" user with "super_admin" role
@@ -218,39 +299,42 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
 
             # 2. Companies (uses admin_user_id if available for created_by or similar in future)
             default_company_id = None
-            cursor.execute("SELECT COUNT(*) FROM Companies")
-            if cursor.fetchone()[0] == 0:
-                default_company_id = str(uuid.uuid4())
-                cursor.execute("INSERT OR IGNORE INTO Companies (company_id, company_name, address, is_default) VALUES (?, ?, ?, ?)",
+        cursor.execute("SELECT COUNT(*) FROM companies") # Querying companies table (lowercase)
+        if cursor.fetchone()[0] == 0: # Corrected indentation
+            default_company_id = str(uuid.uuid4())
+            cursor.execute("INSERT OR IGNORE INTO companies (company_id, company_name, address, is_default) VALUES (?, ?, ?, ?)", # lowercase; unindented this line
                                (default_company_id, "Default Company Inc.", "123 Default Street", True))
-                logger.info("Seeded default company.")
-            else:
-                cursor.execute("SELECT company_id FROM Companies WHERE is_default = TRUE")
-                row = cursor.fetchone()
-                if row: default_company_id = row[0]
+            logger.info("Seeded default company.")
+        else: # Corrected indentation for else
+            cursor.execute("SELECT company_id FROM companies WHERE is_default = TRUE") # lowercase
+            row = cursor.fetchone()
+            if row: default_company_id = row[0]
+            # print("DEBUG_DB_SEED: CHECKPOINT 3 - After Default Company seeding", flush=True) # Removed
 
-            # 3. CompanyPersonnel
-            if default_company_id:
-                cursor.execute("SELECT COUNT(*) FROM CompanyPersonnel WHERE company_id = ?", (default_company_id,))
+        # 3. CompanyPersonnel
+        if default_company_id:
+            cursor.execute("SELECT COUNT(*) FROM CompanyPersonnel WHERE company_id = ?", (default_company_id,))
+            if cursor.fetchone()[0] == 0:
+                cursor.execute("INSERT OR IGNORE INTO CompanyPersonnel (company_id, name, role, email, phone) VALUES (?, ?, ?, ?, ?)",
+                               (default_company_id, "Admin Contact", "Administrator", "contact@defaultcomp.com", "123-456-7890"))
+                logger.info("Seeded default company personnel.")
+        # print("DEBUG_DB_SEED: CHECKPOINT 4 - After CompanyPersonnel seeding", flush=True) # Removed
+
+        # 4. TeamMembers
+        if admin_user_id: # Corrected indentation
+            admin_user_for_tm_dict = users_crud.get_user_by_id(admin_user_id, conn=conn, logger_passed=logger)
+            if admin_user_for_tm_dict:
+                cursor.execute("SELECT COUNT(*) FROM TeamMembers WHERE user_id = ?", (admin_user_id,))
                 if cursor.fetchone()[0] == 0:
-                    cursor.execute("INSERT OR IGNORE INTO CompanyPersonnel (company_id, name, role, email, phone) VALUES (?, ?, ?, ?, ?)",
-                                   (default_company_id, "Admin Contact", "Administrator", "contact@defaultcomp.com", "123-456-7890"))
-                    logger.info("Seeded default company personnel.")
-
-            # 4. TeamMembers
-            if admin_user_id:
-                admin_user_for_tm_dict = users_crud.get_user_by_id(admin_user_id, conn=conn, logger_passed=logger)
-                if admin_user_for_tm_dict:
-                    cursor.execute("SELECT COUNT(*) FROM TeamMembers WHERE user_id = ?", (admin_user_id,))
-                    if cursor.fetchone()[0] == 0:
-                        # Use 'role_name' as fetched from get_user_by_id, and map to 'role_or_title' column in TeamMembers
-                        cursor.execute("INSERT OR IGNORE INTO TeamMembers (user_id, full_name, email, role_or_title) VALUES (?, ?, ?, ?)",
-                                       (admin_user_id, admin_user_for_tm_dict['full_name'], admin_user_for_tm_dict['email'], admin_user_for_tm_dict.get('role_name')))
-                        logger.info("Seeded admin team member.")
+                    # Use 'role_name' as fetched from get_user_by_id, and map to 'role_or_title' column in TeamMembers
+                    cursor.execute("INSERT OR IGNORE INTO TeamMembers (user_id, full_name, email, role_or_title) VALUES (?, ?, ?, ?)",
+                                   (admin_user_id, admin_user_for_tm_dict['full_name'], admin_user_for_tm_dict['email'], admin_user_for_tm_dict.get('role_name')))
+                    logger.info("Seeded admin team member.")
                 else:
                     logger.warning(f"Could not retrieve admin user details for ID {admin_user_id} to seed into TeamMembers.")
             else:
                 logger.warning("Admin user ID not available for TeamMember seeding.")
+            # print("DEBUG_DB_SEED: CHECKPOINT 5 - After TeamMembers seeding", flush=True) # Removed
 
             # Default Operational User
             DEFAULT_OPERATIONAL_USERNAME = "default_operational_user"
@@ -289,19 +373,27 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                     logger.error(f"Could not find role_id for '{OPERATOR}'. Cannot create default operational user.")
             else:
                 logger.info(f"Default operational user '{DEFAULT_OPERATIONAL_USERNAME}' already exists.")
+            # print("DEBUG_DB_SEED: CHECKPOINT 6 - After Default Operational User seeding", flush=True) # Removed
 
             # 5. Countries & 6. Cities
+            # print("DEBUG_DB_SEED: Just before countries_cities loop in _original_seed_initial_data_func_placeholder", flush=True) # Removed
             logger.info("Seeding default countries and cities...")
             countries_cities = {'France': 'Paris', 'USA': 'New York', 'Algeria': 'Algiers'}
             for country_name, city_name in countries_cities.items():
-                country_dict = get_or_add_country(country_name, conn=conn)
+                logger.info(f"Attempting to seed country: {country_name} and city: {city_name}")
+                country_dict = get_or_add_country(country_name, conn=conn) # This function now has logging
                 if country_dict and 'country_id' in country_dict:
-                    get_or_add_city(city_name, country_dict['country_id'], conn=conn)
-                elif country_dict:
-                    logger.error(f"Country '{country_name}' processed by get_or_add_country but 'country_id' key is missing in returned dict: {country_dict}")
-                else:
-                     logger.error(f"Failed to get or add country '{country_name}', cannot add city '{city_name}'.")
-            logger.info(f"Seeded {len(countries_cities)} countries/cities.")
+                    logger.info(f"Country '{country_name}' (ID: {country_dict['country_id']}) successfully processed by get_or_add_country. Proceeding to add city '{city_name}'.")
+                    city_dict = get_or_add_city(city_name, country_dict['country_id'], conn=conn)
+                    if city_dict and 'city_id' in city_dict:
+                        logger.info(f"City '{city_name}' (ID: {city_dict['city_id']}) for country '{country_name}' successfully processed.")
+                    else:
+                        logger.error(f"Failed to process city '{city_name}' for country '{country_name}'. City dict: {city_dict}")
+                elif country_dict: # country_dict exists but 'country_id' is missing (should not happen with current get_or_add_country)
+                    logger.error(f"Country '{country_name}' processed by get_or_add_country, but 'country_id' is missing. Country dict: {country_dict}")
+                else: # get_or_add_country returned None
+                     logger.error(f"Failed to get or add country '{country_name}'. Cannot add city '{city_name}'.")
+            logger.info(f"Finished attempt to seed {len(countries_cities)} countries/cities.")
 
             # 7. Clients & 8. Projects (Simplified)
             logger.info("Seeding sample client and project...")
@@ -316,7 +408,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                     paris_city_dict = get_city_by_name_and_country_id("Paris", actual_france_country_id, conn=conn)
                 actual_paris_city_id = paris_city_dict['city_id'] if paris_city_dict else None
 
-                actif_status_dict = get_status_setting_by_name("Actif", "Client", conn=conn)
+                actif_status_dict = get_status_setting_by_name("Client Actif", "Client", conn=conn) # Corrected status name
                 actual_actif_status_id = actif_status_dict['status_id'] if actif_status_dict else None
 
                 if admin_user_id and actual_france_country_id and actual_paris_city_id and actual_actif_status_id:
@@ -557,8 +649,9 @@ def _seed_main_document_templates(cursor: sqlite3.Cursor, conn: sqlite3.Connecti
 def seed_initial_data_master(cursor: sqlite3.Cursor):
     """Master seeding function that calls all individual seeding parts."""
     logger = logging.getLogger(__name__)
-    conn = cursor.connection
+    conn = cursor.connection # This is the raw sqlite3.Connection
     
+    # Functions that use the raw cursor/connection
     _original_seed_initial_data_func_placeholder(cursor, conn, logger_passed=logger) 
     _seed_main_document_templates(cursor, conn, logger_passed=logger)
     _seed_default_utility_templates(cursor, conn, logger_passed=logger)
@@ -566,8 +659,104 @@ def seed_initial_data_master(cursor: sqlite3.Cursor):
     _seed_user_motivational_messages(cursor, conn, logger_passed=logger)
     _seed_default_document_footers(cursor, conn, logger_passed=logger)
     _seed_new_default_document_notes(cursor, conn, logger_passed=logger)
-    _seed_default_regions(cursor, conn, logger_passed=logger) # Added Region seeding
-    _seed_sample_referents(cursor, conn, logger_passed=logger) # Added Referent seeding
+    _seed_default_regions(cursor, conn, logger_passed=logger)
+    _seed_sample_referents(cursor, conn, logger_passed=logger)
+    _seed_calendar_data(cursor, conn, logger_passed=logger)
+
+    # Accounting data is seeded separately using SQLAlchemy engine after raw connection operations are done.
+    # The actual call to _seed_accounting_data will be managed by run_seed() to ensure
+    # raw connection is closed before SQLAlchemy engine is used for writing.
+    logger.info("Raw SQL dependent seeding in seed_initial_data_master complete.")
+
+
+def _seed_accounting_data(engine_to_use, logger_passed: logging.Logger): # Expects SQLAlchemy engine
+    logger = logger_passed
+    logger.info("Attempting to seed Accounting Module Data (from db_seed.py)...")
+    try:
+        import time # DIAGNOSTIC: Add delay
+        time.sleep(0.5) # DIAGNOSTIC: Add delay
+        from accounting import cruds as acc_cruds
+        from accounting import models as acc_models_pydantic # Pydantic models
+        from sqlalchemy.orm import Session
+        from decimal import Decimal
+        # datetime and date are already imported at the top of db_seed.py
+
+        # Dynamically get the engine from db_connection_module
+        current_engine = db_connection_module.engine
+        if not current_engine:
+            logger.error("db.connection.engine is None in _seed_accounting_data. Cannot proceed.")
+            return
+
+        with Session(current_engine) as session: # Use dynamically fetched engine
+            base_curr = acc_cruds.currency.get_base_currency(db=session)
+            if not base_curr:
+                logger.info("No base currency found. Seeding USD as base.")
+                usd_currency_in = acc_models_pydantic.CurrencyCreate(
+                    code="USD",
+                    name="US Dollar",
+                    symbol="$",
+                    exchange_rate_to_base=Decimal("1.000000"),
+                    is_base_currency=True
+                )
+                acc_cruds.currency.create(db=session, obj_in=usd_currency_in)
+                logger.info("USD seeded as base currency.")
+
+            current_year_name = f"FY{datetime.now().year}"
+            existing_fy = acc_cruds.fiscal_year.get_by_name(db=session, name=current_year_name)
+            if not existing_fy:
+                logger.info(f"No fiscal year found for {current_year_name}. Seeding it now.")
+                default_fy_in = acc_models_pydantic.FiscalYearCreate(
+                    name=current_year_name,
+                    start_date=datetime(datetime.now().year, 1, 1).date(), # Ensure it's a date object
+                    end_date=datetime(datetime.now().year, 12, 31).date(), # Ensure it's a date object
+                    status=acc_models_pydantic.FiscalYearStatusEnum.OPEN
+                )
+                acc_cruds.fiscal_year.create(db=session, obj_in=default_fy_in)
+                logger.info(f"Fiscal year {current_year_name} seeded.")
+
+            if not acc_cruds.chart_of_accounts.get_multi(db=session, limit=1): # Check if any account exists
+                logger.info("Chart of Accounts is empty. Seeding minimal accounts.")
+                accounts_to_seed = [
+                    {"code": "1010", "name": "Cash", "account_type": acc_models_pydantic.AccountTypeEnum.ASSET},
+                    {"code": "1020", "name": "Accounts Receivable", "account_type": acc_models_pydantic.AccountTypeEnum.ASSET},
+                    {"code": "2010", "name": "Accounts Payable", "account_type": acc_models_pydantic.AccountTypeEnum.LIABILITY},
+                    {"code": "3010", "name": "Common Stock", "account_type": acc_models_pydantic.AccountTypeEnum.EQUITY},
+                    {"code": "4010", "name": "Sales Revenue", "account_type": acc_models_pydantic.AccountTypeEnum.REVENUE},
+                    {"code": "5010", "name": "Office Supplies Expense", "account_type": acc_models_pydantic.AccountTypeEnum.EXPENSE},
+                ]
+                for acc_data in accounts_to_seed:
+                    acc_in = acc_models_pydantic.ChartOfAccountsCreate(**acc_data)
+                    if not acc_cruds.chart_of_accounts.get_by_code(db=session, code=acc_in.code):
+                        acc_cruds.chart_of_accounts.create(db=session, obj_in=acc_in)
+                logger.info("Minimal Chart of Accounts seeded.")
+
+            session.commit() # Commit SQLAlchemy session changes
+            logger.info("Accounting module specific seed data committed using SQLAlchemy session.")
+
+    except ImportError:
+        logger.error("Could not import accounting cruds/models for schema/seeding. Skipping accounting part.", exc_info=True)
+    except Exception as e_acc_seed_final:
+        logger.error(f"CRITICAL ERROR during Accounting module data seeding: {e_acc_seed_final}", exc_info=True)
+        # Rollback is handled by the 'with Session(...)' context manager on error.
+
+
+def _seed_calendar_data(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
+    # This function assumes Calendar tables (CompanyCalendarSettings, UserCalendarEvents)
+    # are created by raw SQL in init_schema.py. Seeding can happen here.
+    # If they were SQLAlchemy models, this would use a Session like _seed_accounting_data.
+    logger = logger_passed
+    logger.info("Attempting to seed Calendar Module Data (from db_seed.py)...")
+    # Add any specific seeding for calendar if needed, e.g., default settings for admin.
+    # For now, it's mostly a placeholder if tables are created by init_schema.py's raw SQL.
+    # Example:
+    # admin_user = users_crud.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn, logger_passed=logger)
+    # if admin_user:
+    #     cursor.execute("SELECT * FROM CompanyCalendarSettings WHERE user_id = ?", (admin_user['user_id'],))
+    #     if not cursor.fetchone():
+    #         cursor.execute("INSERT INTO CompanyCalendarSettings (user_id, country_iso) VALUES (?, ?)",
+    #                        (admin_user['user_id'], 'US')) # Default to US
+    #         logger.info(f"Seeded default CompanyCalendarSettings for admin user {admin_user['user_id']}.")
+    logger.info("Calendar module data seeding placeholder complete.")
 
 
 def _seed_default_regions(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
@@ -585,11 +774,13 @@ def _seed_default_regions(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logg
     skipped_count = 0
 
     for country_name, region_names in default_regions_data.items():
-        country = get_country_by_name(country_name, conn=conn) # Changed from locations_crud.get_country_by_name
+        logger.info(f"Attempting to find country '{country_name}' for region seeding.")
+        country = get_country_by_name(country_name, conn=conn) # This function now has logging
         if not country or 'country_id' not in country:
-            logger.warning(f"Country '{country_name}' not found for seeding regions. Skipping its regions.")
+            logger.warning(f"Country '{country_name}' NOT found by get_country_by_name (or 'country_id' missing) for seeding its regions. Country data: {country}. Skipping its regions.")
             skipped_count += len(region_names)
             continue
+        logger.info(f"Country '{country_name}' (ID: {country['country_id']}) found. Proceeding to seed its regions: {region_names}")
 
         country_id = country['country_id']
         for region_name in region_names:
@@ -930,68 +1121,44 @@ def _seed_motivational_messages(cursor: sqlite3.Cursor, conn: sqlite3.Connection
 def run_seed():
     logger = logging.getLogger(__name__)
     logger.info(f"Attempting to seed database: {DATABASE_PATH}")
-    db_conn_object = None # Renamed to avoid confusion with sqlite3.Connection type hint in callees
-    raw_sqlite_conn_for_seeders = None # To hold the raw connection if db_conn_object is a Session
+
+    # Phase 1: Raw SQL seeding (most of seed_initial_data_master)
+    raw_conn = None
     try:
-        db_conn_object = get_db_connection()
+        # Use the new function to ensure a raw sqlite3 connection
+        raw_conn = db_connection_module.get_raw_sqlite_connection()
+        cursor = raw_conn.cursor()
 
-        # Check if db_conn_object is a SQLAlchemy Session or a raw sqlite3 connection
-        if hasattr(db_conn_object, 'get_bind'): # Characteristic of SQLAlchemy Session
-            logger.info("Detected SQLAlchemy Session in run_seed. Attempting to get raw connection for seeders.")
-            # For SQLAlchemy, get the underlying DBAPI connection
-            # This can be engine-specific. For sqlite, .raw_connection() on the engine's connect() result works.
-            # If db_conn_object is a Session, db_conn_object.get_bind() is the Engine.
-            engine = db_conn_object.get_bind()
-            raw_sqlite_conn_for_seeders = engine.raw_connection()
-            cursor = raw_sqlite_conn_for_seeders.cursor()
-            logger.info("Using cursor from raw_connection() of SQLAlchemy session's engine.")
-        elif hasattr(db_conn_object, 'cursor'): # Looks like a sqlite3.Connection
-            logger.info("Detected sqlite3.Connection in run_seed.")
-            raw_sqlite_conn_for_seeders = db_conn_object # It's already the raw connection
-            cursor = raw_sqlite_conn_for_seeders.cursor()
-        else:
-            logger.error("Unknown database connection type in run_seed. Cannot get cursor.")
-            raise TypeError("Unsupported database connection object in run_seed.")
+        # Call parts of seed_initial_data_master that primarily use raw SQL cursor
+        # Note: _seed_accounting_data was removed from seed_initial_data_master's direct calls
+        seed_initial_data_master(cursor)
 
-        seed_initial_data_master(cursor) # This function and its children expect sqlite3.Cursor
-
-        # Commit logic
-        if hasattr(db_conn_object, 'commit'): # SQLAlchemy Session or sqlite3.Connection
-            db_conn_object.commit()
-            logger.info("Main db_conn_object committed (SQLAlchemy Session or sqlite3.Connection).")
-        elif raw_sqlite_conn_for_seeders and hasattr(raw_sqlite_conn_for_seeders, 'commit'):
-            # This case might be redundant if raw_sqlite_conn_for_seeders is db_conn_object
-            # but useful if only raw_sqlite_conn_for_seeders was obtained and needs commit.
-            raw_sqlite_conn_for_seeders.commit()
-            logger.info("Raw SQLite connection used by seeders was committed.")
-
-        logger.info("Seeding process completed and committed.")
-
+        raw_conn.commit()
+        logger.info("Raw SQL seeding parts committed successfully.")
     except Exception as e:
-        logger.error(f"Error during seeding process: {e}", exc_info=True)
-        if hasattr(db_conn_object, 'rollback'):
-            db_conn_object.rollback()
-            logger.info("Main db_conn_object rolled back.")
-        elif raw_sqlite_conn_for_seeders and hasattr(raw_sqlite_conn_for_seeders, 'rollback'):
-            raw_sqlite_conn_for_seeders.rollback()
-            logger.info("Raw SQLite connection used by seeders was rolled back.")
-
+        logger.error(f"Error during raw SQL seeding phase: {e}", exc_info=True)
+        if raw_conn:
+            raw_conn.rollback()
     finally:
-        # Close the raw connection obtained from SQLAlchemy engine if it was created
-        if raw_sqlite_conn_for_seeders and raw_sqlite_conn_for_seeders is not db_conn_object:
-            if hasattr(raw_sqlite_conn_for_seeders, 'close'):
-                raw_sqlite_conn_for_seeders.close()
-                logger.info("Raw SQLite connection obtained for seeders has been closed.")
+        if raw_conn:
+            raw_conn.close()
+            logger.info("Raw SQLite connection for initial seeding parts closed.")
 
-        # Close the main connection object (Session or sqlite3.Connection)
-        if db_conn_object and hasattr(db_conn_object, 'close'):
-            db_conn_object.close()
-            logger.info("Main database connection object closed after seeding attempt.")
-        elif not hasattr(db_conn_object, 'close') and raw_sqlite_conn_for_seeders is db_conn_object and hasattr(raw_sqlite_conn_for_seeders, 'close'):
-            # This case is if db_conn_object was a raw sqlite3 connection and already closed by raw_sqlite_conn_for_seeders logic
-            pass # Already closed
+    # Phase 2: SQLAlchemy based seeding (Accounting)
+    # This uses the global db.connection.engine which should be initialized by init_schema
+    try:
+        logger.info("Attempting SQLAlchemy-based seeding (_seed_accounting_data)...")
+        if db_connection_module.engine:
+            _seed_accounting_data(db_connection_module.engine, logger_passed=logger)
+            logger.info("SQLAlchemy-based seeding for accounting completed.")
         else:
-            logger.info("Main database connection object was not closed (either no close method or already handled).")
+            logger.error("SQLAlchemy engine (db.connection.engine) not initialized. Skipping accounting seed.")
+
+    except Exception as e_sqla_seed:
+        logger.error(f"Error during SQLAlchemy-based seeding phase (_seed_accounting_data): {e_sqla_seed}", exc_info=True)
+        # SQLAlchemy sessions used within _seed_accounting_data should handle their own rollback with context manager
+
+    logger.info("Full seeding process run_seed() completed.")
 
 
 if __name__ == '__main__':

@@ -73,10 +73,12 @@ def add_user(username: str, password: str, role_id: int, full_name: str = None, 
         current_logger.error("Username, password, and role_id are required.")
         return None
 
-    hashed_pw = util_hash_password(password, logger_passed=current_logger)
+    # util_hash_password from utils.auth returns a single string (hash includes salt)
+    final_hashed_password = util_hash_password(password, logger_passed=current_logger)
     user_id_generated = str(uuid.uuid4())
     now_iso = datetime.utcnow().isoformat() + "Z"
 
+    # 'salt' column is removed as passlib handles it within the hash
     sql_common_cols = """(user_id, username, hashed_password, full_name, email, role_id, is_active, created_at, updated_at, last_login_at, is_fingerprint_auth_enabled, fingerprint_template_id, is_face_auth_enabled, face_template_id, is_voice_auth_enabled, voice_profile_id)"""
     sql_sqlite_placeholders = "(?, ?, ?, ?, ?, ?, 1, ?, ?, NULL, 0, NULL, 0, NULL, 0, NULL)"
     sql_sa_placeholders = "(:user_id, :username, :hashed_password, :full_name, :email, :role_id, 1, :created_at, :updated_at, NULL, 0, NULL, 0, NULL, 0, NULL)"
@@ -85,11 +87,13 @@ def add_user(username: str, password: str, role_id: int, full_name: str = None, 
     sql_sa = text(f"INSERT INTO Users {sql_common_cols} VALUES {sql_sa_placeholders}")
 
     params_sa = {
-        "user_id": user_id_generated, "username": username, "hashed_password": hashed_pw,
+        "user_id": user_id_generated, "username": username,
+        "hashed_password": final_hashed_password, # Only the combined hash
         "full_name": full_name, "email": email, "role_id": role_id,
         "created_at": now_iso, "updated_at": now_iso
     }
-    params_sqlite = (user_id_generated, username, hashed_pw, full_name, email, role_id, now_iso, now_iso)
+    # Ensure params_sqlite order matches sql_common_cols and sql_sqlite_placeholders
+    params_sqlite = (user_id_generated, username, final_hashed_password, full_name, email, role_id, now_iso, now_iso)
 
     db_obj, dialect = _get_cursor_and_dialect(conn)
     if not db_obj or not dialect:

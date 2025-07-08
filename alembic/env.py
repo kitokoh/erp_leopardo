@@ -64,6 +64,12 @@ from db.connection import Base, initialize_engine_and_session, get_db_connection
 # This is crucial for Alembic's autogenerate feature to detect all tables and changes.
 print("Alembic env.py: Importing application models...")
 try:
+    from db.common_models import * # For Products, Role, etc.
+    print("  Successfully imported db.common_models")
+except ImportError as e:
+    print(f"  Warning: Could not import db.common_models: {e}")
+
+try:
     from accounting.models import *
     print("  Successfully imported accounting.models")
 except ImportError as e:
