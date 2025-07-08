@@ -36,14 +36,11 @@ try:
     # Import specific models that use MainBase and need table creation here
     from calculator.models import CalculationHistory
     # from other_module.models import OtherModelUsingMainBase # Example for future models
-    from db.common_models import Products # Import the Products SQLAlchemy model
-    # IMPORTANT: Ensure the User model (SQLAlchemy definition) is imported here as well.
-    # For example, if it's in db.common_models:
-    # from db.common_models import User # Or from auth.models import User, etc.
-    # This is critical for SQLAlchemy to correctly handle tables referencing Users.
+    from .common_models import Products # Import the Products SQLAlchemy model
+    from .common_models import User # Import the User SQLAlchemy model
     MAIN_SQLALCHEMY_COMPONENTS_LOADED = True
 except ImportError as e_main_sqlalchemy:
-    logging.error(f"db.init_schema: Could not import MainBase, initialize_engine_and_session, or required SQLAlchemy models from db.connection/common_models: {e_main_sqlalchemy}. Tables using MainBase might not be created by this script.")
+    logging.error(f"db.init_schema: Could not import MainBase, initialize_engine_and_session, or required SQLAlchemy models from db.connection or .common_models: {e_main_sqlalchemy}. Tables using MainBase might not be created by this script.")
     MAIN_SQLALCHEMY_COMPONENTS_LOADED = False
     MainBase = None # Ensure it's None so later checks don't fail with NameError
     # main_engine = None # No longer importing main_engine directly at the top

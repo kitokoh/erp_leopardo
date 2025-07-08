@@ -42,3 +42,34 @@ class Products(Base):
 # The `ondelete='SET NULL'` matches the raw SQL definition.
 # Naming conventions for constraints (fk_products_created_by_user_id, uq_products_product_name_language_code)
 # are made slightly more explicit.
+
+class User(Base):
+    __tablename__ = "Users"
+
+    user_id = Column(Text, primary_key=True) # TEXT in SQLite often implies string UUIDs
+    username = Column(String, nullable=False, unique=True)
+    hashed_password = Column(String, nullable=False)
+    full_name = Column(String, nullable=True)
+    email = Column(String, nullable=False, unique=True)
+    role_id = Column(Integer, ForeignKey('Roles.role_id'), nullable=False) # Assumes Roles table is created by raw SQL or another model
+    is_active = Column(Boolean, default=True, nullable=False)
+    is_deleted = Column(Integer, default=0, nullable=False) # Matching raw SQL which used INTEGER
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Biometric fields
+    is_fingerprint_auth_enabled = Column(Boolean, default=False, nullable=True)
+    fingerprint_template_id = Column(Text, nullable=True)
+    is_face_auth_enabled = Column(Boolean, default=False, nullable=True)
+    face_template_id = Column(Text, nullable=True)
+    is_voice_auth_enabled = Column(Boolean, default=False, nullable=True)
+    voice_profile_id = Column(Text, nullable=True)
+
+    # __table_args__ can include UniqueConstraint if needed for other combinations, or Indexes.
+    # e.g., Index('idx_users_email', 'email', unique=True) is handled by unique=True on column.
+    # Index('idx_users_username', 'username', unique=True) is handled by unique=True on column.
+
+    def __repr__(self):
+        return f"<User(user_id='{self.user_id}', username='{self.username}')>"
