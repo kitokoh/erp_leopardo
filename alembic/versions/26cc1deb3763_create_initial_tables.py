@@ -54,6 +54,19 @@ def upgrade() -> None:
     op.execute("DROP TABLE IF EXISTS acc_tax_rates")
     op.execute("DROP TABLE IF EXISTS acc_fiscal_years")
     op.execute("DROP TABLE IF EXISTS acc_currencies")
+    op.execute("DROP TABLE IF EXISTS Roles") # Added drop for Roles
+
+    # Create Roles table first as users table depends on it
+    op.create_table('Roles',
+        sa.Column('role_id', sa.Integer(), autoincrement=True, nullable=False),
+        sa.Column('role_name', sa.String(), nullable=False),
+        sa.Column('description', sa.Text(), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+        sa.PrimaryKeyConstraint('role_id'),
+        sa.UniqueConstraint('role_name')
+    )
+
 
     op.create_table('acc_chart_of_accounts',
     sa.Column('id', sa.String(), nullable=False),
@@ -298,20 +311,22 @@ def upgrade() -> None:
         sa.Column('username', sa.String(), nullable=False),
         sa.Column('email', sa.String(), nullable=False),
         sa.Column('hashed_password', sa.String(), nullable=False),
+        # sa.Column('salt', sa.String(), nullable=False), # Removed salt column, passlib includes it in hash
         sa.Column('full_name', sa.String(), nullable=True),
-        sa.Column('role_id', sa.Integer(), nullable=False),
+        sa.Column('role_id', sa.Integer(), nullable=True),
         sa.Column('is_active', sa.Boolean(), server_default=sa.true(), nullable=False),
         sa.Column('is_deleted', sa.Integer(), server_default=sa.text('0'), nullable=False),
-        sa.Column('deleted_at', sa.DateTime(), nullable=True),
-        sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
-        sa.Column('updated_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
-        sa.Column('last_login_at', sa.DateTime(), nullable=True),
+        sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True), # Added timezone=True
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False), # Added timezone=True
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False), # Added timezone=True
+        sa.Column('last_login_at', sa.DateTime(timezone=True), nullable=True), # Added timezone=True
         sa.Column('is_fingerprint_auth_enabled', sa.Boolean(), server_default=sa.false(), nullable=True),
-        sa.Column('fingerprint_template_id', sa.String(), nullable=True),
+        sa.Column('fingerprint_template_id', sa.Text(), nullable=True), # Changed String to Text
         sa.Column('is_face_auth_enabled', sa.Boolean(), server_default=sa.false(), nullable=True),
-        sa.Column('face_template_id', sa.String(), nullable=True),
+        sa.Column('face_template_id', sa.Text(), nullable=True), # Changed String to Text
         sa.Column('is_voice_auth_enabled', sa.Boolean(), server_default=sa.false(), nullable=True),
-        sa.Column('voice_profile_id', sa.String(), nullable=True),
+        sa.Column('voice_profile_id', sa.Text(), nullable=True), # Changed String to Text
+
         sa.PrimaryKeyConstraint('user_id'),
         sa.ForeignKeyConstraint(['role_id'], ['Roles.role_id'], ),
         sa.UniqueConstraint('email'),
