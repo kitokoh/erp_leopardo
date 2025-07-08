@@ -2678,16 +2678,18 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         logging.info("DEBUG_INIT_DB: Raw SQL table creations and default roles committed.")
 
         # === DIAGNOSTIC START: Check roles right after commit ===
-        try:
-            debug_cursor = conn.cursor()
-            debug_cursor.execute("SELECT role_id, role_name FROM Roles")
-            debug_roles = debug_cursor.fetchall()
-            logging.info(f"DEBUG_INIT_DB (POST-COMMIT CHECK): Roles found: {[(r['role_id'], r['role_name']) for r in debug_roles]}")
-            if not debug_roles:
-                logging.warning("DEBUG_INIT_DB (POST-COMMIT CHECK): No roles found immediately after commit. Initial insertion might have failed.")
-            debug_cursor.close()
-        except Exception as e_debug_roles:
-            logging.error(f"DEBUG_INIT_DB (POST-COMMIT CHECK): Error querying roles: {e_debug_roles}")
+        # This check for Roles table is problematic because init_schema.py defers Roles table creation to Alembic.
+        # Querying it here will result in "no such table: Roles".
+        # try:
+        #     debug_cursor = conn.cursor()
+        #     debug_cursor.execute("SELECT role_id, role_name FROM Roles")
+        #     debug_roles = debug_cursor.fetchall()
+        #     logging.info(f"DEBUG_INIT_DB (POST-COMMIT CHECK): Roles found: {[(r['role_id'], r['role_name']) for r in debug_roles]}")
+        #     if not debug_roles:
+        #         logging.warning("DEBUG_INIT_DB (POST-COMMIT CHECK): No roles found immediately after commit. Initial insertion might have failed.")
+        #     debug_cursor.close()
+        # except Exception as e_debug_roles:
+        #     logging.error(f"DEBUG_INIT_DB (POST-COMMIT CHECK): Error querying roles (expected if Alembic hasn't run yet): {e_debug_roles}")
         # === DIAGNOSTIC END ===
 
     except sqlite3.Error as e_commit_raw_sql:

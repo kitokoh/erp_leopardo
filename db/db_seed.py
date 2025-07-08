@@ -210,7 +210,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
     # and `current_role_ids` map populated above. This needs to run *after* roles are created
     # and *after* the admin user (who might be associated with a role) is processed.
     # More accurately, it needs role_ids from current_role_ids.
-    _seed_permissions_and_role_permissions(cursor, conn, logger, current_role_ids)
+    # _seed_permissions_and_role_permissions(cursor, conn, logger, current_role_ids) # MOVED/HANDLED by init_schema.py
     # --- End Seed Permissions and RolePermissions ---
 
     # Ensure the rest of the function uses the 'conn' passed in, not 'cursor' directly for write ops unless it's a read.
