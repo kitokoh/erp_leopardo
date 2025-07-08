@@ -303,16 +303,21 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
             logger.info("Seeding default countries and cities...")
             countries_cities = {'France': 'Paris', 'USA': 'New York', 'Algeria': 'Algiers'}
             for country_name, city_name in countries_cities.items():
-                # print(f"DEBUG_DB_SEED: In loop, country: {country_name}", flush=True) # Removed
-                country_dict = get_or_add_country(country_name, conn=conn)
+                logger.info(f"Attempting to seed country: {country_name} and city: {city_name}")
+                country_dict = get_or_add_country(country_name, conn=conn) # This function now has logging
                 if country_dict and 'country_id' in country_dict:
-                    logger.info(f"Country '{country_name}' processed/found, ID: {country_dict['country_id']}. Now processing city: '{city_name}'")
-                    get_or_add_city(city_name, country_dict['country_id'], conn=conn)
-                elif country_dict:
-                    logger.error(f"Country '{country_name}' processed by get_or_add_country but 'country_id' key is missing in returned dict: {country_dict}")
-                else:
-                     logger.error(f"Failed to get or add country '{country_name}', cannot add city '{city_name}'.")
-            logger.info(f"Seeded {len(countries_cities)} countries/cities.")
+                    logger.info(f"Country '{country_name}' (ID: {country_dict['country_id']}) successfully processed by get_or_add_country. Proceeding to add city '{city_name}'.")
+                    city_dict = get_or_add_city(city_name, country_dict['country_id'], conn=conn)
+                    if city_dict and 'city_id' in city_dict:
+                        logger.info(f"City '{city_name}' (ID: {city_dict['city_id']}) for country '{country_name}' successfully processed.")
+                    else:
+                        logger.error(f"Failed to process city '{city_name}' for country '{country_name}'. City dict: {city_dict}")
+                elif country_dict: # country_dict exists but 'country_id' is missing (should not happen with current get_or_add_country)
+                    logger.error(f"Country '{country_name}' processed by get_or_add_country, but 'country_id' is missing. Country dict: {country_dict}")
+                else: # get_or_add_country returned None
+                     logger.error(f"Failed to get or add country '{country_name}'. Cannot add city '{city_name}'.")
+            logger.info(f"Finished attempt to seed {len(countries_cities)} countries/cities.")
+
 
             # 7. Clients & 8. Projects (Simplified)
             logger.info("Seeding sample client and project...")
@@ -693,11 +698,13 @@ def _seed_default_regions(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logg
     skipped_count = 0
 
     for country_name, region_names in default_regions_data.items():
-        country = get_country_by_name(country_name, conn=conn) # Changed from locations_crud.get_country_by_name
+        logger.info(f"Attempting to find country '{country_name}' for region seeding.")
+        country = get_country_by_name(country_name, conn=conn) # This function now has logging
         if not country or 'country_id' not in country:
-            logger.warning(f"Country '{country_name}' not found for seeding regions. Skipping its regions.")
+            logger.warning(f"Country '{country_name}' NOT found by get_country_by_name (or 'country_id' missing) for seeding its regions. Country data: {country}. Skipping its regions.")
             skipped_count += len(region_names)
             continue
+        logger.info(f"Country '{country_name}' (ID: {country['country_id']}) found. Proceeding to seed its regions: {region_names}")
 
         country_id = country['country_id']
         for region_name in region_names:

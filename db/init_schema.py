@@ -2917,13 +2917,13 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
             activity_category TEXT,
             country_iso TEXT NOT NULL,
             region TEXT,
-
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE
         )
         """)
         print("DEBUG_INIT_DB: Table CompanyCalendarSettings created or exists.")
+
 
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS UserCalendarEvents (
