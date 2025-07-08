@@ -722,6 +722,7 @@ def initialize_database(app_config):
             # print(f"DEBUG_INIT_DB: Column '{col_name}' already exists in Clients table.")
 
 
+
     # Create ClientNotes table (base from ca.py)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS ClientNotes (
