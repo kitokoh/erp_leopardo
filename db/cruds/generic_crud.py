@@ -85,11 +85,40 @@ class GenericCRUD:
     # or if needing to ensure dict conversion at a specific point.
     # However, with conn.row_factory = sqlite3.Row, direct dict(row) works.
     # Let's define it here for explicitness and potential complex object handling later.
-    def _object_to_dict(self, db_row: sqlite3.Row) -> Union[Dict, None]:
-        """Converts a sqlite3.Row object to a dictionary."""
+    def _object_to_dict(self, db_row: Union[sqlite3.Row, Any]) -> Union[Dict, None]:
+        """
+        Converts a database row object (sqlite3.Row or SQLAlchemy RowProxy) to a dictionary.
+        Returns None if the input is None.
+        """
         if db_row is None:
             return None
-        return dict(db_row)
+
+        if isinstance(db_row, dict): # Already a dict
+            return db_row
+
+        # For SQLAlchemy RowProxy or similar objects that have _mapping (SQLAlchemy >= 1.4)
+        if hasattr(db_row, '_mapping'):
+            return dict(db_row._mapping)
+
+        # For sqlite3.Row
+        if isinstance(db_row, sqlite3.Row):
+            return {key: db_row[key] for key in db_row.keys()}
+
+        # Fallback for other object types that might have _asdict() (like namedtuples)
+        if hasattr(db_row, "_asdict"):
+            return db_row._asdict()
+
+        # Fallback for simple objects with __dict__ (use with caution)
+        # if hasattr(db_row, "__dict__"):
+        #     return db_row.__dict__
+
+        # Last attempt: direct dict conversion, log if it fails
+        try:
+            return dict(db_row)
+        except (TypeError, ValueError) as e:
+            logger_to_use = getattr(self, 'logger', logging.getLogger(__name__))
+            logger_to_use.error(f"GenericCRUD: Failed to convert db_row of type {type(db_row)} to dict: {e}. Row content: {str(db_row)[:200]}. Returning empty dict.")
+            return {}
 
     @_manage_conn
     def get_by_id(self, table_name: str, id_column: str, item_id: Any, conn: sqlite3.Connection) -> Union[Dict, None]:

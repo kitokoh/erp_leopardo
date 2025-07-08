@@ -237,6 +237,18 @@ def check_session_timeout() -> bool:
 def main():
     global CURRENT_SESSION_TOKEN, CURRENT_USER_ROLE, CURRENT_USER_ID, SESSION_START_TIME
 
+    # --- DEBUG: Ensure fresh database for testing startup ---
+    try:
+        db_path_to_delete = CONFIG.get('database_path')
+        if db_path_to_delete and os.path.exists(db_path_to_delete):
+            os.remove(db_path_to_delete)
+            logging.warning(f"DEBUG: Deleted existing database {db_path_to_delete} for fresh start.")
+        else:
+            logging.info(f"DEBUG: Database {db_path_to_delete} not found, starting fresh.")
+    except Exception as e_del_db:
+        logging.error(f"DEBUG: Error deleting database {db_path_to_delete}: {e_del_db}")
+    # --- END DEBUG ---
+
     # 1. Configure logging as the very first step.
     setup_logging()
     logging.info("Application starting...")
@@ -282,8 +294,17 @@ def main():
             # but can make it more robust if alembic commands are run from various places.
             # alembic_cfg.set_main_option("script_location", os.path.join(PROJECT_ROOT, "alembic"))
 
+            # --- DEBUG: Check if DB file exists before Alembic upgrade ---
+            db_path_for_alembic_check = CONFIG.get('database_path')
+            if db_path_for_alembic_check and os.path.exists(db_path_for_alembic_check):
+                logging.info(f"DEBUG_MAIN: Database file {db_path_for_alembic_check} EXISTS before Alembic upgrade. Size: {os.path.getsize(db_path_for_alembic_check)} bytes.")
+            else:
+                logging.info(f"DEBUG_MAIN: Database file {db_path_for_alembic_check} DOES NOT EXIST before Alembic upgrade.")
+            # --- END DEBUG ---
+
             logging.info("Attempting to upgrade database schema to head using Alembic...")
-            alembic_command.upgrade(alembic_cfg, "head")
+            # logging.warning("DEBUG_MAIN: ALEMBIC UPGRADE TEMPORARILY COMMENTED OUT FOR TESTING.")
+            alembic_command.upgrade(alembic_cfg, "head") # RESTORED
             logging.info("Alembic upgrade head command completed.")
     except ImportError:
         logging.error("Alembic is not installed. Skipping database migrations. Please install alembic.")
