@@ -662,6 +662,27 @@ def initialize_database(app_config):
         except sqlite3.Error as e_alter_default_template_id:
             print(f"Error adding 'default_template_id' column to Clients table: {e_alter_default_template_id}")
 
+    # Ensure status_id column exists (as it's crucial for FK and index)
+    # This is particularly important if an old schema of Clients table existed without status_id
+    cursor.execute("PRAGMA table_info(Clients)")
+    clients_columns_info_status_id_check = cursor.fetchall()
+    clients_column_names_status_id_check = [info['name'] for info in clients_columns_info_status_id_check]
+
+    if 'status_id' not in clients_column_names_status_id_check:
+        try:
+            # Adding with FOREIGN KEY constraint via ALTER TABLE is not directly supported in all SQLite versions for all cases.
+            # The FK is in the main CREATE TABLE. This just ensures the column exists.
+            # The FK relationship relies on the main CREATE TABLE for new DBs or PRAGMA foreign_keys=ON.
+            cursor.execute("ALTER TABLE Clients ADD COLUMN status_id INTEGER REFERENCES StatusSettings(status_id)")
+            print("DEBUG_INIT_DB: Added missing 'status_id' column to Clients table.")
+        except sqlite3.Error as e_alter_status_id:
+            print(f"DEBUG_INIT_DB: Error adding 'status_id' column to Clients table: {e_alter_status_id}")
+    else:
+        # Verify if the existing status_id column has the FK if possible, though PRAGMA foreign_key_list is complex.
+        # For now, assume if status_id exists, it's likely from the proper CREATE TABLE.
+        pass
+
+
     # Create ClientNotes table (base from ca.py)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS ClientNotes (
