@@ -303,6 +303,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
     # and *after* the admin user (who might be associated with a role) is processed.
     # More accurately, it needs role_ids from current_role_ids.
     _seed_permissions_and_role_permissions_logic(cursor, conn, logger, current_role_ids)
+
     # --- End Seed Permissions and RolePermissions ---
 
     # Ensure the rest of the function uses the 'conn' passed in, not 'cursor' directly for write ops unless it's a read.
