@@ -350,3 +350,42 @@ def delete_client_document_note(note_id: int, conn: sqlite3.Connection = None) -
 def get_client_document_note_by_id(note_id: int, conn: sqlite3.Connection = None) -> dict | None:
     logging.warning(f"Called stub function get_client_document_note_by_id for note_id {note_id}. Full implementation is missing.")
     return None
+
+@_manage_conn
+def get_pdf_documents_for_order(commande_id: str, conn: sqlite3.Connection = None, include_deleted: bool = False) -> list[dict]:
+    """
+    Retrieves PDF documents for a specific commande_id.
+    Filters by document_type_generated ending with 'PDF' (case-insensitive).
+    """
+    if not commande_id:
+        logging.error("get_pdf_documents_for_order: commande_id cannot be empty.")
+        return []
+
+    cursor = conn.cursor()
+    # We need client_id as well for constructing full paths later, so join with Clients if necessary,
+    # or ensure ClientDocuments has enough path info or client_id.
+    # For now, assume ClientDocuments has client_id and file_path_relative.
+    sql = """
+        SELECT document_id, client_id, document_name, file_path_relative, document_type_generated, created_at
+        FROM ClientDocuments
+        WHERE order_identifier = ?
+          AND (UPPER(document_type_generated) LIKE '%PDF' OR UPPER(file_name_on_disk) LIKE '%.PDF')
+    """
+    params = [commande_id]
+
+    if not include_deleted:
+        sql += " AND (is_deleted = 0 OR is_deleted IS NULL)"
+
+    sql += " ORDER BY created_at DESC"
+
+    try:
+        cursor.execute(sql, tuple(params))
+        return [dict(row) for row in cursor.fetchall()]
+    except sqlite3.Error as e:
+        logging.error(f"SQLite error getting PDF documents for order {commande_id}: {e}", exc_info=True)
+        return []
+
+# Ensure the new function is added to __all__ if the module uses it.
+# Not strictly necessary for direct calls but good practice for module interface.
+# This requires checking how __all__ is defined or if it's used.
+# For now, assuming direct import/use is fine.
