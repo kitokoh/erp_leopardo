@@ -18,6 +18,7 @@ def get_country_by_name(name: str, conn: sqlite3.Connection = None) -> dict | No
         else:
             logger_crud.warning(f"locations_crud.get_country_by_name: Country '{name}' NOT found.")
             return None
+
     except sqlite3.Error as e:
         logging.error(f"Error getting country by name '{name}': {e}")
         return None
@@ -49,6 +50,7 @@ def get_or_add_country(country_name: str, conn: sqlite3.Connection = None) -> di
         if row:
             logger_crud.info(f"locations_crud.get_or_add_country: Found existing country '{country_name}' with data: {dict(row)}")
             return {key: row[key] for key in row.keys()}
+
         else:
             now = datetime.utcnow().isoformat() + "Z"
             logger_crud.info(f"locations_crud.get_or_add_country: Country '{country_name}' not found, adding it now at {now}.")
@@ -61,6 +63,7 @@ def get_or_add_country(country_name: str, conn: sqlite3.Connection = None) -> di
                 return {'country_id': new_country_id, 'country_name': country_name, 'created_at': now, 'updated_at': now}
             else:
                 logger_crud.error(f"locations_crud.get_or_add_country: Failed to get lastrowid after inserting country: {country_name}")
+
                 return None
     except sqlite3.IntegrityError:
         logger_crud.warning(f"locations_crud.get_or_add_country: Integrity error (likely UNIQUE constraint) adding country '{country_name}', trying to fetch again.")

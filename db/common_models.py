@@ -50,3 +50,4 @@ class Role(Base):
 # Ensure that alembic/env.py imports db.common_models to pick up this Role model.
 # The raw SQL creation of 'Roles' table in db/init_schema.py should be removed.
 # The Alembic migration 26cc1deb3763_create_initial_tables.py should be updated to create 'Roles' table.
+
