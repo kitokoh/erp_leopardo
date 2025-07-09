@@ -47,6 +47,9 @@ def add_license(conn: sqlite3.Connection, license_data: dict) -> str | None:
         now_utc_iso,
         now_utc_iso
     )
+    logger.debug(f"Attempting to add license. SQL: {sql}")
+    logger.debug(f"Params: {params}")
+    logger.debug(f"Received license_data: {license_data}")
     try:
         cursor = conn.cursor()
         cursor.execute(sql, params)
@@ -54,7 +57,7 @@ def add_license(conn: sqlite3.Connection, license_data: dict) -> str | None:
         logger.info(f"License {license_data.get('license_id')} added for user {license_data.get('user_id')}.")
         return license_data.get('license_id')
     except sqlite3.Error as e:
-        logger.error(f"Error adding license for user {license_data.get('user_id')}: {e}", exc_info=True)
+        logger.error(f"Error adding license for user {license_data.get('user_id')}. SQL: {sql}, Params: {params}. Error: {e}", exc_info=True)
         conn.rollback()
         return None
 

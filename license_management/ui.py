@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QIcon
+from datetime import datetime # Import datetime
 
 # Imports pour la logique métier et la connexion DB
 from . import manager as license_manager
