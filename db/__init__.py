@@ -465,7 +465,24 @@ __all__ = [
     "add_sav_ticket",
     "get_sav_ticket_by_id",
     "get_sav_tickets_for_client",
-    "update_sav_ticket",
+    update_sav_ticket,
+    # SMTP Configs CRUD
+    "add_smtp_config",
+    "update_smtp_config",
+    "delete_smtp_config",
+    "get_smtp_config_by_id",
+    "get_all_smtp_configs",
+    "set_default_smtp_config",
+    "get_default_smtp_config",
+    "get_smtp_config_by_name",
+    # User SMTP Assignments CRUD
+    "assign_smtp_to_user",
+    "unassign_smtp_from_user",
+    "get_user_smtp_assignments",
+    "get_default_smtp_for_user",
+    "set_default_smtp_for_user",
+    "update_user_smtp_assignment_default_status",
+    "get_assignment_by_user_and_config",
 ]
 
 from .connection import get_db_connection
@@ -492,4 +509,27 @@ from .cruds.sav_crud import (
     get_sav_ticket_by_id,
     get_sav_tickets_for_client,
     update_sav_ticket
+)
+
+# SMTP Configs CRUD functions
+from .cruds.smtp_configs_crud import (
+    add_smtp_config,
+    update_smtp_config,
+    delete_smtp_config,
+    get_smtp_config_by_id,
+    get_all_smtp_configs,
+    set_default_smtp_config,
+    get_default_smtp_config,
+    get_smtp_config_by_name,
+)
+
+# User SMTP Assignments CRUD functions
+from .cruds.user_smtp_assignments_crud import (
+    assign_smtp_to_user,
+    unassign_smtp_from_user,
+    get_user_smtp_assignments,
+    get_default_smtp_for_user,
+    set_default_smtp_for_user,
+    update_user_smtp_assignment_default_status,
+    get_assignment_by_user_and_config,
 )

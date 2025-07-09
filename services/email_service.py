@@ -11,21 +11,34 @@ from email.encoders import encode_base64
 from PyQt5.QtCore import QObject # QObject for potential signals if service itself was threaded, not strictly needed now
 
 # Assuming db.py and app_config.py are accessible
-import db
+import db # db now re-exports from db.cruds.smtp_configs_crud
 from app_setup import CONFIG # Though CONFIG not directly used here, db.py might use it
 
 class EmailSenderService(QObject): # Inherit from QObject if it were to emit signals directly
-    def __init__(self, smtp_config_id=None, parent=None):
+    def __init__(self, smtp_config_id: int | None = None, parent=None):
         super().__init__(parent) # Call QObject's init if it's a QObject
         self.smtp_config = None
-        if smtp_config_id:
-            self.smtp_config = db.get_smtp_config_by_id(smtp_config_id)
-        else:
-            self.smtp_config = db.get_default_smtp_config()
+        try:
+            if smtp_config_id is not None:
+                # db.__init__ now exports functions from smtp_configs_crud directly
+                self.smtp_config = db.get_smtp_config_by_id(smtp_config_id)
+                if self.smtp_config:
+                    print(f"EmailSenderService: Initialized with SMTP config ID {smtp_config_id}: {self.smtp_config.get('config_name')}")
+                else:
+                    print(f"Error: EmailSenderService: SMTP config ID {smtp_config_id} not found. Falling back to default.")
+                    self.smtp_config = db.get_default_smtp_config()
+            else:
+                self.smtp_config = db.get_default_smtp_config()
+                if self.smtp_config:
+                    print(f"EmailSenderService: Initialized with default SMTP config: {self.smtp_config.get('config_name')}")
+
+        except Exception as e:
+            print(f"Error: EmailSenderService: Failed to load SMTP configuration during init: {e}")
+            self.smtp_config = None # Ensure it's None on error
 
         if not self.smtp_config:
             # This state should be checked by the caller before trying to send.
-            print("Error: EmailSenderService initialized without a valid SMTP configuration.")
+            print("Error: EmailSenderService initialized without a valid SMTP configuration (either specified or default).")
             # Consider raising an exception or having a method to check service readiness.
 
     def _get_value_from_context(self, path: str, context: dict, default_value="[Not Found]"):
