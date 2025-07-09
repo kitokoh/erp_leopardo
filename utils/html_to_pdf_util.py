@@ -145,33 +145,60 @@ def render_html_template(template_string: str, context: dict) -> str:
 
         processed_template = re.sub(r'\{\{#if ([^}]+?)\}\}(.*?)\{\{/if\}\}', process_conditional, processed_template, flags=re.DOTALL)
 
-        # 3. Process simple placeholders {{key.subkey}}
-        def replace_placeholder(match):
-            key = match.group(1).strip()
-            # More verbose logging for specific keys of interest
-            if key in ["main_image_path", "seller.logo_url", "doc.logo_path"]:
-                logger.info(f"render_html_template (replace_placeholder): SPECIAL KEY MATCHED key='{key}'")
-            else:
-                logger.debug(f"render_html_template (replace_placeholder): Matched placeholder key='{key}'")
+        # 3. Process simple placeholders {{key.subkey}} or {{key.subkey | default('fallback')}}
+        def replace_placeholder(match_obj):
+            full_key_expression = match_obj.group(1).strip()
 
-            val = get_value_from_context(key, context)
+            key_parts = full_key_expression.split('|', 1)
+            actual_key = key_parts[0].strip()
+            default_value_provided = None
+            use_default = False
 
-            if key in ["main_image_path", "seller.logo_url", "doc.logo_path"]:
-                logger.info(f"render_html_template (replace_placeholder): SPECIAL KEY VALUE for key='{key}': '{str(val)[:200]}'")
+            if len(key_parts) > 1:
+                default_part = key_parts[1].strip()
+                # Regex to capture content inside default('...') or default("...")
+                default_match = re.match(r"default\s*\(\s*['\"](.*?)['\"]\s*\)", default_part)
+                if default_match:
+                    default_value_provided = default_match.group(1)
+                else:
+                    # If pattern is not default('string') or default("string"), log warning or handle differently.
+                    # For now, we assume if there's a pipe, it's intended for default, and if not matching, the default part is invalid.
+                    logger.warning(f"render_html_template: Found '|' but default syntax not recognized: '{default_part}'. Key: '{actual_key}'")
+                    # In this case, we will just try to render actual_key and ignore the malformed default part.
+
+            # Log for special keys (debugging aid)
+            if actual_key in ["main_image_path", "seller.logo_url", "doc.logo_path"]:
+                logger.info(f"render_html_template (replace_placeholder): Processing key='{actual_key}'")
             else:
-                logger.debug(f"render_html_template (replace_placeholder): Value for key='{key}': '{str(val)[:100]}'")
+                logger.debug(f"render_html_template (replace_placeholder): Processing key='{actual_key}'")
+
+            val = get_value_from_context(actual_key, context) # context is accessible due to nested function scope
+
+            # Condition to use default: if val is empty string (primary indicator of not found/None from get_value_from_context)
+            # AND a default value was successfully parsed.
+            if val == "" and default_value_provided is not None:
+                logger.debug(f"render_html_template (replace_placeholder): Key '{actual_key}' resolved to empty. Using provided default: '{default_value_provided}'")
+                val = default_value_provided # Use the parsed default value
+                use_default = True
+
+            if not use_default:
+                if actual_key in ["main_image_path", "seller.logo_url", "doc.logo_path"]:
+                    logger.info(f"render_html_template (replace_placeholder): Value for key='{actual_key}': '{str(val)[:200]}'")
+                else:
+                    logger.debug(f"render_html_template (replace_placeholder): Value for key='{actual_key}': '{str(val)[:100]}'")
+
             return str(val)
 
-        # Log template before and after main placeholder substitution
-        # logger.debug(f"render_html_template: Template BEFORE simple placeholder substitution:\n{processed_template[:1000]}")
-        processed_template = re.sub(r'\{\{([^}]+?)\}\}', replace_placeholder, processed_template)
-        # logger.debug(f"render_html_template: Template AFTER simple placeholder substitution:\n{processed_template[:1000]}")
+        processed_template = re.sub(r'\{\{\s*(.*?)\s*\}\}', replace_placeholder, processed_template)
 
-        if "{{ main_image_path }}" in processed_template or "{{ seller.logo_url }}" in processed_template:
-            logger.warning("render_html_template: Placeholders for main_image_path or seller.logo_url still exist in processed_template before returning!")
-            logger.debug(f"Problematic template snippet (around main_image_path): {processed_template[max(0, processed_template.find('main_image_path')-20):processed_template.find('main_image_path')+40]}")
-            logger.debug(f"Problematic template snippet (around seller.logo_url): {processed_template[max(0, processed_template.find('seller.logo_url')-20):processed_template.find('seller.logo_url')+40]}")
-
+        # Debugging check for remaining placeholders (can be removed in production)
+        # remaining_placeholders = re.findall(r'\{\{.*?\}\}', processed_template)
+        # if remaining_placeholders:
+        #     logger.warning(f"render_html_template: Found remaining placeholders after processing: {remaining_placeholders[:5]}")
+        #     if "{{ main_image_path }}" in processed_template or "{{ seller.logo_url }}" in processed_template:
+        #         logger.warning("render_html_template: Placeholders for main_image_path or seller.logo_url still exist in processed_template before returning!")
+        #         logger.debug(f"Problematic template snippet (around main_image_path): {processed_template[max(0, processed_template.find('main_image_path')-20):processed_template.find('main_image_path')+40]}")
+        #         logger.debug(f"Problematic template snippet (around seller.logo_url): {processed_template[max(0, processed_template.find('seller.logo_url')-20):processed_template.find('seller.logo_url')+40]}")
 
         logger.debug("render_html_template: FINISHED processing template successfully.")
         return processed_template
