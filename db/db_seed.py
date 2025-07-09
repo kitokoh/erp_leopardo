@@ -228,60 +228,73 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
     target_admin_username = "admin" # Define earlier to avoid UnboundLocalError in logging
     super_admin_role_id = current_role_ids.get(SUPER_ADMIN_ROLE_NAME)
 
-    if super_admin_role_id:
-        temp_admin_password = "admin" # Ensure this is the desired default password
-        logger.info(f"Ensuring super admin user '{target_admin_username}' exists with password (hidden) and role '{SUPER_ADMIN_ROLE_NAME}' (Role ID: {super_admin_role_id})...")
+    # PRE-SEEDING CHECK FOR ADMIN USER
+    try:
+        logger.info(f"DB_SEED_ADMIN_CHECK: Checking Users table state before attempting to seed '{target_admin_username}'.")
+        # Use the raw cursor passed to _original_seed_initial_data_func_placeholder
+        # This cursor should be from the same connection 'conn'
+        check_cursor = conn.cursor() # Obtain a new cursor from the same connection
 
-        admin_user_dict = users_crud.get_user_by_username(target_admin_username, conn=conn, logger_passed=logger)
-        if admin_user_dict:
-            super_admin_user_id = admin_user_dict['user_id']
-            logger.info(f"User '{target_admin_username}' (ID: {super_admin_user_id}) exists. Verifying role and password.")
-            if admin_user_dict.get('role_id') != super_admin_role_id:
-                logger.info(f"User '{target_admin_username}' does not have role '{SUPER_ADMIN_ROLE_NAME}'. Updating role...")
-                users_crud.update_user_role(super_admin_user_id, super_admin_role_id, conn=conn, logger_passed=logger)
+        check_cursor.execute("SELECT COUNT(*) FROM Users")
+        user_count = check_cursor.fetchone()[0]
+        logger.info(f"DB_SEED_ADMIN_CHECK: Current total users in Users table: {user_count}")
 
-            logger.info(f"Updating password for '{target_admin_username}' to ensure it is '{temp_admin_password}'.")
-            update_success = users_crud.update_user_password(super_admin_user_id, temp_admin_password, conn=conn, logger_passed=logger)
-            if update_success: logger.info(f"Password for user '{target_admin_username}' updated successfully.")
-            else: logger.error(f"Failed to update password for user '{target_admin_username}'. This is critical.")
+        check_cursor.execute("SELECT user_id, username, email, role_id, is_active, is_deleted FROM Users WHERE username = ?", (target_admin_username,))
+        existing_admin_row = check_cursor.fetchone()
+        if existing_admin_row:
+            logger.info(f"DB_SEED_ADMIN_CHECK: User '{target_admin_username}' ALREADY EXISTS before seeding attempt. Details: {dict(existing_admin_row)}")
         else:
-            logger.info(f"User '{target_admin_username}' not found. Creating with password '{temp_admin_password}' and role '{SUPER_ADMIN_ROLE_NAME}'.")
-            new_admin_id = users_crud.add_user(
-                username=target_admin_username, password=temp_admin_password, role_id=super_admin_role_id,
-                full_name="Super Administrator", email="superadmin@example.local",
-                conn=conn, logger_passed=logger
-            )
-            if new_admin_id:
-                super_admin_user_id = new_admin_id
-                logger.info(f"User '{target_admin_username}' created successfully with ID {super_admin_user_id}.")
-            else: # add_user returned None, possibly due to IntegrityError
-                logger.warning(f"Initial attempt to add user '{target_admin_username}' failed. Checking if an inactive user exists.")
-                # Try to get any user (active, inactive, or deleted) by that username
-                any_admin_user_dict = users_crud.get_any_user_by_username(target_admin_username, conn=conn, logger_passed=logger)
-                if any_admin_user_dict:
-                    logger.info(f"Found existing user '{target_admin_username}' (ID: {any_admin_user_dict['user_id']}) with potentially non-active status. Attempting to activate and update.")
-                    update_success = users_crud.activate_and_update_user_details(
-                        user_id=any_admin_user_dict['user_id'],
-                        role_id=super_admin_role_id,
-                        password=temp_admin_password,
-                        full_name="Super Administrator (Activated)", # Indicate it was updated
-                        email="superadmin@example.local", # Ensure email is consistent
-                        conn=conn,
-                        logger_passed=logger
-                    )
-                    if update_success:
-                        super_admin_user_id = any_admin_user_dict['user_id']
-                        logger.info(f"Successfully activated and updated existing user '{target_admin_username}' to be super admin (ID: {super_admin_user_id}).")
-                    else:
-                        logger.error(f"Failed to activate and update existing user '{target_admin_username}' (ID: {any_admin_user_dict['user_id']}).")
-                        super_admin_user_id = None
-                else:
-                    logger.error(f"Failed to create user '{target_admin_username}' and no existing user (active or inactive) found by that username.")
-                    super_admin_user_id = None
+            logger.info(f"DB_SEED_ADMIN_CHECK: User '{target_admin_username}' DOES NOT exist before seeding attempt.")
+        # We don't close check_cursor here as it's from the same conn which is managed by _original_seed_initial_data_func_placeholder
+    except Exception as e_check:
+        logger.error(f"DB_SEED_ADMIN_CHECK: Error during pre-seeding check for admin user: {e_check}", exc_info=True)
+    # END PRE-SEEDING CHECK
+
+    if super_admin_role_id:
+        temp_admin_password = "admin"
+        hashed_admin_password = users_crud.util_hash_password(temp_admin_password, logger_passed=logger)
+        admin_user_id_generated = str(uuid.uuid4())
+        now_iso_for_admin = datetime.utcnow().isoformat() + "Z"
+
+        logger.info(f"DB_SEED_ADMIN_DIAGNOSTIC: Attempting raw SQL INSERT OR IGNORE for '{target_admin_username}'.")
+        try:
+            # Use the raw cursor from _original_seed_initial_data_func_placeholder
+            # Column order: user_id, username, hashed_password, full_name, email, role_id, is_active, created_at, updated_at
+            # Assuming salt is handled within hashed_password by util_hash_password
+            # is_deleted default is 0, other biometric fields default to NULL/0 via schema
+            cursor.execute("""
+                INSERT OR IGNORE INTO Users
+                (user_id, username, hashed_password, full_name, email, role_id, is_active, created_at, updated_at, is_deleted)
+                VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, 0)
+            """, (admin_user_id_generated, target_admin_username, hashed_admin_password,
+                  "Super Administrator (Raw Seed)", "superadmin_raw@example.local",
+                  super_admin_role_id, now_iso_for_admin, now_iso_for_admin))
+
+            if cursor.rowcount > 0:
+                logger.info(f"DB_SEED_ADMIN_DIAGNOSTIC: Raw INSERT OR IGNORE successful for '{target_admin_username}', new user_id might be {admin_user_id_generated}.")
+            else:
+                logger.info(f"DB_SEED_ADMIN_DIAGNOSTIC: Raw INSERT OR IGNORE for '{target_admin_username}' was ignored (user likely existed).")
+
+            # Now, try to fetch the admin user to get their definitive user_id
+            cursor.execute("SELECT user_id, role_id FROM Users WHERE username = ?", (target_admin_username,))
+            admin_row = cursor.fetchone()
+            if admin_row:
+                super_admin_user_id = admin_row['user_id'] # Use the ID from the DB
+                logger.info(f"DB_SEED_ADMIN_DIAGNOSTIC: Fetched '{target_admin_username}' from DB. User ID: {super_admin_user_id}, Role ID: {admin_row['role_id']}.")
+                # Optionally, ensure role and password are correct if user already existed
+                if admin_row['role_id'] != super_admin_role_id:
+                    logger.warning(f"DB_SEED_ADMIN_DIAGNOSTIC: Admin user '{target_admin_username}' has role {admin_row['role_id']}, expected {super_admin_role_id}. Consider manual correction or improved seeding logic if this state is problematic.")
+                # Password update can be added here if needed, using users_crud.update_user_password
+            else:
+                logger.error(f"DB_SEED_ADMIN_DIAGNOSTIC: FAILED to fetch '{target_admin_username}' from DB after INSERT OR IGNORE. This is unexpected.")
+                super_admin_user_id = None
+        except sqlite3.Error as e_raw_admin:
+            logger.error(f"DB_SEED_ADMIN_DIAGNOSTIC: SQLite error during raw admin seed: {e_raw_admin}", exc_info=True)
+            super_admin_user_id = None
     else:
         logger.critical(f"Role '{SUPER_ADMIN_ROLE_NAME}' ID not found in current_role_ids. Cannot ensure super admin user '{target_admin_username}'.")
         super_admin_user_id = None
-    # --- End Seed Admin User ---
+    # --- End Diagnostic Seed Admin User ---
 
     # Preserve admin_user_id for compatibility if other parts expect 'admin_user_id' to refer to the general admin
     # For now, 'admin_user_id' will be the super_admin_user_id
@@ -290,11 +303,14 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
 
     # Fallback for original DEFAULT_ADMIN_USERNAME if that's different and was used elsewhere
     # This part might be less relevant if target_admin_username ("admin") is the one true admin.
-    if DEFAULT_ADMIN_USERNAME != "admin":
-        logger.info(f"Checking for original default admin user '{DEFAULT_ADMIN_USERNAME}' for compatibility...")
-        original_admin_user_dict = users_crud.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn, logger_passed=logger)
-        if original_admin_user_dict:
-            logger.info(f"Found original default admin user '{DEFAULT_ADMIN_USERNAME}' with ID {original_admin_user_dict['user_id']}. Note: 'admin_user_id' in this script now refers to the user 'admin' with role '{SUPER_ADMIN_ROLE_NAME}'.")
+    # if DEFAULT_ADMIN_USERNAME != "admin": # This check itself needs DEFAULT_ADMIN_USERNAME to be defined
+    # Ensure DEFAULT_ADMIN_USERNAME is available, e.g. from config or defined in this file
+    # For now, this block is problematic if DEFAULT_ADMIN_USERNAME is not reliably defined here.
+    # Let's assume target_admin_username ("admin") is the primary concern.
+    # logger.info(f"Checking for original default admin user '{DEFAULT_ADMIN_USERNAME}' for compatibility...")
+    # original_admin_user_dict = users_crud.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn, logger_passed=logger)
+    # if original_admin_user_dict:
+    #     logger.info(f"Found original default admin user '{DEFAULT_ADMIN_USERNAME}' with ID {original_admin_user_dict['user_id']}. Note: 'admin_user_id' in this script now refers to the user 'admin' with role '{SUPER_ADMIN_ROLE_NAME}'.")
 
 
     # Seed Default Operational User (depends on 'Operator' role_id from role_id_map_for_permissions)
@@ -402,38 +418,52 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         # --- Seed License for Admin User ---
         if super_admin_user_id:
             try:
-                from license_management import cruds as license_cruds
+            from db.cruds import licenses_crud # Corrected import
                 from datetime import timedelta # datetime is already imported
 
                 logger.info(f"Checking/Seeding license for admin user ID: {super_admin_user_id}")
-                # Check for existing active 'complet' license
-                existing_licenses = license_cruds.get_licenses_for_user(conn, super_admin_user_id)
-                active_complet_license_exists = False
-                if existing_licenses:
-                    for lic in existing_licenses:
-                        if lic['license_type'] == 'complet' and lic['is_active']:
-                            # Check if expiration_date is a string and needs parsing, or already a datetime object
-                            exp_date_str = lic.get('expiration_date')
-                            if exp_date_str:
-                                try:
-                                    # Assuming ISO format with 'Z' or timezone offset
-                                    if isinstance(exp_date_str, str):
-                                        exp_date = datetime.fromisoformat(exp_date_str.replace('Z', '+00:00'))
-                                    elif isinstance(exp_date_str, datetime):
-                                        exp_date = exp_date_str # Already a datetime object
+                # Use get_active_license_for_user which already checks for active and not expired
+                existing_active_license = licenses_crud.get_active_license_for_user(conn, super_admin_user_id)
+                suitable_license_exists = False
 
-                                    if exp_date > datetime.now(exp_date.tzinfo) + timedelta(days=30): # Still valid for at least 30 days
-                                        active_complet_license_exists = True
-                                        logger.info(f"Admin user already has an active 'complet' license expiring on {exp_date_str}.")
-                                        break
-                                except ValueError as e_date:
-                                    logger.warning(f"Could not parse expiration date '{exp_date_str}' for existing license {lic.get('license_id')}: {e_date}")
-                            else: # No expiration date, assume it's not what we want or it's a permanent 'complet' type
-                                logger.info(f"Admin user has an active 'complet' license {lic.get('license_id')} with no expiration date or unparseable.")
-                                # active_complet_license_exists = True # Or decide if this is acceptable
-                                # break
+                if existing_active_license:
+                    logger.info(f"Found an active license for admin: {existing_active_license.get('license_id')}, type: {existing_active_license.get('license_type')}")
+                    if existing_active_license.get('license_type') == 'complet':
+                        exp_date_str = existing_active_license.get('expiration_date')
+                        if exp_date_str:
+                            try:
+                                # datetime.fromisoformat can handle strings like "YYYY-MM-DDTHH:MM:SS.ffffffZ" or "...+00:00"
+                                # For "YYYY-MM-DD", it might need adjustment or the stored format must be consistent.
+                                # Assuming licenses_crud.get_active_license_for_user already ensures it's not expired.
+                                # We add an additional check here: ensure it's valid for at least 30 more days.
+                                if isinstance(exp_date_str, str):
+                                    # Ensure timezone awareness for comparison
+                                    exp_date = datetime.fromisoformat(exp_date_str.replace('Z', '+00:00'))
+                                    if exp_date.tzinfo is None: # If fromisoformat doesn't make it tz-aware based on Z
+                                        exp_date = exp_date.replace(tzinfo=timezone.utc)
+                                elif isinstance(exp_date_str, datetime):
+                                    exp_date = exp_date_str
+                                    if exp_date.tzinfo is None: # Ensure timezone if already datetime
+                                        exp_date = exp_date.replace(tzinfo=timezone.utc)
+                                else:
+                                    raise ValueError("expiration_date is not a recognized string or datetime object")
 
-                if not active_complet_license_exists:
+                                if exp_date > datetime.now(timezone.utc) + timedelta(days=30):
+                                    suitable_license_exists = True
+                                    logger.info(f"Admin user already has a suitable 'complet' license (ID: {existing_active_license.get('license_id')}) expiring on {exp_date_str} (valid for >30 days).")
+                                else:
+                                    logger.info(f"Admin's active 'complet' license (ID: {existing_active_license.get('license_id')}) expires too soon ({exp_date_str}). A new default one will be created if needed.")
+                            except ValueError as e_date:
+                                logger.warning(f"Could not parse expiration date '{exp_date_str}' for admin's active license {existing_active_license.get('license_id')}: {e_date}")
+                        else: # Active 'complet' license with no expiration date
+                            logger.info(f"Admin user has an active 'complet' license (ID: {existing_active_license.get('license_id')}) with no expiration date. Considering it suitable.")
+                            suitable_license_exists = True
+                    else:
+                        logger.info(f"Admin user has an active license (ID: {existing_active_license.get('license_id')}), but it's not 'complet' type (type: {existing_active_license.get('license_type')}).")
+                else:
+                    logger.info(f"No existing active license found for admin user {super_admin_user_id}.")
+
+                if not suitable_license_exists:
                     logger.info(f"No suitable active 'complet' license found for admin. Creating a new 6-month 'complet' license.")
                     activation_date = datetime.utcnow()
                     expiration_date = activation_date + timedelta(days=180)
@@ -444,8 +474,27 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                         "activation_date": activation_date.isoformat() + "Z",
                         "expiration_date": expiration_date.isoformat() + "Z",
                         "is_active": True
+                        # 'license_id' and 'machine_info' will be added next
                     }
-                    new_license_id = license_cruds.add_license(conn, license_data)
+
+                    # Ensure license_id is generated and added
+                    license_data["license_id"] = str(uuid.uuid4())
+
+                    # Add machine_info (placeholder or dynamic)
+                    # Attempting to get it dynamically, fallback to placeholder
+                    try:
+                        from license_management import manager as license_manager_instance
+                        license_data["machine_info"] = license_manager_instance.get_machine_identifier()
+                        logger.info(f"Using dynamic machine_info: {license_data['machine_info']}")
+                    except ImportError:
+                        logger.warning("Could not import LicenseManager to get dynamic machine_id for seeding. Using placeholder.")
+                        license_data["machine_info"] = "default_seed_machine_placeholder"
+                    except Exception as e_machine_id:
+                        logger.warning(f"Error getting dynamic machine_id: {e_machine_id}. Using placeholder.")
+                        license_data["machine_info"] = "error_seed_machine_placeholder"
+
+                    logger.info(f"Attempting to add license for admin with data: {license_data}")
+                    new_license_id = licenses_crud.add_license(conn, license_data)
                     if new_license_id:
                         logger.info(f"Successfully added 'complet' license (ID: {new_license_id}) for admin user {super_admin_user_id}, valid for 6 months.")
                     else:
@@ -453,8 +502,8 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                 else:
                     logger.info(f"Admin user {super_admin_user_id} already has a suitable active 'complet' license. Skipping new license creation.")
 
-            # except ImportError:
-            #     logger.error("Failed to import license_management.cruds. Cannot seed admin license.")
+            # except ImportError: # This was for the old incorrect import, now it should be NameError if licenses_crud itself is not found
+            #     logger.error("Failed to import db.cruds.licenses_crud. Cannot seed admin license.")
             except Exception as e_lic:
                 logger.error(f"An error occurred during admin license seeding: {e_lic}", exc_info=True)
         else:
@@ -559,16 +608,16 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                     logger.info(f"Attempting to seed country: {country_name} and city: {city_name}")
                     country_dict = get_or_add_country(country_name, conn=conn) # This function now has logging
                     if country_dict and 'country_id' in country_dict:
-                        logger.info(f"Country '{country_name}' (ID: {country_dict['country_id']}) successfully processed by get_or_add_country. Proceeding to add city '{city_name}'.")
+                        logger.info(f"SEED_COUNTRY_CITY_LOG: Country '{country_name}' (ID: {country_dict['country_id']}) successfully processed by get_or_add_country. Proceeding to add city '{city_name}'.")
                         city_dict = get_or_add_city(city_name, country_dict['country_id'], conn=conn)
                         if city_dict and 'city_id' in city_dict:
-                            logger.info(f"City '{city_name}' (ID: {city_dict['city_id']}) for country '{country_name}' successfully processed.")
+                            logger.info(f"SEED_COUNTRY_CITY_LOG: City '{city_name}' (ID: {city_dict['city_id']}) for country '{country_name}' successfully processed.")
                         else:
-                            logger.error(f"Failed to process city '{city_name}' for country '{country_name}'. City dict: {city_dict}")
-                    elif country_dict: # country_dict exists but 'country_id' is missing (should not happen with current get_or_add_country)
-                        logger.error(f"Country '{country_name}' processed by get_or_add_country, but 'country_id' is missing. Country dict: {country_dict}")
+                            logger.error(f"SEED_COUNTRY_CITY_LOG: Failed to process city '{city_name}' for country '{country_name}'. City dict: {city_dict}")
+                    elif country_dict: # country_dict exists but 'country_id' is missing
+                        logger.error(f"SEED_COUNTRY_CITY_LOG: Country '{country_name}' processed by get_or_add_country, but 'country_id' is missing. Country dict: {country_dict}. Cannot add city '{city_name}'.")
                     else: # get_or_add_country returned None
-                        logger.error(f"Failed to get or add country '{country_name}'. Cannot add city '{city_name}'.")
+                        logger.error(f"SEED_COUNTRY_CITY_LOG: Failed to get or add country '{country_name}' via get_or_add_country. Cannot add city '{city_name}'.")
                 logger.info(f"Finished attempt to seed {len(countries_cities)} countries/cities.")
 
 
@@ -743,6 +792,7 @@ def _seed_default_utility_templates(cursor: sqlite3.Cursor, conn: sqlite3.Connec
             'template_name': doc_def['template_name'], 'template_type': template_type,
             'language_code': doc_def['language_code'], 'base_file_name': doc_def['base_file_name'],
             'description': doc_def['description'], 'category_id': utility_category_id,
+            'category_purpose': DEFAULT_UTILITY_TEMPLATES_PURPOSE, # Ensure category_purpose is passed
             'client_id': None, 'is_default_for_type_lang': False,
         }
         template_id = add_default_template_if_not_exists(template_data_for_db, conn=conn) 
@@ -808,8 +858,11 @@ def _seed_main_document_templates(cursor: sqlite3.Cursor, conn: sqlite3.Connecti
                 'template_name': full_template_name, 'template_type': doc_def['template_type'],
                 'language_code': lang_code, 'base_file_name': doc_def['base_file_name'],
                 'description': doc_def['description'], 'category_id': category_id,
+                'category_purpose': client_doc_purpose, # Ensure category_purpose is passed
                 'client_id': None, 'is_default_for_type_lang': is_default, # Set dynamically
             }
+            if full_template_name == "Spécification Technique (Excel) (FR)":
+                logger.info(f"SEED_DEBUG: Data for 'Spécification Technique (Excel) (FR)' before calling add_default_template_if_not_exists: {template_data_for_db}")
             template_id = add_default_template_if_not_exists(template_data_for_db, conn=conn) 
             
             if template_id:
