@@ -402,38 +402,52 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         # --- Seed License for Admin User ---
         if super_admin_user_id:
             try:
-                from license_management import cruds as license_cruds
+            from db.cruds import licenses_crud # Corrected import
                 from datetime import timedelta # datetime is already imported
 
                 logger.info(f"Checking/Seeding license for admin user ID: {super_admin_user_id}")
-                # Check for existing active 'complet' license
-                existing_licenses = license_cruds.get_licenses_for_user(conn, super_admin_user_id)
-                active_complet_license_exists = False
-                if existing_licenses:
-                    for lic in existing_licenses:
-                        if lic['license_type'] == 'complet' and lic['is_active']:
-                            # Check if expiration_date is a string and needs parsing, or already a datetime object
-                            exp_date_str = lic.get('expiration_date')
-                            if exp_date_str:
-                                try:
-                                    # Assuming ISO format with 'Z' or timezone offset
-                                    if isinstance(exp_date_str, str):
-                                        exp_date = datetime.fromisoformat(exp_date_str.replace('Z', '+00:00'))
-                                    elif isinstance(exp_date_str, datetime):
-                                        exp_date = exp_date_str # Already a datetime object
+                # Use get_active_license_for_user which already checks for active and not expired
+                existing_active_license = licenses_crud.get_active_license_for_user(conn, super_admin_user_id)
+                suitable_license_exists = False
 
-                                    if exp_date > datetime.now(exp_date.tzinfo) + timedelta(days=30): # Still valid for at least 30 days
-                                        active_complet_license_exists = True
-                                        logger.info(f"Admin user already has an active 'complet' license expiring on {exp_date_str}.")
-                                        break
-                                except ValueError as e_date:
-                                    logger.warning(f"Could not parse expiration date '{exp_date_str}' for existing license {lic.get('license_id')}: {e_date}")
-                            else: # No expiration date, assume it's not what we want or it's a permanent 'complet' type
-                                logger.info(f"Admin user has an active 'complet' license {lic.get('license_id')} with no expiration date or unparseable.")
-                                # active_complet_license_exists = True # Or decide if this is acceptable
-                                # break
+                if existing_active_license:
+                    logger.info(f"Found an active license for admin: {existing_active_license.get('license_id')}, type: {existing_active_license.get('license_type')}")
+                    if existing_active_license.get('license_type') == 'complet':
+                        exp_date_str = existing_active_license.get('expiration_date')
+                        if exp_date_str:
+                            try:
+                                # datetime.fromisoformat can handle strings like "YYYY-MM-DDTHH:MM:SS.ffffffZ" or "...+00:00"
+                                # For "YYYY-MM-DD", it might need adjustment or the stored format must be consistent.
+                                # Assuming licenses_crud.get_active_license_for_user already ensures it's not expired.
+                                # We add an additional check here: ensure it's valid for at least 30 more days.
+                                if isinstance(exp_date_str, str):
+                                    # Ensure timezone awareness for comparison
+                                    exp_date = datetime.fromisoformat(exp_date_str.replace('Z', '+00:00'))
+                                    if exp_date.tzinfo is None: # If fromisoformat doesn't make it tz-aware based on Z
+                                        exp_date = exp_date.replace(tzinfo=timezone.utc)
+                                elif isinstance(exp_date_str, datetime):
+                                    exp_date = exp_date_str
+                                    if exp_date.tzinfo is None: # Ensure timezone if already datetime
+                                        exp_date = exp_date.replace(tzinfo=timezone.utc)
+                                else:
+                                    raise ValueError("expiration_date is not a recognized string or datetime object")
 
-                if not active_complet_license_exists:
+                                if exp_date > datetime.now(timezone.utc) + timedelta(days=30):
+                                    suitable_license_exists = True
+                                    logger.info(f"Admin user already has a suitable 'complet' license (ID: {existing_active_license.get('license_id')}) expiring on {exp_date_str} (valid for >30 days).")
+                                else:
+                                    logger.info(f"Admin's active 'complet' license (ID: {existing_active_license.get('license_id')}) expires too soon ({exp_date_str}). A new default one will be created if needed.")
+                            except ValueError as e_date:
+                                logger.warning(f"Could not parse expiration date '{exp_date_str}' for admin's active license {existing_active_license.get('license_id')}: {e_date}")
+                        else: # Active 'complet' license with no expiration date
+                            logger.info(f"Admin user has an active 'complet' license (ID: {existing_active_license.get('license_id')}) with no expiration date. Considering it suitable.")
+                            suitable_license_exists = True
+                    else:
+                        logger.info(f"Admin user has an active license (ID: {existing_active_license.get('license_id')}), but it's not 'complet' type (type: {existing_active_license.get('license_type')}).")
+                else:
+                    logger.info(f"No existing active license found for admin user {super_admin_user_id}.")
+
+                if not suitable_license_exists:
                     logger.info(f"No suitable active 'complet' license found for admin. Creating a new 6-month 'complet' license.")
                     activation_date = datetime.utcnow()
                     expiration_date = activation_date + timedelta(days=180)
@@ -445,7 +459,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                         "expiration_date": expiration_date.isoformat() + "Z",
                         "is_active": True
                     }
-                    new_license_id = license_cruds.add_license(conn, license_data)
+                    new_license_id = licenses_crud.add_license(conn, license_data)
                     if new_license_id:
                         logger.info(f"Successfully added 'complet' license (ID: {new_license_id}) for admin user {super_admin_user_id}, valid for 6 months.")
                     else:
@@ -453,8 +467,8 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                 else:
                     logger.info(f"Admin user {super_admin_user_id} already has a suitable active 'complet' license. Skipping new license creation.")
 
-            # except ImportError:
-            #     logger.error("Failed to import license_management.cruds. Cannot seed admin license.")
+            # except ImportError: # This was for the old incorrect import, now it should be NameError if licenses_crud itself is not found
+            #     logger.error("Failed to import db.cruds.licenses_crud. Cannot seed admin license.")
             except Exception as e_lic:
                 logger.error(f"An error occurred during admin license seeding: {e_lic}", exc_info=True)
         else:
@@ -559,16 +573,16 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                     logger.info(f"Attempting to seed country: {country_name} and city: {city_name}")
                     country_dict = get_or_add_country(country_name, conn=conn) # This function now has logging
                     if country_dict and 'country_id' in country_dict:
-                        logger.info(f"Country '{country_name}' (ID: {country_dict['country_id']}) successfully processed by get_or_add_country. Proceeding to add city '{city_name}'.")
+                        logger.info(f"SEED_COUNTRY_CITY_LOG: Country '{country_name}' (ID: {country_dict['country_id']}) successfully processed by get_or_add_country. Proceeding to add city '{city_name}'.")
                         city_dict = get_or_add_city(city_name, country_dict['country_id'], conn=conn)
                         if city_dict and 'city_id' in city_dict:
-                            logger.info(f"City '{city_name}' (ID: {city_dict['city_id']}) for country '{country_name}' successfully processed.")
+                            logger.info(f"SEED_COUNTRY_CITY_LOG: City '{city_name}' (ID: {city_dict['city_id']}) for country '{country_name}' successfully processed.")
                         else:
-                            logger.error(f"Failed to process city '{city_name}' for country '{country_name}'. City dict: {city_dict}")
-                    elif country_dict: # country_dict exists but 'country_id' is missing (should not happen with current get_or_add_country)
-                        logger.error(f"Country '{country_name}' processed by get_or_add_country, but 'country_id' is missing. Country dict: {country_dict}")
+                            logger.error(f"SEED_COUNTRY_CITY_LOG: Failed to process city '{city_name}' for country '{country_name}'. City dict: {city_dict}")
+                    elif country_dict: # country_dict exists but 'country_id' is missing
+                        logger.error(f"SEED_COUNTRY_CITY_LOG: Country '{country_name}' processed by get_or_add_country, but 'country_id' is missing. Country dict: {country_dict}. Cannot add city '{city_name}'.")
                     else: # get_or_add_country returned None
-                        logger.error(f"Failed to get or add country '{country_name}'. Cannot add city '{city_name}'.")
+                        logger.error(f"SEED_COUNTRY_CITY_LOG: Failed to get or add country '{country_name}' via get_or_add_country. Cannot add city '{city_name}'.")
                 logger.info(f"Finished attempt to seed {len(countries_cities)} countries/cities.")
 
 
@@ -743,6 +757,7 @@ def _seed_default_utility_templates(cursor: sqlite3.Cursor, conn: sqlite3.Connec
             'template_name': doc_def['template_name'], 'template_type': template_type,
             'language_code': doc_def['language_code'], 'base_file_name': doc_def['base_file_name'],
             'description': doc_def['description'], 'category_id': utility_category_id,
+            'category_purpose': DEFAULT_UTILITY_TEMPLATES_PURPOSE, # Ensure category_purpose is passed
             'client_id': None, 'is_default_for_type_lang': False,
         }
         template_id = add_default_template_if_not_exists(template_data_for_db, conn=conn) 
@@ -808,8 +823,11 @@ def _seed_main_document_templates(cursor: sqlite3.Cursor, conn: sqlite3.Connecti
                 'template_name': full_template_name, 'template_type': doc_def['template_type'],
                 'language_code': lang_code, 'base_file_name': doc_def['base_file_name'],
                 'description': doc_def['description'], 'category_id': category_id,
+                'category_purpose': client_doc_purpose, # Ensure category_purpose is passed
                 'client_id': None, 'is_default_for_type_lang': is_default, # Set dynamically
             }
+            if full_template_name == "Spécification Technique (Excel) (FR)":
+                logger.info(f"SEED_DEBUG: Data for 'Spécification Technique (Excel) (FR)' before calling add_default_template_if_not_exists: {template_data_for_db}")
             template_id = add_default_template_if_not_exists(template_data_for_db, conn=conn) 
             
             if template_id:
