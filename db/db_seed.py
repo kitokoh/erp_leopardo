@@ -399,298 +399,298 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         # Preserve admin_user_id for compatibility with other seeding parts if they expect it.
         admin_user_id = super_admin_user_id # This is the ID of the "admin" user with "super_admin" role
 
-    # --- Seed License for Admin User ---
-    if super_admin_user_id:
-        try:
-            from license_management import cruds as license_cruds
-            from datetime import timedelta # datetime is already imported
-
-            logger.info(f"Checking/Seeding license for admin user ID: {super_admin_user_id}")
-            # Check for existing active 'complet' license
-            existing_licenses = license_cruds.get_licenses_for_user(conn, super_admin_user_id)
-            active_complet_license_exists = False
-            if existing_licenses:
-                for lic in existing_licenses:
-                    if lic['license_type'] == 'complet' and lic['is_active']:
-                        # Check if expiration_date is a string and needs parsing, or already a datetime object
-                        exp_date_str = lic.get('expiration_date')
-                        if exp_date_str:
-                            try:
-                                # Assuming ISO format with 'Z' or timezone offset
-                                if isinstance(exp_date_str, str):
-                                    exp_date = datetime.fromisoformat(exp_date_str.replace('Z', '+00:00'))
-                                elif isinstance(exp_date_str, datetime):
-                                     exp_date = exp_date_str # Already a datetime object
-
-                                if exp_date > datetime.now(exp_date.tzinfo) + timedelta(days=30): # Still valid for at least 30 days
-                                    active_complet_license_exists = True
-                                    logger.info(f"Admin user already has an active 'complet' license expiring on {exp_date_str}.")
-                                    break
-                            except ValueError as e_date:
-                                logger.warning(f"Could not parse expiration date '{exp_date_str}' for existing license {lic.get('license_id')}: {e_date}")
-                        else: # No expiration date, assume it's not what we want or it's a permanent 'complet' type
-                            logger.info(f"Admin user has an active 'complet' license {lic.get('license_id')} with no expiration date or unparseable.")
-                            # active_complet_license_exists = True # Or decide if this is acceptable
-                            # break
-
-            if not active_complet_license_exists:
-                logger.info(f"No suitable active 'complet' license found for admin. Creating a new 6-month 'complet' license.")
-                activation_date = datetime.utcnow()
-                expiration_date = activation_date + timedelta(days=180)
-                license_data = {
-                    "user_id": super_admin_user_id,
-                    "license_type": "complet", # Assuming 'complet' grants full access
-                    "license_key": str(uuid.uuid4()), # Generate a new unique license key
-                    "activation_date": activation_date.isoformat() + "Z",
-                    "expiration_date": expiration_date.isoformat() + "Z",
-                    "is_active": True
-                }
-                new_license_id = license_cruds.add_license(conn, license_data)
-                if new_license_id:
-                    logger.info(f"Successfully added 'complet' license (ID: {new_license_id}) for admin user {super_admin_user_id}, valid for 6 months.")
-                else:
-                    logger.error(f"Failed to add 'complet' license for admin user {super_admin_user_id}.")
-            else:
-                logger.info(f"Admin user {super_admin_user_id} already has a suitable active 'complet' license. Skipping new license creation.")
-
-        except ImportError:
-            logger.error("Failed to import license_management.cruds. Cannot seed admin license.")
-        except Exception as e_lic:
-            logger.error(f"An error occurred during admin license seeding: {e_lic}", exc_info=True)
-    else:
-        logger.warning("super_admin_user_id is not set. Skipping license seeding for admin.")
-    # --- End Seed License for Admin User ---
-
-        # Fallback for original DEFAULT_ADMIN_USERNAME if that's different and was used elsewhere
-        if DEFAULT_ADMIN_USERNAME != "admin":
-            logger.info(f"Checking for original default admin user '{DEFAULT_ADMIN_USERNAME}' for compatibility in other seeding parts if needed.")
-            original_admin_user_dict = users_crud.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn, logger_passed=logger)
-            if original_admin_user_dict:
-                # This original_admin_user_id might be used by other parts of seed script if they haven't been updated
-                # to use the new 'admin_user_id' which refers to the "admin" with "super_admin" role.
-                # For now, we primarily rely on 'admin_user_id' (for user "admin").
-                logger.info(f"Found original default admin user '{DEFAULT_ADMIN_USERNAME}' with ID {original_admin_user_dict['user_id']}. Note: 'admin_user_id' in this script now refers to the user 'admin' with 'super_admin' role.")
-
-
-
-            # 2. Companies (uses admin_user_id if available for created_by or similar in future)
-            default_company_id = None
-        cursor.execute("SELECT COUNT(*) FROM companies") # Querying companies table (lowercase)
-        if cursor.fetchone()[0] == 0: # Corrected indentation
-            default_company_id = str(uuid.uuid4())
-            cursor.execute("INSERT OR IGNORE INTO companies (company_id, company_name, address, is_default) VALUES (?, ?, ?, ?)", # lowercase; unindented this line
-                               (default_company_id, "Default Company Inc.", "123 Default Street", True))
-            logger.info("Seeded default company.")
-        else: # Corrected indentation for else
-            cursor.execute("SELECT company_id FROM companies WHERE is_default = TRUE") # lowercase
-            row = cursor.fetchone()
-            if row: default_company_id = row[0]
-            # print("DEBUG_DB_SEED: CHECKPOINT 3 - After Default Company seeding", flush=True) # Removed
-
-        # 3. CompanyPersonnel
-        if default_company_id:
-            cursor.execute("SELECT COUNT(*) FROM CompanyPersonnel WHERE company_id = ?", (default_company_id,))
-            if cursor.fetchone()[0] == 0:
-                cursor.execute("INSERT OR IGNORE INTO CompanyPersonnel (company_id, name, role, email, phone) VALUES (?, ?, ?, ?, ?)",
-                               (default_company_id, "Admin Contact", "Administrator", "contact@defaultcomp.com", "123-456-7890"))
-                logger.info("Seeded default company personnel.")
-        # print("DEBUG_DB_SEED: CHECKPOINT 4 - After CompanyPersonnel seeding", flush=True) # Removed
-
-        # 4. TeamMembers
-        if admin_user_id: # Corrected indentation
-            admin_user_for_tm_dict = users_crud.get_user_by_id(admin_user_id, conn=conn, logger_passed=logger)
-            if admin_user_for_tm_dict:
-                cursor.execute("SELECT COUNT(*) FROM TeamMembers WHERE user_id = ?", (admin_user_id,))
-                if cursor.fetchone()[0] == 0:
-                    # Use 'role_name' as fetched from get_user_by_id, and map to 'role_or_title' column in TeamMembers
-                    cursor.execute("INSERT OR IGNORE INTO TeamMembers (user_id, full_name, email, role_or_title) VALUES (?, ?, ?, ?)",
-                                   (admin_user_id, admin_user_for_tm_dict['full_name'], admin_user_for_tm_dict['email'], admin_user_for_tm_dict.get('role_name')))
-                    logger.info("Seeded admin team member.")
-                else:
-                    logger.warning(f"Could not retrieve admin user details for ID {admin_user_id} to seed into TeamMembers.")
-            else:
-                logger.warning("Admin user ID not available for TeamMember seeding.")
-            # print("DEBUG_DB_SEED: CHECKPOINT 5 - After TeamMembers seeding", flush=True) # Removed
-
-            # Default Operational User
-            DEFAULT_OPERATIONAL_USERNAME = "default_operational_user"
-            DEFAULT_OPERATIONAL_USER_ROLE = "User" # This should be a role_id or fetched dynamically
-            logger.info(f"Checking for default operational user '{DEFAULT_OPERATIONAL_USERNAME}'...")
-            existing_operational_user = users_crud.get_user_by_username(DEFAULT_OPERATIONAL_USERNAME, conn=conn, logger_passed=logger)
-            if existing_operational_user is None:
-                logger.info(f"Creating default operational user '{DEFAULT_OPERATIONAL_USERNAME}'...")
-                # Fetch OPERATOR role_id
-                operator_role_id = current_role_ids.get(OPERATOR) # Get OPERATOR role_id from seeded roles
-                if operator_role_id:
-                    op_user_data = {
-                        'username': DEFAULT_OPERATIONAL_USERNAME,
-                        'password': uuid.uuid4().hex, # Generate a random password
-                        'role_id': operator_role_id,
-                        'full_name': "Default Operational User",
-                        'email': f"{DEFAULT_OPERATIONAL_USERNAME}@example.local",
-                        'is_active': True # This is not directly passed to users_crud.add_user; it's defaulted there
-                    }
-                    # users_crud.add_user expects: username, password, role_id, full_name=None, email=None, conn=None
-                    # It returns user_id (str) or None
-                    op_user_id = users_crud.add_user(
-                        username=op_user_data['username'],
-                        password=op_user_data['password'],
-                        role_id=op_user_data['role_id'],
-                        full_name=op_user_data['full_name'],
-                        email=op_user_data['email'],
-                        conn=conn,
-                        logger_passed=logger
-                    )
-                    if op_user_id:
-                        logger.info(f"Created default operational user ID: {op_user_id}.")
-                    else:
-                        logger.error(f"Failed to create default operational user: {DEFAULT_OPERATIONAL_USERNAME}")
-                else:
-                    logger.error(f"Could not find role_id for '{OPERATOR}'. Cannot create default operational user.")
-            else:
-                logger.info(f"Default operational user '{DEFAULT_OPERATIONAL_USERNAME}' already exists.")
-            # print("DEBUG_DB_SEED: CHECKPOINT 6 - After Default Operational User seeding", flush=True) # Removed
-
-            # 5. Countries & 6. Cities
-            # print("DEBUG_DB_SEED: Just before countries_cities loop in _original_seed_initial_data_func_placeholder", flush=True) # Removed
-            logger.info("Seeding default countries and cities...")
-            countries_cities = {'France': 'Paris', 'USA': 'New York', 'Algeria': 'Algiers'}
-            for country_name, city_name in countries_cities.items():
-                logger.info(f"Attempting to seed country: {country_name} and city: {city_name}")
-                country_dict = get_or_add_country(country_name, conn=conn) # This function now has logging
-                if country_dict and 'country_id' in country_dict:
-                    logger.info(f"Country '{country_name}' (ID: {country_dict['country_id']}) successfully processed by get_or_add_country. Proceeding to add city '{city_name}'.")
-                    city_dict = get_or_add_city(city_name, country_dict['country_id'], conn=conn)
-                    if city_dict and 'city_id' in city_dict:
-                        logger.info(f"City '{city_name}' (ID: {city_dict['city_id']}) for country '{country_name}' successfully processed.")
-                    else:
-                        logger.error(f"Failed to process city '{city_name}' for country '{country_name}'. City dict: {city_dict}")
-                elif country_dict: # country_dict exists but 'country_id' is missing (should not happen with current get_or_add_country)
-                    logger.error(f"Country '{country_name}' processed by get_or_add_country, but 'country_id' is missing. Country dict: {country_dict}")
-                else: # get_or_add_country returned None
-                     logger.error(f"Failed to get or add country '{country_name}'. Cannot add city '{city_name}'.")
-            logger.info(f"Finished attempt to seed {len(countries_cities)} countries/cities.")
-
-
-            # 7. Clients & 8. Projects (Simplified)
-            logger.info("Seeding sample client and project...")
-            cursor.execute("SELECT COUNT(*) FROM Clients")
-            if cursor.fetchone()[0] == 0:
-                # Fetch IDs specifically for client seeding
-                france_country_dict = get_country_by_name("France", conn=conn)
-                actual_france_country_id = france_country_dict['country_id'] if france_country_dict else None
-
-                paris_city_dict = None
-                if actual_france_country_id:
-                    paris_city_dict = get_city_by_name_and_country_id("Paris", actual_france_country_id, conn=conn)
-                actual_paris_city_id = paris_city_dict['city_id'] if paris_city_dict else None
-
-                actif_status_dict = get_status_setting_by_name("Client Actif", "Client", conn=conn) # Corrected status name
-                actual_actif_status_id = actif_status_dict['status_id'] if actif_status_dict else None
-
-                if admin_user_id and actual_france_country_id and actual_paris_city_id and actual_actif_status_id:
-                    client_data = {
-                        'client_name': "Sample Client SARL",
-                        'country_id': actual_france_country_id,
-                        'city_id': actual_paris_city_id,
-                        'status_id': actual_actif_status_id,
-                        'created_by_user_id': admin_user_id,
-                        'default_base_folder_path': f"clients/{uuid.uuid4()}",
-                        'project_identifier': "SC-PROJ-001"
-                    }
-                    add_client_res = clients_crud_instance.add_client(client_data, conn=conn)
-                    if add_client_res['success']:
-                        logger.info(f"Seeded sample client ID: {add_client_res['client_id']}")
-                        planning_status_dict = get_status_setting_by_name("Planning", "Project", conn=conn)
-                        planning_status_id = planning_status_dict['status_id'] if planning_status_dict else None
-                        if planning_status_id:
-                            project_data = {'project_id': str(uuid.uuid4()), 'client_id': add_client_res['client_id'], 'project_name': "Initial Project", 'status_id': planning_status_id, 'manager_team_member_id': admin_user_id}
-                            cursor.execute("INSERT INTO Projects (project_id, client_id, project_name, status_id, manager_team_member_id) VALUES (?,?,?,?,?)",
-                                           (project_data['project_id'], project_data['client_id'], project_data['project_name'], project_data['status_id'], project_data['manager_team_member_id']))
-                            logger.info("Seeded sample project.")
-                    else:
-                        logger.error(f"Failed to seed sample client. Add client response: {add_client_res}")
-                else:
-                    logger.warning(f"One or more required IDs for sample client not found or invalid. Admin: {admin_user_id}, France: {actual_france_country_id}, Paris: {actual_paris_city_id}, ActifStatus: {actual_actif_status_id}. Skipping sample client seeding.")
-            else:
-                logger.info("Clients table not empty, skipping sample client/project seeding.")
-
-            # 9. Contacts
-            logger.info("Seeding generic contact...")
-            cursor.execute("SELECT COUNT(*) FROM Contacts WHERE email = 'contact@example.com'")
-            if cursor.fetchone()[0] == 0:
-                cursor.execute("INSERT OR IGNORE INTO Contacts (name, email) VALUES (?,?)", ("Placeholder Contact", "contact@example.com"))
-                logger.info("Seeded generic contact.")
-
-            # 10. Products
-            logger.info("Seeding default and sample products...")
-            sample_prods_data = [
-                {'product_name': "Default Product", 'language_code': "en", 'base_unit_price': 10.0, 'product_code': "PROD001"},
-                {'product_name': "Industrial Widget", 'language_code': "en", 'base_unit_price': 100.0, 'product_code': "PROD002"},
-                {'product_name': "Gadget Standard", 'language_code': "fr", 'base_unit_price': 50.0, 'product_code': "PROD003"},
-                {'product_name': "Advanced Gizmo", 'language_code': "en", 'base_unit_price': 250.0, 'product_code': "PROD004"}
-            ]
-            for prod_data in sample_prods_data:
-                cursor.execute("SELECT COUNT(*) FROM Products WHERE product_name = ? AND language_code = ?", (prod_data["product_name"], prod_data["language_code"]))
-                if cursor.fetchone()[0] == 0:
-                    products_crud_instance.add_product(prod_data, conn=conn)
-            logger.info("Finished seeding products.")
-
-            # Seed default hydraulic presses
-            # _seed_default_hydraulic_presses(cursor, conn, logger_passed=logger) # Function definition not found
+        # --- Seed License for Admin User ---
+        if super_admin_user_id:
             try:
-                # Changed to absolute import based on PROJECT_ROOT being in sys.path
-                from db.hidroguc_product_seeder import seed_hidroguc_products
-                logger.info("Attempting to seed HİDROGÜÇ PRES products...")
-                seed_hidroguc_products(conn, cursor, logger_passed=logger)
-                logger.info("HİDROGÜÇ PRES products seeding attempt finished.")
-            except ImportError as e_import_hp:
-                logger.error(f"Could not import seed_hidroguc_products. Error: {e_import_hp}. Skipping HİDROGÜÇ PRES products seeding.", exc_info=True)
-            except Exception as e_hp_seed:
-                logger.error(f"An error occurred during HİDROGÜÇ PRES products seeding: {e_hp_seed}", exc_info=True)
-                # Ne pas laisser une erreur ici arrêter le reste du seeding, sauf si critique.
-                # conn.rollback() # Peut-être pas souhaitable de rollback tout le seeding pour ça.
+                from license_management import cruds as license_cruds
+                from datetime import timedelta # datetime is already imported
 
-            # 11. SmtpConfigs
-            logger.info("Seeding placeholder SMTP config...")
-            cursor.execute("SELECT COUNT(*) FROM SmtpConfigs")
-            if cursor.fetchone()[0] == 0:
-                cursor.execute("INSERT OR IGNORE INTO SmtpConfigs (config_name, smtp_server, smtp_port, username, password_encrypted, use_tls, is_default, sender_email_address, sender_display_name) VALUES (?,?,?,?,?,?,?,?,?)",
-                               ("Placeholder - Configure Me", "smtp.example.com", 587, "user", "placeholder_password", True, True, "noreply@example.com", "Placeholder Email"))
-                logger.info("Seeded placeholder SMTP config.")
+                logger.info(f"Checking/Seeding license for admin user ID: {super_admin_user_id}")
+                # Check for existing active 'complet' license
+                existing_licenses = license_cruds.get_licenses_for_user(conn, super_admin_user_id)
+                active_complet_license_exists = False
+                if existing_licenses:
+                    for lic in existing_licenses:
+                        if lic['license_type'] == 'complet' and lic['is_active']:
+                            # Check if expiration_date is a string and needs parsing, or already a datetime object
+                            exp_date_str = lic.get('expiration_date')
+                            if exp_date_str:
+                                try:
+                                    # Assuming ISO format with 'Z' or timezone offset
+                                    if isinstance(exp_date_str, str):
+                                        exp_date = datetime.fromisoformat(exp_date_str.replace('Z', '+00:00'))
+                                    elif isinstance(exp_date_str, datetime):
+                                        exp_date = exp_date_str # Already a datetime object
 
-            # 12. ApplicationSettings
-            logger.info("Seeding additional application settings...")
-            set_setting('google_maps_review_url', 'https://maps.google.com/?cid=YOUR_CID_HERE', conn=conn)
-            logger.info("Seeded additional application settings.")
+                                    if exp_date > datetime.now(exp_date.tzinfo) + timedelta(days=30): # Still valid for at least 30 days
+                                        active_complet_license_exists = True
+                                        logger.info(f"Admin user already has an active 'complet' license expiring on {exp_date_str}.")
+                                        break
+                                except ValueError as e_date:
+                                    logger.warning(f"Could not parse expiration date '{exp_date_str}' for existing license {lic.get('license_id')}: {e_date}")
+                            else: # No expiration date, assume it's not what we want or it's a permanent 'complet' type
+                                logger.info(f"Admin user has an active 'complet' license {lic.get('license_id')} with no expiration date or unparseable.")
+                                # active_complet_license_exists = True # Or decide if this is acceptable
+                                # break
 
-            # 13. Email Templates
-            logger.info("Seeding email templates...")
-            email_templates_defs = [
-                {'template_name': 'SAV Ticket Ouvert (FR)', 'template_type': 'email_sav_ticket_opened', 'language_code': 'fr', 'base_file_name': 'sav_ticket_opened_fr.html', 'category_name': 'Modèles Email SAV', 'category_purpose': 'email', 'email_subject_template': 'Ticket SAV #{{ticket.id}} Ouvert - {{project.name | default: "Référence Client"}}', 'is_default_for_type_lang': True},
-                {'template_name': 'SAV Ticket Résolu (FR)', 'template_type': 'email_sav_ticket_resolved', 'language_code': 'fr', 'base_file_name': 'sav_ticket_resolved_fr.html', 'category_name': 'Modèles Email SAV', 'category_purpose': 'email', 'email_subject_template': 'Ticket SAV #{{ticket.id}} Résolu - {{project.name | default: "Référence Client"}}', 'is_default_for_type_lang': True},
-                {'template_name': 'Suivi Prospect Proforma (FR)', 'template_type': 'email_follow_up_prospect', 'language_code': 'fr', 'base_file_name': 'follow_up_prospect_fr.html', 'category_name': 'Modèles Email Marketing/Suivi', 'category_purpose': 'email', 'email_subject_template': 'Suite à votre demande de proforma : {{project.name | default: client.primary_need}}', 'is_default_for_type_lang': True},
-                {'template_name': 'Vœux Noël (FR)', 'template_type': 'email_greeting_christmas', 'language_code': 'fr', 'base_file_name': 'greeting_holiday_christmas_fr.html', 'category_name': 'Modèles Email Vœux', 'category_purpose': 'email', 'email_subject_template': 'Joyeux Noël de la part de {{seller.company_name}}!', 'is_default_for_type_lang': True},
-                {'template_name': 'Vœux Nouvelle Année (FR)', 'template_type': 'email_greeting_newyear', 'language_code': 'fr', 'base_file_name': 'greeting_holiday_newyear_fr.html', 'category_name': 'Modèles Email Vœux', 'category_purpose': 'email', 'email_subject_template': 'Bonne Année {{doc.current_year}} ! - {{seller.company_name}}', 'is_default_for_type_lang': True},
-                {'template_name': 'Message Générique (FR)', 'template_type': 'email_generic_message', 'language_code': 'fr', 'base_file_name': 'generic_message_fr.html', 'category_name': 'Modèles Email Généraux', 'category_purpose': 'email', 'email_subject_template': 'Un message de {{seller.company_name}}', 'is_default_for_type_lang': True},
-            ]
-            for et_data in email_templates_defs:
-                add_default_template_if_not_exists(et_data, conn=conn)
-            logger.info("Seeded email templates.")
+                if not active_complet_license_exists:
+                    logger.info(f"No suitable active 'complet' license found for admin. Creating a new 6-month 'complet' license.")
+                    activation_date = datetime.utcnow()
+                    expiration_date = activation_date + timedelta(days=180)
+                    license_data = {
+                        "user_id": super_admin_user_id,
+                        "license_type": "complet", # Assuming 'complet' grants full access
+                        "license_key": str(uuid.uuid4()), # Generate a new unique license key
+                        "activation_date": activation_date.isoformat() + "Z",
+                        "expiration_date": expiration_date.isoformat() + "Z",
+                        "is_active": True
+                    }
+                    new_license_id = license_cruds.add_license(conn, license_data)
+                    if new_license_id:
+                        logger.info(f"Successfully added 'complet' license (ID: {new_license_id}) for admin user {super_admin_user_id}, valid for 6 months.")
+                    else:
+                        logger.error(f"Failed to add 'complet' license for admin user {super_admin_user_id}.")
+                else:
+                    logger.info(f"Admin user {super_admin_user_id} already has a suitable active 'complet' license. Skipping new license creation.")
 
-            # 14. CoverPageTemplates (handled by init_schema.py)
-            logger.info("Cover page templates are expected to be populated by initialize_database from init_schema.py.")
+            # except ImportError:
+            #     logger.error("Failed to import license_management.cruds. Cannot seed admin license.")
+            except Exception as e_lic:
+                logger.error(f"An error occurred during admin license seeding: {e_lic}", exc_info=True)
+        else:
+            logger.warning("super_admin_user_id is not set. Skipping license seeding for admin.")
+        # --- End Seed License for Admin User ---
 
-            # 15. Partner Categories
-            _seed_default_partner_categories(cursor, conn, logger_passed=logger)
-            logger.info("Data seeding operations completed within _original_seed_initial_data_func_placeholder.")
+            # Fallback for original DEFAULT_ADMIN_USERNAME if that's different and was used elsewhere
+            if DEFAULT_ADMIN_USERNAME != "admin":
+                logger.info(f"Checking for original default admin user '{DEFAULT_ADMIN_USERNAME}' for compatibility in other seeding parts if needed.")
+                original_admin_user_dict = users_crud.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn, logger_passed=logger)
+                if original_admin_user_dict:
+                    # This original_admin_user_id might be used by other parts of seed script if they haven't been updated
+                    # to use the new 'admin_user_id' which refers to the "admin" with "super_admin" role.
+                    # For now, we primarily rely on 'admin_user_id' (for user "admin").
+                    logger.info(f"Found original default admin user '{DEFAULT_ADMIN_USERNAME}' with ID {original_admin_user_dict['user_id']}. Note: 'admin_user_id' in this script now refers to the user 'admin' with 'super_admin' role.")
+
+
+
+                # 2. Companies (uses admin_user_id if available for created_by or similar in future)
+                default_company_id = None
+            cursor.execute("SELECT COUNT(*) FROM companies") # Querying companies table (lowercase)
+            if cursor.fetchone()[0] == 0: # Corrected indentation
+                default_company_id = str(uuid.uuid4())
+                cursor.execute("INSERT OR IGNORE INTO companies (company_id, company_name, address, is_default) VALUES (?, ?, ?, ?)", # lowercase; unindented this line
+                                (default_company_id, "Default Company Inc.", "123 Default Street", True))
+                logger.info("Seeded default company.")
+            else: # Corrected indentation for else
+                cursor.execute("SELECT company_id FROM companies WHERE is_default = TRUE") # lowercase
+                row = cursor.fetchone()
+                if row: default_company_id = row[0]
+                # print("DEBUG_DB_SEED: CHECKPOINT 3 - After Default Company seeding", flush=True) # Removed
+
+            # 3. CompanyPersonnel
+            if default_company_id:
+                cursor.execute("SELECT COUNT(*) FROM CompanyPersonnel WHERE company_id = ?", (default_company_id,))
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute("INSERT OR IGNORE INTO CompanyPersonnel (company_id, name, role, email, phone) VALUES (?, ?, ?, ?, ?)",
+                                (default_company_id, "Admin Contact", "Administrator", "contact@defaultcomp.com", "123-456-7890"))
+                    logger.info("Seeded default company personnel.")
+            # print("DEBUG_DB_SEED: CHECKPOINT 4 - After CompanyPersonnel seeding", flush=True) # Removed
+
+            # 4. TeamMembers
+            if admin_user_id: # Corrected indentation
+                admin_user_for_tm_dict = users_crud.get_user_by_id(admin_user_id, conn=conn, logger_passed=logger)
+                if admin_user_for_tm_dict:
+                    cursor.execute("SELECT COUNT(*) FROM TeamMembers WHERE user_id = ?", (admin_user_id,))
+                    if cursor.fetchone()[0] == 0:
+                        # Use 'role_name' as fetched from get_user_by_id, and map to 'role_or_title' column in TeamMembers
+                        cursor.execute("INSERT OR IGNORE INTO TeamMembers (user_id, full_name, email, role_or_title) VALUES (?, ?, ?, ?)",
+                                    (admin_user_id, admin_user_for_tm_dict['full_name'], admin_user_for_tm_dict['email'], admin_user_for_tm_dict.get('role_name')))
+                        logger.info("Seeded admin team member.")
+                    else:
+                        logger.warning(f"Could not retrieve admin user details for ID {admin_user_id} to seed into TeamMembers.")
+                else:
+                    logger.warning("Admin user ID not available for TeamMember seeding.")
+                # print("DEBUG_DB_SEED: CHECKPOINT 5 - After TeamMembers seeding", flush=True) # Removed
+
+                # Default Operational User
+                DEFAULT_OPERATIONAL_USERNAME = "default_operational_user"
+                DEFAULT_OPERATIONAL_USER_ROLE = "User" # This should be a role_id or fetched dynamically
+                logger.info(f"Checking for default operational user '{DEFAULT_OPERATIONAL_USERNAME}'...")
+                existing_operational_user = users_crud.get_user_by_username(DEFAULT_OPERATIONAL_USERNAME, conn=conn, logger_passed=logger)
+                if existing_operational_user is None:
+                    logger.info(f"Creating default operational user '{DEFAULT_OPERATIONAL_USERNAME}'...")
+                    # Fetch OPERATOR role_id
+                    operator_role_id = current_role_ids.get(OPERATOR) # Get OPERATOR role_id from seeded roles
+                    if operator_role_id:
+                        op_user_data = {
+                            'username': DEFAULT_OPERATIONAL_USERNAME,
+                            'password': uuid.uuid4().hex, # Generate a random password
+                            'role_id': operator_role_id,
+                            'full_name': "Default Operational User",
+                            'email': f"{DEFAULT_OPERATIONAL_USERNAME}@example.local",
+                            'is_active': True # This is not directly passed to users_crud.add_user; it's defaulted there
+                        }
+                        # users_crud.add_user expects: username, password, role_id, full_name=None, email=None, conn=None
+                        # It returns user_id (str) or None
+                        op_user_id = users_crud.add_user(
+                            username=op_user_data['username'],
+                            password=op_user_data['password'],
+                            role_id=op_user_data['role_id'],
+                            full_name=op_user_data['full_name'],
+                            email=op_user_data['email'],
+                            conn=conn,
+                            logger_passed=logger
+                        )
+                        if op_user_id:
+                            logger.info(f"Created default operational user ID: {op_user_id}.")
+                        else:
+                            logger.error(f"Failed to create default operational user: {DEFAULT_OPERATIONAL_USERNAME}")
+                    else:
+                        logger.error(f"Could not find role_id for '{OPERATOR}'. Cannot create default operational user.")
+                else:
+                    logger.info(f"Default operational user '{DEFAULT_OPERATIONAL_USERNAME}' already exists.")
+                # print("DEBUG_DB_SEED: CHECKPOINT 6 - After Default Operational User seeding", flush=True) # Removed
+
+                # 5. Countries & 6. Cities
+                # print("DEBUG_DB_SEED: Just before countries_cities loop in _original_seed_initial_data_func_placeholder", flush=True) # Removed
+                logger.info("Seeding default countries and cities...")
+                countries_cities = {'France': 'Paris', 'USA': 'New York', 'Algeria': 'Algiers'}
+                for country_name, city_name in countries_cities.items():
+                    logger.info(f"Attempting to seed country: {country_name} and city: {city_name}")
+                    country_dict = get_or_add_country(country_name, conn=conn) # This function now has logging
+                    if country_dict and 'country_id' in country_dict:
+                        logger.info(f"Country '{country_name}' (ID: {country_dict['country_id']}) successfully processed by get_or_add_country. Proceeding to add city '{city_name}'.")
+                        city_dict = get_or_add_city(city_name, country_dict['country_id'], conn=conn)
+                        if city_dict and 'city_id' in city_dict:
+                            logger.info(f"City '{city_name}' (ID: {city_dict['city_id']}) for country '{country_name}' successfully processed.")
+                        else:
+                            logger.error(f"Failed to process city '{city_name}' for country '{country_name}'. City dict: {city_dict}")
+                    elif country_dict: # country_dict exists but 'country_id' is missing (should not happen with current get_or_add_country)
+                        logger.error(f"Country '{country_name}' processed by get_or_add_country, but 'country_id' is missing. Country dict: {country_dict}")
+                    else: # get_or_add_country returned None
+                        logger.error(f"Failed to get or add country '{country_name}'. Cannot add city '{city_name}'.")
+                logger.info(f"Finished attempt to seed {len(countries_cities)} countries/cities.")
+
+
+                # 7. Clients & 8. Projects (Simplified)
+                logger.info("Seeding sample client and project...")
+                cursor.execute("SELECT COUNT(*) FROM Clients")
+                if cursor.fetchone()[0] == 0:
+                    # Fetch IDs specifically for client seeding
+                    france_country_dict = get_country_by_name("France", conn=conn)
+                    actual_france_country_id = france_country_dict['country_id'] if france_country_dict else None
+
+                    paris_city_dict = None
+                    if actual_france_country_id:
+                        paris_city_dict = get_city_by_name_and_country_id("Paris", actual_france_country_id, conn=conn)
+                    actual_paris_city_id = paris_city_dict['city_id'] if paris_city_dict else None
+
+                    actif_status_dict = get_status_setting_by_name("Client Actif", "Client", conn=conn) # Corrected status name
+                    actual_actif_status_id = actif_status_dict['status_id'] if actif_status_dict else None
+
+                    if admin_user_id and actual_france_country_id and actual_paris_city_id and actual_actif_status_id:
+                        client_data = {
+                            'client_name': "Sample Client SARL",
+                            'country_id': actual_france_country_id,
+                            'city_id': actual_paris_city_id,
+                            'status_id': actual_actif_status_id,
+                            'created_by_user_id': admin_user_id,
+                            'default_base_folder_path': f"clients/{uuid.uuid4()}",
+                            'project_identifier': "SC-PROJ-001"
+                        }
+                        add_client_res = clients_crud_instance.add_client(client_data, conn=conn)
+                        if add_client_res['success']:
+                            logger.info(f"Seeded sample client ID: {add_client_res['client_id']}")
+                            planning_status_dict = get_status_setting_by_name("Planning", "Project", conn=conn)
+                            planning_status_id = planning_status_dict['status_id'] if planning_status_dict else None
+                            if planning_status_id:
+                                project_data = {'project_id': str(uuid.uuid4()), 'client_id': add_client_res['client_id'], 'project_name': "Initial Project", 'status_id': planning_status_id, 'manager_team_member_id': admin_user_id}
+                                cursor.execute("INSERT INTO Projects (project_id, client_id, project_name, status_id, manager_team_member_id) VALUES (?,?,?,?,?)",
+                                            (project_data['project_id'], project_data['client_id'], project_data['project_name'], project_data['status_id'], project_data['manager_team_member_id']))
+                                logger.info("Seeded sample project.")
+                        else:
+                            logger.error(f"Failed to seed sample client. Add client response: {add_client_res}")
+                    else:
+                        logger.warning(f"One or more required IDs for sample client not found or invalid. Admin: {admin_user_id}, France: {actual_france_country_id}, Paris: {actual_paris_city_id}, ActifStatus: {actual_actif_status_id}. Skipping sample client seeding.")
+                else:
+                    logger.info("Clients table not empty, skipping sample client/project seeding.")
+
+                # 9. Contacts
+                logger.info("Seeding generic contact...")
+                cursor.execute("SELECT COUNT(*) FROM Contacts WHERE email = 'contact@example.com'")
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute("INSERT OR IGNORE INTO Contacts (name, email) VALUES (?,?)", ("Placeholder Contact", "contact@example.com"))
+                    logger.info("Seeded generic contact.")
+
+                # 10. Products
+                logger.info("Seeding default and sample products...")
+                sample_prods_data = [
+                    {'product_name': "Default Product", 'language_code': "en", 'base_unit_price': 10.0, 'product_code': "PROD001"},
+                    {'product_name': "Industrial Widget", 'language_code': "en", 'base_unit_price': 100.0, 'product_code': "PROD002"},
+                    {'product_name': "Gadget Standard", 'language_code': "fr", 'base_unit_price': 50.0, 'product_code': "PROD003"},
+                    {'product_name': "Advanced Gizmo", 'language_code': "en", 'base_unit_price': 250.0, 'product_code': "PROD004"}
+                ]
+                for prod_data in sample_prods_data:
+                    cursor.execute("SELECT COUNT(*) FROM Products WHERE product_name = ? AND language_code = ?", (prod_data["product_name"], prod_data["language_code"]))
+                    if cursor.fetchone()[0] == 0:
+                        products_crud_instance.add_product(prod_data, conn=conn)
+                logger.info("Finished seeding products.")
+
+                # Seed default hydraulic presses
+                # _seed_default_hydraulic_presses(cursor, conn, logger_passed=logger) # Function definition not found
+                try:
+                    # Changed to absolute import based on PROJECT_ROOT being in sys.path
+                    from db.hidroguc_product_seeder import seed_hidroguc_products
+                    logger.info("Attempting to seed HİDROGÜÇ PRES products...")
+                    seed_hidroguc_products(conn, cursor, logger_passed=logger)
+                    logger.info("HİDROGÜÇ PRES products seeding attempt finished.")
+                except ImportError as e_import_hp:
+                    logger.error(f"Could not import seed_hidroguc_products. Error: {e_import_hp}. Skipping HİDROGÜÇ PRES products seeding.", exc_info=True)
+                except Exception as e_hp_seed:
+                    logger.error(f"An error occurred during HİDROGÜÇ PRES products seeding: {e_hp_seed}", exc_info=True)
+                    # Ne pas laisser une erreur ici arrêter le reste du seeding, sauf si critique.
+                    # conn.rollback() # Peut-être pas souhaitable de rollback tout le seeding pour ça.
+
+                # 11. SmtpConfigs
+                logger.info("Seeding placeholder SMTP config...")
+                cursor.execute("SELECT COUNT(*) FROM SmtpConfigs")
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute("INSERT OR IGNORE INTO SmtpConfigs (config_name, smtp_server, smtp_port, username, password_encrypted, use_tls, is_default, sender_email_address, sender_display_name) VALUES (?,?,?,?,?,?,?,?,?)",
+                                ("Placeholder - Configure Me", "smtp.example.com", 587, "user", "placeholder_password", True, True, "noreply@example.com", "Placeholder Email"))
+                    logger.info("Seeded placeholder SMTP config.")
+
+                # 12. ApplicationSettings
+                logger.info("Seeding additional application settings...")
+                set_setting('google_maps_review_url', 'https://maps.google.com/?cid=YOUR_CID_HERE', conn=conn)
+                logger.info("Seeded additional application settings.")
+
+                # 13. Email Templates
+                logger.info("Seeding email templates...")
+                email_templates_defs = [
+                    {'template_name': 'SAV Ticket Ouvert (FR)', 'template_type': 'email_sav_ticket_opened', 'language_code': 'fr', 'base_file_name': 'sav_ticket_opened_fr.html', 'category_name': 'Modèles Email SAV', 'category_purpose': 'email', 'email_subject_template': 'Ticket SAV #{{ticket.id}} Ouvert - {{project.name | default: "Référence Client"}}', 'is_default_for_type_lang': True},
+                    {'template_name': 'SAV Ticket Résolu (FR)', 'template_type': 'email_sav_ticket_resolved', 'language_code': 'fr', 'base_file_name': 'sav_ticket_resolved_fr.html', 'category_name': 'Modèles Email SAV', 'category_purpose': 'email', 'email_subject_template': 'Ticket SAV #{{ticket.id}} Résolu - {{project.name | default: "Référence Client"}}', 'is_default_for_type_lang': True},
+                    {'template_name': 'Suivi Prospect Proforma (FR)', 'template_type': 'email_follow_up_prospect', 'language_code': 'fr', 'base_file_name': 'follow_up_prospect_fr.html', 'category_name': 'Modèles Email Marketing/Suivi', 'category_purpose': 'email', 'email_subject_template': 'Suite à votre demande de proforma : {{project.name | default: client.primary_need}}', 'is_default_for_type_lang': True},
+                    {'template_name': 'Vœux Noël (FR)', 'template_type': 'email_greeting_christmas', 'language_code': 'fr', 'base_file_name': 'greeting_holiday_christmas_fr.html', 'category_name': 'Modèles Email Vœux', 'category_purpose': 'email', 'email_subject_template': 'Joyeux Noël de la part de {{seller.company_name}}!', 'is_default_for_type_lang': True},
+                    {'template_name': 'Vœux Nouvelle Année (FR)', 'template_type': 'email_greeting_newyear', 'language_code': 'fr', 'base_file_name': 'greeting_holiday_newyear_fr.html', 'category_name': 'Modèles Email Vœux', 'category_purpose': 'email', 'email_subject_template': 'Bonne Année {{doc.current_year}} ! - {{seller.company_name}}', 'is_default_for_type_lang': True},
+                    {'template_name': 'Message Générique (FR)', 'template_type': 'email_generic_message', 'language_code': 'fr', 'base_file_name': 'generic_message_fr.html', 'category_name': 'Modèles Email Généraux', 'category_purpose': 'email', 'email_subject_template': 'Un message de {{seller.company_name}}', 'is_default_for_type_lang': True},
+                ]
+                for et_data in email_templates_defs:
+                    add_default_template_if_not_exists(et_data, conn=conn)
+                logger.info("Seeded email templates.")
+
+                # 14. CoverPageTemplates (handled by init_schema.py)
+                logger.info("Cover page templates are expected to be populated by initialize_database from init_schema.py.")
+
+                # 15. Partner Categories
+                _seed_default_partner_categories(cursor, conn, logger_passed=logger)
+                logger.info("Data seeding operations completed within _original_seed_initial_data_func_placeholder.")
 
     except sqlite3.Error as e:
         logger.error(f"An SQLite error occurred during data seeding (original part): {e}", exc_info=True)
         raise 
-    except Exception as e_gen:
-        logger.error(f"A general error occurred during data seeding (original part): {e_gen}", exc_info=True)
-        raise
+    # except Exception as e_gen:
+    #     logger.error(f"A general error occurred during data seeding (original part): {e_gen}", exc_info=True)
+    #     raise
 
 DEFAULT_UTILITY_TEMPLATES_CATEGORY_NAME = "Document Utilitaires"
 DEFAULT_UTILITY_TEMPLATES_CATEGORY_DESC = "Modèles de documents utilitaires généraux"
