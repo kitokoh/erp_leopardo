@@ -86,6 +86,98 @@ def _seed_default_partner_categories(cursor: sqlite3.Cursor, conn: sqlite3.Conne
                 logger.warning(f"Could not add partner category '{category_def['category_name']}'. Check logs from partners_crud.")
     logger.info("Default partner categories seeding attempt finished.")
 
+def _seed_permissions_and_role_permissions_logic(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger, current_role_ids: dict):
+    logger = logger_passed
+    logger.info("Seeding Permissions and RolePermissions (from db_seed.py)...")
+
+    # Dynamically get all permission constants from auth.permissions
+    from auth import permissions as auth_perms_module # Ensure this import is valid in this context
+
+    all_permission_keys = []
+    for attr_name in dir(auth_perms_module):
+        if attr_name.startswith("P_"):
+            permission_key = getattr(auth_perms_module, attr_name)
+            if isinstance(permission_key, str):
+                all_permission_keys.append(permission_key)
+
+    for p_key in all_permission_keys:
+        # Generate a simple description based on the key
+        desc = p_key.replace("P_", "").replace("_", " ").capitalize()
+        cursor.execute("INSERT OR IGNORE INTO Permissions (permission_key, description) VALUES (?, ?)",
+                       (p_key, f"Permission to {desc}"))
+    logger.info(f"{len(all_permission_keys)} permissions seeded into Permissions table.")
+
+    # Seed RolePermissions
+    # current_role_ids is passed in (was role_id_map in init_schema.py)
+
+    # 1. Seed Administrator with ALL permissions
+    admin_role_name_from_const = auth_perms_module.ADMINISTRATOR
+    admin_role_id = current_role_ids.get(admin_role_name_from_const)
+
+    if admin_role_id:
+        logger.info(f"Seeding ALL {len(all_permission_keys)} permissions for role '{admin_role_name_from_const}' (ID: {admin_role_id}).")
+        admin_perms_added_count = 0
+        for p_key in all_permission_keys:
+            try:
+                cursor.execute("INSERT OR IGNORE INTO RolePermissions (role_id, permission_key) VALUES (?, ?)",
+                               (admin_role_id, p_key))
+                if cursor.rowcount > 0:
+                    admin_perms_added_count += 1
+            except sqlite3.IntegrityError:
+                logger.warning(f"IntegrityError (or permission not found in Permissions table) while adding {p_key} for Admin ID {admin_role_id}. Skipping.")
+        logger.info(f"{admin_perms_added_count} permissions potentially newly added for role '{admin_role_name_from_const}'. Total defined: {len(all_permission_keys)}.")
+    else:
+        logger.error(f"CRITICAL - Role '{admin_role_name_from_const}' not found in current_role_ids. Cannot seed its permissions.")
+
+    # 1b. Seed SUPER_ADMIN with ALL permissions
+    # SUPER_ADMIN_ROLE_NAME is already imported at the top of db_seed.py as SUPER_ADMIN_ROLE_NAME
+    super_admin_role_id_check = current_role_ids.get(SUPER_ADMIN_ROLE_NAME)
+
+    if super_admin_role_id_check:
+        logger.info(f"Seeding ALL {len(all_permission_keys)} permissions for role '{SUPER_ADMIN_ROLE_NAME}' (ID: {super_admin_role_id_check}).")
+        super_admin_perms_added_count = 0
+        for p_key in all_permission_keys:
+            try:
+                cursor.execute("INSERT OR IGNORE INTO RolePermissions (role_id, permission_key) VALUES (?, ?)",
+                               (super_admin_role_id_check, p_key))
+                if cursor.rowcount > 0:
+                    super_admin_perms_added_count += 1
+            except sqlite3.IntegrityError:
+                 logger.warning(f"IntegrityError for {p_key} for SuperAdmin ID {super_admin_role_id_check}. Skipping.")
+        logger.info(f"{super_admin_perms_added_count} permissions potentially newly added for '{SUPER_ADMIN_ROLE_NAME}'.")
+    else:
+        logger.error(f"Role '{SUPER_ADMIN_ROLE_NAME}' not found in current_role_ids. Cannot seed its permissions in RolePermissions.")
+
+    # 2. Seed other roles based on PERMISSION_MAP
+    seeded_other_role_permissions_count = 0
+    for role_name_constant, perm_keys_list_for_role in auth_perms_module.PERMISSION_MAP.items():
+        actual_role_name_str = role_name_constant
+
+        if actual_role_name_str == admin_role_name_from_const or actual_role_name_str == SUPER_ADMIN_ROLE_NAME:
+            continue
+
+        role_id = current_role_ids.get(actual_role_name_str)
+        if role_id:
+            current_role_perms_added_count = 0
+            for perm_key in perm_keys_list_for_role:
+                if perm_key in all_permission_keys:
+                    try:
+                        cursor.execute("INSERT OR IGNORE INTO RolePermissions (role_id, permission_key) VALUES (?, ?)",
+                                       (role_id, perm_key))
+                        if cursor.rowcount > 0:
+                            seeded_other_role_permissions_count += 1
+                            current_role_perms_added_count +=1
+                    except sqlite3.IntegrityError:
+                         logger.warning(f"IntegrityError while seeding permission '{perm_key}' for role '{actual_role_name_str}'. Skipping.")
+                else:
+                    logger.warning(f"Permission key '{perm_key}' for role '{actual_role_name_str}' in PERMISSION_MAP not found in defined P_ constants. Skipping.")
+            logger.info(f"Added {current_role_perms_added_count} permissions for '{actual_role_name_str}'.")
+        else:
+            logger.warning(f"Role name '{actual_role_name_str}' from PERMISSION_MAP not found in Roles table (IDs: {current_role_ids}). Skipping its permissions.")
+    logger.info(f"Total of {seeded_other_role_permissions_count} role-permission links added/verified for non-Admin/SuperAdmin roles from PERMISSION_MAP.")
+    logger.info("Permissions and RolePermissions seeding (from db_seed.py) finished.")
+
+
 def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
     logger = logger_passed
     # print("DEBUG_DB_SEED: TOP OF _original_seed_initial_data_func_placeholder try block", flush=True) # Removed
@@ -133,10 +225,10 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
     # --- Seed Admin User ---
     # This must happen after roles (especially SUPER_ADMIN_ROLE_NAME) are available in current_role_ids
     super_admin_user_id = None
+    target_admin_username = "admin" # Define earlier to avoid UnboundLocalError in logging
     super_admin_role_id = current_role_ids.get(SUPER_ADMIN_ROLE_NAME)
 
     if super_admin_role_id:
-        target_admin_username = "admin"
         temp_admin_password = "admin" # Ensure this is the desired default password
         logger.info(f"Ensuring super admin user '{target_admin_username}' exists with password (hidden) and role '{SUPER_ADMIN_ROLE_NAME}' (Role ID: {super_admin_role_id})...")
 
@@ -161,13 +253,33 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
             )
             if new_admin_id:
                 super_admin_user_id = new_admin_id
-                logger.info(f"User '{target_admin_username}' created with ID {super_admin_user_id}.")
-
-            else:
-                logger.error(f"Failed to create user '{target_admin_username}'.")
-                super_admin_user_id = None
+                logger.info(f"User '{target_admin_username}' created successfully with ID {super_admin_user_id}.")
+            else: # add_user returned None, possibly due to IntegrityError
+                logger.warning(f"Initial attempt to add user '{target_admin_username}' failed. Checking if an inactive user exists.")
+                # Try to get any user (active, inactive, or deleted) by that username
+                any_admin_user_dict = users_crud.get_any_user_by_username(target_admin_username, conn=conn, logger_passed=logger)
+                if any_admin_user_dict:
+                    logger.info(f"Found existing user '{target_admin_username}' (ID: {any_admin_user_dict['user_id']}) with potentially non-active status. Attempting to activate and update.")
+                    update_success = users_crud.activate_and_update_user_details(
+                        user_id=any_admin_user_dict['user_id'],
+                        role_id=super_admin_role_id,
+                        password=temp_admin_password,
+                        full_name="Super Administrator (Activated)", # Indicate it was updated
+                        email="superadmin@example.local", # Ensure email is consistent
+                        conn=conn,
+                        logger_passed=logger
+                    )
+                    if update_success:
+                        super_admin_user_id = any_admin_user_dict['user_id']
+                        logger.info(f"Successfully activated and updated existing user '{target_admin_username}' to be super admin (ID: {super_admin_user_id}).")
+                    else:
+                        logger.error(f"Failed to activate and update existing user '{target_admin_username}' (ID: {any_admin_user_dict['user_id']}).")
+                        super_admin_user_id = None
+                else:
+                    logger.error(f"Failed to create user '{target_admin_username}' and no existing user (active or inactive) found by that username.")
+                    super_admin_user_id = None
     else:
-        logger.critical(f"Role '{SUPER_ADMIN_ROLE_NAME}' ID not found in role_id_map_for_permissions. Cannot ensure super admin user '{target_admin_username}'.")
+        logger.critical(f"Role '{SUPER_ADMIN_ROLE_NAME}' ID not found in current_role_ids. Cannot ensure super admin user '{target_admin_username}'.")
         super_admin_user_id = None
     # --- End Seed Admin User ---
 
@@ -210,7 +322,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
     # and `current_role_ids` map populated above. This needs to run *after* roles are created
     # and *after* the admin user (who might be associated with a role) is processed.
     # More accurately, it needs role_ids from current_role_ids.
-    _seed_permissions_and_role_permissions(cursor, conn, logger, current_role_ids)
+    _seed_permissions_and_role_permissions_logic(cursor, conn, logger, current_role_ids)
     # --- End Seed Permissions and RolePermissions ---
 
     # Ensure the rest of the function uses the 'conn' passed in, not 'cursor' directly for write ops unless it's a read.
@@ -285,6 +397,68 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
 
         # Preserve admin_user_id for compatibility with other seeding parts if they expect it.
         admin_user_id = super_admin_user_id # This is the ID of the "admin" user with "super_admin" role
+
+    # --- Seed License for Admin User ---
+    if super_admin_user_id:
+        try:
+            from license_management import cruds as license_cruds
+            from datetime import timedelta # datetime is already imported
+
+            logger.info(f"Checking/Seeding license for admin user ID: {super_admin_user_id}")
+            # Check for existing active 'complet' license
+            existing_licenses = license_cruds.get_licenses_for_user(conn, super_admin_user_id)
+            active_complet_license_exists = False
+            if existing_licenses:
+                for lic in existing_licenses:
+                    if lic['license_type'] == 'complet' and lic['is_active']:
+                        # Check if expiration_date is a string and needs parsing, or already a datetime object
+                        exp_date_str = lic.get('expiration_date')
+                        if exp_date_str:
+                            try:
+                                # Assuming ISO format with 'Z' or timezone offset
+                                if isinstance(exp_date_str, str):
+                                    exp_date = datetime.fromisoformat(exp_date_str.replace('Z', '+00:00'))
+                                elif isinstance(exp_date_str, datetime):
+                                     exp_date = exp_date_str # Already a datetime object
+
+                                if exp_date > datetime.now(exp_date.tzinfo) + timedelta(days=30): # Still valid for at least 30 days
+                                    active_complet_license_exists = True
+                                    logger.info(f"Admin user already has an active 'complet' license expiring on {exp_date_str}.")
+                                    break
+                            except ValueError as e_date:
+                                logger.warning(f"Could not parse expiration date '{exp_date_str}' for existing license {lic.get('license_id')}: {e_date}")
+                        else: # No expiration date, assume it's not what we want or it's a permanent 'complet' type
+                            logger.info(f"Admin user has an active 'complet' license {lic.get('license_id')} with no expiration date or unparseable.")
+                            # active_complet_license_exists = True # Or decide if this is acceptable
+                            # break
+
+            if not active_complet_license_exists:
+                logger.info(f"No suitable active 'complet' license found for admin. Creating a new 6-month 'complet' license.")
+                activation_date = datetime.utcnow()
+                expiration_date = activation_date + timedelta(days=180)
+                license_data = {
+                    "user_id": super_admin_user_id,
+                    "license_type": "complet", # Assuming 'complet' grants full access
+                    "license_key": str(uuid.uuid4()), # Generate a new unique license key
+                    "activation_date": activation_date.isoformat() + "Z",
+                    "expiration_date": expiration_date.isoformat() + "Z",
+                    "is_active": True
+                }
+                new_license_id = license_cruds.add_license(conn, license_data)
+                if new_license_id:
+                    logger.info(f"Successfully added 'complet' license (ID: {new_license_id}) for admin user {super_admin_user_id}, valid for 6 months.")
+                else:
+                    logger.error(f"Failed to add 'complet' license for admin user {super_admin_user_id}.")
+            else:
+                logger.info(f"Admin user {super_admin_user_id} already has a suitable active 'complet' license. Skipping new license creation.")
+
+        except ImportError:
+            logger.error("Failed to import license_management.cruds. Cannot seed admin license.")
+        except Exception as e_lic:
+            logger.error(f"An error occurred during admin license seeding: {e_lic}", exc_info=True)
+    else:
+        logger.warning("super_admin_user_id is not set. Skipping license seeding for admin.")
+    # --- End Seed License for Admin User ---
 
         # Fallback for original DEFAULT_ADMIN_USERNAME if that's different and was used elsewhere
         if DEFAULT_ADMIN_USERNAME != "admin":
