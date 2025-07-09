@@ -482,7 +482,7 @@ __all__ = [
     "get_all_smtp_configs",
     "set_default_smtp_config",
     "get_default_smtp_config",
-    "get_smtp_config_by_name",
+    # "get_smtp_config_by_name", # Removed as it's not defined in the crud file
     # User SMTP Assignments CRUD
     "assign_smtp_to_user",
     "unassign_smtp_from_user",
@@ -520,7 +520,7 @@ from .cruds.smtp_configs_crud import (
     get_all_smtp_configs,
     set_default_smtp_config,
     get_default_smtp_config,
-    get_smtp_config_by_name,
+    # get_smtp_config_by_name, # Removed as it's not defined in the crud file
 )
 
 # User SMTP Assignments CRUD functions
