@@ -37,4 +37,5 @@ __all__ = [
     "update_smtp_config",
     "delete_smtp_config",
     "set_default_smtp_config",
+    # "get_smtp_config_by_name", # Removed as it's not defined
 ]
