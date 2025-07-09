@@ -148,12 +148,12 @@
 <body>
     <div class="container">
         <div class="header">
-            {% if seller.logo_path %}
-            <img src="{{ seller.logo_path }}" alt="Company Logo" class="logo" />
-            {% else %}
+            {{#if seller.logo_url}}
+            <img src="{{ seller.logo_url }}" alt="Company Logo" class="logo" />
+            {{else}}
             <!-- Optionally, display company name if no logo -->
             <!-- <p class="no-logo-placeholder">{{ seller.name }}</p> -->
-            {% endif %}
+            {{/if}}
             <h1>{{ labels.proforma_invoice_title | default('FACTURE PROFORMA') }}</h1>
         </div>
 
@@ -161,7 +161,7 @@
             <div class="company-details">
                 <h3>{{ labels.from_seller | default('De :') }}</h3>
                 <p><strong>{{ seller.name | default('N/A') }}</strong></p>
-                <p>{{ seller.address | default('N/A') }}</p>
+                <p>{{ seller.address_full | default('N/A') }}</p>
                 <p>{{ labels.phone | default('Téléphone:') }} {{ seller.phone | default('N/A') }}</p>
                 <p>{{ labels.email | default('Email:') }} {{ seller.email | default('N/A') }}</p>
                 <p>{{ labels.vat_id | default('N° TVA:') }} {{ seller.vat_id | default('N/A') }}</p>
@@ -171,7 +171,7 @@
             <div class="client-details">
                 <h3>{{ labels.to_client | default('À :') }}</h3>
                 <p><strong>{{ client.company_name | default(client.representative_name) | default('N/A') }}</strong></p>
-                <p>{{ client.address | default('N/A') }}</p>
+                <p>{{ client.address_full | default('N/A') }}</p>
                 <p>{{ labels.contact | default('Contact:') }} {{ client.representative_name | default('N/A') }}</p>
                 <p>{{ labels.email | default('Email:') }} {{ client.email | default('N/A') }}</p>
                 <p>{{ labels.vat_id | default('N° TVA:') }} {{ client.vat_id | default('N/A') }}</p>

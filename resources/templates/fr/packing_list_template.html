@@ -173,42 +173,44 @@
                 </tr>
             </thead>
             <tbody>
-                {% for item in items %}
+                {{#each items}}
                 <tr>
-                    <td>{{ item.marks_and_numbers | default('N/A') }}</td>
+                    <td>{{ this.marks_and_numbers | default('N/A') }}</td>
                     <td>
-                        <strong>{{ item.product_name | default('N/A') }}</strong>
-                        {% if item.description and item.description != item.product_name %}
-                        <br><small>{{ item.description }}</small>
-                        {% endif %}
+                        <strong>{{ this.product_name | default('N/A') }}</strong>
+                        {{#if this.description}}
+                        <!-- Assuming description is different from product_name already handled in context if needed -->
+                        <br><small>{{ this.description }}</small>
+                        {{/if}}
                     </td>
-                    <td class="number">{{ item.package_count | default(0) }}</td>
-                    <td class="text-center">{{ item.package_type | default('N/A') }}</td>
-                    <td class="number">{{ "%.2f"|format(item.net_weight_kg | default(0.0)) }}</td>
-                    <td class="number">{{ "%.2f"|format(item.gross_weight_kg | default(0.0)) }}</td>
-                    <td>{{ item.dimensions_text | default('N/A') }}</td>
+                    <td class="number">{{ this.package_count | default(0) }}</td>
+                    <td class="text-center">{{ this.package_type | default('N/A') }}</td>
+                    <td class="number">{{ this.net_weight_kg_formatted | default('0.00') }}</td>
+                    <td class="number">{{ this.gross_weight_kg_formatted | default('0.00') }}</td>
+                    <td>{{ this.dimensions_text | default('N/A') }}</td>
                 </tr>
-                {% else %}
-                <tr>
-                    <td colspan="7" class="text-center">{{ labels.no_items_listed | default('Aucun article listé.') }}</td>
-                </tr>
-                {% endfor %}
+                {{/each}}
+                <!-- Note: The simple templating engine does not have an equivalent for 'else' in a loop. -->
+                <!-- This has to be handled by checking if 'items' is empty using an '#if items.length' (or similar) -->
+                <!-- outside the loop, or by ensuring 'items' is never null (empty list is fine). -->
+                <!-- For now, if items is empty, the table body will be empty. -->
             </tbody>
         </table>
 
         <div class="totals-summary">
             <p>{{ labels.total_packages | default('Nombre Total de Colis:') }} <span>{{ totals.package_count | default(0) }}</span></p>
-            <p>{{ labels.total_net_weight | default('Poids Net Total:') }} <span>{{ "%.2f"|format(totals.net_weight_kg | default(0.0)) }} kg</span></p>
-            <p>{{ labels.total_gross_weight | default('Poids Brut Total:') }} <span>{{ "%.2f"|format(totals.gross_weight_kg | default(0.0)) }} kg</span></p>
-            <p>{{ labels.total_volume | default('Volume Total:') }} <span>{{ "%.3f"|format(totals.volume_cbm | default(0.000)) }} CBM</span></p>
+            <p>{{ labels.total_net_weight | default('Poids Net Total:') }} <span>{{ totals.net_weight_kg_formatted | default('0.00') }} kg</span></p>
+            <p>{{ labels.total_gross_weight | default('Poids Brut Total:') }} <span>{{ totals.gross_weight_kg_formatted | default('0.00') }} kg</span></p>
+            <p>{{ labels.total_volume | default('Volume Total:') }} <span>{{ totals.volume_cbm_formatted | default('0.000') }} CBM</span></p>
         </div>
 
-        {% if doc.packing_notes and doc.packing_notes != 'N/A' %}
+        {{#if doc.packing_notes}}
         <div class="notes-section" style="margin-top:20px; margin-bottom:20px; padding:10px; background-color:#f9f9f9; border-radius:5px;">
             <h4>{{ labels.notes | default('Notes:') }}</h4>
-            <p>{{ doc.packing_notes | replace('\n', '<br>') | safe }}</p>
+            <!-- Assuming doc.packing_notes is already formatted with <br> if needed, or simple text -->
+            <p>{{ doc.packing_notes }}</p>
         </div>
-        {% endif %}
+        {{/if}}
 
         <div class="footer">
             <p>{{ labels.exporter_signature | default("Signature de l'Exportateur:") }} _________________________</p>
