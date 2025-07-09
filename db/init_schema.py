@@ -2655,6 +2655,26 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     print("DEBUG_INIT_DB: Indexes for PasswordResetTokens table created or exists.")
     # --- End Password Reset Tokens Table ---
 
+    # --- UserSmtpAssignments Table ---
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS UserSmtpAssignments (
+        assignment_id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        smtp_config_id INTEGER NOT NULL,
+        is_default_for_user BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE CASCADE,
+        FOREIGN KEY (smtp_config_id) REFERENCES SmtpConfigs (smtp_config_id) ON DELETE CASCADE,
+        UNIQUE (user_id, smtp_config_id)
+    )
+    """)
+    print("DEBUG_INIT_DB: Table UserSmtpAssignments created or exists.")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usersmtpassignments_user_id ON UserSmtpAssignments(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usersmtpassignments_smtp_config_id ON UserSmtpAssignments(smtp_config_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usersmtpassignments_user_default ON UserSmtpAssignments(user_id, is_default_for_user)")
+    print("DEBUG_INIT_DB: Indexes for UserSmtpAssignments table created or exists.")
+    # --- End UserSmtpAssignments Table ---
+
     # --- UseCases Table (for MyBusinessWidget) ---
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS UseCases (
