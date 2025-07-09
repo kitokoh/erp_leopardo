@@ -218,6 +218,14 @@ from .cruds.client_freight_forwarders_crud import (
 from .cruds.application_settings_crud import get_setting, set_setting
 # from .init_schema import initialize_database # initialize_database will be called differently
 
+# SAV CRUD functions
+from .cruds.sav_crud import (
+    add_sav_ticket,
+    get_sav_ticket_by_id,
+    get_sav_tickets_for_client,
+    update_sav_ticket
+)
+
 # Wrapper for initialize_database to accept config
 _init_schema_initialize_database = None
 
@@ -465,7 +473,7 @@ __all__ = [
     "add_sav_ticket",
     "get_sav_ticket_by_id",
     "get_sav_tickets_for_client",
-    update_sav_ticket,
+    "update_sav_ticket", # Changed from bare name
     # SMTP Configs CRUD
     "add_smtp_config",
     "update_smtp_config",
@@ -501,14 +509,6 @@ from .cruds.notes_crud import (
     delete_commande_document_note,
     list_commande_document_notes_for_commande,
     get_effective_document_note,
-)
-
-# SAV CRUD functions
-from .cruds.sav_crud import (
-    add_sav_ticket,
-    get_sav_ticket_by_id,
-    get_sav_tickets_for_client,
-    update_sav_ticket
 )
 
 # SMTP Configs CRUD functions
