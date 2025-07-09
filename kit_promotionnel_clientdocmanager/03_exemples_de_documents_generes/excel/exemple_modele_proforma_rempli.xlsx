@@ -1,0 +1,3 @@
+Placeholder: Exemple de modèle Excel Proforma rempli.
+Ce fichier Excel devrait être un exemple d'un modèle de facture proforma (comme `proforma_template.xlsx`) rempli avec des données fictives. Cela est pertinent si l'application permet de travailler avec des modèles Excel ou d'exporter des données dans un format qui peut ensuite être utilisé avec Excel.
+Si l'application génère directement des `.xlsx` remplis, cet exemple devrait en être un. Si elle utilise des `.xlsx` comme modèles à remplir manuellement après export de données, cet exemple pourrait montrer le modèle avec des données types insérées.

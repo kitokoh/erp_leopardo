@@ -1,0 +1,4 @@
+# Ce fichier .gitkeep assure que le dossier `ressources_video` est inclus dans le commit Git,
+# même s'il est initialement vide.
+# Vous pouvez placer ici des éléments graphiques communs à plusieurs vidéos,
+# comme des intros, outros, jingles sonores, ou des éléments de charte graphique vidéo.

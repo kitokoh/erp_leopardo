@@ -23,3 +23,4 @@ from .assign_freight_forwarder_dialog import AssignFreightForwarderDialog
 from .assign_money_transfer_agent_dialog import AssignMoneyTransferAgentDialog
 from .add_edit_milestone_dialog import AddEditMilestoneDialog
 from .statistics_add_client_dialog import StatisticsAddClientDialog
+from .choose_html_template_action_dialog import ChooseHtmlTemplateActionDialog, ACTION_COPY_RAW, ACTION_GENERATE_DIRECT # Ajout
