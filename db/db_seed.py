@@ -367,57 +367,34 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                 logger.info("Seeded default company personnel.")
 
         # 4. TeamMembers
-        if admin_user_id:
-            admin_user_for_tm_dict = users_crud.get_user_by_id(admin_user_id, conn=conn, logger_passed=logger)
+        if admin_user_id: # This 'admin_user_id' is now from super_admin_user_id (raw seeded 'admin')
+            logger.info(f"Attempting to seed TeamMember for admin_user_id: {admin_user_id}")
+            # Fetch the admin user's details using the admin_user_id
+            admin_details_for_tm_seed = users_crud.get_user_by_id(admin_user_id, conn=conn, logger_passed=logger)
 
-            if admin_user_dict:
-                super_admin_user_id = admin_user_dict['user_id']
-                logger.info(f"User '{target_admin_username}' (ID: {super_admin_user_id}) exists. Verifying role and password.")
-
-                # Verify and update role if necessary
-                if admin_user_dict.get('role_id') != super_admin_role_id:
-                    logger.info(f"User '{target_admin_username}' does not have SUPER_ADMIN role. Updating role...")
-                    users_crud.update_user_role(super_admin_user_id, super_admin_role_id, conn=conn, logger_passed=logger)
-
-                # Verify and update password if necessary.
-                # This also handles hash upgrades if your verify_password and update_user_password logic supports it.
-                # We need to check if the current password is "admin".
-                # users_crud.verify_user_password already checks and returns user data if valid.
-                # Forcing update is simpler to ensure it's "admin".
-                logger.info(f"Updating password for '{target_admin_username}' to ensure it is '{temp_admin_password}'.")
-                update_success = users_crud.update_user_password(super_admin_user_id, temp_admin_password, conn=conn, logger_passed=logger)
-                if update_success:
-                    logger.info(f"Password for user '{target_admin_username}' updated successfully.")
+            if admin_details_for_tm_seed:
+                logger.info(f"Details for TeamMember seeding (admin): ID={admin_user_id}, Name='{admin_details_for_tm_seed.get('full_name')}', Email='{admin_details_for_tm_seed.get('email')}', Role='{admin_details_for_tm_seed.get('role_name')}'")
+                cursor.execute("SELECT COUNT(*) FROM TeamMembers WHERE user_id = ?", (admin_user_id,))
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute("INSERT OR IGNORE INTO TeamMembers (user_id, full_name, email, role_or_title) VALUES (?, ?, ?, ?)",
+                                (admin_user_id,
+                                 admin_details_for_tm_seed.get('full_name'),
+                                 admin_details_for_tm_seed.get('email'),
+                                 admin_details_for_tm_seed.get('role_name'))) # role_name from users table join
+                    logger.info(f"Seeded TeamMember for admin user ID: {admin_user_id}.")
                 else:
-                    logger.error(f"Failed to update password for user '{target_admin_username}'. This is critical.")
+                    logger.info(f"TeamMember record already exists for admin user ID: {admin_user_id}.")
             else:
-                logger.info(f"User '{target_admin_username}' not found. Creating with password '{temp_admin_password}' and role '{SUPER_ADMIN_ROLE_NAME}'.")
-                new_admin_id = users_crud.add_user(
-                    username=target_admin_username,
-                    password=temp_admin_password,
-                    role_id=super_admin_role_id,
-                    full_name="Super Administrator",
-                    email="superadmin@example.local",
-                    conn=conn,
-                    logger_passed=logger
-                )
-                if new_admin_id:
-                    super_admin_user_id = new_admin_id
-                    logger.info(f"User '{target_admin_username}' created with ID {super_admin_user_id}.")
-                else:
-                    logger.error(f"Failed to create user '{target_admin_username}'.")
-                    super_admin_user_id = None
+                logger.warning(f"Could not retrieve details for admin user ID '{admin_user_id}' using users_crud.get_user_by_id. Skipping TeamMember seed for admin.")
         else:
-            logger.critical(f"SUPER_ADMIN role ID not available. Cannot ensure super admin user '{target_admin_username}'.")
-            super_admin_user_id = None
-        # print("DEBUG_DB_SEED: CHECKPOINT 2 - After Super Admin user seeding", flush=True) # Removed
-
-        # Preserve admin_user_id for compatibility with other seeding parts if they expect it.
-        admin_user_id = super_admin_user_id # This is the ID of the "admin" user with "super_admin" role
+            logger.warning("Admin user ID (admin_user_id) is None. Cannot seed TeamMember for admin.")
+        # The duplicated operational user seeding block was already removed in a previous step.
 
         # --- Seed License for Admin User ---
-        if super_admin_user_id:
+        # This block should use `admin_user_id` which is an alias for `super_admin_user_id`
+        if admin_user_id: # Changed from super_admin_user_id to admin_user_id for consistency here
             try:
+
 
 
                 from db.cruds import licenses_crud # Corrected import
