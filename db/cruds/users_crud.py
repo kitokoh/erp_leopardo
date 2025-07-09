@@ -138,6 +138,32 @@ def get_user_by_username(username: str, conn=None, logger_passed: logging.Logger
     return user_data
 
 @_manage_conn
+def get_any_user_by_username(username: str, conn=None, logger_passed: logging.Logger | None = None) -> dict | None:
+    """Fetches a user by username, regardless of their is_active or is_deleted status."""
+    current_logger = logger_passed if logger_passed else module_logger
+    # Similar to get_user_by_username but without status checks, and using LEFT JOIN for robustness
+    sql_select_part = "SELECT u.*, r.role_name FROM Users u LEFT JOIN Roles r ON u.role_id = r.role_id"
+
+    sql_sqlite = f"{sql_select_part} WHERE u.username = ?"
+    sql_sa = text(f"{sql_select_part} WHERE u.username = :username")
+
+    params_sa = {"username": username}
+    params_sqlite = (username,)
+
+    db_obj, dialect = _get_cursor_and_dialect(conn)
+    if not db_obj or not dialect:
+        current_logger.error(f"Unsupported connection type: {type(conn)}")
+        return None
+
+    user_data = _fetch_one_as_dict(db_obj, sql_sa, sql_sqlite, params_sa, params_sqlite, dialect, current_logger)
+
+    if user_data:
+        current_logger.debug(f"Any user (active or not) '{username}' found. Hash: {user_data.get('hashed_password')}")
+    else:
+        current_logger.debug(f"Any user (active or not) '{username}' not found.")
+    return user_data
+
+@_manage_conn
 def get_user_by_id(user_id: str, conn=None, logger_passed: logging.Logger | None = None) -> dict | None:
     current_logger = logger_passed if logger_passed else module_logger
     sql_select_part = "SELECT u.*, r.role_name FROM Users u JOIN Roles r ON u.role_id = r.role_id"
@@ -451,6 +477,78 @@ def get_biometric_auth_status(user_id: str, conn=None, logger_passed: logging.Lo
     else:
         current_logger.warning(f"No biometric settings for user ID '{user_id}'.")
         return None
+
+@_manage_conn
+def activate_and_update_user_details(
+    user_id: str,
+    role_id: int,
+    password: str, # Plain text password, will be hashed
+    full_name: str,
+    email: str,
+    conn=None,
+    logger_passed: logging.Logger | None = None
+) -> bool:
+    current_logger = logger_passed if logger_passed else module_logger
+    now_iso = datetime.utcnow().isoformat() + "Z"
+
+    if not password:
+        current_logger.error(f"Password cannot be empty for user update (ID: {user_id}).")
+        return False
+
+    hashed_new_password = util_hash_password(password, logger_passed=current_logger)
+
+    sql_sqlite = """
+        UPDATE Users
+        SET role_id = ?,
+            hashed_password = ?,
+            full_name = ?,
+            email = ?,
+            is_active = 1,
+            is_deleted = 0,
+            deleted_at = NULL,
+            updated_at = ?
+        WHERE user_id = ?
+    """
+    sql_sa = text("""
+        UPDATE Users
+        SET role_id = :role_id,
+            hashed_password = :hashed_password,
+            full_name = :full_name,
+            email = :email,
+            is_active = 1,
+            is_deleted = 0,
+            deleted_at = NULL,
+            updated_at = :updated_at
+        WHERE user_id = :user_id
+    """)
+
+    params_sa = {
+        "role_id": role_id,
+        "hashed_password": hashed_new_password,
+        "full_name": full_name,
+        "email": email,
+        "updated_at": now_iso,
+        "user_id": user_id
+    }
+    params_sqlite = (role_id, hashed_new_password, full_name, email, now_iso, user_id)
+
+    db_obj, dialect = _get_cursor_and_dialect(conn)
+    if not db_obj or not dialect:
+        current_logger.error(f"Unsupported connection type for activate_and_update_user_details: {type(conn)}")
+        return False
+
+    try:
+        result = _execute_query(db_obj, sql_sa if dialect == "sqlalchemy" else sql_sqlite, params_sa if dialect == "sqlalchemy" else params_sqlite, dialect)
+        if result and result.rowcount > 0:
+            current_logger.info(f"User '{user_id}' activated and details updated successfully.")
+            return True
+        else:
+            current_logger.warning(f"Failed to activate/update user '{user_id}' (user not found or no changes made).")
+            return False
+    except (sqlite3.Error, SQLAlchemyError) as e:
+        current_logger.error(f"Database error activating/updating user '{user_id}': {e}", exc_info=True)
+        # Rollback is assumed to be handled by @_manage_conn
+        return False
 
 @_manage_conn
 def get_user_by_email(email: str, conn=None, logger_passed: logging.Logger | None = None) -> dict | None:
