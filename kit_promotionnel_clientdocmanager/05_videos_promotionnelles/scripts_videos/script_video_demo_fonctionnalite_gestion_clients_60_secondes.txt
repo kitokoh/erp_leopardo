@@ -1,67 +1,32 @@
-# Script Vidéo : Démo Gestion Clients avec ClientDocManager (60 secondes)
+# Script Vidéo Détaillé : Démo Gestion Clients avec ClientDocManager (60 secondes)
 
-**Objectif :** Montrer concrètement comment ClientDocManager facilite la gestion des informations clients.
-**Ton :** Informatif, démonstratif, clair.
-**Public Cible :** Utilisateurs potentiels (commerciaux, admin des ventes).
-
----
-
-**(0-5 secondes) Scène 1 : INTRODUCTION ET INTERFACE**
-*   **VISUEL :** Logo ClientDocManager, puis transition rapide vers l'interface principale de ClientDocManager, focus sur la liste des clients.
-*   **AUDIO (Voix Off Engageante) :** "Gérer efficacement vos clients est crucial. Voyons comment ClientDocManager vous simplifie la tâche."
-*   **MUSIQUE :** Musique de fond discrète et professionnelle.
+**Objectif :** Montrer concrètement comment ClientDocManager facilite la gestion des informations clients, de la création à la consultation et au filtrage.
+**Ton :** Informatif, didactique, clair, mettant en avant la simplicité et l'efficacité.
+**Public Cible :** Utilisateurs potentiels (commerciaux, admin des ventes, chargés de clientèle).
+**Musique :** Discrète, professionnelle, légèrement positive, ne devant jamais masquer la voix off.
 
 ---
 
-**(5-20 secondes) Scène 2 : CRÉATION RAPIDE D'UN NOUVEAU CLIENT**
-*   **VISUEL :**
-    *   Curseur clique sur "Ajouter Nouveau Client".
-    *   Le dialogue `AddNewClientDialog` s'ouvre.
-    *   Saisie rapide (accélérée si besoin) de quelques informations clés : Nom du client, Société, Pays, Email, Statut (ex: "Prospect").
-    *   Validation. Le nouveau client apparaît dans la liste.
-*   **AUDIO (Voix Off) :** "Ajouter un nouveau client est un jeu d'enfant. Remplissez les informations essentielles, assignez un statut, et voilà ! Votre nouveau contact est prêt."
-*   **TEXTE À L'ÉCRAN (Incrustations ponctuelles) :** "Création Client Facile", "Infos Clés Centralisées".
-
+**SECONDES | VISUEL (Description détaillée des actions à l'écran) | AUDIO (Voix Off) | TEXTE À L'ÉCRAN (Dynamique, concis)**
+------- | -------- | -------- | --------
+**0-2s** | **Scène 1.1 : Introduction** <br> Logo ClientDocManager animé apparaît et disparaît. | *(Musique d'introduction, claire et engageante)* |
+**2-5s** | **Scène 1.2 : Interface Client** <br> Transition vers une vue claire de l'interface `DocumentManager`, spécifiquement la `documents_page_widget` montrant la liste des clients (`client_list_widget`) à gauche et une zone d'onglets vide ou un onglet d'accueil à droite. La liste contient quelques clients fictifs avec des statuts colorés visibles. | **Voix Off (calme et claire) :** "Gérer efficacement vos clients est la clé du succès. Voyons ensemble comment ClientDocManager vous simplifie cette tâche essentielle." | Titre : "Gestion Clients Simplifiée" (apparaît en fondu)
+**5-10s** | **Scène 2.1 : Initier la Création** <br> Le curseur se déplace de manière visible et clique sur le bouton "**Ajouter Nouveau Client**" (`add_new_client_button`). La fenêtre de dialogue `AddNewClientDialog` s'ouvre. | **Voix Off :** "Pour ajouter un nouveau client, c'est très simple. Un clic suffit pour ouvrir la fiche de création." |
+**10-20s** | **Scène 2.2 : Remplissage des Informations Clés** <br> Dans `AddNewClientDialog` : <br> - Le curseur clique dans le champ "Nom du client". **Saisie (temps réel ou légèrement accéléré) :** "Alpha Entreprise SARL". <br> - Champ "Nom de la société" (si différent) : "Alpha Group". <br> - Sélection du Pays : Clic sur le combobox, sélection de "France". <br> - Champ "Email": Saisie de "contact@alphaentreprise.fr". <br> - Sélection du Statut : Clic sur le combobox, sélection de "Prospect". <br> - Clic sur le bouton "Sauvegarder" (ou "OK"). La fenêtre se ferme. | **Voix Off :** "Remplissez les informations essentielles : nom, société, coordonnées, et attribuez un statut pour un suivi optimal. Chaque champ est pensé pour une saisie rapide." | **Pop-ups textes courts près des champs saisis :** <br> - "Nom Client" <br> - "Pays" <br> - "Statut : Prospect"
+**20-23s** | **Scène 2.3 : Nouveau Client dans la Liste** <br> Retour à la liste des clients. Le nouveau client "Alpha Entreprise SARL" apparaît en haut de la liste (ou est mis en évidence), avec son indicateur de statut "Prospect" (bleu). | **Voix Off :** "Et voilà ! Votre nouveau client est immédiatement ajouté et visible dans votre base de données." | Le nouveau client est brièvement surligné dans la liste.
+**23-28s** | **Scène 3.1 : Ouvrir une Fiche Client** <br> Le curseur se déplace et clique sur un client existant dans la liste (ex: "Beta Innovations"). L'onglet correspondant à "Beta Innovations" s'ouvre dans `client_tabs_widget`, affichant `ClientMainWidget`. | **Voix Off :** "Consultons maintenant une fiche client existante pour voir toutes les informations centralisées." |
+**28-35s** | **Scène 3.2 : Explorer les Détails** <br> Dans la fiche "Beta Innovations" (`ClientMainWidget`) : <br> - Le curseur survole l'onglet "**Détails**" (déjà actif), montrant les champs principaux (adresse, téléphone, etc.). <br> - Clic sur l'onglet "**Documents**". La liste des documents associés à Beta Innovations s'affiche (montrer 2-3 documents fictifs). <br> - Clic sur l'onglet "**Notes**". Une ou deux notes d'exemple sont visibles. | **Voix Off :** "Accédez à une vue complète : coordonnées précises, tous les documents échangés, notes de suivi... Tout est organisé et à portée de main pour une relation client personnalisée." | **Textes superposés lors du survol/clic des onglets :** <br> - "Détails Complets" <br> - "Documents Liés" <br> - "Historique & Notes"
+**35-40s** | **Scène 4.1 : Recherche Rapide** <br> Retour à la vue `documents_page_widget` (liste des clients). Le curseur clique dans le champ de recherche (`search_input_field`). L'utilisateur tape "Alpha". La liste se filtre instantanément pour n'afficher que "Alpha Entreprise SARL". | **Voix Off :** "Besoin de retrouver un client en particulier ? Notre barre de recherche vous donne des résultats instantanés." | **Texte :** "Recherche Instantanée"
+**40-48s** | **Scène 4.2 : Filtrage Avancé** <br> Le champ de recherche est effacé. Le curseur clique sur le bouton de filtre par statut (`status_filter_button`). Le dialogue `MultiSelectStatusDialog` s'ouvre. L'utilisateur coche "Actif" et "Inactif", puis valide. La liste des clients se met à jour pour n'afficher que les clients avec ces statuts. | **Voix Off :** "Affinez votre vue avec des filtres multicritères. Par statut, par pays... Ciblez précisément les informations dont vous avez besoin." | **Texte :** "Filtrage Puissant" <br> (Montrer les statuts sélectionnés : "Actif", "Inactif")
+**48-50s** | **Scène 4.3 : Réinitialisation des Filtres** <br> Le curseur clique sur le bouton "Réinitialiser Tous les Filtres" (`reset_filters_button`). La liste des clients revient à son état initial complet. | **Voix Off :** "Et revenez à une vue d'ensemble en un clic." |
+**50-57s** | **Scène 5 : Bénéfices et Conclusion Partielle** <br> Transition vers un écran graphique sobre et moderne. Des icônes animées apparaissent successivement avec du texte : <br> 1. Icône "Organisation" + Texte "Centralisation Totale" <br> 2. Icône "Interaction" + Texte "Suivi Personnalisé" <br> 3. Icône "Cible" + Texte "Segmentation Facile" <br> L'URL du site web (`www.clientdocmanager.com`) apparaît en bas. | **Voix Off (ton plus affirmé) :** "Avec la gestion clients de ClientDocManager, gagnez en organisation, personnalisez vos interactions et ne perdez plus jamais une information cruciale. C'est la base d'une relation client réussie !" | **Textes animés :** <br> - "Centralisation Totale" <br> - "Suivi Personnalisé" <br> - "Segmentation Facile" <br> `www.clientdocmanager.com`
+**57-60s** | **Scène 6 : Écran Final** <br> Logo ClientDocManager en grand. URL du site web. Slogan : "ClientDocManager : Vos clients, votre priorité." | **Voix Off (incitative) :** "ClientDocManager : la gestion client, enfin simplifiée. Demandez votre démonstration gratuite dès aujourd'hui !" | **Logo + URL + Slogan :** "Vos clients, votre priorité."
 ---
 
-**(20-35 secondes) Scène 3 : CONSULTATION D'UNE FICHE CLIENT DÉTAILLÉE**
-*   **VISUEL :**
-    *   Curseur clique sur un client existant dans la liste.
-    *   La fiche client (`ClientMainWidget`) s'ouvre.
-    *   Navigation rapide entre les onglets : "Détails" (montrant les champs remplis), "Contacts" (si plusieurs contacts), "Notes" (montrant une note d'exemple).
-*   **AUDIO (Voix Off) :** "Accédez à une vue complète de chaque client : coordonnées, historique des échanges, notes importantes, documents liés... tout est organisé et facile à retrouver."
-*   **TEXTE À L'ÉCRAN :** "Vue 360° du Client", "Historique Complet".
-
----
-
-**(35-50 secondes) Scène 4 : FILTRAGE ET RECHERCHE DANS LA LISTE**
-*   **VISUEL :**
-    *   Retour à la liste des clients.
-    *   Démonstration de la barre de recherche : l'utilisateur tape une partie d'un nom, la liste se filtre.
-    *   Démonstration d'un filtre par statut : l'utilisateur sélectionne "Actif", la liste n'affiche que les clients actifs.
-    *   Optionnel : Démonstration d'un filtre par pays.
-*   **AUDIO (Voix Off) :** "Besoin de retrouver un client spécifique ou de segmenter votre base ? Utilisez nos puissants outils de recherche et de filtrage. Obtenez la bonne information, au bon moment."
-*   **TEXTE À L'ÉCRAN :** "Recherche Instantanée", "Filtrage Multicritères".
-
----
-
-**(50-58 secondes) Scène 5 : AVANTAGES ET APPEL À L'ACTION**
-*   **VISUEL :** Transition vers un écran sobre avec les avantages clés listés (icônes + texte court) ou une animation graphique symbolisant l'organisation et l'efficacité. URL du site visible.
-*   **AUDIO (Voix Off) :** "Avec la gestion clients de ClientDocManager, gagnez en organisation, personnalisez vos interactions et ne perdez plus jamais une information cruciale."
-*   **TEXTE À L'ÉCRAN :** "Organisé. Personnalisé. Efficace." puis "VotreSite.com".
-
----
-
-**(58-60 secondes) Scène 6 : ÉCRAN FINAL**
-*   **VISUEL :** Logo ClientDocManager, URL du site web, Slogan.
-*   **AUDIO (Voix Off) :** "ClientDocManager : la gestion client, enfin simplifiée. Demandez votre démo !"
-*   **MUSIQUE :** Outro.
-
----
-
-**Notes de Production :**
-*   Utiliser des enregistrements d'écran réels de l'application.
-*   Les actions doivent être claires et le curseur visible.
-*   Accélérer légèrement les saisies de texte pour ne pas perdre de temps.
-*   Assurer une bonne qualité d'enregistrement (pas de lags, interface propre).
-*   La voix off doit guider l'utilisateur à travers les actions montrées.
+**Notes de Production Spécifiques :**
+*   **Clarté des Clics :** Utiliser des effets visuels pour indiquer clairement où le curseur clique (cercles, changements de couleur temporaires).
+*   **Vitesse de Saisie :** Les saisies de texte doivent être lisibles mais peuvent être légèrement accélérées pour respecter le timing.
+*   **Données de Démo :** Utiliser des noms de sociétés et des informations fictives mais crédibles et professionnelles.
+*   **Transitions :** Des transitions douces (fondus, balayages légers) entre les différentes vues de l'application.
+*   **Interface :** S'assurer que l'interface de l'application est dans la langue cible de la vidéo.
+*   **Focus :** Maintenir le focus visuel sur la partie de l'écran pertinente pour l'action en cours. Éviter de montrer des parties inutiles de l'écran si possible (zooms).
