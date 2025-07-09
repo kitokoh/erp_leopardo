@@ -302,24 +302,30 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
     admin_user_id = super_admin_user_id
 
 
-    # Fallback for original DEFAULT_ADMIN_USERNAME if that's different and was used elsewhere
-    # This part might be less relevant if target_admin_username ("admin") is the one true admin.
-    # if DEFAULT_ADMIN_USERNAME != "admin": # This check itself needs DEFAULT_ADMIN_USERNAME to be defined
-    # Ensure DEFAULT_ADMIN_USERNAME is available, e.g. from config or defined in this file
-    # For now, this block is problematic if DEFAULT_ADMIN_USERNAME is not reliably defined here.
-    # Let's assume target_admin_username ("admin") is the primary concern.
-    # logger.info(f"Checking for original default admin user '{DEFAULT_ADMIN_USERNAME}' for compatibility...")
-    # original_admin_user_dict = users_crud.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn, logger_passed=logger)
-    # if original_admin_user_dict:
-    #     logger.info(f"Found original default admin user '{DEFAULT_ADMIN_USERNAME}' with ID {original_admin_user_dict['user_id']}. Note: 'admin_user_id' in this script now refers to the user 'admin' with role '{SUPER_ADMIN_ROLE_NAME}'.")
+    # Fallback for original DEFAULT_ADMIN_USERNAME (now using admin_user_id for checks)
+    # This block is mostly for informational logging if DEFAULT_ADMIN_USERNAME was different from 'admin'
+    # and was used in older versions of the seeding script.
+    # If DEFAULT_ADMIN_USERNAME is not defined or same as 'admin', this block can be skipped or simplified.
+    try:
+        if DEFAULT_ADMIN_USERNAME and DEFAULT_ADMIN_USERNAME != target_admin_username: # target_admin_username is 'admin'
+            logger.info(f"Checking for original default admin user '{DEFAULT_ADMIN_USERNAME}' for compatibility (current admin_user_id refers to '{target_admin_username}').")
+            # We use get_any_user_by_username here to find it even if inactive, for logging purposes.
+            original_default_admin_details = users_crud.get_any_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn, logger_passed=logger)
+            if original_default_admin_details:
+                logger.info(f"Found user record for '{DEFAULT_ADMIN_USERNAME}' with ID {original_default_admin_details['user_id']}. This is separate from the primary '{target_admin_username}'.")
+            else:
+                logger.info(f"No user record found for a separate '{DEFAULT_ADMIN_USERNAME}'.")
+    except NameError: # DEFAULT_ADMIN_USERNAME might not be defined if it was removed from config
+        logger.info("DEFAULT_ADMIN_USERNAME not defined, skipping check for alternate admin name.")
 
 
-    # Seed Default Operational User (depends on 'Operator' role_id from role_id_map_for_permissions)
+
+    # Seed Default Operational User (depends on 'Operator' role_id from current_role_ids)
     DEFAULT_OPERATIONAL_USERNAME = "default_operational_user"
     logger.info(f"Checking for default operational user '{DEFAULT_OPERATIONAL_USERNAME}'...")
-    existing_operational_user = users_crud.get_user_by_username(DEFAULT_OPERATIONAL_USERNAME, conn=conn, logger_passed=logger)
+    existing_operational_user = users_crud.get_user_by_username(DEFAULT_OPERATIONAL_USERNAME, conn=conn, logger_passed=logger) # Checks for active user
     if not existing_operational_user:
-        operator_role_id_for_op_user = current_role_ids.get(OPERATOR) # Corrected variable name
+        operator_role_id_for_op_user = current_role_ids.get(OPERATOR)
         if operator_role_id_for_op_user:
             logger.info(f"Creating default operational user '{DEFAULT_OPERATIONAL_USERNAME}' with role '{OPERATOR}'.")
             op_user_id = users_crud.add_user(
@@ -332,22 +338,15 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         else:
             logger.error(f"Could not find role_id for '{OPERATOR}'. Cannot create default operational user.")
     else:
-        logger.info(f"Default operational user '{DEFAULT_OPERATIONAL_USERNAME}' already exists.")
+        logger.info(f"Default operational user '{DEFAULT_OPERATIONAL_USERNAME}' already exists (is active).")
 
     # --- Seed Permissions and RolePermissions (Moved from init_schema.py) ---
-    # This uses the 'cursor' and 'conn' from _original_seed_initial_data_func_placeholder
-    # and `current_role_ids` map populated above. This needs to run *after* roles are created
-    # and *after* the admin user (who might be associated with a role) is processed.
-    # More accurately, it needs role_ids from current_role_ids.
     _seed_permissions_and_role_permissions_logic(cursor, conn, logger, current_role_ids)
-
     # --- End Seed Permissions and RolePermissions ---
 
-    # Ensure the rest of the function uses the 'conn' passed in, not 'cursor' directly for write ops unless it's a read.
-    # The cursor object is still valid for SELECTs if needed.
     try:
-        # 2. Companies (uses admin_user_id if available for created_by or similar in future)
-        default_company_id = None # Renamed from default_company_id to avoid conflict
+        # 2. Companies
+        default_company_id = None
         cursor.execute("SELECT COUNT(*) FROM companies")
         if cursor.fetchone()[0] == 0:
             default_company_id = str(uuid.uuid4())
@@ -419,6 +418,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         # --- Seed License for Admin User ---
         if super_admin_user_id:
             try:
+
 
                 from db.cruds import licenses_crud # Corrected import
 
