@@ -10,7 +10,7 @@ if PROJECT_ROOT_FOR_SEED not in sys.path:
 
 import uuid
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import logging
 import importlib
@@ -425,11 +425,11 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                                 elif isinstance(exp_date_str, datetime):
                                     exp_date = exp_date_str
                                     if exp_date.tzinfo is None: # Ensure timezone if already datetime
-                                        exp_date = exp_date.replace(tzinfo=datetime.timezone.utc)
+                                        exp_date = exp_date.replace(tzinfo=timezone.utc)
                                 else:
                                     raise ValueError("expiration_date is not a recognized string or datetime object")
 
-                                if exp_date > datetime.now(datetime.timezone.utc) + timedelta(days=30):
+                                if exp_date > datetime.now(timezone.utc) + timedelta(days=30):
 
                                     suitable_license_exists = True
                                     logger.info(f"Admin user already has a suitable 'complet' license (ID: {existing_active_license.get('license_id')}) expiring on {exp_date_str} (valid for >30 days).")
