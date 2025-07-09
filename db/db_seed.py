@@ -86,6 +86,98 @@ def _seed_default_partner_categories(cursor: sqlite3.Cursor, conn: sqlite3.Conne
                 logger.warning(f"Could not add partner category '{category_def['category_name']}'. Check logs from partners_crud.")
     logger.info("Default partner categories seeding attempt finished.")
 
+def _seed_permissions_and_role_permissions_logic(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger, current_role_ids: dict):
+    logger = logger_passed
+    logger.info("Seeding Permissions and RolePermissions (from db_seed.py)...")
+
+    # Dynamically get all permission constants from auth.permissions
+    from auth import permissions as auth_perms_module # Ensure this import is valid in this context
+
+    all_permission_keys = []
+    for attr_name in dir(auth_perms_module):
+        if attr_name.startswith("P_"):
+            permission_key = getattr(auth_perms_module, attr_name)
+            if isinstance(permission_key, str):
+                all_permission_keys.append(permission_key)
+
+    for p_key in all_permission_keys:
+        # Generate a simple description based on the key
+        desc = p_key.replace("P_", "").replace("_", " ").capitalize()
+        cursor.execute("INSERT OR IGNORE INTO Permissions (permission_key, description) VALUES (?, ?)",
+                       (p_key, f"Permission to {desc}"))
+    logger.info(f"{len(all_permission_keys)} permissions seeded into Permissions table.")
+
+    # Seed RolePermissions
+    # current_role_ids is passed in (was role_id_map in init_schema.py)
+
+    # 1. Seed Administrator with ALL permissions
+    admin_role_name_from_const = auth_perms_module.ADMINISTRATOR
+    admin_role_id = current_role_ids.get(admin_role_name_from_const)
+
+    if admin_role_id:
+        logger.info(f"Seeding ALL {len(all_permission_keys)} permissions for role '{admin_role_name_from_const}' (ID: {admin_role_id}).")
+        admin_perms_added_count = 0
+        for p_key in all_permission_keys:
+            try:
+                cursor.execute("INSERT OR IGNORE INTO RolePermissions (role_id, permission_key) VALUES (?, ?)",
+                               (admin_role_id, p_key))
+                if cursor.rowcount > 0:
+                    admin_perms_added_count += 1
+            except sqlite3.IntegrityError:
+                logger.warning(f"IntegrityError (or permission not found in Permissions table) while adding {p_key} for Admin ID {admin_role_id}. Skipping.")
+        logger.info(f"{admin_perms_added_count} permissions potentially newly added for role '{admin_role_name_from_const}'. Total defined: {len(all_permission_keys)}.")
+    else:
+        logger.error(f"CRITICAL - Role '{admin_role_name_from_const}' not found in current_role_ids. Cannot seed its permissions.")
+
+    # 1b. Seed SUPER_ADMIN with ALL permissions
+    # SUPER_ADMIN_ROLE_NAME is already imported at the top of db_seed.py as SUPER_ADMIN_ROLE_NAME
+    super_admin_role_id_check = current_role_ids.get(SUPER_ADMIN_ROLE_NAME)
+
+    if super_admin_role_id_check:
+        logger.info(f"Seeding ALL {len(all_permission_keys)} permissions for role '{SUPER_ADMIN_ROLE_NAME}' (ID: {super_admin_role_id_check}).")
+        super_admin_perms_added_count = 0
+        for p_key in all_permission_keys:
+            try:
+                cursor.execute("INSERT OR IGNORE INTO RolePermissions (role_id, permission_key) VALUES (?, ?)",
+                               (super_admin_role_id_check, p_key))
+                if cursor.rowcount > 0:
+                    super_admin_perms_added_count += 1
+            except sqlite3.IntegrityError:
+                 logger.warning(f"IntegrityError for {p_key} for SuperAdmin ID {super_admin_role_id_check}. Skipping.")
+        logger.info(f"{super_admin_perms_added_count} permissions potentially newly added for '{SUPER_ADMIN_ROLE_NAME}'.")
+    else:
+        logger.error(f"Role '{SUPER_ADMIN_ROLE_NAME}' not found in current_role_ids. Cannot seed its permissions in RolePermissions.")
+
+    # 2. Seed other roles based on PERMISSION_MAP
+    seeded_other_role_permissions_count = 0
+    for role_name_constant, perm_keys_list_for_role in auth_perms_module.PERMISSION_MAP.items():
+        actual_role_name_str = role_name_constant
+
+        if actual_role_name_str == admin_role_name_from_const or actual_role_name_str == SUPER_ADMIN_ROLE_NAME:
+            continue
+
+        role_id = current_role_ids.get(actual_role_name_str)
+        if role_id:
+            current_role_perms_added_count = 0
+            for perm_key in perm_keys_list_for_role:
+                if perm_key in all_permission_keys:
+                    try:
+                        cursor.execute("INSERT OR IGNORE INTO RolePermissions (role_id, permission_key) VALUES (?, ?)",
+                                       (role_id, perm_key))
+                        if cursor.rowcount > 0:
+                            seeded_other_role_permissions_count += 1
+                            current_role_perms_added_count +=1
+                    except sqlite3.IntegrityError:
+                         logger.warning(f"IntegrityError while seeding permission '{perm_key}' for role '{actual_role_name_str}'. Skipping.")
+                else:
+                    logger.warning(f"Permission key '{perm_key}' for role '{actual_role_name_str}' in PERMISSION_MAP not found in defined P_ constants. Skipping.")
+            logger.info(f"Added {current_role_perms_added_count} permissions for '{actual_role_name_str}'.")
+        else:
+            logger.warning(f"Role name '{actual_role_name_str}' from PERMISSION_MAP not found in Roles table (IDs: {current_role_ids}). Skipping its permissions.")
+    logger.info(f"Total of {seeded_other_role_permissions_count} role-permission links added/verified for non-Admin/SuperAdmin roles from PERMISSION_MAP.")
+    logger.info("Permissions and RolePermissions seeding (from db_seed.py) finished.")
+
+
 def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
     logger = logger_passed
     # print("DEBUG_DB_SEED: TOP OF _original_seed_initial_data_func_placeholder try block", flush=True) # Removed
@@ -161,13 +253,33 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
             )
             if new_admin_id:
                 super_admin_user_id = new_admin_id
-                logger.info(f"User '{target_admin_username}' created with ID {super_admin_user_id}.")
-
-            else:
-                logger.error(f"Failed to create user '{target_admin_username}'.")
-                super_admin_user_id = None
+                logger.info(f"User '{target_admin_username}' created successfully with ID {super_admin_user_id}.")
+            else: # add_user returned None, possibly due to IntegrityError
+                logger.warning(f"Initial attempt to add user '{target_admin_username}' failed. Checking if an inactive user exists.")
+                # Try to get any user (active, inactive, or deleted) by that username
+                any_admin_user_dict = users_crud.get_any_user_by_username(target_admin_username, conn=conn, logger_passed=logger)
+                if any_admin_user_dict:
+                    logger.info(f"Found existing user '{target_admin_username}' (ID: {any_admin_user_dict['user_id']}) with potentially non-active status. Attempting to activate and update.")
+                    update_success = users_crud.activate_and_update_user_details(
+                        user_id=any_admin_user_dict['user_id'],
+                        role_id=super_admin_role_id,
+                        password=temp_admin_password,
+                        full_name="Super Administrator (Activated)", # Indicate it was updated
+                        email="superadmin@example.local", # Ensure email is consistent
+                        conn=conn,
+                        logger_passed=logger
+                    )
+                    if update_success:
+                        super_admin_user_id = any_admin_user_dict['user_id']
+                        logger.info(f"Successfully activated and updated existing user '{target_admin_username}' to be super admin (ID: {super_admin_user_id}).")
+                    else:
+                        logger.error(f"Failed to activate and update existing user '{target_admin_username}' (ID: {any_admin_user_dict['user_id']}).")
+                        super_admin_user_id = None
+                else:
+                    logger.error(f"Failed to create user '{target_admin_username}' and no existing user (active or inactive) found by that username.")
+                    super_admin_user_id = None
     else:
-        logger.critical(f"Role '{SUPER_ADMIN_ROLE_NAME}' ID not found in role_id_map_for_permissions. Cannot ensure super admin user '{target_admin_username}'.")
+        logger.critical(f"Role '{SUPER_ADMIN_ROLE_NAME}' ID not found in current_role_ids. Cannot ensure super admin user '{target_admin_username}'.")
         super_admin_user_id = None
     # --- End Seed Admin User ---
 
@@ -190,7 +302,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
     logger.info(f"Checking for default operational user '{DEFAULT_OPERATIONAL_USERNAME}'...")
     existing_operational_user = users_crud.get_user_by_username(DEFAULT_OPERATIONAL_USERNAME, conn=conn, logger_passed=logger)
     if not existing_operational_user:
-        operator_role_id_for_op_user = role_id_map_for_permissions.get(OPERATOR)
+        operator_role_id_for_op_user = current_role_ids.get(OPERATOR) # Corrected variable name
         if operator_role_id_for_op_user:
             logger.info(f"Creating default operational user '{DEFAULT_OPERATIONAL_USERNAME}' with role '{OPERATOR}'.")
             op_user_id = users_crud.add_user(
@@ -210,7 +322,8 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
     # and `current_role_ids` map populated above. This needs to run *after* roles are created
     # and *after* the admin user (who might be associated with a role) is processed.
     # More accurately, it needs role_ids from current_role_ids.
-    _seed_permissions_and_role_permissions(cursor, conn, logger, current_role_ids)
+    _seed_permissions_and_role_permissions_logic(cursor, conn, logger, current_role_ids)
+
     # --- End Seed Permissions and RolePermissions ---
 
     # Ensure the rest of the function uses the 'conn' passed in, not 'cursor' directly for write ops unless it's a read.
@@ -345,7 +458,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
             if existing_operational_user is None:
                 logger.info(f"Creating default operational user '{DEFAULT_OPERATIONAL_USERNAME}'...")
                 # Fetch OPERATOR role_id
-                operator_role_id = role_ids.get(OPERATOR) # Get OPERATOR role_id from seeded roles
+                operator_role_id = current_role_ids.get(OPERATOR) # Get OPERATOR role_id from seeded roles
                 if operator_role_id:
                     op_user_data = {
                         'username': DEFAULT_OPERATIONAL_USERNAME,
