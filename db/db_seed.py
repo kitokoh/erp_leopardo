@@ -402,7 +402,8 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         # --- Seed License for Admin User ---
         if super_admin_user_id:
             try:
-                from db.cruds import licenses_crud # Corrected import
+            from db.cruds import licenses_crud # Corrected import
+
                 from datetime import timedelta # datetime is already imported
 
                 logger.info(f"Checking/Seeding license for admin user ID: {super_admin_user_id}")
@@ -459,7 +460,27 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                         "activation_date": activation_date.isoformat() + "Z",
                         "expiration_date": expiration_date.isoformat() + "Z",
                         "is_active": True
+                        # 'license_id' and 'machine_info' will be added next
                     }
+
+                    # Ensure license_id is generated and added
+                    license_data["license_id"] = str(uuid.uuid4())
+
+                    # Add machine_info (placeholder or dynamic)
+                    # Attempting to get it dynamically, fallback to placeholder
+                    try:
+                        from license_management import manager as license_manager_instance
+                        license_data["machine_info"] = license_manager_instance.get_machine_identifier()
+                        logger.info(f"Using dynamic machine_info: {license_data['machine_info']}")
+                    except ImportError:
+                        logger.warning("Could not import LicenseManager to get dynamic machine_id for seeding. Using placeholder.")
+                        license_data["machine_info"] = "default_seed_machine_placeholder"
+                    except Exception as e_machine_id:
+                        logger.warning(f"Error getting dynamic machine_id: {e_machine_id}. Using placeholder.")
+                        license_data["machine_info"] = "error_seed_machine_placeholder"
+
+                    logger.info(f"Attempting to add license for admin with data: {license_data}")
+
                     new_license_id = licenses_crud.add_license(conn, license_data)
                     if new_license_id:
                         logger.info(f"Successfully added 'complet' license (ID: {new_license_id}) for admin user {super_admin_user_id}, valid for 6 months.")
@@ -522,7 +543,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                                     (admin_user_id, admin_user_for_tm_dict['full_name'], admin_user_for_tm_dict['email'], admin_user_for_tm_dict.get('role_name')))
                         logger.info("Seeded admin team member.")
                     else:
-                        logger.warning(f"Could not retrieve admin user details for ID {admin_user_id} to seed into TeamMembers.")
+                                                                                                                                                                                                                                                                                         logger.warning(f"Could not retrieve admin user details for ID {admin_user_id} to seed into TeamMembers.")
                 else:
                     logger.warning("Admin user ID not available for TeamMember seeding.")
                 # print("DEBUG_DB_SEED: CHECKPOINT 5 - After TeamMembers seeding", flush=True) # Removed
