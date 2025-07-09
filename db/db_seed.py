@@ -243,6 +243,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         existing_admin_row = check_cursor.fetchone()
         if existing_admin_row:
             logger.info(f"DB_SEED_ADMIN_CHECK: User '{target_admin_username}' ALREADY EXISTS before seeding attempt. Details: {dict(existing_admin_row)}")
+
         else:
             logger.info(f"DB_SEED_ADMIN_CHECK: User '{target_admin_username}' DOES NOT exist before seeding attempt.")
         # We don't close check_cursor here as it's from the same conn which is managed by _original_seed_initial_data_func_placeholder
@@ -316,6 +317,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                 logger.info(f"No user record found for a separate '{DEFAULT_ADMIN_USERNAME}'.")
     except NameError: # DEFAULT_ADMIN_USERNAME might not be defined if it was removed from config
         logger.info("DEFAULT_ADMIN_USERNAME not defined, skipping check for alternate admin name.")
+
 
 
     # Seed Default Operational User (depends on 'Operator' role_id from current_role_ids)
@@ -392,7 +394,11 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         # This block should use `admin_user_id` which is an alias for `super_admin_user_id`
         if admin_user_id: # Changed from super_admin_user_id to admin_user_id for consistency here
             try:
-            from db.cruds import licenses_crud # Corrected import
+
+
+
+                from db.cruds import licenses_crud # Corrected import
+
                 from datetime import timedelta # datetime is already imported
 
                 logger.info(f"Checking/Seeding license for admin user ID: {super_admin_user_id}")
@@ -438,6 +444,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                     logger.info(f"No existing active license found for admin user {super_admin_user_id}.")
 
                 if not suitable_license_exists:
+
                     logger.info(f"No suitable active 'complet' license found for admin. Creating a new 6-month 'complet' license.")
                     activation_date = datetime.utcnow()
                     expiration_date = activation_date + timedelta(days=180)
@@ -468,6 +475,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                         license_data["machine_info"] = "error_seed_machine_placeholder"
 
                     logger.info(f"Attempting to add license for admin with data: {license_data}")
+
                     new_license_id = licenses_crud.add_license(conn, license_data)
                     if new_license_id:
                         logger.info(f"Successfully added 'complet' license (ID: {new_license_id}) for admin user {super_admin_user_id}, valid for 6 months.")
@@ -530,7 +538,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                                     (admin_user_id, admin_user_for_tm_dict['full_name'], admin_user_for_tm_dict['email'], admin_user_for_tm_dict.get('role_name')))
                         logger.info("Seeded admin team member.")
                     else:
-                        logger.warning(f"Could not retrieve admin user details for ID {admin_user_id} to seed into TeamMembers.")
+                                                                                                                                                                                                                                                                                         logger.warning(f"Could not retrieve admin user details for ID {admin_user_id} to seed into TeamMembers.")
                 else:
                     logger.warning("Admin user ID not available for TeamMember seeding.")
                 # print("DEBUG_DB_SEED: CHECKPOINT 5 - After TeamMembers seeding", flush=True) # Removed
