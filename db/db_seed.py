@@ -402,38 +402,53 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         # --- Seed License for Admin User ---
         if super_admin_user_id:
             try:
-                from db.cruds import licenses_crud # Corrected import
+            from db.cruds import licenses_crud # Corrected import
                 from datetime import timedelta # datetime is already imported
 
                 logger.info(f"Checking/Seeding license for admin user ID: {super_admin_user_id}")
-                # Check for existing active 'complet' license
-                existing_licenses = licenses_crud.get_licenses_for_user(conn, super_admin_user_id)
-                active_complet_license_exists = False
-                if existing_licenses:
-                    for lic in existing_licenses:
-                        if lic['license_type'] == 'complet' and lic['is_active']:
-                            # Check if expiration_date is a string and needs parsing, or already a datetime object
-                            exp_date_str = lic.get('expiration_date')
-                            if exp_date_str:
-                                try:
-                                    # Assuming ISO format with 'Z' or timezone offset
-                                    if isinstance(exp_date_str, str):
-                                        exp_date = datetime.fromisoformat(exp_date_str.replace('Z', '+00:00'))
-                                    elif isinstance(exp_date_str, datetime):
-                                        exp_date = exp_date_str # Already a datetime object
+                # Use get_active_license_for_user which already checks for active and not expired
+                existing_active_license = licenses_crud.get_active_license_for_user(conn, super_admin_user_id)
+                suitable_license_exists = False
 
-                                    if exp_date > datetime.now(exp_date.tzinfo) + timedelta(days=30): # Still valid for at least 30 days
-                                        active_complet_license_exists = True
-                                        logger.info(f"Admin user already has an active 'complet' license expiring on {exp_date_str}.")
-                                        break
-                                except ValueError as e_date:
-                                    logger.warning(f"Could not parse expiration date '{exp_date_str}' for existing license {lic.get('license_id')}: {e_date}")
-                            else: # No expiration date, assume it's not what we want or it's a permanent 'complet' type
-                                logger.info(f"Admin user has an active 'complet' license {lic.get('license_id')} with no expiration date or unparseable.")
-                                # active_complet_license_exists = True # Or decide if this is acceptable
-                                # break
+                if existing_active_license:
+                    logger.info(f"Found an active license for admin: {existing_active_license.get('license_id')}, type: {existing_active_license.get('license_type')}")
+                    if existing_active_license.get('license_type') == 'complet':
+                        exp_date_str = existing_active_license.get('expiration_date')
+                        if exp_date_str:
+                            try:
+                                # datetime.fromisoformat can handle strings like "YYYY-MM-DDTHH:MM:SS.ffffffZ" or "...+00:00"
+                                # For "YYYY-MM-DD", it might need adjustment or the stored format must be consistent.
+                                # Assuming licenses_crud.get_active_license_for_user already ensures it's not expired.
+                                # We add an additional check here: ensure it's valid for at least 30 more days.
+                                if isinstance(exp_date_str, str):
+                                    # Ensure timezone awareness for comparison
+                                    exp_date = datetime.fromisoformat(exp_date_str.replace('Z', '+00:00'))
+                                    if exp_date.tzinfo is None: # If fromisoformat doesn't make it tz-aware based on Z
+                                        exp_date = exp_date.replace(tzinfo=timezone.utc)
+                                elif isinstance(exp_date_str, datetime):
+                                    exp_date = exp_date_str
+                                    if exp_date.tzinfo is None: # Ensure timezone if already datetime
+                                        exp_date = exp_date.replace(tzinfo=timezone.utc)
+                                else:
+                                    raise ValueError("expiration_date is not a recognized string or datetime object")
 
-                if not active_complet_license_exists:
+                                if exp_date > datetime.now(timezone.utc) + timedelta(days=30):
+                                    suitable_license_exists = True
+                                    logger.info(f"Admin user already has a suitable 'complet' license (ID: {existing_active_license.get('license_id')}) expiring on {exp_date_str} (valid for >30 days).")
+                                else:
+                                    logger.info(f"Admin's active 'complet' license (ID: {existing_active_license.get('license_id')}) expires too soon ({exp_date_str}). A new default one will be created if needed.")
+                            except ValueError as e_date:
+                                logger.warning(f"Could not parse expiration date '{exp_date_str}' for admin's active license {existing_active_license.get('license_id')}: {e_date}")
+                        else: # Active 'complet' license with no expiration date
+                            logger.info(f"Admin user has an active 'complet' license (ID: {existing_active_license.get('license_id')}) with no expiration date. Considering it suitable.")
+                            suitable_license_exists = True
+                    else:
+                        logger.info(f"Admin user has an active license (ID: {existing_active_license.get('license_id')}), but it's not 'complet' type (type: {existing_active_license.get('license_type')}).")
+                else:
+                    logger.info(f"No existing active license found for admin user {super_admin_user_id}.")
+
+                if not suitable_license_exists:
+
                     logger.info(f"No suitable active 'complet' license found for admin. Creating a new 6-month 'complet' license.")
                     activation_date = datetime.utcnow()
                     expiration_date = activation_date + timedelta(days=180)
@@ -812,6 +827,8 @@ def _seed_main_document_templates(cursor: sqlite3.Cursor, conn: sqlite3.Connecti
                 'category_purpose': client_doc_purpose, # Ensure category_purpose is passed
                 'client_id': None, 'is_default_for_type_lang': is_default, # Set dynamically
             }
+            if full_template_name == "Spécification Technique (Excel) (FR)":
+                logger.info(f"SEED_DEBUG: Data for 'Spécification Technique (Excel) (FR)' before calling add_default_template_if_not_exists: {template_data_for_db}")
             template_id = add_default_template_if_not_exists(template_data_for_db, conn=conn) 
             
             if template_id:
