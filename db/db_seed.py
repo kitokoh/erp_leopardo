@@ -407,7 +407,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
 
                 logger.info(f"Checking/Seeding license for admin user ID: {super_admin_user_id}")
                 # Check for existing active 'complet' license
-                existing_licenses = license_cruds.get_licenses_for_user(conn, super_admin_user_id)
+                existing_licenses = licenses_crud.get_licenses_for_user(conn, super_admin_user_id)
                 active_complet_license_exists = False
                 if existing_licenses:
                     for lic in existing_licenses:
@@ -445,7 +445,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                         "expiration_date": expiration_date.isoformat() + "Z",
                         "is_active": True
                     }
-                    new_license_id = license_cruds.add_license(conn, license_data)
+                    new_license_id = licenses_crud.add_license(conn, license_data)
                     if new_license_id:
                         logger.info(f"Successfully added 'complet' license (ID: {new_license_id}) for admin user {super_admin_user_id}, valid for 6 months.")
                     else:
@@ -453,8 +453,8 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                 else:
                     logger.info(f"Admin user {super_admin_user_id} already has a suitable active 'complet' license. Skipping new license creation.")
 
-            # except ImportError:
-            #     logger.error("Failed to import license_management.cruds. Cannot seed admin license.")
+            # except ImportError: # This was for the old incorrect import, now it should be NameError if licenses_crud itself is not found
+            #     logger.error("Failed to import db.cruds.licenses_crud. Cannot seed admin license.")
             except Exception as e_lic:
                 logger.error(f"An error occurred during admin license seeding: {e_lic}", exc_info=True)
         else:
@@ -743,6 +743,7 @@ def _seed_default_utility_templates(cursor: sqlite3.Cursor, conn: sqlite3.Connec
             'template_name': doc_def['template_name'], 'template_type': template_type,
             'language_code': doc_def['language_code'], 'base_file_name': doc_def['base_file_name'],
             'description': doc_def['description'], 'category_id': utility_category_id,
+            'category_purpose': DEFAULT_UTILITY_TEMPLATES_PURPOSE, # Ensure category_purpose is passed
             'client_id': None, 'is_default_for_type_lang': False,
         }
         template_id = add_default_template_if_not_exists(template_data_for_db, conn=conn) 
@@ -808,6 +809,7 @@ def _seed_main_document_templates(cursor: sqlite3.Cursor, conn: sqlite3.Connecti
                 'template_name': full_template_name, 'template_type': doc_def['template_type'],
                 'language_code': lang_code, 'base_file_name': doc_def['base_file_name'],
                 'description': doc_def['description'], 'category_id': category_id,
+                'category_purpose': client_doc_purpose, # Ensure category_purpose is passed
                 'client_id': None, 'is_default_for_type_lang': is_default, # Set dynamically
             }
             template_id = add_default_template_if_not_exists(template_data_for_db, conn=conn) 

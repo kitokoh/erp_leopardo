@@ -102,15 +102,20 @@ def add_default_template_if_not_exists(data: dict, conn: sqlite3.Connection = No
             is_binary_file = base_file_name.endswith(('.xlsx', '.docx', '.pdf')) # Add other binary types if needed
 
             if category_purpose == 'email':
-                template_base_path = os.path.join(config.APP_ROOT_DIR, "email_template_designs")
+                # New path for email templates
+                template_base_path = os.path.join(config.APP_ROOT_DIR, "resources", "email_template_designs")
+
                 fpath = os.path.join(template_base_path, base_file_name)
             elif category_purpose in ['client_document', 'utility_document', 'utility']: # 'utility' was seen in seed data
                 # Document templates are in resources/templates/[lang_code]/
                 template_base_path = os.path.join(config.APP_ROOT_DIR, "resources", "templates", language_code)
                 fpath = os.path.join(template_base_path, base_file_name)
-            else: # Fallback or undefined category_purpose, default to old behavior (or error)
-                logging.warning(f"Undefined category_purpose '{category_purpose}' for template '{name}'. Defaulting to email_template_designs path structure.")
-                template_base_path = os.path.join(config.APP_ROOT_DIR, "email_template_designs")
+            else: # Fallback or undefined category_purpose
+                # This case should ideally not be hit if category_purpose is always correctly set during seeding.
+                # Defaulting to the new email path as a general fallback, but with a strong warning.
+                logging.error(f"CRITICAL: Undefined or missing category_purpose '{category_purpose}' for template '{name}'. Attempting new email template path structure as a fallback: resources/email_template_designs.")
+                template_base_path = os.path.join(config.APP_ROOT_DIR, "resources", "email_template_designs")
+
                 fpath = os.path.join(template_base_path, base_file_name)
 
             if os.path.exists(fpath):
