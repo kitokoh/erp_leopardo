@@ -1,0 +1,3 @@
+Placeholder: Exemple de Facture Proforma PDF.
+Ce fichier PDF devrait être un exemple concret d'une facture proforma générée par ClientDocManager. Il doit montrer la mise en page, les sections typiques (informations vendeur/acheteur, détails des produits/services, prix, totaux, conditions) et l'intégration potentielle du logo de l'entreprise.
+À générer en utilisant le modèle `proforma_invoice_template.html` de l'application avec des données fictives.

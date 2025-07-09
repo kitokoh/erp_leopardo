@@ -1,0 +1,6 @@
+<!-- Placeholder: Logo ClientDocManager Monochrome Blanc SVG -->
+<!-- Version du logo en blanc, pour utilisation sur fonds foncés. -->
+<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" style="fill:rgb(255,255,255);" />
+    <text x="50" y="50" font-family="Verdana" font-size="35" fill="black" text-anchor="middle" dy=".3em">CDM</text> <!-- Contraste pour visibilité du placeholder -->
+</svg>

@@ -1,0 +1,53 @@
+# Script Vidéo : Présentation Générale ClientDocManager (30 secondes)
+
+**Objectif :** Présenter rapidement ClientDocManager, ses avantages clés et inciter à en savoir plus.
+**Ton :** Dynamique, clair, professionnel.
+**Public Cible :** PME, commerciaux, chefs de projet.
+
+---
+
+**(0-3 secondes) Scène 1 : ACCROCHE VISUELLE ET PROBLÈME**
+*   **VISUEL :** Animation rapide montrant des icônes de paperasse, horloge qui tourne vite, personnage stressé devant un ordinateur (stylisé).
+*   **AUDIO (Voix Off Entraînante) :** "Fatigué de jongler avec les informations clients et de perdre un temps fou à créer vos documents commerciaux ?"
+*   **MUSIQUE :** Musique de fond dynamique et moderne (commence ici et continue).
+
+---
+
+**(3-10 secondes) Scène 2 : PRÉSENTATION DE LA SOLUTION**
+*   **VISUEL :** Apparition du logo ClientDocManager avec le nom. Transition vers une capture d'écran clean de l'interface principale (ex: page d'accueil ou liste clients épurée). Incrustation de mots-clés : "Centralisation", "Automatisation".
+*   **AUDIO (Voix Off) :** "Découvrez ClientDocManager ! L'application de bureau qui révolutionne votre gestion."
+
+---
+
+**(10-20 secondes) Scène 3 : AVANTAGES CLÉS EN ACTION (MONTAGE RAPIDE)**
+*   **VISUEL :** Séquence très rapide de 2-3 mini-démonstrations ou captures d'écran dynamiques :
+    1.  Zoom sur une fiche client bien remplie.
+    2.  Animation montrant des données s'insérant automatiquement dans un modèle de proforma.
+    3.  Aperçu d'un tableau de bord statistique simple et clair.
+*   **AUDIO (Voix Off) :** "Centralisez vos données clients, automatisez vos proformas, contrats, et suivez vos projets... le tout, au même endroit !"
+*   **TEXTE À L'ÉCRAN (Superposé, concis) :** "Clients Centralisés", "Documents Automatisés", "Projets Suivis".
+
+---
+
+**(20-27 secondes) Scène 4 : BÉNÉFICES ET APPEL À L'ACTION**
+*   **VISUEL :** Personnage souriant et productif utilisant ClientDocManager (peut être une illustration ou une image stylisée). Le visuel se termine par l'URL du site web bien visible.
+*   **AUDIO (Voix Off) :** "Gagnez en temps, en professionnalisme et en efficacité. Simplifiez votre quotidien avec ClientDocManager !"
+*   **TEXTE À L'ÉCRAN :** "Gagnez du Temps. Soyez Pro. Soyez Efficace." puis "VotreLogoApplicatif.com" (ou l'URL réelle).
+
+---
+
+**(27-30 secondes) Scène 5 : ÉCRAN FINAL**
+*   **VISUEL :** Logo ClientDocManager en grand, avec l'URL du site web et un slogan court (ex: "Votre gestion, simplifiée.").
+*   **AUDIO (Voix Off) :** "Visitez [URL du site] pour une démonstration gratuite !"
+*   **MUSIQUE :** Outro musical court et positif.
+
+---
+
+**Notes de Production :**
+*   Le rythme doit être soutenu pour tenir en 30 secondes.
+*   Les animations graphiques (motion design) sont préférables pour les scènes abstraites (problème, mots-clés).
+*   Les captures d'écran de l'application doivent être de haute qualité et montrer une interface épurée.
+*   La voix off doit être professionnelle, claire et enthousiaste.
+*   La musique ne doit pas couvrir la voix off.
+
+*(Ce script est une base. Il faudra l'adapter en fonction des visuels qui peuvent être réellement produits.)*

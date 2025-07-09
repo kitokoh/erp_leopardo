@@ -1,0 +1,67 @@
+# Script Vidéo : Démo Génération de Documents avec ClientDocManager (60 secondes)
+
+**Objectif :** Montrer la facilité et la rapidité de génération de documents professionnels avec ClientDocManager.
+**Ton :** Pratique, démonstratif, orienté bénéfices.
+**Public Cible :** Commerciaux, administratifs, toute personne créant des documents commerciaux.
+
+---
+
+**(0-5 secondes) Scène 1 : INTRODUCTION ET PROBLÉMATIQUE**
+*   **VISUEL :** Logo ClientDocManager. Puis, image stylisée d'une personne submergée par des papiers ou un montage rapide de documents Word/Excel manuels.
+*   **AUDIO (Voix Off Dynamique) :** "Créer des documents commerciaux parfaits prend du temps... beaucoup de temps. Et les erreurs sont vite arrivées."
+*   **MUSIQUE :** Musique de fond engageante.
+
+---
+
+**(5-20 secondes) Scène 2 : SÉLECTION DU CLIENT ET DU MODÈLE**
+*   **VISUEL :**
+    *   Interface de ClientDocManager : l'utilisateur sélectionne un client dans la liste.
+    *   Ouverture de la fiche client. Clic sur un bouton "Générer Document" (ou similaire).
+    *   Dialogue de sélection de modèle (`TemplateDialog` ou équivalent) apparaît, montrant une liste de modèles (Proforma, Contrat, etc.).
+    *   L'utilisateur sélectionne "Facture Proforma".
+*   **AUDIO (Voix Off) :** "Avec ClientDocManager, c'est différent. Sélectionnez votre client, choisissez le type de document parmi vos modèles personnalisés..."
+*   **TEXTE À L'ÉCRAN (Incrustations) :** "Choix du Client", "Modèles Prédéfinis".
+
+---
+
+**(20-35 secondes) Scène 3 : PERSONNALISATION ET AJOUT DE PRODUITS (SI NÉCESSAIRE)**
+*   **VISUEL :**
+    *   Interface de préparation du document :
+        *   Les informations du client et de l'entreprise sont déjà pré-remplies.
+        *   L'utilisateur ajoute quelques produits/services à la proforma (simulation d'une recherche rapide dans le catalogue produits et ajout).
+        *   Modification simple d'une quantité ou d'un prix.
+*   **AUDIO (Voix Off) :** "...les informations sont automatiquement remplies. Ajoutez vos produits ou services, ajustez les détails si besoin..."
+*   **TEXTE À L'ÉCRAN :** "Données Auto-Remplies", "Catalogue Produits Intégré".
+
+---
+
+**(35-45 secondes) Scène 4 : PRÉVISUALISATION ET GÉNÉRATION PDF**
+*   **VISUEL :**
+    *   Clic sur un bouton "Prévisualiser" ou "Générer PDF".
+    *   Une prévisualisation du document PDF apparaît (montrant un document professionnel, bien formaté, avec logo).
+    *   Mise en évidence de la qualité du document.
+*   **AUDIO (Voix Off) :** "...et en un clic, votre document professionnel est prêt ! Propre, précis, et à l'image de votre entreprise."
+*   **TEXTE À L'ÉCRAN :** "Qualité Professionnelle", "Export PDF Facile".
+
+---
+
+**(45-55 secondes) Scène 5 : AVANTAGES RÉCAPITULÉS ET FLEXIBILITÉ**
+*   **VISUEL :** Montage rapide d'autres types de documents générés (Contrat, Fiche Technique). Icônes symbolisant gain de temps, zéro erreur, multilingue. URL du site visible.
+*   **AUDIO (Voix Off) :** "Factures proforma, contrats, spécifications techniques... Gagnez des heures, éliminez les erreurs et communiquez efficacement dans plusieurs langues."
+*   **TEXTE À L'ÉCRAN :** "Gain de Temps", "Zéro Erreur", "Multilingue".
+
+---
+
+**(55-60 secondes) Scène 6 : ÉCRAN FINAL**
+*   **VISUEL :** Logo ClientDocManager, URL du site web, Slogan (ex: "Vos documents, en mieux.").
+*   **AUDIO (Voix Off) :** "ClientDocManager : la puissance documentaire au service de votre efficacité. Essayez-le !"
+*   **MUSIQUE :** Outro.
+
+---
+
+**Notes de Production :**
+*   Enregistrements d'écran de l'application pour les étapes de sélection et de génération.
+*   Utiliser des données de démonstration claires et professionnelles.
+*   Les animations peuvent aider à fluidifier les transitions et à mettre en évidence les clics importants.
+*   Si la génération est très rapide, la montrer en temps réel. Sinon, une légère accélération peut être envisagée pour les parties de saisie.
+*   S'assurer que les documents générés en exemple sont visuellement attrayants.

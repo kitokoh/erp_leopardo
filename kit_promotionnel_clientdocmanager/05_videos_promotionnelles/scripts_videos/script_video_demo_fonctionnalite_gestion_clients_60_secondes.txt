@@ -1,0 +1,67 @@
+# Script Vidéo : Démo Gestion Clients avec ClientDocManager (60 secondes)
+
+**Objectif :** Montrer concrètement comment ClientDocManager facilite la gestion des informations clients.
+**Ton :** Informatif, démonstratif, clair.
+**Public Cible :** Utilisateurs potentiels (commerciaux, admin des ventes).
+
+---
+
+**(0-5 secondes) Scène 1 : INTRODUCTION ET INTERFACE**
+*   **VISUEL :** Logo ClientDocManager, puis transition rapide vers l'interface principale de ClientDocManager, focus sur la liste des clients.
+*   **AUDIO (Voix Off Engageante) :** "Gérer efficacement vos clients est crucial. Voyons comment ClientDocManager vous simplifie la tâche."
+*   **MUSIQUE :** Musique de fond discrète et professionnelle.
+
+---
+
+**(5-20 secondes) Scène 2 : CRÉATION RAPIDE D'UN NOUVEAU CLIENT**
+*   **VISUEL :**
+    *   Curseur clique sur "Ajouter Nouveau Client".
+    *   Le dialogue `AddNewClientDialog` s'ouvre.
+    *   Saisie rapide (accélérée si besoin) de quelques informations clés : Nom du client, Société, Pays, Email, Statut (ex: "Prospect").
+    *   Validation. Le nouveau client apparaît dans la liste.
+*   **AUDIO (Voix Off) :** "Ajouter un nouveau client est un jeu d'enfant. Remplissez les informations essentielles, assignez un statut, et voilà ! Votre nouveau contact est prêt."
+*   **TEXTE À L'ÉCRAN (Incrustations ponctuelles) :** "Création Client Facile", "Infos Clés Centralisées".
+
+---
+
+**(20-35 secondes) Scène 3 : CONSULTATION D'UNE FICHE CLIENT DÉTAILLÉE**
+*   **VISUEL :**
+    *   Curseur clique sur un client existant dans la liste.
+    *   La fiche client (`ClientMainWidget`) s'ouvre.
+    *   Navigation rapide entre les onglets : "Détails" (montrant les champs remplis), "Contacts" (si plusieurs contacts), "Notes" (montrant une note d'exemple).
+*   **AUDIO (Voix Off) :** "Accédez à une vue complète de chaque client : coordonnées, historique des échanges, notes importantes, documents liés... tout est organisé et facile à retrouver."
+*   **TEXTE À L'ÉCRAN :** "Vue 360° du Client", "Historique Complet".
+
+---
+
+**(35-50 secondes) Scène 4 : FILTRAGE ET RECHERCHE DANS LA LISTE**
+*   **VISUEL :**
+    *   Retour à la liste des clients.
+    *   Démonstration de la barre de recherche : l'utilisateur tape une partie d'un nom, la liste se filtre.
+    *   Démonstration d'un filtre par statut : l'utilisateur sélectionne "Actif", la liste n'affiche que les clients actifs.
+    *   Optionnel : Démonstration d'un filtre par pays.
+*   **AUDIO (Voix Off) :** "Besoin de retrouver un client spécifique ou de segmenter votre base ? Utilisez nos puissants outils de recherche et de filtrage. Obtenez la bonne information, au bon moment."
+*   **TEXTE À L'ÉCRAN :** "Recherche Instantanée", "Filtrage Multicritères".
+
+---
+
+**(50-58 secondes) Scène 5 : AVANTAGES ET APPEL À L'ACTION**
+*   **VISUEL :** Transition vers un écran sobre avec les avantages clés listés (icônes + texte court) ou une animation graphique symbolisant l'organisation et l'efficacité. URL du site visible.
+*   **AUDIO (Voix Off) :** "Avec la gestion clients de ClientDocManager, gagnez en organisation, personnalisez vos interactions et ne perdez plus jamais une information cruciale."
+*   **TEXTE À L'ÉCRAN :** "Organisé. Personnalisé. Efficace." puis "VotreSite.com".
+
+---
+
+**(58-60 secondes) Scène 6 : ÉCRAN FINAL**
+*   **VISUEL :** Logo ClientDocManager, URL du site web, Slogan.
+*   **AUDIO (Voix Off) :** "ClientDocManager : la gestion client, enfin simplifiée. Demandez votre démo !"
+*   **MUSIQUE :** Outro.
+
+---
+
+**Notes de Production :**
+*   Utiliser des enregistrements d'écran réels de l'application.
+*   Les actions doivent être claires et le curseur visible.
+*   Accélérer légèrement les saisies de texte pour ne pas perdre de temps.
+*   Assurer une bonne qualité d'enregistrement (pas de lags, interface propre).
+*   La voix off doit guider l'utilisateur à travers les actions montrées.
