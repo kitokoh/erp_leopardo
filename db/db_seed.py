@@ -402,12 +402,12 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         # --- Seed License for Admin User ---
         if super_admin_user_id:
             try:
-                from license_management import cruds as license_cruds
+            from db.cruds import licenses_crud # Corrected import
                 from datetime import timedelta # datetime is already imported
 
                 logger.info(f"Checking/Seeding license for admin user ID: {super_admin_user_id}")
                 # Check for existing active 'complet' license
-                existing_licenses = license_cruds.get_licenses_for_user(conn, super_admin_user_id)
+                existing_licenses = licenses_crud.get_licenses_for_user(conn, super_admin_user_id)
                 active_complet_license_exists = False
                 if existing_licenses:
                     for lic in existing_licenses:
@@ -445,7 +445,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                         "expiration_date": expiration_date.isoformat() + "Z",
                         "is_active": True
                     }
-                    new_license_id = license_cruds.add_license(conn, license_data)
+                    new_license_id = licenses_crud.add_license(conn, license_data)
                     if new_license_id:
                         logger.info(f"Successfully added 'complet' license (ID: {new_license_id}) for admin user {super_admin_user_id}, valid for 6 months.")
                     else:
@@ -453,8 +453,8 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                 else:
                     logger.info(f"Admin user {super_admin_user_id} already has a suitable active 'complet' license. Skipping new license creation.")
 
-            # except ImportError:
-            #     logger.error("Failed to import license_management.cruds. Cannot seed admin license.")
+            # except ImportError: # This was for the old incorrect import, now it should be NameError if licenses_crud itself is not found
+            #     logger.error("Failed to import db.cruds.licenses_crud. Cannot seed admin license.")
             except Exception as e_lic:
                 logger.error(f"An error occurred during admin license seeding: {e_lic}", exc_info=True)
         else:
@@ -559,16 +559,16 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                     logger.info(f"Attempting to seed country: {country_name} and city: {city_name}")
                     country_dict = get_or_add_country(country_name, conn=conn) # This function now has logging
                     if country_dict and 'country_id' in country_dict:
-                        logger.info(f"Country '{country_name}' (ID: {country_dict['country_id']}) successfully processed by get_or_add_country. Proceeding to add city '{city_name}'.")
+                        logger.info(f"SEED_COUNTRY_CITY_LOG: Country '{country_name}' (ID: {country_dict['country_id']}) successfully processed by get_or_add_country. Proceeding to add city '{city_name}'.")
                         city_dict = get_or_add_city(city_name, country_dict['country_id'], conn=conn)
                         if city_dict and 'city_id' in city_dict:
-                            logger.info(f"City '{city_name}' (ID: {city_dict['city_id']}) for country '{country_name}' successfully processed.")
+                            logger.info(f"SEED_COUNTRY_CITY_LOG: City '{city_name}' (ID: {city_dict['city_id']}) for country '{country_name}' successfully processed.")
                         else:
-                            logger.error(f"Failed to process city '{city_name}' for country '{country_name}'. City dict: {city_dict}")
-                    elif country_dict: # country_dict exists but 'country_id' is missing (should not happen with current get_or_add_country)
-                        logger.error(f"Country '{country_name}' processed by get_or_add_country, but 'country_id' is missing. Country dict: {country_dict}")
+                            logger.error(f"SEED_COUNTRY_CITY_LOG: Failed to process city '{city_name}' for country '{country_name}'. City dict: {city_dict}")
+                    elif country_dict: # country_dict exists but 'country_id' is missing
+                        logger.error(f"SEED_COUNTRY_CITY_LOG: Country '{country_name}' processed by get_or_add_country, but 'country_id' is missing. Country dict: {country_dict}. Cannot add city '{city_name}'.")
                     else: # get_or_add_country returned None
-                        logger.error(f"Failed to get or add country '{country_name}'. Cannot add city '{city_name}'.")
+                        logger.error(f"SEED_COUNTRY_CITY_LOG: Failed to get or add country '{country_name}' via get_or_add_country. Cannot add city '{city_name}'.")
                 logger.info(f"Finished attempt to seed {len(countries_cities)} countries/cities.")
 
 
@@ -743,6 +743,7 @@ def _seed_default_utility_templates(cursor: sqlite3.Cursor, conn: sqlite3.Connec
             'template_name': doc_def['template_name'], 'template_type': template_type,
             'language_code': doc_def['language_code'], 'base_file_name': doc_def['base_file_name'],
             'description': doc_def['description'], 'category_id': utility_category_id,
+            'category_purpose': DEFAULT_UTILITY_TEMPLATES_PURPOSE, # Ensure category_purpose is passed
             'client_id': None, 'is_default_for_type_lang': False,
         }
         template_id = add_default_template_if_not_exists(template_data_for_db, conn=conn) 
@@ -808,6 +809,7 @@ def _seed_main_document_templates(cursor: sqlite3.Cursor, conn: sqlite3.Connecti
                 'template_name': full_template_name, 'template_type': doc_def['template_type'],
                 'language_code': lang_code, 'base_file_name': doc_def['base_file_name'],
                 'description': doc_def['description'], 'category_id': category_id,
+                'category_purpose': client_doc_purpose, # Ensure category_purpose is passed
                 'client_id': None, 'is_default_for_type_lang': is_default, # Set dynamically
             }
             template_id = add_default_template_if_not_exists(template_data_for_db, conn=conn) 

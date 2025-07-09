@@ -94,22 +94,46 @@ def add_default_template_if_not_exists(data: dict, conn: sqlite3.Connection = No
         data['category_id'] = cat_id
 
         if 'base_file_name' in data and 'raw_template_file_data' not in data:
-            # Use config.APP_ROOT_DIR from the root config.py
-            # The new config.py defines APP_ROOT_DIR.
-            # The path "email_template_designs" is relative to the project root.
-            fpath = os.path.join(config.APP_ROOT_DIR, "email_template_designs", data['base_file_name'])
+            base_file_name = data['base_file_name']
+            language_code = data.get('language_code', 'en') # Default to 'en' if not specified, though it should be.
+            category_purpose = data.get('category_purpose') # 'email', 'client_document', 'utility'
+
+            template_base_path = ""
+            is_binary_file = base_file_name.endswith(('.xlsx', '.docx', '.pdf')) # Add other binary types if needed
+
+            if category_purpose == 'email':
+                # New path for email templates
+                template_base_path = os.path.join(config.APP_ROOT_DIR, "resources", "email_template_designs")
+                fpath = os.path.join(template_base_path, base_file_name)
+            elif category_purpose in ['client_document', 'utility_document', 'utility']: # 'utility' was seen in seed data
+                # Document templates are in resources/templates/[lang_code]/
+                template_base_path = os.path.join(config.APP_ROOT_DIR, "resources", "templates", language_code)
+                fpath = os.path.join(template_base_path, base_file_name)
+            else: # Fallback or undefined category_purpose
+                # This case should ideally not be hit if category_purpose is always correctly set during seeding.
+                # Defaulting to the new email path as a general fallback, but with a strong warning.
+                logging.error(f"CRITICAL: Undefined or missing category_purpose '{category_purpose}' for template '{name}'. Attempting new email template path structure as a fallback: resources/email_template_designs.")
+                template_base_path = os.path.join(config.APP_ROOT_DIR, "resources", "email_template_designs")
+                fpath = os.path.join(template_base_path, base_file_name)
 
             if os.path.exists(fpath):
-                with open(fpath,'r',encoding='utf-8') as f:
-                    data['raw_template_file_data'] = f.read()
+                file_mode = 'rb' if is_binary_file else 'r'
+                file_encoding = None if is_binary_file else 'utf-8'
+                try:
+                    with open(fpath, file_mode, encoding=file_encoding) as f:
+                        data['raw_template_file_data'] = f.read()
+                except Exception as e_read:
+                    logging.error(f"Error reading template file at {fpath}: {e_read}")
+                    data['raw_template_file_data'] = None
             else:
-                logging.warning(f"Template file not found at {fpath} for default template {name}")
-                data['raw_template_file_data'] = None # Or some default content
+                logging.warning(f"Template file not found at {fpath} for default template {name} (category purpose: {category_purpose})")
+                data['raw_template_file_data'] = None
 
         original_template_id = add_template(data, conn=conn) # Pass conn
 
         # Check if the template is an HTML email and duplicate it for PDF generation
-        if data.get('template_type') == 'html_email' and original_template_id is not None:
+        # Adjusted type check to be more specific if category_purpose is reliable
+        if category_purpose == 'email' and data.get('template_type') == 'html_email' and original_template_id is not None:
             pdf_template_data = data.copy() # Create a shallow copy
             pdf_template_data['template_type'] = 'html_email_to_pdf'
             pdf_template_data['is_default_for_type_lang'] = False
