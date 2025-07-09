@@ -448,6 +448,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                     logger.info(f"No existing active license found for admin user {super_admin_user_id}.")
 
                 if not suitable_license_exists:
+
                     logger.info(f"No suitable active 'complet' license found for admin. Creating a new 6-month 'complet' license.")
                     activation_date = datetime.utcnow()
                     expiration_date = activation_date + timedelta(days=180)
