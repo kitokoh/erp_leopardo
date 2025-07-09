@@ -141,8 +141,9 @@ def get_user_by_username(username: str, conn=None, logger_passed: logging.Logger
 def get_any_user_by_username(username: str, conn=None, logger_passed: logging.Logger | None = None) -> dict | None:
     """Fetches a user by username, regardless of their is_active or is_deleted status."""
     current_logger = logger_passed if logger_passed else module_logger
-    # Similar to get_user_by_username but without status checks
-    sql_select_part = "SELECT u.*, r.role_name FROM Users u JOIN Roles r ON u.role_id = r.role_id"
+    # Similar to get_user_by_username but without status checks, and using LEFT JOIN for robustness
+    sql_select_part = "SELECT u.*, r.role_name FROM Users u LEFT JOIN Roles r ON u.role_id = r.role_id"
+
 
     sql_sqlite = f"{sql_select_part} WHERE u.username = ?"
     sql_sa = text(f"{sql_select_part} WHERE u.username = :username")
