@@ -307,11 +307,18 @@ def main():
             alembic_command.upgrade(alembic_cfg, "head") # RESTORED
             logging.info("Alembic upgrade head command completed.")
     except ImportError:
-        logging.error("Alembic is not installed. Skipping database migrations. Please install alembic.")
+        logging.error("Alembic is not installed. Database migrations will be skipped. The application may not function correctly.")
+        QMessageBox.critical(None, "Erreur Critique d'Initialisation",
+                             "Alembic n'est pas installé. Les migrations de base de données ne peuvent pas être exécutées.\n"
+                             "Veuillez installer Alembic (ex: pip install alembic) et redémarrer l'application.\n"
+                             "L'application va maintenant se fermer.")
+        sys.exit(1) # Exit if Alembic is not installed
     except Exception as e_alembic:
         logging.error(f"An error occurred during Alembic migration: {e_alembic}", exc_info=True)
-        # Depending on the severity, you might want to show an error to the user or exit.
-        # For now, just logging.
+        QMessageBox.critical(None, "Erreur de Migration de Base de Données",
+                             f"Une erreur est survenue lors de la migration de la base de données avec Alembic:\n{e_alembic}\n"
+                             "L'application ne peut pas continuer et va se fermer.")
+        sys.exit(1) # Exit if migration fails
 
     # Set the database configuration for db.connection module
     # This must be done after app_setup.CONFIG is loaded and db structure might be initialized

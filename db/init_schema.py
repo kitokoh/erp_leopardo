@@ -2655,6 +2655,12 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     print("DEBUG_INIT_DB: Indexes for PasswordResetTokens table created or exists.")
     # --- End Password Reset Tokens Table ---
 
+    # --- UserSmtpAssignments Table ---
+    # The creation of UserSmtpAssignments table and its indexes is now handled by Alembic migration 20240315_add_user_smtp_assignments_table.py
+    print("DEBUG_INIT_DB: Table UserSmtpAssignments creation SKIPPED - Handled by Alembic.")
+    print("DEBUG_INIT_DB: Indexes for UserSmtpAssignments table creation SKIPPED - Handled by Alembic.")
+    # --- End UserSmtpAssignments Table ---
+
     # --- UseCases Table (for MyBusinessWidget) ---
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS UseCases (

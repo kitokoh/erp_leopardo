@@ -313,6 +313,7 @@ from dialogs.transporter_dialog import TransporterDialog
 from dialogs.freight_forwarder_dialog import FreightForwarderDialog
 from company_management import CompanyTabWidget
 from securite.security_settings_page import SecuritySettingsPage # Import de la nouvelle page
+from dialogs.smtp_config_dialog import SmtpConfigDialog # Import the new dialog
 try:
     from user_profile_management.my_business_widget import MyBusinessWidget
     USER_PROFILE_MODULE_AVAILABLE = True
@@ -438,7 +439,9 @@ class SettingsPage(QWidget):
         # Initialize new tab structure
         self._setup_general_settings_tab()
         self._setup_company_personnel_tab()
-        self._setup_connectivity_services_tab()
+        # self._setup_connectivity_services_tab() # This is now split
+        self._setup_global_smtp_configs_tab()
+        self._setup_user_email_assignment_tab()
         self._setup_application_modules_tab()
         self._setup_data_backup_tab()
         self._setup_logistics_tab()
@@ -557,39 +560,145 @@ class SettingsPage(QWidget):
         self.tabs_widget.addTab(self.company_tab_widget_instance, self.tr("Company & Personnel"))
         # Loading and saving for this tab is presumably handled within CompanyTabWidget or called by _load/save_all_settings.
 
-    def _setup_connectivity_services_tab(self):
-        tab_widget = QWidget()
-        main_layout = QVBoxLayout(tab_widget)
+    # def _setup_connectivity_services_tab(self): -- This method is now removed and split --
+
+    def _setup_global_smtp_configs_tab(self):
+        """Sets up the tab for managing global SMTP configurations."""
+        global_smtp_tab_widget = QWidget()
+        main_layout = QVBoxLayout(global_smtp_tab_widget)
         main_layout.setContentsMargins(15, 15, 15, 15)
         main_layout.setSpacing(15)
 
-        # --- Email (SMTP) Settings Group ---
-        email_group = QGroupBox(self.tr("Email Configuration (SMTP)"))
-        email_form_layout = QFormLayout(email_group)
-        email_form_layout.setSpacing(10)
+        global_smtp_group = QGroupBox(self.tr("Configurations SMTP Globales"))
+        global_smtp_group_layout = QVBoxLayout(global_smtp_group)
 
-        self.smtp_server_input = QLineEdit()
-        self.smtp_server_input.setPlaceholderText(self.tr("e.g., smtp.example.com"))
-        email_form_layout.addRow(self.tr("SMTP Server:"), self.smtp_server_input)
+        self.smtp_configs_table = QTableWidget()
+        self.smtp_configs_table.setObjectName("smtpConfigsTable")
+        self.smtp_configs_table.setColumnCount(7)
+        self.smtp_configs_table.setHorizontalHeaderLabels([
+            self.tr("ID"), self.tr("Nom Config"), self.tr("Serveur"),
+            self.tr("Port"), self.tr("Utilisateur"), self.tr("Email Exp."), self.tr("Défaut Global")
+        ])
+        self.smtp_configs_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.smtp_configs_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.smtp_configs_table.horizontalHeader().setStretchLastSection(True)
+        self.smtp_configs_table.setColumnHidden(0, True)
+        self.smtp_configs_table.setColumnWidth(1, 150)
+        self.smtp_configs_table.setColumnWidth(2, 150)
+        self.smtp_configs_table.setColumnWidth(4, 120)
+        self.smtp_configs_table.setColumnWidth(5, 150)
+        self.smtp_configs_table.itemSelectionChanged.connect(self._update_smtp_buttons_state)
+        global_smtp_group_layout.addWidget(self.smtp_configs_table)
 
-        self.smtp_port_spinbox = QSpinBox()
-        self.smtp_port_spinbox.setRange(1, 65535)
-        self.smtp_port_spinbox.setToolTip(self.tr("Common ports: 587 (TLS), 465 (SSL), 25 (unencrypted)."))
-        email_form_layout.addRow(self.tr("SMTP Port:"), self.smtp_port_spinbox)
+        smtp_buttons_layout = QHBoxLayout()
+        self.add_smtp_config_btn = QPushButton(self.tr("Ajouter"))
+        self.add_smtp_config_btn.setIcon(QIcon(":/icons/plus-circle.svg"))
+        self.add_smtp_config_btn.setToolTip(self.tr("Ajouter une nouvelle configuration SMTP globale."))
+        self.add_smtp_config_btn.clicked.connect(self._handle_add_smtp_config)
+        smtp_buttons_layout.addWidget(self.add_smtp_config_btn)
 
-        self.smtp_user_input = QLineEdit()
-        self.smtp_user_input.setPlaceholderText(self.tr("e.g., user@example.com"))
-        email_form_layout.addRow(self.tr("SMTP Username:"), self.smtp_user_input)
+        self.edit_smtp_config_btn = QPushButton(self.tr("Modifier"))
+        self.edit_smtp_config_btn.setIcon(QIcon(":/icons/edit-2.svg"))
+        self.edit_smtp_config_btn.setToolTip(self.tr("Modifier la configuration SMTP sélectionnée."))
+        self.edit_smtp_config_btn.setEnabled(False)
+        self.edit_smtp_config_btn.clicked.connect(self._handle_edit_smtp_config)
+        smtp_buttons_layout.addWidget(self.edit_smtp_config_btn)
 
-        self.smtp_pass_input = QLineEdit()
-        self.smtp_pass_input.setEchoMode(QLineEdit.Password)
-        self.smtp_pass_input.setPlaceholderText(self.tr("Your SMTP account password"))
-        email_form_layout.addRow(self.tr("SMTP Password:"), self.smtp_pass_input)
+        self.delete_smtp_config_btn = QPushButton(self.tr("Supprimer"))
+        self.delete_smtp_config_btn.setIcon(QIcon(":/icons/trash.svg"))
+        self.delete_smtp_config_btn.setObjectName("dangerButton")
+        self.delete_smtp_config_btn.setToolTip(self.tr("Supprimer la configuration SMTP sélectionnée."))
+        self.delete_smtp_config_btn.setEnabled(False)
+        self.delete_smtp_config_btn.clicked.connect(self._handle_delete_smtp_config)
+        smtp_buttons_layout.addWidget(self.delete_smtp_config_btn)
 
-        main_layout.addWidget(email_group)
+        smtp_buttons_layout.addStretch(1)
+
+        self.set_global_default_smtp_btn = QPushButton(self.tr("Définir par Défaut (Global)"))
+        self.set_global_default_smtp_btn.setIcon(QIcon(":/icons/check-square.svg"))
+        self.set_global_default_smtp_btn.setToolTip(self.tr("Définir la configuration SMTP sélectionnée comme défaut global pour l'application."))
+        self.set_global_default_smtp_btn.setEnabled(False)
+        self.set_global_default_smtp_btn.clicked.connect(self._handle_set_global_default_smtp)
+        smtp_buttons_layout.addWidget(self.set_global_default_smtp_btn)
+
+        global_smtp_group_layout.addLayout(smtp_buttons_layout)
+        main_layout.addWidget(global_smtp_group)
         main_layout.addStretch(1)
-        self.tabs_widget.addTab(tab_widget, self.tr("Connectivity"))
+        self.tabs_widget.addTab(global_smtp_tab_widget, self.tr("Configurations SMTP Globales"))
 
+    def _setup_user_email_assignment_tab(self):
+        """Sets up the tab for assigning email configurations to users."""
+        user_assignment_tab_widget = QWidget()
+        main_layout = QVBoxLayout(user_assignment_tab_widget)
+        main_layout.setContentsMargins(15, 15, 15, 15)
+        main_layout.setSpacing(15)
+
+        user_email_assignment_group = QGroupBox(self.tr("Affectation des Emails aux Utilisateurs"))
+        assignment_main_layout = QVBoxLayout(user_email_assignment_group)
+        assignment_main_layout.setSpacing(10)
+
+        user_selection_layout = QHBoxLayout()
+        user_selection_layout.addWidget(QLabel(self.tr("Utilisateur :")))
+        self.assign_user_combo = QComboBox()
+        self.assign_user_combo.setToolTip(self.tr("Sélectionner un utilisateur pour gérer ses affectations d'email."))
+        self.assign_user_combo.currentIndexChanged.connect(self._load_assigned_smtp_for_selected_user)
+        self.assign_user_combo.currentIndexChanged.connect(self._update_user_assignment_buttons_state)
+        user_selection_layout.addWidget(self.assign_user_combo)
+        user_selection_layout.addStretch(1)
+        assignment_main_layout.addLayout(user_selection_layout)
+
+        self.user_assigned_smtp_table = QTableWidget()
+        self.user_assigned_smtp_table.setObjectName("userAssignedSmtpTable")
+        self.user_assigned_smtp_table.setColumnCount(4)
+        self.user_assigned_smtp_table.setHorizontalHeaderLabels([
+            self.tr("ID Affect."), self.tr("Nom Config SMTP"),
+            self.tr("Email Expéditeur"), self.tr("Défaut pour Utilisateur")
+        ])
+        self.user_assigned_smtp_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.user_assigned_smtp_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.user_assigned_smtp_table.horizontalHeader().setStretchLastSection(True)
+        self.user_assigned_smtp_table.setColumnHidden(0, True)
+        self.user_assigned_smtp_table.setColumnWidth(1, 200)
+        self.user_assigned_smtp_table.setColumnWidth(2, 200)
+        self.user_assigned_smtp_table.itemSelectionChanged.connect(self._update_user_assignment_buttons_state)
+        assignment_main_layout.addWidget(self.user_assigned_smtp_table)
+
+        assign_new_layout = QHBoxLayout()
+        assign_new_layout.addWidget(QLabel(self.tr("Assigner Config Globale :")))
+        self.assign_global_smtp_combo = QComboBox()
+        self.assign_global_smtp_combo.setToolTip(self.tr("Choisir une configuration SMTP globale à assigner à l'utilisateur sélectionné."))
+        self.assign_global_smtp_combo.currentIndexChanged.connect(self._update_user_assignment_buttons_state)
+        assign_new_layout.addWidget(self.assign_global_smtp_combo)
+        self.assign_smtp_to_user_btn = QPushButton(self.tr("Assigner à l'Utilisateur"))
+        self.assign_smtp_to_user_btn.setIcon(QIcon(":/icons/plus.svg"))
+        self.assign_smtp_to_user_btn.setToolTip(self.tr("Assigner la configuration SMTP globale sélectionnée à l'utilisateur."))
+        self.assign_smtp_to_user_btn.setEnabled(False)
+        self.assign_smtp_to_user_btn.clicked.connect(self._handle_assign_smtp_to_user)
+        assign_new_layout.addWidget(self.assign_smtp_to_user_btn)
+        assign_new_layout.addStretch(1)
+        assignment_main_layout.addLayout(assign_new_layout)
+
+        user_assignment_buttons_layout = QHBoxLayout()
+        self.set_user_default_smtp_btn = QPushButton(self.tr("Définir par Défaut (Utilisateur)"))
+        self.set_user_default_smtp_btn.setIcon(QIcon(":/icons/check.svg"))
+        self.set_user_default_smtp_btn.setToolTip(self.tr("Définir la configuration SMTP assignée sélectionnée comme défaut pour cet utilisateur."))
+        self.set_user_default_smtp_btn.setEnabled(False)
+        self.set_user_default_smtp_btn.clicked.connect(self._handle_set_user_default_smtp)
+        user_assignment_buttons_layout.addWidget(self.set_user_default_smtp_btn)
+
+        self.unassign_smtp_from_user_btn = QPushButton(self.tr("Désassigner de l'Utilisateur"))
+        self.unassign_smtp_from_user_btn.setIcon(QIcon(":/icons/trash.svg"))
+        self.unassign_smtp_from_user_btn.setObjectName("dangerButton")
+        self.unassign_smtp_from_user_btn.setToolTip(self.tr("Désassigner la configuration SMTP de cet utilisateur."))
+        self.unassign_smtp_from_user_btn.setEnabled(False)
+        self.unassign_smtp_from_user_btn.clicked.connect(self._handle_unassign_smtp_from_user)
+        user_assignment_buttons_layout.addWidget(self.unassign_smtp_from_user_btn)
+        user_assignment_buttons_layout.addStretch(1)
+        assignment_main_layout.addLayout(user_assignment_buttons_layout)
+
+        main_layout.addWidget(user_email_assignment_group)
+        main_layout.addStretch(1)
+        self.tabs_widget.addTab(user_assignment_tab_widget, self.tr("Affectations Email Utilisateurs"))
 
     def _setup_application_modules_tab(self):
         modules_tab_widget = QWidget()
@@ -1569,6 +1678,15 @@ class SettingsPage(QWidget):
         self._toggle_pg_settings_visibility() # Ensure correct visibility on load
         print("Data & Backup tab settings loaded.")
 
+    # _load_connectivity_tab_data is no longer needed as SMTP is managed by its own table.
+    # def _load_connectivity_tab_data(self):
+    #     # Loads Email (SMTP) settings
+    #     self.smtp_server_input.setText(self.main_config.get("smtp_server", ""))
+    #     self.smtp_port_spinbox.setValue(self.main_config.get("smtp_port", 587))
+    #     self.smtp_user_input.setText(self.main_config.get("smtp_user", ""))
+    #     self.smtp_pass_input.setText(self.main_config.get("smtp_password", ""))
+    #     print("Connectivity (Email) settings loaded.")
+
     def _toggle_pg_settings_visibility(self):
         selected_db_type = self.db_type_combo.currentData()
         is_pg_selected = selected_db_type == "postgresql"
@@ -1615,14 +1733,15 @@ class SettingsPage(QWidget):
             "show_initial_setup_on_startup": self.show_setup_prompt_checkbox.isChecked(),
         }
 
-    def get_connectivity_settings_data(self):
-        # Collects Email (SMTP) settings
-        return {
-            "smtp_server": self.smtp_server_input.text().strip(),
-            "smtp_port": self.smtp_port_spinbox.value(),
-            "smtp_user": self.smtp_user_input.text().strip(),
-            "smtp_password": self.smtp_pass_input.text() # Password not stripped
-        }
+    # get_connectivity_settings_data is no longer needed for main_config saving.
+    # def get_connectivity_settings_data(self):
+    #     # Collects Email (SMTP) settings
+    #     return {
+    #         "smtp_server": self.smtp_server_input.text().strip(),
+    #         "smtp_port": self.smtp_port_spinbox.value(),
+    #         "smtp_user": self.smtp_user_input.text().strip(),
+    #         "smtp_password": self.smtp_pass_input.text() # Password not stripped
+    #     }
 
     def get_data_backup_settings_data(self):
         # Collects Database, Download Monitor, and Backup server settings
@@ -1681,7 +1800,7 @@ class SettingsPage(QWidget):
 
     def _load_all_settings_from_config(self):
         self._load_general_tab_data()
-        self._load_connectivity_tab_data() # For Email
+        # self._load_connectivity_tab_data() # Removed, SMTP handled by _load_smtp_configs_table
         self._load_data_backup_tab_data() # For DB, Download Monitor, Backup
         self._load_document_templates_tab_data() # For Template Dirs
         self._load_document_customization_tab_data() # Load footer notes
@@ -1694,12 +1813,18 @@ class SettingsPage(QWidget):
         if db_manager:
             self._load_transporters_table()
             self._load_forwarders_table()
+            self._load_smtp_configs_table() # Load SMTP configs table
         else:
-            print("WARNING: db_manager not available. Transporter and Forwarder tables will not be loaded.")
+            print("WARNING: db_manager not available. Transporter, Forwarder, and SMTP Config tables will not be loaded.")
 
         # Security tab is self-contained for now (biometric test page)
         # Template Visibility table has its own load method called by _load_document_templates_tab_data
         # Menu Customization tab data is loaded by _load_menu_customization_data
+
+        # Load data for User Email Assignment section
+        self._load_users_for_assignment_combo()
+        self._load_available_global_smtp_configs_combo()
+        # self._load_assigned_smtp_for_selected_user() # This is triggered by user combo change
 
         print("SettingsPage: All relevant settings sections reloaded.")
 
@@ -1735,9 +1860,10 @@ class SettingsPage(QWidget):
 
     def _save_all_settings(self):
         # Consolidate settings from various getters into main_config
+        # self.get_connectivity_settings_data() is removed as SMTP is no longer part of main_config
         settings_collections = [
             self.get_general_settings_data(),
-            self.get_connectivity_settings_data(),
+            # self.get_connectivity_settings_data(), # Removed
             self.get_data_backup_settings_data(),
             self.get_document_templates_settings_data(),
             # Document customization settings (footer notes) are saved directly to DB, not main_config
@@ -2223,6 +2349,336 @@ class SettingsPage(QWidget):
             label.setWordWrap(True)
             layout.addWidget(label)
             self.tabs_widget.addTab(unavailable_tab, self.tr("Mon Entreprise (Profil) - Erreur"))
+
+    # --- SMTP Configuration Management Methods ---
+    def _load_smtp_configs_table(self):
+        if not db_manager:
+            QMessageBox.warning(self, self.tr("Erreur Base de Données"), self.tr("Connexion à la base de données non disponible. Impossible de charger les configurations SMTP."))
+            return
+
+        self.smtp_configs_table.setRowCount(0) # Clear existing rows
+        self.smtp_configs_table.setSortingEnabled(False)
+        try:
+            configs = db_manager.get_all_smtp_configs() or []
+            for row_idx, config_data in enumerate(configs):
+                self.smtp_configs_table.insertRow(row_idx)
+
+                # ID (hidden)
+                id_item = QTableWidgetItem(str(config_data.get('smtp_config_id')))
+                self.smtp_configs_table.setItem(row_idx, 0, id_item)
+
+                # Config Name
+                name_item = QTableWidgetItem(config_data.get('config_name'))
+                name_item.setData(Qt.UserRole, config_data.get('smtp_config_id')) # Store ID for easy access
+                self.smtp_configs_table.setItem(row_idx, 1, name_item)
+
+                self.smtp_configs_table.setItem(row_idx, 2, QTableWidgetItem(config_data.get('smtp_server')))
+                self.smtp_configs_table.setItem(row_idx, 3, QTableWidgetItem(str(config_data.get('smtp_port'))))
+                self.smtp_configs_table.setItem(row_idx, 4, QTableWidgetItem(config_data.get('username')))
+                self.smtp_configs_table.setItem(row_idx, 5, QTableWidgetItem(config_data.get('sender_email_address')))
+
+                # Is Default Global
+                default_checkbox = QCheckBox()
+                default_checkbox.setChecked(bool(config_data.get('is_default')))
+                default_checkbox.setEnabled(False) # Display only, actual setting via button
+                cell_widget = QWidget()
+                layout = QHBoxLayout(cell_widget)
+                layout.addWidget(default_checkbox)
+                layout.setAlignment(Qt.AlignCenter)
+                layout.setContentsMargins(0,0,0,0)
+                self.smtp_configs_table.setCellWidget(row_idx, 6, cell_widget)
+
+        except Exception as e:
+            logger.error(f"Error loading SMTP configurations into table: {e}", exc_info=True)
+            QMessageBox.warning(self, self.tr("Erreur Chargement SMTP"), self.tr("Erreur lors du chargement des configurations SMTP: {0}").format(str(e)))
+        finally:
+            self.smtp_configs_table.setSortingEnabled(True)
+            self._update_smtp_buttons_state()
+
+    def _handle_add_smtp_config(self):
+        if not db_manager: return
+        dialog = SmtpConfigDialog(parent=self)
+        if dialog.exec_() == QDialog.Accepted:
+            self._load_smtp_configs_table() # Refresh table
+
+    def _handle_edit_smtp_config(self):
+        if not db_manager: return
+        selected_items = self.smtp_configs_table.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, self.tr("Sélection Requise"), self.tr("Veuillez sélectionner une configuration SMTP à modifier."))
+            return
+
+        # Get ID from the hidden first column of the selected row
+        config_id_str = self.smtp_configs_table.item(selected_items[0].row(), 0).text()
+        try:
+            config_id = int(config_id_str)
+        except ValueError:
+            QMessageBox.critical(self, self.tr("Erreur ID"), self.tr("ID de configuration SMTP invalide."))
+            return
+
+        dialog = SmtpConfigDialog(config_id=config_id, parent=self)
+        if dialog.exec_() == QDialog.Accepted:
+            self._load_smtp_configs_table()
+
+    def _handle_delete_smtp_config(self):
+        if not db_manager: return
+        selected_items = self.smtp_configs_table.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, self.tr("Sélection Requise"), self.tr("Veuillez sélectionner une configuration SMTP à supprimer."))
+            return
+
+        config_id_str = self.smtp_configs_table.item(selected_items[0].row(), 0).text()
+        config_name = self.smtp_configs_table.item(selected_items[0].row(), 1).text() # For confirmation message
+        try:
+            config_id = int(config_id_str)
+        except ValueError:
+            QMessageBox.critical(self, self.tr("Erreur ID"), self.tr("ID de configuration SMTP invalide pour la suppression."))
+            return
+
+        reply = QMessageBox.question(self, self.tr("Confirmer Suppression"),
+                                     self.tr("Êtes-vous sûr de vouloir supprimer la configuration SMTP '{0}'?").format(config_name),
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            if db_manager.delete_smtp_config(config_id):
+                QMessageBox.information(self, self.tr("Succès"), self.tr("Configuration SMTP supprimée."))
+                self._load_smtp_configs_table()
+            else:
+                QMessageBox.warning(self, self.tr("Échec"), self.tr("Impossible de supprimer la configuration SMTP."))
+
+    def _handle_set_global_default_smtp(self):
+        if not db_manager: return
+        selected_items = self.smtp_configs_table.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, self.tr("Sélection Requise"), self.tr("Veuillez sélectionner une configuration à définir comme défaut global."))
+            return
+
+        config_id_str = self.smtp_configs_table.item(selected_items[0].row(), 0).text()
+        config_name = self.smtp_configs_table.item(selected_items[0].row(), 1).text()
+        try:
+            config_id = int(config_id_str)
+        except ValueError:
+            QMessageBox.critical(self, self.tr("Erreur ID"), self.tr("ID de configuration SMTP invalide pour la définition par défaut."))
+            return
+
+        # Check if it's already default
+        current_data_item = self.smtp_configs_table.cellWidget(selected_items[0].row(), 6) # Checkbox widget
+        if current_data_item:
+            checkbox = current_data_item.findChild(QCheckBox)
+            if checkbox and checkbox.isChecked():
+                QMessageBox.information(self, self.tr("Information"), self.tr("La configuration '{0}' est déjà le défaut global.").format(config_name))
+                return
+
+        if db_manager.set_default_smtp_config(config_id):
+            QMessageBox.information(self, self.tr("Succès"), self.tr("La configuration '{0}' est maintenant le défaut global.").format(config_name))
+            self._load_smtp_configs_table()
+        else:
+            QMessageBox.warning(self, self.tr("Échec"), self.tr("Impossible de définir la configuration '{0}' comme défaut global.").format(config_name))
+
+    def _update_smtp_buttons_state(self):
+        has_selection = bool(self.smtp_configs_table.selectedItems())
+        self.edit_smtp_config_btn.setEnabled(has_selection)
+        self.delete_smtp_config_btn.setEnabled(has_selection)
+        self.set_global_default_smtp_btn.setEnabled(has_selection)
+
+        # Also check if the selected config is already default, if so, disable "Set Default"
+        if has_selection:
+            selected_row = self.smtp_configs_table.currentRow()
+            default_widget = self.smtp_configs_table.cellWidget(selected_row, 6) # Column for "Default Global"
+            if default_widget:
+                checkbox = default_widget.findChild(QCheckBox)
+                if checkbox and checkbox.isChecked():
+                    self.set_global_default_smtp_btn.setEnabled(False)
+                    self.set_global_default_smtp_btn.setToolTip(self.tr("Cette configuration est déjà le défaut global."))
+                else:
+                    self.set_global_default_smtp_btn.setToolTip(self.tr("Définir cette configuration comme défaut global pour l'application."))
+            else: # Should not happen if table is populated correctly
+                 self.set_global_default_smtp_btn.setToolTip("")
+
+
+    # --- User Email Assignment Methods ---
+    def _load_users_for_assignment_combo(self):
+        self.assign_user_combo.blockSignals(True)
+        self.assign_user_combo.clear()
+        self.assign_user_combo.addItem(self.tr("Sélectionner un utilisateur..."), None)
+        if not db_manager:
+            self.assign_user_combo.blockSignals(False)
+            return
+        try:
+            # Assuming list_users returns a list of dicts with 'user_id' and 'username'
+            users = db_manager.list_users(include_deleted=False, status_filter='active')
+            for user in sorted(users, key=lambda u: u.get('username', '').lower()):
+                display_name = f"{user.get('full_name', user.get('username', 'N/A'))} ({user.get('username', 'N/A')})"
+                self.assign_user_combo.addItem(display_name, user.get('user_id'))
+        except Exception as e:
+            logger.error(f"Error loading users into assignment combo: {e}", exc_info=True)
+        finally:
+            self.assign_user_combo.blockSignals(False)
+
+    def _load_available_global_smtp_configs_combo(self):
+        self.assign_global_smtp_combo.blockSignals(True)
+        self.assign_global_smtp_combo.clear()
+        self.assign_global_smtp_combo.addItem(self.tr("Choisir une configuration SMTP globale..."), None)
+        if not db_manager:
+            self.assign_global_smtp_combo.blockSignals(False)
+            return
+        try:
+            configs = db_manager.get_all_smtp_configs()
+            for config in sorted(configs, key=lambda c: c.get('config_name', '').lower()):
+                self.assign_global_smtp_combo.addItem(config.get('config_name'), config.get('smtp_config_id'))
+        except Exception as e:
+            logger.error(f"Error loading global SMTP configs into assignment combo: {e}", exc_info=True)
+        finally:
+            self.assign_global_smtp_combo.blockSignals(False)
+
+    def _load_assigned_smtp_for_selected_user(self):
+        self.user_assigned_smtp_table.setRowCount(0)
+        selected_user_id = self.assign_user_combo.currentData()
+        if not selected_user_id or not db_manager:
+            self._update_user_assignment_buttons_state()
+            return
+
+        try:
+            assigned_configs = db_manager.get_user_smtp_assignments(selected_user_id)
+            self.user_assigned_smtp_table.setSortingEnabled(False)
+            for row_idx, assignment_data in enumerate(assigned_configs):
+                self.user_assigned_smtp_table.insertRow(row_idx)
+
+                # Assignment ID (hidden)
+                assign_id_item = QTableWidgetItem(str(assignment_data.get('assignment_id')))
+                self.user_assigned_smtp_table.setItem(row_idx, 0, assign_id_item)
+
+                # Config Name (from SmtpConfigs table via JOIN in get_user_smtp_assignments)
+                config_name_item = QTableWidgetItem(assignment_data.get('config_name'))
+                # Store assignment_id in UserRole for easy access from selection
+                config_name_item.setData(Qt.UserRole, assignment_data.get('assignment_id'))
+                self.user_assigned_smtp_table.setItem(row_idx, 1, config_name_item)
+
+                self.user_assigned_smtp_table.setItem(row_idx, 2, QTableWidgetItem(assignment_data.get('sender_email_address')))
+
+                # Is Default for User
+                user_default_checkbox = QCheckBox()
+                user_default_checkbox.setChecked(bool(assignment_data.get('is_default_for_user')))
+                user_default_checkbox.setEnabled(False) # Display only
+                cell_widget = QWidget()
+                layout = QHBoxLayout(cell_widget)
+                layout.addWidget(user_default_checkbox)
+                layout.setAlignment(Qt.AlignCenter)
+                layout.setContentsMargins(0,0,0,0)
+                self.user_assigned_smtp_table.setCellWidget(row_idx, 3, cell_widget)
+
+        except Exception as e:
+            logger.error(f"Error loading assigned SMTP configs for user {selected_user_id}: {e}", exc_info=True)
+        finally:
+            self.user_assigned_smtp_table.setSortingEnabled(True)
+            self._update_user_assignment_buttons_state()
+
+    def _handle_assign_smtp_to_user(self):
+        selected_user_id = self.assign_user_combo.currentData()
+        selected_smtp_config_id = self.assign_global_smtp_combo.currentData()
+
+        if not selected_user_id:
+            QMessageBox.warning(self, self.tr("Utilisateur Non Sélectionné"), self.tr("Veuillez sélectionner un utilisateur."))
+            return
+        if not selected_smtp_config_id:
+            QMessageBox.warning(self, self.tr("Configuration Non Sélectionnée"), self.tr("Veuillez sélectionner une configuration SMTP globale à assigner."))
+            return
+
+        if not db_manager: return
+
+        # Check if this config is already assigned to the user
+        existing_assignments = db_manager.get_user_smtp_assignments(selected_user_id)
+        if any(a['smtp_config_id'] == selected_smtp_config_id for a in existing_assignments):
+            QMessageBox.information(self, self.tr("Déjà Assigné"), self.tr("Cette configuration SMTP est déjà assignée à cet utilisateur."))
+            return
+
+        # For simplicity, new assignments are not set as user's default by default.
+        # User can use "Set as User's Default" button after assignment.
+        assignment_id = db_manager.assign_smtp_to_user(selected_user_id, selected_smtp_config_id, is_default_for_user=False)
+        if assignment_id:
+            QMessageBox.information(self, self.tr("Succès"), self.tr("Configuration SMTP assignée avec succès à l'utilisateur."))
+            self._load_assigned_smtp_for_selected_user() # Refresh table
+        else:
+            QMessageBox.critical(self, self.tr("Échec"), self.tr("Impossible d'assigner la configuration SMTP à l'utilisateur."))
+
+    def _handle_set_user_default_smtp(self):
+        selected_user_id = self.assign_user_combo.currentData()
+        selected_assignment_items = self.user_assigned_smtp_table.selectedItems()
+
+        if not selected_user_id:
+            QMessageBox.warning(self, self.tr("Utilisateur Non Sélectionné"), self.tr("Veuillez sélectionner un utilisateur."))
+            return
+        if not selected_assignment_items:
+            QMessageBox.warning(self, self.tr("Affectation Non Sélectionnée"), self.tr("Veuillez sélectionner une affectation dans la table à définir comme défaut pour l'utilisateur."))
+            return
+
+        if not db_manager: return
+
+        assignment_id = self.user_assigned_smtp_table.item(selected_assignment_items[0].row(), 0).text()
+        config_name = self.user_assigned_smtp_table.item(selected_assignment_items[0].row(), 1).text()
+
+        # Check if it's already default for user
+        default_cell_widget = self.user_assigned_smtp_table.cellWidget(selected_assignment_items[0].row(), 3)
+        if default_cell_widget:
+            checkbox = default_cell_widget.findChild(QCheckBox)
+            if checkbox and checkbox.isChecked():
+                QMessageBox.information(self, self.tr("Information"), self.tr("La configuration '{0}' est déjà le défaut pour cet utilisateur.").format(config_name))
+                return
+
+        if db_manager.set_default_smtp_for_user(selected_user_id, assignment_id):
+            QMessageBox.information(self, self.tr("Succès"), self.tr("La configuration '{0}' est maintenant le défaut pour l'utilisateur {1}.").format(config_name, self.assign_user_combo.currentText()))
+            self._load_assigned_smtp_for_selected_user() # Refresh table
+        else:
+            QMessageBox.warning(self, self.tr("Échec"), self.tr("Impossible de définir la configuration comme défaut pour l'utilisateur."))
+
+    def _handle_unassign_smtp_from_user(self):
+        selected_assignment_items = self.user_assigned_smtp_table.selectedItems()
+        if not selected_assignment_items:
+            QMessageBox.warning(self, self.tr("Affectation Non Sélectionnée"), self.tr("Veuillez sélectionner une affectation à supprimer."))
+            return
+
+        if not db_manager: return
+
+        assignment_id = self.user_assigned_smtp_table.item(selected_assignment_items[0].row(), 0).text()
+        config_name = self.user_assigned_smtp_table.item(selected_assignment_items[0].row(), 1).text() # For message
+        user_name = self.assign_user_combo.currentText()
+
+        reply = QMessageBox.question(self, self.tr("Confirmer Désassignation"),
+                                     self.tr("Êtes-vous sûr de vouloir désassigner la configuration '{0}' de l'utilisateur '{1}'?").format(config_name, user_name),
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            if db_manager.unassign_smtp_from_user(assignment_id):
+                QMessageBox.information(self, self.tr("Succès"), self.tr("Configuration désassignée avec succès."))
+                self._load_assigned_smtp_for_selected_user() # Refresh
+            else:
+                QMessageBox.warning(self, self.tr("Échec"), self.tr("Impossible de désassigner la configuration."))
+
+    def _update_user_assignment_buttons_state(self):
+        user_selected = bool(self.assign_user_combo.currentData())
+        assignment_selected = bool(self.user_assigned_smtp_table.selectedItems())
+        global_config_selected_for_assign = bool(self.assign_global_smtp_combo.currentData())
+
+        self.assign_smtp_to_user_btn.setEnabled(user_selected and global_config_selected_for_assign)
+        self.set_user_default_smtp_btn.setEnabled(user_selected and assignment_selected)
+        self.unassign_smtp_from_user_btn.setEnabled(user_selected and assignment_selected)
+
+        # Further refinement for "Set as User's Default"
+        if user_selected and assignment_selected:
+            selected_row = self.user_assigned_smtp_table.currentRow()
+            default_widget = self.user_assigned_smtp_table.cellWidget(selected_row, 3) # Column for "Défaut pour Utilisateur"
+            if default_widget:
+                checkbox = default_widget.findChild(QCheckBox)
+                if checkbox and checkbox.isChecked():
+                    self.set_user_default_smtp_btn.setEnabled(False)
+                    self.set_user_default_smtp_btn.setToolTip(self.tr("Cette configuration est déjà le défaut pour cet utilisateur."))
+                else:
+                    self.set_user_default_smtp_btn.setToolTip(self.tr("Définir cette configuration comme défaut pour l'utilisateur sélectionné."))
+            else: # Should not happen
+                self.set_user_default_smtp_btn.setToolTip("")
+
+
+    # --- End User Email Assignment Methods ---
+
+    # --- End SMTP Configuration Management Methods ---
 
 
 if __name__ == '__main__':
