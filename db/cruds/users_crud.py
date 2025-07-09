@@ -144,6 +144,7 @@ def get_any_user_by_username(username: str, conn=None, logger_passed: logging.Lo
     # Similar to get_user_by_username but without status checks, and using LEFT JOIN for robustness
     sql_select_part = "SELECT u.*, r.role_name FROM Users u LEFT JOIN Roles r ON u.role_id = r.role_id"
 
+
     sql_sqlite = f"{sql_select_part} WHERE u.username = ?"
     sql_sa = text(f"{sql_select_part} WHERE u.username = :username")
 
