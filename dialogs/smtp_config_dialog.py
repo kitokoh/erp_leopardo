@@ -2,10 +2,13 @@
 import logging
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QLineEdit, QSpinBox,
-    QCheckBox, QDialogButtonBox, QMessageBox, QLabel
+    QCheckBox, QDialogButtonBox, QMessageBox, QLabel, QPushButton, QHBoxLayout
 )
 from PyQt5.QtCore import Qt
 import db # Assuming db.__init__ exports the necessary smtp_configs_crud functions
+import smtplib
+from email.mime.text import MIMEText
+
 
 logger = logging.getLogger(__name__)
 
@@ -68,11 +71,22 @@ class SmtpConfigDialog(QDialog):
 
         main_layout.addLayout(form_layout)
 
-        # Dialog buttons
+        # Test connection button
+        self.test_connection_button = QPushButton(self.tr("Tester la Connexion"))
+        self.test_connection_button.setToolTip(self.tr("Tenter une connexion au serveur SMTP et envoyer un email de test."))
+        self.test_connection_button.clicked.connect(self._test_smtp_connection)
+
+        # Buttons layout
+        buttons_layout = QHBoxLayout()
+        buttons_layout.addWidget(self.test_connection_button)
+        buttons_layout.addStretch(1)
+
         self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         self.button_box.accepted.connect(self._on_accept)
         self.button_box.rejected.connect(self.reject)
-        main_layout.addWidget(self.button_box)
+        buttons_layout.addWidget(self.button_box) # Add standard OK/Cancel to the right
+
+        main_layout.addLayout(buttons_layout) # Add the QHBoxLayout with test button and buttonBox
 
     def _load_data(self):
         if not self.is_edit_mode or self.config_id is None:
@@ -184,6 +198,110 @@ class SmtpConfigDialog(QDialog):
             logger.error(f"Error saving SMTP configuration: {e}", exc_info=True)
             QMessageBox.critical(self, self.tr("Erreur Sauvegarde"),
                                  self.tr("Une erreur est survenue lors de la sauvegarde: {0}").format(str(e)))
+
+    def _test_smtp_connection(self):
+        data = self.get_data()
+        smtp_server = data['smtp_server']
+        smtp_port = data['smtp_port']
+        username = data.get('username', '')
+        # For testing, we need the password if it's set or if it's an existing config
+        password_to_test = data.get('password')
+        if not password_to_test and self.is_edit_mode and self.original_data:
+            # If password field is empty in edit mode, try to use original password for test
+            # This is a simplification; a real app might require re-entry or have a secure way to re-use.
+            # For now, we assume original_data holds the (potentially obfuscated) password.
+            # If it's obfuscated, this test won't work without de-obfuscation.
+            # The CRUD layer uses base64 for now, so we'd need to decode that.
+            # Let's assume for now the test needs a plainly entered password or the stored one is plain for test purposes.
+            # This part needs careful consideration for security if passwords are encrypted/hashed.
+            # For this step, we'll assume password_edit must contain the password for testing.
+            if not self.password_edit.text():
+                 QMessageBox.warning(self, self.tr("Mot de passe requis"),
+                                     self.tr("Veuillez entrer le mot de passe SMTP pour le test de connexion."))
+                 self.password_edit.setFocus()
+                 return
+            password_to_test = self.password_edit.text()
+
+
+        use_tls = data['use_tls']
+        sender_email = data['sender_email_address']
+
+        if not smtp_server or not smtp_port or not sender_email:
+            QMessageBox.warning(self, self.tr("Informations Manquantes"),
+                                self.tr("Serveur SMTP, port et email expéditeur sont requis pour le test."))
+            return
+
+        try:
+            # Prompt for a recipient email for the test
+            recipient_email, ok = QLineEdit.getText(self, self.tr("Email de Test"),
+                                                    self.tr("Entrez l'adresse email destinataire pour le test :"),
+                                                    QLineEdit.Normal, "")
+            if not (ok and recipient_email and "@" in recipient_email):
+                QMessageBox.information(self, self.tr("Test Annulé"), self.tr("Test de connexion annulé ou email destinataire invalide."))
+                return
+
+            msg = MIMEText(self.tr("Ceci est un email de test de la configuration SMTP."))
+            msg['Subject'] = self.tr("Email de Test SMTP")
+            msg['From'] = f"{data.get('sender_display_name', sender_email)} <{sender_email}>"
+            msg['To'] = recipient_email
+
+            self.setCursor(Qt.WaitCursor)
+            QApplication.processEvents()
+
+
+            if use_tls:
+                server = smtplib.SMTP(smtp_server, smtp_port, timeout=10)
+                server.ehlo()
+                server.starttls()
+                server.ehlo()
+            else: # SSL - less common now, usually on port 465
+                # For SSL, smtplib.SMTP_SSL should be used.
+                # We'll assume TLS if checked, plain if not. Port should guide SSL/TLS.
+                # A more robust solution would have a "Security Type" dropdown (None, TLS, SSL).
+                # For now, checkbox handles TLS, otherwise plain.
+                server = smtplib.SMTP(smtp_server, smtp_port, timeout=10)
+                server.ehlo()
+
+
+            if username and password_to_test:
+                server.login(username, password_to_test)
+
+            server.sendmail(sender_email, [recipient_email], msg.as_string())
+            server.quit()
+
+            self.unsetCursor()
+            QMessageBox.information(self, self.tr("Test de Connexion Réussi"),
+                                    self.tr("Connexion SMTP réussie et email de test envoyé à {0}.").format(recipient_email))
+        except smtplib.SMTPAuthenticationError:
+            self.unsetCursor()
+            QMessageBox.critical(self, self.tr("Échec de l'Authentification"),
+                                 self.tr("Authentification SMTP échouée. Vérifiez nom d'utilisateur et mot de passe."))
+        except smtplib.SMTPConnectError:
+            self.unsetCursor()
+            QMessageBox.critical(self, self.tr("Échec de Connexion"),
+                                 self.tr("Impossible de se connecter au serveur SMTP. Vérifiez l'adresse et le port."))
+        except smtplib.SMTPServerDisconnected:
+            self.unsetCursor()
+            QMessageBox.critical(self, self.tr("Serveur Déconnecté"),
+                                 self.tr("Le serveur SMTP s'est déconnecté de manière inattendue."))
+        except smtplib.SMTPException as e:
+            self.unsetCursor()
+            logger.error(f"SMTP test connection error: {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur SMTP"),
+                                 self.tr("Une erreur SMTP est survenue : {0}").format(str(e)))
+        except ConnectionRefusedError: # More specific network error
+            self.unsetCursor()
+            QMessageBox.critical(self, self.tr("Connexion Refusée"),
+                                 self.tr("La connexion au serveur SMTP a été refusée. Le serveur est-il en ligne et le port correct?"))
+
+        except Exception as e:
+            self.unsetCursor()
+            logger.error(f"Unexpected error during SMTP test connection: {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur Inattendue"),
+                                 self.tr("Une erreur inattendue est survenue : {0}").format(str(e)))
+        finally:
+            self.unsetCursor()
+
 
 if __name__ == '__main__':
     # This part is for testing the dialog standalone.

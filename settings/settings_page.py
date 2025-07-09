@@ -439,7 +439,9 @@ class SettingsPage(QWidget):
         # Initialize new tab structure
         self._setup_general_settings_tab()
         self._setup_company_personnel_tab()
-        self._setup_connectivity_services_tab()
+        # self._setup_connectivity_services_tab() # This is now split
+        self._setup_global_smtp_configs_tab()
+        self._setup_user_email_assignment_tab()
         self._setup_application_modules_tab()
         self._setup_data_backup_tab()
         self._setup_logistics_tab()
@@ -558,20 +560,21 @@ class SettingsPage(QWidget):
         self.tabs_widget.addTab(self.company_tab_widget_instance, self.tr("Company & Personnel"))
         # Loading and saving for this tab is presumably handled within CompanyTabWidget or called by _load/save_all_settings.
 
-    def _setup_connectivity_services_tab(self):
-        tab_widget = QWidget()
-        main_layout = QVBoxLayout(tab_widget)
+    # def _setup_connectivity_services_tab(self): -- This method is now removed and split --
+
+    def _setup_global_smtp_configs_tab(self):
+        """Sets up the tab for managing global SMTP configurations."""
+        global_smtp_tab_widget = QWidget()
+        main_layout = QVBoxLayout(global_smtp_tab_widget)
         main_layout.setContentsMargins(15, 15, 15, 15)
         main_layout.setSpacing(15)
 
-        # --- Email (SMTP) Settings Group ---
-        # --- Email (SMTP) Settings Group ---
-        email_group = QGroupBox(self.tr("Gestion des Configurations Email (SMTP)"))
-        email_group_layout = QVBoxLayout(email_group) # Main layout for this group
+        global_smtp_group = QGroupBox(self.tr("Configurations SMTP Globales"))
+        global_smtp_group_layout = QVBoxLayout(global_smtp_group)
 
-        # Table for SMTP configurations
         self.smtp_configs_table = QTableWidget()
-        self.smtp_configs_table.setColumnCount(6) # ID (hidden), Name, Server, Port, User, Sender Email, Default
+        self.smtp_configs_table.setObjectName("smtpConfigsTable")
+        self.smtp_configs_table.setColumnCount(7)
         self.smtp_configs_table.setHorizontalHeaderLabels([
             self.tr("ID"), self.tr("Nom Config"), self.tr("Serveur"),
             self.tr("Port"), self.tr("Utilisateur"), self.tr("Email Exp."), self.tr("Défaut Global")
@@ -579,25 +582,24 @@ class SettingsPage(QWidget):
         self.smtp_configs_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.smtp_configs_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.smtp_configs_table.horizontalHeader().setStretchLastSection(True)
-        self.smtp_configs_table.setColumnHidden(0, True) # Hide ID
-        # Adjust column widths - example
-        self.smtp_configs_table.setColumnWidth(1, 150) # Name
-        self.smtp_configs_table.setColumnWidth(2, 150) # Server
-        self.smtp_configs_table.setColumnWidth(4, 120) # User
-        self.smtp_configs_table.setColumnWidth(5, 150) # Sender Email
-
+        self.smtp_configs_table.setColumnHidden(0, True)
+        self.smtp_configs_table.setColumnWidth(1, 150)
+        self.smtp_configs_table.setColumnWidth(2, 150)
+        self.smtp_configs_table.setColumnWidth(4, 120)
+        self.smtp_configs_table.setColumnWidth(5, 150)
         self.smtp_configs_table.itemSelectionChanged.connect(self._update_smtp_buttons_state)
-        email_group_layout.addWidget(self.smtp_configs_table)
+        global_smtp_group_layout.addWidget(self.smtp_configs_table)
 
-        # Buttons for managing SMTP configurations
         smtp_buttons_layout = QHBoxLayout()
         self.add_smtp_config_btn = QPushButton(self.tr("Ajouter"))
         self.add_smtp_config_btn.setIcon(QIcon(":/icons/plus-circle.svg"))
+        self.add_smtp_config_btn.setToolTip(self.tr("Ajouter une nouvelle configuration SMTP globale."))
         self.add_smtp_config_btn.clicked.connect(self._handle_add_smtp_config)
         smtp_buttons_layout.addWidget(self.add_smtp_config_btn)
 
         self.edit_smtp_config_btn = QPushButton(self.tr("Modifier"))
         self.edit_smtp_config_btn.setIcon(QIcon(":/icons/edit-2.svg"))
+        self.edit_smtp_config_btn.setToolTip(self.tr("Modifier la configuration SMTP sélectionnée."))
         self.edit_smtp_config_btn.setEnabled(False)
         self.edit_smtp_config_btn.clicked.connect(self._handle_edit_smtp_config)
         smtp_buttons_layout.addWidget(self.edit_smtp_config_btn)
@@ -605,6 +607,7 @@ class SettingsPage(QWidget):
         self.delete_smtp_config_btn = QPushButton(self.tr("Supprimer"))
         self.delete_smtp_config_btn.setIcon(QIcon(":/icons/trash.svg"))
         self.delete_smtp_config_btn.setObjectName("dangerButton")
+        self.delete_smtp_config_btn.setToolTip(self.tr("Supprimer la configuration SMTP sélectionnée."))
         self.delete_smtp_config_btn.setEnabled(False)
         self.delete_smtp_config_btn.clicked.connect(self._handle_delete_smtp_config)
         smtp_buttons_layout.addWidget(self.delete_smtp_config_btn)
@@ -612,22 +615,90 @@ class SettingsPage(QWidget):
         smtp_buttons_layout.addStretch(1)
 
         self.set_global_default_smtp_btn = QPushButton(self.tr("Définir par Défaut (Global)"))
-        self.set_global_default_smtp_btn.setIcon(QIcon(":/icons/check-square.svg")) # Placeholder icon
+        self.set_global_default_smtp_btn.setIcon(QIcon(":/icons/check-square.svg"))
+        self.set_global_default_smtp_btn.setToolTip(self.tr("Définir la configuration SMTP sélectionnée comme défaut global pour l'application."))
         self.set_global_default_smtp_btn.setEnabled(False)
         self.set_global_default_smtp_btn.clicked.connect(self._handle_set_global_default_smtp)
         smtp_buttons_layout.addWidget(self.set_global_default_smtp_btn)
 
-        email_group_layout.addLayout(smtp_buttons_layout)
-        main_layout.addWidget(email_group)
-
-        # Placeholder for User Email Assignment section (to be added in a later step)
-        # user_email_assignment_group = QGroupBox(self.tr("Affectation des Emails aux Utilisateurs"))
-        # ... layout and widgets for user assignment ...
-        # main_layout.addWidget(user_email_assignment_group)
-
+        global_smtp_group_layout.addLayout(smtp_buttons_layout)
+        main_layout.addWidget(global_smtp_group)
         main_layout.addStretch(1)
-        self.tabs_widget.addTab(tab_widget, self.tr("Email et Connectivité")) # Tab name might change
+        self.tabs_widget.addTab(global_smtp_tab_widget, self.tr("Configurations SMTP Globales"))
 
+    def _setup_user_email_assignment_tab(self):
+        """Sets up the tab for assigning email configurations to users."""
+        user_assignment_tab_widget = QWidget()
+        main_layout = QVBoxLayout(user_assignment_tab_widget)
+        main_layout.setContentsMargins(15, 15, 15, 15)
+        main_layout.setSpacing(15)
+
+        user_email_assignment_group = QGroupBox(self.tr("Affectation des Emails aux Utilisateurs"))
+        assignment_main_layout = QVBoxLayout(user_email_assignment_group)
+        assignment_main_layout.setSpacing(10)
+
+        user_selection_layout = QHBoxLayout()
+        user_selection_layout.addWidget(QLabel(self.tr("Utilisateur :")))
+        self.assign_user_combo = QComboBox()
+        self.assign_user_combo.setToolTip(self.tr("Sélectionner un utilisateur pour gérer ses affectations d'email."))
+        self.assign_user_combo.currentIndexChanged.connect(self._load_assigned_smtp_for_selected_user)
+        self.assign_user_combo.currentIndexChanged.connect(self._update_user_assignment_buttons_state)
+        user_selection_layout.addWidget(self.assign_user_combo)
+        user_selection_layout.addStretch(1)
+        assignment_main_layout.addLayout(user_selection_layout)
+
+        self.user_assigned_smtp_table = QTableWidget()
+        self.user_assigned_smtp_table.setObjectName("userAssignedSmtpTable")
+        self.user_assigned_smtp_table.setColumnCount(4)
+        self.user_assigned_smtp_table.setHorizontalHeaderLabels([
+            self.tr("ID Affect."), self.tr("Nom Config SMTP"),
+            self.tr("Email Expéditeur"), self.tr("Défaut pour Utilisateur")
+        ])
+        self.user_assigned_smtp_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.user_assigned_smtp_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.user_assigned_smtp_table.horizontalHeader().setStretchLastSection(True)
+        self.user_assigned_smtp_table.setColumnHidden(0, True)
+        self.user_assigned_smtp_table.setColumnWidth(1, 200)
+        self.user_assigned_smtp_table.setColumnWidth(2, 200)
+        self.user_assigned_smtp_table.itemSelectionChanged.connect(self._update_user_assignment_buttons_state)
+        assignment_main_layout.addWidget(self.user_assigned_smtp_table)
+
+        assign_new_layout = QHBoxLayout()
+        assign_new_layout.addWidget(QLabel(self.tr("Assigner Config Globale :")))
+        self.assign_global_smtp_combo = QComboBox()
+        self.assign_global_smtp_combo.setToolTip(self.tr("Choisir une configuration SMTP globale à assigner à l'utilisateur sélectionné."))
+        self.assign_global_smtp_combo.currentIndexChanged.connect(self._update_user_assignment_buttons_state)
+        assign_new_layout.addWidget(self.assign_global_smtp_combo)
+        self.assign_smtp_to_user_btn = QPushButton(self.tr("Assigner à l'Utilisateur"))
+        self.assign_smtp_to_user_btn.setIcon(QIcon(":/icons/plus.svg"))
+        self.assign_smtp_to_user_btn.setToolTip(self.tr("Assigner la configuration SMTP globale sélectionnée à l'utilisateur."))
+        self.assign_smtp_to_user_btn.setEnabled(False)
+        self.assign_smtp_to_user_btn.clicked.connect(self._handle_assign_smtp_to_user)
+        assign_new_layout.addWidget(self.assign_smtp_to_user_btn)
+        assign_new_layout.addStretch(1)
+        assignment_main_layout.addLayout(assign_new_layout)
+
+        user_assignment_buttons_layout = QHBoxLayout()
+        self.set_user_default_smtp_btn = QPushButton(self.tr("Définir par Défaut (Utilisateur)"))
+        self.set_user_default_smtp_btn.setIcon(QIcon(":/icons/check.svg"))
+        self.set_user_default_smtp_btn.setToolTip(self.tr("Définir la configuration SMTP assignée sélectionnée comme défaut pour cet utilisateur."))
+        self.set_user_default_smtp_btn.setEnabled(False)
+        self.set_user_default_smtp_btn.clicked.connect(self._handle_set_user_default_smtp)
+        user_assignment_buttons_layout.addWidget(self.set_user_default_smtp_btn)
+
+        self.unassign_smtp_from_user_btn = QPushButton(self.tr("Désassigner de l'Utilisateur"))
+        self.unassign_smtp_from_user_btn.setIcon(QIcon(":/icons/trash.svg"))
+        self.unassign_smtp_from_user_btn.setObjectName("dangerButton")
+        self.unassign_smtp_from_user_btn.setToolTip(self.tr("Désassigner la configuration SMTP de cet utilisateur."))
+        self.unassign_smtp_from_user_btn.setEnabled(False)
+        self.unassign_smtp_from_user_btn.clicked.connect(self._handle_unassign_smtp_from_user)
+        user_assignment_buttons_layout.addWidget(self.unassign_smtp_from_user_btn)
+        user_assignment_buttons_layout.addStretch(1)
+        assignment_main_layout.addLayout(user_assignment_buttons_layout)
+
+        main_layout.addWidget(user_email_assignment_group)
+        main_layout.addStretch(1)
+        self.tabs_widget.addTab(user_assignment_tab_widget, self.tr("Affectations Email Utilisateurs"))
 
     def _setup_application_modules_tab(self):
         modules_tab_widget = QWidget()
