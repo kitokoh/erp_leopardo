@@ -104,6 +104,7 @@ def add_default_template_if_not_exists(data: dict, conn: sqlite3.Connection = No
             if category_purpose == 'email':
                 # New path for email templates
                 template_base_path = os.path.join(config.APP_ROOT_DIR, "resources", "email_template_designs")
+
                 fpath = os.path.join(template_base_path, base_file_name)
             elif category_purpose in ['client_document', 'utility_document', 'utility']: # 'utility' was seen in seed data
                 # Document templates are in resources/templates/[lang_code]/
@@ -114,6 +115,7 @@ def add_default_template_if_not_exists(data: dict, conn: sqlite3.Connection = No
                 # Defaulting to the new email path as a general fallback, but with a strong warning.
                 logging.error(f"CRITICAL: Undefined or missing category_purpose '{category_purpose}' for template '{name}'. Attempting new email template path structure as a fallback: resources/email_template_designs.")
                 template_base_path = os.path.join(config.APP_ROOT_DIR, "resources", "email_template_designs")
+
                 fpath = os.path.join(template_base_path, base_file_name)
 
             if os.path.exists(fpath):
