@@ -228,6 +228,28 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
     target_admin_username = "admin" # Define earlier to avoid UnboundLocalError in logging
     super_admin_role_id = current_role_ids.get(SUPER_ADMIN_ROLE_NAME)
 
+    # PRE-SEEDING CHECK FOR ADMIN USER
+    try:
+        logger.info(f"DB_SEED_ADMIN_CHECK: Checking Users table state before attempting to seed '{target_admin_username}'.")
+        # Use the raw cursor passed to _original_seed_initial_data_func_placeholder
+        # This cursor should be from the same connection 'conn'
+        check_cursor = conn.cursor() # Obtain a new cursor from the same connection
+
+        check_cursor.execute("SELECT COUNT(*) FROM Users")
+        user_count = check_cursor.fetchone()[0]
+        logger.info(f"DB_SEED_ADMIN_CHECK: Current total users in Users table: {user_count}")
+
+        check_cursor.execute("SELECT user_id, username, email, role_id, is_active, is_deleted FROM Users WHERE username = ?", (target_admin_username,))
+        existing_admin_row = check_cursor.fetchone()
+        if existing_admin_row:
+            logger.info(f"DB_SEED_ADMIN_CHECK: User '{target_admin_username}' ALREADY EXISTS before seeding attempt. Details: {dict(existing_admin_row)}")
+        else:
+            logger.info(f"DB_SEED_ADMIN_CHECK: User '{target_admin_username}' DOES NOT exist before seeding attempt.")
+        # We don't close check_cursor here as it's from the same conn which is managed by _original_seed_initial_data_func_placeholder
+    except Exception as e_check:
+        logger.error(f"DB_SEED_ADMIN_CHECK: Error during pre-seeding check for admin user: {e_check}", exc_info=True)
+    # END PRE-SEEDING CHECK
+
     if super_admin_role_id:
         temp_admin_password = "admin" # Ensure this is the desired default password
         logger.info(f"Ensuring super admin user '{target_admin_username}' exists with password (hidden) and role '{SUPER_ADMIN_ROLE_NAME}' (Role ID: {super_admin_role_id})...")
