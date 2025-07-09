@@ -21,6 +21,7 @@ from excel_editor import ExcelEditor
 from gui.widgets.html_editor import HtmlEditor
 from utils.app_constants import SUPPORTED_LANGUAGES # Import centralisé
 # Other necessary dialogs and modules will be imported as needed, or passed from parent
+from typing import Optional
 
 class DocumentsTab(QWidget):
     def __init__(self, client_info: dict, config: object, app_root_dir: str,
