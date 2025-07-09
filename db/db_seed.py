@@ -225,10 +225,10 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
     # --- Seed Admin User ---
     # This must happen after roles (especially SUPER_ADMIN_ROLE_NAME) are available in current_role_ids
     super_admin_user_id = None
+    target_admin_username = "admin" # Define earlier to avoid UnboundLocalError in logging
     super_admin_role_id = current_role_ids.get(SUPER_ADMIN_ROLE_NAME)
 
     if super_admin_role_id:
-        target_admin_username = "admin"
         temp_admin_password = "admin" # Ensure this is the desired default password
         logger.info(f"Ensuring super admin user '{target_admin_username}' exists with password (hidden) and role '{SUPER_ADMIN_ROLE_NAME}' (Role ID: {super_admin_role_id})...")
 
@@ -398,6 +398,68 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
 
         # Preserve admin_user_id for compatibility with other seeding parts if they expect it.
         admin_user_id = super_admin_user_id # This is the ID of the "admin" user with "super_admin" role
+
+    # --- Seed License for Admin User ---
+    if super_admin_user_id:
+        try:
+            from license_management import cruds as license_cruds
+            from datetime import timedelta # datetime is already imported
+
+            logger.info(f"Checking/Seeding license for admin user ID: {super_admin_user_id}")
+            # Check for existing active 'complet' license
+            existing_licenses = license_cruds.get_licenses_for_user(conn, super_admin_user_id)
+            active_complet_license_exists = False
+            if existing_licenses:
+                for lic in existing_licenses:
+                    if lic['license_type'] == 'complet' and lic['is_active']:
+                        # Check if expiration_date is a string and needs parsing, or already a datetime object
+                        exp_date_str = lic.get('expiration_date')
+                        if exp_date_str:
+                            try:
+                                # Assuming ISO format with 'Z' or timezone offset
+                                if isinstance(exp_date_str, str):
+                                    exp_date = datetime.fromisoformat(exp_date_str.replace('Z', '+00:00'))
+                                elif isinstance(exp_date_str, datetime):
+                                     exp_date = exp_date_str # Already a datetime object
+
+                                if exp_date > datetime.now(exp_date.tzinfo) + timedelta(days=30): # Still valid for at least 30 days
+                                    active_complet_license_exists = True
+                                    logger.info(f"Admin user already has an active 'complet' license expiring on {exp_date_str}.")
+                                    break
+                            except ValueError as e_date:
+                                logger.warning(f"Could not parse expiration date '{exp_date_str}' for existing license {lic.get('license_id')}: {e_date}")
+                        else: # No expiration date, assume it's not what we want or it's a permanent 'complet' type
+                            logger.info(f"Admin user has an active 'complet' license {lic.get('license_id')} with no expiration date or unparseable.")
+                            # active_complet_license_exists = True # Or decide if this is acceptable
+                            # break
+
+            if not active_complet_license_exists:
+                logger.info(f"No suitable active 'complet' license found for admin. Creating a new 6-month 'complet' license.")
+                activation_date = datetime.utcnow()
+                expiration_date = activation_date + timedelta(days=180)
+                license_data = {
+                    "user_id": super_admin_user_id,
+                    "license_type": "complet", # Assuming 'complet' grants full access
+                    "license_key": str(uuid.uuid4()), # Generate a new unique license key
+                    "activation_date": activation_date.isoformat() + "Z",
+                    "expiration_date": expiration_date.isoformat() + "Z",
+                    "is_active": True
+                }
+                new_license_id = license_cruds.add_license(conn, license_data)
+                if new_license_id:
+                    logger.info(f"Successfully added 'complet' license (ID: {new_license_id}) for admin user {super_admin_user_id}, valid for 6 months.")
+                else:
+                    logger.error(f"Failed to add 'complet' license for admin user {super_admin_user_id}.")
+            else:
+                logger.info(f"Admin user {super_admin_user_id} already has a suitable active 'complet' license. Skipping new license creation.")
+
+        except ImportError:
+            logger.error("Failed to import license_management.cruds. Cannot seed admin license.")
+        except Exception as e_lic:
+            logger.error(f"An error occurred during admin license seeding: {e_lic}", exc_info=True)
+    else:
+        logger.warning("super_admin_user_id is not set. Skipping license seeding for admin.")
+    # --- End Seed License for Admin User ---
 
         # Fallback for original DEFAULT_ADMIN_USERNAME if that's different and was used elsewhere
         if DEFAULT_ADMIN_USERNAME != "admin":
