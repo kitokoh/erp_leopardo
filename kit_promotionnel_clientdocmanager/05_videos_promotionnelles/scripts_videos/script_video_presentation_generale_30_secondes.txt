@@ -1,0 +1,34 @@
+# Script Vidéo Détaillé : Présentation Générale ClientDocManager (30 secondes)
+
+**Objectif :** Présenter rapidement ClientDocManager, ses avantages clés et inciter à en savoir plus.
+**Ton :** Dynamique, clair, professionnel, inspirant confiance.
+**Public Cible :** PME, commerciaux, chefs de projet, responsables administratifs.
+**Musique :** Moderne, entraînante mais pas intrusive, avec des variations d'intensité pour souligner les moments clés.
+
+---
+
+**SECONDES | VISUEL (Description détaillée) | AUDIO (Voix Off) | TEXTE À L'ÉCRAN (Dynamique)**
+------- | -------- | -------- | --------
+**0-1.5s** | **Scène 1.1 : Le Chaos Documentaire** <br> Animation motion design : Des icônes stylisées (documents papier, tableurs Excel, post-its) s'accumulent rapidement et de manière désordonnée sur un bureau virtuel. Une horloge tourne frénétiquement en arrière-plan. Couleurs légèrement désaturées ou "stressantes". | *(Musique commence, tempo rapide mais un peu tendu)* | *(Optionnel : "Trop de paperasse ?" en fondu rapide)*
+**1.5-3s** | **Scène 1.2 : La Frustration** <br> Plan serré sur une icône de personnage stylisé (ou une main tenant une souris) exprimant la frustration (ex: se tenant la tête, soupirant) devant un écran d'ordinateur affichant une interface générique et encombrée. | **Voix Off (ton empathique mais dynamique) :** "Fatigué de jongler avec les informations clients et de perdre un temps fou à créer vos documents commerciaux ?" |
+**3-5s** | **Scène 2.1 : L'Apparition de la Solution** <br> Transition fluide. Le logo "ClientDocManager" (avec le nom complet) apparaît en animation 2D/3D simple et élégante au centre de l'écran, sur un fond propre et moderne (peut-être un dégradé subtil du Bleu ClientDocManager). Effet sonore positif discret à l'apparition. | *(La musique devient plus positive et optimiste)* | **Logo ClientDocManager** (clair et lisible)
+**5-10s** | **Scène 2.2 : L'Interface Accueillante** <br> Le logo se fond ou zoome pour révéler une capture d'écran impeccable et bien éclairée de l'interface principale de ClientDocManager (ex: `HomePageWidget` épuré ou la liste de clients avec des indicateurs de statut colorés). Le curseur de la souris survole brièvement quelques éléments clés pour montrer la clarté. | **Voix Off :** "Découvrez ClientDocManager ! L'application de bureau qui révolutionne votre gestion." | **Mots-clés animés** apparaissant successivement : <br> - "Centralisation Intelligente" <br> - "Automatisation Efficace" <br> - "Simplicité d'Utilisation"
+**10-13s** | **Scène 3.1 : Focus Client** <br> Capture d'écran dynamique : Zoom sur une fiche client (`ClientMainWidget`) montrant clairement le nom du client, son statut, et des onglets (Détails, Documents). Le curseur clique sur l'onglet "Documents", révélant une liste de documents bien organisée. | **Voix Off :** "Centralisez toutes vos données clients..." | **Texte superposé :** "Clients 360°" (apparaît et disparaît en fondu)
+**13-16s** | **Scène 3.2 : Magie Documentaire** <br> Animation graphique : Des icônes représentant des données (profil client, détails produit, logo entreprise) flottent et s'insèrent dans un gabarit de document stylisé (ex: une proforma). Le document se "construit" visuellement. | **Voix Off :** "...automatisez la création de vos proformas, contrats..." | **Texte superposé :** "Documents en 1 Clic"
+**16-20s** | **Scène 3.3 : Suivi de Projet Visuel** <br> Capture d'écran dynamique : Aperçu du `ProjectManagementDashboard` avec des cartes de projets colorées indiquant leur statut, ou une frise chronologique simple. Mouvement léger pour montrer l'interactivité. | **Voix Off :** "...et suivez l'avancement de vos projets... le tout, au même endroit !" | **Texte superposé :** "Projets Maîtrisés"
+**20-24s** | **Scène 4.1 : Le Bénéfice Humain** <br> Illustration ou courte vidéo stylisée : Un(e) professionnel(le) (représentant le public cible) travaillant sereinement sur un ordinateur portable affichant discrètement l'interface ClientDocManager, dans un environnement de bureau moderne et lumineux. Un léger sourire, une posture détendue. | **Voix Off (ton plus affirmé, positif) :** "Gagnez en temps, en professionnalisme et en efficacité." | **Texte animé apparaissant mot à mot :** "Gagnez du Temps." puis "Soyez Pro." puis "Soyez Efficace."
+**24-27s** | **Scène 4.2 : L'Appel à l'Action Clair** <br> L'URL du site web (ex: `www.clientdocmanager.com`) apparaît en grand, de manière très lisible, sur un fond uni ou un dégradé utilisant les couleurs de la marque. Le personnage de la scène précédente peut regarder vers l'URL. | **Voix Off :** "Simplifiez votre quotidien avec ClientDocManager !" | **URL du site web** (grande et claire)
+**27-30s** | **Scène 5 : Écran Final Mémorable** <br> Le logo ClientDocManager revient en position centrale, plus grand. En dessous, l'URL du site web. Un slogan percutant s'affiche (ex: "ClientDocManager : Votre gestion, enfin optimisée."). Les icônes des principaux réseaux sociaux où trouver la marque peuvent apparaître discrètement. | **Voix Off (plus posée, incitative) :** "Visitez [URL du site] pour une démonstration gratuite et personnalisée !" | **Logo + URL + Slogan** (ex: "Votre gestion, enfin optimisée.")
+---
+
+**Notes de Production Détaillées :**
+*   **Rythme :** Chaque scène doit être concise. Les transitions doivent être fluides et rapides.
+*   **Motion Design :** Essentiel pour les scènes 1, 2.1 et les superpositions de texte. Doit être moderne et professionnel.
+*   **Captures d'Écran :** De très haute qualité. Utiliser des données de démo réalistes et non sensibles. L'interface doit être dans la langue principale de la vidéo. Mettre en évidence les interactions avec des effets de curseur subtils (highlight au clic).
+*   **Voix Off :** Enregistrement professionnel indispensable. Le ton doit varier pour s'adapter à chaque phase (empathie, enthousiasme, affirmation, incitation).
+*   **Musique :** Doit être choisie avec soin pour ne pas dater la vidéo et pour soutenir le message sans distraire. Des variations de volume et d'intensité peuvent marquer les transitions.
+*   **Textes à l'écran :** Lisibles, courts, utilisant la police de la charte. Animations d'apparition/disparition soignées.
+*   **Branding :** Le logo et les couleurs de la marque doivent être omniprésents de manière subtile ou évidente selon les scènes.
+*   **Timing :** Respecter scrupuleusement le timing de chaque segment pour tenir dans les 30 secondes. Faire des répétitions "à blanc" du script voix off est crucial.
+
+*(Ce script détaillé sert de guide pour le monteur vidéo et l'équipe de production.)*
