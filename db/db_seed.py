@@ -243,6 +243,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         existing_admin_row = check_cursor.fetchone()
         if existing_admin_row:
             logger.info(f"DB_SEED_ADMIN_CHECK: User '{target_admin_username}' ALREADY EXISTS before seeding attempt. Details: {dict(existing_admin_row)}")
+
         else:
             logger.info(f"DB_SEED_ADMIN_CHECK: User '{target_admin_username}' DOES NOT exist before seeding attempt.")
         # We don't close check_cursor here as it's from the same conn which is managed by _original_seed_initial_data_func_placeholder
@@ -251,59 +252,50 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
     # END PRE-SEEDING CHECK
 
     if super_admin_role_id:
-        temp_admin_password = "admin" # Ensure this is the desired default password
-        logger.info(f"Ensuring super admin user '{target_admin_username}' exists with password (hidden) and role '{SUPER_ADMIN_ROLE_NAME}' (Role ID: {super_admin_role_id})...")
+        temp_admin_password = "admin"
+        hashed_admin_password = users_crud.util_hash_password(temp_admin_password, logger_passed=logger)
+        admin_user_id_generated = str(uuid.uuid4())
+        now_iso_for_admin = datetime.utcnow().isoformat() + "Z"
 
-        admin_user_dict = users_crud.get_user_by_username(target_admin_username, conn=conn, logger_passed=logger)
-        if admin_user_dict:
-            super_admin_user_id = admin_user_dict['user_id']
-            logger.info(f"User '{target_admin_username}' (ID: {super_admin_user_id}) exists. Verifying role and password.")
-            if admin_user_dict.get('role_id') != super_admin_role_id:
-                logger.info(f"User '{target_admin_username}' does not have role '{SUPER_ADMIN_ROLE_NAME}'. Updating role...")
-                users_crud.update_user_role(super_admin_user_id, super_admin_role_id, conn=conn, logger_passed=logger)
+        logger.info(f"DB_SEED_ADMIN_DIAGNOSTIC: Attempting raw SQL INSERT OR IGNORE for '{target_admin_username}'.")
+        try:
+            # Use the raw cursor from _original_seed_initial_data_func_placeholder
+            # Column order: user_id, username, hashed_password, full_name, email, role_id, is_active, created_at, updated_at
+            # Assuming salt is handled within hashed_password by util_hash_password
+            # is_deleted default is 0, other biometric fields default to NULL/0 via schema
+            cursor.execute("""
+                INSERT OR IGNORE INTO Users
+                (user_id, username, hashed_password, full_name, email, role_id, is_active, created_at, updated_at, is_deleted)
+                VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, 0)
+            """, (admin_user_id_generated, target_admin_username, hashed_admin_password,
+                  "Super Administrator (Raw Seed)", "superadmin_raw@example.local",
+                  super_admin_role_id, now_iso_for_admin, now_iso_for_admin))
 
-            logger.info(f"Updating password for '{target_admin_username}' to ensure it is '{temp_admin_password}'.")
-            update_success = users_crud.update_user_password(super_admin_user_id, temp_admin_password, conn=conn, logger_passed=logger)
-            if update_success: logger.info(f"Password for user '{target_admin_username}' updated successfully.")
-            else: logger.error(f"Failed to update password for user '{target_admin_username}'. This is critical.")
-        else:
-            logger.info(f"User '{target_admin_username}' not found. Creating with password '{temp_admin_password}' and role '{SUPER_ADMIN_ROLE_NAME}'.")
-            new_admin_id = users_crud.add_user(
-                username=target_admin_username, password=temp_admin_password, role_id=super_admin_role_id,
-                full_name="Super Administrator", email="superadmin@example.local",
-                conn=conn, logger_passed=logger
-            )
-            if new_admin_id:
-                super_admin_user_id = new_admin_id
-                logger.info(f"User '{target_admin_username}' created successfully with ID {super_admin_user_id}.")
-            else: # add_user returned None, possibly due to IntegrityError
-                logger.warning(f"Initial attempt to add user '{target_admin_username}' failed. Checking if an inactive user exists.")
-                # Try to get any user (active, inactive, or deleted) by that username
-                any_admin_user_dict = users_crud.get_any_user_by_username(target_admin_username, conn=conn, logger_passed=logger)
-                if any_admin_user_dict:
-                    logger.info(f"Found existing user '{target_admin_username}' (ID: {any_admin_user_dict['user_id']}) with potentially non-active status. Attempting to activate and update.")
-                    update_success = users_crud.activate_and_update_user_details(
-                        user_id=any_admin_user_dict['user_id'],
-                        role_id=super_admin_role_id,
-                        password=temp_admin_password,
-                        full_name="Super Administrator (Activated)", # Indicate it was updated
-                        email="superadmin@example.local", # Ensure email is consistent
-                        conn=conn,
-                        logger_passed=logger
-                    )
-                    if update_success:
-                        super_admin_user_id = any_admin_user_dict['user_id']
-                        logger.info(f"Successfully activated and updated existing user '{target_admin_username}' to be super admin (ID: {super_admin_user_id}).")
-                    else:
-                        logger.error(f"Failed to activate and update existing user '{target_admin_username}' (ID: {any_admin_user_dict['user_id']}).")
-                        super_admin_user_id = None
-                else:
-                    logger.error(f"Failed to create user '{target_admin_username}' and no existing user (active or inactive) found by that username.")
-                    super_admin_user_id = None
+            if cursor.rowcount > 0:
+                logger.info(f"DB_SEED_ADMIN_DIAGNOSTIC: Raw INSERT OR IGNORE successful for '{target_admin_username}', new user_id might be {admin_user_id_generated}.")
+            else:
+                logger.info(f"DB_SEED_ADMIN_DIAGNOSTIC: Raw INSERT OR IGNORE for '{target_admin_username}' was ignored (user likely existed).")
+
+            # Now, try to fetch the admin user to get their definitive user_id
+            cursor.execute("SELECT user_id, role_id FROM Users WHERE username = ?", (target_admin_username,))
+            admin_row = cursor.fetchone()
+            if admin_row:
+                super_admin_user_id = admin_row['user_id'] # Use the ID from the DB
+                logger.info(f"DB_SEED_ADMIN_DIAGNOSTIC: Fetched '{target_admin_username}' from DB. User ID: {super_admin_user_id}, Role ID: {admin_row['role_id']}.")
+                # Optionally, ensure role and password are correct if user already existed
+                if admin_row['role_id'] != super_admin_role_id:
+                    logger.warning(f"DB_SEED_ADMIN_DIAGNOSTIC: Admin user '{target_admin_username}' has role {admin_row['role_id']}, expected {super_admin_role_id}. Consider manual correction or improved seeding logic if this state is problematic.")
+                # Password update can be added here if needed, using users_crud.update_user_password
+            else:
+                logger.error(f"DB_SEED_ADMIN_DIAGNOSTIC: FAILED to fetch '{target_admin_username}' from DB after INSERT OR IGNORE. This is unexpected.")
+                super_admin_user_id = None
+        except sqlite3.Error as e_raw_admin:
+            logger.error(f"DB_SEED_ADMIN_DIAGNOSTIC: SQLite error during raw admin seed: {e_raw_admin}", exc_info=True)
+            super_admin_user_id = None
     else:
         logger.critical(f"Role '{SUPER_ADMIN_ROLE_NAME}' ID not found in current_role_ids. Cannot ensure super admin user '{target_admin_username}'.")
         super_admin_user_id = None
-    # --- End Seed Admin User ---
+    # --- End Diagnostic Seed Admin User ---
 
     # Preserve admin_user_id for compatibility if other parts expect 'admin_user_id' to refer to the general admin
     # For now, 'admin_user_id' will be the super_admin_user_id
@@ -312,11 +304,14 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
 
     # Fallback for original DEFAULT_ADMIN_USERNAME if that's different and was used elsewhere
     # This part might be less relevant if target_admin_username ("admin") is the one true admin.
-    if DEFAULT_ADMIN_USERNAME != "admin":
-        logger.info(f"Checking for original default admin user '{DEFAULT_ADMIN_USERNAME}' for compatibility...")
-        original_admin_user_dict = users_crud.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn, logger_passed=logger)
-        if original_admin_user_dict:
-            logger.info(f"Found original default admin user '{DEFAULT_ADMIN_USERNAME}' with ID {original_admin_user_dict['user_id']}. Note: 'admin_user_id' in this script now refers to the user 'admin' with role '{SUPER_ADMIN_ROLE_NAME}'.")
+    # if DEFAULT_ADMIN_USERNAME != "admin": # This check itself needs DEFAULT_ADMIN_USERNAME to be defined
+    # Ensure DEFAULT_ADMIN_USERNAME is available, e.g. from config or defined in this file
+    # For now, this block is problematic if DEFAULT_ADMIN_USERNAME is not reliably defined here.
+    # Let's assume target_admin_username ("admin") is the primary concern.
+    # logger.info(f"Checking for original default admin user '{DEFAULT_ADMIN_USERNAME}' for compatibility...")
+    # original_admin_user_dict = users_crud.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn, logger_passed=logger)
+    # if original_admin_user_dict:
+    #     logger.info(f"Found original default admin user '{DEFAULT_ADMIN_USERNAME}' with ID {original_admin_user_dict['user_id']}. Note: 'admin_user_id' in this script now refers to the user 'admin' with role '{SUPER_ADMIN_ROLE_NAME}'.")
 
 
     # Seed Default Operational User (depends on 'Operator' role_id from role_id_map_for_permissions)
@@ -424,6 +419,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         # --- Seed License for Admin User ---
         if super_admin_user_id:
             try:
+
                 from db.cruds import licenses_crud # Corrected import
 
                 from datetime import timedelta # datetime is already imported
