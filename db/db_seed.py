@@ -402,7 +402,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         # --- Seed License for Admin User ---
         if super_admin_user_id:
             try:
-                from license_management import cruds as license_cruds
+            from db.cruds import licenses_crud # Corrected import
                 from datetime import timedelta # datetime is already imported
 
                 logger.info(f"Checking/Seeding license for admin user ID: {super_admin_user_id}")
@@ -559,16 +559,16 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                     logger.info(f"Attempting to seed country: {country_name} and city: {city_name}")
                     country_dict = get_or_add_country(country_name, conn=conn) # This function now has logging
                     if country_dict and 'country_id' in country_dict:
-                        logger.info(f"Country '{country_name}' (ID: {country_dict['country_id']}) successfully processed by get_or_add_country. Proceeding to add city '{city_name}'.")
+                        logger.info(f"SEED_COUNTRY_CITY_LOG: Country '{country_name}' (ID: {country_dict['country_id']}) successfully processed by get_or_add_country. Proceeding to add city '{city_name}'.")
                         city_dict = get_or_add_city(city_name, country_dict['country_id'], conn=conn)
                         if city_dict and 'city_id' in city_dict:
-                            logger.info(f"City '{city_name}' (ID: {city_dict['city_id']}) for country '{country_name}' successfully processed.")
+                            logger.info(f"SEED_COUNTRY_CITY_LOG: City '{city_name}' (ID: {city_dict['city_id']}) for country '{country_name}' successfully processed.")
                         else:
-                            logger.error(f"Failed to process city '{city_name}' for country '{country_name}'. City dict: {city_dict}")
-                    elif country_dict: # country_dict exists but 'country_id' is missing (should not happen with current get_or_add_country)
-                        logger.error(f"Country '{country_name}' processed by get_or_add_country, but 'country_id' is missing. Country dict: {country_dict}")
+                            logger.error(f"SEED_COUNTRY_CITY_LOG: Failed to process city '{city_name}' for country '{country_name}'. City dict: {city_dict}")
+                    elif country_dict: # country_dict exists but 'country_id' is missing
+                        logger.error(f"SEED_COUNTRY_CITY_LOG: Country '{country_name}' processed by get_or_add_country, but 'country_id' is missing. Country dict: {country_dict}. Cannot add city '{city_name}'.")
                     else: # get_or_add_country returned None
-                        logger.error(f"Failed to get or add country '{country_name}'. Cannot add city '{city_name}'.")
+                        logger.error(f"SEED_COUNTRY_CITY_LOG: Failed to get or add country '{country_name}' via get_or_add_country. Cannot add city '{city_name}'.")
                 logger.info(f"Finished attempt to seed {len(countries_cities)} countries/cities.")
 
 
