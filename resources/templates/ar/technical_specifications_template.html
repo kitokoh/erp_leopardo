@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <title>SPECIFICATIONS TECHNIQUES - {{PRODUCT_NAME_TECH_SPEC}}</title>
@@ -129,89 +129,126 @@
     <!-- Page 1: Image and Dimensions -->
     <div class="page">
         <div class="header-container-tech">
-            <img src="{{SELLER_LOGO_PATH}}" alt="Logo Entreprise" class="logo-tech">
+            {{#if seller.logo_url}}
+            <img src="{{seller.logo_url}}" alt="{{labels.logo_alt | default('شعار الشركة')}}" class="logo-tech">
+            {{/if}}
             <div class="document-title-tech">
-                <h1>SPECIFICATIONS TECHNIQUES</h1>
-                <p>Produit: {{PRODUCT_NAME_TECH_SPEC}}</p>
-                <p>Référence Projet: {{PROJECT_ID_TECH_SPEC}}</p>
-                <p>Date: {{DATE_TECH_SPEC}} | Version: {{VERSION_TECH_SPEC}}</p>
+                <h1>{{labels.tech_spec_title | default('المواصفات الفنية')}}</h1>
+                <p>{{labels.product | default('المنتج')}}: {{doc.product_name | default('غير متوفر')}}</p>
+                <p>{{labels.project_ref | default('مرجع المشروع')}}: {{project.identifier | default('غير متوفر')}}</p>
+                <p>{{labels.date | default('التاريخ')}}: {{doc.current_date_formatted | default('غير متوفر')}} | {{labels.version | default('الإصدار')}}: {{doc.version_tag | default('1.0')}}</p>
             </div>
         </div>
 
         <div class="section-tech">
-            <h2>Aperçu Technique et Dimensions</h2>
+            <h2>{{labels.tech_overview_dimensions | default('نظرة عامة فنية وأبعاد')}}</h2>
+            {{#if doc.main_image_url}}
             <div class="tech-image-container">
-                <img src="{{TECHNICAL_IMAGE_PATH_OR_EMBED}}" alt="Image Technique du Produit">
-                <p><em>{{TECHNICAL_IMAGE_CAPTION}}</em></p>
+                <img src="{{doc.main_image_url}}" alt="{{labels.tech_image_alt | default('صورة فنية للمنتج')}}">
+                {{#if doc.main_image_caption}}
+                <p><em>{{doc.main_image_caption}}</em></p>
+                {{/if}}
             </div>
-            <h3>Dimensions Principales</h3>
+            {{/if}}
+            <h3>{{labels.main_dimensions | default('الأبعاد الرئيسية')}}</h3>
             <table class="dimensions-table">
                 <thead>
                     <tr>
-                        <th>Caractéristique</th>
-                        <th>Valeur</th>
-                        <th>Unité</th>
-                        <th>Tolérance</th>
+                        <th>{{labels.characteristic | default('الخاصية')}}</th>
+                        <th>{{labels.value | default('القيمة')}}</th>
+                        <th>{{labels.unit | default('الوحدة')}}</th>
+                        <th>{{labels.tolerance | default('التفاوت المسموح')}}</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {{DIMENSIONS_TABLE_ROWS_TECH_SPEC}}
+                    {{#each tech_specs.dimensions_list}}
+                    <tr>
+                        <td>{{this.characteristic}}</td>
+                        <td>{{this.value}}</td>
+                        <td>{{this.unit}}</td>
+                        <td>{{this.tolerance}}</td>
+                    </tr>
+                    {{/each}}
                 </tbody>
             </table>
         </div>
         <div class="footer-tech">
-            <span class="page-number"></span> | {{SELLER_COMPANY_NAME}} - Confidentiel
+            <span class="page-number"></span> | {{seller.name | default('غير متوفر')}} - {{labels.confidential | default('سري')}}
         </div>
     </div>
 
     <!-- Page 2: Material Conditions and Performance -->
     <div class="page">
         <div class="header-container-tech" style="border-bottom:none; margin-bottom:5px;">
-             <img src="{{SELLER_LOGO_PATH}}" alt="Logo Entreprise" class="logo-tech" style="max-height:40px;">
+             {{#if seller.logo_url}}
+             <img src="{{seller.logo_url}}" alt="{{labels.logo_alt | default('شعار الشركة')}}" class="logo-tech" style="max-height:40px;">
+             {{/if}}
              <div class="document-title-tech" style="padding-top:10px;">
-                <p style="font-size:11pt; color:#3498db; font-weight:500;">SPECIFICATIONS TECHNIQUES - {{PRODUCT_NAME_TECH_SPEC}} (Suite)</p>
+                <p style="font-size:11pt; color:#3498db; font-weight:500;">{{labels.tech_spec_title | default('المواصفات الفنية')}} - {{doc.product_name | default('')}} ({{labels.continued | default('تابع')}})</p>
             </div>
         </div>
         <div class="section-tech">
-            <h2>Conditions sur les Matériaux</h2>
-            <p>{{MATERIALS_GENERAL_OVERVIEW_TECH_SPEC}}</p>
-            {{MATERIALS_CONDITIONS_DETAILED_LIST_TECH_SPEC}}
+            <h2>{{labels.material_conditions | default('شروط المواد')}}</h2>
+            <p>{{tech_specs.materials_overview | default('')}}</p>
+            <ul>
+            {{#each tech_specs.materials_list}}
+                <li>{{this.item}}</li>
+            {{/each}}
+            </ul>
         </div>
         <div class="section-tech">
-            <h2>Performances et Caractéristiques Opérationnelles</h2>
-            {{PERFORMANCE_SPECS_TECH_SPEC}}
+            <h2>{{labels.performance_operational | default('الأداء والخصائص التشغيلية')}}</h2>
+            <ul>
+            {{#each tech_specs.performance_list}}
+                <li>{{this.item}}</li>
+            {{/each}}
+            </ul>
         </div>
         <div class="footer-tech">
-             <span class="page-number"></span> | {{SELLER_COMPANY_NAME}} - Confidentiel
+             <span class="page-number"></span> | {{seller.name | default('غير متوفر')}} - {{labels.confidential | default('سري')}}
         </div>
     </div>
 
     <!-- Page 3: Compliance, Environment, Maintenance, Notes -->
     <div class="page">
         <div class="header-container-tech" style="border-bottom:none; margin-bottom:5px;">
-             <img src="{{SELLER_LOGO_PATH}}" alt="Logo Entreprise" class="logo-tech" style="max-height:40px;">
+             {{#if seller.logo_url}}
+             <img src="{{seller.logo_url}}" alt="{{labels.logo_alt | default('شعار الشركة')}}" class="logo-tech" style="max-height:40px;">
+             {{/if}}
              <div class="document-title-tech" style="padding-top:10px;">
-                <p style="font-size:11pt; color:#3498db; font-weight:500;">SPECIFICATIONS TECHNIQUES - {{PRODUCT_NAME_TECH_SPEC}} (Suite)</p>
+                <p style="font-size:11pt; color:#3498db; font-weight:500;">{{labels.tech_spec_title | default('المواصفات الفنية')}} - {{doc.product_name | default('')}} ({{labels.continued | default('تابع')}})</p>
             </div>
         </div>
         <div class="section-tech">
-            <h2>Conformité et Standards</h2>
-            {{COMPLIANCE_STANDARDS_TECH_SPEC}}
+            <h2>{{labels.compliance_standards | default('التوافق والمعايير')}}</h2>
+            <ul>
+            {{#each tech_specs.compliance_list}}
+                <li>{{this.item}}</li>
+            {{/each}}
+            </ul>
         </div>
         <div class="section-tech">
-            <h2>Environnement d'Utilisation</h2>
-            {{OPERATING_ENVIRONMENT_TECH_SPEC}}
+            <h2>{{labels.operating_environment | default('بيئة التشغيل')}}</h2>
+            <ul>
+            {{#each tech_specs.environment_list}}
+                <li>{{this.item}}</li>
+            {{/each}}
+            </ul>
         </div>
         <div class="section-tech">
-            <h2>Maintenance et Entretien</h2>
-            {{MAINTENANCE_INFO_TECH_SPEC}}
+            <h2>{{labels.maintenance_care | default('الصيانة والعناية')}}</h2>
+            <ul>
+            {{#each tech_specs.maintenance_list}}
+                <li>{{this.item}}</li>
+            {{/each}}
+            </ul>
         </div>
         <div class="section-tech">
-            <h2>Notes Complémentaires</h2>
-            <p>{{NOTES_TECH_SPEC}}</p>
+            <h2>{{labels.additional_notes | default('ملاحظات إضافية')}}</h2>
+            <p>{{doc.notes | default('')}}</p>
         </div>
         <div class="footer-tech">
-             <span class="page-number"></span> | {{SELLER_COMPANY_NAME}} - Confidentiel
+             <span class="page-number"></span> | {{seller.name | default('غير متوفر')}} - {{labels.confidential | default('سري')}}
         </div>
     </div>
 </body>
