@@ -99,6 +99,7 @@ class LicenseManager:
         Returns:
             tuple[bool, str | None, dict | None]: (is_valid, message, license_details)
         """
+        logger.debug(f"LicenseManager.check_license_validity called for user_id: {user_id}. Connection type: {type(conn)}")
         if not conn or not user_id:
             logger.error("check_license_validity: Missing connection or user_id.")
             return False, "Internal error: Missing connection or user ID.", None
@@ -142,12 +143,21 @@ class LicenseManager:
         except Exception as e:
             logger.error(f"Error during check_license_validity for user {user_id}: {e}", exc_info=True)
             return False, "Erreur interne lors de la vérification de la licence.", None
+        except AttributeError as e_attr_cv: # Specific catch for AttributeError
+            logger.error(f"AttributeError in check_license_validity for user {user_id}. Conn type: {type(conn)}. Error: {e_attr_cv}", exc_info=True)
+            # import traceback # Already imported at module level
+            logger.error(f"Traceback for AttributeError in check_license_validity:\n{traceback.format_exc()}")
+            return False, f"Erreur interne (AttributeError) lors de la vérification de la licence: {e_attr_cv}", None
+        except Exception as e: # General catch-all
+            logger.error(f"Error during check_license_validity for user {user_id}: {e}", exc_info=True)
+            return False, "Erreur interne lors de la vérification de la licence.", None
 
     def create_default_admin_license(self, conn: sqlite3.Connection, user_id: str) -> tuple[bool, str | None, dict | None]:
         """
         Creates a default 6-month 'complet' license for the specified user_id.
         Typically used for the admin user on first setup or if their license is missing/invalid.
         """
+        logger.debug(f"LicenseManager.create_default_admin_license called for user_id: {user_id}. Connection type: {type(conn)}")
         if not conn or not user_id:
             logger.error("create_default_admin_license: Missing connection or user_id.")
             return False, "Internal error: Missing connection or user ID for admin license creation.", None
@@ -193,8 +203,12 @@ class LicenseManager:
             else:
                 logger.error(f"Failed to add default admin license to database for user {user_id}.")
                 return False, "Échec de la création de la licence administrateur par défaut en base de données.", None
-
-        except Exception as e:
+        except AttributeError as e_attr_cdal: # Specific catch for AttributeError
+            logger.error(f"AttributeError in create_default_admin_license for user {user_id}. Conn type: {type(conn)}. Error: {e_attr_cdal}", exc_info=True)
+            # import traceback # Already imported at module level
+            logger.error(f"Traceback for AttributeError in create_default_admin_license:\n{traceback.format_exc()}")
+            return False, f"Erreur interne (AttributeError) lors de la création de la licence admin: {e_attr_cdal}", None
+        except Exception as e: # General catch-all
             logger.error(f"Exception while creating default admin license for user {user_id}: {e}", exc_info=True)
             return False, "Erreur interne lors de la création de la licence administrateur.", None
 
