@@ -2,28 +2,71 @@
 import sqlite3
 import logging
 from datetime import datetime, timezone
+from sqlalchemy.sql import text
+from sqlalchemy.exc import SQLAlchemyError
 
 logger = logging.getLogger(__name__)
 
-def add_license(conn: sqlite3.Connection, license_data: dict) -> str | None:
+def _is_sqlalchemy_conn(conn):
+    """Checks if the connection is a SQLAlchemy Session or Connection."""
+    return hasattr(conn, 'execute') and not hasattr(conn, 'cursor')
+
+def _execute_commit(conn, sql_query, params=None):
+    """Executes a query and commits. Handles both SQLAlchemy and sqlite3."""
+    if _is_sqlalchemy_conn(conn):
+        conn.execute(text(sql_query), params or {})
+        conn.commit()
+    else: # sqlite3 connection
+        cursor = conn.cursor()
+        cursor.execute(sql_query, params or ())
+        conn.commit()
+
+def _fetchone_as_dict(conn, sql_query, params=None):
+    """Executes a query and returns one row as a dict. Handles both."""
+    if _is_sqlalchemy_conn(conn):
+        result = conn.execute(text(sql_query), params or {}).fetchone()
+        return dict(result._mapping) if result else None
+    else: # sqlite3 connection
+        cursor = conn.cursor()
+        cursor.execute(sql_query, params or ())
+        row = cursor.fetchone()
+        if row:
+            return {desc[0]: value for desc, value in zip(cursor.description, row)}
+        return None
+
+def _fetchall_as_dict_list(conn, sql_query, params=None):
+    """Executes a query and returns all rows as a list of dicts. Handles both."""
+    if _is_sqlalchemy_conn(conn):
+        results = conn.execute(text(sql_query), params or {}).fetchall()
+        return [dict(row._mapping) for row in results]
+    else: # sqlite3 connection
+        cursor = conn.cursor()
+        cursor.execute(sql_query, params or ())
+        rows = cursor.fetchall()
+        return [{desc[0]: value for desc, value in zip(cursor.description, row)} for row in rows]
+
+
+def add_license(conn, license_data: dict) -> str | None:
     """
     Adds a new license to the database.
-
     Args:
-        conn: Database connection object.
-        license_data: A dictionary containing license details:
-            - license_id (str)
-            - user_id (str)
-            - license_type (str)
-            - license_key (str, can be None)
-            - activation_date (datetime)
-            - expiration_date (datetime, can be None)
-            - machine_info (str, can be None)
-            - is_active (bool)
+        conn: Database connection object (sqlite3 or SQLAlchemy).
+        license_data: A dictionary containing license details.
     Returns:
         The license_id if successful, None otherwise.
     """
-    sql = """
+    # SQL query remains the same, but placeholders differ for SQLAlchemy
+    sql_insert = """
+        INSERT INTO Licenses (
+            license_id, user_id, license_type, license_key,
+            activation_date, expiration_date, machine_info,
+            is_active, created_at, updated_at
+        ) VALUES (:license_id, :user_id, :license_type, :license_key,
+                  :activation_date, :expiration_date, :machine_info,
+                  :is_active, :created_at, :updated_at)
+    """
+    # For sqlite3, use ? placeholders
+    sql_insert_sqlite = """
         INSERT INTO Licenses (
             license_id, user_id, license_type, license_key,
             activation_date, expiration_date, machine_info,
@@ -31,54 +74,52 @@ def add_license(conn: sqlite3.Connection, license_data: dict) -> str | None:
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
     now_utc_iso = datetime.now(timezone.utc).isoformat()
-    # Ensure datetime objects are converted to ISO format strings for SQLite
     activation_date_iso = license_data.get('activation_date').isoformat() if isinstance(license_data.get('activation_date'), datetime) else license_data.get('activation_date')
     expiration_date_iso = license_data.get('expiration_date').isoformat() if isinstance(license_data.get('expiration_date'), datetime) else license_data.get('expiration_date')
 
-    params = (
-        license_data.get('license_id'),
-        license_data.get('user_id'),
-        license_data.get('license_type'),
-        license_data.get('license_key'),
-        activation_date_iso,
-        expiration_date_iso,
-        license_data.get('machine_info'),
-        1 if license_data.get('is_active', True) else 0,
-        now_utc_iso,
-        now_utc_iso
-    )
-    logger.debug(f"Attempting to add license. SQL: {sql}")
-    logger.debug(f"Params: {params}")
-    logger.debug(f"Received license_data: {license_data}")
+    params_dict = {
+        'license_id': license_data.get('license_id'),
+        'user_id': license_data.get('user_id'),
+        'license_type': license_data.get('license_type'),
+        'license_key': license_data.get('license_key'),
+        'activation_date': activation_date_iso,
+        'expiration_date': expiration_date_iso,
+        'machine_info': license_data.get('machine_info'),
+        'is_active': 1 if license_data.get('is_active', True) else 0,
+        'created_at': now_utc_iso,
+        'updated_at': now_utc_iso
+    }
+    params_tuple = tuple(params_dict.values()) # Order must match columns for sqlite
+
+    logger.debug(f"Attempting to add license. Data: {params_dict}")
     try:
-        cursor = conn.cursor()
-        cursor.execute(sql, params)
-        conn.commit()
-        logger.info(f"License {license_data.get('license_id')} added for user {license_data.get('user_id')}.")
-        return license_data.get('license_id')
-    except sqlite3.Error as e:
-        logger.error(f"Error adding license for user {license_data.get('user_id')}. SQL: {sql}, Params: {params}. Error: {e}", exc_info=True)
-        conn.rollback()
+        sql_to_use = sql_insert if _is_sqlalchemy_conn(conn) else sql_insert_sqlite
+        params_to_use = params_dict if _is_sqlalchemy_conn(conn) else params_tuple
+        _execute_commit(conn, sql_to_use, params_to_use)
+        logger.info(f"License {params_dict['license_id']} added for user {params_dict['user_id']}.")
+        return params_dict['license_id']
+    except (sqlite3.Error, SQLAlchemyError) as e:
+        logger.error(f"Error adding license for user {params_dict['user_id']}. Error: {e}", exc_info=True)
+        if not _is_sqlalchemy_conn(conn): # SQLAlchemy handles its own rollback usually with session context
+            conn.rollback()
         return None
 
-def get_active_license_for_user(conn: sqlite3.Connection, user_id: str) -> dict | None:
+def get_active_license_for_user(conn, user_id: str) -> dict | None:
     """
     Retrieves the currently active license for a given user.
     An active license is one where is_active is TRUE and expiration_date is in the future.
     If multiple such licenses exist, it might return the one with the furthest expiration date or the most recently activated.
     For simplicity, this version returns the first one found that matches.
     """
-    sql = """
+    sql_query_sa = """
         SELECT * FROM Licenses
-        WHERE user_id = ? AND is_active = 1
+        WHERE user_id = :user_id
+          AND is_active = 1
+          AND (expiration_date IS NULL OR expiration_date > :now_utc_iso)
         ORDER BY expiration_date DESC, activation_date DESC
         LIMIT 1
     """
-    # No, the above query is not quite right for "active and not expired".
-    # SQLite doesn't have a native boolean TRUE, it uses 1.
-    # Dates are stored as TEXT, so comparison needs care. ISO format strings compare correctly.
-
-    sql_corrected = """
+    sql_query_sqlite = """
         SELECT * FROM Licenses
         WHERE user_id = ?
           AND is_active = 1
@@ -87,62 +128,76 @@ def get_active_license_for_user(conn: sqlite3.Connection, user_id: str) -> dict 
         LIMIT 1
     """
     now_utc_iso = datetime.now(timezone.utc).isoformat()
+    params_sa = {'user_id': user_id, 'now_utc_iso': now_utc_iso}
+    params_sqlite = (user_id, now_utc_iso)
 
     try:
-        cursor = conn.cursor()
-        cursor.execute(sql_corrected, (user_id, now_utc_iso))
-        row = cursor.fetchone()
-        if row:
-            license_details = dict(row)
-            # Convert date strings back to datetime objects if needed by caller,
-            # but for now, returning as stored.
+        sql_to_use = sql_query_sa if _is_sqlalchemy_conn(conn) else sql_query_sqlite
+        params_to_use = params_sa if _is_sqlalchemy_conn(conn) else params_sqlite
+        license_details = _fetchone_as_dict(conn, sql_to_use, params_to_use)
+
+        if license_details:
             logger.debug(f"Active license found for user {user_id}: {license_details.get('license_id')}")
-            return license_details
         else:
             logger.debug(f"No active license found for user {user_id}.")
-            return None
-    except sqlite3.Error as e:
+        return license_details
+    except (sqlite3.Error, SQLAlchemyError) as e:
         logger.error(f"Error retrieving active license for user {user_id}: {e}", exc_info=True)
         return None
 
-def deactivate_license(conn: sqlite3.Connection, license_id: str) -> bool:
+def deactivate_license(conn, license_id: str) -> bool:
     """
     Deactivates a license by setting is_active to 0.
     """
-    sql = "UPDATE Licenses SET is_active = 0, updated_at = ? WHERE license_id = ?"
+    sql_sa = "UPDATE Licenses SET is_active = 0, updated_at = :now_utc_iso WHERE license_id = :license_id"
+    sql_sqlite = "UPDATE Licenses SET is_active = 0, updated_at = ? WHERE license_id = ?"
     now_utc_iso = datetime.now(timezone.utc).isoformat()
+    params_sa = {'now_utc_iso': now_utc_iso, 'license_id': license_id}
+    params_sqlite = (now_utc_iso, license_id)
+
     try:
-        cursor = conn.cursor()
-        cursor.execute(sql, (now_utc_iso, license_id))
-        conn.commit()
-        if cursor.rowcount > 0:
+        sql_to_use = sql_sa if _is_sqlalchemy_conn(conn) else sql_sqlite
+        params_to_use = params_sa if _is_sqlalchemy_conn(conn) else params_sqlite
+
+        if _is_sqlalchemy_conn(conn):
+            result = conn.execute(text(sql_to_use), params_to_use)
+            conn.commit()
+            rowcount = result.rowcount
+        else:
+            cursor = conn.cursor()
+            cursor.execute(sql_to_use, params_to_use)
+            conn.commit()
+            rowcount = cursor.rowcount
+
+        if rowcount > 0:
             logger.info(f"License {license_id} deactivated.")
             return True
         else:
             logger.warning(f"Attempted to deactivate license {license_id}, but license not found or no change made.")
             return False
-    except sqlite3.Error as e:
+    except (sqlite3.Error, SQLAlchemyError) as e:
         logger.error(f"Error deactivating license {license_id}: {e}", exc_info=True)
-        conn.rollback()
+        if not _is_sqlalchemy_conn(conn):
+            conn.rollback()
         return False
 
-def get_license_by_key(conn: sqlite3.Connection, license_key: str) -> dict | None:
+def get_license_by_key(conn, license_key: str) -> dict | None:
     """
     Retrieves a license by its license_key.
     """
-    sql = "SELECT * FROM Licenses WHERE license_key = ?"
+    sql_sa = "SELECT * FROM Licenses WHERE license_key = :license_key"
+    sql_sqlite = "SELECT * FROM Licenses WHERE license_key = ?"
+    params_sa = {'license_key': license_key}
+    params_sqlite = (license_key,)
     try:
-        cursor = conn.cursor()
-        cursor.execute(sql, (license_key,))
-        row = cursor.fetchone()
-        if row:
-            return dict(row)
-        return None
-    except sqlite3.Error as e:
+        sql_to_use = sql_sa if _is_sqlalchemy_conn(conn) else sql_sqlite
+        params_to_use = params_sa if _is_sqlalchemy_conn(conn) else params_sqlite
+        return _fetchone_as_dict(conn, sql_to_use, params_to_use)
+    except (sqlite3.Error, SQLAlchemyError) as e:
         logger.error(f"Error retrieving license by key {license_key}: {e}", exc_info=True)
         return None
 
-def update_license(conn: sqlite3.Connection, license_id: str, license_data: dict) -> bool:
+def update_license(conn, license_id: str, license_data: dict) -> bool:
     """
     Updates an existing license with new data.
     Args:
@@ -155,36 +210,56 @@ def update_license(conn: sqlite3.Connection, license_id: str, license_data: dict
         return False
 
     fields = []
-    params = []
-    for key, value in license_data.items():
-        # Ensure datetime objects are converted
-        if isinstance(value, datetime):
-            current_val = value.isoformat()
-        else:
-            current_val = value
+    params_dict = {}
+    params_sqlite_list = []
 
+    for key, value in license_data.items():
+        current_val = value.isoformat() if isinstance(value, datetime) else value
         if key in ['user_id', 'license_type', 'license_key', 'activation_date', 'expiration_date', 'machine_info', 'is_active']:
-            fields.append(f"{key} = ?")
-            params.append(current_val)
+            if _is_sqlalchemy_conn(conn):
+                fields.append(f"{key} = :{key}")
+                params_dict[key] = current_val
+            else:
+                fields.append(f"{key} = ?")
+                params_sqlite_list.append(current_val)
 
     if not fields:
         logger.warning(f"No valid fields provided for updating license {license_id}.")
         return False
 
-    params.append(datetime.now(timezone.utc).isoformat()) # for updated_at
-    params.append(license_id) # for WHERE clause
-
-    sql = f"UPDATE Licenses SET {', '.join(fields)}, updated_at = ? WHERE license_id = ?"
+    now_utc_iso = datetime.now(timezone.utc).isoformat()
+    if _is_sqlalchemy_conn(conn):
+        params_dict['updated_at'] = now_utc_iso
+        params_dict['license_id_where'] = license_id # Use a different key for WHERE clause to avoid conflict if license_id is in update data
+        sql_query = f"UPDATE Licenses SET {', '.join(fields)}, updated_at = :updated_at WHERE license_id = :license_id_where"
+        params_to_use = params_dict
+    else:
+        params_sqlite_list.append(now_utc_iso) # updated_at
+        params_sqlite_list.append(license_id)    # license_id for WHERE
+        sql_query = f"UPDATE Licenses SET {', '.join(fields)}, updated_at = ? WHERE license_id = ?"
+        params_to_use = tuple(params_sqlite_list)
 
     try:
-        cursor = conn.cursor()
-        cursor.execute(sql, tuple(params))
-        conn.commit()
-        logger.info(f"License {license_id} updated successfully.")
-        return True
-    except sqlite3.Error as e:
+        if _is_sqlalchemy_conn(conn):
+            result = conn.execute(text(sql_query), params_to_use)
+            conn.commit()
+            rowcount = result.rowcount
+        else:
+            cursor = conn.cursor()
+            cursor.execute(sql_query, params_to_use)
+            conn.commit()
+            rowcount = cursor.rowcount
+
+        if rowcount > 0:
+            logger.info(f"License {license_id} updated successfully.")
+            return True
+        else:
+            logger.warning(f"License {license_id} not updated (not found or no change).")
+            return False
+    except (sqlite3.Error, SQLAlchemyError) as e:
         logger.error(f"Error updating license {license_id}: {e}", exc_info=True)
-        conn.rollback()
+        if not _is_sqlalchemy_conn(conn):
+            conn.rollback()
         return False
 
 # Example of how to use:
@@ -207,31 +282,41 @@ def update_license(conn: sqlite3.Connection, license_id: str, license_data: dict
 #         print(f"Active license: {retrieved_license}")
 #     conn.close()
 
-def get_license_by_key_and_machine(conn: sqlite3.Connection, license_key: str, machine_info: str) -> dict | None:
+def get_license_by_key_and_machine(conn, license_key: str, machine_info: str) -> dict | None:
     """
     Retrieves a license by its license_key and machine_info.
     This is used to check if a specific signed key has already been activated on a particular machine.
     """
-    sql = "SELECT * FROM Licenses WHERE license_key = ? AND machine_info = ?"
+    sql_sa = "SELECT * FROM Licenses WHERE license_key = :license_key AND machine_info = :machine_info"
+    sql_sqlite = "SELECT * FROM Licenses WHERE license_key = ? AND machine_info = ?"
+    params_sa = {'license_key': license_key, 'machine_info': machine_info}
+    params_sqlite = (license_key, machine_info)
     try:
-        cursor = conn.cursor()
-        cursor.execute(sql, (license_key, machine_info))
-        row = cursor.fetchone()
-        if row:
+        sql_to_use = sql_sa if _is_sqlalchemy_conn(conn) else sql_sqlite
+        params_to_use = params_sa if _is_sqlalchemy_conn(conn) else params_sqlite
+        result = _fetchone_as_dict(conn, sql_to_use, params_to_use)
+        if result:
             logger.debug(f"License found for key '{license_key}' and machine '{machine_info}'.")
-            return dict(row)
-        logger.debug(f"No license found for key '{license_key}' and machine '{machine_info}'.")
-        return None
-    except sqlite3.Error as e:
+        else:
+            logger.debug(f"No license found for key '{license_key}' and machine '{machine_info}'.")
+        return result
+    except (sqlite3.Error, SQLAlchemyError) as e:
         logger.error(f"Error retrieving license by key '{license_key}' and machine '{machine_info}': {e}", exc_info=True)
         return None
 
-def has_any_active_complete_license(conn: sqlite3.Connection) -> bool:
+def has_any_active_complete_license(conn) -> bool:
     """
     Checks if there is any active 'complet' license in the system for any user.
     An active license is one where is_active is TRUE and expiration_date is in the future (or NULL).
     """
-    sql = """
+    sql_sa = """
+        SELECT 1 FROM Licenses
+        WHERE license_type = 'complet'
+          AND is_active = 1
+          AND (expiration_date IS NULL OR expiration_date > :now_utc_iso)
+        LIMIT 1
+    """
+    sql_sqlite = """
         SELECT 1 FROM Licenses
         WHERE license_type = 'complet'
           AND is_active = 1
@@ -239,17 +324,19 @@ def has_any_active_complete_license(conn: sqlite3.Connection) -> bool:
         LIMIT 1
     """
     now_utc_iso = datetime.now(timezone.utc).isoformat()
+    params_sa = {'now_utc_iso': now_utc_iso}
+    params_sqlite = (now_utc_iso,)
+
     try:
-        cursor = conn.cursor()
-        cursor.execute(sql, (now_utc_iso,))
-        row = cursor.fetchone()
-        if row:
+        sql_to_use = sql_sa if _is_sqlalchemy_conn(conn) else sql_sqlite
+        params_to_use = params_sa if _is_sqlalchemy_conn(conn) else params_sqlite
+        result = _fetchone_as_dict(conn, sql_to_use, params_to_use) # Using fetchone, expecting 0 or 1 row with a single col
+        if result:
             logger.debug("Found at least one active 'complet' license in the system.")
             return True
         else:
             logger.debug("No active 'complet' licenses found in the system.")
             return False
-    except sqlite3.Error as e:
+    except (sqlite3.Error, SQLAlchemyError) as e:
         logger.error(f"Error checking for active 'complet' licenses: {e}", exc_info=True)
         return False # Fail safe: assume one might exist if check fails
-
