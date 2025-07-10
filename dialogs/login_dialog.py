@@ -63,6 +63,8 @@ class LoginDialog(QDialog):
 
         # Allow login on Enter press from password field
         self.password_input.returnPressed.connect(self._attempt_login)
+        print(f"DEBUG_PRINT: DIALOGS_LOGIN_DIALOG: init_ui - password_input.returnPressed.connect result: <connected>")
+
 
         # Remember Me Checkbox
         self.remember_me_checkbox = QCheckBox(self.tr("Se souvenir de moi"))
@@ -83,11 +85,26 @@ class LoginDialog(QDialog):
         self.login_button.setIcon(QIcon(":/icons/log-out.svg")) # Corrected: log-out.svg exists and is suitable
         self.login_button.setObjectName("primaryButton") # For styling
 
+        # DEBUG PRINT ADDITIONS
+        print("DEBUG_PRINT: DIALOGS_LOGIN_DIALOG: init_ui - Before login_button connect (button_box.accepted)")
+        # The QDialogButtonBox's accepted signal is connected, not the button's clicked signal directly here.
+        # So, we check the connection to self.button_box.accepted.
+        # connection_success_accepted = self.button_box.accepted.connect(self._attempt_login)
+        # print(f"DEBUG_PRINT: DIALOGS_LOGIN_DIALOG: init_ui - button_box.accepted.connect result: {connection_success_accepted}")
+        # Also, the password input's returnPressed is connected:
+        # connection_success_return = self.password_input.returnPressed.connect(self._attempt_login)
+        # print(f"DEBUG_PRINT: DIALOGS_LOGIN_DIALOG: init_ui - password_input.returnPressed.connect result: {connection_success_return}")
+        # For direct button click, if it's also desired (though QDialogButtonBox usually handles it via roles):
+        # self.login_button.clicked.connect(self._attempt_login) # This would be an alternative or additional connection
+
         cancel_button = self.button_box.addButton(QDialogButtonBox.Cancel)
         cancel_button.setText(self.tr("Annuler"))
         # cancel_button.setIcon(QIcon(":/icons/dialog-cancel.svg")) # Standard icon often set by style
 
+        print("DEBUG_PRINT: DIALOGS_LOGIN_DIALOG: init_ui - Before button_box.accepted.connect")
         self.button_box.accepted.connect(self._attempt_login)
+        print("DEBUG_PRINT: DIALOGS_LOGIN_DIALOG: init_ui - After button_box.accepted.connect")
+
         self.button_box.rejected.connect(self.reject) # Standard reject closes dialog
 
         main_layout.addWidget(self.button_box)
@@ -161,6 +178,7 @@ class LoginDialog(QDialog):
         # No further action needed here after it closes.
 
     def _attempt_login(self):
+        print("DEBUG_PRINT: DIALOGS_LOGIN_DIALOG: _attempt_login called.") # ADDED
         username = self.username_input.text().strip()
         password = self.password_input.text() # No strip for password
 

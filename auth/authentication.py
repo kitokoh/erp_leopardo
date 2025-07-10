@@ -236,7 +236,9 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
     """
     Attempts to log in a user. If remember_me is True, generates and stores a session token.
     """
-    logger.info("AUTHENTICATION_LOGIN: login function CALLED.") # ADDED
+    print("DEBUG_PRINT: AUTHENTICATION_LOGIN: login function CALLED.") # ADDED
+    logger.info("AUTHENTICATION_LOGIN: login function CALLED.")
+
     global _current_user_data
     # Note: license_manager and get_db_connection are already imported at module level
 
