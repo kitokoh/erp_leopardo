@@ -286,6 +286,7 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
             try: # Corrected from try { to try:
                 logger.debug(f"AUTH_LOGIN: Entered token/license processing block for user '{username}'.")
                 conn = get_db_connection()
+                logger.debug(f"AUTH_LOGIN: conn object type after get_db_connection(): {type(conn)}") # <<< ADDED THIS LOG
                 if remember_me:
                     logger.debug(f"AUTH_LOGIN: 'Remember Me' is true for '{username}'. Processing token.")
                     user_session_tokens_crud.delete_all_user_session_tokens(conn, user['user_id'])
@@ -335,7 +336,7 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
                             return True, detailed_error_msg, _current_user_data, license_details
                     else:
                         logger.info(f"Administrator user '{username}' has an invalid/missing license, but other 'complet' licenses exist. Default license not created.")
-
+                
                 logger.debug(f"AUTH_LOGIN: Final license state before returning: is_license_valid={is_license_valid}, license_msg='{license_msg}', license_details_type={type(license_details)}")
                 if not is_license_valid:
                     logger.debug(f"AUTH_LOGIN: Returning (True, '{license_msg}', user_data, license_details_type={type(license_details)}) because license is not valid.")
@@ -348,16 +349,16 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
                 logger.error(f"AUTH_LOGIN: AttributeError during token/license processing for {username}: {e_attr}", exc_info=True)
                 formatted_traceback = traceback.format_exc()
                 logger.error(f"Detailed Traceback for AttributeError:\n{formatted_traceback}")
-                _current_user_data = None
-                if remember_me and conn:
+                _current_user_data = None 
+                if remember_me and conn: 
                     user_session_tokens_crud.delete_all_user_session_tokens(conn, user['user_id'])
                 clear_remember_me_token_from_settings()
                 # Return a more specific error message if possible, or the generic one
                 return False, f"Erreur interne (AttributeError): {str(e_attr)}", None, None
-            except Exception as e_inner:
+            except Exception as e_inner: 
                 logger.error(f"AUTH_LOGIN: Error during token/license processing for {username}: {e_inner}", exc_info=True)
-                _current_user_data = None
-                if remember_me and conn:
+                _current_user_data = None 
+                if remember_me and conn: 
                     user_session_tokens_crud.delete_all_user_session_tokens(conn, user['user_id'])
                 clear_remember_me_token_from_settings()
                 return False, f"Erreur interne ({type(e_inner).__name__}).", None, None

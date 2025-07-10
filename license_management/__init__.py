@@ -99,13 +99,15 @@ class LicenseManager:
         Returns:
             tuple[bool, str | None, dict | None]: (is_valid, message, license_details)
         """
-        logger.debug(f"LicenseManager.check_license_validity called for user_id: {user_id}. Connection type: {type(conn)}")
+        logger.debug(f"LicenseManager.check_license_validity CALLED for user_id: {user_id}. Connection type: {type(conn)}")
         if not conn or not user_id:
             logger.error("check_license_validity: Missing connection or user_id.")
             return False, "Internal error: Missing connection or user ID.", None
 
         try:
+            logger.debug(f"LicenseManager.check_license_validity: Attempting licenses_crud.get_active_license_for_user for user {user_id}")
             license_details = licenses_crud.get_active_license_for_user(conn, user_id)
+            logger.debug(f"LicenseManager.check_license_validity: licenses_crud.get_active_license_for_user returned: {type(license_details)}")
 
             if not license_details:
                 logger.info(f"No active license found for user_id: {user_id}.")
@@ -148,9 +150,12 @@ class LicenseManager:
             # import traceback # Already imported at module level
             logger.error(f"Traceback for AttributeError in check_license_validity:\n{traceback.format_exc()}")
             return False, f"Erreur interne (AttributeError) lors de la vérification de la licence: {e_attr_cv}", None
-        except Exception as e: # General catch-all
-            logger.error(f"Error during check_license_validity for user {user_id}: {e}", exc_info=True)
-            return False, "Erreur interne lors de la vérification de la licence.", None
+        except Exception as e_check_lic: # General catch-all
+            logger.error(f"CRITICAL_ERROR_INSIDE_CHECK_LICENSE_VALIDITY (user: {user_id}, conn_type: {type(conn)}): Type: {type(e_check_lic).__name__}, Error: {str(e_check_lic)}")
+            logger.error(traceback.format_exc()) # Print full traceback here
+            # Now, instead of returning a generic message, let's return a more specific one OR re-raise
+            # Forcing the specific error message to see if it appears in the GUI via main.py
+            return False, f"Internal Crash in License Check: {type(e_check_lic).__name__}", None
 
     def create_default_admin_license(self, conn: sqlite3.Connection, user_id: str) -> tuple[bool, str | None, dict | None]:
         """
