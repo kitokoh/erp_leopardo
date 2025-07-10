@@ -464,7 +464,9 @@ class DocumentsTab(QWidget):
 
                     if full_file_path and os.path.exists(full_file_path):
                         doc_type = doc.get("document_type_generated")
-                        if doc_type == "HTML" and can_manage:
+
+                        # Bouton Modifier pour HTML, EDITABLE_HTML et XLSX (si permission)
+                        if doc_type in ["HTML", "EDITABLE_HTML"] and can_manage:
                             edit_btn = QPushButton(QIcon(":/icons/edit-2.svg"), "")
                             edit_btn.setToolTip(self.tr("Modifier HTML"))
                             edit_btn.setProperty("class", "tableActionButton")
@@ -477,8 +479,21 @@ class DocumentsTab(QWidget):
                             edit_btn.clicked.connect(lambda checked, p=full_file_path, d_id=doc_id: self.handle_edit_excel_action(p, d_id))
                             actions_layout.addWidget(edit_btn)
 
+                        # Bouton Générer Document Final pour EDITABLE_HTML (si permission)
+                        if doc_type == "EDITABLE_HTML" and can_manage:
+                            generate_final_btn = QPushButton(QIcon(":/icons/file-plus.svg"), "") # Icone "générer"
+                            generate_final_btn.setToolTip(self.tr("Générer Document Final (PDF/HTML)"))
+                            generate_final_btn.setProperty("class", "tableActionButton") # ou "primaryButtonTable" si on veut le mettre en évidence
+                            generate_final_btn.clicked.connect(
+                                lambda checked, d_id=doc_id, p=full_file_path, src_tpl_id=doc.get("source_template_id"):
+                                self.handle_generate_from_raw_html_action(d_id, p, src_tpl_id)
+                            )
+                            actions_layout.addWidget(generate_final_btn)
+
+                        # Bouton Ouvrir/Visualiser
                         view_icon_path = ":/icons/eye.svg"
-                        if doc_type == "PDF": view_icon_path = ":/icons/file-text.svg" # More specific for PDF
+                        if doc_type == "PDF" or doc_type.endswith("_PDF"): # Plus générique pour les PDF générés
+                            view_icon_path = ":/icons/file-text.svg"
 
                         view_btn = QPushButton(QIcon(view_icon_path), "")
                         view_btn.setToolTip(self.tr("Ouvrir Document"))
@@ -487,23 +502,25 @@ class DocumentsTab(QWidget):
                         actions_layout.addWidget(view_btn)
 
                     if can_manage:
-                        if doc.get("source_template_id"): # Only show "New Version" if it's from a template
-                            version_btn = QPushButton(QIcon(":/icons/copy.svg"), "") # Using copy icon for "new version"
+                        # Bouton Nouvelle Version (si applicable)
+                        if doc.get("source_template_id") and doc_type != "EDITABLE_HTML": # Pas de "nouvelle version" pour un HTML brut éditable lui-même, mais pour ses enfants générés.
+                                                                                         # Ou si on veut versionner l'EDITABLE_HTML lui-même, on enlève la condition doc_type != "EDITABLE_HTML"
+                            version_btn = QPushButton(QIcon(":/icons/copy.svg"), "")
                             version_btn.setToolTip(self.tr("Créer une nouvelle version à partir du même modèle"))
                             version_btn.setProperty("class", "tableActionButton")
                             version_btn.clicked.connect(lambda checked, old_id=doc_id, t_id=doc.get("source_template_id"): self.handle_create_new_version_clicked(old_id, t_id))
                             actions_layout.addWidget(version_btn)
 
-                        delete_btn = QPushButton(QIcon(":/icons/trash-2.svg"), "") # Standardized delete icon
+                        # Bouton Supprimer
+                        delete_btn = QPushButton(QIcon(":/icons/trash-2.svg"), "")
                         delete_btn.setToolTip(self.tr("Supprimer Document"))
                         delete_btn.setProperty("class", "dangerButtonTable")
                         delete_btn.clicked.connect(lambda checked, d_id=doc_id, p=full_file_path: self.delete_client_document_entry(d_id, p))
                         actions_layout.addWidget(delete_btn)
 
                     # Bouton "Convertir en Facture" pour les Proformas PDF
-                    if doc.get("document_type_generated") == "PROFORMA_PDF" and can_manage: # PROFORMA_PDF est une constante de app_constants
-                        convert_btn = QPushButton(QIcon(":/icons/share.svg"), "") # Utiliser une icône appropriée, share comme placeholder
-
+                    if doc.get("document_type_generated", "").endswith("_PDF") and "PROFORMA" in doc.get("document_type_generated", "") and can_manage:
+                        convert_btn = QPushButton(QIcon(":/icons/share.svg"), "")
                         convert_btn.setToolTip(self.tr("Convertir en Facture"))
                         convert_btn.setProperty("class", "tableActionButton")
                         convert_btn.clicked.connect(lambda checked, doc_id_proforma=doc_id: self.handle_convert_proforma_to_invoice(doc_id_proforma))
