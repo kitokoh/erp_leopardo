@@ -840,7 +840,7 @@ def main():
                 splash.hide()
                 sys.exit(0) # Quitter l'application
 
-    if proceed_to_main_app and logged_in_user_info and current_license_info and current_license_info.get('is_active'):
+    if proceed_to_main_app and logged_in_user_info and current_license_info is not None and current_license_info.get('is_active'):
         # Passer user_info et license_info à DocumentManager
         main_window = DocumentManager(APP_ROOT_DIR, logged_in_user_info, current_license_info)
 
