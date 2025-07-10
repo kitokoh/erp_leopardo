@@ -315,37 +315,43 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
 
                 logger.debug(f"AUTH_LOGIN: About to call license_manager.check_license_validity for user_id: {user['user_id']}")
                 is_license_valid, license_msg, license_details = license_manager.check_license_validity(conn, user['user_id'])
-                logger.debug(f"AUTH_LOGIN: license_manager.check_license_validity result: is_license_valid={is_license_valid}, license_msg='{license_msg}', license_details_type={type(license_details)}, license_details_value={license_details}")
+                logger.debug(f"AUTH_LOGIN: license_manager.check_license_validity result: is_license_valid={is_license_valid}, license_msg='{license_msg}', license_details_value={license_details}")
 
-                if not is_license_valid and user.get('role_name') == "Administrator":
-                    logger.debug(f"AUTH_LOGIN: Admin user '{username}' has invalid license. Checking if other 'complet' licenses exist.")
-                    if not licenses_crud.has_any_active_complete_license(conn):
-                        logger.warning(f"Administrator user '{username}' has an invalid/missing license and no other active 'complet' license found. Attempting to create a default 6-month license.")
-                        try:
-                            created_ok, create_msg, new_license_details = license_manager.create_default_admin_license(conn, user['user_id'])
-                            logger.debug(f"AUTH_LOGIN: create_default_admin_license result: created_ok={created_ok}, create_msg='{create_msg}', new_license_details_type={type(new_license_details)}")
-                            if created_ok:
-                                logger.info(f"Default admin license created successfully for '{username}'. Re-checking validity.")
-                                is_license_valid, license_msg, license_details = license_manager.check_license_validity(conn, user['user_id'])
-                                logger.debug(f"AUTH_LOGIN: Re-check after admin license creation: is_license_valid={is_license_valid}, license_msg='{license_msg}', license_details_type={type(license_details)}")
-                            else:
-                                logger.error(f"Failed to create default admin license for '{username}': {create_msg}")
-                                logger.debug(f"AUTH_LOGIN: Returning (True, '{create_msg or license_msg}', user_data, license_details_type={type(license_details)}) due to failed admin license creation.")
-                                return True, create_msg or license_msg, _current_user_data, license_details
-                        except Exception as e_create_lic:
-                            logger.error(f"Exception during default admin license creation for '{username}': {e_create_lic}", exc_info=True)
-                            detailed_error_msg = f"Erreur critique lors de la création de la licence admin: {type(e_create_lic).__name__} - {str(e_create_lic)}"
-                            logger.debug(f"AUTH_LOGIN: Returning (True, '{detailed_error_msg}', user_data, license_details_type={type(license_details)}) due to exception in admin license creation.")
-                            return True, detailed_error_msg, _current_user_data, license_details
-                    else:
-                        logger.info(f"Administrator user '{username}' has an invalid/missing license, but other 'complet' licenses exist. Default license not created.")
+                # If the user is an Administrator and their license is not valid, attempt to create/renew the default admin license.
+                if user.get('role_name') == "Administrator" and not is_license_valid:
+                    logger.warning(f"Administrator user '{username}' has an invalid/missing license (Initial check: {license_msg}). Attempting to create/renew default 6-month license.")
+                    try:
+                        # The create_default_admin_license function in manager.py will handle deactivating old ones.
+                        created_ok, create_msg, new_license_details = license_manager.create_default_admin_license(conn, user['user_id'])
+                        logger.debug(f"AUTH_LOGIN: create_default_admin_license result: created_ok={created_ok}, create_msg='{create_msg}', new_license_details={new_license_details}")
 
-                logger.debug(f"AUTH_LOGIN: Final license state before returning: is_license_valid={is_license_valid}, license_msg='{license_msg}', license_details_type={type(license_details)}")
+                        if created_ok and new_license_details:
+                            logger.info(f"Default admin license created/renewed successfully for '{username}'. Overriding previous license state.")
+                            is_license_valid = True # Mark as valid because we just created/renewed it
+                            license_msg = None # Clear any previous error message
+                            license_details = new_license_details # Use the new license details
+                        else:
+                            # If creation failed, the original license_msg and license_details are still relevant.
+                            # We augment the message to indicate creation failure.
+                            logger.error(f"Failed to create/renew default admin license for '{username}': {create_msg}")
+                            license_msg = f"Échec de la création/renouvellement de la licence admin: {create_msg}. Problème initial: {license_msg if license_msg else 'Licence invalide.'}"
+                            # is_license_valid remains False
+                            # license_details remains the potentially problematic ones from the first check, or None
+                    except Exception as e_create_lic:
+                        logger.error(f"Exception during default admin license creation/renewal for '{username}': {e_create_lic}", exc_info=True)
+                        license_msg = f"Erreur critique lors de la création/renouvellement de la licence admin: {type(e_create_lic).__name__}. Problème initial: {license_msg if license_msg else 'Licence invalide.'}"
+                        # is_license_valid remains False
+                        # license_details remains the potentially problematic ones from the first check, or None
+
+                # Final check on license status before returning
+                logger.debug(f"AUTH_LOGIN: Final license state before returning: is_license_valid={is_license_valid}, license_msg='{license_msg}', license_details={license_details}")
                 if not is_license_valid:
-                    logger.debug(f"AUTH_LOGIN: Returning (True, '{license_msg}', user_data, license_details_type={type(license_details)}) because license is not valid.")
+                    # User is authenticated, but license is not valid. Return success for auth, but with license message.
+                    logger.warning(f"Login for '{username}' successful, but license is invalid: {license_msg}")
                     return True, license_msg, _current_user_data, license_details
 
-                logger.debug(f"AUTH_LOGIN: Returning (True, None, user_data, license_details_type={type(license_details)}) for successful login with valid license.")
+                # Login and license are both OK.
+                logger.info(f"Login and license check successful for {username}.")
                 return True, None, _current_user_data, license_details
 
             except AttributeError as e_attr:
