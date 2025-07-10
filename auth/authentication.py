@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone # Added timedelta and timezon
 
 # auth/authentication.py
 import logging
+import traceback # Import for detailed traceback
 from datetime import datetime, timedelta, timezone # Added timedelta and timezone
 
 from db.cruds import users_crud, activity_logs_crud, licenses_crud # Added licenses_crud
@@ -283,91 +284,80 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
 
             conn = None
             try: # Corrected from try { to try:
-
+                logger.debug(f"AUTH_LOGIN: Entered token/license processing block for user '{username}'.")
                 conn = get_db_connection()
                 if remember_me:
-                    # Invalidate old tokens for this user on this device (or all devices)
-                    # For simplicity, let's invalidate all for now. A device_identifier could refine this.
+                    logger.debug(f"AUTH_LOGIN: 'Remember Me' is true for '{username}'. Processing token.")
                     user_session_tokens_crud.delete_all_user_session_tokens(conn, user['user_id'])
-
-                    new_token = generate_secure_token(48) # Generate a new strong token
+                    new_token = generate_secure_token(48)
                     token_hash = hash_token_for_storage(new_token)
                     expires_at = datetime.now(timezone.utc) + timedelta(days=SESSION_TOKEN_EXPIRY_DAYS)
-
                     device_id = None
-
-
                     token_record_id = user_session_tokens_crud.add_session_token(
                         conn, user['user_id'], token_hash, expires_at, device_id
                     )
                     if token_record_id:
                         save_remember_me_token_to_settings(new_token)
                         logger.info(f"New session token generated and stored for user {user['user_id']}.")
-                        activity_logs_crud.add_activity_log(
-                            conn=conn,
-
-                            data={
-                                "user_id": user['user_id'],
-                                "action_type": "REMEMBER_ME_TOKEN_GENERATED",
-                                "details": f"New 'Remember Me' session token generated. Expires: {expires_at.isoformat()}.",
-                                "related_entity_type": "UserSessionToken",
-                                "related_entity_id": token_record_id
-                            }
-                        )
+                        activity_logs_crud.add_activity_log(conn=conn, data={"user_id": user['user_id'], "action_type": "REMEMBER_ME_TOKEN_GENERATED", "details": f"New 'Remember Me' session token generated. Expires: {expires_at.isoformat()}.", "related_entity_type": "UserSessionToken", "related_entity_id": token_record_id})
                     else:
                         logger.error(f"Failed to store new session token in DB for user {user['user_id']}.")
                 else:
-
+                    logger.debug(f"AUTH_LOGIN: 'Remember Me' is false for '{username}'. Clearing any existing tokens.")
                     deleted_count = user_session_tokens_crud.delete_all_user_session_tokens(conn, user['user_id'])
                     if deleted_count > 0:
                         logger.info(f"Cleared {deleted_count} 'Remember Me' token(s) for user {user['user_id']} as 'Remember Me' was not checked.")
-                        activity_logs_crud.add_activity_log(
-                            conn=conn,
-                            data={
-                                "user_id": user['user_id'],
-                                "action_type": "REMEMBER_ME_TOKENS_CLEARED_ON_LOGIN",
-                                "details": f"All 'Remember Me' tokens cleared for user as 'Remember Me' was not selected during login. Count: {deleted_count}.",
-                            }
-                        )
+                        activity_logs_crud.add_activity_log(conn=conn, data={"user_id": user['user_id'], "action_type": "REMEMBER_ME_TOKENS_CLEARED_ON_LOGIN", "details": f"All 'Remember Me' tokens cleared for user as 'Remember Me' was not selected during login. Count: {deleted_count}."})
 
-                # License Check
+                logger.debug(f"AUTH_LOGIN: About to call license_manager.check_license_validity for user_id: {user['user_id']}")
                 is_license_valid, license_msg, license_details = license_manager.check_license_validity(conn, user['user_id'])
+                logger.debug(f"AUTH_LOGIN: license_manager.check_license_validity result: is_license_valid={is_license_valid}, license_msg='{license_msg}', license_details_type={type(license_details)}, license_details_value={license_details}")
 
-                # --- Modified Default Admin License Creation Trigger ---
-                if not is_license_valid and user.get('role_name') == "Administrator": # Check role
-                    # Check if any other 'complet' license exists in the system
-                    if not licenses_crud.has_any_active_complete_license(conn): # Corrected: Use licenses_crud directly
-
+                if not is_license_valid and user.get('role_name') == "Administrator":
+                    logger.debug(f"AUTH_LOGIN: Admin user '{username}' has invalid license. Checking if other 'complet' licenses exist.")
+                    if not licenses_crud.has_any_active_complete_license(conn):
                         logger.warning(f"Administrator user '{username}' has an invalid/missing license and no other active 'complet' license found. Attempting to create a default 6-month license.")
                         try:
                             created_ok, create_msg, new_license_details = license_manager.create_default_admin_license(conn, user['user_id'])
+                            logger.debug(f"AUTH_LOGIN: create_default_admin_license result: created_ok={created_ok}, create_msg='{create_msg}', new_license_details_type={type(new_license_details)}")
                             if created_ok:
                                 logger.info(f"Default admin license created successfully for '{username}'. Re-checking validity.")
                                 is_license_valid, license_msg, license_details = license_manager.check_license_validity(conn, user['user_id'])
+                                logger.debug(f"AUTH_LOGIN: Re-check after admin license creation: is_license_valid={is_license_valid}, license_msg='{license_msg}', license_details_type={type(license_details)}")
                             else:
                                 logger.error(f"Failed to create default admin license for '{username}': {create_msg}")
+                                logger.debug(f"AUTH_LOGIN: Returning (True, '{create_msg or license_msg}', user_data, license_details_type={type(license_details)}) due to failed admin license creation.")
                                 return True, create_msg or license_msg, _current_user_data, license_details
                         except Exception as e_create_lic:
                             logger.error(f"Exception during default admin license creation for '{username}': {e_create_lic}", exc_info=True)
-                            return True, f"Erreur critique lors de la création de la licence admin: {str(e_create_lic)}", _current_user_data, license_details
+                            detailed_error_msg = f"Erreur critique lors de la création de la licence admin: {type(e_create_lic).__name__} - {str(e_create_lic)}"
+                            logger.debug(f"AUTH_LOGIN: Returning (True, '{detailed_error_msg}', user_data, license_details_type={type(license_details)}) due to exception in admin license creation.")
+                            return True, detailed_error_msg, _current_user_data, license_details
                     else:
                         logger.info(f"Administrator user '{username}' has an invalid/missing license, but other 'complet' licenses exist. Default license not created.")
-                # --- End Modified Default Admin License Creation Trigger ---
 
-
+                logger.debug(f"AUTH_LOGIN: Final license state before returning: is_license_valid={is_license_valid}, license_msg='{license_msg}', license_details_type={type(license_details)}")
                 if not is_license_valid:
+                    logger.debug(f"AUTH_LOGIN: Returning (True, '{license_msg}', user_data, license_details_type={type(license_details)}) because license is not valid.")
                     return True, license_msg, _current_user_data, license_details
 
+                logger.debug(f"AUTH_LOGIN: Returning (True, None, user_data, license_details_type={type(license_details)}) for successful login with valid license.")
                 return True, None, _current_user_data, license_details
 
-            except Exception as e_inner: # Catch exceptions within the 'try with conn'
-
-                logger.error(f"Error during token/license processing for {username}: {e_inner}", exc_info=True)
-                # Decide on return value: if token/license fails, is login still valid?
-                # For now, let's assume if this block fails, login might be compromised or incomplete.
-                _current_user_data = None # Don't consider user logged in
-                # Attempt to clear any potentially partially saved token if remember_me was true
-                if remember_me and conn: # Check conn as it might have failed to be established
+            except AttributeError as e_attr:
+                logger.error(f"AUTH_LOGIN: AttributeError during token/license processing for {username}: {e_attr}", exc_info=True)
+                formatted_traceback = traceback.format_exc()
+                logger.error(f"Detailed Traceback for AttributeError:\n{formatted_traceback}")
+                _current_user_data = None
+                if remember_me and conn:
+                    user_session_tokens_crud.delete_all_user_session_tokens(conn, user['user_id'])
+                clear_remember_me_token_from_settings()
+                # Return a more specific error message if possible, or the generic one
+                return False, f"Erreur interne (AttributeError): {str(e_attr)}", None, None
+            except Exception as e_inner:
+                logger.error(f"AUTH_LOGIN: Error during token/license processing for {username}: {e_inner}", exc_info=True)
+                _current_user_data = None
+                if remember_me and conn:
                     user_session_tokens_crud.delete_all_user_session_tokens(conn, user['user_id'])
                 clear_remember_me_token_from_settings()
                 return False, f"Erreur interne ({type(e_inner).__name__}).", None, None
