@@ -834,6 +834,63 @@ def get_document_context(
         else:
             logger.warning("'custom_fields' in additional_data is not a dictionary. Skipping.")
 
+    # Populate tech_specs if document_type is for technical specifications
+    if document_type and "TECHNICAL_SPECIFICATIONS" in document_type.upper():
+        logger.info(f"Populating context for TECHNICAL_SPECIFICATIONS: {document_type}")
+        # This section would typically fetch detailed technical data for a product.
+        # For now, using placeholder data or data from additional_data.
+        # Product specific data might be in context['items'][0] if only one product, or needs specific fetching.
+
+        product_data_for_specs = {}
+        if context.get("items"):
+            product_data_for_specs = context["items"][0] # Assuming tech spec is for the first item/product
+            context["doc"]["product_name"] = product_data_for_specs.get("name", context["doc"].get("product_name"))
+            # Assuming main_image_url and caption might come from the first product's media or specific fields
+            if product_data_for_specs.get("media_links") and len(product_data_for_specs["media_links"]) > 0:
+                 context["doc"]["main_image_url"] = product_data_for_specs["media_links"][0].get("url")
+                 context["doc"]["main_image_caption"] = product_data_for_specs["media_links"][0].get("description")
+            else:
+                 context["doc"]["main_image_url"] = additional_data.get("main_image_url_override") # Allow override
+                 context["doc"]["main_image_caption"] = additional_data.get("main_image_caption_override")
+
+
+        context['tech_specs'] = {
+            "dimensions_list": additional_data.get(
+                "tech_specs_dimensions_list",
+                [ # Example data
+                    {"characteristic": "Hauteur", "value": "100", "unit": "mm", "tolerance": "±1"},
+                    {"characteristic": "Largeur", "value": "200", "unit": "mm", "tolerance": "±2"},
+                ]
+            ),
+            "materials_overview": additional_data.get("tech_specs_materials_overview", "Description générale des matériaux..."),
+            "materials_list": additional_data.get(
+                "tech_specs_materials_list",
+                [ # Example data
+                    {"item": "Acier inoxydable 304"},
+                    {"item": "Polycarbonate haute résistance"},
+                ]
+            ),
+            "performance_list": additional_data.get(
+                "tech_specs_performance_list",
+                [{"item": "Performance A: Valeur X"}, {"item": "Performance B: Valeur Y"}]
+            ),
+            "compliance_list": additional_data.get(
+                "tech_specs_compliance_list",
+                [{"item": "Standard ISO 9001"}, {"item": "Certification CE"}]
+            ),
+            "environment_list": additional_data.get(
+                "tech_specs_environment_list",
+                [{"item": "Température de fonctionnement: -10°C à 50°C"}]
+            ),
+            "maintenance_list": additional_data.get(
+                "tech_specs_maintenance_list",
+                [{"item": "Nettoyage avec un chiffon doux."}, {"item": "Vérification annuelle recommandée."}]
+            ),
+        }
+        # General notes for the document might be in doc.notes, populated from client_specific_notes or other sources.
+        context["doc"]["notes"] = additional_data.get("tech_specs_general_notes", context["doc"].get("notes", "Notes techniques complémentaires..."))
+        context["doc"]["version_tag"] = additional_data.get("tech_specs_version", context["doc"].get("version_tag", "1.0"))
+
     return context
 
 if __name__ == '__main__':
