@@ -277,6 +277,7 @@ class LoginWindow(QDialog):
 
     def handle_password_login(self):
         """Handles login attempt using username and password."""
+        logger.info("LOGIN_WINDOW: handle_password_login called.") # ADDED
         username = self.username_input.text().strip()
         password = self.password_input.text()
 
