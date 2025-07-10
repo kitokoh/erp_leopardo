@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 import json
 import logging
 import importlib
+from datetime import datetime
 
 # Assuming config.py is in the parent directory (root)
 from config import DATABASE_PATH, DEFAULT_ADMIN_USERNAME
@@ -398,8 +399,8 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
 
 
 
-                from db.cruds import licenses_crud # Corrected import
-
+                from db.cruds import licenses_crud # Keep for get_active_license_for_user if needed for check
+                from license_management import manager as license_manager_instance # Import the manager
                 from datetime import timedelta # datetime is already imported
 
                 logger.info(f"Checking/Seeding license for admin user ID: {super_admin_user_id}")
@@ -483,11 +484,12 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                         logger.info(f"Successfully added 'complet' license (ID: {new_license_id}) for admin user {super_admin_user_id}, valid for 6 months.")
                     else:
                         logger.error(f"Failed to add 'complet' license for admin user {super_admin_user_id}.")
-                else:
-                    logger.info(f"Admin user {super_admin_user_id} already has a suitable active 'complet' license. Skipping new license creation.")
 
-            # except ImportError: # This was for the old incorrect import, now it should be NameError if licenses_crud itself is not found
-            #     logger.error("Failed to import db.cruds.licenses_crud. Cannot seed admin license.")
+                else:
+                    logger.error(f"Failed to ensure/create default admin license for user {super_admin_user_id}. Message: {message}")
+
+            except ImportError as e_import_lic:
+                logger.error(f"Failed to import LicenseManager for admin license seeding: {e_import_lic}. Admin may not get a default license.", exc_info=True)
             except Exception as e_lic:
                 logger.error(f"An error occurred during admin license seeding: {e_lic}", exc_info=True)
         else:

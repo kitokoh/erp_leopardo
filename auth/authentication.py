@@ -352,6 +352,7 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
                 logger.error(f"Detailed Traceback for AttributeError:\n{formatted_traceback}")
                 _current_user_data = None
                 if remember_me and conn:
+
                     user_session_tokens_crud.delete_all_user_session_tokens(conn, user['user_id'])
                 clear_remember_me_token_from_settings()
                 # Return a more specific error message if possible, or the generic one
@@ -360,6 +361,7 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
                 logger.error(f"AUTH_LOGIN: Error during token/license processing for {username}: {e_inner}", exc_info=True)
                 _current_user_data = None
                 if remember_me and conn:
+
                     user_session_tokens_crud.delete_all_user_session_tokens(conn, user['user_id'])
                 clear_remember_me_token_from_settings()
                 return False, f"Erreur interne ({type(e_inner).__name__}).", None, None

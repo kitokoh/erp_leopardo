@@ -119,8 +119,8 @@ def format_currency(amount, currency_symbol='€', decimal_places=2, language_co
             amount = Decimal(str(amount))
         except Exception:
             if language_code == 'fr':
-                return f"0,00 {currency_symbol}"
-            return f"{currency_symbol}0.00"
+                return f"0,00 {currency_symbol}" # Devrait probablement être juste "0,00" si amount est invalide
+            return f"{currency_symbol}0.00" # Idem, "0.00"
 
     quantizer = Decimal('0.1') ** decimal_places
     rounded_amount = amount.quantize(quantizer, ROUND_HALF_UP)
@@ -154,6 +154,48 @@ def format_currency(amount, currency_symbol='€', decimal_places=2, language_co
         return f"{sign}{formatted_integer_part}{decimal_sep}{decimal_part_str} {currency_symbol}"
     else: # Default (EN-like)
         return f"{sign}{currency_symbol}{formatted_integer_part}{decimal_sep}{decimal_part_str}"
+
+def format_number(number, decimal_places=2, language_code='en') -> str:
+    """
+    Formats a numerical amount as a string with specified decimal places and basic localization for separators.
+    """
+    if number is None:
+        return "0.00" # Ou une chaîne vide, selon la préférence
+
+    if not isinstance(number, Decimal):
+        try:
+            number = Decimal(str(number))
+        except Exception:
+            return "0.00" # Ou une chaîne vide
+
+    quantizer = Decimal('0.1') ** decimal_places
+    rounded_number = number.quantize(quantizer, ROUND_HALF_UP)
+
+    abs_rounded_number = abs(rounded_number)
+
+    parts = str(abs_rounded_number).split('.')
+    integer_part_str = parts[0]
+    decimal_part_str = parts[1] if len(parts) > 1 else '0' * decimal_places
+    decimal_part_str = decimal_part_str.ljust(decimal_places, '0')
+
+    if language_code == 'fr':
+        thousands_sep = " "
+        decimal_sep = ","
+    else: # Default to EN-like
+        thousands_sep = ","
+        decimal_sep = "."
+
+    reversed_integer_part = list(integer_part_str[::-1])
+    formatted_integer_list = []
+    for i, digit in enumerate(reversed_integer_part):
+        if i > 0 and i % 3 == 0:
+            formatted_integer_list.append(thousands_sep)
+        formatted_integer_list.append(digit)
+    formatted_integer_part = "".join(formatted_integer_list[::-1])
+
+    sign = "-" if rounded_number < 0 else ""
+
+    return f"{sign}{formatted_integer_part}{decimal_sep}{decimal_part_str}"
 
 
 def get_document_context(
@@ -577,39 +619,63 @@ def get_document_context(
                 "vat_rate_percentage": Decimal(str(item_data.get("vat_rate", "0.0"))) * Decimal("100"),
                 "total_ttc_formatted": format_currency(Decimal(str(item_data.get("total_item_ttc", "0.0"))), context["doc"]["currency_symbol"], language_code=language_code),
                 "weight": item_data.get("weight"), # From CommandeItems
+                "net_weight_kg_formatted": format_number(item_data.get("weight"), 2, language_code), # Assuming 'weight' is net weight for packing list item
+                "gross_weight_kg_formatted": format_number(item_data.get("gross_weight"), 2, language_code), # Assuming 'gross_weight' field exists on CommandeItem
                 "dimensions_text": item_data.get("dimensions_text"), # From CommandeItems
                 "item_language_code": item_data.get("product_language_code"), # From CommandeItems
                 "media_links": media_links_processed,
+                # Packing list specific fields from item_data if they exist
+                "marks_and_numbers": item_data.get("marks_and_numbers", ""),
+                "package_count": item_data.get("package_count", 1), # Default to 1 if not specified
+                "package_type": item_data.get("package_type", "Carton"), # Default
             })
         
         context["items"] = processed_items_for_context # Use "items" for generic line items
 
-        # Use calculated subtotal from items if order details are not authoritative or need override
+        # Totals for Packing List (conceptual, assumes these are calculated elsewhere or passed in additional_data)
+        # If these totals are derived from the sum of item properties, that calculation should happen here.
+        # For example:
+        # totals_data_for_packing_list = additional_data.get("packing_list_totals", {})
+        # calculated_total_net_weight = sum(it.get('weight', Decimal(0)) for it in raw_items_data if it.get('weight'))
+        # calculated_total_gross_weight = sum(it.get('gross_weight', Decimal(0)) for it in raw_items_data if it.get('gross_weight'))
+        # calculated_total_package_count = sum(it.get('package_count', 0) for it in raw_items_data if it.get('package_count'))
+        # calculated_total_volume_cbm = sum(it.get('volume_cbm', Decimal(0)) for it in raw_items_data if it.get('volume_cbm'))
+
+
+        # This is a simplified placeholder for totals. Real calculation would be needed.
+        # These might come from order_details if available there, or calculated from items.
+        context["totals"] = {
+            "package_count": additional_data.get("total_package_count", sum(item.get("package_count", 0) for item in processed_items_for_context)),
+            "net_weight_kg_formatted": format_number(additional_data.get("total_net_weight_kg"), 2, language_code),
+            "gross_weight_kg_formatted": format_number(additional_data.get("total_gross_weight_kg"), 2, language_code),
+            "volume_cbm_formatted": format_number(additional_data.get("total_volume_cbm"), 3, language_code),
+        }
+
+
+        # Financial Totals (Proforma, Invoice etc.)
         subtotal_ht = calculated_subtotal_ht
         if order_id and context["order"].get("total_ht_raw") is not None: # Prefer order's total if available
             subtotal_ht = context["order"]["total_ht_raw"]
 
-        # Recalculate totals based on context["items"] or order totals
-        # Assuming discount_rate and vat_rate are for the whole order
         discount_amount = subtotal_ht * context["doc"]["discount_rate"]
         subtotal_after_discount = subtotal_ht - discount_amount
         vat_amount = subtotal_after_discount * context["doc"]["vat_rate"]
         grand_total = subtotal_after_discount + vat_amount
 
-        context["doc"]["subtotal_amount_raw"] = subtotal_ht # Corrected: was subtotal
+        context["doc"]["subtotal_amount_raw"] = subtotal_ht
         context["doc"]["discount_amount_raw"] = discount_amount
         context["doc"]["vat_amount_raw"] = vat_amount
         context["doc"]["grand_total_amount_raw"] = grand_total
 
         cs = context["doc"]["currency_symbol"]
-        context["doc"]["subtotal_amount"] = format_currency(subtotal_ht, cs, language_code=language_code) # Corrected: was subtotal, added language_code
+        context["doc"]["subtotal_amount"] = format_currency(subtotal_ht, cs, language_code=language_code)
         context["doc"]["discount_amount"] = format_currency(discount_amount, cs, language_code=language_code)
         context["doc"]["vat_amount"] = format_currency(vat_amount, cs, language_code=language_code)
         context["doc"]["grand_total_amount"] = format_currency(grand_total, cs, language_code=language_code)
 
-        doc_type_for_notes = additional_data.get("current_document_type_for_notes", document_type) # Use the key passed from create_document_dialog
+        # Notes handling
+        doc_type_for_notes = additional_data.get("current_document_type_for_notes", document_type)
         if doc_type_for_notes and client_id and language_code:
-            # Explicitly fetch only active notes. conn is handled by @_manage_conn in get_client_document_notes
             client_notes_records = get_client_document_notes(client_id, doc_type_for_notes, language_code, is_active=True)
             # Templates likely expect a list of note strings, not dicts.
             context["doc"]["client_specific_notes"] = [note['note_content'] for note in client_notes_records] if client_notes_records else []
@@ -620,6 +686,14 @@ def get_document_context(
         else:
             context["doc"]["client_specific_notes"] = []
             logger.info(f"Skipping client-specific notes fetch due to missing: doc_type_for_notes='{doc_type_for_notes}', client_id='{client_id}', or language_code='{language_code}'.")
+
+        # Handle packing_notes formatting if it's a packing list
+        if document_type and "PACKING_LIST" in document_type.upper():
+            raw_packing_notes = additional_data.get("packing_notes", "") # Get from additional_data
+            if isinstance(raw_packing_notes, str):
+                context["doc"]["packing_notes"] = raw_packing_notes.replace('\n', '<br>')
+            else:
+                context["doc"]["packing_notes"] = raw_packing_notes # Or handle non-string case
 
         context["placeholders"]["BUYER_COMPANY_NAME"] = context["client"].get("company_name", context["client"].get("name"))
         context["placeholders"]["BUYER_CONTACT_NAME"] = context["client"].get("contact_name")
@@ -759,6 +833,63 @@ def get_document_context(
                 context["placeholders"][f"CUSTOM_{cf_key.upper()}"] = cf_value
         else:
             logger.warning("'custom_fields' in additional_data is not a dictionary. Skipping.")
+
+    # Populate tech_specs if document_type is for technical specifications
+    if document_type and "TECHNICAL_SPECIFICATIONS" in document_type.upper():
+        logger.info(f"Populating context for TECHNICAL_SPECIFICATIONS: {document_type}")
+        # This section would typically fetch detailed technical data for a product.
+        # For now, using placeholder data or data from additional_data.
+        # Product specific data might be in context['items'][0] if only one product, or needs specific fetching.
+
+        product_data_for_specs = {}
+        if context.get("items"):
+            product_data_for_specs = context["items"][0] # Assuming tech spec is for the first item/product
+            context["doc"]["product_name"] = product_data_for_specs.get("name", context["doc"].get("product_name"))
+            # Assuming main_image_url and caption might come from the first product's media or specific fields
+            if product_data_for_specs.get("media_links") and len(product_data_for_specs["media_links"]) > 0:
+                 context["doc"]["main_image_url"] = product_data_for_specs["media_links"][0].get("url")
+                 context["doc"]["main_image_caption"] = product_data_for_specs["media_links"][0].get("description")
+            else:
+                 context["doc"]["main_image_url"] = additional_data.get("main_image_url_override") # Allow override
+                 context["doc"]["main_image_caption"] = additional_data.get("main_image_caption_override")
+
+
+        context['tech_specs'] = {
+            "dimensions_list": additional_data.get(
+                "tech_specs_dimensions_list",
+                [ # Example data
+                    {"characteristic": "Hauteur", "value": "100", "unit": "mm", "tolerance": "±1"},
+                    {"characteristic": "Largeur", "value": "200", "unit": "mm", "tolerance": "±2"},
+                ]
+            ),
+            "materials_overview": additional_data.get("tech_specs_materials_overview", "Description générale des matériaux..."),
+            "materials_list": additional_data.get(
+                "tech_specs_materials_list",
+                [ # Example data
+                    {"item": "Acier inoxydable 304"},
+                    {"item": "Polycarbonate haute résistance"},
+                ]
+            ),
+            "performance_list": additional_data.get(
+                "tech_specs_performance_list",
+                [{"item": "Performance A: Valeur X"}, {"item": "Performance B: Valeur Y"}]
+            ),
+            "compliance_list": additional_data.get(
+                "tech_specs_compliance_list",
+                [{"item": "Standard ISO 9001"}, {"item": "Certification CE"}]
+            ),
+            "environment_list": additional_data.get(
+                "tech_specs_environment_list",
+                [{"item": "Température de fonctionnement: -10°C à 50°C"}]
+            ),
+            "maintenance_list": additional_data.get(
+                "tech_specs_maintenance_list",
+                [{"item": "Nettoyage avec un chiffon doux."}, {"item": "Vérification annuelle recommandée."}]
+            ),
+        }
+        # General notes for the document might be in doc.notes, populated from client_specific_notes or other sources.
+        context["doc"]["notes"] = additional_data.get("tech_specs_general_notes", context["doc"].get("notes", "Notes techniques complémentaires..."))
+        context["doc"]["version_tag"] = additional_data.get("tech_specs_version", context["doc"].get("version_tag", "1.0"))
 
     return context
 
