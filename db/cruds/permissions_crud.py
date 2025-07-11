@@ -1,55 +1,150 @@
 # db/cruds/permissions_crud.py
 import sqlite3
 import logging
+from sqlalchemy.orm import Session
+from sqlalchemy.engine import Engine, Connection as SQLAlchemyConnection
+from sqlalchemy.sql import text as sqlalchemy_text
+from sqlalchemy.exc import SQLAlchemyError
+
 from .generic_crud import _manage_conn
 
 logger = logging.getLogger(__name__)
 
+# Helper functions (copied from roles_crud.py / users_crud.py)
+# Ideally, these should be in a shared db.crud_utils module
+def _get_cursor_and_dialect(conn):
+    if isinstance(conn, (Session, Engine, SQLAlchemyConnection)):
+        return conn, "sqlalchemy"
+    elif hasattr(conn, 'cursor'):
+        return conn.cursor(), "sqlite"
+    logger.warning(f"Unsupported connection type: {type(conn)} in _get_cursor_and_dialect (permissions_crud).")
+    return None, None
+
+def _execute_query(db_obj, sql_query, params, dialect, logger_to_use=None):
+    current_logger = logger_to_use if logger_to_use else logger
+    try:
+        if dialect == "sqlalchemy":
+            return db_obj.execute(sql_query, params)
+        elif dialect == "sqlite":
+            return db_obj.execute(sql_query, params)
+        else:
+            current_logger.error(f"Unsupported dialect '{dialect}' in _execute_query.")
+            return None
+    except (sqlite3.Error, SQLAlchemyError) as e:
+        current_logger.error(f"Database error in _execute_query (dialect: {dialect}): {e}", exc_info=True)
+        raise
+
+def _fetch_one_as_dict(db_obj, sql_query, params, dialect, logger_to_use=None):
+    current_logger = logger_to_use if logger_to_use else logger
+    try:
+        row_data = None
+        if dialect == "sqlalchemy":
+            result = db_obj.execute(sql_query, params)
+            row = result.fetchone()
+            if row: row_data = dict(row._mapping)
+        elif dialect == "sqlite":
+            db_obj.execute(sql_query, params)
+            row = db_obj.fetchone()
+            if row:
+                column_names = [desc[0] for desc in db_obj.description]
+                row_data = dict(zip(column_names, row))
+        return row_data
+    except (sqlite3.Error, SQLAlchemyError) as e:
+        current_logger.error(f"Database error in _fetch_one_as_dict (dialect: {dialect}): {e}", exc_info=True)
+        return None
+
+def _fetch_all_as_dict_list(db_obj, sql_query, params, dialect, logger_to_use=None):
+    current_logger = logger_to_use if logger_to_use else logger
+    try:
+        rows_data = []
+        if dialect == "sqlalchemy":
+            result = db_obj.execute(sql_query, params)
+            for row in result.fetchall():
+                rows_data.append(dict(row._mapping))
+        elif dialect == "sqlite":
+            db_obj.execute(sql_query, params)
+            rows = db_obj.fetchall()
+            if rows:
+                column_names = [desc[0] for desc in db_obj.description]
+                for row_item in rows:
+                    rows_data.append(dict(zip(column_names, row_item)))
+        return rows_data
+    except (sqlite3.Error, SQLAlchemyError) as e:
+        current_logger.error(f"Database error in _fetch_all_as_dict_list (dialect: {dialect}): {e}", exc_info=True)
+        return []
+
+
 @_manage_conn
-def add_permission(permission_key: str, description: str, conn: sqlite3.Connection = None) -> bool:
+def add_permission(permission_key: str, description: str, conn=None) -> bool:
     """
     Adds a new permission to the Permissions table.
     Mainly intended for initial seeding or administrative setup.
     Returns True if successful, False otherwise.
     """
-    sql = "INSERT INTO Permissions (permission_key, description) VALUES (?, ?)"
-    try:
-        cursor = conn.cursor()
-        cursor.execute(sql, (permission_key, description))
-        # conn.commit() # Handled by _manage_conn
-        logger.info(f"Permission '{permission_key}' added successfully.")
-        return True
-    except sqlite3.IntegrityError:
-        logger.warning(f"Permission '{permission_key}' already exists. Skipping.")
-        return False # Not necessarily an error if called during seeding
-    except sqlite3.Error as e:
-        logger.error(f"Database error adding permission '{permission_key}': {e}", exc_info=True)
+    sql_sqlite = "INSERT INTO Permissions (permission_key, description) VALUES (?, ?)"
+    sql_sa = sqlalchemy_text("INSERT INTO Permissions (permission_key, description) VALUES (:permission_key, :description)")
+
+    params_sqlite = (permission_key, description)
+    params_sa = {"permission_key": permission_key, "description": description}
+
+    db_obj, dialect = _get_cursor_and_dialect(conn)
+    if not db_obj or not dialect:
+        logger.error(f"Unsupported connection type in add_permission: {type(conn)}")
         return False
 
-@_manage_conn
-def get_permission_by_key(permission_key: str, conn: sqlite3.Connection = None) -> dict | None:
-    """Fetches a permission by its key."""
-    sql = "SELECT * FROM Permissions WHERE permission_key = ?"
     try:
-        cursor = conn.cursor()
-        cursor.execute(sql, (permission_key,))
-        row = cursor.fetchone()
-        return dict(row) if row else None
-    except sqlite3.Error as e:
-        logger.error(f"Database error fetching permission by key '{permission_key}': {e}", exc_info=True)
-        return None
+        _execute_query(db_obj, sql_sa if dialect == "sqlalchemy" else sql_sqlite,
+                       params_sa if dialect == "sqlalchemy" else params_sqlite, dialect)
+        logger.info(f"Permission '{permission_key}' added successfully.")
+        return True
+    except (sqlite3.IntegrityError, SQLAlchemyError) as e:
+        # Handle potential wrapped IntegrityError from SQLAlchemy
+        original_error = getattr(e, 'orig', e)
+        if isinstance(original_error, sqlite3.IntegrityError):
+            logger.warning(f"Permission '{permission_key}' already exists (IntegrityError). Skipping.")
+        else: # Other SQLAlchemyError or direct sqlite3.IntegrityError if not wrapped
+            logger.error(f"Database error adding permission '{permission_key}': {e}", exc_info=True)
+        return False # Not necessarily an error if called during seeding and it exists
+    except (sqlite3.Error, SQLAlchemyError) as e: # Broader catch
+        logger.error(f"General database error adding permission '{permission_key}': {e}", exc_info=True)
+        return False
+
 
 @_manage_conn
-def list_all_permissions(conn: sqlite3.Connection = None) -> list[dict]:
+def get_permission_by_key(permission_key: str, conn=None) -> dict | None:
+    """Fetches a permission by its key."""
+    sql_sqlite = "SELECT * FROM Permissions WHERE permission_key = ?"
+    sql_sa = sqlalchemy_text("SELECT * FROM Permissions WHERE permission_key = :permission_key")
+
+    params_sqlite = (permission_key,)
+    params_sa = {"permission_key": permission_key}
+
+    db_obj, dialect = _get_cursor_and_dialect(conn)
+    if not db_obj or not dialect:
+        logger.error(f"Unsupported connection type in get_permission_by_key: {type(conn)}")
+        return None
+
+    return _fetch_one_as_dict(db_obj, sql_sa if dialect == "sqlalchemy" else sql_sqlite,
+                              params_sa if dialect == "sqlalchemy" else params_sqlite, dialect, logger)
+
+
+@_manage_conn
+def list_all_permissions(conn=None) -> list[dict]:
     """Lists all available permissions."""
-    sql = "SELECT * FROM Permissions ORDER BY permission_key"
-    try:
-        cursor = conn.cursor()
-        cursor.execute(sql)
-        return [dict(row) for row in cursor.fetchall()]
-    except sqlite3.Error as e:
-        logger.error(f"Database error listing all permissions: {e}", exc_info=True)
+    sql_common = "SELECT * FROM Permissions ORDER BY permission_key"
+    sql_sqlite = sql_common
+    sql_sa = sqlalchemy_text(sql_common)
+
+    params_sqlite = ()
+    params_sa = {}
+
+    db_obj, dialect = _get_cursor_and_dialect(conn)
+    if not db_obj or not dialect:
+        logger.error(f"Unsupported connection type in list_all_permissions: {type(conn)}")
         return []
+
+    return _fetch_all_as_dict_list(db_obj, sql_sa if dialect == "sqlalchemy" else sql_sqlite,
+                                   params_sa if dialect == "sqlalchemy" else params_sqlite, dialect, logger)
 
 # Potential future functions:
 # - update_permission_description(permission_key: str, new_description: str) -> bool
