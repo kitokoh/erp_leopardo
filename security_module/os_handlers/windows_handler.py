@@ -51,6 +51,27 @@ WINBIO_E_UNKNOWN_ID = HRESULT(0x80098031).value
 WINBIO_E_DATABASE_NO_RESULTS = HRESULT(0x8009803E).value
 WINBIO_E_NO_DEVICE = HRESULT(0x8009803F).value
 
+# More accurate definition for the initial part of WINBIO_UNIT_SCHEMA
+WINBIO_POOL_TYPE = ctypes.c_uint32
+WINBIO_BIOMETRIC_TYPE = ctypes.c_uint32
+# WINBIO_BIOMETRIC_SUBTYPE is already ctypes.c_ubyte
+WINBIO_CAPABILITIES = ctypes.c_uint32
+
+class WINBIO_UNIT_SCHEMA(ctypes.Structure): # Renamed from WINBIO_UNIT_SCHEMA_ACCURATE for direct replacement
+    _fields_ = [
+        ("UnitId", WINBIO_UNIT_ID),                   # offset 0, size 4
+        ("PoolType", WINBIO_POOL_TYPE),             # offset 4, size 4
+        ("BiometricFactor", WINBIO_BIOMETRIC_TYPE), # offset 8, size 4
+        ("SensorSubtype", WINBIO_BIOMETRIC_SUBTYPE),  # offset 12, size 1
+        # ctypes default packing should align Capabilities to a 4-byte boundary.
+        # If SensorSubtype is at offset 12 (0xC), next 4-byte aligned offset is 16 (0x10).
+        # So, 3 bytes of padding will likely be inserted by ctypes here.
+        ("Capabilities", WINBIO_CAPABILITIES),       # offset 16, size 4
+        # Current size based on fields above: 4+4+4+1(pad 3)+4 = 20 bytes.
+        # Original placeholder was 28 bytes. Add 8 bytes of padding to maintain size.
+        ("ReservedPadding", ctypes.c_ubyte * 8)     # 20 + 8 = 28 bytes.
+    ]
+
 class WINBIO_IDENTITY(ctypes.Structure):
     _fields_ = [
         ("Type", ctypes.c_uint32),
@@ -152,12 +173,18 @@ class WindowsBiometricHandler:
         if not self._ensure_session_for_factor(target_factor): # Ensures session is open for the correct factor
             return False
 
-        unit_schema_array = ctypes.POINTER(ctypes.c_void_p)()
+        # ptr_to_unit_schemas will receive a pointer to the first WINBIO_UNIT_SCHEMA in an array.
+        # It should be of type POINTER(WINBIO_UNIT_SCHEMA).
+        ptr_to_unit_schemas = ctypes.POINTER(WINBIO_UNIT_SCHEMA)() # This is WINBIO_UNIT_SCHEMA*
         unit_count = ctypes.c_size_t()
+
         try:
             self.winbio.WinBioEnumBiometricUnits.argtypes = [
-                WINBIO_SESSION_HANDLE, ctypes.c_uint32,
-                ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p)), ctypes.POINTER(ctypes.c_size_t)
+                WINBIO_SESSION_HANDLE,
+                ctypes.c_uint32,
+                # Parameter in C is PWINBIO_UNIT_SCHEMA** (pointer to a pointer to schema)
+                ctypes.POINTER(ctypes.POINTER(WINBIO_UNIT_SCHEMA)),
+                ctypes.POINTER(ctypes.c_size_t)
             ]
             self.winbio.WinBioEnumBiometricUnits.restype = HRESULT
         except AttributeError:
@@ -165,20 +192,35 @@ class WindowsBiometricHandler:
             return False
 
         hr = self.winbio.WinBioEnumBiometricUnits(
-            self.session_handle, target_factor, # Use target_factor here
-            ctypes.byref(unit_schema_array), ctypes.byref(unit_count)
+            self.session_handle,
+            target_factor,
+            ctypes.byref(ptr_to_unit_schemas), # Pass address of our WINBIO_UNIT_SCHEMA* variable
+            ctypes.byref(unit_count)
         )
+
         available = False
         if hr == S_OK:
             available = unit_count.value > 0
             logger.info(f"WinBioEnumBiometricUnits: {unit_count.value} unit(s) for {method} (factor {target_factor}). Available: {available}")
-            if unit_schema_array and unit_schema_array.contents:
+
+            # ptr_to_unit_schemas now holds the actual pointer to the array allocated by WinBio.
+            # This is the pointer (type: WINBIO_UNIT_SCHEMA*) that needs to be freed.
+            # WinBioFree expects a PVOID, which WINBIO_UNIT_SCHEMA* is compatible with.
+            if ptr_to_unit_schemas: # Check if the pointer itself is not NULL (i.e., ptr_to_unit_schemas.value is not 0)
                 try:
-                    self.winbio.WinBioFree.argtypes = [ctypes.c_void_p]
-                    self.winbio.WinBioFree.restype = None
-                    self.winbio.WinBioFree(unit_schema_array.contents)
+                    # Ensure WinBioFree argtypes is set once, ideally during handler initialization or first use.
+                    # For safety, can be set here if there's doubt.
+                    if not hasattr(self.winbio.WinBioFree, 'argtypes') or not self.winbio.WinBioFree.argtypes:
+                        self.winbio.WinBioFree.argtypes = [ctypes.c_void_p]
+                        self.winbio.WinBioFree.restype = HRESULT # WinBioFree returns HRESULT
+
+                    free_hr = self.winbio.WinBioFree(ptr_to_unit_schemas)
+                    if free_hr != S_OK:
+                        logger.warning(f"WinBioFree failed with HRESULT: {free_hr:#0x} for pointer {ptr_to_unit_schemas}")
                 except AttributeError:
                      logger.error("winbio.dll not available for WinBioFree.")
+                except Exception as e:
+                    logger.error(f"Exception during WinBioFree: {e}")
         elif hr == WINBIO_E_NO_DEVICE:
             logger.info(f"WinBioEnumBiometricUnits: No devices for {method} (factor {target_factor}).")
         else:
