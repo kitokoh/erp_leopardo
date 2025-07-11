@@ -165,6 +165,38 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
                 logger.debug(f"AUTH_LOGIN: Entered token/license processing block for user '{username}'.")
                 conn = get_db_connection()
                 logger.debug(f"AUTH_LOGIN: conn object type after get_db_connection(): {type(conn)}") # <<< ADDED THIS LOG
+
+                # --- License Check Bypass Logic ---
+                should_check_license_str = users_crud.db_manager.get_setting('check_license_on_startup', default='True', conn_override=conn) # Pass conn
+                should_check_license = should_check_license_str.lower() == 'true'
+                logger.info(f"AUTH_LOGIN: License check setting 'check_license_on_startup' is '{should_check_license_str}', parsed as: {should_check_license}")
+
+                is_license_valid = False # Default to false, will be updated by actual check or bypass
+                license_msg = None
+                license_details = None
+
+                if not should_check_license:
+                    logger.warning(f"AUTH_LOGIN: Bypassing license check for user '{username}' due to 'check_license_on_startup' setting.")
+                    is_license_valid = True
+                    license_msg = "Vérification de la licence contournée par paramètre."
+                    license_details = {
+                        "license_type": "bypass_setting",
+                        "is_active": True,
+                        "license_id": "BYPASS_VIA_SETTINGS",
+                        "user_id": _current_user_data['user_id'],
+                        "activation_date": datetime.now(timezone.utc).isoformat(),
+                        "expiration_date": (datetime.now(timezone.utc) + timedelta(days=365*100)).isoformat(), # Long expiry
+                        "machine_info": "N/A_BYPASS",
+                        "allowed_features": "all" # Assuming bypass grants all features
+                    }
+                    # Log activity for bypass
+                    activity_logs_crud.add_activity_log(conn=conn, data={
+                        "user_id": _current_user_data['user_id'], "action_type": "LICENSE_CHECK_BYPASSED",
+                        "details": "License check was bypassed due to application setting.",
+                        "related_entity_type": "User", "related_entity_id": _current_user_data['user_id']
+                    })
+                # --- End License Check Bypass Logic ---
+
                 if remember_me:
                     logger.debug(f"AUTH_LOGIN: 'Remember Me' is true for '{username}'. Processing token.")
                     user_session_tokens_crud.delete_all_user_session_tokens(conn, user['user_id'])
@@ -188,46 +220,49 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
                         logger.info(f"Cleared {deleted_count} 'Remember Me' token(s) for user {user['user_id']} as 'Remember Me' was not checked.")
                         activity_logs_crud.add_activity_log(conn=conn, data={"user_id": user['user_id'], "action_type": "REMEMBER_ME_TOKENS_CLEARED_ON_LOGIN", "details": f"All 'Remember Me' tokens cleared for user as 'Remember Me' was not selected during login. Count: {deleted_count}."})
 
-                logger.debug(f"AUTH_LOGIN: About to call license_manager.check_license_validity for user_id: {user['user_id']}")
-                is_license_valid, license_msg, license_details = license_manager.check_license_validity(conn, user['user_id'])
-                logger.debug(f"AUTH_LOGIN: license_manager.check_license_validity result: is_license_valid={is_license_valid}, license_msg='{license_msg}', license_details_value={license_details}")
+                # --- Actual License Check (if not bypassed) ---
+                if should_check_license: # Only perform these if license check is not bypassed
+                    logger.debug(f"AUTH_LOGIN: About to call license_manager.check_license_validity for user_id: {user['user_id']}")
+                    is_license_valid, license_msg, license_details = license_manager.check_license_validity(conn, user['user_id'])
+                    logger.debug(f"AUTH_LOGIN: license_manager.check_license_validity result: is_license_valid={is_license_valid}, license_msg='{license_msg}', license_details_value={license_details}")
 
-                # If the user is an Administrator and their license is not valid, attempt to create/renew the default admin license.
-                if user.get('role_name') == "Administrator" and not is_license_valid:
-                    logger.warning(f"Administrator user '{username}' has an invalid/missing license (Initial check: {license_msg}). Attempting to create/renew default 6-month license.")
-                    try:
-                        # The create_default_admin_license function in manager.py will handle deactivating old ones.
-                        created_ok, create_msg, new_license_details = license_manager.create_default_admin_license(conn, user['user_id'])
-                        logger.debug(f"AUTH_LOGIN: create_default_admin_license result: created_ok={created_ok}, create_msg='{create_msg}', new_license_details={new_license_details}")
+                    # If the user is an Administrator and their license is not valid, attempt to create/renew the default admin license.
+                    if user.get('role_name') == "Administrator" and not is_license_valid:
+                        logger.warning(f"Administrator user '{username}' has an invalid/missing license (Initial check: {license_msg}). Attempting to create/renew default 6-month license.")
+                        try:
+                            # The create_default_admin_license function in manager.py will handle deactivating old ones.
+                            created_ok, create_msg, new_license_details = license_manager.create_default_admin_license(conn, user['user_id'])
+                            logger.debug(f"AUTH_LOGIN: create_default_admin_license result: created_ok={created_ok}, create_msg='{create_msg}', new_license_details={new_license_details}")
 
-                        if created_ok and new_license_details:
-                            logger.info(f"Default admin license created/renewed successfully for '{username}'. Overriding previous license state.")
-                            is_license_valid = True # Mark as valid because we just created/renewed it
-                            license_msg = None # Clear any previous error message
-                            license_details = new_license_details # Use the new license details
-                        else:
-                            # If creation failed, the original license_msg and license_details are still relevant.
-                            # We augment the message to indicate creation failure.
-                            logger.error(f"Failed to create/renew default admin license for '{username}': {create_msg}")
-                            license_msg = f"Échec de la création/renouvellement de la licence admin: {create_msg}. Problème initial: {license_msg if license_msg else 'Licence invalide.'}"
+                            if created_ok and new_license_details:
+                                logger.info(f"Default admin license created/renewed successfully for '{username}'. Overriding previous license state.")
+                                is_license_valid = True # Mark as valid because we just created/renewed it
+                                license_msg = None # Clear any previous error message
+                                license_details = new_license_details # Use the new license details
+                            else:
+                                # If creation failed, the original license_msg and license_details are still relevant.
+                                # We augment the message to indicate creation failure.
+                                logger.error(f"Failed to create/renew default admin license for '{username}': {create_msg}")
+                                license_msg = f"Échec de la création/renouvellement de la licence admin: {create_msg}. Problème initial: {license_msg if license_msg else 'Licence invalide.'}"
+                                # is_license_valid remains False
+                                # license_details remains the potentially problematic ones from the first check, or None
+                        except Exception as e_create_lic:
+                            logger.error(f"Exception during default admin license creation/renewal for '{username}': {e_create_lic}", exc_info=True)
+                            license_msg = f"Erreur critique lors de la création/renouvellement de la licence admin: {type(e_create_lic).__name__}. Problème initial: {license_msg if license_msg else 'Licence invalide.'}"
                             # is_license_valid remains False
                             # license_details remains the potentially problematic ones from the first check, or None
-                    except Exception as e_create_lic:
-                        logger.error(f"Exception during default admin license creation/renewal for '{username}': {e_create_lic}", exc_info=True)
-                        license_msg = f"Erreur critique lors de la création/renouvellement de la licence admin: {type(e_create_lic).__name__}. Problème initial: {license_msg if license_msg else 'Licence invalide.'}"
-                        # is_license_valid remains False
-                        # license_details remains the potentially problematic ones from the first check, or None
+                # --- End Actual License Check ---
 
-                # Final check on license status before returning
+                # Final check on license status before returning (is_license_valid is now set by either bypass or actual check)
                 logger.debug(f"AUTH_LOGIN: Final license state before returning: is_license_valid={is_license_valid}, license_msg='{license_msg}', license_details={license_details}")
-                if not is_license_valid:
+                if not is_license_valid: # This condition is met if should_check_license was True AND the check failed
                     # User is authenticated, but license is not valid. Return success for auth, but with license message.
                     logger.warning(f"Login for '{username}' successful, but license is invalid: {license_msg}")
                     return True, license_msg, _current_user_data, license_details
 
-                # Login and license are both OK.
+                # Login and license are both OK (either by bypass or successful check).
                 logger.info(f"Login and license check successful for {username}.")
-                return True, None, _current_user_data, license_details
+                return True, None, _current_user_data, license_details # license_msg is None if valid or bypassed successfully
 
             except AttributeError as e_attr:
                 logger.error(f"AUTH_LOGIN: AttributeError during token/license processing for {username}: {e_attr}", exc_info=True)
@@ -337,18 +372,51 @@ def login_with_session_token(token_from_qsettings: str) -> tuple[bool, str | Non
             }
         )
 
-        # License Check
-        is_license_valid, license_msg, license_details = license_manager.check_license_validity(conn, user['user_id'])
-        # Admin default license creation is not typically part of token login,
-        # as it's an interactive step usually following explicit password login.
+        # --- License Check Bypass Logic (for token login) ---
+        should_check_license_str = users_crud.db_manager.get_setting('check_license_on_startup', default='True', conn_override=conn)
+        should_check_license = should_check_license_str.lower() == 'true'
+        logger.info(f"AUTH_TOKEN_LOGIN: License check setting 'check_license_on_startup' is '{should_check_license_str}', parsed as: {should_check_license}")
 
-        if not is_license_valid:
+        is_license_valid = False
+        license_msg = None
+        license_details = None
+
+        if not should_check_license:
+            logger.warning(f"AUTH_TOKEN_LOGIN: Bypassing license check for user '{user['username']}' (token login) due to setting.")
+            is_license_valid = True
+            license_msg = "Vérification de la licence contournée par paramètre (session restaurée)."
+            license_details = {
+                "license_type": "bypass_setting_token",
+                "is_active": True,
+                "license_id": "BYPASS_VIA_SETTINGS_TOKEN",
+                "user_id": _current_user_data['user_id'],
+                "activation_date": datetime.now(timezone.utc).isoformat(),
+                "expiration_date": (datetime.now(timezone.utc) + timedelta(days=365*100)).isoformat(),
+                "machine_info": "N/A_BYPASS_TOKEN",
+                "allowed_features": "all"
+            }
+            activity_logs_crud.add_activity_log(conn=conn, data={
+                "user_id": _current_user_data['user_id'], "action_type": "LICENSE_CHECK_BYPASSED_TOKEN",
+                "details": "License check (token login) was bypassed due to application setting.",
+                "related_entity_type": "User", "related_entity_id": _current_user_data['user_id']
+            })
+        else:
+            # --- Actual License Check (if not bypassed for token login) ---
+            logger.debug(f"AUTH_TOKEN_LOGIN: Performing license check for user '{user['username']}'.")
+            is_license_valid, license_msg, license_details = license_manager.check_license_validity(conn, user['user_id'])
+            # Admin default license creation is not typically part of token login,
+            # as it's an interactive step usually following explicit password login.
+
+        # --- End License Check Logic for token login ---
+
+        logger.debug(f"AUTH_TOKEN_LOGIN: Final license state: valid={is_license_valid}, msg='{license_msg}', details={license_details}")
+        if not is_license_valid: # This implies should_check_license was True and the check failed
             logger.warning(f"Token login for '{user['username']}' successful, but license is invalid: {license_msg}")
             # User is authenticated, but license is an issue.
             # main.py will handle showing LicenseDialog if needed.
             return True, license_msg, _current_user_data, license_details # Return True for auth, with license message
 
-        return True, None, _current_user_data, license_details
+        return True, None, _current_user_data, license_details # Auth and license OK (either by check or bypass)
 
 
     except Exception as e:
