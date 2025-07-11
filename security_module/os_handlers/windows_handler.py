@@ -51,16 +51,26 @@ WINBIO_E_UNKNOWN_ID = HRESULT(0x80098031).value
 WINBIO_E_DATABASE_NO_RESULTS = HRESULT(0x8009803E).value
 WINBIO_E_NO_DEVICE = HRESULT(0x8009803F).value
 
-# Minimal placeholder for WINBIO_UNIT_SCHEMA structure
-# Actual structure is more complex, but this is sufficient for pointer typing.
-class WINBIO_UNIT_SCHEMA(ctypes.Structure):
+# More accurate definition for the initial part of WINBIO_UNIT_SCHEMA
+WINBIO_POOL_TYPE = ctypes.c_uint32
+WINBIO_BIOMETRIC_TYPE = ctypes.c_uint32
+# WINBIO_BIOMETRIC_SUBTYPE is already ctypes.c_ubyte
+WINBIO_CAPABILITIES = ctypes.c_uint32
+
+class WINBIO_UNIT_SCHEMA(ctypes.Structure): # Renamed from WINBIO_UNIT_SCHEMA_ACCURATE for direct replacement
     _fields_ = [
-        ("UnitId", WINBIO_UNIT_ID),
-        # Add a few padding fields to give it some size beyond a single ID,
-        # as actual schemas are larger. This helps ctypes manage memory if size matters implicitly.
-        ("Reserved1", ctypes.c_uint32),
-        ("Reserved2", ctypes.c_uint32),
-        ("Reserved3", ctypes.c_ubyte * 16) # Some arbitrary bytes
+        ("UnitId", WINBIO_UNIT_ID),                   # offset 0, size 4
+        ("PoolType", WINBIO_POOL_TYPE),             # offset 4, size 4
+        ("BiometricFactor", WINBIO_BIOMETRIC_TYPE), # offset 8, size 4
+        ("SensorSubtype", WINBIO_BIOMETRIC_SUBTYPE),  # offset 12, size 1
+        # ctypes default packing should align Capabilities to a 4-byte boundary.
+        # If SensorSubtype is at offset 12 (0xC), next 4-byte aligned offset is 16 (0x10).
+        # So, 3 bytes of padding will likely be inserted by ctypes here.
+        ("Capabilities", WINBIO_CAPABILITIES),       # offset 16, size 4
+        # Current size based on fields above: 4+4+4+1(pad 3)+4 = 20 bytes.
+        # Original placeholder was 28 bytes. Add 8 bytes of padding to maintain size.
+        ("ReservedPadding", ctypes.c_ubyte * 8)     # 20 + 8 = 28 bytes.
+
     ]
 
 class WINBIO_IDENTITY(ctypes.Structure):
