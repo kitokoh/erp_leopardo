@@ -1,11 +1,12 @@
-import sqlite3
-from .generic_crud import _manage_conn # get_db_connection is not used directly
+import sqlite3 # Keep for type hints if necessary, but conn will be Session
+from sqlalchemy.sql import text
+from .generic_crud import _manage_conn
 import logging
 
 # --- StatusSettings CRUD ---
 @_manage_conn
-def get_status_setting_by_name(name: str, type: str, conn: sqlite3.Connection = None) -> dict | None:
-    original_name_param = name # Keep a copy for logging or fallback
+def get_status_setting_by_name(name: str, type: str, conn = None) -> dict | None: # conn is SQLAlchemy Session
+    original_name_param = name
     if isinstance(name, dict) and type == 'Client':
         logging.warning(
             f"WARNING: get_status_setting_by_name called with a dictionary for 'name' when type is 'Client'. "
@@ -22,55 +23,56 @@ def get_status_setting_by_name(name: str, type: str, conn: sqlite3.Connection = 
             )
             name = original_name_param
 
-    cursor=conn.cursor()
-    # logger_crud = logging.getLogger(__name__)
-    # logger_crud.warning(f"get_status_setting_by_name: Querying for Name='{name}', Type='{type}'")
     try:
-        cursor.execute("SELECT * FROM StatusSettings WHERE status_name = ? AND status_type = ?",(name,type))
-        row=cursor.fetchone()
-        # if row:
-            # logger_crud.warning(f"get_status_setting_by_name: Found status: {dict(row)}")
-        # else:
-            # logger_crud.warning(f"get_status_setting_by_name: Status NOT FOUND for Name='{name}', Type='{type}'")
-        return dict(row) if row else None
-    except sqlite3.Error as e:
-        logging.error(f"Error getting status setting by name '{name}' (original_param_type: {type(original_name_param).__name__}) and type '{type}': {e}")
+        sql_query = text("SELECT * FROM StatusSettings WHERE status_name = :name AND status_type = :type")
+        result = conn.execute(sql_query, {"name": name, "type": type})
+        row = result.fetchone()
+        return dict(row._mapping) if row else None # Use row._mapping for RowProxy
+    except Exception as e: # Changed to general Exception
+        logging.error(f"Error getting status setting by name '{name}' (original_param_type: {type(original_name_param).__name__}) and type '{type}': {e}", exc_info=True)
         return None
 
 @_manage_conn
-def get_status_setting_by_id(id: int, conn: sqlite3.Connection = None) -> dict | None:
-    cursor=conn.cursor()
+def get_status_setting_by_id(id: int, conn = None) -> dict | None: # conn is SQLAlchemy Session
     try:
-        cursor.execute("SELECT * FROM StatusSettings WHERE status_id = ?",(id,))
-        row=cursor.fetchone()
-        return dict(row) if row else None
-    except sqlite3.Error as e:
-        logging.error(f"Error getting status setting by id {id}: {e}")
+        sql_query = text("SELECT * FROM StatusSettings WHERE status_id = :id")
+        result = conn.execute(sql_query, {"id": id})
+        row = result.fetchone()
+        return dict(row._mapping) if row else None
+    except Exception as e: # Changed to general Exception
+        logging.error(f"Error getting status setting by id {id}: {e}", exc_info=True)
         return None
 
 @_manage_conn
-def get_all_status_settings(type_filter: str = None, conn: sqlite3.Connection = None) -> list[dict]:
+def get_all_status_settings(type_filter: str = None, conn = None) -> list[dict]: # conn is SQLAlchemy Session
     """
     Retrieves all status settings, optionally filtered by type.
     """
-    cursor = conn.cursor()
-    sql = "SELECT * FROM StatusSettings"
-    params = []
+    sql_base = "SELECT * FROM StatusSettings"
+    params = {}
+    conditions = []
+
     if type_filter:
-        sql += " WHERE status_type = ?"
-        params.append(type_filter)
-    sql += " ORDER BY status_type, sort_order, status_name"
+        conditions.append("status_type = :type_filter")
+        params["type_filter"] = type_filter
+
+    if conditions:
+        sql_base += " WHERE " + " AND ".join(conditions)
+
+    sql_base += " ORDER BY status_type, sort_order, status_name"
+
+    sql_query = text(sql_base)
 
     try:
-        cursor.execute(sql, params)
-        return [dict(row) for row in cursor.fetchall()]
-    except sqlite3.Error as e:
-        logging.error(f"Database error in get_all_status_settings (filter: {type_filter}): {e}")
+        result = conn.execute(sql_query, params)
+        return [dict(row._mapping) for row in result.fetchall()]
+    except Exception as e: # Changed to general Exception
+        logging.error(f"Database error in get_all_status_settings (filter: {type_filter}): {e}", exc_info=True)
         return []
 
 
 @_manage_conn
-def add_status_setting(status_name: str, status_type: str, color_hex: str = None, sort_order: int = 0, conn: sqlite3.Connection = None) -> int | bool:
+def add_status_setting(status_name: str, status_type: str, color_hex: str = None, sort_order: int = 0, conn = None) -> int | bool: # conn is SQLAlchemy Session
     """
     Adds a new status setting to the StatusSettings table.
 
@@ -89,24 +91,29 @@ def add_status_setting(status_name: str, status_type: str, color_hex: str = None
     # The `conn` parameter is provided by the decorator.
 
     try:
-        cur = conn.cursor()
-        sql = """INSERT INTO StatusSettings (status_name, status_type, color_hex, sort_order)
-                 VALUES (?, ?, ?, ?)"""
-        cur.execute(sql, (status_name, status_type, color_hex, sort_order))
+        sql_query = text("""INSERT INTO StatusSettings (status_name, status_type, color_hex, sort_order)
+                         VALUES (:status_name, :status_type, :color_hex, :sort_order)""")
+        params = {
+            "status_name": status_name, "status_type": status_type,
+            "color_hex": color_hex, "sort_order": sort_order
+        }
+        result = conn.execute(sql_query, params)
         # commit is handled by _manage_conn
 
-        last_id = cur.lastrowid
-        # cur.close() # cursor closing might be handled by _manage_conn or when conn closes
-        return last_id if last_id is not None else True # lastrowid is None if no row was inserted or backend doesn't support it well, but True indicates it likely worked if no error
-    except sqlite3.Error as e:
-        logging.error(f"Database error in add_status_setting for '{status_name}'/'{status_type}': {e}")
+        last_id = result.lastrowid
+        if last_id is None and hasattr(result, 'inserted_primary_key') and result.inserted_primary_key: # Fallback for some drivers
+            last_id = result.inserted_primary_key[0]
+
+        return last_id if last_id is not None else True
+    except Exception as e: # Changed to general Exception
+        logging.error(f"Database error in add_status_setting for '{status_name}'/'{status_type}': {e}", exc_info=True)
         # rollback is handled by _manage_conn
         return False
     # finally: # connection closing handled by _manage_conn
 
 
 @_manage_conn
-def update_status_setting(status_id: int, status_name: str, status_type: str, color_hex: str = None, sort_order: int = None, conn: sqlite3.Connection = None) -> bool:
+def update_status_setting(status_id: int, status_name: str, status_type: str, color_hex: str = None, sort_order: int = None, conn = None) -> bool: # conn is SQLAlchemy Session
     """
     Updates an existing status setting in the StatusSettings table.
 
@@ -123,38 +130,33 @@ def update_status_setting(status_id: int, status_name: str, status_type: str, co
     Returns:
         True if successful, False otherwise.
     """
-    sql = """UPDATE StatusSettings SET
-             status_name = ?,
-             status_type = ?"""
-    params = [status_name, status_type]
+    sql_base = "UPDATE StatusSettings SET status_name = :status_name, status_type = :status_type"
+    params_dict = {"status_name": status_name, "status_type": status_type, "status_id": status_id}
 
-    if color_hex is not None: # Assuming None means "do not update this field"
-        sql += ", color_hex = ?"
-        params.append(color_hex)
+    if color_hex is not None:
+        sql_base += ", color_hex = :color_hex"
+        params_dict["color_hex"] = color_hex
 
-    if sort_order is not None: # Assuming None means "do not update this field"
-        sql += ", sort_order = ?"
-        params.append(sort_order)
+    if sort_order is not None:
+        sql_base += ", sort_order = :sort_order"
+        params_dict["sort_order"] = sort_order
 
-    sql += " WHERE status_id = ?"
-    params.append(status_id)
+    sql_base += " WHERE status_id = :status_id"
+
+    sql_query = text(sql_base)
 
     try:
-        cur = conn.cursor()
-        cur.execute(sql, tuple(params))
-        conn.commit()
-        return cur.rowcount > 0  # True if at least one row was updated
-    except sqlite3.Error as e:
-        logging.error(f"Database error in update_status_setting for ID {status_id}: {e}")
+        result = conn.execute(sql_query, params_dict)
+        # conn.commit() # Handled by _manage_conn
+        return result.rowcount > 0
+    except Exception as e: # Changed to general Exception
+        logging.error(f"Database error in update_status_setting for ID {status_id}: {e}", exc_info=True)
         # conn.rollback() # Handled by _manage_conn
         return False
-    # finally: # Cursor and connection closing handled by _manage_conn
-        # if cur:
-        #     cur.close()
 
 
 @_manage_conn
-def is_status_in_use(status_id: int, conn: sqlite3.Connection = None) -> bool:
+def is_status_in_use(status_id: int, conn = None) -> bool: # conn is SQLAlchemy Session
     """
     Checks if a status_id is currently in use in the Clients table.
 
@@ -165,19 +167,18 @@ def is_status_in_use(status_id: int, conn: sqlite3.Connection = None) -> bool:
     Returns:
         True if the status_id is found in Clients, False otherwise.
     """
-    sql = "SELECT 1 FROM Clients WHERE status_id = ? LIMIT 1"
+    sql_query = text("SELECT 1 FROM Clients WHERE status_id = :status_id LIMIT 1")
     try:
-        cur = conn.cursor()
-        cur.execute(sql, (status_id,))
-        return cur.fetchone() is not None  # True if a row is found
-    except sqlite3.Error as e:
-        logging.error(f"Database error in is_status_in_use for status_id {status_id}: {e}")
+        result = conn.execute(sql_query, {"status_id": status_id})
+        return result.fetchone() is not None
+    except Exception as e: # Changed to general Exception
+        logging.error(f"Database error in is_status_in_use for status_id {status_id}: {e}", exc_info=True)
         # Returning True on error prevents deletion if the check fails, which is safer.
         return True # Safer: assume in use if check fails
 
 
 @_manage_conn
-def delete_status_setting(status_id: int, conn: sqlite3.Connection = None) -> bool:
+def delete_status_setting(status_id: int, conn = None) -> bool: # conn is SQLAlchemy Session
     """
     Deletes a status setting from the StatusSettings table.
 
@@ -188,13 +189,12 @@ def delete_status_setting(status_id: int, conn: sqlite3.Connection = None) -> bo
     Returns:
         True if successful (row was deleted), False otherwise.
     """
-    sql = "DELETE FROM StatusSettings WHERE status_id = ?"
+    sql_query = text("DELETE FROM StatusSettings WHERE status_id = :status_id")
     try:
-        cur = conn.cursor()
-        cur.execute(sql, (status_id,))
-        conn.commit()
-        return cur.rowcount > 0  # True if at least one row was deleted
-    except sqlite3.Error as e:
-        logging.error(f"Database error in delete_status_setting for ID {status_id}: {e}")
+        result = conn.execute(sql_query, {"status_id": status_id})
+        # conn.commit() # Handled by _manage_conn
+        return result.rowcount > 0
+    except Exception as e: # Changed to general Exception
+        logging.error(f"Database error in delete_status_setting for ID {status_id}: {e}", exc_info=True)
         # conn.rollback() # Handled by _manage_conn
         return False

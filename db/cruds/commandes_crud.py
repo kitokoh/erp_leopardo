@@ -1,7 +1,8 @@
-import sqlite3
+import sqlite3 # Keep for type hints if necessary
 import uuid
 from datetime import datetime, timezone
 import logging
+from sqlalchemy.sql import text
 from .generic_crud import _manage_conn
 from . import clients_crud  # For updating client status
 from . import status_settings_crud # For fetching status definitions
@@ -11,16 +12,15 @@ logger = logging.getLogger(__name__)
 # --- Commandes (Orders) CRUD ---
 
 @_manage_conn
-def add_commande(data: dict, conn: sqlite3.Connection = None) -> str | None:
+def add_commande(data: dict, conn = None) -> str | None: # conn is Session
     """
     Adds a new commande (order) to the Commandes table.
     Expected data keys: client_id, commande_reference, status_commande_id, created_by_user_id.
     Optional keys: project_id, description_commande, total_ht, total_ttc, currency, shipping_address, billing_address, commande_date.
     """
-    cursor = conn.cursor()
     new_commande_id = str(uuid.uuid4())
     now_utc = datetime.now(timezone.utc).isoformat()
-    commande_date = data.get('commande_date', now_utc)
+    commande_date_to_use = data.get('commande_date', now_utc)
 
     required_fields = ['client_id', 'commande_reference', 'status_commande_id', 'created_by_user_id']
     for field in required_fields:
@@ -28,7 +28,7 @@ def add_commande(data: dict, conn: sqlite3.Connection = None) -> str | None:
             logger.error(f"Field '{field}' is required to add a commande.")
             return None
 
-    sql = """
+    sql_query = text("""
         INSERT INTO Commandes (
             commande_id, client_id, project_id, commande_reference, commande_date,
             status_commande_id, description_commande, notes, is_default,
@@ -36,43 +36,46 @@ def add_commande(data: dict, conn: sqlite3.Connection = None) -> str | None:
             shipping_address, billing_address,
             created_at, updated_at, created_by_user_id
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """
-    params = (
-        new_commande_id,
-        data['client_id'],
-        data.get('project_id'),
-        data['commande_reference'],
-        commande_date,
-        data['status_commande_id'],
-        data.get('description_commande'),
-        data.get('notes'), # Added notes
-        data.get('is_default', False), # Added is_default
-        data.get('total_ht'),
-        data.get('total_ttc'),
-        data.get('currency', 'EUR'),
-        data.get('shipping_address'),
-        data.get('billing_address'),
-        now_utc,
-        now_utc,
-        data['created_by_user_id']
-    )
+        VALUES (:commande_id, :client_id, :project_id, :commande_reference, :commande_date,
+                :status_commande_id, :description_commande, :notes, :is_default,
+                :total_ht, :total_ttc, :currency,
+                :shipping_address, :billing_address,
+                :created_at, :updated_at, :created_by_user_id)
+    """)
+    params_dict = {
+        "commande_id": new_commande_id,
+        "client_id": data['client_id'],
+        "project_id": data.get('project_id'),
+        "commande_reference": data['commande_reference'],
+        "commande_date": commande_date_to_use,
+        "status_commande_id": data['status_commande_id'],
+        "description_commande": data.get('description_commande'),
+        "notes": data.get('notes'),
+        "is_default": data.get('is_default', False),
+        "total_ht": data.get('total_ht'),
+        "total_ttc": data.get('total_ttc'),
+        "currency": data.get('currency', 'EUR'),
+        "shipping_address": data.get('shipping_address'),
+        "billing_address": data.get('billing_address'),
+        "created_at": now_utc,
+        "updated_at": now_utc,
+        "created_by_user_id": data['created_by_user_id']
+    }
     try:
-        cursor.execute(sql, params)
+        conn.execute(sql_query, params_dict)
+        # _manage_conn handles commit/rollback
         logger.info(f"Commande '{data['commande_reference']}' added with ID: {new_commande_id} for client {data['client_id']}.")
         return new_commande_id
-    except sqlite3.Error as e:
+    except Exception as e: # Changed to general Exception
         logger.error(f"Failed to add commande with data {data}. Error: {type(e).__name__} - {e}", exc_info=True)
-        if "UNIQUE constraint failed: Commandes.commande_reference" in str(e):
+        if "UNIQUE constraint failed: Commandes.commande_reference" in str(e).lower(): # Check lower for safety
              logger.error(f"Unique constraint failed for commande_reference: {data['commande_reference']}")
         return None
 
 @_manage_conn
-def get_commande_by_id(commande_id: str, conn: sqlite3.Connection = None) -> dict | None:
+def get_commande_by_id(commande_id: str, conn = None) -> dict | None: # conn is Session
     """Retrieves a commande by its ID, joining with Clients, Projects, and StatusSettings for more details."""
-    cursor = conn.cursor()
-    # Adjust JOINs and selected fields as necessary
-    sql = """
+    sql_query = text("""
         SELECT
             cmd.*,
             c.client_name,
@@ -85,16 +88,21 @@ def get_commande_by_id(commande_id: str, conn: sqlite3.Connection = None) -> dic
         LEFT JOIN Projects p ON cmd.project_id = p.project_id
         JOIN StatusSettings s ON cmd.status_commande_id = s.status_id
         LEFT JOIN Users u ON cmd.created_by_user_id = u.user_id
-        WHERE cmd.commande_id = ?
-    """
-    cursor.execute(sql, (commande_id,))
-    row = cursor.fetchone()
-    return dict(row) if row else None
+        WHERE cmd.commande_id = :commande_id
+    """)
+    try:
+        result = conn.execute(sql_query, {"commande_id": commande_id})
+        row = result.fetchone()
+        return dict(row._mapping) if row else None
+    except Exception as e:
+        logger.error(f"Error getting commande by ID {commande_id}: {e}", exc_info=True)
+        return None
 
 @_manage_conn
-def get_commandes_for_client(client_id: str, filters: dict = None, conn: sqlite3.Connection = None, limit: int = None, offset: int = 0) -> list[dict]:
+def get_commandes_for_client(client_id: str, filters: dict = None, conn = None, limit: int = None, offset: int = 0) -> list[dict]: # conn is Session
     """Retrieves all commandes for a given client_id, with optional filtering and pagination."""
-    cursor = conn.cursor()
+    params_dict = {"client_id": client_id}
+
     base_sql = """
         SELECT
             cmd.*,
@@ -106,18 +114,17 @@ def get_commandes_for_client(client_id: str, filters: dict = None, conn: sqlite3
         LEFT JOIN Projects p ON cmd.project_id = p.project_id
         JOIN StatusSettings s ON cmd.status_commande_id = s.status_id
         LEFT JOIN Users u ON cmd.created_by_user_id = u.user_id
-        WHERE cmd.client_id = ?
+        WHERE cmd.client_id = :client_id
     """
-    q_params = [client_id]
 
     conditions = []
     if filters:
         if 'status_commande_id' in filters and filters['status_commande_id'] is not None:
-            conditions.append("cmd.status_commande_id = ?")
-            q_params.append(filters['status_commande_id'])
+            conditions.append("cmd.status_commande_id = :status_commande_id")
+            params_dict["status_commande_id"] = filters['status_commande_id']
         if 'commande_reference' in filters and filters['commande_reference']:
-            conditions.append("cmd.commande_reference LIKE ?")
-            q_params.append(f"%{filters['commande_reference']}%")
+            conditions.append("cmd.commande_reference LIKE :commande_reference")
+            params_dict["commande_reference"] = f"%{filters['commande_reference']}%"
         # Add more filters as needed (e.g., date range)
 
     if conditions:
@@ -126,16 +133,21 @@ def get_commandes_for_client(client_id: str, filters: dict = None, conn: sqlite3
     base_sql += " ORDER BY cmd.commande_date DESC"
 
     if limit is not None:
-        base_sql += " LIMIT ? OFFSET ?"
-        q_params.extend([limit, offset])
+        base_sql += " LIMIT :limit OFFSET :offset"
+        params_dict["limit"] = limit
+        params_dict["offset"] = offset
 
-    cursor.execute(base_sql, q_params)
-    return [dict(row) for row in cursor.fetchall()]
+    sql_query = text(base_sql)
+    try:
+        result = conn.execute(sql_query, params_dict)
+        return [dict(row._mapping) for row in result.fetchall()]
+    except Exception as e:
+        logger.error(f"Error getting commandes for client {client_id}: {e}", exc_info=True)
+        return []
 
 @_manage_conn
-def update_commande(commande_id: str, data: dict, conn: sqlite3.Connection = None) -> bool:
+def update_commande(commande_id: str, data: dict, conn = None) -> bool: # conn is Session
     """Updates an existing commande."""
-    cursor = conn.cursor()
     now_utc = datetime.now(timezone.utc).isoformat()
 
     valid_fields = [
@@ -151,60 +163,56 @@ def update_commande(commande_id: str, data: dict, conn: sqlite3.Connection = Non
         return False
 
     fields_to_update['updated_at'] = now_utc
+    # Add commande_id to params_dict for the WHERE clause
+    fields_to_update['commande_id_where'] = commande_id
 
-    set_clauses = [f"{field} = ?" for field in fields_to_update.keys()]
-    params = list(fields_to_update.values())
-    params.append(commande_id)
+    set_clauses = [f"{field} = :{field}" for field in fields_to_update if field != 'commande_id_where']
 
-    sql = f"UPDATE Commandes SET {', '.join(set_clauses)} WHERE commande_id = ?"
+    sql_query_str = f"UPDATE Commandes SET {', '.join(set_clauses)} WHERE commande_id = :commande_id_where"
+    sql_query = text(sql_query_str)
 
     try:
-        cursor.execute(sql, tuple(params))
-        return cursor.rowcount > 0
-    except sqlite3.Error as e:
+        result = conn.execute(sql_query, fields_to_update)
+        # _manage_conn handles commit/rollback
+        return result.rowcount > 0
+    except Exception as e: # Changed to general Exception
         logger.error(f"Database error updating commande {commande_id}: {e}", exc_info=True)
-        if "UNIQUE constraint failed: Commandes.commande_reference" in str(e):
+        if "UNIQUE constraint failed: Commandes.commande_reference" in str(e).lower():
              logger.error(f"Unique constraint failed for commande_reference during update: {data.get('commande_reference')}")
         return False
 
 @_manage_conn
-def delete_commande(commande_id: str, conn: sqlite3.Connection = None) -> bool:
+def delete_commande(commande_id: str, conn = None) -> bool: # conn is Session
     """
     Soft "deletes" a commande by its ID by setting the `deleted_at` timestamp.
     The `is_deleted` column does not exist in the `Commandes` table.
     Associated CommandeItems are NOT deleted.
     """
-    cursor = conn.cursor()
     now_utc_iso = datetime.now(timezone.utc).isoformat()
-    # Removed "is_deleted = 1" from the query as the column does not exist.
-    sql = "UPDATE Commandes SET deleted_at = ? WHERE commande_id = ?"
+    sql_query = text("UPDATE Commandes SET deleted_at = :deleted_at WHERE commande_id = :commande_id")
+    params_dict = {"deleted_at": now_utc_iso, "commande_id": commande_id}
     try:
-        cursor.execute(sql, (now_utc_iso, commande_id))
-        if cursor.rowcount > 0:
+        result = conn.execute(sql_query, params_dict)
+        # _manage_conn handles commit/rollback
+        if result.rowcount > 0:
             logger.info(f"Commande {commande_id} marked as deleted (deleted_at set).")
-            # Optionally, one might want to soft-delete related CommandeItems here if business logic requires,
-            # but typically they remain associated with the soft-deleted order.
-            # If CommandeItems also had an is_deleted/deleted_at flag:
-            # cursor.execute("UPDATE CommandeItems SET deleted_at = ? WHERE commande_id = ?", (now_utc_iso, commande_id))
-            # logger.info(f"Associated CommandeItems for {commande_id} also marked as deleted.")
             return True
         logger.warning(f"No commande found with ID {commande_id} to mark as deleted, or already marked.")
         return False
-    except sqlite3.Error as e:
+    except Exception as e: # Changed to general Exception
         logger.error(f"Database error marking commande {commande_id} as deleted: {e}", exc_info=True)
         return False
 
 # --- CommandeItems (Order Items) CRUD ---
 
 @_manage_conn
-def add_commande_item(data: dict, conn: sqlite3.Connection = None) -> str | None:
+def add_commande_item(data: dict, conn = None) -> str | None: # conn is Session
     """
     Adds a new item to a commande.
     Expected data keys: commande_id, product_id, description_item, quantity, unit_price_ht.
     Optional keys: vat_rate.
     Calculates total_item_ht and total_item_ttc.
     """
-    cursor = conn.cursor()
     new_item_id = str(uuid.uuid4())
 
     required_fields = ['commande_id', 'product_id', 'description_item', 'quantity', 'unit_price_ht']
@@ -220,57 +228,64 @@ def add_commande_item(data: dict, conn: sqlite3.Connection = None) -> str | None
     total_item_ht = quantity * unit_price_ht
     total_item_ttc = total_item_ht * (1 + vat_rate)
 
-    sql = """
+    sql_query = text("""
         INSERT INTO CommandeItems (
             item_id, commande_id, product_id, description_item, quantity,
             unit_price_ht, vat_rate, total_item_ht, total_item_ttc,
             weight, dimensions_text, product_language_code
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """
-    params = (
-        new_item_id,
-        data['commande_id'],
-        data['product_id'],
-        data['description_item'],
-        quantity,
-        unit_price_ht,
-        vat_rate,
-        total_item_ht,
-        total_item_ttc,
-        data.get('weight'), # Nouveau champ
-        data.get('dimensions_text'), # Nouveau champ
-        data.get('product_language_code') # Nouveau champ
-    )
+        VALUES (:item_id, :commande_id, :product_id, :description_item, :quantity,
+                :unit_price_ht, :vat_rate, :total_item_ht, :total_item_ttc,
+                :weight, :dimensions_text, :product_language_code)
+    """)
+    params_dict = {
+        "item_id": new_item_id,
+        "commande_id": data['commande_id'],
+        "product_id": data['product_id'],
+        "description_item": data['description_item'],
+        "quantity": quantity,
+        "unit_price_ht": unit_price_ht,
+        "vat_rate": vat_rate,
+        "total_item_ht": total_item_ht,
+        "total_item_ttc": total_item_ttc,
+        "weight": data.get('weight'),
+        "dimensions_text": data.get('dimensions_text'),
+        "product_language_code": data.get('product_language_code')
+    }
     try:
-        cursor.execute(sql, params)
+        conn.execute(sql_query, params_dict)
+        # _manage_conn handles commit/rollback
         logger.info(f"CommandeItem added with ID: {new_item_id} for commande {data['commande_id']}.")
         return new_item_id
-    except sqlite3.Error as e:
+    except Exception as e: # Changed to general Exception
         logger.error(f"Failed to add commande item with data {data}. Error: {e}", exc_info=True)
         return None
 
 @_manage_conn
-def get_items_for_commande(commande_id: str, conn: sqlite3.Connection = None) -> list[dict]:
+def get_items_for_commande(commande_id: str, conn = None) -> list[dict]: # conn is Session
     """Retrieves all items for a given commande_id, joining with Products for product_name."""
-    cursor = conn.cursor()
-    sql = """
+    sql_query = text("""
         SELECT ci.*, p.product_name, p.product_code,
                p.language_code AS global_product_language_code,
                p.weight AS global_product_weight,
                p.dimensions AS global_product_dimensions
         FROM CommandeItems ci
         JOIN Products p ON ci.product_id = p.product_id
-        WHERE ci.commande_id = ?
+        WHERE ci.commande_id = :commande_id
         ORDER BY ci.item_id -- Or some other ordering if items have a sequence
-    """
-    cursor.execute(sql, (commande_id,))
-    return [dict(row) for row in cursor.fetchall()]
+    """)
+    try:
+        result = conn.execute(sql_query, {"commande_id": commande_id})
+        return [dict(row._mapping) for row in result.fetchall()]
+    except Exception as e:
+        logger.error(f"Error getting items for commande {commande_id}: {e}", exc_info=True)
+        return []
 
 @_manage_conn
-def update_commande_item(item_id: str, data: dict, conn: sqlite3.Connection = None) -> bool:
+def update_commande_item(item_id: str, data: dict, conn = None) -> bool: # conn is Session
     """Updates an existing commande item."""
-    cursor = conn.cursor()
+    # This method involves a preliminary SELECT if totals need recalculation,
+    # then an UPDATE. Both need to use the session.
 
     valid_fields = ['product_id', 'description_item', 'quantity', 'unit_price_ht', 'vat_rate', 'weight', 'dimensions_text', 'product_language_code']
     fields_to_update = {k: v for k, v in data.items() if k in valid_fields}
@@ -284,73 +299,87 @@ def update_commande_item(item_id: str, data: dict, conn: sqlite3.Connection = No
     if 'quantity' in fields_to_update or 'unit_price_ht' in fields_to_update or 'vat_rate' in fields_to_update:
         recalculate_totals = True
         # Fetch current values if not all are being updated, to ensure correct calculation
-        if not all(k in fields_to_update for k in ['quantity', 'unit_price_ht']):
-            current_item_sql = "SELECT quantity, unit_price_ht, vat_rate FROM CommandeItems WHERE item_id = ?"
-            current_item_row = cursor.execute(current_item_sql, (item_id,)).fetchone()
+        if not all(k in fields_to_update for k in ['quantity', 'unit_price_ht', 'vat_rate']): # vat_rate also needed if not in fields_to_update for calc
+            current_item_sql = text("SELECT quantity, unit_price_ht, vat_rate FROM CommandeItems WHERE item_id = :item_id")
+            current_item_result = conn.execute(current_item_sql, {"item_id": item_id})
+            current_item_row = current_item_result.fetchone()
             if not current_item_row:
                 logger.error(f"Cannot find item {item_id} to update for recalculating totals.")
                 return False
-            current_item = dict(current_item_row)
+            current_item = dict(current_item_row._mapping)
         else:
-            current_item = {} # All needed fields are in fields_to_update
+            current_item = {} # All needed fields are in fields_to_update or will default if not
 
-        quantity = float(fields_to_update.get('quantity', current_item.get('quantity')))
-        unit_price_ht = float(fields_to_update.get('unit_price_ht', current_item.get('unit_price_ht')))
-        vat_rate = float(fields_to_update.get('vat_rate', current_item.get('vat_rate', 0.0)))
+        quantity = float(fields_to_update.get('quantity', current_item.get('quantity', 0)))
+        unit_price_ht = float(fields_to_update.get('unit_price_ht', current_item.get('unit_price_ht', 0)))
+        # Ensure vat_rate for calculation is sourced correctly
+        # If 'vat_rate' is in fields_to_update, use it. Otherwise, use current_item's vat_rate, or default to 0.0.
+        vat_rate_for_calc = float(fields_to_update.get('vat_rate', current_item.get('vat_rate', 0.0)))
 
         fields_to_update['total_item_ht'] = quantity * unit_price_ht
-        fields_to_update['total_item_ttc'] = fields_to_update['total_item_ht'] * (1 + vat_rate)
+        fields_to_update['total_item_ttc'] = fields_to_update['total_item_ht'] * (1 + vat_rate_for_calc)
 
-    set_clauses = [f"{field} = ?" for field in fields_to_update.keys()]
-    params = list(fields_to_update.values())
-    params.append(item_id)
+    # Prepare for UPDATE query
+    # Add item_id to fields_to_update for the WHERE clause, ensuring it's not part of SET
+    params_for_update = fields_to_update.copy()
+    params_for_update['item_id_where'] = item_id
 
-    sql = f"UPDATE CommandeItems SET {', '.join(set_clauses)} WHERE item_id = ?"
+    set_clauses = [f"{field} = :{field}" for field in fields_to_update.keys()]
+
+    sql_query_str = f"UPDATE CommandeItems SET {', '.join(set_clauses)} WHERE item_id = :item_id_where"
+    sql_query = text(sql_query_str)
 
     try:
-        cursor.execute(sql, tuple(params))
-        return cursor.rowcount > 0
-    except sqlite3.Error as e:
+        result = conn.execute(sql_query, params_for_update)
+        # _manage_conn handles commit/rollback
+        return result.rowcount > 0
+    except Exception as e: # Changed to general Exception
         logger.error(f"Database error updating commande item {item_id}: {e}", exc_info=True)
         return False
 
 @_manage_conn
-def delete_commande_item(item_id: str, conn: sqlite3.Connection = None) -> bool:
+def delete_commande_item(item_id: str, conn = None) -> bool: # conn is Session
     """Deletes a commande item by its ID."""
-    cursor = conn.cursor()
+    sql_query = text("DELETE FROM CommandeItems WHERE item_id = :item_id")
     try:
-        cursor.execute("DELETE FROM CommandeItems WHERE item_id = ?", (item_id,))
-        return cursor.rowcount > 0
-    except sqlite3.Error as e:
+        result = conn.execute(sql_query, {"item_id": item_id})
+        # _manage_conn handles commit/rollback
+        return result.rowcount > 0
+    except Exception as e: # Changed to general Exception
         logger.error(f"Database error deleting commande item {item_id}: {e}", exc_info=True)
         return False
 
 @_manage_conn
-def get_next_commande_reference(conn: sqlite3.Connection = None, prefix="CMD") -> str:
+def get_next_commande_reference(conn = None, prefix="CMD") -> str: # conn is Session
     """
     Generates the next available commande_reference based on a prefix and the current year.
     Example: CMD-2023-0001, CMD-2023-0002.
     """
-    cursor = conn.cursor()
     current_year = datetime.now().year
-    year_prefix = f"{prefix}-{current_year}-"
+    year_prefix_like = f"{prefix}-{current_year}-%"
 
-    sql = "SELECT commande_reference FROM Commandes WHERE commande_reference LIKE ? ORDER BY commande_reference DESC LIMIT 1"
-    cursor.execute(sql, (f"{year_prefix}%",))
-    last_ref_row = cursor.fetchone()
+    sql_query = text("SELECT commande_reference FROM Commandes WHERE commande_reference LIKE :year_prefix_like ORDER BY commande_reference DESC LIMIT 1")
 
-    if last_ref_row:
-        last_ref = last_ref_row['commande_reference']
-        try:
-            last_num_str = last_ref.split('-')[-1]
-            next_num = int(last_num_str) + 1
-        except (IndexError, ValueError):
-            # Fallback if parsing fails (e.g., unexpected format)
-            next_num = 1
-    else:
+    try:
+        result = conn.execute(sql_query, {"year_prefix_like": year_prefix_like})
+        last_ref_row = result.fetchone()
+
         next_num = 1
+        if last_ref_row:
+            last_ref = last_ref_row.commande_reference # Access by attribute
+            try:
+                last_num_str = last_ref.split('-')[-1]
+                next_num = int(last_num_str) + 1
+            except (IndexError, ValueError):
+                logger.warning(f"Could not parse last commande reference number from '{last_ref}'. Defaulting to 1.")
+                next_num = 1
 
-    return f"{year_prefix}{next_num:04d}"
+        return f"{prefix}-{current_year}-{next_num:04d}"
+    except Exception as e:
+        logger.error(f"Database error generating next commande reference: {e}", exc_info=True)
+        # Fallback reference in case of DB error
+        timestamp_fallback = datetime.now().strftime("%Y%m%d%H%M%S")
+        return f"{prefix}-ERR-{timestamp_fallback}"
 
 __all__ = [
     "add_commande",
@@ -368,15 +397,12 @@ __all__ = [
 ]
 
 @_manage_conn
-def get_all_commandes_with_details(filters: dict = None, limit: int = None, offset: int = 0, conn: sqlite3.Connection = None) -> list[dict]:
+def get_all_commandes_with_details(filters: dict = None, limit: int = None, offset: int = 0, conn = None) -> list[dict]: # conn is Session
     """
     Retrieves all commandes with details from joined tables (Clients, Projects, StatusSettings, Users).
     Supports filtering and pagination.
     """
-    cursor = conn.cursor()
-    # Ensure row_factory is set for this cursor if not globally for the connection
-    # conn.row_factory = sqlite3.Row # Already set at connection level in _manage_conn likely
-
+    params_dict = {}
     base_sql = """
         SELECT
             cmd.commande_id, cmd.commande_reference, cmd.commande_date, cmd.description_commande,
@@ -392,85 +418,84 @@ def get_all_commandes_with_details(filters: dict = None, limit: int = None, offs
         JOIN StatusSettings s ON cmd.status_commande_id = s.status_id AND s.status_type = 'Commande'
         LEFT JOIN Users u ON cmd.created_by_user_id = u.user_id
     """
-    q_params = []
     conditions = []
-
-    # The problematic line `conditions.append("cmd.is_deleted = 0")` is removed.
-    # The Commandes table does not have an is_deleted column.
 
     if filters:
         if filters.get('status_commande_id'):
-            conditions.append("cmd.status_commande_id = ?")
-            q_params.append(filters['status_commande_id'])
+            conditions.append("cmd.status_commande_id = :status_commande_id")
+            params_dict["status_commande_id"] = filters['status_commande_id']
 
         if filters.get('search_term'):
             term = f"%{filters['search_term']}%"
-            # Adjusted to search in commande_reference, client_name, or project_name
-            conditions.append("(cmd.commande_reference LIKE ? OR c.client_name LIKE ? OR IFNULL(p.project_name, '') LIKE ?)")
-            q_params.extend([term, term, term])
+            conditions.append("(cmd.commande_reference LIKE :search_term_ref OR c.client_name LIKE :search_term_client OR IFNULL(p.project_name, '') LIKE :search_term_project)")
+            params_dict["search_term_ref"] = term
+            params_dict["search_term_client"] = term
+            params_dict["search_term_project"] = term
 
         if filters.get('date_from'):
-            # Ensure date format matches 'YYYY-MM-DD' as stored or used by date() function
-            conditions.append("date(cmd.commande_date) >= date(?)")
-            q_params.append(filters['date_from']) # Should be 'YYYY-MM-DD'
+            conditions.append("date(cmd.commande_date) >= date(:date_from)")
+            params_dict["date_from"] = filters['date_from']
 
         if filters.get('date_to'):
-            conditions.append("date(cmd.commande_date) <= date(?)")
-            q_params.append(filters['date_to']) # Should be 'YYYY-MM-DD'
+            conditions.append("date(cmd.commande_date) <= date(:date_to)")
+            params_dict["date_to"] = filters['date_to']
 
     if conditions:
         base_sql += " WHERE " + " AND ".join(conditions)
 
     base_sql += " ORDER BY cmd.commande_date DESC"
 
-    if limit is not None: # Ensure offset is used with limit
-        base_sql += " LIMIT ? OFFSET ?"
-        q_params.extend([limit, offset if offset is not None else 0])
+    if limit is not None:
+        base_sql += " LIMIT :limit OFFSET :offset"
+        params_dict["limit"] = limit
+        params_dict["offset"] = offset if offset is not None else 0
 
+    sql_query = text(base_sql)
     try:
-        cursor.execute(base_sql, tuple(q_params)) # Ensure q_params is a tuple
-        return [dict(row) for row in cursor.fetchall()]
-    except sqlite3.Error as e:
-        logger.error(f"Failed to get all commandes with details. Filters: {filters}. SQL: {base_sql} Params: {q_params} Error: {e}", exc_info=True)
+        result = conn.execute(sql_query, params_dict)
+        return [dict(row._mapping) for row in result.fetchall()]
+    except Exception as e: # Changed to general Exception
+        logger.error(f"Failed to get all commandes with details. Filters: {filters}. SQL: {base_sql} Params: {params_dict} Error: {e}", exc_info=True)
         return []
 
 @_manage_conn
-def get_all_commandes_count(filters: dict = None, conn: sqlite3.Connection = None) -> int:
+def get_all_commandes_count(filters: dict = None, conn = None) -> int: # conn is Session
     """Counts all commandes based on filters."""
-    cursor = conn.cursor()
-    base_sql = "SELECT COUNT(DISTINCT cmd.commande_id) FROM Commandes cmd" # Use DISTINCT if joins might create duplicates
-    q_params = []
-    conditions = []
-
+    params_dict = {}
+    base_sql = "SELECT COUNT(DISTINCT cmd.commande_id) FROM Commandes cmd"
     joins = " JOIN Clients c ON cmd.client_id = c.client_id LEFT JOIN Projects p ON cmd.project_id = p.project_id JOIN StatusSettings s ON cmd.status_commande_id = s.status_id AND s.status_type = 'Commande' LEFT JOIN Users u ON cmd.created_by_user_id = u.user_id"
+    conditions = []
 
     if filters:
         if filters.get('status_commande_id'):
-            conditions.append("cmd.status_commande_id = ?")
-            q_params.append(filters['status_commande_id'])
+            conditions.append("cmd.status_commande_id = :status_commande_id")
+            params_dict["status_commande_id"] = filters['status_commande_id']
 
         if filters.get('search_term'):
             term = f"%{filters['search_term']}%"
-            conditions.append("(cmd.commande_reference LIKE ? OR c.client_name LIKE ? OR IFNULL(p.project_name, '') LIKE ?)")
-            q_params.extend([term, term, term])
+            conditions.append("(cmd.commande_reference LIKE :search_term_ref OR c.client_name LIKE :search_term_client OR IFNULL(p.project_name, '') LIKE :search_term_project)")
+            params_dict["search_term_ref"] = term
+            params_dict["search_term_client"] = term
+            params_dict["search_term_project"] = term
 
         if filters.get('date_from'):
-            conditions.append("date(cmd.commande_date) >= date(?)")
-            q_params.append(filters['date_from'])
+            conditions.append("date(cmd.commande_date) >= date(:date_from)")
+            params_dict["date_from"] = filters['date_from']
 
         if filters.get('date_to'):
-            conditions.append("date(cmd.commande_date) <= date(?)")
-            q_params.append(filters['date_to'])
+            conditions.append("date(cmd.commande_date) <= date(:date_to)")
+            params_dict["date_to"] = filters['date_to']
 
-    full_sql = base_sql + joins
+    full_sql_str = base_sql + joins
     if conditions:
-        full_sql += " WHERE " + " AND ".join(conditions)
+        full_sql_str += " WHERE " + " AND ".join(conditions)
 
+    sql_query = text(full_sql_str)
     try:
-        cursor.execute(full_sql, tuple(q_params)) # Ensure q_params is a tuple
-        count_result = cursor.fetchone()
-        return count_result[0] if count_result is not None else 0
-    except sqlite3.Error as e:
-        logger.error(f"Failed to count commandes. Filters: {filters}. SQL: {full_sql} Params: {q_params} Error: {e}", exc_info=True)
+        result = conn.execute(sql_query, params_dict)
+        count_result = result.scalar_one_or_none() # scalar_one_or_none() is good for single value results
+        return count_result if count_result is not None else 0
+    except Exception as e: # Changed to general Exception
+        logger.error(f"Failed to count commandes. Filters: {filters}. SQL: {full_sql_str} Params: {params_dict} Error: {e}", exc_info=True)
         return 0
 
