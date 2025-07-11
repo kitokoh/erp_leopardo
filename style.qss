@@ -1318,6 +1318,54 @@ QPushButton#userMenuButton::menu-indicator {
     image: none; /* Hide default menu indicator arrow */
 }
 
+/* === Styles pour les améliorations de la Liste des Clients === */
+
+/* Contrôles de Tri */
+QWidget#leftPaneWidget QComboBox#sortByCombo,
+QWidget#leftPaneWidget QComboBox#sortOrderCombo {
+    min-width: 130px;
+    margin-left: 5px;
+    margin-right: 8px;
+}
+
+/* Actions en Ligne dans ClientListItemWidget */
+/* Assumant que ClientListItemWidget a un objectName "clientListItem" pour spécificité, sinon ajuster */
+QWidget#clientListItem QToolButton[objectName="listItemActionButton"] {
+    background-color: transparent;
+    border: none;
+    padding: 2px;
+    border-radius: 3px;
+    color: #6c757d; /* Gris pour icônes non survolées */
+    /* setFixedSize(22,22) ou setIconSize(18,18) en Python recommandé */
+}
+
+QWidget#clientListItem QToolButton[objectName="listItemActionButton"]:hover {
+    background-color: #e9ecef;
+    color: #007BFF;
+}
+
+/* Pagination Améliorée */
+QWidget#leftPaneWidget QLineEdit#goToPageInput {
+    max-width: 50px;
+    /* padding: 5px; */ /* Hérité */
+    /* text-align: center; */ /* Mieux en Python avec setAlignment(Qt.AlignCenter) */
+    margin-left: 4px;
+    margin-right: 4px;
+}
+
+QWidget#leftPaneWidget QPushButton#goToPageButton {
+    padding: 5px 10px;
+    min-width: 40px;
+    /* margin-left: 2px; */ /* Si besoin d'ajuster l'espacement */
+}
+
+/* Optionnel: ajuster les boutons Précédent/Suivant s'ils ont des objectName */
+QWidget#leftPaneWidget QPushButton#prevPageButton,
+QWidget#leftPaneWidget QPushButton#nextPageButton {
+    /* padding: 5px 8px; */ /* Exemple de réduction de padding */
+}
+
+
 /* === Sidebar Navigation Widget Styles === */
 QWidget#sidebarNavigationWidget {
     background-color: #ECEFF1; /* Nuance de gris-bleu clair, distincte du contenu principal */

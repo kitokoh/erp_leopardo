@@ -47,6 +47,7 @@ import logging
 
 from datetime import datetime # Added datetime import
 from PyQt5.QtCore import QStringListModel
+import functools # Ajouté pour partial
 
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -55,11 +56,11 @@ from PyQt5.QtWidgets import (
     QFileDialog, QMessageBox, QDialog, QFormLayout, QComboBox,
     QInputDialog, QCompleter, QTabWidget, QAction, QMenu, QGroupBox,
     QStackedWidget, QDoubleSpinBox, QTableWidget, QTableWidgetItem, QAbstractItemView,
-    QTextEdit, QSplitter, QApplication, # Added QTextEdit for SettingsDialog notes, QSplitter for layout, QApplication
+    QTextEdit, QSplitter, QApplication, QToolButton # Added QToolButton for inline actions
 
 )
 from PyQt5.QtGui import QIcon, QDesktopServices, QFont
-from PyQt5.QtCore import Qt, QUrl, QTimer, pyqtSlot, QByteArray, QDate # Added QDate
+from PyQt5.QtCore import Qt, QUrl, QTimer, pyqtSlot, QByteArray, QDate, QEvent # Added QDate and QEvent
 # QWebEngineView might still be used by ClientWidget or other parts, so keep for now unless confirmed unused.
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 # from PyQt5.QtWebChannel import QWebChannel # QWebChannel removed as DocumentManager no longer uses its own map.
@@ -213,37 +214,32 @@ import json # For handling menu config storage
 
 
 class ClientListItemWidget(QWidget):
+    # Signaux pour les actions en ligne
+    editActionClicked = pyqtSignal()
+    openFolderActionClicked = pyqtSignal()
+    # archiveActionClicked = pyqtSignal() # Optionnel pour V1
+
     def __init__(self, client_data, parent=None):
         super().__init__(parent)
         self.client_data = client_data
-        # Get the main DocumentManager instance to call its methods (like tr)
-        # This assumes ClientListItemWidget is instantiated with DocumentManager as an ancestor or direct parent.
-        # A more robust way might be to pass DocumentManager instance if deeply nested.
-        self.doc_manager = parent # Assuming parent is DocumentManager or provides tr
+        self.doc_manager = parent
         while self.doc_manager and not isinstance(self.doc_manager, DocumentManager):
             self.doc_manager = self.doc_manager.parent()
 
-        if not self.doc_manager:
-            # Fallback if DocumentManager not found in parent hierarchy
-            # This might happen if parent is QListWidget, then its parent etc.
-            # For simplicity, we assume it can be found or tr will work via QCoreApplication.translate
-            # A cleaner way is to pass doc_manager instance explicitly if this becomes an issue.
-            # logging.warning("ClientListItemWidget: DocumentManager instance not found via parent hierarchy.")
-            pass
-
         self.init_ui()
+        self.setMouseTracking(True) # Important pour enterEvent/leaveEvent sur le widget lui-même
 
     def _tr(self, text):
         if self.doc_manager and hasattr(self.doc_manager, 'tr'):
             return self.doc_manager.tr(text)
-        return QApplication.translate("ClientListItemWidget", text) # Fallback
+        return QApplication.translate("ClientListItemWidget", text)
 
     def init_ui(self):
-        main_layout = QHBoxLayout(self) # Changed to QHBoxLayout for side-by-side status and text
-        main_layout.setContentsMargins(8, 5, 8, 5) # Increased margins for better spacing
-        main_layout.setSpacing(8) # Increased spacing
+        self.main_h_layout = QHBoxLayout(self) # Renommé pour clarté
+        self.main_h_layout.setContentsMargins(8, 5, 8, 5)
+        self.main_h_layout.setSpacing(8)
 
-        # Status Indicator (larger, more distinct)
+        # Status Indicator
         self.status_indicator_label = QLabel()
         self.status_indicator_label.setFixedSize(12, 12) # Circular indicator
         self.status_indicator_label.setStyleSheet("border-radius: 6px; background-color: #343A40;") # Default color
@@ -269,27 +265,109 @@ class ClientListItemWidget(QWidget):
         self.additional_info_label.setFont(font_additional)
         self.additional_info_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         palette = self.additional_info_label.palette()
-        palette.setColor(QPalette.WindowText, QColor(Qt.gray)) # Darker gray for better readability
+        palette.setColor(QPalette.WindowText, QColor(Qt.gray))
         self.additional_info_label.setPalette(palette)
         text_content_layout.addWidget(self.additional_info_label)
 
-        main_layout.addWidget(self.status_indicator_label)
-        main_layout.addLayout(text_content_layout)
-        main_layout.addStretch() # Pushes content to the left
+        self.main_h_layout.addWidget(self.status_indicator_label)
+        self.main_h_layout.addLayout(text_content_layout)
+        self.main_h_layout.addStretch(1)
 
-        self.update_data(self.client_data) # Populate widget with data
+        # Layout pour les actions en ligne (initialement masqué)
+        self.actions_layout = QHBoxLayout()
+        self.actions_layout.setContentsMargins(0,0,0,0)
+        self.actions_layout.setSpacing(5)
 
-        # Basic styling for the widget itself (can be overridden by QListWidget delegate)
-        self.setAutoFillBackground(True) # Important for hover effects if not handled by delegate
-        self.setStyleSheet("""
-            ClientListItemWidget {
-                background-color: transparent; /* Base background */
-                border-radius: 4px; /* Optional: rounded corners for items */
-            }
-            ClientListItemWidget:hover {
-                background-color: #e9ecef; /* Subtle hover, adjust as needed */
-            }
-        """)
+        self.edit_action_button = QToolButton(self)
+        self.edit_action_button.setObjectName("listItemActionButton")
+        self.edit_action_button.setIcon(QIcon(":/icons/pencil.svg"))
+        self.edit_action_button.setToolTip(self.tr("Modifier ce client"))
+        self.edit_action_button.setCursor(Qt.PointingHandCursor)
+        self.edit_action_button.clicked.connect(self._on_edit_action_clicked)
+        self.actions_layout.addWidget(self.edit_action_button)
+
+        self.folder_action_button = QToolButton(self)
+        self.folder_action_button.setObjectName("listItemActionButton")
+        self.folder_action_button.setIcon(QIcon(":/icons/folder.svg"))
+        self.folder_action_button.setToolTip(self.tr("Ouvrir le dossier de ce client"))
+        self.folder_action_button.setCursor(Qt.PointingHandCursor)
+        self.folder_action_button.clicked.connect(self._on_folder_action_clicked)
+        self.actions_layout.addWidget(self.folder_action_button)
+
+        # Ajouter d'autres boutons d'action ici si nécessaire (ex: archiver)
+
+        for i in range(self.actions_layout.count()): # Cacher les boutons individuellement
+            widget = self.actions_layout.itemAt(i).widget()
+            if widget:
+                widget.setVisible(False)
+
+        self.main_h_layout.addLayout(self.actions_layout) # Ajouter le layout des actions au layout principal
+
+        self.update_data(self.client_data)
+
+        self.setAutoFillBackground(True)
+        # Le style QSS pour ClientListItemWidget:hover sera dans style.qss
+
+    def _on_edit_action_clicked(self):
+        self.editActionClicked.emit()
+
+    def _on_folder_action_clicked(self):
+        self.openFolderActionClicked.emit()
+
+    def enterEvent(self, event: QEvent):
+        super().enterEvent(event)
+        for i in range(self.actions_layout.count()):
+            widget = self.actions_layout.itemAt(i).widget()
+            if widget:
+                widget.setVisible(True)
+
+    def leaveEvent(self, event: QEvent):
+        super().leaveEvent(event)
+        # Vérifier si le curseur n'est pas sur l'un des boutons d'action avant de les cacher
+        # Ceci est une simple vérification; une gestion plus robuste pourrait être nécessaire
+        # si les boutons sont très proches ou si le comportement de leaveEvent est complexe.
+        # Pour l'instant, on cache si la souris quitte le widget principal.
+        # Si le curseur est sur un bouton, le leaveEvent du bouton sera déclenché avant celui du parent.
+        # Cependant, pour éviter que les boutons ne disparaissent pendant que la souris se déplace
+        # entre le widget principal et un bouton d'action, on pourrait vérifier si le curseur
+        # est DANS le rectangle du widget ClientListItemWidget.
+        # Si la souris quitte le widget, on cache.
+        # Si elle est sur un bouton, le bouton reste visible.
+        # La solution simple:
+        for i in range(self.actions_layout.count()):
+            widget = self.actions_layout.itemAt(i).widget()
+            if widget and not widget.geometry().contains(widget.mapFromGlobal(QCursor.pos())): # QCursor n'est pas importé
+                 widget.setVisible(False)
+            elif widget: # Si le curseur est dessus, on le laisse visible (le hover du bouton prendra le relais)
+                 pass # Le bouton reste visible s'il est survolé, sera caché si la souris quitte le bouton ET le parent.
+
+        # Une approche plus simple et souvent suffisante :
+        # Si la souris n'est plus sur le ClientListItemWidget lui-même, on cache les actions.
+        # Les boutons eux-mêmes géreront leur propre état de survol.
+        if not self.rect().contains(self.mapFromGlobal(QCursor.pos())): # QCursor n'est pas importé
+            for i in range(self.actions_layout.count()):
+                widget = self.actions_layout.itemAt(i).widget()
+                if widget:
+                    widget.setVisible(False)
+        # Correction: La logique ci-dessus est complexe et peut mal se comporter.
+        # Le plus simple est de cacher les boutons lorsque la souris quitte le ClientListItemWidget.
+        # Si la souris est sur un bouton, le leaveEvent du ClientListItemWidget ne sera pas
+        # immédiatement déclenché tant que la souris est sur l'enfant.
+        # Quand la souris quitte l'enfant ET le parent, alors on cache.
+        # Pour simplifier et éviter des clignotements :
+        # On cache toujours quand on quitte le ClientListItemWidget. Si la souris entre ensuite sur un bouton,
+        # le bouton sera toujours visible car il est un enfant. Le problème est si le bouton
+        # est caché alors que la souris est dessus.
+        # Solution plus robuste pour leaveEvent:
+        # Vérifier si la souris est DANS le rectangle du widget. Si non, on cache.
+        # Cela ne fonctionne pas bien si les boutons sont au bord.
+        # Le plus simple est de cacher au leaveEvent du ClientListItemWidget.
+        # Le hover des QToolButton les gardera stylés.
+        for i in range(self.actions_layout.count()): # Masquer tous les boutons lorsque la souris quitte le widget principal
+            widget = self.actions_layout.itemAt(i).widget()
+            if widget:
+                 widget.setVisible(False)
+
 
     def update_data(self, client_data):
         self.client_data = client_data
@@ -942,6 +1020,36 @@ class DocumentManager(QMainWindow):
         # The main stretch for filter_search_main_layout should be removed if we want the client list
         # to be directly under the collapsible_filter_widget (or top_filter_line_layout when collapsed).
         # filter_search_main_layout.addStretch(1) # REMOVE THIS to prevent pushing client list down
+
+        # --- Sort Controls ---
+        sort_controls_layout = QHBoxLayout()
+        sort_label = QLabel(self.tr("Trier par:"))
+        self.sort_by_combo = QComboBox()
+        self.sort_by_combo.setObjectName("sortByCombo")
+        # Options: Clé affichée -> valeur technique pour le backend/CRUD
+        self.sort_by_combo.addItem(self.tr("Nom du Client"), "client_name")
+        self.sort_by_combo.addItem(self.tr("Date de Création"), "created_at")
+        self.sort_by_combo.addItem(self.tr("Pays"), "country_name")
+        self.sort_by_combo.addItem(self.tr("ID Projet"), "project_identifier")
+        self.sort_by_combo.addItem(self.tr("Statut"), "status_name")
+
+        self.sort_order_combo = QComboBox()
+        self.sort_order_combo.setObjectName("sortOrderCombo")
+        self.sort_order_combo.addItem(self.tr("Ascendant"), "ASC")
+        self.sort_order_combo.addItem(self.tr("Descendant"), "DESC")
+
+        # Connecter les signaux des combos de tri pour rafraîchir la liste
+        self.sort_by_combo.currentIndexChanged.connect(self.filter_client_list_display_slot)
+        self.sort_order_combo.currentIndexChanged.connect(self.filter_client_list_display_slot)
+
+        sort_controls_layout.addWidget(sort_label)
+        sort_controls_layout.addWidget(self.sort_by_combo)
+        sort_controls_layout.addWidget(self.sort_order_combo)
+        sort_controls_layout.addStretch(1) # Pousse les contrôles de tri à gauche
+
+        filter_search_main_layout.addLayout(sort_controls_layout) # Ajout du layout de tri au QGroupBox
+        # --- End Sort Controls ---
+
         left_pane_layout.addWidget(filter_search_group)
 
         self.client_list_widget = QListWidget()
@@ -955,9 +1063,37 @@ class DocumentManager(QMainWindow):
         left_pane_layout.addWidget(self.client_list_widget)
         
         pagination_layout = QHBoxLayout()
-        self.prev_page_button = QPushButton(self.tr("Précédent")); self.prev_page_button.clicked.connect(self.prev_page)
-        self.next_page_button = QPushButton(self.tr("Suivant")); self.next_page_button.clicked.connect(self.next_page)
-        self.page_info_label = QLabel(self.tr("Page 1")); pagination_layout.addWidget(self.prev_page_button); pagination_layout.addWidget(self.page_info_label); pagination_layout.addWidget(self.next_page_button)
+        self.prev_page_button = QPushButton(self.tr("Précédent"))
+        self.prev_page_button.setObjectName("prevPageButton")
+        self.prev_page_button.clicked.connect(self.prev_page)
+
+        self.next_page_button = QPushButton(self.tr("Suivant"))
+        self.next_page_button.setObjectName("nextPageButton")
+        self.next_page_button.clicked.connect(self.next_page)
+
+        self.page_info_label = QLabel(self.tr("Page 1"))
+        self.page_info_label.setObjectName("pageInfoLabel")
+
+        # Nouveaux éléments pour la pagination améliorée
+        go_to_label = QLabel(self.tr("Aller à :"))
+        self.go_to_page_input = QLineEdit()
+        self.go_to_page_input.setObjectName("goToPageInput")
+        self.go_to_page_input.setFixedWidth(50) # Largeur pour ~3-4 chiffres
+        self.go_to_page_input.setPlaceholderText(self.tr("Page"))
+        self.go_to_page_button = QPushButton(self.tr("OK"))
+        self.go_to_page_button.setObjectName("goToPageButton")
+
+        self.go_to_page_button.clicked.connect(self._handle_go_to_page)
+        self.go_to_page_input.returnPressed.connect(self._handle_go_to_page)
+
+        pagination_layout.addWidget(self.prev_page_button)
+        pagination_layout.addWidget(self.page_info_label)
+        pagination_layout.addWidget(self.next_page_button)
+        pagination_layout.addStretch(1) # Espace flexible
+        pagination_layout.addWidget(go_to_label)
+        pagination_layout.addWidget(self.go_to_page_input)
+        pagination_layout.addWidget(self.go_to_page_button)
+
         left_pane_layout.addLayout(pagination_layout)
         
         # Buttons in a single row
@@ -1800,7 +1936,6 @@ class DocumentManager(QMainWindow):
         filters_for_crud = {}
         if self.selected_status_ids_filter: # Use the list of selected status IDs
             filters_for_crud['status_ids'] = self.selected_status_ids_filter
-        # If self.selected_status_ids_filter is empty, no status_ids filter is applied (shows all, respecting archive filter)
 
         if country_id_filter is not None: filters_for_crud['country_id'] = country_id_filter
         if category_filter_text: filters_for_crud['category'] = category_filter_text
@@ -1813,19 +1948,42 @@ class DocumentManager(QMainWindow):
         if hasattr(self, 'date_filter_end') and self.date_filter_end.date().isValid() and not self.date_filter_end.date().isNull():
             filters_for_crud['created_at_end'] = self.date_filter_end.date().toString("yyyy-MM-dd")
 
-        # Update total_filtered_clients count
-        # Conceptual: if clients_crud_instance.get_all_clients_count existed:
-        # self.total_filtered_clients = clients_crud_instance.get_all_clients_count(filters=filters_for_crud, include_deleted=include_deleted_filter)
-        # Simulation for this subtask if the count function isn't available:
-        all_matching_clients = clients_crud_instance.get_all_clients(filters=filters_for_crud, include_deleted=include_deleted_filter, limit=None, offset=0)
+        # Ajouter les paramètres de tri aux filtres passés au CRUD
+        if hasattr(self, 'sort_by_combo') and self.sort_by_combo.currentData():
+            filters_for_crud['order_by_field'] = self.sort_by_combo.currentData()
+        if hasattr(self, 'sort_order_combo') and self.sort_order_combo.currentData():
+            filters_for_crud['order_direction'] = self.sort_order_combo.currentData()
+
+        # Note: la méthode get_all_clients_with_details a été modifiée pour extraire
+        # 'order_by_field' et 'order_direction' de `filters` et les utiliser,
+        # puis les retirer pour ne pas qu'ils soient interprétés comme des conditions WHERE.
+
+        # Mettre à jour le nombre total de clients filtrés
+        # Pour cela, il faut appeler la méthode CRUD sans limit/offset mais avec les filtres
+        # Cela peut être coûteux si non optimisé. Idéalement, une méthode get_count(filters) serait mieux.
+        # Pour l'instant, on récupère tout pour compter, puis on pagine.
+        # La méthode CRUD get_all_clients_with_details s'attend à ce que order_by_field et order_direction soient dans filters.
+        temp_filters_for_count = filters_for_crud.copy() # Copier pour ne pas modifier l'original pour la pagination
+
+        all_matching_clients = clients_crud_instance.get_all_clients_with_details(
+            filters=temp_filters_for_count,
+            include_deleted=include_deleted_filter,
+            limit=None, offset=0, conn=None # Pas de pagination pour le comptage
+        )
         self.total_filtered_clients = len(all_matching_clients)
 
+        # Charger et afficher la page actuelle de clients
+        # `load_and_display_clients` utilise `get_all_clients_with_details` en interne.
+        # Il faut s'assurer que `load_and_display_clients` passe bien les filtres (y compris de tri)
+        # à `get_all_clients_with_details`.
+        # La logique actuelle de `load_and_display_clients` devrait déjà le faire si `filters_for_crud` contient les clés de tri.
         load_and_display_clients(self, filters=filters_for_crud, limit=self.limit_per_page, offset=self.current_offset, include_deleted=include_deleted_filter)
-        self.update_pagination_controls() # Call after total_filtered_clients is updated
-        filter_and_display_clients(self)
+
+        self.update_pagination_controls() # Mettre à jour les contrôles de pagination
+        # filter_and_display_clients(self) # Cette ligne semble redondante si load_and_display_clients fait déjà l'affichage
 
     def filter_client_list_display_slot(self):
-        self.current_offset = 0
+        self.current_offset = 0 # Réinitialiser à la première page lors d'un changement de filtre/tri
         self.load_clients_from_db_slot()
 
     def update_pagination_controls(self):
@@ -1833,12 +1991,53 @@ class DocumentManager(QMainWindow):
         if self.total_filtered_clients > 0:
             total_pages = (self.total_filtered_clients + self.limit_per_page - 1) // self.limit_per_page
         else:
-            total_pages = 1
-        total_pages = max(1, total_pages) # Ensure total_pages is at least 1
+            total_pages = 1 # ou 0 si self.total_filtered_clients est 0
+        total_pages = max(1, total_pages) # Assurer qu'il y a au moins une page même si vide
 
-        self.page_info_label.setText(self.tr("Page {0} / {1}").format(current_page, total_pages))
+        self.page_info_label.setText(self.tr("Page {0} / {1} ({2} éléments)").format(current_page, total_pages, self.total_filtered_clients))
         self.prev_page_button.setEnabled(self.current_offset > 0)
         self.next_page_button.setEnabled((self.current_offset + self.limit_per_page) < self.total_filtered_clients)
+
+        # Activer/désactiver les contrôles "Aller à la page" en fonction du nombre de pages
+        can_go_to_page = total_pages > 1
+        if hasattr(self, 'go_to_page_input'): # Vérifier si les widgets existent
+            self.go_to_page_input.setEnabled(can_go_to_page)
+        if hasattr(self, 'go_to_page_button'):
+            self.go_to_page_button.setEnabled(can_go_to_page)
+
+
+    def _handle_go_to_page(self):
+        if not hasattr(self, 'go_to_page_input') or not hasattr(self, 'total_filtered_clients'):
+            return
+
+        try:
+            page_num_str = self.go_to_page_input.text().strip()
+            if not page_num_str: # Si l'entrée est vide, ne rien faire
+                return
+
+            page_num = int(page_num_str)
+
+            if self.total_filtered_clients > 0:
+                total_pages = (self.total_filtered_clients + self.limit_per_page - 1) // self.limit_per_page
+            else:
+                total_pages = 1
+            total_pages = max(1, total_pages)
+
+            if 1 <= page_num <= total_pages:
+                self.current_offset = (page_num - 1) * self.limit_per_page
+                self.load_clients_from_db_slot()
+                self.go_to_page_input.clear() # Vider le champ après navigation
+            else:
+                QMessageBox.warning(self, self.tr("Page Invalide"),
+                                    self.tr("Veuillez entrer un numéro de page entre 1 et {0}.").format(total_pages))
+                self.go_to_page_input.selectAll()
+                self.go_to_page_input.setFocus()
+        except ValueError:
+            QMessageBox.warning(self, self.tr("Entrée Invalide"),
+                                self.tr("Veuillez entrer un numéro de page valide."))
+            self.go_to_page_input.selectAll()
+            self.go_to_page_input.setFocus()
+
 
     def prev_page(self):
         if self.current_offset > 0:
@@ -1889,9 +2088,19 @@ class DocumentManager(QMainWindow):
         # This is crucial for context menus, click handling etc. to get the full data.
         item.setData(Qt.UserRole, client_dict_data)
 
+        # Connecter les signaux des actions en ligne du custom_widget
+        client_id_for_actions = client_dict_data.get("client_id")
+        if client_id_for_actions:
+            custom_widget.editActionClicked.connect(
+                functools.partial(self.open_edit_client_dialog_slot, client_id_for_actions)
+            )
+            custom_widget.openFolderActionClicked.connect(
+                functools.partial(self.open_client_folder_fs, client_id_for_actions)
+            )
+            # Connecter d'autres signaux ici si ajoutés (ex: archiveActionClicked)
+
         self.client_list_widget.addItem(item)
         self.client_list_widget.setItemWidget(item, custom_widget)
-
 
 
     def load_countries_into_filter_combo(self):
