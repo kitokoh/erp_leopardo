@@ -187,9 +187,3 @@ if __name__ == '__main__':
     # sidebar_collapsed.show()
 
     sys.exit(app.exec_())
-
-# Placeholder pour les fonctions de traduction si ce widget est testé seul
-def tr(text):
-    return QApplication.translate("SidebarNavigationWidget", text)
-
-SidebarNavigationWidget.tr = tr # Attacher la fonction tr à la classe pour les tooltips, etc.
