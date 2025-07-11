@@ -715,9 +715,38 @@ class DocumentsTab(QWidget):
             doc_type = doc_details.get("document_type_generated", "").upper() if doc_details else ""
 
             if doc_type == "PDF" or file_path.lower().endswith(".pdf"):
-                # C'est un PDF, utilisons notre visionneuse
-                try:
-                    viewer = PdfViewerWidget(file_path, self) # self pour parent
+                if self._should_use_internal_pdf_viewer():
+                    # C'est un PDF, et la préférence est d'utiliser la visionneuse interne
+                    try:
+                        viewer = PdfViewerWidget(file_path, self) # self pour parent
+                        viewer.exec_() # Ouvre en tant que dialogue modal
+                    except Exception as e:
+                        logging.error(f"Erreur lors de l'ouverture de PdfViewerWidget pour {file_path}: {e}", exc_info=True)
+                        self.notify(self.tr("Erreur Visionneuse PDF"),
+                                    self.tr("Impossible d'ouvrir le PDF dans la visionneuse interne: {0}.\nTentative avec l'application externe.").format(str(e)),
+                                    type='ERROR')
+                        # Fallback vers l'ouverture externe en cas d'erreur avec la visionneuse interne
+                        QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
+                else:
+                    # La préférence est d'utiliser l'application externe
+                    QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
+            else:
+                # Pour les autres types, comportement normal
+                QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
+        else:
+            self.notify(self.tr("Fichier Introuvable"), self.tr("Le document est introuvable:\n{0}").format(file_path), type='WARNING')
+
+    def _should_use_internal_pdf_viewer(self) -> bool:
+        # TODO: Lire cette préférence depuis les paramètres globaux de l'application.
+        # Pour l'instant, on code en dur pour activer la visionneuse interne.
+        # Mettre à False pour tester le comportement avec visionneuse externe.
+        # Exemple:
+        # app_settings = self.config.get_application_settings()
+        # return app_settings.get("use_internal_pdf_viewer", True)
+        return True # Par défaut, utiliser la visionneuse interne
+
+    def handle_create_new_version_clicked(self, old_document_id, source_template_id):
+        if not self.client_info or not self.client_info.get('client_id'):
                     viewer.exec_() # Ouvre en tant que dialogue modal
                 except Exception as e:
                     logging.error(f"Erreur lors de l'ouverture de PdfViewerWidget pour {file_path}: {e}", exc_info=True)

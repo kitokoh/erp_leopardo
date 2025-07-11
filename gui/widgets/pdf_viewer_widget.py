@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (
     QSplitter, QTabWidget, QListWidget, QTreeWidget, QTreeWidgetItem, QListWidgetItem
 )
 from PyQt5.QtGui import QPixmap, QImage, QIcon
-from PyQt5.QtCore import Qt, QRectF, QCoreApplication, QSize
+from PyQt5.QtCore import Qt, QRectF, QCoreApplication, QSize, QThread, pyqtSignal, QObject
 
 
 class PdfViewerWidget(QDialog):
@@ -32,6 +32,8 @@ class PdfViewerWidget(QDialog):
         self.left_panel_tab_widget = None
         self.thumbnail_list_widget = None
         self.bookmark_tree_widget = None
+
+        self.thumbnail_loader_thread = None # Pour le chargement asynchrone
 
 
         # Utilisation de self.tr() pour le titre de la fenêtre
@@ -257,12 +259,14 @@ class PdfViewerWidget(QDialog):
            self.current_page_number >= self.current_pdf_document.page_count:
             if self.pdf_scene: self.pdf_scene.clear() # Clear the scene if no valid page
             self.pdf_view_item = QGraphicsPixmapItem() # Reset item
-            self.pdf_scene.addItem(self.pdf_view_item) # Add new empty item
+            if self.pdf_scene: self.pdf_scene.addItem(self.pdf_view_item) # Add new empty item
             self.pdf_view_item.setPixmap(QPixmap()) # Set an empty pixmap
             return
 
         try:
             page = self.current_pdf_document.load_page(self.current_page_number)
+            if not page: # Vérification supplémentaire
+                raise RuntimeError(self.tr("Impossible de charger la page {0}.").format(self.current_page_number + 1))
 
             # Combinez le zoom et la rotation dans la matrice de transformation
             matrix = fitz.Matrix(self.current_zoom_factor, self.current_zoom_factor)
@@ -273,13 +277,15 @@ class PdfViewerWidget(QDialog):
             qimage = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format_RGB888)
             pixmap = QPixmap.fromImage(qimage)
 
-            self.pdf_scene.clear() # Clear previous items before adding new one
+            if self.pdf_scene: self.pdf_scene.clear() # Clear previous items before adding new one
             self.pdf_view_item = QGraphicsPixmapItem(pixmap)
-            self.pdf_scene.addItem(self.pdf_view_item)
-            self.pdf_scene.setSceneRect(QRectF(pixmap.rect()))
+            if self.pdf_scene: self.pdf_scene.addItem(self.pdf_view_item)
+            if self.pdf_scene: self.pdf_scene.setSceneRect(QRectF(pixmap.rect()))
         except Exception as e:
-            logging.error(f"Erreur lors de l'affichage de la page {self.current_page_number}: {e}", exc_info=True)
-            # Potentially show an error message on the page itself or a QMessageBox
+            logging.error(self.tr("Erreur lors de l'affichage de la page {0}: {1}").format(self.current_page_number + 1, str(e)), exc_info=True)
+            QMessageBox.warning(self, self.tr("Erreur d'affichage"),
+                                self.tr("Impossible d'afficher la page {0}.\n{1}").format(self.current_page_number + 1, str(e)))
+            if self.pdf_scene: self.pdf_scene.clear() # Assurer que la scène est propre en cas d'erreur
 
     def update_navigation_controls(self):
         if self.current_pdf_document and self.current_pdf_document.page_count > 0:
@@ -652,48 +658,118 @@ class PdfViewerWidget(QDialog):
 
     # --- Gestion des Miniatures et Signets ---
     def _load_thumbnails(self):
-        self.thumbnail_list_widget.clear()
-        if not self.current_pdf_document:
+        if not self.current_pdf_document or self.current_pdf_document.page_count == 0:
+            self.thumbnail_list_widget.clear()
             return
 
-        QApplication.setOverrideCursor(Qt.WaitCursor)
-        try:
-            for page_idx in range(self.current_pdf_document.page_count):
-                page = self.current_pdf_document.load_page(page_idx)
-                # Générer une miniature plus petite pour la liste
-                thumb_matrix = fitz.Matrix(0.15, 0.15) # Ajuster ce facteur pour la taille désirée
-                pix = page.get_pixmap(matrix=thumb_matrix, alpha=False)
-                qimage = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format_RGB888)
-                pixmap = QPixmap.fromImage(qimage)
+        # Arrêter le thread précédent s'il est en cours
+        if self.thumbnail_loader_thread and self.thumbnail_loader_thread.isRunning():
+            self.thumbnail_loader_thread.requestInterruption()
+            self.thumbnail_loader_thread.wait() # Attendre la fin du thread
 
-                item = QListWidgetItem(QIcon(pixmap), self.tr("Page {0}").format(page_idx + 1))
-                item.setData(Qt.UserRole, page_idx) # Stocker l'index de page (0-basé)
-                item.setSizeHint(QSize(120, 160)) # Donner une taille indicative à l'item
+        self.thumbnail_list_widget.clear()
+        # Afficher un message de chargement ou un indicateur
+        # Pour l'instant, on peut simplement le laisser vide jusqu'à ce que les items arrivent.
+        # Ou ajouter un item temporaire :
+        loading_item = QListWidgetItem(self.tr("Chargement des miniatures..."))
+        self.thumbnail_list_widget.addItem(loading_item)
+
+        # Pré-remplir avec des placeholders pour maintenir l'ordre si nécessaire,
+        # ou s'assurer que _add_thumbnail_item gère l'insertion à la bonne position.
+        # Pour la simplicité, _add_thumbnail_item va juste ajouter. On pourrait améliorer
+        # en créant des items vides puis en les mettant à jour.
+        # Alternative: créer une liste d'items et les ajouter tous à la fin.
+        self._thumbnail_items_buffer = [None] * self.current_pdf_document.page_count
+
+
+        self.thumbnail_loader_thread = ThumbnailLoaderThread(self.pdf_path, self.current_pdf_document.page_count, self)
+        self.thumbnail_loader_thread.thumbnailReady.connect(self._add_thumbnail_item)
+        self.thumbnail_loader_thread.finished.connect(self._on_thumbnail_loading_finished)
+        self.thumbnail_loader_thread.errorOccurred.connect(self._on_thumbnail_loading_error)
+        self.thumbnail_loader_thread.start()
+
+    def _add_thumbnail_item(self, page_idx, pixmap):
+        if not self.thumbnail_list_widget: # Si le widget a été détruit entre-temps
+            return
+
+        # Si on avait un item de chargement, le retirer au premier item réel reçu
+        if self.thumbnail_list_widget.count() == 1 and self.thumbnail_list_widget.item(0).text() == self.tr("Chargement des miniatures..."):
+            self.thumbnail_list_widget.clear() # Efface "Chargement..."
+
+        if pixmap.isNull(): # Miniature vide en cas d'erreur pour cette page
+            item_text = self.tr("Erreur P.{0}").format(page_idx + 1)
+            item_icon = QIcon() # Pas d'icône
+        else:
+            item_text = self.tr("Page {0}").format(page_idx + 1)
+            item_icon = QIcon(pixmap)
+
+        # Créer l'item et le stocker dans le buffer pour l'ordre
+        item = QListWidgetItem(item_icon, item_text)
+        item.setData(Qt.UserRole, page_idx)
+        item.setSizeHint(QSize(120, 160))
+
+        if 0 <= page_idx < len(self._thumbnail_items_buffer):
+            self._thumbnail_items_buffer[page_idx] = item
+        else: # Ne devrait pas arriver si page_count est correct
+             self.thumbnail_list_widget.addItem(item) # Fallback: ajouter à la fin
+
+    def _on_thumbnail_loading_finished(self):
+        # Ajouter tous les items bufferisés au QListWidget dans le bon ordre
+        if self.thumbnail_list_widget.count() == 1 and self.thumbnail_list_widget.item(0).text() == self.tr("Chargement des miniatures..."):
+            self.thumbnail_list_widget.clear()
+
+        for item in self._thumbnail_items_buffer:
+            if item: # Si l'item a été créé (pas d'erreur grave pour cette page)
                 self.thumbnail_list_widget.addItem(item)
-        finally:
-            QApplication.restoreOverrideCursor()
 
+        self._thumbnail_items_buffer = [] # Vider le buffer
+
+        logging.info(self.tr("Chargement des miniatures terminé."))
         self._highlight_current_thumbnail()
+        # On peut cacher un indicateur de chargement plus formel ici si on en avait un
+
+    def _on_thumbnail_loading_error(self, error_message):
+        logging.error(self.tr("Erreur du thread de chargement des miniatures: {0}").format(error_message))
+        if self.thumbnail_list_widget.count() == 1 and self.thumbnail_list_widget.item(0).text() == self.tr("Chargement des miniatures..."):
+            self.thumbnail_list_widget.item(0).setText(self.tr("Erreur chargement miniatures"))
+        else:
+            QMessageBox.warning(self, self.tr("Erreur Miniatures"), self.tr("Une erreur est survenue lors du chargement des miniatures."))
+
 
     def _on_thumbnail_clicked(self, item: QListWidgetItem):
-        page_idx = item.data(Qt.UserRole)
-        if isinstance(page_idx, int):
-            self.go_to_page(page_idx)
+        try:
+            page_idx = item.data(Qt.UserRole)
+            if isinstance(page_idx, int):
+                self.go_to_page(page_idx)
+        except Exception as e:
+            logging.error(self.tr("Erreur en cliquant sur la miniature : {0}").format(str(e)), exc_info=True)
+
 
     def _highlight_current_thumbnail(self):
-        if not self.thumbnail_list_widget or self.thumbnail_list_widget.count() == 0:
-            return
-        if 0 <= self.current_page_number < self.thumbnail_list_widget.count():
-            item = self.thumbnail_list_widget.item(self.current_page_number)
-            if item:
-                self.thumbnail_list_widget.setCurrentItem(item) # Met en surbrillance
+        try:
+            if not self.thumbnail_list_widget or self.thumbnail_list_widget.count() == 0:
+                return
+            if 0 <= self.current_page_number < self.thumbnail_list_widget.count():
+                item = self.thumbnail_list_widget.item(self.current_page_number)
+                if item:
+                    self.thumbnail_list_widget.setCurrentItem(item) # Met en surbrillance
+        except Exception as e:
+            logging.error(self.tr("Erreur lors de la mise en évidence de la miniature : {0}").format(str(e)), exc_info=True)
+
 
     def _load_bookmarks(self):
         self.bookmark_tree_widget.clear()
         if not self.current_pdf_document:
             return
 
-        toc = self.current_pdf_document.get_toc(simple=False)
+        try:
+            toc = self.current_pdf_document.get_toc(simple=False)
+        except Exception as e_toc:
+            logging.error(self.tr("Erreur lors de la récupération des signets (TOC): {0}").format(str(e_toc)), exc_info=True)
+            self.left_panel_tab_widget.setTabText(1, self.tr("Signets (Erreur)"))
+            QMessageBox.warning(self, self.tr("Erreur Signets"), self.tr("Impossible de charger la table des matières (signets)."))
+            return
+
         if not toc:
             self.left_panel_tab_widget.setTabText(1, self.tr("Signets (Aucun)"))
             return
@@ -702,65 +778,77 @@ class PdfViewerWidget(QDialog):
 
         # Fonction récursive pour ajouter les items de signets
         def add_toc_items_recursively(parent_item_or_tree, toc_entries_level):
-            for entry in toc_entries_level:
-                level, title, page_num_1_indexed, dest_dict = entry
-                tree_item = QTreeWidgetItem([title])
-                # Stocker la page (0-indexée) et les détails de destination
-                dest_data = {'page': page_num_1_indexed - 1, 'dest_details': dest_dict}
-                tree_item.setData(0, Qt.UserRole, dest_data)
+            try:
+                for entry in toc_entries_level:
+                    level, title, page_num_1_indexed, dest_dict = entry
+                    tree_item = QTreeWidgetItem([title if title else self.tr("Sans titre")])
+                    # Stocker la page (0-indexée) et les détails de destination
+                    dest_data = {'page': page_num_1_indexed - 1, 'dest_details': dest_dict}
+                    tree_item.setData(0, Qt.UserRole, dest_data)
 
-                if isinstance(parent_item_or_tree, QTreeWidget):
-                    parent_item_or_tree.addTopLevelItem(tree_item)
-                else: # C'est un QTreeWidgetItem parent
-                    parent_item_or_tree.addChild(tree_item)
+                    if isinstance(parent_item_or_tree, QTreeWidget):
+                        parent_item_or_tree.addTopLevelItem(tree_item)
+                    else: # C'est un QTreeWidgetItem parent
+                        parent_item_or_tree.addChild(tree_item)
 
-                # Trouver les enfants de cette entrée
-                children = []
-                current_entry_index_in_toc = -1
-                for i, e in enumerate(toc): # Recherche dans la liste toc globale
-                    if e == entry:
-                        current_entry_index_in_toc = i
-                        break
-
-                if current_entry_index_in_toc != -1:
-                    for i in range(current_entry_index_in_toc + 1, len(toc)):
-                        next_entry = toc[i]
-                        next_level = next_entry[0]
-                        if next_level == level + 1: # Enfant direct
-                            children.append(next_entry)
-                        elif next_level <= level: # Fin des enfants pour ce niveau
+                    # Trouver les enfants de cette entrée
+                    children = []
+                    current_entry_index_in_toc = -1
+                    for i, e in enumerate(toc): # Recherche dans la liste toc globale
+                        if e == entry: # Comparaison d'objets tuple
+                            current_entry_index_in_toc = i
                             break
 
-                if children:
-                    add_toc_items_recursively(tree_item, children)
+                    if current_entry_index_in_toc != -1:
+                        for i in range(current_entry_index_in_toc + 1, len(toc)):
+                            next_entry = toc[i]
+                            next_level = next_entry[0]
+                            if next_level == level + 1: # Enfant direct
+                                children.append(next_entry)
+                            elif next_level <= level: # Fin des enfants pour ce niveau
+                                break
 
-        top_level_toc_items = [entry for entry in toc if entry[0] == 1]
-        add_toc_items_recursively(self.bookmark_tree_widget, top_level_toc_items)
-        self.bookmark_tree_widget.expandAll()
+                    if children:
+                        add_toc_items_recursively(tree_item, children)
+            except Exception as e_add_item:
+                logging.error(self.tr("Erreur lors de l'ajout d'un item de signet : {0}").format(str(e_add_item)), exc_info=True)
+
+        try:
+            top_level_toc_items = [entry for entry in toc if entry[0] == 1]
+            add_toc_items_recursively(self.bookmark_tree_widget, top_level_toc_items)
+            self.bookmark_tree_widget.expandAll()
+        except Exception as e_build_tree:
+            logging.error(self.tr("Erreur lors de la construction de l'arbre des signets : {0}").format(str(e_build_tree)), exc_info=True)
+            QMessageBox.warning(self, self.tr("Erreur Signets"), self.tr("Une partie de la table des matières (signets) n'a pas pu être affichée."))
 
 
     def _on_bookmark_clicked(self, item: QTreeWidgetItem, column: int):
-        data = item.data(0, Qt.UserRole)
-        if data and isinstance(data, dict) and 'page' in data:
-            page_idx_0_based = data['page']
-            dest_details = data.get('dest_details', {}) # type: fitz.Destination
+        try:
+            data = item.data(0, Qt.UserRole)
+            if data and isinstance(data, dict) and 'page' in data:
+                page_idx_0_based = data['page']
+                dest_details = data.get('dest_details', {}) # type: fitz.Destination
 
-            if not (self.current_pdf_document and 0 <= page_idx_0_based < self.current_pdf_document.page_count):
-                logging.warning(f"Signet cliqué: numéro de page invalide {page_idx_0_based}")
-                return
+                if not (self.current_pdf_document and 0 <= page_idx_0_based < self.current_pdf_document.page_count):
+                    logging.warning(self.tr("Signet cliqué: numéro de page invalide {0}").format(page_idx_0_based))
+                    return
 
-            self.go_to_page(page_idx_0_based)
+                self.go_to_page(page_idx_0_based)
 
-            # Appliquer le zoom et le défilement spécifiques du signet après que la page soit chargée
-            # Utiliser QTimer.singleShot pour s'assurer que la vue de la page est mise à jour
-            QTimer.singleShot(0, lambda: self._apply_bookmark_destination_details(dest_details, page_idx_0_based))
+                # Appliquer le zoom et le défilement spécifiques du signet après que la page soit chargée
+                # Utiliser QTimer.singleShot pour s'assurer que la vue de la page est mise à jour
+                QTimer.singleShot(0, lambda: self._apply_bookmark_destination_details(dest_details, page_idx_0_based))
+        except Exception as e:
+            logging.error(self.tr("Erreur en cliquant sur le signet : {0}").format(str(e)), exc_info=True)
+
 
     def _apply_bookmark_destination_details(self, dest_details: dict, target_page_idx: int):
-        if not self.current_pdf_document or self.current_page_number != target_page_idx:
-            # La page a changé depuis que le timer a été lancé, ou le document est fermé
-            return
+        try:
+            if not self.current_pdf_document or self.current_page_number != target_page_idx:
+                # La page a changé depuis que le timer a été lancé, ou le document est fermé
+                return
 
-        logging.debug(f"Application des détails de destination du signet pour page {target_page_idx+1}: {dest_details}")
+            logging.debug(self.tr("Application des détails de destination du signet pour page {0}: {1}").format(target_page_idx+1, dest_details))
 
         # Zoom
         # 'zoom' in dest_details est un facteur de zoom (0 pour hériter, sinon >0)
@@ -803,12 +891,76 @@ class PdfViewerWidget(QDialog):
             scene_y = scroll_to_point.y * self.current_zoom_factor
 
             # Assurer que la vue est centrée autant que possible sur ce point
-            # QGraphicsView.centerOn(QPointF)
-            self.pdf_view.centerOn(QPointF(scene_x, scene_y))
-            # Alternativement, contrôler les barres de défilement directement
-            # self.pdf_view.horizontalScrollBar().setValue(int(scene_x - self.pdf_view.viewport().width() / 2))
-            # self.pdf_view.verticalScrollBar().setValue(int(scene_y - self.pdf_view.viewport().height() / 2))
-            logging.debug(f"Signet: Défilement vers le point PDF {scroll_to_point}, scène ({scene_x}, {scene_y})")
+            if self.pdf_view: self.pdf_view.centerOn(QPointF(scene_x, scene_y))
+            logging.debug(self.tr("Signet: Défilement vers le point PDF {0}, scène ({1}, {2})").format(scroll_to_point, scene_x, scene_y))
+
+        except Exception as e:
+            logging.error(self.tr("Erreur lors de l'application des détails de destination du signet : {0}").format(str(e)), exc_info=True)
+            QMessageBox.warning(self, self.tr("Navigation Signet"), self.tr("Impossible d'appliquer pleinement les détails de destination du signet."))
+
+
+# --- Thread pour le chargement asynchrone des miniatures ---
+class ThumbnailLoaderThread(QThread):
+    thumbnailReady = pyqtSignal(int, QPixmap) # page_idx, pixmap
+    finished = pyqtSignal()
+    errorOccurred = pyqtSignal(str)
+
+    def __init__(self, pdf_path, page_count, parent=None):
+        super().__init__(parent)
+        self.pdf_path = pdf_path
+        self.page_count = page_count
+        # self._is_interruption_requested = False # QThread a déjà isInterruptionRequested
+
+    def run(self):
+        doc = None
+        try:
+            doc = fitz.open(self.pdf_path)
+            if doc.page_count != self.page_count:
+                # Cela pourrait indiquer que le fichier a changé entre-temps, ou une erreur.
+                logging.warning(QCoreApplication.translate("ThumbnailLoaderThread", "Le nombre de pages a changé; arrêt du chargement des miniatures."))
+                self.errorOccurred.emit(QCoreApplication.translate("ThumbnailLoaderThread", "Incohérence du nombre de pages."))
+                return
+
+            for page_idx in range(self.page_count):
+                if self.isInterruptionRequested():
+                    logging.info(QCoreApplication.translate("ThumbnailLoaderThread", "Chargement des miniatures interrompu."))
+                    return
+
+                try:
+                    page = doc.load_page(page_idx)
+                    if not page:
+                        logging.warning(QCoreApplication.translate("ThumbnailLoaderThread", "Impossible de charger la page {0} pour la miniature.").format(page_idx + 1))
+                        # Émettre un pixmap vide ou un signal d'erreur spécifique pour cette page ?
+                        # Pour l'instant, on saute cette miniature.
+                        continue
+
+                    thumb_matrix = fitz.Matrix(0.15, 0.15)
+                    pix = page.get_pixmap(matrix=thumb_matrix, alpha=False)
+                    qimage = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format_RGB888)
+                    pixmap = QPixmap.fromImage(qimage)
+                    self.thumbnailReady.emit(page_idx, pixmap)
+                except Exception as e_page:
+                    logging.error(QCoreApplication.translate("ThumbnailLoaderThread", "Erreur génération miniature pour page {0}: {1}").format(page_idx + 1, str(e_page)), exc_info=True)
+                    # On pourrait émettre un signal avec un QPixmap vide ou null pour indiquer l'échec pour cette page
+                    self.thumbnailReady.emit(page_idx, QPixmap()) # Émettre un QPixmap vide
+
+        except Exception as e_doc:
+            logging.error(QCoreApplication.translate("ThumbnailLoaderThread", "Erreur ouverture PDF dans le thread de miniatures: {0}").format(str(e_doc)), exc_info=True)
+            self.errorOccurred.emit(str(e_doc))
+        finally:
+            if doc:
+                try:
+                    doc.close()
+                except Exception as e_close:
+                     logging.warning(QCoreApplication.translate("ThumbnailLoaderThread", "Erreur fermeture PDF dans thread: {0}").format(e_close))
+            self.finished.emit()
+
+    # requestInterruption() et isInterruptionRequested() sont déjà fournis par QThread.
+    # Pas besoin de les surcharger si on utilise directement super().requestInterruption() etc.
+    # Si on a besoin d'une logique customisée (comme le flag _is_interruption_requested),
+    # alors il faut les garder, mais s'assurer que le flag est bien géré.
+    # Le flag interne n'est plus nécessaire si on utilise directement les méthodes de QThread.
+
 
 if __name__ == '__main__':
     # This is for testing the widget independently
