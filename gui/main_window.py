@@ -532,6 +532,10 @@ class DocumentManager(QMainWindow):
 
         self.searchable_actions_map = {} # Initialize for create_actions_main
 
+        # For App Title Animation - Initialize shadow effect before menus are created
+        self.app_title_shadow_effect = QGraphicsDropShadowEffect(self)
+        # self.app_title_label will be set in create_menus_main
+
         # Création des actions et menus (le menu Modules sera supprimé plus tard)
         self.create_actions_main(); self.create_menus_main()
 
@@ -563,8 +567,8 @@ class DocumentManager(QMainWindow):
         self.populate_saved_filters_combo()
 
         # For App Title Animation
-        self.app_title_label = None # Will be set in create_menus_main
-        self.app_title_shadow_effect = QGraphicsDropShadowEffect(self)
+        # self.app_title_label is set in create_menus_main
+        # self.app_title_shadow_effect is initialized earlier
         self.app_title_animation = QPropertyAnimation(self.app_title_shadow_effect, b"color", self) # parent `self` for QPropertyAnimation
         self.app_title_animation_timer = QTimer(self)
         self._setup_app_title_animation()
