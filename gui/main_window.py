@@ -799,17 +799,32 @@ class DocumentManager(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
-        # Layout horizontal principal pour la sidebar et la zone de contenu principale
-        main_horizontal_layout = QHBoxLayout(central_widget)
-        main_horizontal_layout.setContentsMargins(0, 0, 0, 0) # Pas de marges pour que la sidebar touche le bord
-        main_horizontal_layout.setSpacing(0) # Pas d'espacement entre sidebar et contenu
+        # Nouveau layout vertical principal pour le central_widget
+        new_main_vertical_layout = QVBoxLayout(central_widget)
+        new_main_vertical_layout.setContentsMargins(0, 0, 0, 0)
+        new_main_vertical_layout.setSpacing(0)
 
-        # Ajout de la sidebar (déjà instanciée dans __init__)
+        # Placeholder pour la barre de menu supérieure (sera un QFrame ou similaire)
+        self.top_menu_bar_widget = QFrame() # Sera configuré dans create_menus_main
+        self.top_menu_bar_widget.setObjectName("topMenuBarWidget")
+        # self.top_menu_bar_widget.setFixedHeight(50) # Hauteur typique pour une barre de menu
+        # self.top_menu_bar_widget.setStyleSheet("background-color: #f0f2f5; border-bottom: 1px solid #d1d5db;") # Style initial
+        new_main_vertical_layout.addWidget(self.top_menu_bar_widget)
+
+        # Layout horizontal pour la sidebar et la zone de contenu principale (comme avant)
+        main_horizontal_layout = QHBoxLayout() # Ce layout sera ajouté au new_main_vertical_layout
+        main_horizontal_layout.setContentsMargins(0, 0, 0, 0)
+        main_horizontal_layout.setSpacing(0)
+
+        # Ajout de la sidebar
         main_horizontal_layout.addWidget(self.sidebar_nav)
 
         # La QStackedWidget pour le contenu principal
         self.main_area_stack = QStackedWidget()
-        main_horizontal_layout.addWidget(self.main_area_stack, 1) # Le 1 indique qu'il prend l'espace restant
+        main_horizontal_layout.addWidget(self.main_area_stack, 1)
+
+        # Ajout du layout horizontal (sidebar + stack) au layout vertical principal
+        new_main_vertical_layout.addLayout(main_horizontal_layout)
         
         # -- Configuration de la page "Documents" (qui va dans le main_area_stack) --
         self.documents_page_widget = QWidget()
@@ -1367,101 +1382,206 @@ class DocumentManager(QMainWindow):
 
 
     def create_menus_main(self):
-        menu_bar = self.menuBar()
+        # Clear the old QMenuBar content if it exists, as we are replacing it
+        # self.menuBar().clear() # This is for QMainWindow's default menu bar. We're using a custom widget.
 
-        # File Menu
-        file_menu = menu_bar.addMenu(self.tr("Fichier"))
-        # Actions like Settings, Status Management, Customize Menu will be moved to "Outils"
-        file_menu.addAction(self.exit_action) # Exit is always available
+        # Configure the top_menu_bar_widget (QFrame)
+        self.top_menu_bar_widget.setFixedHeight(50)
+        self.top_menu_bar_widget.setStyleSheet("""
+            QFrame#topMenuBarWidget {
+                background-color: #f8fafc; /* Light grey, similar to modern UIs */
+                border-bottom: 1px solid #e2e8f0; /* Subtle border */
+            }
+            QPushButton#topMenuButton {
+                background-color: transparent;
+                color: #4b5563; /* Dark grey text */
+                border: none;
+                font-size: 14px;
+                padding: 8px 12px;
+                border-radius: 4px;
+            }
+            QPushButton#topMenuButton:hover {
+                background-color: #e5e7eb; /* Lighter grey on hover */
+                color: #1f2937; /* Darker text on hover */
+            }
+            QPushButton#topMenuButton::menu-indicator {
+                image: none; /* Hide default menu indicator if not desired */
+            }
+            QMenu {
+                background-color: #ffffff;
+                border: 1px solid #d1d5db;
+                padding: 5px;
+                border-radius: 6px;
+            }
+            QMenu::item {
+                color: #4b5563;
+                padding: 8px 20px;
+                margin: 1px;
+                border-radius: 4px;
+            }
+            QMenu::item:selected {
+                background-color: #f3f4f6;
+                color: #111827;
+            }
+            QMenu::separator {
+                height: 1px;
+                background: #e5e7eb;
+                margin: 5px 0px;
+            }
+        """)
 
-        # Tools Menu (New)
-        tools_menu = menu_bar.addMenu(self.tr("Outils"))
-        tools_menu.addAction(self.settings_action) # Will be controlled by _apply_permissions
-        tools_menu.addAction(self.status_action) # Controlled by P_MANAGE_STATUSES
-        tools_menu.addAction(self.customize_sidebar_action) # Utiliser l'action renommée
+        top_bar_layout = QHBoxLayout(self.top_menu_bar_widget)
+        top_bar_layout.setContentsMargins(10, 0, 10, 0) # Left/right padding, no top/bottom for frame
+        top_bar_layout.setSpacing(10)
 
-        # Admin Menu (new menu for admin-specific tasks)
-        self.admin_menu = menu_bar.addMenu(self.tr("Administration"))
-        self.admin_menu.addAction(self.manage_users_action)
-        self.admin_menu.addAction(self.manage_roles_action) # Add role management action
-        # Add other admin-specific actions here if any (e.g., system logs)
+        # App Logo/Title (Optional)
+        app_title_label = QLabel("Leopardo AI")
+        app_title_label.setObjectName("topMenuAppTitle")
+        app_title_label.setStyleSheet("color: #2563eb; font-size: 18px; font-weight: bold; padding-right: 15px;")
+        top_bar_layout.addWidget(app_title_label)
 
-        # Modules Menu - Supprimé car la navigation se fera par la sidebar
-        # Si certains modules ne sont pas dans la sidebar, ils pourraient être accessibles
-        # via un item "Autres modules" dans la sidebar ou un menu "Affichage" par exemple.
-        # Pour l'instant, on le supprime complètement.
-        # logging.info("Le menu 'Modules' du QMenuBar est désactivé au profit de la nouvelle sidebar.")
+        # --- Define Menu Structure ---
+        # Format: (Button Text, Optional Icon, [ (Action Text, QAction, Optional Submenu Def), ... ])
+        # Submenu Def: [ (SubAction Text, QAction), ... ]
 
-        # Help Menu (remains static)
-        help_menu = menu_bar.addMenu(self.tr("Aide")); about_action = QAction(QIcon(":/icons/help-circle.svg"), self.tr("À propos"), self); about_action.triggered.connect(self.show_about_dialog); help_menu.addAction(about_action)
-        self.searchable_actions_map[self.tr("À propos")] = about_action
+        # Using existing QActions (self.home_action, self.settings_action, etc.)
+        # Note: The original 'Modules' menu is removed in favor of the sidebar.
+        # The 'File', 'Tools', 'Admin', 'Help' structure will be recreated here.
 
-        # Search bar in menu bar
-        self.search_bar_line_edit = QLineEdit(self)
-        self.search_bar_line_edit.setObjectName("menuBarSearch")
-        self.search_bar_line_edit.setPlaceholderText(self.tr("Rechercher une fonctionnalité..."))
+        menu_definitions = [
+            (self.tr("Fichier"), None, [
+                (self.tr("Quitter"), self.exit_action)
+            ]),
+            (self.tr("Outils"), None, [
+                (self.tr("Paramètres"), self.settings_action),
+                (self.tr("Gérer les Statuts"), self.status_action),
+                (self.tr("Personnaliser la Barre Latérale"), self.customize_sidebar_action)
+            ]),
+            (self.tr("Administration"), None, [ # This is self.admin_menu from old code
+                (self.tr("Gérer les Utilisateurs"), self.manage_users_action),
+                (self.tr("Gérer les Rôles"), self.manage_roles_action)
+            ]),
+            # (self.tr("Modules"), None, []), # Modules menu is removed
+            (self.tr("Aide"), None, [
+                (self.tr("À propos"), self.searchable_actions_map.get(self.tr("À propos"))) # Get 'About' action from map
+            ])
+        ]
 
-        self.search_completer_model = QStringListModel([])
-        self.search_completer = QCompleter(self.search_completer_model, self)
-        self.search_completer.setCaseSensitivity(Qt.CaseInsensitive)
-        self.search_completer.setFilterMode(Qt.MatchContains)
+        self.top_menu_buttons = {} # To store references if needed for _apply_permissions
 
-        completer_popup = self.search_completer.popup()
-        completer_popup.setObjectName("menuBarSearchCompleterView")
+        for menu_title, menu_icon_path, actions_defs in menu_definitions:
+            menu_button = QPushButton(menu_title)
+            menu_button.setObjectName("topMenuButton")
+            if menu_icon_path:
+                menu_button.setIcon(QIcon(menu_icon_path))
 
-        self.search_bar_line_edit.setCompleter(self.search_completer)
+            if actions_defs: # If there are actions, create a dropdown menu
+                dropdown_menu = QMenu(self)
+                for action_text, q_action_obj in actions_defs:
+                    if q_action_obj: # Ensure QAction object exists
+                        dropdown_menu.addAction(q_action_obj)
+                    else:
+                        logging.warning(f"QAction for '{action_text}' not found when creating top menu.")
+                menu_button.setMenu(dropdown_menu)
 
-        # Update completer model with action names
-        action_names = list(self.searchable_actions_map.keys())
-        self.search_completer_model.setStringList(action_names)
-
-        # Connect signals for search activation
-        self.search_completer.activated[str].connect(self.handle_search_activation)
-        self.search_bar_line_edit.returnPressed.connect(self.handle_search_return_pressed)
-
-        # User display and logout button
-        self.user_display_widget = QWidget()
-        user_display_layout = QHBoxLayout(self.user_display_widget)
-        user_display_layout.setContentsMargins(5, 0, 5, 0) # Adjust margins as needed
-        user_display_layout.setSpacing(10)
-
-        # self.user_info_label = QLabel(self.tr("Non connecté")) # Replaced by UserMenuButton
-        # self.user_info_label.setObjectName("userInfoLabel") # For styling
-        # user_display_layout.addWidget(self.user_info_label)
-
-        # self.logout_button = QPushButton(self.tr("Déconnexion")) # Replaced by UserMenuButton
-        # self.logout_button.setIcon(QIcon(":/icons/log-out.svg"))
-        # self.logout_button.setFlat(True)
-        # self.logout_button.setToolTip(self.tr("Se déconnecter et revenir à l'écran de connexion"))
-        # self.logout_button.clicked.connect(self._handle_logout)
-        # user_display_layout.addWidget(self.logout_button)
-
-        self.user_menu_button_instance = UserMenuButton(current_user_info=self.current_user_info, parent=self)
-        self.user_menu_button_instance.setObjectName("userMenuButton") # Added object name
-        self.user_menu_button_instance.request_logout.connect(self._handle_logout)
-        self.user_menu_button_instance.request_show_user_management_page.connect(self.show_user_management_page)
-        self.user_menu_button_instance.request_open_edit_my_account_dialog.connect(self._handle_request_open_edit_my_account)
-        self.user_menu_button_instance.request_open_add_user_dialog.connect(self._handle_request_open_add_user)
-        user_display_layout.addWidget(self.user_menu_button_instance)
+            top_bar_layout.addWidget(menu_button)
+            self.top_menu_buttons[menu_title] = menu_button
 
 
-        # The following block redefining self.search_bar_line_edit is redundant
-        # and was likely causing the issue. It's removed.
-        # # Main Search Bar (as before)
-        # self.search_bar_line_edit = QLineEdit(self)
-        # self.search_bar_line_edit.setObjectName("menuBarSearch")
-        # self.search_bar_line_edit.setPlaceholderText(self.tr("Rechercher une fonctionnalité..."))
-        # # ... (completer setup as before) ...
+        top_bar_layout.addStretch(1) # Pushes menu items to left, following items to right
 
-        # Container for both search and user display
-        top_right_container = QWidget()
-        top_right_layout = QHBoxLayout(top_right_container)
-        top_right_layout.setContentsMargins(0,0,0,0)
-        top_right_layout.setSpacing(15) # Spacing between search and user info
-        top_right_layout.addWidget(self.search_bar_line_edit)
-        top_right_layout.addWidget(self.user_display_widget)
+        # Search bar (re-add with its completer)
+        self.search_bar_line_edit = QLineEdit(self) # Already initialized in create_actions_main
+        self.search_bar_line_edit.setObjectName("topMenuBarSearch") # Different object name for specific styling
+        self.search_bar_line_edit.setPlaceholderText(self.tr("Rechercher..."))
+        self.search_bar_line_edit.setFixedWidth(200) # Adjust width as needed
+        self.search_bar_line_edit.setStyleSheet("""
+            QLineEdit#topMenuBarSearch {
+                padding: 5px 8px;
+                border: 1px solid #d1d5db;
+                border-radius: 4px;
+                background-color: white;
+            }
+            QLineEdit#topMenuBarSearch:focus {
+                border-color: #2563eb;
+            }
+        """)
+        # Completer is already set up in create_actions_main
+        top_bar_layout.addWidget(self.search_bar_line_edit)
 
-        self.menuBar().setCornerWidget(top_right_container, Qt.TopRightCorner)
+        # User Menu Button (already initialized in create_actions_main)
+        if not hasattr(self, 'user_menu_button_instance'): # Ensure it's created
+            self.user_menu_button_instance = UserMenuButton(current_user_info=self.current_user_info, parent=self)
+            self.user_menu_button_instance.setObjectName("userMenuButton")
+            self.user_menu_button_instance.request_logout.connect(self._handle_logout)
+            self.user_menu_button_instance.request_show_user_management_page.connect(self.show_user_management_page)
+            self.user_menu_button_instance.request_open_edit_my_account_dialog.connect(self._handle_request_open_edit_my_account)
+            self.user_menu_button_instance.request_open_add_user_dialog.connect(self._handle_request_open_add_user)
+
+        self.user_menu_button_instance.setStyleSheet("""
+            QPushButton#userMenuButton {
+                background-color: transparent;
+                color: #4b5563;
+                border: none;
+                padding: 5px 10px;
+                font-size: 14px;
+            }
+            QPushButton#userMenuButton:hover {
+                background-color: #e5e7eb;
+                border-radius: 4px;
+            }
+        """)
+        top_bar_layout.addWidget(self.user_menu_button_instance)
+
+        # Window Controls (Minimize, Maximize, Close)
+        window_controls_layout = QHBoxLayout()
+        window_controls_layout.setSpacing(5)
+
+        minimize_button = QToolButton()
+        minimize_button.setText("—") # Or use an icon
+        minimize_button.setToolTip(self.tr("Minimiser"))
+        minimize_button.clicked.connect(self.showMinimized)
+
+        maximize_button = QToolButton()
+        maximize_button.setText("□") # Or use an icon
+        maximize_button.setToolTip(self.tr("Agrandir / Restaurer"))
+        maximize_button.clicked.connect(self.toggleMaximized)
+
+        close_button = QToolButton()
+        close_button.setText("✕") # Or use an icon
+        close_button.setToolTip(self.tr("Fermer"))
+        close_button.clicked.connect(self.close)
+
+        for btn in [minimize_button, maximize_button, close_button]:
+            btn.setObjectName("windowControlButton")
+            btn.setFixedSize(28, 28)
+            btn.setStyleSheet("""
+                QToolButton#windowControlButton {
+                    background-color: transparent;
+                    border: none;
+                    font-size: 16px;
+                    color: #6b7280; /* Muted color */
+                }
+                QToolButton#windowControlButton:hover {
+                    background-color: #e5e7eb;
+                    border-radius: 4px;
+                    color: #1f2937;
+                }
+            """)
+
+        # Specific hover for close button
+        close_button.setStyleSheet(close_button.styleSheet() + """
+            QToolButton#windowControlButton:hover {
+                background-color: #fee2e2; /* Light red on hover for close */
+                color: #ef4444; /* Red text/icon */
+            }
+        """)
+
+        window_controls_layout.addWidget(minimize_button)
+        window_controls_layout.addWidget(maximize_button)
+        window_controls_layout.addWidget(close_button)
+        top_bar_layout.addLayout(window_controls_layout)
+
         self._update_user_display() # Initial update of user display
         self._apply_permissions() # Apply permissions on initial load
 
@@ -1501,32 +1621,66 @@ class DocumentManager(QMainWindow):
         can_create_client = has_permission(role_name, P_CREATE_CLIENT)
         logging.info(f"  Role '{role_name}': P_MANAGE_SYSTEM_SETTINGS={is_admin_or_similar}, P_CREATE_CLIENT={can_create_client}")
 
-        # Menu Actions
-        log_msg_system_settings = f"Permission P_MANAGE_SYSTEM_SETTINGS for role '{role_name}': {'Granted' if is_admin_or_similar else 'Denied'}. Settings action {'enabled' if is_admin_or_similar else 'disabled'}."
-        logging.info(log_msg_system_settings)
+        # --- Apply permissions to QActions (which are now in QMenus of the top menu buttons) ---
+        # Settings Action
         self.settings_action.setEnabled(is_admin_or_similar)
-        logging.info(f"  Action 'settings_action' enabled: {is_admin_or_similar}")
+        logging.info(f"  Action 'settings_action' enabled: {is_admin_or_similar} (P_MANAGE_SYSTEM_SETTINGS)")
+
+        # Status Action
         if hasattr(self, 'status_action'):
             can_manage_statuses = has_permission(role_name, P_MANAGE_STATUSES)
             self.status_action.setEnabled(can_manage_statuses)
-            logging.info(f"  Action 'status_action' enabled: {can_manage_statuses} (Permission: P_MANAGE_STATUSES)")
+            logging.info(f"  Action 'status_action' enabled: {can_manage_statuses} (P_MANAGE_STATUSES)")
+
+        # Customize Sidebar Action (assuming always enabled for logged-in users for now, or add a specific permission)
+        if hasattr(self, 'customize_sidebar_action'):
+            self.customize_sidebar_action.setEnabled(True) # Or add a specific permission check
+            logging.info(f"  Action 'customize_sidebar_action' enabled: True (assuming)")
 
 
-        # Admin Menu visibility
+        # Admin Menu Actions (manage_users_action, manage_roles_action)
         can_manage_users = has_permission(role_name, P_MANAGE_USERS)
         can_manage_roles = has_permission(role_name, P_MANAGE_ROLES)
-        admin_menu_visible = can_manage_users or can_manage_roles
-        self.admin_menu.menuAction().setVisible(admin_menu_visible)
-        logging.info(f"  Admin Menu visible: {admin_menu_visible} (P_MANAGE_USERS={can_manage_users}, P_MANAGE_ROLES={can_manage_roles})")
 
-        # Further check for admin menu actions based on license features if applicable
-        # Example: If P_MANAGE_USERS requires a certain license feature beyond role permission
         can_manage_users_licensed = FEATURE_USER_MANAGEMENT_FULL in self.allowed_features
         self.manage_users_action.setEnabled(can_manage_users and can_manage_users_licensed)
         self.manage_roles_action.setEnabled(can_manage_roles and can_manage_users_licensed) # Assuming role management also tied to this feature
+        logging.info(f"  Action 'manage_users_action' enabled: {self.manage_users_action.isEnabled()} (P_MANAGE_USERS={can_manage_users}, Licensed={can_manage_users_licensed})")
+        logging.info(f"  Action 'manage_roles_action' enabled: {self.manage_roles_action.isEnabled()} (P_MANAGE_ROLES={can_manage_roles}, Licensed={can_manage_users_licensed})")
 
-        # Module Menu Actions & Feature Mapping
-        # The MODULE_TO_LICENSE_FEATURE_MAP is now removed.
+        # --- Control visibility of top-level menu buttons based on their actions' visibility ---
+        # Example: Hide "Administration" button if both "Gérer les Utilisateurs" and "Gérer les Rôles" are disabled/hidden
+        if hasattr(self, 'top_menu_buttons'):
+            admin_button = self.top_menu_buttons.get(self.tr("Administration"))
+            if admin_button:
+                # An admin menu button should be visible if at least one of its actions is enabled.
+                # QActions don't have isVisible(), use isEnabled() as a proxy for menu items.
+                admin_menu_has_visible_action = self.manage_users_action.isEnabled() or self.manage_roles_action.isEnabled()
+                admin_button.setVisible(admin_menu_has_visible_action)
+                logging.info(f"  Top Menu Button 'Administration' visible: {admin_menu_has_visible_action}")
+
+            tools_button = self.top_menu_buttons.get(self.tr("Outils"))
+            if tools_button:
+                tools_menu_has_visible_action = (self.settings_action.isEnabled() or
+                                                 (hasattr(self, 'status_action') and self.status_action.isEnabled()) or
+                                                 (hasattr(self, 'customize_sidebar_action') and self.customize_sidebar_action.isEnabled()))
+                tools_button.setVisible(tools_menu_has_visible_action)
+                logging.info(f"  Top Menu Button 'Outils' visible: {tools_menu_has_visible_action}")
+
+            # File and Help menus are usually always visible.
+            file_button = self.top_menu_buttons.get(self.tr("Fichier"))
+            if file_button: file_button.setVisible(True) # Exit action always available
+
+            help_button = self.top_menu_buttons.get(self.tr("Aide"))
+            if help_button:
+                 about_action = self.searchable_actions_map.get(self.tr("À propos"))
+                 help_button.setVisible(about_action.isEnabled() if about_action else False)
+
+
+        # Module Menu Actions & Feature Mapping (This part primarily affects sidebar now)
+        # The QActions for modules are still used by the sidebar logic if they are added to it.
+        # Their enabled/visible state here might affect if they *could* be added to a menu,
+        # but the sidebar population logic (_populate_sidebar) has its own permission checks.
         # License feature checks will use module_config.get('license_feature').
 
         # Role-based permissions for modules (as before)
