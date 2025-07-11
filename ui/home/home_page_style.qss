@@ -16,24 +16,24 @@ QLabel#homePageWelcomeLabel {
 }
 
 /* HomePageWidget Button Styles (Cartes de Module) */
-/* Ciblé via le conteneur pour spécificité */
+/* Ancien style pour QPushButton, commenté/supprimé au profit de ModuleCardWidget */
+/*
 QWidget#homePageButtonGridContainer QPushButton {
     background-color: #FFFFFF;
-    border: 1px solid #DDE2E6; /* Bordure fine pour la définition de la carte */
-    border-radius: 12px;       /* Coins légèrement plus arrondis */
-    padding: 12px;             /* Padding légèrement augmenté */
+    border: 1px solid #DDE2E6;
+    border-radius: 12px;
+    padding: 12px;
     font-size: 12px;
     font-weight: bold;
     color: #333333;
     text-align: center;
-    min-height: 90px;          /* Hauteur légèrement augmentée */
-    /* Les ombres sont gérées par QGraphicsDropShadowEffect en Python */
+    min-height: 90px;
 }
 
 QWidget#homePageButtonGridContainer QPushButton:hover {
-    background-color: #E3F2FD; /* Bleu clair pour survol */
-    border: 1px solid #007BFF; /* Bordure accentuée au survol */
-    color: #0056B3; /* Texte plus foncé au survol */
+    background-color: #E3F2FD;
+    border: 1px solid #007BFF;
+    color: #0056B3;
 }
 
 QWidget#homePageButtonGridContainer QPushButton:pressed {
@@ -41,6 +41,101 @@ QWidget#homePageButtonGridContainer QPushButton:pressed {
     border-color: #004085;
     color: #004085;
 }
+*/
+
+/* Styles pour ModuleCardWidget */
+QWidget#moduleCard {
+    background-color: #FFFFFF;
+    border: 1px solid #DDE2E6;
+    border-radius: 8px;
+    padding: 15px;
+    min-height: 170px; /* Augmenté pour stats */
+    max-width: 280px;
+    /* Consider adding QGraphicsDropShadowEffect in Python for better shadow */
+}
+
+QWidget#moduleCard:hover {
+    border-color: #007BFF;
+    background-color: #F8FAFC;
+}
+
+QLabel#moduleIconLabel {
+    /* qproperty-alignment: 'AlignCenter'; */ /* Géré en code */
+    padding-bottom: 10px;
+    /* La taille de l'icône est gérée en code (ex: 48x48) */
+}
+
+QLabel#moduleTitleLabel {
+    font-size: 13pt; /* Un peu plus petit que 14pt initialement proposé pour équilibre */
+    font-weight: bold;
+    color: #263238; /* Primary Text */
+    /* qproperty-alignment: 'AlignCenter'; */ /* Géré en code */
+    padding-bottom: 8px;
+    min-height: 30px; /* Pour gérer 1 ou 2 lignes de titre */
+}
+
+QWidget#statsContainer { /* Le QWidget qui contient les QHBoxLayout des stats */
+    background-color: transparent;
+    padding-top: 8px;
+    border-top: 1px solid #ECEFF1;
+    margin-top: auto; /* Pousse le conteneur de stats vers le bas si le layout principal le permet */
+}
+
+/* Styles pour les labels de statistiques individuels (valeur et texte) */
+QLabel#statValueLabel {
+    font-size: 16pt; /* Réduit de 18pt pour ne pas être trop dominant */
+    font-weight: bold;
+    color: #007BFF; /* Couleur d'accent par défaut */
+    /* qproperty-alignment: 'AlignCenter'; */ /* Géré en code */
+    padding: 0px;
+    margin:0px;
+}
+
+QLabel#statTextLabel {
+    font-size: 8pt; /* Réduit pour être plus discret */
+    color: #546E7A; /* Secondary Text */
+    /* qproperty-alignment: 'AlignCenter'; */ /* Géré en code */
+    padding: 0px;
+    margin:0px;
+}
+
+/* Exemples de couleurs d'accentuation par moduleType (propriété dynamique) */
+/* La couleur d'accent est appliquée à la valeur de la stat principale */
+/* Ou à la bordure de la carte au survol, ou à l'icône */
+
+QWidget#moduleCard[moduleType="clientdocuments"] QLabel#statValueLabel,
+QWidget#moduleCard[moduleType="clientdocuments"] QLabel#moduleIconLabel { /* Si icône SVG monochrome */
+    color: #007BFF; /* Bleu */
+}
+QWidget#moduleCard[moduleType="clientdocuments"]:hover {
+    border-color: #007BFF;
+}
+
+QWidget#moduleCard[moduleType="projectmanagement"] QLabel#statValueLabel,
+QWidget#moduleCard[moduleType="projectmanagement"] QLabel#moduleIconLabel {
+    color: #28A745; /* Vert */
+}
+QWidget#moduleCard[moduleType="projectmanagement"]:hover {
+    border-color: #28A745;
+}
+
+QWidget#moduleCard[moduleType="productmanagement"] QLabel#statValueLabel,
+QWidget#moduleCard[moduleType="productmanagement"] QLabel#moduleIconLabel {
+    color: #6F42C1; /* Violet */
+}
+QWidget#moduleCard[moduleType="productmanagement"]:hover {
+    border-color: #6F42C1;
+}
+
+QWidget#moduleCard[moduleType="recruitment"] QLabel#statValueLabel,
+QWidget#moduleCard[moduleType="recruitment"] QLabel#moduleIconLabel {
+    color: #FD7E14; /* Orange */
+}
+QWidget#moduleCard[moduleType="recruitment"]:hover {
+    border-color: #FD7E14;
+}
+/* Ajouter d'autres moduleTypes ici si nécessaire */
+
 
 /* QLabel pour le GIF */
 QLabel#homePageGifLabel {
