@@ -205,7 +205,7 @@ class WindowsBiometricHandler:
         available = False
         # Default to False, will be set True if call succeeds and units are found
         try:
-            # This is the single, guarded call to WinBioEnumBiometricUnits
+
             hr = self.winbio.WinBioEnumBiometricUnits(
                 self.session_handle,
                 target_factor,
