@@ -202,16 +202,10 @@ class WindowsBiometricHandler:
             logger.error("winbio.dll not available for WinBioEnumBiometricUnits setup.")
             return False
 
-        hr = self.winbio.WinBioEnumBiometricUnits(
-            self.session_handle,
-            target_factor,
-            ctypes.byref(ptr_to_unit_schemas), # Pass address of our WINBIO_UNIT_SCHEMA* variable
-            ctypes.byref(unit_count)
-        )
-
         available = False
         # Default to False, will be set True if call succeeds and units are found
         try:
+
             hr = self.winbio.WinBioEnumBiometricUnits(
                 self.session_handle,
                 target_factor,
