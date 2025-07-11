@@ -1,14 +1,14 @@
 import sqlite3
 import uuid
 from datetime import datetime
-from ..connection import get_db_connection # Corrected import path
+from ..connection import get_raw_sqlite_connection # Corrected import path
 
 # --- CRUD functions for Transporters ---
 def add_transporter(data: dict) -> str | None:
     """Adds a new transporter. Returns transporter_id (UUID) or None."""
     conn = None
     try:
-        conn = get_db_connection()
+        conn = get_raw_sqlite_connection()
         cursor = conn.cursor()
         new_transporter_id = str(uuid.uuid4())
         now = datetime.utcnow().isoformat() + "Z"
@@ -38,7 +38,7 @@ def get_transporter_by_id(transporter_id: str) -> dict | None:
     """Retrieves a transporter by its ID."""
     conn = None
     try:
-        conn = get_db_connection()
+        conn = get_raw_sqlite_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM Transporters WHERE transporter_id = ?", (transporter_id,))
         row = cursor.fetchone()
@@ -53,7 +53,7 @@ def get_all_transporters() -> list[dict]:
     """Retrieves all transporters."""
     conn = None
     try:
-        conn = get_db_connection()
+        conn = get_raw_sqlite_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM Transporters ORDER BY name")
         rows = cursor.fetchall()
@@ -69,7 +69,7 @@ def update_transporter(transporter_id: str, data: dict) -> bool:
     conn = None
     if not data: return False
     try:
-        conn = get_db_connection()
+        conn = get_raw_sqlite_connection()
         cursor = conn.cursor()
         data['updated_at'] = datetime.utcnow().isoformat() + "Z"
         set_clauses = [f"{key} = ?" for key in data.keys() if key != 'transporter_id']
@@ -90,7 +90,7 @@ def delete_transporter(transporter_id: str) -> bool:
     """Deletes a transporter. Returns True on success."""
     conn = None
     try:
-        conn = get_db_connection()
+        conn = get_raw_sqlite_connection()
         cursor = conn.cursor()
         # Consider ON DELETE SET NULL or RESTRICT for Client_Transporters if direct deletion is too destructive
         cursor.execute("DELETE FROM Transporters WHERE transporter_id = ?", (transporter_id,))
