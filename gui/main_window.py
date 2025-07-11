@@ -213,6 +213,7 @@ from utils.app_constants import CONFIGURABLE_MODULES # For menu customization an
 import json # For handling menu config storage
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtCore import QSize
+from PyQt5.QtWidgets import QFrame
 
 
 class ClientListItemWidget(QWidget):
