@@ -54,24 +54,33 @@ WINBIO_E_NO_DEVICE = HRESULT(0x8009803F).value
 # More accurate definition for the initial part of WINBIO_UNIT_SCHEMA
 WINBIO_POOL_TYPE = ctypes.c_uint32
 WINBIO_BIOMETRIC_TYPE = ctypes.c_uint32
-WINBIO_BIOMETRIC_SUBTYPE = ctypes.c_ubyte # Moved definition here
-
+WINBIO_BIOMETRIC_SUBTYPE = ctypes.c_ubyte
 WINBIO_CAPABILITIES = ctypes.c_uint32
+WINBIO_MAX_STRING_LEN = 256  # As per winbio.h
+WINBIO_STRING = ctypes.c_wchar * WINBIO_MAX_STRING_LEN
 
-class WINBIO_UNIT_SCHEMA(ctypes.Structure): # Renamed from WINBIO_UNIT_SCHEMA_ACCURATE for direct replacement
+class WINBIO_VERSION(ctypes.Structure):
     _fields_ = [
-        ("UnitId", WINBIO_UNIT_ID),                   # offset 0, size 4
-        ("PoolType", WINBIO_POOL_TYPE),             # offset 4, size 4
-        ("BiometricFactor", WINBIO_BIOMETRIC_TYPE), # offset 8, size 4
-        ("SensorSubtype", WINBIO_BIOMETRIC_SUBTYPE),  # offset 12, size 1
-        # ctypes default packing should align Capabilities to a 4-byte boundary.
-        # If SensorSubtype is at offset 12 (0xC), next 4-byte aligned offset is 16 (0x10).
-        # So, 3 bytes of padding will likely be inserted by ctypes here.
-        ("Capabilities", WINBIO_CAPABILITIES),       # offset 16, size 4
-        # Current size based on fields above: 4+4+4+1(pad 3)+4 = 20 bytes.
-        # Original placeholder was 28 bytes. Add 8 bytes of padding to maintain size.
-        ("ReservedPadding", ctypes.c_ubyte * 8)     # 20 + 8 = 28 bytes.
+        ("MajorVersion", ctypes.c_long), # Using c_long as per common practice for DWORD-like fields
+        ("MinorVersion", ctypes.c_long)  # Adjust if specific header shows WORD or other.
+    ]
 
+class WINBIO_UNIT_SCHEMA(ctypes.Structure):
+    _fields_ = [
+        ("UnitId", WINBIO_UNIT_ID),
+        ("PoolType", WINBIO_POOL_TYPE),
+        ("BiometricFactor", WINBIO_BIOMETRIC_TYPE),
+        ("SensorSubtype", WINBIO_BIOMETRIC_SUBTYPE), # Typically followed by 3 bytes padding for alignment
+        ("Capabilities", WINBIO_CAPABILITIES),
+        ("DeviceInstanceId", WINBIO_STRING),
+        ("Description", WINBIO_STRING),
+        ("Manufacturer", WINBIO_STRING),
+        ("Model", WINBIO_STRING),
+        ("SerialNumber", WINBIO_STRING),
+        ("FirmwareVersion", WINBIO_VERSION)
+        # Note: HardwareVersion is not part of WINBIO_UNIT_SCHEMA in common SDKs,
+        # it's often part of WINBIO_SENSOR_ATTRIBUTES.
+        # The structure size will be determined by ctypes based on these fields and default packing.
     ]
 
 class WINBIO_IDENTITY(ctypes.Structure):
