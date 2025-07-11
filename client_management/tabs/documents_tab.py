@@ -719,6 +719,11 @@ class DocumentsTab(QWidget):
                     # C'est un PDF, et la préférence est d'utiliser la visionneuse interne
                     try:
                         viewer = PdfViewerWidget(file_path, self) # self pour parent
+                        # Connecter le signal de sauvegarde à une méthode de DocumentsTab
+                        viewer.documentSavedAsNewVersion.connect(
+                            lambda orig_path, new_path, doc_id=document_id:
+                            self._handle_new_pdf_version_saved(doc_id, orig_path, new_path)
+                        )
                         viewer.exec_() # Ouvre en tant que dialogue modal
                     except Exception as e:
                         logging.error(f"Erreur lors de l'ouverture de PdfViewerWidget pour {file_path}: {e}", exc_info=True)
@@ -744,6 +749,37 @@ class DocumentsTab(QWidget):
         # app_settings = self.config.get_application_settings()
         # return app_settings.get("use_internal_pdf_viewer", True)
         return True # Par défaut, utiliser la visionneuse interne
+
+    def _handle_new_pdf_version_saved(self, original_document_id: str, original_document_path: str, new_document_path: str):
+        """
+        Gère la notification qu'une nouvelle version d'un PDF annoté a été sauvegardée.
+        original_document_id: L'ID en base de données du document original.
+        original_document_path: Le chemin système du document original.
+        new_document_path: Le chemin système vers le nouveau fichier PDF sauvegardé.
+        """
+        logging.info(
+            f"Nouvelle version de document PDF sauvegardée. "
+            f"Original ID: {original_document_id}, Original Path: {original_document_path}, Nouveau Path: {new_document_path}"
+        )
+
+        # Pour l'instant, afficher un message à l'utilisateur.
+        # L'étape suivante serait d'ajouter ce nouveau document à la base de données
+        # et de rafraîchir la table des documents.
+
+        self.notify(
+            self.tr("Nouvelle Version Enregistrée"),
+            self.tr("Une nouvelle version du document a été enregistrée sous:\n{0}\n\n"
+                    "L'intégration de ce nouveau fichier dans la liste des documents du client est une prochaine étape."
+                    ).format(new_document_path),
+            type='INFO'
+        )
+
+        # TODO:
+        # 1. Déterminer le nom du document, type, langue etc. pour la nouvelle entrée DB.
+        #    On pourrait se baser sur le document original.
+        # 2. Construire le file_path_relative pour la nouvelle entrée.
+        # 3. Appeler client_documents_crud.add_client_document().
+        # 4. self.populate_doc_table() pour rafraîchir.
 
     def handle_create_new_version_clicked(self, old_document_id, source_template_id):
         if not self.client_info or not self.client_info.get('client_id'):
