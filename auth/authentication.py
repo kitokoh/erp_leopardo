@@ -7,7 +7,7 @@ import logging
 import traceback # Import for detailed traceback
 from datetime import datetime, timedelta, timezone # Added timedelta and timezone
 
-from db.cruds import users_crud, activity_logs_crud, licenses_crud # Added licenses_crud
+from db.cruds import users_crud, activity_logs_crud, licenses_crud, application_settings_crud # Added application_settings_crud
 
 from db.cruds import user_session_tokens_crud # New CRUD for session tokens
 from utils.security_helpers import generate_secure_token, hash_token_for_storage # New helpers
@@ -167,7 +167,7 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
                 logger.debug(f"AUTH_LOGIN: conn object type after get_db_connection(): {type(conn)}") # <<< ADDED THIS LOG
 
                 # --- License Check Bypass Logic ---
-                should_check_license_str = users_crud.db_manager.get_setting('check_license_on_startup', default='True', conn_override=conn) # Pass conn
+                should_check_license_str = application_settings_crud.get_setting('check_license_on_startup', default='True', conn=conn) # Pass conn
                 should_check_license = should_check_license_str.lower() == 'true'
                 logger.info(f"AUTH_LOGIN: License check setting 'check_license_on_startup' is '{should_check_license_str}', parsed as: {should_check_license}")
 
@@ -373,7 +373,7 @@ def login_with_session_token(token_from_qsettings: str) -> tuple[bool, str | Non
         )
 
         # --- License Check Bypass Logic (for token login) ---
-        should_check_license_str = users_crud.db_manager.get_setting('check_license_on_startup', default='True', conn_override=conn)
+        should_check_license_str = application_settings_crud.get_setting('check_license_on_startup', default='True', conn=conn)
         should_check_license = should_check_license_str.lower() == 'true'
         logger.info(f"AUTH_TOKEN_LOGIN: License check setting 'check_license_on_startup' is '{should_check_license_str}', parsed as: {should_check_license}")
 
