@@ -2,6 +2,7 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSizePolicy
 from PyQt5.QtCore import Qt, pyqtSignal, QSize
 from PyQt5.QtGui import QIcon, QMouseEvent, QFontMetrics # Added QFontMetrics
+from PyQt5.QtCore import QFile
 
 class ModuleCardWidget(QWidget):
     """
