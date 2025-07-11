@@ -70,6 +70,7 @@ class WINBIO_UNIT_SCHEMA(ctypes.Structure): # Renamed from WINBIO_UNIT_SCHEMA_AC
         # Current size based on fields above: 4+4+4+1(pad 3)+4 = 20 bytes.
         # Original placeholder was 28 bytes. Add 8 bytes of padding to maintain size.
         ("ReservedPadding", ctypes.c_ubyte * 8)     # 20 + 8 = 28 bytes.
+
     ]
 
 class WINBIO_IDENTITY(ctypes.Structure):
