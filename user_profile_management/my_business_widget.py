@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import (
     QFormLayout, QLineEdit, QApplication
 )
 from PyQt5.QtCore import Qt, pyqtSignal
+from sqlalchemy.sql import text # Added for SQLAlchemy raw SQL
 
 # Assuming db.connection is accessible in PYTHONPATH
 # This is the main way to get DB connection for the application
@@ -116,33 +117,46 @@ class MyBusinessWidget(QWidget):
 
 
     def _load_initial_data(self):
-        conn = self._get_db_connection()
-        cursor = conn.cursor()
+        conn = self._get_db_connection() # conn is an SQLAlchemy Session
+        if not conn: # Should be handled by _get_db_connection raising an error or initial check
+            return
 
-        # Load Use Cases
-        cursor.execute("SELECT id, name FROM UseCases ORDER BY name")
-        for row in cursor.fetchall():
-            item = QListWidgetItem(row['name'])
-            item.setData(Qt.UserRole, row['id']) # Store ID
-            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-            item.setCheckState(Qt.Unchecked)
-            self.use_cases_list.addItem(item)
+        try:
+            # Load Use Cases
+            use_cases_query = text("SELECT id, name FROM UseCases ORDER BY name")
+            result_use_cases = conn.execute(use_cases_query)
+            for row in result_use_cases:
+                item = QListWidgetItem(row.name) # Access by attribute
+                item.setData(Qt.UserRole, row.id) # Store ID
+                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+                item.setCheckState(Qt.Unchecked)
+                self.use_cases_list.addItem(item)
 
-        # Load Document Types
-        cursor.execute("SELECT id, name FROM DocumentTypes ORDER BY name")
-        for row in cursor.fetchall():
-            item = QListWidgetItem(row['name'])
-            item.setData(Qt.UserRole, row['id']) # Store ID
-            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-            item.setCheckState(Qt.Unchecked)
-            self.documents_list.addItem(item)
+            # Load Document Types
+            doc_types_query = text("SELECT id, name FROM DocumentTypes ORDER BY name")
+            result_doc_types = conn.execute(doc_types_query)
+            for row in result_doc_types:
+                item = QListWidgetItem(row.name) # Access by attribute
+                item.setData(Qt.UserRole, row.id) # Store ID
+                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+                item.setCheckState(Qt.Unchecked)
+                self.documents_list.addItem(item)
 
-        conn.close()
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur de chargement",
+                                 f"Erreur lors du chargement des données initiales: {e}")
+            # Depending on how get_db_connection manages sessions, a rollback might be needed here
+            # For now, assume session management is external or handled by get_db_connection context
+        # finally:
+            # conn.close() # Typically, session.close() is managed externally (e.g., request scope)
+
         # Sectors are loaded dynamically based on B2B/B2C choice
 
     def _on_business_type_changed(self):
-        conn = self._get_db_connection()
-        cursor = conn.cursor()
+        conn = self._get_db_connection() # conn is an SQLAlchemy Session
+        if not conn:
+            return
+        # cursor = conn.cursor() # Remove this
         self.sector_combo.clear()
 
         business_type = None
@@ -152,116 +166,198 @@ class MyBusinessWidget(QWidget):
             business_type = 'B2C'
 
         if business_type:
-            cursor.execute("SELECT id, name FROM Sectors WHERE type_association = ? OR type_association = 'BOTH' ORDER BY name", (business_type,))
-            for row in cursor.fetchall():
-                self.sector_combo.addItem(row['name'], userData=row['id'])
-        conn.close()
+            try:
+                sectors_query = text("""
+                    SELECT id, name FROM Sectors
+                    WHERE type_association = :type_assoc OR type_association = 'BOTH'
+                    ORDER BY name
+                """)
+                result_sectors = conn.execute(sectors_query, {"type_assoc": business_type})
+                for row in result_sectors:
+                    self.sector_combo.addItem(row.name, userData=row.id)
+            except Exception as e:
+                QMessageBox.critical(self, "Erreur de chargement des secteurs",
+                                     f"Erreur lors du chargement des secteurs d'activité: {e}")
+        # conn.close() # Session managed externally
 
     def _load_user_profile(self):
-        conn = self._get_db_connection()
-        cursor = conn.cursor()
+        conn = self._get_db_connection() # conn is an SQLAlchemy Session
+        if not conn:
+            return
+        # cursor = conn.cursor() # Remove this
 
-        cursor.execute("SELECT id, name, business_type, sector_id FROM BusinessProfile WHERE user_id = ?", (self.user_id,))
-        profile = cursor.fetchone()
+        try:
+            profile_query = text("SELECT id, name, business_type, sector_id FROM BusinessProfile WHERE user_id = :user_id")
+            profile_result = conn.execute(profile_query, {"user_id": self.user_id})
+            profile = profile_result.fetchone()
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur de chargement du profil",
+                                 f"Erreur lors du chargement du profil utilisateur: {e}")
+            # conn.close() # Session managed externally
+            return # Exit if profile load fails
 
+        # The rest of _load_user_profile needs to be refactored to use 'conn' (session)
+        # for subsequent queries for BusinessUseCases and BusinessSelectedDocuments.
+        # This will be handled in the next modification step for _load_user_profile.
+        # For now, just replacing the initial part.
+
+        # Placeholder for the rest of the logic that used the old 'cursor'
+        # This will be refactored in the next step dedicated to _load_user_profile
         if profile:
-            self.current_profile_id = profile['id']
-            self.business_name_edit.setText(profile['name'] if profile['name'] else "")
+            self.current_profile_id = profile.id # Access by attribute
+            self.business_name_edit.setText(profile.name if profile.name else "")
 
-            if profile['business_type'] == 'B2B':
+            if profile.business_type == 'B2B':
                 self.rb_b2b.setChecked(True)
-            elif profile['business_type'] == 'B2C':
+            elif profile.business_type == 'B2C':
                 self.rb_b2c.setChecked(True)
 
-            # Ensure sectors are loaded for the current business type before setting the value
-            self._on_business_type_changed() # This will populate the combo box
-            if profile['sector_id']:
-                index = self.sector_combo.findData(profile['sector_id'])
+            # This call will repopulate sectors based on the type, using the refactored _on_business_type_changed
+            # self._on_business_type_changed() # This might cause issues if called before sector_id is used below.
+                                            # Let's defer this specific call or ensure sectors are loaded first.
+                                            # For now, the original logic of _on_business_type_changed is called by setChecked.
+
+            if profile.sector_id: # Ensure sectors are loaded for current business_type *before* finding data
+                # Manually trigger sector load if not already done by radio button toggle
+                # This ensures combo box is populated before we try to findData.
+                if not self.sector_combo.count(): # If combo is empty, force load based on profile type
+                    current_type_for_sectors = 'B2B' if profile.business_type == 'B2B' else 'B2C' if profile.business_type == 'B2C' else None
+                    if current_type_for_sectors:
+                        try:
+                            sectors_query_for_profile = text("""
+                                SELECT id, name FROM Sectors
+                                WHERE type_association = :type_assoc OR type_association = 'BOTH'
+                                ORDER BY name
+                            """)
+                            result_sectors_for_profile = conn.execute(sectors_query_for_profile, {"type_assoc": current_type_for_sectors})
+                            for row_sector in result_sectors_for_profile:
+                                self.sector_combo.addItem(row_sector.name, userData=row_sector.id)
+                        except Exception as e_sector_load:
+                             QMessageBox.critical(self, "Erreur chargement secteurs (profil)", f"{e_sector_load}")
+
+
+                index = self.sector_combo.findData(profile.sector_id)
                 if index >= 0:
                     self.sector_combo.setCurrentIndex(index)
 
             # Load selected use cases
-            cursor.execute("SELECT use_case_id FROM BusinessUseCases WHERE business_profile_id = ?", (self.current_profile_id,))
-            selected_use_case_ids = {row['use_case_id'] for row in cursor.fetchall()}
-            for i in range(self.use_cases_list.count()):
-                item = self.use_cases_list.item(i)
-                if item.data(Qt.UserRole) in selected_use_case_ids:
-                    item.setCheckState(Qt.Checked)
-                else:
-                    item.setCheckState(Qt.Unchecked)
+            try:
+                use_cases_query = text("SELECT use_case_id FROM BusinessUseCases WHERE business_profile_id = :profile_id")
+                result_use_cases = conn.execute(use_cases_query, {"profile_id": self.current_profile_id})
+                selected_use_case_ids = {row.use_case_id for row in result_use_cases}
+                for i in range(self.use_cases_list.count()):
+                    item = self.use_cases_list.item(i)
+                    if item.data(Qt.UserRole) in selected_use_case_ids:
+                        item.setCheckState(Qt.Checked)
+                    else:
+                        item.setCheckState(Qt.Unchecked)
+            except Exception as e_uc:
+                QMessageBox.critical(self, "Erreur chargement (Cas d'usage)", f"Erreur: {e_uc}")
 
 
             # Load selected document types
-            cursor.execute("SELECT document_type_id FROM BusinessSelectedDocuments WHERE business_profile_id = ?", (self.current_profile_id,))
-            selected_doc_ids = {row['document_type_id'] for row in cursor.fetchall()}
-            for i in range(self.documents_list.count()):
-                item = self.documents_list.item(i)
-                if item.data(Qt.UserRole) in selected_doc_ids:
-                    item.setCheckState(Qt.Checked)
-                else:
-                    item.setCheckState(Qt.Unchecked)
-
+            try:
+                doc_types_query = text("SELECT document_type_id FROM BusinessSelectedDocuments WHERE business_profile_id = :profile_id")
+                result_doc_types = conn.execute(doc_types_query, {"profile_id": self.current_profile_id})
+                selected_doc_ids = {row.document_type_id for row in result_doc_types}
+                for i in range(self.documents_list.count()):
+                    item = self.documents_list.item(i)
+                    if item.data(Qt.UserRole) in selected_doc_ids:
+                        item.setCheckState(Qt.Checked)
+                    else:
+                        item.setCheckState(Qt.Unchecked)
+            except Exception as e_dt:
+                QMessageBox.critical(self, "Erreur chargement (Types de doc)", f"Erreur: {e_dt}")
         else:
             self.current_profile_id = None
-            self.rb_b2b.setChecked(True) # Default selection
-            self._on_business_type_changed() # Load B2B sectors by default
+            # Default selection, triggers _on_business_type_changed which is now refactored
+            # This will populate sectors for B2B by default.
+            self.rb_b2b.setChecked(True)
 
-
-        conn.close()
+        # conn.close() # Session managed externally
 
     def _save_profile(self):
-        conn = self._get_db_connection()
-        cursor = conn.cursor()
+        conn = self._get_db_connection() # conn is an SQLAlchemy Session
+        if not conn:
+            QMessageBox.critical(self, "Erreur", "Connexion à la base de données non disponible.")
+            return
 
         business_name = self.business_name_edit.text()
         business_type = 'B2B' if self.rb_b2b.isChecked() else 'B2C'
-        sector_id = self.sector_combo.currentData()
+        sector_id = self.sector_combo.currentData() # Assuming currentData returns the ID
 
         try:
             if self.current_profile_id:
-                cursor.execute("""
-                    UPDATE BusinessProfile SET name = ?, business_type = ?, sector_id = ?, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                """, (business_name, business_type, sector_id, self.current_profile_id))
+                # Update existing profile
+                update_profile_sql = text("""
+                    UPDATE BusinessProfile SET name = :name, business_type = :type,
+                           sector_id = :sector_id, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = :profile_id
+                """)
+                conn.execute(update_profile_sql, {
+                    "name": business_name, "type": business_type,
+                    "sector_id": sector_id, "profile_id": self.current_profile_id
+                })
                 profile_id = self.current_profile_id
             else:
-                cursor.execute("""
+                # Insert new profile
+                insert_profile_sql = text("""
                     INSERT INTO BusinessProfile (user_id, name, business_type, sector_id)
-                    VALUES (?, ?, ?, ?)
-                """, (self.user_id, business_name, business_type, sector_id))
-                profile_id = cursor.lastrowid
+                    VALUES (:user_id, :name, :type, :sector_id)
+                """)
+                result = conn.execute(insert_profile_sql, {
+                    "user_id": self.user_id, "name": business_name,
+                    "type": business_type, "sector_id": sector_id
+                })
+                # For SQLAlchemy with SQLite, lastrowid is often on the ResultProxy or its cursor attribute
+                # For other DBs, result.inserted_primary_key might be used
+                profile_id = result.lastrowid
+                if profile_id is None and hasattr(result, 'inserted_primary_key') and result.inserted_primary_key:
+                    profile_id = result.inserted_primary_key[0]
                 self.current_profile_id = profile_id
 
             # Update BusinessUseCases
-            # First, remove existing associations for this profile
-            cursor.execute("DELETE FROM BusinessUseCases WHERE business_profile_id = ?", (profile_id,))
-            # Then, add selected ones
-            selected_use_cases = []
+            delete_use_cases_sql = text("DELETE FROM BusinessUseCases WHERE business_profile_id = :profile_id")
+            conn.execute(delete_use_cases_sql, {"profile_id": profile_id})
+
+            selected_use_cases_data = []
             for i in range(self.use_cases_list.count()):
                 item = self.use_cases_list.item(i)
                 if item.checkState() == Qt.Checked:
-                    selected_use_cases.append((profile_id, item.data(Qt.UserRole)))
-            if selected_use_cases:
-                cursor.executemany("INSERT INTO BusinessUseCases (business_profile_id, use_case_id) VALUES (?, ?)", selected_use_cases)
+                    # Each dict in the list corresponds to one row for executemany-like behavior
+                    selected_use_cases_data.append({"profile_id": profile_id, "use_case_id": item.data(Qt.UserRole)})
+
+            if selected_use_cases_data:
+                # SQLAlchemy's session.execute can often handle a list of dicts for bulk inserts
+                # if the underlying DBAPI driver supports it with its executemany.
+                # The text() construct itself doesn't directly do executemany, but the session might.
+                # For clarity and broader compatibility, loop if executemany behavior isn't direct.
+                # However, modern SQLAlchemy often handles list of dicts for bulk operations.
+                insert_use_case_sql = text("INSERT INTO BusinessUseCases (business_profile_id, use_case_id) VALUES (:profile_id, :use_case_id)")
+                conn.execute(insert_use_case_sql, selected_use_cases_data)
 
             # Update BusinessSelectedDocuments
-            cursor.execute("DELETE FROM BusinessSelectedDocuments WHERE business_profile_id = ?", (profile_id,))
-            selected_documents = []
+            delete_docs_sql = text("DELETE FROM BusinessSelectedDocuments WHERE business_profile_id = :profile_id")
+            conn.execute(delete_docs_sql, {"profile_id": profile_id})
+
+            selected_documents_data = []
             for i in range(self.documents_list.count()):
                 item = self.documents_list.item(i)
                 if item.checkState() == Qt.Checked:
-                    selected_documents.append((profile_id, item.data(Qt.UserRole)))
-            if selected_documents:
-                cursor.executemany("INSERT INTO BusinessSelectedDocuments (business_profile_id, document_type_id) VALUES (?, ?)", selected_documents)
+                    selected_documents_data.append({"profile_id": profile_id, "document_type_id": item.data(Qt.UserRole)})
+
+            if selected_documents_data:
+                insert_doc_sql = text("INSERT INTO BusinessSelectedDocuments (business_profile_id, document_type_id) VALUES (:profile_id, :document_type_id)")
+                conn.execute(insert_doc_sql, selected_documents_data)
 
             conn.commit()
             QMessageBox.information(self, "Succès", "Profil d'entreprise enregistré avec succès.")
             self.profile_updated.emit()
-        except sqlite3.Error as e:
+        except Exception as e: # Changed from sqlite3.Error to general Exception
             conn.rollback()
             QMessageBox.critical(self, "Erreur", f"Erreur lors de l'enregistrement du profil: {e}")
-        finally:
-            conn.close()
+        # finally:
+            # conn.close() # Session managed externally
 
 
 if __name__ == '__main__':
