@@ -215,6 +215,8 @@ from PyQt5.QtCore import pyqtSignal, QTimer, QEasingCurve # Added QTimer, QEasin
 from PyQt5.QtGui import QColor # Added QColor
 from PyQt5.QtWidgets import QGraphicsDropShadowEffect # Added QGraphicsDropShadowEffect
 from PyQt5.QtCore import QPropertyAnimation # Added QPropertyAnimation
+from PyQt5.QtWidgets import QFrame
+from PyQt5.QtCore import QSize
 
 
 
