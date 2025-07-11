@@ -54,7 +54,8 @@ WINBIO_E_NO_DEVICE = HRESULT(0x8009803F).value
 # More accurate definition for the initial part of WINBIO_UNIT_SCHEMA
 WINBIO_POOL_TYPE = ctypes.c_uint32
 WINBIO_BIOMETRIC_TYPE = ctypes.c_uint32
-# WINBIO_BIOMETRIC_SUBTYPE is already ctypes.c_ubyte
+WINBIO_BIOMETRIC_SUBTYPE = ctypes.c_ubyte # Moved definition here
+
 WINBIO_CAPABILITIES = ctypes.c_uint32
 
 class WINBIO_UNIT_SCHEMA(ctypes.Structure): # Renamed from WINBIO_UNIT_SCHEMA_ACCURATE for direct replacement
@@ -79,7 +80,7 @@ class WINBIO_IDENTITY(ctypes.Structure):
         ("Value", ctypes.c_ubyte * 32)
     ]
 
-WINBIO_BIOMETRIC_SUBTYPE = ctypes.c_ubyte
+# WINBIO_BIOMETRIC_SUBTYPE = ctypes.c_ubyte # Moved earlier
 WINBIO_REJECT_REASON = ctypes.c_uint32
 
 class WindowsBiometricHandler:
