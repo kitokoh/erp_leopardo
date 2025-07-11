@@ -387,6 +387,45 @@ class ClientsCRUD(GenericCRUD):
         """
         cursor = conn.cursor()
         q_params = []
+
+        # Nouveaux paramètres pour le tri
+        order_by_field = filters.pop('order_by_field', 'c.client_name') if filters else 'c.client_name' # Default sort by client_name
+        order_direction = filters.pop('order_direction', 'ASC').upper() if filters else 'ASC'
+        if order_direction not in ['ASC', 'DESC']:
+            order_direction = 'ASC'
+
+        # Mapping des champs de tri aux colonnes SQL réelles (avec alias de table)
+        valid_sort_fields = {
+            "client_name": "c.client_name",
+            "created_at": "c.created_at",
+            "country_name": "co.country_name", # Nécessite la jointure co
+            "project_identifier": "c.project_identifier",
+            "status_name": "s.status_name"    # Nécessite la jointure s
+        }
+
+        # Utiliser le champ mappé ou le champ par défaut si non valide
+        # Le champ par défaut est déjà 'c.client_name' via l'initialisation de order_by_field
+        # Si un order_by_field est passé dans les filtres et n'est pas dans valid_sort_fields,
+        # il sera ignoré par cette logique simple. Une gestion d'erreur ou un fallback plus robuste pourrait être ajouté.
+        # Pour cet exemple, on assume que si order_by_field est fourni, il est valide ou on trie par défaut.
+        # Si un order_by_field est fourni dans les filtres, on l'utilise s'il est valide.
+        # Sinon, on garde le défaut.
+
+        # Correction: Assurer que order_by_field est bien un champ SQL valide avant de l'injecter.
+        # Si order_by_field est passé via filters, il est extrait.
+        # Sinon, il prend la valeur par défaut 'c.client_name'.
+        # Nous devons nous assurer que le order_by_field final est sûr.
+        # Le order_by_field est déjà extrait des filtres (et retiré).
+        # Si le order_by_field fourni n'est pas dans notre map, on revient au défaut.
+        sql_order_by_column = valid_sort_fields.get(order_by_field, "c.client_name")
+        if order_by_field not in valid_sort_fields and order_by_field != 'c.client_name': # Si ce n'est pas le défaut et pas dans la map
+             self.logger.warning(f"Invalid order_by_field '{order_by_field}' requested. Defaulting to 'c.client_name'.")
+             sql_order_by_column = "c.client_name" # Revenir au défaut explicitement
+        elif order_by_field in valid_sort_fields: # S'il est dans la map, utiliser la valeur mappée
+             sql_order_by_column = valid_sort_fields[order_by_field]
+        # Si order_by_field était le défaut "c.client_name", sql_order_by_column est déjà "c.client_name"
+
+
         query = """
         SELECT c.client_id, c.client_name, c.company_name, c.primary_need_description,
                c.project_identifier, c.default_base_folder_path, c.selected_languages,
@@ -446,7 +485,10 @@ class ClientsCRUD(GenericCRUD):
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
 
-        query += " ORDER BY c.client_name"
+        # Appliquer le tri dynamiquement
+        # Assurer que sql_order_by_column et order_direction sont "safe"
+        # (sql_order_by_column vient de notre map valid_sort_fields, order_direction est validé ASC/DESC)
+        query += f" ORDER BY {sql_order_by_column} {order_direction}, c.client_name {order_direction}" # Ajout d'un tri secondaire par nom
 
         if limit is not None:
             query += " LIMIT ? OFFSET ?"
