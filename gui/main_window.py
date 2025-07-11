@@ -454,11 +454,11 @@ class DocumentManager(QMainWindow):
         self.total_filtered_clients = 0  # Added for pagination
         
         # La Sidebar est initialisée avant setup_ui_main pour être disponible lors de la construction du layout
-        self.sidebar_nav = SidebarNavigationWidget(parent=self)
-        self.sidebar_nav.moduleSelected.connect(self.handle_sidebar_module_selection)
-        self.sidebar_nav.expansionToggled.connect(self.handle_sidebar_expansion_toggled)
+        # self.sidebar_nav = SidebarNavigationWidget(parent=self) # REMOVED Sidebar instantiation
+        # self.sidebar_nav.moduleSelected.connect(self.handle_sidebar_module_selection) # REMOVED
+        # self.sidebar_nav.expansionToggled.connect(self.handle_sidebar_expansion_toggled) # REMOVED
 
-        self.setup_ui_main() # Sets up self.main_area_stack, et intègre la sidebar
+        self.setup_ui_main() # Sets up self.main_area_stack
 
         # Initialize core widget instances that are always needed or fundamental
         self.home_page_widget_instance = HomePageWidget(main_window=self, parent=self)
@@ -527,19 +527,19 @@ class DocumentManager(QMainWindow):
         # Création des actions et menus (le menu Modules sera supprimé plus tard)
         self.create_actions_main(); self.create_menus_main()
 
-        # Peupler la sidebar et définir son état initial
-        self._populate_sidebar()
-        try:
-            saved_expanded_state = db_manager.get_setting('sidebar_expanded_state', default='True')
-            initial_expanded_state = saved_expanded_state.lower() == 'true'
-        except Exception as e:
-            logging.error(f"Error reading sidebar_expanded_state: {e}", exc_info=True)
-            initial_expanded_state = True # Default to expanded if error
-        self.sidebar_nav.set_expanded_state(initial_expanded_state, animate=False)
+        # REMOVED: Peupler la sidebar et définir son état initial
+        # self._populate_sidebar()
+        # try:
+        #     saved_expanded_state = db_manager.get_setting('sidebar_expanded_state', default='True')
+        #     initial_expanded_state = saved_expanded_state.lower() == 'true'
+        # except Exception as e:
+        #     logging.error(f"Error reading sidebar_expanded_state: {e}", exc_info=True)
+        #     initial_expanded_state = True # Default to expanded if error
+        # self.sidebar_nav.set_expanded_state(initial_expanded_state, animate=False)
 
-        # Définir la vue d'accueil comme vue initiale et marquer le bouton actif
+        # Définir la vue d'accueil comme vue initiale
         self.main_area_stack.setCurrentWidget(self.home_page_widget_instance)
-        self.sidebar_nav.set_active_module('home') # 'home' est l'ID que nous utiliserons pour l'accueil
+        # REMOVED: self.sidebar_nav.set_active_module('home')
 
         logging.debug("--- Widgets in main_area_stack after DocumentManager.__init__ (lazy loading setup) ---")
         for i in range(self.main_area_stack.count()):
@@ -824,15 +824,23 @@ class DocumentManager(QMainWindow):
         main_horizontal_layout.setContentsMargins(0, 0, 0, 0)
         main_horizontal_layout.setSpacing(0)
 
-        # Ajout de la sidebar
-        main_horizontal_layout.addWidget(self.sidebar_nav)
+        # REMOVED: Ajout de la sidebar
+        # main_horizontal_layout.addWidget(self.sidebar_nav)
 
         # La QStackedWidget pour le contenu principal
         self.main_area_stack = QStackedWidget()
-        main_horizontal_layout.addWidget(self.main_area_stack, 1)
+        # Add main_area_stack directly to new_main_vertical_layout if sidebar is gone,
+        # or keep main_horizontal_layout if other elements might go beside the stack later.
+        # For now, assuming main_area_stack will take the full width under the top_menu_bar.
+        # So, main_horizontal_layout might become redundant if it only holds the stack.
+        # Let's simplify: new_main_vertical_layout will hold top_menu_bar and then main_area_stack.
+        # main_horizontal_layout.addWidget(self.main_area_stack, 1) # Old line
 
         # Ajout du layout horizontal (sidebar + stack) au layout vertical principal
-        new_main_vertical_layout.addLayout(main_horizontal_layout)
+        # new_main_vertical_layout.addLayout(main_horizontal_layout) # Old line
+
+        new_main_vertical_layout.addWidget(self.main_area_stack, 1) # Add stack directly, it takes remaining space
+
         
         # -- Configuration de la page "Documents" (qui va dans le main_area_stack) --
         self.documents_page_widget = QWidget()
@@ -1369,10 +1377,10 @@ class DocumentManager(QMainWindow):
         self.searchable_actions_map[self.tr("Gestion des Commandes")] = self.commande_management_action
         self.searchable_actions_map[self.tr("Gérer les Rôles")] = self.manage_roles_action
 
-        # Action for sidebar customization (anciennement menu customization)
-        self.customize_sidebar_action = QAction(QIcon(":/icons/edit.svg"), self.tr("Personnaliser la Barre Latérale"), self)
-        self.customize_sidebar_action.triggered.connect(self.open_sidebar_customization_dialog) # Renommer la méthode cible
-        self.searchable_actions_map[self.tr("Personnaliser la Barre Latérale")] = self.customize_sidebar_action
+        # Action for sidebar customization (anciennement menu customization) - REMOVED
+        # self.customize_sidebar_action = QAction(QIcon(":/icons/edit.svg"), self.tr("Personnaliser la Barre Latérale"), self)
+        # self.customize_sidebar_action.triggered.connect(self.open_sidebar_customization_dialog) # Renommer la méthode cible
+        # self.searchable_actions_map[self.tr("Personnaliser la Barre Latérale")] = self.customize_sidebar_action
 
         # B2C Restaurant Module Action
         # TODO: Find or create a suitable icon e.g., :/icons/restaurant.svg or :/icons/utensils.svg
@@ -1448,54 +1456,73 @@ class DocumentManager(QMainWindow):
         top_bar_layout.setSpacing(10)
 
         # App Logo/Title (Optional)
-        app_title_label = QLabel("Leopardo AI")
+        app_title_label = QLabel("Leopardo ERP") # Changed title
+
         app_title_label.setObjectName("topMenuAppTitle")
         app_title_label.setStyleSheet("color: #2563eb; font-size: 18px; font-weight: bold; padding-right: 15px;")
         top_bar_layout.addWidget(app_title_label)
 
         # --- Define Menu Structure ---
-        # Format: (Button Text, Optional Icon, [ (Action Text, QAction, Optional Submenu Def), ... ])
-        # Submenu Def: [ (SubAction Text, QAction), ... ]
+        self.top_menu_buttons = {} # To store references
 
-        # Using existing QActions (self.home_action, self.settings_action, etc.)
-        # Note: The original 'Modules' menu is removed in favor of the sidebar.
-        # The 'File', 'Tools', 'Admin', 'Help' structure will be recreated here.
+        # Helper to create module actions for the new "Modules" menu
+        # These actions will call handle_sidebar_module_selection (which will be renamed or its logic adapted)
+        module_menu_actions = []
+        # Order can be defined here or taken from CONFIGURABLE_MODULES if its order is preferred.
+        # Using CONFIGURABLE_MODULES to ensure all are covered and use their defined names/icons.
+        for module_info in CONFIGURABLE_MODULES:
+            action_attr_name = module_info['action_attr']
+            q_action = getattr(self, action_attr_name, None)
+            if q_action:
+                # We need to ensure the action, when triggered from the top menu,
+                # calls the correct view switching logic.
+                # The QAction itself is already connected to a show_..._view method.
+                module_menu_actions.append((q_action.text(), q_action))
+            else:
+                logging.warning(f"QAction instance for module {module_info['name']} (attr: {action_attr_name}) not found.")
+
+        # Add core navigation items like "Accueil" and "Gestion Documents" if not in CONFIGURABLE_MODULES
+        # or if they need special placement. For now, assuming they are QActions like others.
+        # self.home_action and self.documents_view_action are already created.
 
         menu_definitions = [
-            (self.tr("Fichier"), None, [
-                (self.tr("Quitter"), self.exit_action)
-            ]),
+            (self.tr("Accueil"), None, self.home_action), # Direct action, not a dropdown
+            (self.tr("Modules"), None, module_menu_actions), # Dropdown for all other modules
             (self.tr("Outils"), None, [
                 (self.tr("Paramètres"), self.settings_action),
-                (self.tr("Gérer les Statuts"), self.status_action),
-                (self.tr("Personnaliser la Barre Latérale"), self.customize_sidebar_action)
+                (self.tr("Gérer les Statuts"), self.status_action)
+                # (self.tr("Personnaliser la Barre Latérale"), self.customize_sidebar_action) # REMOVED
             ]),
-            (self.tr("Administration"), None, [ # This is self.admin_menu from old code
+            (self.tr("Administration"), None, [
                 (self.tr("Gérer les Utilisateurs"), self.manage_users_action),
                 (self.tr("Gérer les Rôles"), self.manage_roles_action)
             ]),
-            # (self.tr("Modules"), None, []), # Modules menu is removed
+            (self.tr("Fichier"), None, [
+                (self.tr("Quitter"), self.exit_action)
+            ]),
             (self.tr("Aide"), None, [
-                (self.tr("À propos"), self.searchable_actions_map.get(self.tr("À propos"))) # Get 'About' action from map
+                (self.tr("À propos"), self.searchable_actions_map.get(self.tr("À propos")))
             ])
         ]
 
-        self.top_menu_buttons = {} # To store references if needed for _apply_permissions
-
-        for menu_title, menu_icon_path, actions_defs in menu_definitions:
+        for menu_title, menu_icon_path, actions_or_action_defs in menu_definitions:
             menu_button = QPushButton(menu_title)
             menu_button.setObjectName("topMenuButton")
-            if menu_icon_path:
+            if menu_icon_path: # Not currently used for these main items
                 menu_button.setIcon(QIcon(menu_icon_path))
 
-            if actions_defs: # If there are actions, create a dropdown menu
-                dropdown_menu = QMenu(self)
-                for action_text, q_action_obj in actions_defs:
-                    if q_action_obj: # Ensure QAction object exists
-                        dropdown_menu.addAction(q_action_obj)
-                    else:
-                        logging.warning(f"QAction for '{action_text}' not found when creating top menu.")
-                menu_button.setMenu(dropdown_menu)
+            if isinstance(actions_or_action_defs, list): # It's a list of (text, QAction) for a dropdown
+                if actions_or_action_defs: # If there are actions, create a dropdown menu
+                    dropdown_menu = QMenu(self)
+                    for action_text, q_action_obj in actions_or_action_defs:
+                        if q_action_obj:
+                            dropdown_menu.addAction(q_action_obj)
+                        else:
+                            logging.warning(f"QAction for '{action_text}' in menu '{menu_title}' not found.")
+                    menu_button.setMenu(dropdown_menu)
+            elif isinstance(actions_or_action_defs, QAction): # It's a single direct QAction
+                menu_button.clicked.connect(actions_or_action_defs.trigger)
+
 
             top_bar_layout.addWidget(menu_button)
             self.top_menu_buttons[menu_title] = menu_button
@@ -3080,9 +3107,34 @@ class DocumentManager(QMainWindow):
                                  self.tr("La page du Service Restaurant n'a pas pu être chargée."))
 
 
-    def open_sidebar_customization_dialog(self): # Renommée
-        if not self.current_user_id:
-            QMessageBox.warning(self, self.tr("Accès Refusé"), self.tr("Vous devez être connecté pour personnaliser la barre latérale."))
+    def _handle_sidebar_config_changed(self):
+        """Handles changes from the sidebar customization dialog."""
+        logging.info("Configuration de la barre latérale utilisateur modifiée. Reconstruction de la barre latérale...")
+        self._populate_sidebar() # Re-populate sidebar with new configuration
+        self.notify(self.tr("Barre Latérale Mise à Jour"), self.tr("La barre latérale a été mise à jour selon vos préférences."), type='INFO')
+
+
+    def _handle_menu_config_changed(self): # Kept for now, might be removed if menu is fully replaced
+        logging.info("Configuration du menu utilisateur modifiée. Reconstruction des menus...")
+
+        # Store the corner widget (search bar and user button) to restore it later
+        corner_widget = self.menuBar().cornerWidget(Qt.TopRightCorner)
+        # Temporarily remove it from the menu bar to prevent it from being deleted by clear()
+        if corner_widget:
+            self.menuBar().setCornerWidget(None)
+            corner_widget.setParent(None) # Ensure it's not deleted with the old menubar
+
+        self.menuBar().clear() # This clears all menus and actions within them.
+        self.create_menus_main() # This will use the new configuration from the database.
+        self._apply_permissions() # Re-apply permissions to the new menu structure.
+
+        if corner_widget:
+            self.menuBar().setCornerWidget(corner_widget, Qt.TopRightCorner)
+
+        self.notify(self.tr("Menu Mis à Jour"), self.tr("Le menu principal a été mis à jour selon vos préférences."), type='INFO')
+
+    # --- Sidebar Population and State Management --- (ALL REMOVED)
+    # --- End Slots for Sidebar Interaction --- (ALL REMOVED)
             return
 
         available_modules_for_customization = []
@@ -3155,190 +3207,7 @@ class DocumentManager(QMainWindow):
 
         self.notify(self.tr("Menu Mis à Jour"), self.tr("Le menu principal a été mis à jour selon vos préférences."), type='INFO')
 
-    # --- Sidebar Population and State Management ---
-    def _populate_sidebar(self):
-        """
-        Populates the sidebar with module buttons based on configuration,
-        permissions, license, and user customization.
-        """
-        from auth.permissions import has_permission # Local import
-
-        modules_config_list = []
-        role_name = self.current_user_info.get('role_name', '')
-
-        # 1. Core/Fixed Modules (toujours en premier)
-        core_modules_definition = [
-            {'id': 'home', 'name': self.tr("Accueil"), 'icon_path': ':/icons/home.svg', 'tooltip': self.tr("Afficher la page d'accueil"), 'action': self.show_home_view, 'permission': None},
-            {'id': 'documents', 'name': self.tr("Gestion Documents"), 'icon_path': ':/icons/modern/folder-docs.svg', 'tooltip': self.tr("Accéder à la gestion des documents clients"), 'action': self.show_documents_view, 'permission': None}, # Basic access usually granted
-        ]
-
-        for core_mod in core_modules_definition:
-            # Pour les modules core, on suppose qu'ils sont toujours activés globalement et par licence,
-            # mais on pourrait ajouter des vérifications si nécessaire.
-            # La permission peut être None si l'accès est toujours accordé.
-            if core_mod['permission'] is None or has_permission(role_name, core_mod['permission']):
-                modules_config_list.append(core_mod)
-
-        # 2. Configurable Modules (depuis utils.app_constants.CONFIGURABLE_MODULES)
-        # TODO: Intégrer la logique de lecture de la configuration utilisateur pour l'ordre/visibilité
-        # user_sidebar_config_raw = db_manager.get_setting(f"user_sidebar_config_{self.current_user_id}", default=None)
-        # ... (logique de parsing et d'ordonnancement comme dans create_menus_main) ...
-        # Pour l'instant, on utilise l'ordre de CONFIGURABLE_MODULES
-
-        # Recréer la map des permissions de rôle pour les modules ici ou la rendre accessible globalement
-        module_role_permissions = {
-            'project_management': 'P_ACCESS_PROJECT_MODULE', # Exemple, utiliser les vraies constantes de permissions.py
-            'product_management': ('P_MANAGE_GLOBAL_PRODUCTS', 'P_VIEW_GLOBAL_PRODUCTS'),
-            'partner_management': 'P_ACCESS_PARTNER_MODULE',
-            'statistics': 'P_ACCESS_STATISTICS_MODULE',
-            'inventory_management': 'P_ACCESS_INVENTORY_MODULE',
-            'experience_management': 'P_ACCESS_EXPERIENCE_MODULE',
-            'calendar': 'P_ACCESS_CALENDAR_MODULE',
-            'botpress_integration': 'P_ACCESS_BOTPRESS_MODULE',
-            'carrier_map': 'P_ACCESS_CARRIER_MAP_MODULE', # Not a main view, dialog
-            'camera_management': 'P_ACCESS_CAMERA_MODULE',
-            'calculator': 'P_ACCESS_CALCULATOR_MODULE',
-            'commandes_management': 'P_ACCESS_PROJECT_MODULE' # Placeholder
-        }
-
-        for module_info_const in CONFIGURABLE_MODULES:
-            module_name_key = module_info_const['name'] # e.g., 'project_management'
-            action_attr_name = module_info_const['action_attr'] # e.g., 'project_management_action'
-
-            # a. Module globalement activé ?
-            if not self.module_states.get(module_name_key, True):
-                logging.info(f"Sidebar: Module '{module_name_key}' globalement désactivé. Ignoré.")
-                continue
-
-            # b. Licence permet-elle cette fonctionnalité ?
-            license_feature_key = module_info_const.get('license_feature')
-            if license_feature_key and license_feature_key not in self.allowed_features:
-                logging.info(f"Sidebar: Module '{module_name_key}', fonctionnalité '{license_feature_key}' non autorisée par la licence. Ignoré.")
-                continue
-
-            # c. L'utilisateur a-t-il la permission (rôle) ?
-            perm_keys = module_role_permissions.get(module_name_key)
-            role_permitted = False
-            if perm_keys:
-                if isinstance(perm_keys, tuple):
-                    role_permitted = any(has_permission(role_name, pk_const) for pk_const in perm_keys if pk_const)
-                elif perm_keys: # Single permission string
-                    role_permitted = has_permission(role_name, perm_keys)
-            else: # Si pas de permission spécifique définie pour ce module, on suppose que c'est OK si les autres conditions passent
-                role_permitted = True
-
-            if not role_permitted:
-                logging.info(f"Sidebar: Module '{module_name_key}', permission(s) '{perm_keys}' refusée(s) pour le rôle '{role_name}'. Ignoré.")
-                continue
-
-            # d. TODO: Vérifier la visibilité configurée par l'utilisateur pour la sidebar
-
-            # Si toutes les conditions sont remplies, ajouter à la liste
-            # L'action QAction elle-même a déjà le texte traduit et l'icône
-            q_action_instance = getattr(self, action_attr_name, None)
-            if q_action_instance:
-                module_config_entry = {
-                    'id': module_name_key, # Utiliser le nom du module comme ID unique
-                    'name': q_action_instance.text(), # Texte traduit de l'action
-                    'icon_path': q_action_instance.icon().name(), # Chemin de l'icône (peut nécessiter ajustement si icône pas de fichier)
-                    'tooltip': q_action_instance.toolTip() or q_action_instance.text(),
-                    'action': getattr(self, q_action_instance.data(), None) if q_action_instance.data() else getattr(self, module_info_const.get('show_method', ''), None)
-                }
-                # Correction pour la méthode d'action : les QAction sont connectées directement aux méthodes show_..._view
-                # Donc, nous devons mapper l'ID du module à la méthode show_..._view correspondante.
-                # La map `module_actions` dans `handle_sidebar_module_selection` fait déjà cela.
-                # Ici, nous avons juste besoin de l'ID pour que la sidebar l'émette.
-
-                # Assurer que l'icône est bien un chemin si possible
-                icon_name = q_action_instance.icon().name()
-                if not icon_name or icon_name.startswith("PyQt5.QtGui.QIcon"): # Cas où .name() ne donne pas un chemin de fichier
-                    # Tenter de retrouver le chemin original stocké lors de la création de l'action
-                    # Ceci est un placeholder, car les QActions ne stockent pas nativement leur chemin d'icône source.
-                    # Il faudrait modifier create_actions_main pour stocker ce chemin si besoin.
-                    # Pour l'instant, on utilise un placeholder si le nom n'est pas un chemin.
-                    placeholder_icons = {
-                        "project_management_action": ":/icons/dashboard.svg",
-                        "product_list_action": ":/icons/book.svg",
-                        "partner_management_action": ":/icons/team.svg",
-                        "statistics_action": ":/icons/bar-chart.svg",
-                        "calendar_module_action": ":/icons/calendar.svg", # Assumons qu'il existe
-                        "recruitment_action": ":/icons/users.svg",
-                        "calculator_module_action": ":/icons/bar-chart.svg", # Placeholder
-                        "commande_management_action": ":/icons/briefcase.svg",
-                        "inventory_browser_action": ":/icons/archive.svg", # Assumons
-                        "experience_management_action": ":/icons/book-open.svg", # Assumons
-                        "camera_management_action": ":/icons/video.svg",
-                        "botpress_integration_action": ":/icons/message-circle.svg" # Assumons
-                    }
-                    module_config_entry['icon_path'] = placeholder_icons.get(action_attr_name, ":/icons/placeholder_icon.svg")
-
-                modules_config_list.append(module_config_entry)
-            else:
-                logging.warning(f"Sidebar: QAction '{action_attr_name}' non trouvée pour le module '{module_name_key}'.")
-
-        # 3. Module B2C Restaurant (s'il est traité séparément des CONFIGURABLE_MODULES)
-        #    Pour l'instant, il est inclus dans searchable_actions_map et sera géré par la logique ci-dessus s'il est dans CONFIGURABLE_MODULES
-        #    ou ajouté manuellement ici s'il est un module "core" spécial.
-        #    Supposons qu'il est dans CONFIGURABLE_MODULES avec l'id 'b2c_restaurant'.
-
-        if hasattr(self, 'sidebar_nav') and self.sidebar_nav:
-            self.sidebar_nav.set_modules(modules_config_list)
-        else:
-            logging.error("_populate_sidebar appelée avant que self.sidebar_nav ne soit initialisée.")
-
-
-    # --- Slots for Sidebar Interaction ---
-    def handle_sidebar_module_selection(self, module_id: str):
-        """Slot to handle module selection from the sidebar."""
-        logging.info(f"Sidebar module selected: {module_id}")
-
-        # Map module_id to the corresponding show_..._view() method or widget instance
-        # This map needs to be comprehensive for all sidebar items.
-        # For lazy-loaded items, ensure their respective show_..._view() method is called.
-        # For items already loaded, we can directly set the widget.
-
-        # Example mapping (to be completed based on actual module IDs and methods)
-        module_actions = {
-            "home": self.show_home_view,
-            "documents": self.show_documents_view,
-            "project_management": self.show_project_management_view,
-            "product_management": self.show_product_management_page,
-            "partner_management": self.show_partner_management_view,
-            "statistics": self.show_statistics_view,
-            "recruitment": self.show_recruitment_view,
-            "calendar": self.show_calendar_module_view,
-            "calculator": self.show_calculator_module_view,
-            "commandes_management": self.show_commande_management_view,
-            "inventory_management": self.show_inventory_browser_view,
-            "experience_management": self.show_experience_module_view,
-            "camera_management": self.show_camera_management_view,
-            "botpress_integration": self.show_botpress_integration_view,
-            "b2c_restaurant": self.show_restaurant_module_view,
-            # Admin/Tool pages (if they were to be in sidebar, which they are not currently planned to be)
-            # "settings": self.show_settings_page,
-            # "user_management": self.show_user_management_page,
-        }
-
-        action_method = module_actions.get(module_id)
-        if action_method:
-            action_method()
-            # The show_..._view methods handle setCurrentWidget and lazy loading.
-            # We also need to ensure the sidebar button itself is marked active.
-            if hasattr(self.sidebar_nav, 'set_active_module'):
-                 self.sidebar_nav.set_active_module(module_id)
-        else:
-            logging.warning(f"No action defined for sidebar module_id: {module_id}")
-            QMessageBox.warning(self, self.tr("Navigation"), self.tr("Module non implémenté ou ID inconnu : {0}").format(module_id))
-
-    def handle_sidebar_expansion_toggled(self, is_expanded: bool):
-        """Slot to handle sidebar expansion state changes."""
-        logging.info(f"Sidebar expansion toggled. Is expanded: {is_expanded}")
-        try:
-            db_manager.set_setting('sidebar_expanded_state', str(is_expanded))
-            logging.info(f"Sidebar expansion state ({is_expanded}) saved to settings.")
-        except Exception as e:
-            logging.error(f"Failed to save sidebar expansion state: {e}", exc_info=True)
-            self.notify(self.tr("Erreur"), self.tr("Impossible de sauvegarder l'état de la barre latérale."), type='ERROR')
-    # --- End Slots for Sidebar Interaction ---
+    # --- Sidebar Population and State Management --- (ALL REMOVED)
+    # --- End Slots for Sidebar Interaction --- (ALL REMOVED)
 
 # [end of main_window.py]
