@@ -3,6 +3,7 @@ import fitz  # PyMuPDF
 import logging
 import os
 
+
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QGraphicsView,
     QGraphicsScene, QGraphicsPixmapItem, QSizePolicy, QSpinBox, QWidget,
@@ -16,6 +17,7 @@ from PyQt5.QtCore import Qt, QRectF, QCoreApplication, QSize, QThread, pyqtSigna
 
 class PdfViewerWidget(QDialog):
     documentSavedAsNewVersion = pyqtSignal(str, str)
+
 
     def __init__(self, pdf_path: str, parent=None):
         super().__init__(parent)
@@ -773,4 +775,4 @@ if __name__ == '__main__':
     if test_pdf_path: viewer = PdfViewerWidget(test_pdf_path); viewer.show(); sys.exit(app.exec_())
     else: sys.exit(0)
 
-[end of gui/widgets/pdf_viewer_widget.py]
+# [end of gui/widgets/pdf_viewer_widget.py]

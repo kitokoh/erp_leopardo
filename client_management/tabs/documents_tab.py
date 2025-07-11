@@ -881,6 +881,7 @@ class DocumentsTab(QWidget):
 
     def handle_create_new_version_clicked(self, old_document_id, source_template_id):
         if not self.client_info or not self.client_info.get('client_id'):
+
                     viewer.exec_() # Ouvre en tant que dialogue modal
                 except Exception as e:
                     logging.error(f"Erreur lors de l'ouverture de PdfViewerWidget pour {file_path}: {e}", exc_info=True)
