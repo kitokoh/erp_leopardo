@@ -409,6 +409,10 @@ class ClientListItemWidget(QWidget):
 class DocumentManager(QMainWindow):
     def __init__(self, app_root_dir, current_user_info: dict, current_license_info: dict | None):
         super().__init__()
+
+        # Make the window frameless
+        self.setWindowFlags(Qt.FramelessWindowHint | self.windowFlags())
+
         self.app_root_dir = app_root_dir
         self.current_user_info = current_user_info # Store the full user info dictionary
         self.current_license_info = current_license_info # Store license information
@@ -823,6 +827,7 @@ class DocumentManager(QMainWindow):
         main_horizontal_layout = QHBoxLayout() # Ce layout sera ajouté au new_main_vertical_layout
         main_horizontal_layout.setContentsMargins(0, 0, 0, 0)
         main_horizontal_layout.setSpacing(0)
+
 
         # REMOVED: Ajout de la sidebar
         # main_horizontal_layout.addWidget(self.sidebar_nav)
@@ -1522,7 +1527,6 @@ class DocumentManager(QMainWindow):
                     menu_button.setMenu(dropdown_menu)
             elif isinstance(actions_or_action_defs, QAction): # It's a single direct QAction
                 menu_button.clicked.connect(actions_or_action_defs.trigger)
-
 
             top_bar_layout.addWidget(menu_button)
             self.top_menu_buttons[menu_title] = menu_button
