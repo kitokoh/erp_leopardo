@@ -212,6 +212,7 @@ from dialogs.menu_customization_dialog import MenuCustomizationDialog
 from utils.app_constants import CONFIGURABLE_MODULES # For menu customization and default order
 import json # For handling menu config storage
 from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import QSize
 
 
 class ClientListItemWidget(QWidget):
