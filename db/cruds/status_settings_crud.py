@@ -1,11 +1,15 @@
 import sqlite3 # Keep for type hints if necessary, but conn will be Session
 from sqlalchemy.sql import text
-from .generic_crud import _manage_conn
+# from .generic_crud import _manage_conn # Decorator removed
+from ..connection import get_db_connection # Direct import
 import logging
 
 # --- StatusSettings CRUD ---
-@_manage_conn
-def get_status_setting_by_name(name: str, type: str, conn = None) -> dict | None: # conn is SQLAlchemy Session
+def get_status_setting_by_name(name: str, type: str, conn = None) -> dict | None:
+    conn_is_external = conn is not None
+    if not conn_is_external:
+        conn = get_db_connection() # This should provide an SA Session if configured
+
     original_name_param = name
     if isinstance(name, dict) and type == 'Client':
         logging.warning(
@@ -31,9 +35,15 @@ def get_status_setting_by_name(name: str, type: str, conn = None) -> dict | None
     except Exception as e: # Changed to general Exception
         logging.error(f"Error getting status setting by name '{name}' (original_param_type: {type(original_name_param).__name__}) and type '{type}': {e}", exc_info=True)
         return None
+    finally:
+        if not conn_is_external and conn:
+            conn.close()
 
-@_manage_conn
-def get_status_setting_by_id(id: int, conn = None) -> dict | None: # conn is SQLAlchemy Session
+def get_status_setting_by_id(id: int, conn = None) -> dict | None:
+    conn_is_external = conn is not None
+    if not conn_is_external:
+        conn = get_db_connection()
+
     try:
         sql_query = text("SELECT * FROM StatusSettings WHERE status_id = :id")
         result = conn.execute(sql_query, {"id": id})
@@ -42,9 +52,14 @@ def get_status_setting_by_id(id: int, conn = None) -> dict | None: # conn is SQL
     except Exception as e: # Changed to general Exception
         logging.error(f"Error getting status setting by id {id}: {e}", exc_info=True)
         return None
+    finally:
+        if not conn_is_external and conn:
+            conn.close()
 
-@_manage_conn
-def get_all_status_settings(type_filter: str = None, conn = None) -> list[dict]: # conn is SQLAlchemy Session
+def get_all_status_settings(type_filter: str = None, conn = None) -> list[dict]:
+    conn_is_external = conn is not None
+    if not conn_is_external:
+        conn = get_db_connection()
     """
     Retrieves all status settings, optionally filtered by type.
     """
@@ -69,10 +84,15 @@ def get_all_status_settings(type_filter: str = None, conn = None) -> list[dict]:
     except Exception as e: # Changed to general Exception
         logging.error(f"Database error in get_all_status_settings (filter: {type_filter}): {e}", exc_info=True)
         return []
+    finally:
+        if not conn_is_external and conn:
+            conn.close()
 
 
-@_manage_conn
-def add_status_setting(status_name: str, status_type: str, color_hex: str = None, sort_order: int = 0, conn = None) -> int | bool: # conn is SQLAlchemy Session
+def add_status_setting(status_name: str, status_type: str, color_hex: str = None, sort_order: int = 0, conn = None) -> int | bool:
+    conn_is_external = conn is not None
+    if not conn_is_external:
+        conn = get_db_connection()
     """
     Adds a new status setting to the StatusSettings table.
 
@@ -98,7 +118,8 @@ def add_status_setting(status_name: str, status_type: str, color_hex: str = None
             "color_hex": color_hex, "sort_order": sort_order
         }
         result = conn.execute(sql_query, params)
-        # commit is handled by _manage_conn
+        if not conn_is_external:
+            conn.commit()
 
         last_id = result.lastrowid
         if last_id is None and hasattr(result, 'inserted_primary_key') and result.inserted_primary_key: # Fallback for some drivers
@@ -107,13 +128,18 @@ def add_status_setting(status_name: str, status_type: str, color_hex: str = None
         return last_id if last_id is not None else True
     except Exception as e: # Changed to general Exception
         logging.error(f"Database error in add_status_setting for '{status_name}'/'{status_type}': {e}", exc_info=True)
-        # rollback is handled by _manage_conn
+        if not conn_is_external and conn:
+            conn.rollback()
         return False
-    # finally: # connection closing handled by _manage_conn
+    finally:
+        if not conn_is_external and conn:
+            conn.close()
 
 
-@_manage_conn
-def update_status_setting(status_id: int, status_name: str, status_type: str, color_hex: str = None, sort_order: int = None, conn = None) -> bool: # conn is SQLAlchemy Session
+def update_status_setting(status_id: int, status_name: str, status_type: str, color_hex: str = None, sort_order: int = None, conn = None) -> bool:
+    conn_is_external = conn is not None
+    if not conn_is_external:
+        conn = get_db_connection()
     """
     Updates an existing status setting in the StatusSettings table.
 
@@ -147,16 +173,23 @@ def update_status_setting(status_id: int, status_name: str, status_type: str, co
 
     try:
         result = conn.execute(sql_query, params_dict)
-        # conn.commit() # Handled by _manage_conn
+        if not conn_is_external:
+            conn.commit()
         return result.rowcount > 0
     except Exception as e: # Changed to general Exception
         logging.error(f"Database error in update_status_setting for ID {status_id}: {e}", exc_info=True)
-        # conn.rollback() # Handled by _manage_conn
+        if not conn_is_external and conn:
+            conn.rollback()
         return False
+    finally:
+        if not conn_is_external and conn:
+            conn.close()
 
 
-@_manage_conn
-def is_status_in_use(status_id: int, conn = None) -> bool: # conn is SQLAlchemy Session
+def is_status_in_use(status_id: int, conn = None) -> bool:
+    conn_is_external = conn is not None
+    if not conn_is_external:
+        conn = get_db_connection()
     """
     Checks if a status_id is currently in use in the Clients table.
 
@@ -175,10 +208,15 @@ def is_status_in_use(status_id: int, conn = None) -> bool: # conn is SQLAlchemy 
         logging.error(f"Database error in is_status_in_use for status_id {status_id}: {e}", exc_info=True)
         # Returning True on error prevents deletion if the check fails, which is safer.
         return True # Safer: assume in use if check fails
+    finally:
+        if not conn_is_external and conn:
+            conn.close()
 
 
-@_manage_conn
-def delete_status_setting(status_id: int, conn = None) -> bool: # conn is SQLAlchemy Session
+def delete_status_setting(status_id: int, conn = None) -> bool:
+    conn_is_external = conn is not None
+    if not conn_is_external:
+        conn = get_db_connection()
     """
     Deletes a status setting from the StatusSettings table.
 
@@ -192,9 +230,14 @@ def delete_status_setting(status_id: int, conn = None) -> bool: # conn is SQLAlc
     sql_query = text("DELETE FROM StatusSettings WHERE status_id = :status_id")
     try:
         result = conn.execute(sql_query, {"status_id": status_id})
-        # conn.commit() # Handled by _manage_conn
+        if not conn_is_external:
+            conn.commit()
         return result.rowcount > 0
     except Exception as e: # Changed to general Exception
         logging.error(f"Database error in delete_status_setting for ID {status_id}: {e}", exc_info=True)
-        # conn.rollback() # Handled by _manage_conn
+        if not conn_is_external and conn:
+            conn.rollback()
         return False
+    finally:
+        if not conn_is_external and conn:
+            conn.close()

@@ -28,10 +28,13 @@ def _is_sqlalchemy_obj(conn_obj):
 # Helper to manage connection lifecycle for CRUD functions
 def _manage_conn(func):
     def wrapper(*args, **kwargs):
-        from ..connection import get_db_connection # DEFERRED IMPORT
+        from ..connection import get_raw_sqlite_connection # DEFERRED IMPORT for raw connection
         conn_passed = kwargs.get('conn')
         conn_is_external = conn_passed is not None
-        conn_to_use = conn_passed if conn_is_external else get_db_connection()
+        # Ensure raw connection for functions decorated with this, unless a connection is explicitly passed.
+        # If an SQLAlchemy session is passed via conn_passed, it would still error if func uses .cursor()
+        # This decorator is now primarily for functions expecting raw sqlite3.Connection.
+        conn_to_use = conn_passed if conn_is_external else get_raw_sqlite_connection()
 
         try:
             kwargs_for_func = {**kwargs, 'conn': conn_to_use}
