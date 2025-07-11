@@ -3131,7 +3131,7 @@ class DocumentManager(QMainWindow):
         if corner_widget:
             self.menuBar().setCornerWidget(corner_widget, Qt.TopRightCorner)
 
-        self.notify(self.tr("Menu Mis à Jour"), self.tr("Le menu principal a été mis à jour selon vos préférences."), type='INFO')
+            self.notify(self.tr("Menu Mis à Jour"), self.tr("Le menu principal a été mis à jour selon vos préférences."), type='INFO')
 
     # --- Sidebar Population and State Management --- (ALL REMOVED)
     # --- End Slots for Sidebar Interaction --- (ALL REMOVED)
