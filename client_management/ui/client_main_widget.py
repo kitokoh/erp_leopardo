@@ -409,7 +409,7 @@ class ClientMainWidget(QWidget):
             contacts_pagination_layout.setSpacing(8)
 
             self.prev_contact_button = QPushButton(self.tr("Précédent"))
-            self.prev_contact_button.setIcon(QIcon(":/icons/chevron-left.svg")) # Using chevron
+            self.prev_contact_button.setIcon(QIcon(":/icons/arrow-left-circle.svg")) # Using available icon
 
             self.prev_contact_button.setObjectName("paginationButton")
             self.prev_contact_button.setStyleSheet("padding: 5px 10px;")
