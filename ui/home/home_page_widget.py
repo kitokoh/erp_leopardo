@@ -17,6 +17,7 @@ from .quick_stats_widget import QuickStatsWidget # Import the new widget
 
 
 from .quick_stats_widget import QuickStatsWidget # Import the new widget
+from .module_card_widget import ModuleCardWidget # Ajout de l'import
 
 
 class HomePageWidget(QWidget):
@@ -120,6 +121,81 @@ class HomePageWidget(QWidget):
 
 
         self.setLayout(main_v_layout)
+
+        # Charger les statistiques pour les cartes après que l'UI soit initialisée
+        self._load_all_module_card_stats()
+
+    def _get_stats_for_module(self, module_id: str) -> list[dict]:
+        """
+        Récupère les données statistiques pour un module donné.
+        Pour l'instant, retourne des données factices.
+        Devra être connecté aux vrais services/CRUDs plus tard.
+        """
+        # logging.debug(f"HomePageWidget: Récupération des stats pour le module_id: {module_id}")
+
+        # Note: Les imports suivants sont supposés être faits en haut du fichier
+        # from db import db_manager
+        # from db.cruds.clients_crud import get_active_clients_count
+        # from project_management.cruds import get_active_projects_count, get_overdue_tasks_count
+        # etc. pour les autres modules.
+
+        # Pour cette simulation, nous allons appeler des fonctions placeholder qui existent dans ce fichier.
+        # Dans la vraie implémentation, ces appels se feraient aux fonctions CRUD importées.
+
+        if module_id == "btnClientDocuments":
+            # active_clients = get_active_clients_count(db_session) # Appel réel
+            active_clients = self._placeholder_get_active_clients_count() # Appel simulé
+            # docs_recents = get_recent_documents_count(db_session) # Appel réel
+            docs_recents = 12 # Valeur factice
+            return [
+                {'value': str(active_clients), 'label': self.tr('Clients Actifs')},
+                {'value': str(docs_recents), 'label': self.tr('Docs Récents')}
+            ]
+        elif module_id == "btnProjectManagement":
+            # active_projects = get_active_projects_count(db_session) # Appel réel
+            active_projects = self._placeholder_get_active_projects_count() # Appel simulé
+            # overdue_tasks = get_overdue_tasks_count(db_session) # Appel réel
+            overdue_tasks = self._placeholder_get_overdue_tasks_count() # Appel simulé
+            return [
+                {'value': str(active_projects), 'label': self.tr('Projets en Cours'), 'color': '#28A745'},
+                {'value': str(overdue_tasks), 'label': self.tr('Tâches en Retard'), 'color': '#DC3545' if overdue_tasks > 0 else '#28A745'}
+            ]
+        elif module_id == "btnProductManagement":
+            # total_products = get_total_products_count(db_session) # Appel réel
+            total_products = 1250 # Valeur factice
+            return [
+                {'value': str(total_products), 'label': self.tr('Produits Actifs')}
+            ]
+        elif module_id == "btnRecruitment":
+            # open_positions = get_open_positions_count(db_session) # Appel réel
+            open_positions = 5 # Valeur factice
+            # new_candidates = get_new_candidates_count(db_session) # Appel réel
+            new_candidates = 28 # Valeur factice
+            return [
+                {'value': str(open_positions), 'label': self.tr('Postes Ouverts')},
+                {'value': str(new_candidates), 'label': self.tr('Nouv. Candidatures')}
+            ]
+        return []
+
+    # Fonctions placeholder pour simuler les appels CRUD (à supprimer lors de l'implémentation réelle)
+    def _placeholder_get_active_clients_count(self): return 142
+    def _placeholder_get_active_projects_count(self): return 22
+    def _placeholder_get_overdue_tasks_count(self): return 4
+
+
+    def _load_all_module_card_stats(self):
+        """Charge et affiche les statistiques pour toutes les cartes de module."""
+        if not hasattr(self, 'module_cards_list'):
+            logging.warning("HomePageWidget: module_cards_list non trouvée, impossible de charger les stats.")
+            return
+
+        for card in self.module_cards_list:
+            if isinstance(card, ModuleCardWidget): # S'assurer que c'est bien une ModuleCardWidget
+                stats_data = self._get_stats_for_module(card.module_id)
+                card.update_stats(stats_data)
+            else:
+                logging.warning(f"HomePageWidget: Item dans module_cards_list n'est pas une ModuleCardWidget: {type(card)}")
+
 
     def _handle_search_query(self):
         query = self.search_input.text()
@@ -226,31 +302,39 @@ class HomePageWidget(QWidget):
 
         # self.modules is defined in _init_ui or constructor
         row, col = 0, 0
-        num_columns = 4
-        for i, module_data in enumerate(self.modules): # self.modules needs to be accessible
-            button = QPushButton(module_data["name"])
-            button.setObjectName(module_data["object_name"])
-            if module_data["icon"] and QIcon.hasThemeIcon(module_data["icon"]):
-                button.setIcon(QIcon(module_data["icon"]))
-            else:
-                button.setIcon(QIcon(":/icons/placeholder_icon.svg"))
-            button.setIconSize(QSize(32, 32))
-            button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-            button.clicked.connect(module_data["slot"])
+        num_columns = 3 # Ajusté pour des cartes potentiellement plus larges
 
-            shadow = QGraphicsDropShadowEffect(self)
-            shadow.setBlurRadius(15)
-            shadow.setXOffset(0)
-            shadow.setYOffset(2)
-            shadow.setColor(QColor(0, 0, 0, 60))
-            button.setGraphicsEffect(shadow)
-            button.setProperty("isModuleButton", True) # Custom property to identify these buttons
+        # S'assurer que self.module_cards_list est initialisé pour stocker les cartes
+        if not hasattr(self, 'module_cards_list'):
+            self.module_cards_list = []
+        else: # Vider la liste si elle existe déjà (ex: lors d'un rafraîchissement)
+            for card_ref in self.module_cards_list:
+                if card_ref: # Si la référence n'est pas None
+                    card_ref.deleteLater() # S'assurer que les anciens widgets sont supprimés
+            self.module_cards_list.clear()
 
+        for i, module_data in enumerate(self.modules):
+            # Définir une clé de couleur d'accent basée sur l'object_name ou un mapping
+            # Ceci est un exemple, vous pouvez avoir un mapping plus explicite
+            accent_color_key = module_data["object_name"].replace("btn", "").lower()
 
-            # Install event filter to handle Enter/Leave for animation
-            button.installEventFilter(self)
+            card = ModuleCardWidget(
+                module_id=module_data["object_name"], # Utiliser object_name comme ID unique
+                title=module_data["name"],
+                icon_path=module_data["icon"],
+                tooltip=module_data["name"], # Utiliser le nom comme tooltip de base
+                navigation_slot=module_data["slot"],
+                accent_color_key=accent_color_key
+            )
+            # card.setGraphicsEffect(shadow) # L'ombre peut être gérée par QSS sur ModuleCardWidget
 
-            grid_layout.addWidget(button, row, col)
+            # Connecter le signal cardClicked au slot de navigation du module
+            if module_data["slot"]:
+                card.cardClicked.connect(module_data["slot"])
+
+            self.module_cards_list.append(card) # Garder une référence si besoin de les mettre à jour
+            grid_layout.addWidget(card, row, col)
+
             col += 1
             if col >= num_columns:
                 col = 0

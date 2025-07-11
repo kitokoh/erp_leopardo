@@ -47,6 +47,7 @@ import logging
 
 from datetime import datetime # Added datetime import
 from PyQt5.QtCore import QStringListModel
+import functools # Ajouté pour partial
 
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -55,11 +56,11 @@ from PyQt5.QtWidgets import (
     QFileDialog, QMessageBox, QDialog, QFormLayout, QComboBox,
     QInputDialog, QCompleter, QTabWidget, QAction, QMenu, QGroupBox,
     QStackedWidget, QDoubleSpinBox, QTableWidget, QTableWidgetItem, QAbstractItemView,
-    QTextEdit, QSplitter, QApplication, # Added QTextEdit for SettingsDialog notes, QSplitter for layout, QApplication
+    QTextEdit, QSplitter, QApplication, QToolButton # Added QToolButton for inline actions
 
 )
 from PyQt5.QtGui import QIcon, QDesktopServices, QFont
-from PyQt5.QtCore import Qt, QUrl, QTimer, pyqtSlot, QByteArray, QDate # Added QDate
+from PyQt5.QtCore import Qt, QUrl, QTimer, pyqtSlot, QByteArray, QDate, QEvent # Added QDate and QEvent
 # QWebEngineView might still be used by ClientWidget or other parts, so keep for now unless confirmed unused.
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 # from PyQt5.QtWebChannel import QWebChannel # QWebChannel removed as DocumentManager no longer uses its own map.
@@ -189,6 +190,7 @@ from dialogs.edit_user_dialog import EditUserDialog # For handling edit/add user
 from dialogs.role_management_dialog import RoleManagementDialog # Added for Role Management
 from commande_management.commandes_dashboard_widget import CommandesDashboardWidget # Import CommandesDashboardWidget
 from utils.app_constants import CONFIGURABLE_MODULES # Import from new location
+from gui.widgets.sidebar_navigation_widget import SidebarNavigationWidget # Import de la Sidebar
 
 # B2C Restaurant Module Import
 from b2c.ges_restaurant.ui.main_widget import RestaurantMainWidget
@@ -209,41 +211,40 @@ from license_management import (
 from dialogs.menu_customization_dialog import MenuCustomizationDialog
 from utils.app_constants import CONFIGURABLE_MODULES # For menu customization and default order
 import json # For handling menu config storage
-from PyQt5.QtCore import QSize
+from PyQt5.QtCore import pyqtSignal, QTimer, QEasingCurve # Added QTimer, QEasingCurve
+from PyQt5.QtGui import QColor # Added QColor
+from PyQt5.QtWidgets import QGraphicsDropShadowEffect # Added QGraphicsDropShadowEffect
+from PyQt5.QtCore import QPropertyAnimation # Added QPropertyAnimation
+
 
 
 class ClientListItemWidget(QWidget):
+    # Signaux pour les actions en ligne
+    editActionClicked = pyqtSignal()
+    openFolderActionClicked = pyqtSignal()
+    # archiveActionClicked = pyqtSignal() # Optionnel pour V1
+
     def __init__(self, client_data, parent=None):
         super().__init__(parent)
         self.client_data = client_data
-        # Get the main DocumentManager instance to call its methods (like tr)
-        # This assumes ClientListItemWidget is instantiated with DocumentManager as an ancestor or direct parent.
-        # A more robust way might be to pass DocumentManager instance if deeply nested.
-        self.doc_manager = parent # Assuming parent is DocumentManager or provides tr
+        self.doc_manager = parent
         while self.doc_manager and not isinstance(self.doc_manager, DocumentManager):
             self.doc_manager = self.doc_manager.parent()
 
-        if not self.doc_manager:
-            # Fallback if DocumentManager not found in parent hierarchy
-            # This might happen if parent is QListWidget, then its parent etc.
-            # For simplicity, we assume it can be found or tr will work via QCoreApplication.translate
-            # A cleaner way is to pass doc_manager instance explicitly if this becomes an issue.
-            # logging.warning("ClientListItemWidget: DocumentManager instance not found via parent hierarchy.")
-            pass
-
         self.init_ui()
+        self.setMouseTracking(True) # Important pour enterEvent/leaveEvent sur le widget lui-même
 
     def _tr(self, text):
         if self.doc_manager and hasattr(self.doc_manager, 'tr'):
             return self.doc_manager.tr(text)
-        return QApplication.translate("ClientListItemWidget", text) # Fallback
+        return QApplication.translate("ClientListItemWidget", text)
 
     def init_ui(self):
-        main_layout = QHBoxLayout(self) # Changed to QHBoxLayout for side-by-side status and text
-        main_layout.setContentsMargins(8, 5, 8, 5) # Increased margins for better spacing
-        main_layout.setSpacing(8) # Increased spacing
+        self.main_h_layout = QHBoxLayout(self) # Renommé pour clarté
+        self.main_h_layout.setContentsMargins(8, 5, 8, 5)
+        self.main_h_layout.setSpacing(8)
 
-        # Status Indicator (larger, more distinct)
+        # Status Indicator
         self.status_indicator_label = QLabel()
         self.status_indicator_label.setFixedSize(12, 12) # Circular indicator
         self.status_indicator_label.setStyleSheet("border-radius: 6px; background-color: #343A40;") # Default color
@@ -269,27 +270,109 @@ class ClientListItemWidget(QWidget):
         self.additional_info_label.setFont(font_additional)
         self.additional_info_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         palette = self.additional_info_label.palette()
-        palette.setColor(QPalette.WindowText, QColor(Qt.gray)) # Darker gray for better readability
+        palette.setColor(QPalette.WindowText, QColor(Qt.gray))
         self.additional_info_label.setPalette(palette)
         text_content_layout.addWidget(self.additional_info_label)
 
-        main_layout.addWidget(self.status_indicator_label)
-        main_layout.addLayout(text_content_layout)
-        main_layout.addStretch() # Pushes content to the left
+        self.main_h_layout.addWidget(self.status_indicator_label)
+        self.main_h_layout.addLayout(text_content_layout)
+        self.main_h_layout.addStretch(1)
 
-        self.update_data(self.client_data) # Populate widget with data
+        # Layout pour les actions en ligne (initialement masqué)
+        self.actions_layout = QHBoxLayout()
+        self.actions_layout.setContentsMargins(0,0,0,0)
+        self.actions_layout.setSpacing(5)
 
-        # Basic styling for the widget itself (can be overridden by QListWidget delegate)
-        self.setAutoFillBackground(True) # Important for hover effects if not handled by delegate
-        self.setStyleSheet("""
-            ClientListItemWidget {
-                background-color: transparent; /* Base background */
-                border-radius: 4px; /* Optional: rounded corners for items */
-            }
-            ClientListItemWidget:hover {
-                background-color: #e9ecef; /* Subtle hover, adjust as needed */
-            }
-        """)
+        self.edit_action_button = QToolButton(self)
+        self.edit_action_button.setObjectName("listItemActionButton")
+        self.edit_action_button.setIcon(QIcon(":/icons/pencil.svg"))
+        self.edit_action_button.setToolTip(self.tr("Modifier ce client"))
+        self.edit_action_button.setCursor(Qt.PointingHandCursor)
+        self.edit_action_button.clicked.connect(self._on_edit_action_clicked)
+        self.actions_layout.addWidget(self.edit_action_button)
+
+        self.folder_action_button = QToolButton(self)
+        self.folder_action_button.setObjectName("listItemActionButton")
+        self.folder_action_button.setIcon(QIcon(":/icons/folder.svg"))
+        self.folder_action_button.setToolTip(self.tr("Ouvrir le dossier de ce client"))
+        self.folder_action_button.setCursor(Qt.PointingHandCursor)
+        self.folder_action_button.clicked.connect(self._on_folder_action_clicked)
+        self.actions_layout.addWidget(self.folder_action_button)
+
+        # Ajouter d'autres boutons d'action ici si nécessaire (ex: archiver)
+
+        for i in range(self.actions_layout.count()): # Cacher les boutons individuellement
+            widget = self.actions_layout.itemAt(i).widget()
+            if widget:
+                widget.setVisible(False)
+
+        self.main_h_layout.addLayout(self.actions_layout) # Ajouter le layout des actions au layout principal
+
+        self.update_data(self.client_data)
+
+        self.setAutoFillBackground(True)
+        # Le style QSS pour ClientListItemWidget:hover sera dans style.qss
+
+    def _on_edit_action_clicked(self):
+        self.editActionClicked.emit()
+
+    def _on_folder_action_clicked(self):
+        self.openFolderActionClicked.emit()
+
+    def enterEvent(self, event: QEvent):
+        super().enterEvent(event)
+        for i in range(self.actions_layout.count()):
+            widget = self.actions_layout.itemAt(i).widget()
+            if widget:
+                widget.setVisible(True)
+
+    def leaveEvent(self, event: QEvent):
+        super().leaveEvent(event)
+        # Vérifier si le curseur n'est pas sur l'un des boutons d'action avant de les cacher
+        # Ceci est une simple vérification; une gestion plus robuste pourrait être nécessaire
+        # si les boutons sont très proches ou si le comportement de leaveEvent est complexe.
+        # Pour l'instant, on cache si la souris quitte le widget principal.
+        # Si le curseur est sur un bouton, le leaveEvent du bouton sera déclenché avant celui du parent.
+        # Cependant, pour éviter que les boutons ne disparaissent pendant que la souris se déplace
+        # entre le widget principal et un bouton d'action, on pourrait vérifier si le curseur
+        # est DANS le rectangle du widget ClientListItemWidget.
+        # Si la souris quitte le widget, on cache.
+        # Si elle est sur un bouton, le bouton reste visible.
+        # La solution simple:
+        for i in range(self.actions_layout.count()):
+            widget = self.actions_layout.itemAt(i).widget()
+            if widget and not widget.geometry().contains(widget.mapFromGlobal(QCursor.pos())): # QCursor n'est pas importé
+                 widget.setVisible(False)
+            elif widget: # Si le curseur est dessus, on le laisse visible (le hover du bouton prendra le relais)
+                 pass # Le bouton reste visible s'il est survolé, sera caché si la souris quitte le bouton ET le parent.
+
+        # Une approche plus simple et souvent suffisante :
+        # Si la souris n'est plus sur le ClientListItemWidget lui-même, on cache les actions.
+        # Les boutons eux-mêmes géreront leur propre état de survol.
+        if not self.rect().contains(self.mapFromGlobal(QCursor.pos())): # QCursor n'est pas importé
+            for i in range(self.actions_layout.count()):
+                widget = self.actions_layout.itemAt(i).widget()
+                if widget:
+                    widget.setVisible(False)
+        # Correction: La logique ci-dessus est complexe et peut mal se comporter.
+        # Le plus simple est de cacher les boutons lorsque la souris quitte le ClientListItemWidget.
+        # Si la souris est sur un bouton, le leaveEvent du ClientListItemWidget ne sera pas
+        # immédiatement déclenché tant que la souris est sur l'enfant.
+        # Quand la souris quitte l'enfant ET le parent, alors on cache.
+        # Pour simplifier et éviter des clignotements :
+        # On cache toujours quand on quitte le ClientListItemWidget. Si la souris entre ensuite sur un bouton,
+        # le bouton sera toujours visible car il est un enfant. Le problème est si le bouton
+        # est caché alors que la souris est dessus.
+        # Solution plus robuste pour leaveEvent:
+        # Vérifier si la souris est DANS le rectangle du widget. Si non, on cache.
+        # Cela ne fonctionne pas bien si les boutons sont au bord.
+        # Le plus simple est de cacher au leaveEvent du ClientListItemWidget.
+        # Le hover des QToolButton les gardera stylés.
+        for i in range(self.actions_layout.count()): # Masquer tous les boutons lorsque la souris quitte le widget principal
+            widget = self.actions_layout.itemAt(i).widget()
+            if widget:
+                 widget.setVisible(False)
+
 
     def update_data(self, client_data):
         self.client_data = client_data
@@ -328,6 +411,10 @@ class ClientListItemWidget(QWidget):
 class DocumentManager(QMainWindow):
     def __init__(self, app_root_dir, current_user_info: dict, current_license_info: dict | None):
         super().__init__()
+
+        # Make the window frameless
+        self.setWindowFlags(Qt.FramelessWindowHint | self.windowFlags())
+
         self.app_root_dir = app_root_dir
         self.current_user_info = current_user_info # Store the full user info dictionary
         self.current_license_info = current_license_info # Store license information
@@ -372,6 +459,11 @@ class DocumentManager(QMainWindow):
         self.limit_per_page = 50
         self.total_filtered_clients = 0  # Added for pagination
         
+        # La Sidebar est initialisée avant setup_ui_main pour être disponible lors de la construction du layout
+        # self.sidebar_nav = SidebarNavigationWidget(parent=self) # REMOVED Sidebar instantiation
+        # self.sidebar_nav.moduleSelected.connect(self.handle_sidebar_module_selection) # REMOVED
+        # self.sidebar_nav.expansionToggled.connect(self.handle_sidebar_expansion_toggled) # REMOVED
+
         self.setup_ui_main() # Sets up self.main_area_stack
 
         # Initialize core widget instances that are always needed or fundamental
@@ -437,8 +529,23 @@ class DocumentManager(QMainWindow):
                     self.home_page_widget_instance.set_bottom_widget(None)
 
         self.searchable_actions_map = {} # Initialize for create_actions_main
-        self.main_area_stack.setCurrentWidget(self.home_page_widget_instance) # Set Home Page as default view
-        self.create_actions_main(); self.create_menus_main() # Menus and actions are created before _apply_permissions
+
+        # Création des actions et menus (le menu Modules sera supprimé plus tard)
+        self.create_actions_main(); self.create_menus_main()
+
+        # REMOVED: Peupler la sidebar et définir son état initial
+        # self._populate_sidebar()
+        # try:
+        #     saved_expanded_state = db_manager.get_setting('sidebar_expanded_state', default='True')
+        #     initial_expanded_state = saved_expanded_state.lower() == 'true'
+        # except Exception as e:
+        #     logging.error(f"Error reading sidebar_expanded_state: {e}", exc_info=True)
+        #     initial_expanded_state = True # Default to expanded if error
+        # self.sidebar_nav.set_expanded_state(initial_expanded_state, animate=False)
+
+        # Définir la vue d'accueil comme vue initiale
+        self.main_area_stack.setCurrentWidget(self.home_page_widget_instance)
+        # REMOVED: self.sidebar_nav.set_active_module('home')
 
         logging.debug("--- Widgets in main_area_stack after DocumentManager.__init__ (lazy loading setup) ---")
         for i in range(self.main_area_stack.count()):
@@ -452,6 +559,61 @@ class DocumentManager(QMainWindow):
         self.check_timer = QTimer(self); self.check_timer.timeout.connect(self.check_old_clients_routine_slot); self.check_timer.start(3600000)
         self.init_or_update_download_monitor()
         self.populate_saved_filters_combo()
+
+        # For App Title Animation
+        self.app_title_label = None # Will be set in create_menus_main
+        self.app_title_shadow_effect = QGraphicsDropShadowEffect(self)
+        self.app_title_animation = QPropertyAnimation(self.app_title_shadow_effect, b"color", self) # parent `self` for QPropertyAnimation
+        self.app_title_animation_timer = QTimer(self)
+        self._setup_app_title_animation()
+
+
+
+    def toggleMaximized(self):
+        """Toggles between maximized and normal window state."""
+        if self.isMaximized():
+            self.showNormal()
+        else:
+            self.showMaximized()
+
+    def _setup_app_title_animation(self):
+        if not self.app_title_label: # Ensure label is created
+            logging.warning("App title label not initialized before animation setup.")
+            return
+
+        # Configure the QPropertyAnimation for the shadow color
+        self.app_title_animation.setDuration(1500) # Duration of one pulse (e.g., 1.5 seconds)
+        self.app_title_animation.setLoopCount(1)    # We run it once per timer tick
+
+        # Define keyframes for the color animation (glow effect)
+        # Accent color from your QSS: #007BFF (blueish)
+        # Let's use a lighter shade of this blue for the glow
+        glow_color = QColor(0, 123, 255, 90) # Accent blue with alpha for subtlety
+
+        self.app_title_animation.setKeyValueAt(0, QColor(0, 0, 0, 0))      # Start transparent
+        self.app_title_animation.setKeyValueAt(0.5, glow_color)           # Mid-point glow
+        self.app_title_animation.setKeyValueAt(1, QColor(0, 0, 0, 0))      # End transparent
+
+        self.app_title_animation.setEasingCurve(QEasingCurve.InOutQuad) # Smooth animation curve
+
+        # Configure and start the QTimer
+        self.app_title_animation_timer.setInterval(15000) # e.g., trigger every 15 seconds
+        self.app_title_animation_timer.timeout.connect(self._trigger_app_title_animation)
+        self.app_title_animation_timer.start()
+        logging.info("App title animation setup complete and timer started.")
+
+    def _trigger_app_title_animation(self):
+        if self.app_title_animation.state() == QPropertyAnimation.Stopped:
+            self.app_title_animation.start()
+            # Optional: Add randomization for the next interval
+            # import random
+            # next_interval = random.randint(10000, 20000) # e.g., between 10 and 20 seconds
+            # self.app_title_animation_timer.setInterval(next_interval)
+            # logging.debug(f"App title animation triggered. Next in {next_interval / 1000}s")
+        else:
+            logging.debug("App title animation triggered but already running.")
+
+
 
     def get_statistics_widget_instance(self): # This method seems to refer to the dashboard, not the summary.
         """Lazily creates and returns the instance of the statistics dashboard if module is enabled."""
@@ -695,15 +857,51 @@ class DocumentManager(QMainWindow):
         if manager: manager.show(title, message, type=type, duration=duration, icon_path=icon_path)
         else: logging.warning(f"Notification Manager not found. Notification: {title} - {message}")
 
-    def setup_ui_main(self): 
-        central_widget = QWidget(); self.setCentralWidget(central_widget)
-        main_layout = QVBoxLayout(central_widget); main_layout.setContentsMargins(10,10,10,10); main_layout.setSpacing(10)
-        # self.stats_widget = StatisticsWidget(); main_layout.addWidget(self.stats_widget) # Removed
+    def setup_ui_main(self):
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
 
-        self.main_area_stack = QStackedWidget(); main_layout.addWidget(self.main_area_stack)
+        # Nouveau layout vertical principal pour le central_widget
+        new_main_vertical_layout = QVBoxLayout(central_widget)
+        new_main_vertical_layout.setContentsMargins(0, 0, 0, 0)
+        new_main_vertical_layout.setSpacing(0)
+
+        # Placeholder pour la barre de menu supérieure (sera un QFrame ou similaire)
+        self.top_menu_bar_widget = QFrame() # Sera configuré dans create_menus_main
+        self.top_menu_bar_widget.setObjectName("topMenuBarWidget")
+        # self.top_menu_bar_widget.setFixedHeight(50) # Hauteur typique pour une barre de menu
+        # self.top_menu_bar_widget.setStyleSheet("background-color: #f0f2f5; border-bottom: 1px solid #d1d5db;") # Style initial
+        new_main_vertical_layout.addWidget(self.top_menu_bar_widget)
+
+
+        # Layout horizontal pour la sidebar et la zone de contenu principale (comme avant)
+        main_horizontal_layout = QHBoxLayout() # Ce layout sera ajouté au new_main_vertical_layout
+        main_horizontal_layout.setContentsMargins(0, 0, 0, 0)
+        main_horizontal_layout.setSpacing(0)
+
+
+        # REMOVED: Ajout de la sidebar
+        # main_horizontal_layout.addWidget(self.sidebar_nav)
+
+        # La QStackedWidget pour le contenu principal
+        self.main_area_stack = QStackedWidget()
+        # Add main_area_stack directly to new_main_vertical_layout if sidebar is gone,
+        # or keep main_horizontal_layout if other elements might go beside the stack later.
+        # For now, assuming main_area_stack will take the full width under the top_menu_bar.
+        # So, main_horizontal_layout might become redundant if it only holds the stack.
+        # Let's simplify: new_main_vertical_layout will hold top_menu_bar and then main_area_stack.
+        # main_horizontal_layout.addWidget(self.main_area_stack, 1) # Old line
+
+        # Ajout du layout horizontal (sidebar + stack) au layout vertical principal
+        # new_main_vertical_layout.addLayout(main_horizontal_layout) # Old line
+
+        new_main_vertical_layout.addWidget(self.main_area_stack, 1) # Add stack directly, it takes remaining space
+
         
+        # -- Configuration de la page "Documents" (qui va dans le main_area_stack) --
         self.documents_page_widget = QWidget()
-        self.main_splitter = QSplitter(Qt.Horizontal, self.documents_page_widget) # Store as self.main_splitter
+        # Le main_splitter est maintenant un enfant de documents_page_widget, pas directement de DocumentManager
+        self.main_splitter = QSplitter(Qt.Horizontal, self.documents_page_widget)
 
         left_pane_widget = QWidget()
         left_pane_widget.setObjectName("leftPaneWidget") # Set object name for QSS
@@ -911,6 +1109,36 @@ class DocumentManager(QMainWindow):
         # The main stretch for filter_search_main_layout should be removed if we want the client list
         # to be directly under the collapsible_filter_widget (or top_filter_line_layout when collapsed).
         # filter_search_main_layout.addStretch(1) # REMOVE THIS to prevent pushing client list down
+
+        # --- Sort Controls ---
+        sort_controls_layout = QHBoxLayout()
+        sort_label = QLabel(self.tr("Trier par:"))
+        self.sort_by_combo = QComboBox()
+        self.sort_by_combo.setObjectName("sortByCombo")
+        # Options: Clé affichée -> valeur technique pour le backend/CRUD
+        self.sort_by_combo.addItem(self.tr("Nom du Client"), "client_name")
+        self.sort_by_combo.addItem(self.tr("Date de Création"), "created_at")
+        self.sort_by_combo.addItem(self.tr("Pays"), "country_name")
+        self.sort_by_combo.addItem(self.tr("ID Projet"), "project_identifier")
+        self.sort_by_combo.addItem(self.tr("Statut"), "status_name")
+
+        self.sort_order_combo = QComboBox()
+        self.sort_order_combo.setObjectName("sortOrderCombo")
+        self.sort_order_combo.addItem(self.tr("Ascendant"), "ASC")
+        self.sort_order_combo.addItem(self.tr("Descendant"), "DESC")
+
+        # Connecter les signaux des combos de tri pour rafraîchir la liste
+        self.sort_by_combo.currentIndexChanged.connect(self.filter_client_list_display_slot)
+        self.sort_order_combo.currentIndexChanged.connect(self.filter_client_list_display_slot)
+
+        sort_controls_layout.addWidget(sort_label)
+        sort_controls_layout.addWidget(self.sort_by_combo)
+        sort_controls_layout.addWidget(self.sort_order_combo)
+        sort_controls_layout.addStretch(1) # Pousse les contrôles de tri à gauche
+
+        filter_search_main_layout.addLayout(sort_controls_layout) # Ajout du layout de tri au QGroupBox
+        # --- End Sort Controls ---
+
         left_pane_layout.addWidget(filter_search_group)
 
         self.client_list_widget = QListWidget()
@@ -924,9 +1152,37 @@ class DocumentManager(QMainWindow):
         left_pane_layout.addWidget(self.client_list_widget)
         
         pagination_layout = QHBoxLayout()
-        self.prev_page_button = QPushButton(self.tr("Précédent")); self.prev_page_button.clicked.connect(self.prev_page)
-        self.next_page_button = QPushButton(self.tr("Suivant")); self.next_page_button.clicked.connect(self.next_page)
-        self.page_info_label = QLabel(self.tr("Page 1")); pagination_layout.addWidget(self.prev_page_button); pagination_layout.addWidget(self.page_info_label); pagination_layout.addWidget(self.next_page_button)
+        self.prev_page_button = QPushButton(self.tr("Précédent"))
+        self.prev_page_button.setObjectName("prevPageButton")
+        self.prev_page_button.clicked.connect(self.prev_page)
+
+        self.next_page_button = QPushButton(self.tr("Suivant"))
+        self.next_page_button.setObjectName("nextPageButton")
+        self.next_page_button.clicked.connect(self.next_page)
+
+        self.page_info_label = QLabel(self.tr("Page 1"))
+        self.page_info_label.setObjectName("pageInfoLabel")
+
+        # Nouveaux éléments pour la pagination améliorée
+        go_to_label = QLabel(self.tr("Aller à :"))
+        self.go_to_page_input = QLineEdit()
+        self.go_to_page_input.setObjectName("goToPageInput")
+        self.go_to_page_input.setFixedWidth(50) # Largeur pour ~3-4 chiffres
+        self.go_to_page_input.setPlaceholderText(self.tr("Page"))
+        self.go_to_page_button = QPushButton(self.tr("OK"))
+        self.go_to_page_button.setObjectName("goToPageButton")
+
+        self.go_to_page_button.clicked.connect(self._handle_go_to_page)
+        self.go_to_page_input.returnPressed.connect(self._handle_go_to_page)
+
+        pagination_layout.addWidget(self.prev_page_button)
+        pagination_layout.addWidget(self.page_info_label)
+        pagination_layout.addWidget(self.next_page_button)
+        pagination_layout.addStretch(1) # Espace flexible
+        pagination_layout.addWidget(go_to_label)
+        pagination_layout.addWidget(self.go_to_page_input)
+        pagination_layout.addWidget(self.go_to_page_button)
+
         left_pane_layout.addLayout(pagination_layout)
         
         # Buttons in a single row
@@ -1177,16 +1433,21 @@ class DocumentManager(QMainWindow):
         self.searchable_actions_map[self.tr("Gestion des Commandes")] = self.commande_management_action
         self.searchable_actions_map[self.tr("Gérer les Rôles")] = self.manage_roles_action
 
-        # Action for menu customization
-        self.customize_menu_action = QAction(QIcon(":/icons/edit.svg"), self.tr("Personnaliser le Menu Modules"), self)
-        self.customize_menu_action.triggered.connect(self.open_menu_customization_dialog)
-        self.searchable_actions_map[self.tr("Personnaliser le Menu Modules")] = self.customize_menu_action
+        # Action for sidebar customization (anciennement menu customization) - REMOVED
+        # self.customize_sidebar_action = QAction(QIcon(":/icons/edit.svg"), self.tr("Personnaliser la Barre Latérale"), self)
+        # self.customize_sidebar_action.triggered.connect(self.open_sidebar_customization_dialog) # Renommer la méthode cible
+        # self.searchable_actions_map[self.tr("Personnaliser la Barre Latérale")] = self.customize_sidebar_action
 
         # B2C Restaurant Module Action
         # TODO: Find or create a suitable icon e.g., :/icons/restaurant.svg or :/icons/utensils.svg
         self.restaurant_module_action = QAction(QIcon(":/icons/placeholder_icon.svg"), self.tr("Service Restaurant (B2C)"), self)
         self.restaurant_module_action.triggered.connect(self.show_restaurant_module_view)
         self.searchable_actions_map[self.tr("Service Restaurant (B2C)")] = self.restaurant_module_action
+
+        # About Action (ensure it's created here for the map)
+        self.about_action = QAction(QIcon(":/icons/help-circle.svg"), self.tr("À propos"), self)
+        self.about_action.triggered.connect(self.show_about_dialog)
+        self.searchable_actions_map[self.tr("À propos")] = self.about_action
 
 
     def _placeholder_manage_users(self):
@@ -1198,186 +1459,231 @@ class DocumentManager(QMainWindow):
 
 
     def create_menus_main(self):
-        menu_bar = self.menuBar()
+        # Clear the old QMenuBar content if it exists, as we are replacing it
+        # self.menuBar().clear() # This is for QMainWindow's default menu bar. We're using a custom widget.
 
-        # File Menu
-        file_menu = menu_bar.addMenu(self.tr("Fichier"))
-        file_menu.addAction(self.settings_action) # Will be controlled by _apply_permissions
-        file_menu.addAction(self.status_action) # Controlled by P_MANAGE_STATUSES
-        file_menu.addAction(self.customize_menu_action) # Add customization action
-        file_menu.addSeparator()
-        file_menu.addAction(self.exit_action) # Exit is always available
+        # Configure the top_menu_bar_widget (QFrame)
+        self.top_menu_bar_widget.setFixedHeight(50)
+        self.top_menu_bar_widget.setStyleSheet("""
+            QFrame#topMenuBarWidget {
+                background-color: #f8fafc; /* Light grey, similar to modern UIs */
+                border-bottom: 1px solid #e2e8f0; /* Subtle border */
+            }
+            QPushButton#topMenuButton {
+                background-color: transparent;
+                color: #4b5563; /* Dark grey text */
+                border: none;
+                font-size: 14px;
+                padding: 8px 12px;
+                border-radius: 4px;
+            }
+            QPushButton#topMenuButton:hover {
+                background-color: #e5e7eb; /* Lighter grey on hover */
+                color: #1f2937; /* Darker text on hover */
+            }
+            QPushButton#topMenuButton::menu-indicator {
+                image: none; /* Hide default menu indicator if not desired */
+            }
+            QMenu {
+                background-color: #ffffff;
+                border: 1px solid #d1d5db;
+                padding: 5px;
+                border-radius: 6px;
+            }
+            QMenu::item {
+                color: #4b5563;
+                padding: 8px 20px;
+                margin: 1px;
+                border-radius: 4px;
+            }
+            QMenu::item:selected {
+                background-color: #f3f4f6;
+                color: #111827;
+            }
+            QMenu::separator {
+                height: 1px;
+                background: #e5e7eb;
+                margin: 5px 0px;
+            }
+        """)
 
-        # Admin Menu (new menu for admin-specific tasks)
-        self.admin_menu = menu_bar.addMenu(self.tr("Administration"))
-        self.admin_menu.addAction(self.manage_users_action)
-        self.admin_menu.addAction(self.manage_roles_action) # Add role management action
-        # Add other admin-specific actions here if any (e.g., system logs)
+        top_bar_layout = QHBoxLayout(self.top_menu_bar_widget)
+        top_bar_layout.setContentsMargins(10, 0, 10, 0) # Left/right padding, no top/bottom for frame
+        top_bar_layout.setSpacing(10)
 
-        # Modules Menu - Now dynamically built
-        modules_menu = menu_bar.addMenu(self.tr("Modules"))
-        # Core, non-configurable actions first
-        modules_menu.addAction(self.home_action)
-        modules_menu.addAction(self.documents_view_action)
-        # modules_menu.addAction(self.commande_management_action) # Removed: Now part of CONFIGURABLE_MODULES
-        modules_menu.addSeparator()
-        modules_menu.addAction(self.restaurant_module_action) # Added B2C Restaurant module action
-        modules_menu.addSeparator() # Separator after B2C module fixed entry
+        # App Logo/Title (Optional)
+        self.app_title_label = QLabel("Leopardo ERP") # Changed title & assign to self
+        self.app_title_label.setObjectName("topMenuAppTitle")
+        self.app_title_label.setStyleSheet("color: #2563eb; font-size: 18px; font-weight: bold; padding-right: 15px;")
 
-        # Load user's menu configuration
-        user_menu_config = None
-        if db_manager and self.current_user_id:
-            config_key = f"user_menu_config_{self.current_user_id}"
-            try:
-                user_menu_config_raw = db_manager.get_setting(config_key, default=None)
-                if isinstance(user_menu_config_raw, str):
-                    import json
-                    user_menu_config = json.loads(user_menu_config_raw)
-                elif isinstance(user_menu_config_raw, dict): # Already a dict
-                    user_menu_config = user_menu_config_raw
-                else: # None or other unexpected type
-                    user_menu_config = None
-            except Exception as e:
-                logging.error(f"Error loading or parsing user menu config for key {config_key}: {e}")
-                user_menu_config = None # Fallback to default if error
+        # Setup shadow effect for animation
+        self.app_title_shadow_effect.setBlurRadius(15)
+        self.app_title_shadow_effect.setColor(QColor(0, 0, 0, 0)) # Start fully transparent
+        self.app_title_shadow_effect.setOffset(0, 1) # Slight offset for a bit of depth
+        self.app_title_label.setGraphicsEffect(self.app_title_shadow_effect)
 
-        default_module_order = [mod['name'] for mod in CONFIGURABLE_MODULES]
-        default_module_visibility = {mod['name']: True for mod in CONFIGURABLE_MODULES}
+        top_bar_layout.addWidget(self.app_title_label)
 
-        if user_menu_config and isinstance(user_menu_config, dict):
-            ordered_module_names = user_menu_config.get('order', default_module_order)
-            visibility_map = user_menu_config.get('visibility', default_module_visibility)
-            # Ensure all known modules are present in ordered_module_names from config, add missing ones at the end
-            # This handles cases where new modules are added to CONFIGURABLE_MODULES after user saved config
-            all_known_module_names = set(default_module_order)
-            configured_module_names = set(ordered_module_names)
-            missing_from_config = list(all_known_module_names - configured_module_names)
-            if missing_from_config:
-                ordered_module_names.extend(missing_from_config) # Add new modules to the end of the user's order
-                for m_name in missing_from_config: # Ensure they have a visibility entry (default to True)
-                    if m_name not in visibility_map:
-                        visibility_map[m_name] = True
 
-        else: # No valid user config found, use defaults
-            ordered_module_names = default_module_order
-            visibility_map = default_module_visibility
-            logging.info(f"No valid user menu configuration found for user {self.current_user_id}. Using default menu order and visibility.")
+        # --- Define Menu Structure ---
+        self.top_menu_buttons = {} # To store references
 
-        # Add actions based on the (potentially user-defined) order and visibility
-        for module_name in ordered_module_names:
-            if not visibility_map.get(module_name, False): # If not visible in user config, skip
-                logging.info(f"Module '{module_name}' is configured as NOT VISIBLE by user. Skipping menu action.")
-                continue
-
-            # Find the module_info from CONFIGURABLE_MODULES using module_name
-            module_info = next((m for m in CONFIGURABLE_MODULES if m['name'] == module_name), None)
-            if not module_info:
-                logging.warning(f"Module name '{module_name}' from menu config not found in CONFIGURABLE_MODULES. Skipping.")
-                continue
-
+        # Helper to create module actions for the new "Modules" menu
+        # These actions will call handle_sidebar_module_selection (which will be renamed or its logic adapted)
+        module_menu_actions = []
+        # Order can be defined here or taken from CONFIGURABLE_MODULES if its order is preferred.
+        # Using CONFIGURABLE_MODULES to ensure all are covered and use their defined names/icons.
+        for module_info in CONFIGURABLE_MODULES:
             action_attr_name = module_info['action_attr']
-            action_instance = getattr(self, action_attr_name, None)
-
-            if action_instance:
-                # 1. Check if module is globally enabled by admin settings
-                is_module_globally_enabled = self.module_states.get(module_name, True)
-                if not is_module_globally_enabled:
-                    logging.info(f"Module '{module_name}' globally DISABLED by admin. Action '{action_attr_name}' NOT ADDED to menu.")
-                    continue # Skip adding this module to the menu entirely
-
-                # 2. Check if license permits this feature
-                # Assuming MODULE_TO_LICENSE_FEATURE_MAP is defined and accessible (it is in _apply_permissions, should be consistent here or passed)
-                # For simplicity, let's re-fetch or ensure self.allowed_features is up-to-date.
-                # It's set in __init__ and potentially updated in _handle_roles_changed if license itself changes.
-
-                # Now using module_info['license_feature']
-                license_feature_key = module_info.get('license_feature')
-                permitted_by_license = True # Default to true if no specific license feature is mapped or feature is None
-                if license_feature_key: # If a specific license feature is defined for this module
-                    permitted_by_license = license_feature_key in self.allowed_features
-
-                if not permitted_by_license:
-                    logging.info(f"Module '{module_name}': Feature '{license_feature_key}' NOT ALLOWED by current license. Action '{action_attr_name}' NOT ADDED to menu.")
-                    continue # Skip adding this module to the menu
-
-                # If globally enabled AND permitted by license, then add to menu.
-                # Role-based visibility will be handled by _apply_permissions.
-                modules_menu.addAction(action_instance)
-                logging.info(f"Module '{module_name}' (Action: {action_attr_name}) ADDED to menu (globally enabled, license permitted, user visible).")
-
+            q_action = getattr(self, action_attr_name, None)
+            if q_action:
+                # We need to ensure the action, when triggered from the top menu,
+                # calls the correct view switching logic.
+                # The QAction itself is already connected to a show_..._view method.
+                module_menu_actions.append((q_action.text(), q_action))
             else:
-                logging.warning(f"Action attribute '{action_attr_name}' for module '{module_name}' not found on DocumentManager instance.")
+                logging.warning(f"QAction instance for module {module_info['name']} (attr: {action_attr_name}) not found.")
 
-        # Help Menu (remains static)
-        help_menu = menu_bar.addMenu(self.tr("Aide")); about_action = QAction(QIcon(":/icons/help-circle.svg"), self.tr("À propos"), self); about_action.triggered.connect(self.show_about_dialog); help_menu.addAction(about_action)
-        self.searchable_actions_map[self.tr("À propos")] = about_action
+        # Add core navigation items like "Accueil" and "Gestion Documents" if not in CONFIGURABLE_MODULES
+        # or if they need special placement. For now, assuming they are QActions like others.
+        # self.home_action and self.documents_view_action are already created.
 
-        # Search bar in menu bar
-        self.search_bar_line_edit = QLineEdit(self)
-        self.search_bar_line_edit.setObjectName("menuBarSearch")
-        self.search_bar_line_edit.setPlaceholderText(self.tr("Rechercher une fonctionnalité..."))
+        menu_definitions = [
+            (self.tr("Accueil"), None, self.home_action), # Direct action, not a dropdown
+            (self.tr("Modules"), None, module_menu_actions), # Dropdown for all other modules
+            (self.tr("Outils"), None, [
+                (self.tr("Paramètres"), self.settings_action),
+                (self.tr("Gérer les Statuts"), self.status_action)
+                # (self.tr("Personnaliser la Barre Latérale"), self.customize_sidebar_action) # REMOVED
+            ]),
+            (self.tr("Administration"), None, [
+                (self.tr("Gérer les Utilisateurs"), self.manage_users_action),
+                (self.tr("Gérer les Rôles"), self.manage_roles_action)
+            ]),
+            (self.tr("Fichier"), None, [
+                (self.tr("Quitter"), self.exit_action)
+            ]),
+            (self.tr("Aide"), None, [
+                (self.tr("À propos"), self.searchable_actions_map.get(self.tr("À propos")))
+            ])
+        ]
 
-        self.search_completer_model = QStringListModel([])
-        self.search_completer = QCompleter(self.search_completer_model, self)
-        self.search_completer.setCaseSensitivity(Qt.CaseInsensitive)
-        self.search_completer.setFilterMode(Qt.MatchContains)
+        for menu_title, menu_icon_path, actions_or_action_defs in menu_definitions:
+            menu_button = QPushButton(menu_title)
+            menu_button.setObjectName("topMenuButton")
+            if menu_icon_path: # Not currently used for these main items
+                menu_button.setIcon(QIcon(menu_icon_path))
 
-        completer_popup = self.search_completer.popup()
-        completer_popup.setObjectName("menuBarSearchCompleterView")
+            if isinstance(actions_or_action_defs, list): # It's a list of (text, QAction) for a dropdown
+                if actions_or_action_defs: # If there are actions, create a dropdown menu
+                    dropdown_menu = QMenu(self)
+                    for action_text, q_action_obj in actions_or_action_defs:
+                        if q_action_obj:
+                            dropdown_menu.addAction(q_action_obj)
+                        else:
+                            logging.warning(f"QAction for '{action_text}' in menu '{menu_title}' not found.")
+                    menu_button.setMenu(dropdown_menu)
+            elif isinstance(actions_or_action_defs, QAction): # It's a single direct QAction
+                menu_button.clicked.connect(actions_or_action_defs.trigger)
 
-        self.search_bar_line_edit.setCompleter(self.search_completer)
-
-        # Update completer model with action names
-        action_names = list(self.searchable_actions_map.keys())
-        self.search_completer_model.setStringList(action_names)
-
-        # Connect signals for search activation
-        self.search_completer.activated[str].connect(self.handle_search_activation)
-        self.search_bar_line_edit.returnPressed.connect(self.handle_search_return_pressed)
-
-        # User display and logout button
-        self.user_display_widget = QWidget()
-        user_display_layout = QHBoxLayout(self.user_display_widget)
-        user_display_layout.setContentsMargins(5, 0, 5, 0) # Adjust margins as needed
-        user_display_layout.setSpacing(10)
-
-        # self.user_info_label = QLabel(self.tr("Non connecté")) # Replaced by UserMenuButton
-        # self.user_info_label.setObjectName("userInfoLabel") # For styling
-        # user_display_layout.addWidget(self.user_info_label)
-
-        # self.logout_button = QPushButton(self.tr("Déconnexion")) # Replaced by UserMenuButton
-        # self.logout_button.setIcon(QIcon(":/icons/log-out.svg"))
-        # self.logout_button.setFlat(True)
-        # self.logout_button.setToolTip(self.tr("Se déconnecter et revenir à l'écran de connexion"))
-        # self.logout_button.clicked.connect(self._handle_logout)
-        # user_display_layout.addWidget(self.logout_button)
-
-        self.user_menu_button_instance = UserMenuButton(current_user_info=self.current_user_info, parent=self)
-        self.user_menu_button_instance.setObjectName("userMenuButton") # Added object name
-        self.user_menu_button_instance.request_logout.connect(self._handle_logout)
-        self.user_menu_button_instance.request_show_user_management_page.connect(self.show_user_management_page)
-        self.user_menu_button_instance.request_open_edit_my_account_dialog.connect(self._handle_request_open_edit_my_account)
-        self.user_menu_button_instance.request_open_add_user_dialog.connect(self._handle_request_open_add_user)
-        user_display_layout.addWidget(self.user_menu_button_instance)
+            top_bar_layout.addWidget(menu_button)
+            self.top_menu_buttons[menu_title] = menu_button
 
 
-        # The following block redefining self.search_bar_line_edit is redundant
-        # and was likely causing the issue. It's removed.
-        # # Main Search Bar (as before)
-        # self.search_bar_line_edit = QLineEdit(self)
-        # self.search_bar_line_edit.setObjectName("menuBarSearch")
-        # self.search_bar_line_edit.setPlaceholderText(self.tr("Rechercher une fonctionnalité..."))
-        # # ... (completer setup as before) ...
+        top_bar_layout.addStretch(1) # Pushes menu items to left, following items to right
 
-        # Container for both search and user display
-        top_right_container = QWidget()
-        top_right_layout = QHBoxLayout(top_right_container)
-        top_right_layout.setContentsMargins(0,0,0,0)
-        top_right_layout.setSpacing(15) # Spacing between search and user info
-        top_right_layout.addWidget(self.search_bar_line_edit)
-        top_right_layout.addWidget(self.user_display_widget)
+        # Search bar (re-add with its completer)
+        self.search_bar_line_edit = QLineEdit(self) # Already initialized in create_actions_main
+        self.search_bar_line_edit.setObjectName("topMenuBarSearch") # Different object name for specific styling
+        self.search_bar_line_edit.setPlaceholderText(self.tr("Rechercher..."))
+        self.search_bar_line_edit.setFixedWidth(200) # Adjust width as needed
+        self.search_bar_line_edit.setStyleSheet("""
+            QLineEdit#topMenuBarSearch {
+                padding: 5px 8px;
+                border: 1px solid #d1d5db;
+                border-radius: 4px;
+                background-color: white;
+            }
+            QLineEdit#topMenuBarSearch:focus {
+                border-color: #2563eb;
+            }
+        """)
+        # Completer is already set up in create_actions_main
+        top_bar_layout.addWidget(self.search_bar_line_edit)
 
-        self.menuBar().setCornerWidget(top_right_container, Qt.TopRightCorner)
+        # User Menu Button (already initialized in create_actions_main)
+        if not hasattr(self, 'user_menu_button_instance'): # Ensure it's created
+            self.user_menu_button_instance = UserMenuButton(current_user_info=self.current_user_info, parent=self)
+            self.user_menu_button_instance.setObjectName("userMenuButton")
+            self.user_menu_button_instance.request_logout.connect(self._handle_logout)
+            self.user_menu_button_instance.request_show_user_management_page.connect(self.show_user_management_page)
+            self.user_menu_button_instance.request_open_edit_my_account_dialog.connect(self._handle_request_open_edit_my_account)
+            self.user_menu_button_instance.request_open_add_user_dialog.connect(self._handle_request_open_add_user)
+
+        self.user_menu_button_instance.setStyleSheet("""
+            QPushButton#userMenuButton {
+                background-color: transparent;
+                color: #4b5563;
+                border: none;
+                padding: 5px 10px;
+                font-size: 14px;
+            }
+            QPushButton#userMenuButton:hover {
+                background-color: #e5e7eb;
+                border-radius: 4px;
+            }
+        """)
+        top_bar_layout.addWidget(self.user_menu_button_instance)
+
+        # Window Controls (Minimize, Maximize, Close)
+        window_controls_layout = QHBoxLayout()
+        window_controls_layout.setSpacing(5)
+
+        minimize_button = QToolButton()
+        minimize_button.setText("—") # Or use an icon
+        minimize_button.setToolTip(self.tr("Minimiser"))
+        minimize_button.clicked.connect(self.showMinimized)
+
+        maximize_button = QToolButton()
+        maximize_button.setText("□") # Or use an icon
+        maximize_button.setToolTip(self.tr("Agrandir / Restaurer"))
+        maximize_button.clicked.connect(self.toggleMaximized)
+
+        close_button = QToolButton()
+        close_button.setText("✕") # Or use an icon
+        close_button.setToolTip(self.tr("Fermer"))
+        close_button.clicked.connect(self.close)
+
+        for btn in [minimize_button, maximize_button, close_button]:
+            btn.setObjectName("windowControlButton")
+            btn.setFixedSize(28, 28)
+            btn.setStyleSheet("""
+                QToolButton#windowControlButton {
+                    background-color: transparent;
+                    border: none;
+                    font-size: 16px;
+                    color: #6b7280; /* Muted color */
+                }
+                QToolButton#windowControlButton:hover {
+                    background-color: #e5e7eb;
+                    border-radius: 4px;
+                    color: #1f2937;
+                }
+            """)
+
+        # Specific hover for close button
+        close_button.setStyleSheet(close_button.styleSheet() + """
+            QToolButton#windowControlButton:hover {
+                background-color: #fee2e2; /* Light red on hover for close */
+                color: #ef4444; /* Red text/icon */
+            }
+        """)
+
+        window_controls_layout.addWidget(minimize_button)
+        window_controls_layout.addWidget(maximize_button)
+        window_controls_layout.addWidget(close_button)
+        top_bar_layout.addLayout(window_controls_layout)
+
         self._update_user_display() # Initial update of user display
         self._apply_permissions() # Apply permissions on initial load
 
@@ -1417,32 +1723,67 @@ class DocumentManager(QMainWindow):
         can_create_client = has_permission(role_name, P_CREATE_CLIENT)
         logging.info(f"  Role '{role_name}': P_MANAGE_SYSTEM_SETTINGS={is_admin_or_similar}, P_CREATE_CLIENT={can_create_client}")
 
-        # Menu Actions
-        log_msg_system_settings = f"Permission P_MANAGE_SYSTEM_SETTINGS for role '{role_name}': {'Granted' if is_admin_or_similar else 'Denied'}. Settings action {'enabled' if is_admin_or_similar else 'disabled'}."
-        logging.info(log_msg_system_settings)
+        # --- Apply permissions to QActions (which are now in QMenus of the top menu buttons) ---
+        # Settings Action
         self.settings_action.setEnabled(is_admin_or_similar)
-        logging.info(f"  Action 'settings_action' enabled: {is_admin_or_similar}")
+        logging.info(f"  Action 'settings_action' enabled: {is_admin_or_similar} (P_MANAGE_SYSTEM_SETTINGS)")
+
+        # Status Action
         if hasattr(self, 'status_action'):
             can_manage_statuses = has_permission(role_name, P_MANAGE_STATUSES)
             self.status_action.setEnabled(can_manage_statuses)
-            logging.info(f"  Action 'status_action' enabled: {can_manage_statuses} (Permission: P_MANAGE_STATUSES)")
+            logging.info(f"  Action 'status_action' enabled: {can_manage_statuses} (P_MANAGE_STATUSES)")
 
 
-        # Admin Menu visibility
+        # Customize Sidebar Action (assuming always enabled for logged-in users for now, or add a specific permission)
+        if hasattr(self, 'customize_sidebar_action'):
+            self.customize_sidebar_action.setEnabled(True) # Or add a specific permission check
+            logging.info(f"  Action 'customize_sidebar_action' enabled: True (assuming)")
+
+
+        # Admin Menu Actions (manage_users_action, manage_roles_action)
         can_manage_users = has_permission(role_name, P_MANAGE_USERS)
         can_manage_roles = has_permission(role_name, P_MANAGE_ROLES)
-        admin_menu_visible = can_manage_users or can_manage_roles
-        self.admin_menu.menuAction().setVisible(admin_menu_visible)
-        logging.info(f"  Admin Menu visible: {admin_menu_visible} (P_MANAGE_USERS={can_manage_users}, P_MANAGE_ROLES={can_manage_roles})")
 
-        # Further check for admin menu actions based on license features if applicable
-        # Example: If P_MANAGE_USERS requires a certain license feature beyond role permission
         can_manage_users_licensed = FEATURE_USER_MANAGEMENT_FULL in self.allowed_features
         self.manage_users_action.setEnabled(can_manage_users and can_manage_users_licensed)
         self.manage_roles_action.setEnabled(can_manage_roles and can_manage_users_licensed) # Assuming role management also tied to this feature
+        logging.info(f"  Action 'manage_users_action' enabled: {self.manage_users_action.isEnabled()} (P_MANAGE_USERS={can_manage_users}, Licensed={can_manage_users_licensed})")
+        logging.info(f"  Action 'manage_roles_action' enabled: {self.manage_roles_action.isEnabled()} (P_MANAGE_ROLES={can_manage_roles}, Licensed={can_manage_users_licensed})")
 
-        # Module Menu Actions & Feature Mapping
-        # The MODULE_TO_LICENSE_FEATURE_MAP is now removed.
+        # --- Control visibility of top-level menu buttons based on their actions' visibility ---
+        # Example: Hide "Administration" button if both "Gérer les Utilisateurs" and "Gérer les Rôles" are disabled/hidden
+        if hasattr(self, 'top_menu_buttons'):
+            admin_button = self.top_menu_buttons.get(self.tr("Administration"))
+            if admin_button:
+                # An admin menu button should be visible if at least one of its actions is enabled.
+                # QActions don't have isVisible(), use isEnabled() as a proxy for menu items.
+                admin_menu_has_visible_action = self.manage_users_action.isEnabled() or self.manage_roles_action.isEnabled()
+                admin_button.setVisible(admin_menu_has_visible_action)
+                logging.info(f"  Top Menu Button 'Administration' visible: {admin_menu_has_visible_action}")
+
+            tools_button = self.top_menu_buttons.get(self.tr("Outils"))
+            if tools_button:
+                tools_menu_has_visible_action = (self.settings_action.isEnabled() or
+                                                 (hasattr(self, 'status_action') and self.status_action.isEnabled()) or
+                                                 (hasattr(self, 'customize_sidebar_action') and self.customize_sidebar_action.isEnabled()))
+                tools_button.setVisible(tools_menu_has_visible_action)
+                logging.info(f"  Top Menu Button 'Outils' visible: {tools_menu_has_visible_action}")
+
+            # File and Help menus are usually always visible.
+            file_button = self.top_menu_buttons.get(self.tr("Fichier"))
+            if file_button: file_button.setVisible(True) # Exit action always available
+
+            help_button = self.top_menu_buttons.get(self.tr("Aide"))
+            if help_button:
+                 about_action = self.searchable_actions_map.get(self.tr("À propos"))
+                 help_button.setVisible(about_action.isEnabled() if about_action else False)
+
+
+        # Module Menu Actions & Feature Mapping (This part primarily affects sidebar now)
+        # The QActions for modules are still used by the sidebar logic if they are added to it.
+        # Their enabled/visible state here might affect if they *could* be added to a menu,
+        # but the sidebar population logic (_populate_sidebar) has its own permission checks.
         # License feature checks will use module_config.get('license_feature').
 
         # Role-based permissions for modules (as before)
@@ -1854,7 +2195,6 @@ class DocumentManager(QMainWindow):
         filters_for_crud = {}
         if self.selected_status_ids_filter: # Use the list of selected status IDs
             filters_for_crud['status_ids'] = self.selected_status_ids_filter
-        # If self.selected_status_ids_filter is empty, no status_ids filter is applied (shows all, respecting archive filter)
 
         if country_id_filter is not None: filters_for_crud['country_id'] = country_id_filter
         if category_filter_text: filters_for_crud['category'] = category_filter_text
@@ -1867,19 +2207,42 @@ class DocumentManager(QMainWindow):
         if hasattr(self, 'date_filter_end') and self.date_filter_end.date().isValid() and not self.date_filter_end.date().isNull():
             filters_for_crud['created_at_end'] = self.date_filter_end.date().toString("yyyy-MM-dd")
 
-        # Update total_filtered_clients count
-        # Conceptual: if clients_crud_instance.get_all_clients_count existed:
-        # self.total_filtered_clients = clients_crud_instance.get_all_clients_count(filters=filters_for_crud, include_deleted=include_deleted_filter)
-        # Simulation for this subtask if the count function isn't available:
-        all_matching_clients = clients_crud_instance.get_all_clients(filters=filters_for_crud, include_deleted=include_deleted_filter, limit=None, offset=0)
+        # Ajouter les paramètres de tri aux filtres passés au CRUD
+        if hasattr(self, 'sort_by_combo') and self.sort_by_combo.currentData():
+            filters_for_crud['order_by_field'] = self.sort_by_combo.currentData()
+        if hasattr(self, 'sort_order_combo') and self.sort_order_combo.currentData():
+            filters_for_crud['order_direction'] = self.sort_order_combo.currentData()
+
+        # Note: la méthode get_all_clients_with_details a été modifiée pour extraire
+        # 'order_by_field' et 'order_direction' de `filters` et les utiliser,
+        # puis les retirer pour ne pas qu'ils soient interprétés comme des conditions WHERE.
+
+        # Mettre à jour le nombre total de clients filtrés
+        # Pour cela, il faut appeler la méthode CRUD sans limit/offset mais avec les filtres
+        # Cela peut être coûteux si non optimisé. Idéalement, une méthode get_count(filters) serait mieux.
+        # Pour l'instant, on récupère tout pour compter, puis on pagine.
+        # La méthode CRUD get_all_clients_with_details s'attend à ce que order_by_field et order_direction soient dans filters.
+        temp_filters_for_count = filters_for_crud.copy() # Copier pour ne pas modifier l'original pour la pagination
+
+        all_matching_clients = clients_crud_instance.get_all_clients_with_details(
+            filters=temp_filters_for_count,
+            include_deleted=include_deleted_filter,
+            limit=None, offset=0, conn=None # Pas de pagination pour le comptage
+        )
         self.total_filtered_clients = len(all_matching_clients)
 
+        # Charger et afficher la page actuelle de clients
+        # `load_and_display_clients` utilise `get_all_clients_with_details` en interne.
+        # Il faut s'assurer que `load_and_display_clients` passe bien les filtres (y compris de tri)
+        # à `get_all_clients_with_details`.
+        # La logique actuelle de `load_and_display_clients` devrait déjà le faire si `filters_for_crud` contient les clés de tri.
         load_and_display_clients(self, filters=filters_for_crud, limit=self.limit_per_page, offset=self.current_offset, include_deleted=include_deleted_filter)
-        self.update_pagination_controls() # Call after total_filtered_clients is updated
-        filter_and_display_clients(self)
+
+        self.update_pagination_controls() # Mettre à jour les contrôles de pagination
+        # filter_and_display_clients(self) # Cette ligne semble redondante si load_and_display_clients fait déjà l'affichage
 
     def filter_client_list_display_slot(self):
-        self.current_offset = 0
+        self.current_offset = 0 # Réinitialiser à la première page lors d'un changement de filtre/tri
         self.load_clients_from_db_slot()
 
     def update_pagination_controls(self):
@@ -1887,12 +2250,53 @@ class DocumentManager(QMainWindow):
         if self.total_filtered_clients > 0:
             total_pages = (self.total_filtered_clients + self.limit_per_page - 1) // self.limit_per_page
         else:
-            total_pages = 1
-        total_pages = max(1, total_pages) # Ensure total_pages is at least 1
+            total_pages = 1 # ou 0 si self.total_filtered_clients est 0
+        total_pages = max(1, total_pages) # Assurer qu'il y a au moins une page même si vide
 
-        self.page_info_label.setText(self.tr("Page {0} / {1}").format(current_page, total_pages))
+        self.page_info_label.setText(self.tr("Page {0} / {1} ({2} éléments)").format(current_page, total_pages, self.total_filtered_clients))
         self.prev_page_button.setEnabled(self.current_offset > 0)
         self.next_page_button.setEnabled((self.current_offset + self.limit_per_page) < self.total_filtered_clients)
+
+        # Activer/désactiver les contrôles "Aller à la page" en fonction du nombre de pages
+        can_go_to_page = total_pages > 1
+        if hasattr(self, 'go_to_page_input'): # Vérifier si les widgets existent
+            self.go_to_page_input.setEnabled(can_go_to_page)
+        if hasattr(self, 'go_to_page_button'):
+            self.go_to_page_button.setEnabled(can_go_to_page)
+
+
+    def _handle_go_to_page(self):
+        if not hasattr(self, 'go_to_page_input') or not hasattr(self, 'total_filtered_clients'):
+            return
+
+        try:
+            page_num_str = self.go_to_page_input.text().strip()
+            if not page_num_str: # Si l'entrée est vide, ne rien faire
+                return
+
+            page_num = int(page_num_str)
+
+            if self.total_filtered_clients > 0:
+                total_pages = (self.total_filtered_clients + self.limit_per_page - 1) // self.limit_per_page
+            else:
+                total_pages = 1
+            total_pages = max(1, total_pages)
+
+            if 1 <= page_num <= total_pages:
+                self.current_offset = (page_num - 1) * self.limit_per_page
+                self.load_clients_from_db_slot()
+                self.go_to_page_input.clear() # Vider le champ après navigation
+            else:
+                QMessageBox.warning(self, self.tr("Page Invalide"),
+                                    self.tr("Veuillez entrer un numéro de page entre 1 et {0}.").format(total_pages))
+                self.go_to_page_input.selectAll()
+                self.go_to_page_input.setFocus()
+        except ValueError:
+            QMessageBox.warning(self, self.tr("Entrée Invalide"),
+                                self.tr("Veuillez entrer un numéro de page valide."))
+            self.go_to_page_input.selectAll()
+            self.go_to_page_input.setFocus()
+
 
     def prev_page(self):
         if self.current_offset > 0:
@@ -1943,9 +2347,19 @@ class DocumentManager(QMainWindow):
         # This is crucial for context menus, click handling etc. to get the full data.
         item.setData(Qt.UserRole, client_dict_data)
 
+        # Connecter les signaux des actions en ligne du custom_widget
+        client_id_for_actions = client_dict_data.get("client_id")
+        if client_id_for_actions:
+            custom_widget.editActionClicked.connect(
+                functools.partial(self.open_edit_client_dialog_slot, client_id_for_actions)
+            )
+            custom_widget.openFolderActionClicked.connect(
+                functools.partial(self.open_client_folder_fs, client_id_for_actions)
+            )
+            # Connecter d'autres signaux ici si ajoutés (ex: archiveActionClicked)
+
         self.client_list_widget.addItem(item)
         self.client_list_widget.setItemWidget(item, custom_widget)
-
 
 
     def load_countries_into_filter_combo(self):
@@ -2756,9 +3170,35 @@ class DocumentManager(QMainWindow):
                                  self.tr("La page du Service Restaurant n'a pas pu être chargée."))
 
 
-    def open_menu_customization_dialog(self):
-        if not self.current_user_id:
-            QMessageBox.warning(self, self.tr("Accès Refusé"), self.tr("Vous devez être connecté pour personnaliser le menu."))
+    def _handle_sidebar_config_changed(self):
+        """Handles changes from the sidebar customization dialog."""
+        logging.info("Configuration de la barre latérale utilisateur modifiée. Reconstruction de la barre latérale...")
+        self._populate_sidebar() # Re-populate sidebar with new configuration
+        self.notify(self.tr("Barre Latérale Mise à Jour"), self.tr("La barre latérale a été mise à jour selon vos préférences."), type='INFO')
+
+
+    def _handle_menu_config_changed(self): # Kept for now, might be removed if menu is fully replaced
+        logging.info("Configuration du menu utilisateur modifiée. Reconstruction des menus...")
+
+        # Store the corner widget (search bar and user button) to restore it later
+        corner_widget = self.menuBar().cornerWidget(Qt.TopRightCorner)
+        # Temporarily remove it from the menu bar to prevent it from being deleted by clear()
+        if corner_widget:
+            self.menuBar().setCornerWidget(None)
+            corner_widget.setParent(None) # Ensure it's not deleted with the old menubar
+
+        self.menuBar().clear() # This clears all menus and actions within them.
+        self.create_menus_main() # This will use the new configuration from the database.
+        self._apply_permissions() # Re-apply permissions to the new menu structure.
+
+        if corner_widget:
+            self.menuBar().setCornerWidget(corner_widget, Qt.TopRightCorner)
+
+
+            self.notify(self.tr("Menu Mis à Jour"), self.tr("Le menu principal a été mis à jour selon vos préférences."), type='INFO')
+
+    # --- Sidebar Population and State Management --- (ALL REMOVED)
+    # --- End Slots for Sidebar Interaction --- (ALL REMOVED)
             return
 
         available_modules_for_customization = []
@@ -2782,7 +3222,7 @@ class DocumentManager(QMainWindow):
                                     self.tr("Il n'y a actuellement aucun module que vous êtes autorisé à configurer."))
             return
 
-        dialog = MenuCustomizationDialog(
+        dialog = MenuCustomizationDialog( # TODO: This dialog might need to become SidebarCustomizationDialog
             current_user_id=self.current_user_id,
             configurable_modules=available_modules_for_customization,
             module_states=self.module_states,
@@ -2797,18 +3237,22 @@ class DocumentManager(QMainWindow):
              QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("Le gestionnaire de base de données n'est pas disponible."))
              return
 
-        dialog.get_user_menu_config_func = lambda user_id: db_manager.get_setting(f"user_menu_config_{user_id}")
+        # TODO: Adapt these keys if MenuCustomizationDialog is changed for sidebar config
+        dialog.get_user_menu_config_func = lambda user_id: db_manager.get_setting(f"user_sidebar_config_{user_id}") # Changed key
+        dialog.set_user_menu_config_func = lambda user_id, data: db_manager.set_setting(f"user_sidebar_config_{user_id}", json.dumps(data)) # Changed key
 
-        # Ensure set_setting expects a string for JSON, so dump it here.
-        dialog.set_user_menu_config_func = lambda user_id, data: db_manager.set_setting(f"user_menu_config_{user_id}", json.dumps(data))
-
-        dialog.menu_config_changed.connect(self._handle_menu_config_changed)
+        dialog.menu_config_changed.connect(self._handle_sidebar_config_changed) # Connect to new handler
         if dialog.exec_() == QDialog.Accepted:
-            # _handle_menu_config_changed is already connected to the signal,
-            # so it will be called if the dialog emits it upon successful save.
             pass
 
-    def _handle_menu_config_changed(self):
+    def _handle_sidebar_config_changed(self):
+        """Handles changes from the sidebar customization dialog."""
+        logging.info("Configuration de la barre latérale utilisateur modifiée. Reconstruction de la barre latérale...")
+        self._populate_sidebar() # Re-populate sidebar with new configuration
+        self.notify(self.tr("Barre Latérale Mise à Jour"), self.tr("La barre latérale a été mise à jour selon vos préférences."), type='INFO')
+
+
+    def _handle_menu_config_changed(self): # Kept for now, might be removed if menu is fully replaced
         logging.info("Configuration du menu utilisateur modifiée. Reconstruction des menus...")
 
         # Store the corner widget (search bar and user button) to restore it later
@@ -2819,20 +3263,15 @@ class DocumentManager(QMainWindow):
             corner_widget.setParent(None) # Ensure it's not deleted with the old menubar
 
         self.menuBar().clear() # This clears all menus and actions within them.
-
-        # Re-create actions and menus
-        # create_actions_main() generally doesn't need to be recalled unless action properties change.
-        # However, if action texts (used by dialog) or icons were part of user config, it might be needed.
-        # For now, assume only menu structure changes.
-        # self.create_actions_main() # Uncomment if actions themselves might change based on new config.
-
         self.create_menus_main() # This will use the new configuration from the database.
         self._apply_permissions() # Re-apply permissions to the new menu structure.
 
-        # Restore the corner widget
         if corner_widget:
             self.menuBar().setCornerWidget(corner_widget, Qt.TopRightCorner)
 
         self.notify(self.tr("Menu Mis à Jour"), self.tr("Le menu principal a été mis à jour selon vos préférences."), type='INFO')
+
+    # --- Sidebar Population and State Management --- (ALL REMOVED)
+    # --- End Slots for Sidebar Interaction --- (ALL REMOVED)
 
 # [end of main_window.py]

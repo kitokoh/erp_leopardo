@@ -544,6 +544,10 @@ class SettingsPage(QWidget):
         self.show_setup_prompt_checkbox.setToolTip(self.tr("If checked, the initial company setup dialog will appear at startup if no default company exists."))
         behavior_layout.addRow(self.show_setup_prompt_checkbox)
 
+        self.check_license_on_startup_checkbox = QCheckBox(self.tr("Vérifier la validité de la licence au démarrage"))
+        self.check_license_on_startup_checkbox.setToolTip(self.tr("Si décoché, l'application ne vérifiera pas la licence au démarrage et autorisera l'accès."))
+        behavior_layout.addRow(self.check_license_on_startup_checkbox) # Add to the form layout
+
         main_layout.addWidget(behavior_group)
         main_layout.addStretch(1) # Push content to the top
         self.tabs_widget.addTab(tab_widget, self.tr("General"))
@@ -1627,6 +1631,14 @@ class SettingsPage(QWidget):
         self.reminder_days_spinbox.setValue(self.main_config.get("default_reminder_days", 30))
         self.google_maps_url_input.setText(self.main_config.get("google_maps_review_url", "https://maps.google.com/?cid=YOUR_CID_HERE"))
         self.show_setup_prompt_checkbox.setChecked(self.main_config.get("show_initial_setup_on_startup", False))
+
+        # Load the new license check setting
+        if db_manager:
+            check_license_str = db_manager.get_setting('check_license_on_startup', default='True')
+            self.check_license_on_startup_checkbox.setChecked(check_license_str.lower() == 'true')
+        else:
+            self.check_license_on_startup_checkbox.setChecked(True) # Default to True if db_manager is not available
+            print("WARNING: db_manager not available, 'check_license_on_startup' defaulted to True for UI.")
         print("General tab settings loaded.")
 
     def _load_connectivity_tab_data(self):
@@ -1878,8 +1890,13 @@ class SettingsPage(QWidget):
             for key, value in footer_notes_data.items():
                 db_manager.set_setting(key, value)
             print("Default document footer notes saved to DB.")
+
+            # Save the new license check setting directly to DB
+            check_license_value = self.check_license_on_startup_checkbox.isChecked()
+            db_manager.set_setting('check_license_on_startup', 'True' if check_license_value else 'False')
+            print(f"License check on startup setting saved to DB: {check_license_value}")
         else:
-            print("WARNING: db_manager not available. Default footer notes not saved to DB.")
+            print("WARNING: db_manager not available. Default footer notes and license check setting not saved to DB.")
 
 
         # Save module activation states (persisted in DB, not main_config directly)
