@@ -997,78 +997,76 @@ QListView#menuBarSearchCompleterView::item:selected {
 /* == MENU STYLING ENHANCEMENTS (Improved for better UX) == */
 
 QMenuBar {
-    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #007BFF, stop:1 #0056B3); /* Vibrant blue gradient */
-    border-bottom: 1px solid #004085; /* Darker blue border */
-    padding: 8px 10px;
-    font-size: 11pt;
-    font-weight: bold; /* Bolder text for top menu */
+    background-color: #263238; /* Dark Slate Grey (Primary Text Color) */
+    border-bottom: 1px solid #000000; /* Black border for subtle definition */
+    padding: 6px 8px; /* Reduced padding */
+    font-size: 10pt; /* Harmonized font size */
+    font-weight: bold;
 }
 
 QMenuBar::item {
-    spacing: 8px;
-    padding: 10px 18px;
+    spacing: 6px; /* Adjusted spacing */
+    padding: 8px 12px; /* Adjusted padding */
     background: transparent;
-    color: #FFFFFF; /* White text for contrast against blue gradient */
-    border-radius: 6px;
+    color: #F5F7FA; /* Light Grey-Blue text for contrast */
+    border-radius: 0px; /* Sharper look - no border radius for items on bar */
 }
 
 QMenuBar::item:selected { /* When menu is open or hovered */
-    background-color: rgba(255, 255, 255, 0.2); /* Subtle white highlight */
+    background-color: #546E7A; /* Lighter Slate Grey for hover/selection */
     color: #FFFFFF;
 }
 
 QMenuBar::item:pressed { /* When menu item is pressed */
-    background-color: rgba(0, 0, 0, 0.2); /* Subtle dark highlight */
-    color: #E0E0E0; /* Slightly dimmer white */
+    background-color: #007BFF; /* Accent color when pressed */
+    color: #FFFFFF;
 }
 
 /* QMenu (Dropdowns) - Refinements for a premium feel */
 QMenu {
     background-color: #FFFFFF; /* Clean white background */
-    border: 1px solid #B0BEC5; /* Existing border, could be slightly darker if needed #A0A0A0 */
-    padding: 8px;
-    border-radius: 6px;
-    /* Adding a subtle shadow effect using multiple borders if QGraphicsDropShadowEffect isn't used directly on QMenu */
-    /* This is a trick and might not look perfect, actual shadow is better. */
-    /* For QSS, a simple border is more reliable. */
+    border: 1px solid #DDE2E6; /* Consistent with main border color */
+    padding: 6px; /* Slightly reduced padding */
+    border-radius: 4px; /* Consistent with other elements */
 }
 
 QMenu::item {
-    padding: 10px 25px 10px 25px; /* More horizontal padding */
-    color: #1A2B3C; /* Dark, slightly desaturated blue for text - high contrast */
+    padding: 8px 20px 8px 20px; /* Adjusted padding */
+    color: #263238; /* Primary text color */
     background-color: transparent;
-    border-radius: 5px; /* Rounded corners for items */
-    margin: 3px 0;
+    border-radius: 3px; /* Rounded corners for items */
+    margin: 2px 0; /* Reduced margin */
     font-size: 10pt;
-    font-weight: 500; /* Medium weight for readability */
+    font-weight: normal; /* Standard weight, selected can be bolder if needed */
 }
 
 QMenu::item:selected { /* Hover/selected state in dropdown */
     background-color: #007BFF; /* Vibrant blue accent */
     color: #FFFFFF;
+    font-weight: 500; /* Medium weight for selected item */
 }
 
 QMenu::item:disabled {
-    color: #A0A0A0; /* Lighter grey for disabled items */
+    color: #90A4AE; /* Lighter grey for disabled items */
     background-color: transparent;
 }
 
 QMenu::icon {
-    padding-left: 10px;
-    padding-right: 10px;
+    padding-left: 5px; /* Reduced padding */
+    padding-right: 8px; /* Reduced padding */
     /* Ensure icons are visible and well-aligned */
 }
 
 QMenu::separator {
     height: 1px;
     background: #E0E0E0; /* Lighter separator */
-    margin: 8px 5px;
+    margin: 6px 0px; /* Adjusted margin */
 }
 
 QMenu::indicator { /* For checkable menu items */
-    width: 18px;
-    height: 18px;
-    left: 12px;
+    width: 16px; /* Standardized size */
+    height: 16px;
+    left: 8px; /* Adjusted position */
 }
 
 QMenu::indicator:non-exclusive:checked {
@@ -1082,12 +1080,29 @@ QMenu::indicator:non-exclusive:unchecked {
 /* Style for sub-menus */
 QMenu::right-arrow { /* Arrow for sub-menus */
     image: url(:/icons/chevron-right.svg);
-    width: 18px;
-    height: 18px;
-    right: 10px;
+    width: 16px; /* Standardized size */
+    height: 16px;
+    right: 8px; /* Adjusted position */
 }
 
 /* == END OF MENU STYLING ENHANCEMENTS == */
+
+/* Search bar in Menu Bar - specific styling for position and appearance */
+QLineEdit#menuBarSearch {
+    font-size: 9pt;
+    border: 1px solid #546E7A; /* Darker border to blend with dark menubar */
+    border-radius: 4px;       /* Consistent rounding */
+    padding: 4px 8px;
+    background-color: #FFFFFF; /* White background for input */
+    color: #263238;
+    min-height: 28px; /* Ensure decent height */
+    /* margin adjusted in code if needed, or via parent layout in QMenuBar::setCornerWidget */
+}
+
+QLineEdit#menuBarSearch:focus {
+    border-color: #007BFF; /* Accent color on focus */
+    background-color: #FFFFFF; /* Ensure background remains white on focus */
+}
 
 
 /* HomePageWidget Specific Styles */
@@ -1302,6 +1317,91 @@ QPushButton#userMenuButton:pressed {
 QPushButton#userMenuButton::menu-indicator {
     image: none; /* Hide default menu indicator arrow */
 }
+
+/* === Sidebar Navigation Widget Styles === */
+QWidget#sidebarNavigationWidget {
+    background-color: #ECEFF1; /* Nuance de gris-bleu clair, distincte du contenu principal */
+    border-right: 1px solid #CFD8DC; /* Bordure de séparation un peu plus visible */
+    min-width: 60px; /* Largeur par défaut pour l'état rétracté */
+    max-width: 60px;
+}
+
+QWidget#sidebarNavigationWidget[expanded="true"] {
+    min-width: 220px; /* Largeur pour l'état déployé */
+    max-width: 220px;
+}
+
+/* Optionnel: Logo dans la Sidebar */
+QWidget#sidebarNavigationWidget QLabel#sidebarAppLogo {
+    background-color: transparent; /* Important si la sidebar a un fond */
+    padding: 10px 5px; /* Ajuster le padding */
+    border-bottom: 1px solid #CFD8DC; /* Séparateur sous le logo */
+    margin-bottom: 5px;
+    /* qproperty-alignment: 'AlignCenter'; */ /* Mieux en code pour QLabel */
+}
+
+/* Conteneur des boutons de module dans la sidebar */
+QWidget#sidebarNavigationWidget QWidget#sidebarButtonsContainer { /* Si vous utilisez un QWidget intermédiaire */
+    background-color: transparent;
+}
+
+/* Boutons de Module dans la Sidebar */
+/* Utilisation d'un sélecteur plus général et exclusion du toggleButton par son objectName */
+QWidget#sidebarNavigationWidget QToolButton:not(#sidebarToggleButton) {
+    border: none;
+    border-radius: 4px; /* Coins légèrement arrondis */
+    padding: 10px 0px; /* Padding vertical, horizontal géré par l'alignement du contenu */
+    text-align: left;
+    color: #37474F; /* Texte gris foncé */
+    background-color: transparent;
+    font-size: 10pt;
+    font-weight: 500; /* Medium weight */
+}
+
+/* Style pour l'icône et le texte quand déployé */
+QWidget#sidebarNavigationWidget[expanded="true"] QToolButton:not(#sidebarToggleButton) {
+    padding: 10px 12px; /* Padding pour icône + texte */
+}
+
+QWidget#sidebarNavigationWidget QToolButton:not(#sidebarToggleButton)::menu-indicator {
+    image: none;
+}
+
+/* État Survol (Hover) des boutons de module */
+QWidget#sidebarNavigationWidget QToolButton:not(#sidebarToggleButton):hover {
+    background-color: #CFD8DC; /* Gris clair pour survol */
+    color: #007BFF; /* Texte en couleur d'accent */
+}
+
+/* État Actif/Sélectionné (:checked) des boutons de module */
+QWidget#sidebarNavigationWidget QToolButton:not(#sidebarToggleButton):checked {
+    background-color: #007BFF; /* Couleur d'accent pour fond */
+    color: white; /* Texte blanc */
+    font-weight: bold;
+    border-left: 4px solid #0056B3; /* Indicateur latéral bleu foncé */
+}
+
+/* Ajustement du padding pour l'état :checked si une bordure est ajoutée */
+QWidget#sidebarNavigationWidget QToolButton:not(#sidebarToggleButton):checked {
+    padding-left: 8px; /* (padding original icon only) - (largeur bordure) + un peu de marge */
+}
+QWidget#sidebarNavigationWidget[expanded="true"] QToolButton:not(#sidebarToggleButton):checked {
+    padding-left: 8px; /* (padding original déployé) - (largeur bordure) */
+}
+
+
+/* Bouton de Bascule (Toggle) en bas de la Sidebar */
+QWidget#sidebarNavigationWidget QToolButton#sidebarToggleButton {
+    border: none;
+    background-color: transparent;
+    padding: 0px;
+    border-top: 1px solid #CFD8DC; /* Séparateur au-dessus */
+}
+
+QWidget#sidebarNavigationWidget QToolButton#sidebarToggleButton:hover {
+    background-color: #B0BEC5; /* Gris plus foncé au survol */
+}
+/* === Fin des Styles Sidebar Navigation Widget === */
 
 /* === Specific styles for DocumentManager Left Pane === */
 QWidget#leftPaneWidget {

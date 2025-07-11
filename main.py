@@ -447,71 +447,10 @@ def main():
     # load_stylesheet_global is imported from app_setup
     load_stylesheet_global(app) 
     
-    # Apply the basic QSS stylesheet (this was the one previously embedded)
-    # This can be moved to style.qss and loaded by load_stylesheet_global if preferred.
-    app.setStyleSheet("""
-        QWidget {}
-        QPushButton {
-            padding: 6px 12px; border: 1px solid #cccccc; border-radius: 4px;
-        background-color: #f8f9fa; min-width: 80px;
-        }
-        QPushButton:hover { background-color: #e9ecef; border-color: #adb5bd; }
-        QPushButton:pressed { background-color: #dee2e6; border-color: #adb5bd; }
-        QPushButton:disabled { background-color: #e9ecef; color: #6c757d; border-color: #ced4da; }
-        QPushButton#primaryButton, QPushButton[primary="true"] {
-            background-color: #007bff; color: white; border-color: #007bff;
-        }
-        QPushButton#primaryButton:hover, QPushButton[primary="true"]:hover {
-            background-color: #0069d9; border-color: #0062cc;
-        }
-        QPushButton#primaryButton:pressed, QPushButton[primary="true"]:pressed {
-            background-color: #005cbf; border-color: #005cbf;
-        }
-        QPushButton#dangerButton, QPushButton[danger="true"] {
-            background-color: #dc3545; color: white; border-color: #dc3545;
-        }
-        QPushButton#dangerButton:hover, QPushButton[danger="true"]:hover {
-            background-color: #c82333; border-color: #bd2130;
-        }
-        QPushButton#dangerButton:pressed, QPushButton[danger="true"]:pressed {
-            background-color: #b21f2d; border-color: #b21f2d;
-        }
-        QLineEdit, QTextEdit, QSpinBox, QDoubleSpinBox, QComboBox {
-            padding: 5px; border: 1px solid #ced4da; border-radius: 4px;
-        }
-        QLineEdit:focus, QTextEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {
-            border-color: #80bdff;
-        }
-        QGroupBox {
-            font-weight: bold; border: 1px solid #ced4da; border-radius: 4px;
-            margin-top: 10px; padding: 10px;
-        }
-        QGroupBox::title {
-            subcontrol-origin: margin; subcontrol-position: top left;
-            padding: 0 3px 0 3px; left: 10px; background-color: transparent;
-        }
-        QTabWidget::pane { border-top: 1px solid #ced4da; padding: 10px; }
-        QTabBar::tab {
-            padding: 8px 15px; border: 1px solid #ced4da; border-bottom: none;
-            border-top-left-radius: 4px; border-top-right-radius: 4px;
-            background-color: #e9ecef; margin-right: 2px;
-        }
-        QTabBar::tab:selected { background-color: #ffffff; border-color: #ced4da; }
-        QTabBar::tab:hover:!selected { background-color: #f8f9fa; }
-        QTableWidget {
-            border: 1px solid #dee2e6; gridline-color: #dee2e6;
-            alternate-background-color: #f8f9fa;
-        }
-        QHeaderView::section {
-            background-color: #e9ecef; padding: 4px; border: 1px solid #dee2e6;
-            font-weight: bold;
-        }
-        QListWidget { border: 1px solid #ced4da; border-radius: 4px; }
-        QListWidget::item { padding: 5px; }
-        QListWidget::item:alternate { background-color: #f8f9fa; }
-        QListWidget::item:hover { background-color: #e9ecef; }
-        QListWidget::item:selected { background-color: #007bff; /* color: white; */ }
-    # """) # The # color: white; part for QListWidget::item:selected was commented out in original.
+    # The following app.setStyleSheet call has been removed to ensure style.qss is the single source of truth.
+    # Basic styles that were here should be covered by or merged into style.qss.
+    # For example, default QPushButton, QLineEdit, QGroupBox styles are now expected
+    # to be defined comprehensively in style.qss.
 
     # 8. Setup Translations
     # Try to get language from DB settings
