@@ -2,6 +2,7 @@
 import fitz  # PyMuPDF
 import logging
 import os
+from PyQt5.QtGui import QMouseEvent
 
 
 from PyQt5.QtWidgets import (
