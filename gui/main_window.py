@@ -212,6 +212,8 @@ from dialogs.menu_customization_dialog import MenuCustomizationDialog
 from utils.app_constants import CONFIGURABLE_MODULES # For menu customization and default order
 import json # For handling menu config storage
 from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import QSize
+from PyQt5.QtWidgets import QFrame
 
 
 class ClientListItemWidget(QWidget):
@@ -826,6 +828,7 @@ class DocumentManager(QMainWindow):
         main_horizontal_layout.setContentsMargins(0, 0, 0, 0)
         main_horizontal_layout.setSpacing(0)
 
+
         # REMOVED: Ajout de la sidebar
         # main_horizontal_layout.addWidget(self.sidebar_nav)
 
@@ -842,6 +845,7 @@ class DocumentManager(QMainWindow):
         # new_main_vertical_layout.addLayout(main_horizontal_layout) # Old line
 
         new_main_vertical_layout.addWidget(self.main_area_stack, 1) # Add stack directly, it takes remaining space
+
         
         # -- Configuration de la page "Documents" (qui va dans le main_area_stack) --
         self.documents_page_widget = QWidget()
@@ -1458,6 +1462,7 @@ class DocumentManager(QMainWindow):
 
         # App Logo/Title (Optional)
         app_title_label = QLabel("Leopardo ERP") # Changed title
+
         app_title_label.setObjectName("topMenuAppTitle")
         app_title_label.setStyleSheet("color: #2563eb; font-size: 18px; font-weight: bold; padding-right: 15px;")
         top_bar_layout.addWidget(app_title_label)
@@ -1525,6 +1530,7 @@ class DocumentManager(QMainWindow):
 
             top_bar_layout.addWidget(menu_button)
             self.top_menu_buttons[menu_title] = menu_button
+
 
         top_bar_layout.addStretch(1) # Pushes menu items to left, following items to right
 
