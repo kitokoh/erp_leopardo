@@ -715,9 +715,173 @@ class DocumentsTab(QWidget):
             doc_type = doc_details.get("document_type_generated", "").upper() if doc_details else ""
 
             if doc_type == "PDF" or file_path.lower().endswith(".pdf"):
-                # C'est un PDF, utilisons notre visionneuse
-                try:
-                    viewer = PdfViewerWidget(file_path, self) # self pour parent
+                if self._should_use_internal_pdf_viewer():
+                    # C'est un PDF, et la préférence est d'utiliser la visionneuse interne
+                    try:
+                        viewer = PdfViewerWidget(file_path, self) # self pour parent
+                        # Connecter le signal de sauvegarde à une méthode de DocumentsTab
+                        viewer.documentSavedAsNewVersion.connect(
+                            lambda orig_path, new_path, doc_id=document_id:
+                            self._handle_new_pdf_version_saved(doc_id, orig_path, new_path)
+                        )
+                        viewer.exec_() # Ouvre en tant que dialogue modal
+                    except Exception as e:
+                        logging.error(f"Erreur lors de l'ouverture de PdfViewerWidget pour {file_path}: {e}", exc_info=True)
+                        self.notify(self.tr("Erreur Visionneuse PDF"),
+                                    self.tr("Impossible d'ouvrir le PDF dans la visionneuse interne: {0}.\nTentative avec l'application externe.").format(str(e)),
+                                    type='ERROR')
+                        # Fallback vers l'ouverture externe en cas d'erreur avec la visionneuse interne
+                        QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
+                else:
+                    # La préférence est d'utiliser l'application externe
+                    QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
+            else:
+                # Pour les autres types, comportement normal
+                QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
+        else:
+            self.notify(self.tr("Fichier Introuvable"), self.tr("Le document est introuvable:\n{0}").format(file_path), type='WARNING')
+
+    def _should_use_internal_pdf_viewer(self) -> bool:
+        # TODO: Lire cette préférence depuis les paramètres globaux de l'application.
+        # Pour l'instant, on code en dur pour activer la visionneuse interne.
+        # Mettre à False pour tester le comportement avec visionneuse externe.
+        # Exemple:
+        # app_settings = self.config.get_application_settings()
+        # return app_settings.get("use_internal_pdf_viewer", True)
+        return True # Par défaut, utiliser la visionneuse interne
+
+    def _handle_new_pdf_version_saved(self, original_document_id: str, original_document_path: str, new_document_path: str):
+        """
+        Gère la notification qu'une nouvelle version d'un PDF annoté a été sauvegardée.
+        original_document_id: L'ID en base de données du document original.
+        original_document_path: Le chemin système du document original.
+        new_document_path: Le chemin système vers le nouveau fichier PDF sauvegardé.
+        """
+        logging.info(
+            f"Nouvelle version de document PDF sauvegardée. "
+            f"Original ID: {original_document_id}, Original Path: {original_document_path}, Nouveau Path: {new_document_path}"
+        )
+
+        # Pour l'instant, afficher un message à l'utilisateur.
+        # L'étape suivante serait d'ajouter ce nouveau document à la base de données
+        # et de rafraîchir la table des documents.
+
+        self.notify(
+            self.tr("Nouvelle Version Enregistrée"),
+            self.tr("Une nouvelle version du document a été enregistrée sous:\n{0}\n\n"
+                    "L'intégration de ce nouveau fichier dans la liste des documents du client est une prochaine étape."
+                    ).format(new_document_path),
+            type='INFO'
+        )
+
+        # TODO:
+        # 1. Déterminer le nom du document, type, langue etc. pour la nouvelle entrée DB.
+        #    On pourrait se baser sur le document original.
+        # 2. Construire le file_path_relative pour la nouvelle entrée.
+        # 3. Appeler client_documents_crud.add_client_document().
+        # 4. self.populate_doc_table() pour rafraîchir.
+        try:
+            original_doc_details = client_documents_crud.get_document_by_id(original_document_id)
+            if not original_doc_details:
+                self.notify(self.tr("Erreur"), self.tr("Impossible de récupérer les détails du document original pour créer la nouvelle version en base de données."), type='ERROR')
+                return
+
+            new_doc_name = os.path.basename(new_document_path)
+
+            # Calculer file_path_relative
+            # On suppose que new_document_path est un chemin absolu.
+            # On a besoin du chemin de base des clients et du chemin de base de CE client.
+            clients_root_abs = os.path.join(self.app_root_dir, self.config.get("clients_dir", "clients"))
+            # Le new_document_path devrait être DANS un sous-dossier de clients_root_abs.
+            # Si le PdfViewerWidget sauvegarde dans le même dossier que l'original (ou un sous-dossier prévisible),
+            # on pourrait utiliser le base_folder_path du client.
+
+            client_base_folder_abs = ""
+            if self.client_info.get("base_folder_path"): # Chemin relatif au dossier 'clients'
+                 client_base_folder_abs = os.path.join(clients_root_abs, self.client_info.get("base_folder_path"))
+            elif self.client_info.get("default_base_folder_path"): # Chemin relatif à app_root_dir
+                 client_base_folder_abs = os.path.join(self.app_root_dir, self.client_info.get("default_base_folder_path"))
+            else:
+                self.notify(self.tr("Erreur Configuration"), self.tr("Chemin du dossier client non trouvé. Impossible de déterminer le chemin relatif."), type="ERROR")
+                return
+
+            if not new_document_path.startswith(client_base_folder_abs):
+                # Ceci est un problème si le fichier est sauvegardé en dehors du dossier attendu pour le client.
+                # Pour l'instant, on va essayer de faire un relpath, mais il faut s'assurer que la sauvegarde se fait au bon endroit.
+                # Idéalement, PdfViewerWidget devrait sauvegarder dans un sous-dossier de client_base_folder_abs.
+                # On va supposer que `new_document_path` est DANS `client_base_folder_abs` ou un de ses sous-dossiers.
+                # Pour l'instant, on calcule par rapport à app_root_dir, puis on ajuste.
+                # Le file_path_relative dans la BDD est relatif au dossier racine de l'application pour les documents clients
+                # Ex: clients/client_xyz/FR/document.pdf
+                # Donc, on prend new_document_path et on le rend relatif à self.app_root_dir
+
+                # Le chemin stocké en BDD est relatif à app_root_dir, mais doit commencer par le "clients_dir"
+                # ex: "clients/client_name_country_id/lang/file.pdf"
+                # new_document_path est absolu.
+                # self.client_info.get("base_folder_path") est relatif à self.config.get("clients_dir")
+                # ex: "client_name_country_id"
+                # client_base_folder_path dans la DB pour un doc est relatif à la base du client.
+                # ex: "fr/commande_xyz/doc.pdf"
+                # Donc, new_document_path devrait être dans os.path.join(self.app_root_dir, self.client_info.get("default_base_folder_path"), ...)
+
+                # Si new_document_path est /abs/path/to/app_root/clients/client_folder/lang/file.pdf
+                # Et client_base_folder_abs est /abs/path/to/app_root/clients/client_folder/
+                # Alors le file_path_relative pour la DB est lang/file.pdf
+                file_path_relative_for_db = os.path.relpath(new_document_path, client_base_folder_abs)
+
+            else: # Si new_document_path est déjà relatif au dossier client (moins probable ici)
+                 file_path_relative_for_db = new_document_path
+
+
+            new_version_tag = original_doc_details.get("version_tag", "1.0")
+            try:
+                # Essayer d'incrémenter la version si c'est un float ou int
+                version_parts = new_version_tag.split('.')
+                if len(version_parts) > 0 and version_parts[-1].isdigit():
+                    version_parts[-1] = str(int(version_parts[-1]) + 1)
+                    new_version_tag = ".".join(version_parts)
+                else: # Sinon, ajouter un suffixe
+                    new_version_tag += "_annotated"
+            except:
+                new_version_tag += "_annotated"
+
+
+            new_doc_data = {
+                "client_id": original_doc_details.get("client_id"),
+                "document_name": new_doc_name,
+                "file_name_on_disk": new_doc_name,
+                "file_path_relative": file_path_relative_for_db,
+                "document_type_generated": "PDF_ANNOTATED", # Ou juste PDF, ou un type spécifique
+                "language_code": original_doc_details.get("language_code"),
+                "source_template_id": original_doc_details.get("source_template_id"), # Peut-être None si c'était un import
+                "order_identifier": original_doc_details.get("order_identifier"),
+                "user_id": self.current_user_id,
+                "notes": self.tr("Version annotée de '{0}'. Document original ID: {1}.").format(
+                    original_doc_details.get("document_name"), original_document_id
+                ),
+                "parent_document_id": original_document_id, # Lier à l'original
+                "version_tag": new_version_tag
+            }
+
+            new_doc_id = client_documents_crud.add_client_document(new_doc_data)
+            if new_doc_id:
+                self.notify(self.tr("Nouvelle Version Enregistrée"),
+                            self.tr("La nouvelle version annotée '{0}' a été ajoutée à la base de données.").format(new_doc_name),
+                            type='SUCCESS')
+                self.populate_doc_table() # Rafraîchir la table
+            else:
+                self.notify(self.tr("Erreur Base de Données"),
+                            self.tr("Échec de l'enregistrement de la nouvelle version en base de données."), type='ERROR')
+
+        except Exception as e:
+            logging.error(self.tr("Erreur lors de la gestion de la nouvelle version PDF sauvegardée: {0}").format(str(e)), exc_info=True)
+            self.notify(self.tr("Erreur Inattendue"),
+                        self.tr("Une erreur inattendue est survenue lors de l'enregistrement de la nouvelle version en base de données."), type='CRITICAL')
+
+
+    def handle_create_new_version_clicked(self, old_document_id, source_template_id):
+        if not self.client_info or not self.client_info.get('client_id'):
+
                     viewer.exec_() # Ouvre en tant que dialogue modal
                 except Exception as e:
                     logging.error(f"Erreur lors de l'ouverture de PdfViewerWidget pour {file_path}: {e}", exc_info=True)
