@@ -217,6 +217,7 @@ from PyQt5.QtWidgets import QGraphicsDropShadowEffect # Added QGraphicsDropShado
 from PyQt5.QtCore import QPropertyAnimation # Added QPropertyAnimation
 
 
+
 class ClientListItemWidget(QWidget):
     # Signaux pour les actions en ligne
     editActionClicked = pyqtSignal()
@@ -567,6 +568,7 @@ class DocumentManager(QMainWindow):
         self._setup_app_title_animation()
 
 
+
     def toggleMaximized(self):
         """Toggles between maximized and normal window state."""
         if self.isMaximized():
@@ -610,6 +612,7 @@ class DocumentManager(QMainWindow):
             # logging.debug(f"App title animation triggered. Next in {next_interval / 1000}s")
         else:
             logging.debug("App title animation triggered but already running.")
+
 
 
     def get_statistics_widget_instance(self): # This method seems to refer to the dashboard, not the summary.
@@ -870,10 +873,12 @@ class DocumentManager(QMainWindow):
         # self.top_menu_bar_widget.setStyleSheet("background-color: #f0f2f5; border-bottom: 1px solid #d1d5db;") # Style initial
         new_main_vertical_layout.addWidget(self.top_menu_bar_widget)
 
+
         # Layout horizontal pour la sidebar et la zone de contenu principale (comme avant)
         main_horizontal_layout = QHBoxLayout() # Ce layout sera ajouté au new_main_vertical_layout
         main_horizontal_layout.setContentsMargins(0, 0, 0, 0)
         main_horizontal_layout.setSpacing(0)
+
 
         # REMOVED: Ajout de la sidebar
         # main_horizontal_layout.addWidget(self.sidebar_nav)
@@ -891,6 +896,7 @@ class DocumentManager(QMainWindow):
         # new_main_vertical_layout.addLayout(main_horizontal_layout) # Old line
 
         new_main_vertical_layout.addWidget(self.main_area_stack, 1) # Add stack directly, it takes remaining space
+
         
         # -- Configuration de la page "Documents" (qui va dans le main_area_stack) --
         self.documents_page_widget = QWidget()
@@ -1518,6 +1524,7 @@ class DocumentManager(QMainWindow):
 
         top_bar_layout.addWidget(self.app_title_label)
 
+
         # --- Define Menu Structure ---
         self.top_menu_buttons = {} # To store references
 
@@ -1581,6 +1588,7 @@ class DocumentManager(QMainWindow):
 
             top_bar_layout.addWidget(menu_button)
             self.top_menu_buttons[menu_title] = menu_button
+
 
         top_bar_layout.addStretch(1) # Pushes menu items to left, following items to right
 
@@ -1725,6 +1733,7 @@ class DocumentManager(QMainWindow):
             can_manage_statuses = has_permission(role_name, P_MANAGE_STATUSES)
             self.status_action.setEnabled(can_manage_statuses)
             logging.info(f"  Action 'status_action' enabled: {can_manage_statuses} (P_MANAGE_STATUSES)")
+
 
         # Customize Sidebar Action (assuming always enabled for logged-in users for now, or add a specific permission)
         if hasattr(self, 'customize_sidebar_action'):
@@ -3185,7 +3194,8 @@ class DocumentManager(QMainWindow):
         if corner_widget:
             self.menuBar().setCornerWidget(corner_widget, Qt.TopRightCorner)
 
-        self.notify(self.tr("Menu Mis à Jour"), self.tr("Le menu principal a été mis à jour selon vos préférences."), type='INFO')
+
+            self.notify(self.tr("Menu Mis à Jour"), self.tr("Le menu principal a été mis à jour selon vos préférences."), type='INFO')
 
     # --- Sidebar Population and State Management --- (ALL REMOVED)
     # --- End Slots for Sidebar Interaction --- (ALL REMOVED)
