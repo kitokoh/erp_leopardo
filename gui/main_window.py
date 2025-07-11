@@ -554,6 +554,13 @@ class DocumentManager(QMainWindow):
         self.init_or_update_download_monitor()
         self.populate_saved_filters_combo()
 
+    def toggleMaximized(self):
+        """Toggles between maximized and normal window state."""
+        if self.isMaximized():
+            self.showNormal()
+        else:
+            self.showMaximized()
+
     def get_statistics_widget_instance(self): # This method seems to refer to the dashboard, not the summary.
         """Lazily creates and returns the instance of the statistics dashboard if module is enabled."""
         if not self.module_states.get('statistics', True):
@@ -1372,6 +1379,11 @@ class DocumentManager(QMainWindow):
         self.restaurant_module_action = QAction(QIcon(":/icons/placeholder_icon.svg"), self.tr("Service Restaurant (B2C)"), self)
         self.restaurant_module_action.triggered.connect(self.show_restaurant_module_view)
         self.searchable_actions_map[self.tr("Service Restaurant (B2C)")] = self.restaurant_module_action
+
+        # About Action (ensure it's created here for the map)
+        self.about_action = QAction(QIcon(":/icons/help-circle.svg"), self.tr("À propos"), self)
+        self.about_action.triggered.connect(self.show_about_dialog)
+        self.searchable_actions_map[self.tr("À propos")] = self.about_action
 
 
     def _placeholder_manage_users(self):
