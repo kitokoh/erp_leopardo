@@ -14,6 +14,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIcon, QDesktopServices, QFont
 from PyQt5.QtCore import Qt, QUrl, QStandardPaths
 
+from gui.widgets.pdf_viewer_widget import PdfViewerWidget # Ajout de l'importation
 import db as db_manager
 from db.cruds import client_documents_crud, projects_crud
 
@@ -709,7 +710,25 @@ class DocumentsTab(QWidget):
 
     def _handle_view_document_action(self, file_path, document_id):
         if file_path and os.path.exists(file_path):
-            QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
+            # Récupérer le type de document pour vérifier si c'est un PDF
+            doc_details = client_documents_crud.get_document_by_id(document_id)
+            doc_type = doc_details.get("document_type_generated", "").upper() if doc_details else ""
+
+            if doc_type == "PDF" or file_path.lower().endswith(".pdf"):
+                # C'est un PDF, utilisons notre visionneuse
+                try:
+                    viewer = PdfViewerWidget(file_path, self) # self pour parent
+                    viewer.exec_() # Ouvre en tant que dialogue modal
+                except Exception as e:
+                    logging.error(f"Erreur lors de l'ouverture de PdfViewerWidget pour {file_path}: {e}", exc_info=True)
+                    self.notify(self.tr("Erreur Visionneuse PDF"),
+                                self.tr("Impossible d'ouvrir le PDF dans la visionneuse interne: {0}.\nTentative avec l'application externe.").format(str(e)),
+                                type='ERROR')
+                    # Fallback vers l'ouverture externe en cas d'erreur avec la visionneuse interne
+                    QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
+            else:
+                # Pour les autres types, comportement normal
+                QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
         else:
             self.notify(self.tr("Fichier Introuvable"), self.tr("Le document est introuvable:\n{0}").format(file_path), type='WARNING')
 

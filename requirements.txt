@@ -9,6 +9,7 @@ python-docx>=0.8.0
 lxml>=4.5.0 # Dependency for python-docx
 PyPDF2==3.0.1
 WeasyPrint>=50.0 # For PDF generation from HTML
+PyMuPDF>=1.23.0 # For PDF viewing and manipulation (fitz)
 
 # API & Web Services
 fastapi>=0.100.0
