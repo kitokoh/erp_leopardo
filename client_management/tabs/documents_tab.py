@@ -881,7 +881,7 @@ class DocumentsTab(QWidget):
 
     def handle_create_new_version_clicked(self, old_document_id, source_template_id):
         if not self.client_info or not self.client_info.get('client_id'):
-
+                try :
                     viewer.exec_() # Ouvre en tant que dialogue modal
                 except Exception as e:
                     logging.error(f"Erreur lors de l'ouverture de PdfViewerWidget pour {file_path}: {e}", exc_info=True)
@@ -890,9 +890,9 @@ class DocumentsTab(QWidget):
                                 type='ERROR')
                     # Fallback vers l'ouverture externe en cas d'erreur avec la visionneuse interne
                     QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
-            else:
-                # Pour les autres types, comportement normal
-                QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
+            # else:
+            #     # Pour les autres types, comportement normal
+            #     QDesktopServices.openUrl(QUrl.fromLocalFile(file_path))
         else:
             self.notify(self.tr("Fichier Introuvable"), self.tr("Le document est introuvable:\n{0}").format(file_path), type='WARNING')
 
