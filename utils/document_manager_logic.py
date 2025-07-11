@@ -733,7 +733,7 @@ def perform_old_clients_check(doc_manager):
                 for c_info in old_clients_to_notify:
                     archive_client_status(doc_manager, c_info['client_id']) # Call the refactored function
     except Exception as e:
-        logging.error(f"Erreur vérification clients anciens: {str(e)}")
+        logging.error(f"Erreur vérification clients anciens: {type(e).__name__} - {str(e)}", exc_info=True) # Log exception type and full traceback
 
 def handle_open_edit_client_dialog(doc_manager, client_id):
     current_client_data = doc_manager.clients_data_map.get(client_id)

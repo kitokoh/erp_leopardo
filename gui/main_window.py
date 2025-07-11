@@ -211,9 +211,11 @@ from license_management import (
 from dialogs.menu_customization_dialog import MenuCustomizationDialog
 from utils.app_constants import CONFIGURABLE_MODULES # For menu customization and default order
 import json # For handling menu config storage
-from PyQt5.QtCore import pyqtSignal
-from PyQt5.QtCore import QSize
-from PyQt5.QtWidgets import QFrame
+from PyQt5.QtCore import pyqtSignal, QTimer, QEasingCurve # Added QTimer, QEasingCurve
+from PyQt5.QtGui import QColor # Added QColor
+from PyQt5.QtWidgets import QGraphicsDropShadowEffect # Added QGraphicsDropShadowEffect
+from PyQt5.QtCore import QPropertyAnimation # Added QPropertyAnimation
+
 
 
 class ClientListItemWidget(QWidget):
@@ -558,12 +560,60 @@ class DocumentManager(QMainWindow):
         self.init_or_update_download_monitor()
         self.populate_saved_filters_combo()
 
+        # For App Title Animation
+        self.app_title_label = None # Will be set in create_menus_main
+        self.app_title_shadow_effect = QGraphicsDropShadowEffect(self)
+        self.app_title_animation = QPropertyAnimation(self.app_title_shadow_effect, b"color", self) # parent `self` for QPropertyAnimation
+        self.app_title_animation_timer = QTimer(self)
+        self._setup_app_title_animation()
+
+
+
     def toggleMaximized(self):
         """Toggles between maximized and normal window state."""
         if self.isMaximized():
             self.showNormal()
         else:
             self.showMaximized()
+
+    def _setup_app_title_animation(self):
+        if not self.app_title_label: # Ensure label is created
+            logging.warning("App title label not initialized before animation setup.")
+            return
+
+        # Configure the QPropertyAnimation for the shadow color
+        self.app_title_animation.setDuration(1500) # Duration of one pulse (e.g., 1.5 seconds)
+        self.app_title_animation.setLoopCount(1)    # We run it once per timer tick
+
+        # Define keyframes for the color animation (glow effect)
+        # Accent color from your QSS: #007BFF (blueish)
+        # Let's use a lighter shade of this blue for the glow
+        glow_color = QColor(0, 123, 255, 90) # Accent blue with alpha for subtlety
+
+        self.app_title_animation.setKeyValueAt(0, QColor(0, 0, 0, 0))      # Start transparent
+        self.app_title_animation.setKeyValueAt(0.5, glow_color)           # Mid-point glow
+        self.app_title_animation.setKeyValueAt(1, QColor(0, 0, 0, 0))      # End transparent
+
+        self.app_title_animation.setEasingCurve(QEasingCurve.InOutQuad) # Smooth animation curve
+
+        # Configure and start the QTimer
+        self.app_title_animation_timer.setInterval(15000) # e.g., trigger every 15 seconds
+        self.app_title_animation_timer.timeout.connect(self._trigger_app_title_animation)
+        self.app_title_animation_timer.start()
+        logging.info("App title animation setup complete and timer started.")
+
+    def _trigger_app_title_animation(self):
+        if self.app_title_animation.state() == QPropertyAnimation.Stopped:
+            self.app_title_animation.start()
+            # Optional: Add randomization for the next interval
+            # import random
+            # next_interval = random.randint(10000, 20000) # e.g., between 10 and 20 seconds
+            # self.app_title_animation_timer.setInterval(next_interval)
+            # logging.debug(f"App title animation triggered. Next in {next_interval / 1000}s")
+        else:
+            logging.debug("App title animation triggered but already running.")
+
+
 
     def get_statistics_widget_instance(self): # This method seems to refer to the dashboard, not the summary.
         """Lazily creates and returns the instance of the statistics dashboard if module is enabled."""
@@ -822,6 +872,7 @@ class DocumentManager(QMainWindow):
         # self.top_menu_bar_widget.setFixedHeight(50) # Hauteur typique pour une barre de menu
         # self.top_menu_bar_widget.setStyleSheet("background-color: #f0f2f5; border-bottom: 1px solid #d1d5db;") # Style initial
         new_main_vertical_layout.addWidget(self.top_menu_bar_widget)
+
 
         # Layout horizontal pour la sidebar et la zone de contenu principale (comme avant)
         main_horizontal_layout = QHBoxLayout() # Ce layout sera ajouté au new_main_vertical_layout
@@ -1461,11 +1512,18 @@ class DocumentManager(QMainWindow):
         top_bar_layout.setSpacing(10)
 
         # App Logo/Title (Optional)
-        app_title_label = QLabel("Leopardo ERP") # Changed title
+        self.app_title_label = QLabel("Leopardo ERP") # Changed title & assign to self
+        self.app_title_label.setObjectName("topMenuAppTitle")
+        self.app_title_label.setStyleSheet("color: #2563eb; font-size: 18px; font-weight: bold; padding-right: 15px;")
 
-        app_title_label.setObjectName("topMenuAppTitle")
-        app_title_label.setStyleSheet("color: #2563eb; font-size: 18px; font-weight: bold; padding-right: 15px;")
-        top_bar_layout.addWidget(app_title_label)
+        # Setup shadow effect for animation
+        self.app_title_shadow_effect.setBlurRadius(15)
+        self.app_title_shadow_effect.setColor(QColor(0, 0, 0, 0)) # Start fully transparent
+        self.app_title_shadow_effect.setOffset(0, 1) # Slight offset for a bit of depth
+        self.app_title_label.setGraphicsEffect(self.app_title_shadow_effect)
+
+        top_bar_layout.addWidget(self.app_title_label)
+
 
         # --- Define Menu Structure ---
         self.top_menu_buttons = {} # To store references
@@ -1675,6 +1733,7 @@ class DocumentManager(QMainWindow):
             can_manage_statuses = has_permission(role_name, P_MANAGE_STATUSES)
             self.status_action.setEnabled(can_manage_statuses)
             logging.info(f"  Action 'status_action' enabled: {can_manage_statuses} (P_MANAGE_STATUSES)")
+
 
         # Customize Sidebar Action (assuming always enabled for logged-in users for now, or add a specific permission)
         if hasattr(self, 'customize_sidebar_action'):
@@ -3134,6 +3193,7 @@ class DocumentManager(QMainWindow):
 
         if corner_widget:
             self.menuBar().setCornerWidget(corner_widget, Qt.TopRightCorner)
+
 
             self.notify(self.tr("Menu Mis à Jour"), self.tr("Le menu principal a été mis à jour selon vos préférences."), type='INFO')
 
