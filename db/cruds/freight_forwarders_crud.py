@@ -1,14 +1,14 @@
 import sqlite3
 import uuid
 from datetime import datetime
-from ..connection import get_db_connection # Corrected import path
+from ..connection import get_raw_sqlite_connection # Corrected import path
 
 # --- CRUD functions for FreightForwarders ---
 def add_freight_forwarder(data: dict) -> str | None:
     """Adds a new freight forwarder. Returns forwarder_id (UUID) or None."""
     conn = None
     try:
-        conn = get_db_connection()
+        conn = get_raw_sqlite_connection()
         cursor = conn.cursor()
         new_forwarder_id = str(uuid.uuid4())
         now = datetime.utcnow().isoformat() + "Z"
@@ -36,7 +36,7 @@ def get_freight_forwarder_by_id(forwarder_id: str) -> dict | None:
     """Retrieves a freight forwarder by its ID."""
     conn = None
     try:
-        conn = get_db_connection()
+        conn = get_raw_sqlite_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM FreightForwarders WHERE forwarder_id = ?", (forwarder_id,))
         row = cursor.fetchone()
@@ -51,7 +51,7 @@ def get_all_freight_forwarders() -> list[dict]:
     """Retrieves all freight forwarders."""
     conn = None
     try:
-        conn = get_db_connection()
+        conn = get_raw_sqlite_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM FreightForwarders ORDER BY name")
         rows = cursor.fetchall()
@@ -67,7 +67,7 @@ def update_freight_forwarder(forwarder_id: str, data: dict) -> bool:
     conn = None
     if not data: return False
     try:
-        conn = get_db_connection()
+        conn = get_raw_sqlite_connection()
         cursor = conn.cursor()
         data['updated_at'] = datetime.utcnow().isoformat() + "Z"
         set_clauses = [f"{key} = ?" for key in data.keys() if key != 'forwarder_id']
@@ -88,7 +88,7 @@ def delete_freight_forwarder(forwarder_id: str) -> bool:
     """Deletes a freight forwarder. Returns True on success."""
     conn = None
     try:
-        conn = get_db_connection()
+        conn = get_raw_sqlite_connection()
         cursor = conn.cursor()
         # Consider ON DELETE SET NULL or RESTRICT for Client_FreightForwarders
         cursor.execute("DELETE FROM FreightForwarders WHERE forwarder_id = ?", (forwarder_id,))
