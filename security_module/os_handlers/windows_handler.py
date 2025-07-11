@@ -210,32 +210,46 @@ class WindowsBiometricHandler:
         )
 
         available = False
-        if hr == S_OK:
-            available = unit_count.value > 0
-            logger.info(f"WinBioEnumBiometricUnits: {unit_count.value} unit(s) for {method} (factor {target_factor}). Available: {available}")
+        # Default to False, will be set True if call succeeds and units are found
+        try:
+            hr = self.winbio.WinBioEnumBiometricUnits(
+                self.session_handle,
+                target_factor,
+                ctypes.byref(ptr_to_unit_schemas),
+                ctypes.byref(unit_count)
+            )
 
-            # ptr_to_unit_schemas now holds the actual pointer to the array allocated by WinBio.
-            # This is the pointer (type: WINBIO_UNIT_SCHEMA*) that needs to be freed.
-            # WinBioFree expects a PVOID, which WINBIO_UNIT_SCHEMA* is compatible with.
-            if ptr_to_unit_schemas: # Check if the pointer itself is not NULL (i.e., ptr_to_unit_schemas.value is not 0)
-                try:
-                    # Ensure WinBioFree argtypes is set once, ideally during handler initialization or first use.
-                    # For safety, can be set here if there's doubt.
-                    if not hasattr(self.winbio.WinBioFree, 'argtypes') or not self.winbio.WinBioFree.argtypes:
-                        self.winbio.WinBioFree.argtypes = [ctypes.c_void_p]
-                        self.winbio.WinBioFree.restype = HRESULT # WinBioFree returns HRESULT
+            if hr == S_OK:
+                available = unit_count.value > 0
+                logger.info(f"WinBioEnumBiometricUnits: {unit_count.value} unit(s) for {method} (factor {target_factor}). Available: {available}")
 
-                    free_hr = self.winbio.WinBioFree(ptr_to_unit_schemas)
-                    if free_hr != S_OK:
-                        logger.warning(f"WinBioFree failed with HRESULT: {free_hr:#0x} for pointer {ptr_to_unit_schemas}")
-                except AttributeError:
-                     logger.error("winbio.dll not available for WinBioFree.")
-                except Exception as e:
-                    logger.error(f"Exception during WinBioFree: {e}")
-        elif hr == WINBIO_E_NO_DEVICE:
-            logger.info(f"WinBioEnumBiometricUnits: No devices for {method} (factor {target_factor}).")
-        else:
-            logger.error(f"WinBioEnumBiometricUnits for {method} failed with HRESULT: {hr:#0x}")
+                if ptr_to_unit_schemas and ptr_to_unit_schemas.contents: # Check if the pointer is not NULL before trying to free
+                    try:
+                        if not hasattr(self.winbio.WinBioFree, 'argtypes') or not self.winbio.WinBioFree.argtypes:
+                            self.winbio.WinBioFree.argtypes = [ctypes.c_void_p]
+                            self.winbio.WinBioFree.restype = HRESULT
+
+                        free_hr = self.winbio.WinBioFree(ptr_to_unit_schemas)
+                        if free_hr != S_OK:
+                            logger.warning(f"WinBioFree failed with HRESULT: {free_hr:#0x} for pointer {ptr_to_unit_schemas}")
+                    except AttributeError:
+                        logger.error("winbio.dll not available for WinBioFree.")
+                    except Exception as e_free:
+                        logger.error(f"Exception during WinBioFree: {e_free}")
+            elif hr == WINBIO_E_NO_DEVICE:
+                logger.info(f"WinBioEnumBiometricUnits: No devices for {method} (factor {target_factor}). Sensor likely unavailable.")
+                available = False # Explicitly set, though it's the default
+            else:
+                logger.error(f"WinBioEnumBiometricUnits for {method} failed with HRESULT: {hr:#0x}")
+                available = False # Explicitly set
+
+        except OSError as e:
+            logger.error(f"OSError during WinBioEnumBiometricUnits call for method '{method}': {e}", exc_info=True)
+            # This will catch the "access violation writing" error.
+            # Ensure `available` remains False, which is its default initial value.
+            available = False
+            # Do not attempt to free ptr_to_unit_schemas here, as its state is unknown after the crash.
+
         return available
 
     def enroll(self, method: str, window_handle=None) -> bool:
