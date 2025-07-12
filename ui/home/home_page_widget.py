@@ -16,8 +16,9 @@ from .quick_stats_widget import QuickStatsWidget # Import the new widget
 
 
 
-from .quick_stats_widget import QuickStatsWidget # Import the new widget
-from .module_card_widget import ModuleCardWidget # Ajout de l'import
+from .quick_stats_widget import QuickStatsWidget
+from .module_card_widget import ModuleCardWidget
+from db.cruds import clients_crud, projects_crud, products_crud, recruitment_cruds
 
 
 class HomePageWidget(QWidget):
@@ -63,10 +64,9 @@ class HomePageWidget(QWidget):
 
     def _init_ui(self):
         main_v_layout = QVBoxLayout(self)
-        main_v_layout.setContentsMargins(0,0,0,0) # Main layout itself has no outer margins
-        main_v_layout.setSpacing(10) # Add some spacing between major horizontal sections
+        main_v_layout.setContentsMargins(0, 0, 0, 0)
+        main_v_layout.setSpacing(10)
 
-        # Define self.modules here so it's accessible by _setup_center_layout
         self.modules = [
             {"name": self.tr("Gestion Documents Client"), "object_name": "btnClientDocuments", "icon": ":/icons/modern/folder-docs.svg", "slot": self.go_to_documents},
             {"name": self.tr("Gestion de Projet"), "object_name": "btnProjectManagement", "icon": ":/icons/dashboard.svg", "slot": self.go_to_project_management},
@@ -81,48 +81,36 @@ class HomePageWidget(QWidget):
             {"name": self.tr("Paramètres"), "object_name": "btnSettings", "icon": ":/icons/modern/settings.svg", "slot": self.go_to_settings},
         ]
 
-        # Initialize Promo Content Manager here so it's accessible by _setup_bottom_layout
         self.promo_manager = PromoContentManager()
 
-        # Setup layouts by calling helper methods
-        center_layout = self._setup_center_layout()
-        bottom_layout = self._setup_bottom_layout()
-
-        main_v_layout.addLayout(center_layout)
-        main_v_layout.addLayout(bottom_layout, 1) # Assign stretch factor to the bottom layout
-
-
-
-        # Search Bar Layout (added at the top of main_v_layout)
-        search_bar_layout = QHBoxLayout()
-        search_bar_layout.setContentsMargins(10, 5, 10, 5) # Adjust margins as needed
-        search_bar_layout.setSpacing(5)
-
-        self.search_input = QLineEdit()
-        self.search_input.setObjectName("homePageSearchInput")
-        self.search_input.setPlaceholderText(self.tr("Rechercher dans l'application..."))
-        self.search_input.returnPressed.connect(self._handle_search_query)
-        search_bar_layout.addWidget(self.search_input, 1) # Input takes most space
-
-        self.search_button = QPushButton()
-        self.search_button.setObjectName("homePageSearchButton")
-        search_icon = QIcon.fromTheme("search", QIcon(":/icons/search.svg")) # Common theme icon name
-        if not search_icon.isNull():
-            self.search_button.setIcon(search_icon)
+        # Le GIF est maintenant initialisé ici pour être passé aux méthodes de layout
+        self.gif_label = QLabel()
+        self.gif_label.setObjectName("homePageGifLabel")
+        available_gifs = ["1.gif", "2.gif", "3.gif"]
+        chosen_gif_name = random.choice(available_gifs)
+        gif_path = os.path.join(os.path.dirname(__file__), "..", "..", "resources", "gifshome", chosen_gif_name)
+        if os.path.exists(gif_path):
+            self.movie = QMovie(gif_path)
+            self.gif_label.setMovie(self.movie)
+            self.gif_label.setScaledContents(True)
+            self.movie.start()
+            self.gif_label.setAlignment(Qt.AlignCenter)
         else:
-            self.search_button.setText("🔍") # Fallback emoji/text
-        self.search_button.setToolTip(self.tr("Lancer la recherche"))
-        self.search_button.clicked.connect(self._handle_search_query)
-        # self.search_button.setFixedSize(QSize(30,30)) # Adjust size as needed
-        search_bar_layout.addWidget(self.search_button)
+            self.gif_label.setText(self.tr("GIF non trouvé"))
 
-        # Insert search bar at the top of the main layout
-        main_v_layout.insertLayout(0, search_bar_layout)
+        # La carte est maintenant un widget de la classe, pour être déplacée facilement
+        self.map_widget_container = QFrame() # Conteneur pour la carte
+        self.map_widget_container.setObjectName("homePageMapContainer")
 
+        top_layout = self._setup_top_layout() # Nouveau layout pour la carte et la sidebar
+        middle_layout = self._setup_middle_layout() # Pour la barre de recherche
+        bottom_layout = self._setup_bottom_layout() # Pour les boutons et astuces
+
+        main_v_layout.addLayout(top_layout, 2) # Plus d'espace pour la partie haute
+        main_v_layout.addLayout(middle_layout)
+        main_v_layout.addLayout(bottom_layout, 1)
 
         self.setLayout(main_v_layout)
-
-        # Charger les statistiques pour les cartes après que l'UI soit initialisée
         self._load_all_module_card_stats()
 
     def _get_stats_for_module(self, module_id: str) -> list[dict]:
@@ -140,47 +128,37 @@ class HomePageWidget(QWidget):
         # etc. pour les autres modules.
 
         # Pour cette simulation, nous allons appeler des fonctions placeholder qui existent dans ce fichier.
-        # Dans la vraie implémentation, ces appels se feraient aux fonctions CRUD importées.
-
-        if module_id == "btnClientDocuments":
-            # active_clients = get_active_clients_count(db_session) # Appel réel
-            active_clients = self._placeholder_get_active_clients_count() # Appel simulé
-            # docs_recents = get_recent_documents_count(db_session) # Appel réel
-            docs_recents = 12 # Valeur factice
-            return [
-                {'value': str(active_clients), 'label': self.tr('Clients Actifs')},
-                {'value': str(docs_recents), 'label': self.tr('Docs Récents')}
-            ]
-        elif module_id == "btnProjectManagement":
-            # active_projects = get_active_projects_count(db_session) # Appel réel
-            active_projects = self._placeholder_get_active_projects_count() # Appel simulé
-            # overdue_tasks = get_overdue_tasks_count(db_session) # Appel réel
-            overdue_tasks = self._placeholder_get_overdue_tasks_count() # Appel simulé
-            return [
-                {'value': str(active_projects), 'label': self.tr('Projets en Cours'), 'color': '#28A745'},
-                {'value': str(overdue_tasks), 'label': self.tr('Tâches en Retard'), 'color': '#DC3545' if overdue_tasks > 0 else '#28A745'}
-            ]
-        elif module_id == "btnProductManagement":
-            # total_products = get_total_products_count(db_session) # Appel réel
-            total_products = 1250 # Valeur factice
-            return [
-                {'value': str(total_products), 'label': self.tr('Produits Actifs')}
-            ]
-        elif module_id == "btnRecruitment":
-            # open_positions = get_open_positions_count(db_session) # Appel réel
-            open_positions = 5 # Valeur factice
-            # new_candidates = get_new_candidates_count(db_session) # Appel réel
-            new_candidates = 28 # Valeur factice
-            return [
-                {'value': str(open_positions), 'label': self.tr('Postes Ouverts')},
-                {'value': str(new_candidates), 'label': self.tr('Nouv. Candidatures')}
-            ]
+        try:
+            if module_id == "btnClientDocuments":
+                active_clients = clients_crud.get_active_clients_count()
+                # Assumons une fonction pour les documents récents, sinon mettons une valeur statique
+                docs_recents = 12 # Placeholder, car la fonction n'existe pas
+                return [
+                    {'value': str(active_clients), 'label': self.tr('Clients Actifs')},
+                    {'value': str(docs_recents), 'label': self.tr('Docs Récents')}
+                ]
+            elif module_id == "btnProjectManagement":
+                active_projects = projects_crud.get_active_projects_count()
+                overdue_tasks = projects_crud.get_overdue_tasks_count()
+                return [
+                    {'value': str(active_projects), 'label': self.tr('Projets en Cours'), 'color': '#28A745'},
+                    {'value': str(overdue_tasks), 'label': self.tr('Tâches en Retard'), 'color': '#DC3545' if overdue_tasks > 0 else '#28A745'}
+                ]
+            elif module_id == "btnProductManagement":
+                total_products = products_crud.get_total_products_count()
+                return [
+                    {'value': str(total_products), 'label': self.tr('Produits Actifs')}
+                ]
+            elif module_id == "btnRecruitment":
+                open_positions = recruitment_cruds.get_open_positions_count()
+                new_candidates = recruitment_cruds.get_new_candidates_count()
+                return [
+                    {'value': str(open_positions), 'label': self.tr('Postes Ouverts')},
+                    {'value': str(new_candidates), 'label': self.tr('Nouv. Candidatures')}
+                ]
+        except Exception as e:
+            print(f"Erreur lors de la récupération des statistiques pour {module_id}: {e}")
         return []
-
-    # Fonctions placeholder pour simuler les appels CRUD (à supprimer lors de l'implémentation réelle)
-    def _placeholder_get_active_clients_count(self): return 142
-    def _placeholder_get_active_projects_count(self): return 22
-    def _placeholder_get_overdue_tasks_count(self): return 4
 
 
     def _load_all_module_card_stats(self):
@@ -255,112 +233,31 @@ class HomePageWidget(QWidget):
 
         return super().eventFilter(obj, event)
 
-    def _setup_center_layout(self):
-        """Creates and configures the central layout with GIF, buttons, and right sidebar."""
-        center_h_layout = QHBoxLayout()
-        center_h_layout.setContentsMargins(10, 10, 10, 10)
-        center_h_layout.setSpacing(15)
+    def _setup_top_layout(self):
+        """Crée le layout du haut avec la carte et la sidebar de statistiques."""
+        top_h_layout = QHBoxLayout()
+        top_h_layout.setContentsMargins(10, 10, 10, 10)
+        top_h_layout.setSpacing(15)
 
-        # GIF Label
-        gif_label = QLabel()
-        gif_label.setObjectName("homePageGifLabel")
-        available_gifs = ["1.gif", "2.gif", "3.gif"]
-        chosen_gif_name = random.choice(available_gifs)
-        gif_path = os.path.join(os.path.dirname(__file__), "..", "..", "resources", "gifshome", chosen_gif_name)
-        if not os.path.exists(gif_path):
-            gif_path_alt_base = os.path.join("resources", "gifshome")
-            if os.path.isdir(gif_path_alt_base): gif_path = os.path.join(gif_path_alt_base, chosen_gif_name)
-            else: gif_path = chosen_gif_name
+        # La carte prend la place principale
+        top_h_layout.addWidget(self.map_widget_container, 3) # Stretch factor 3
 
-        if os.path.exists(gif_path):
-            self.movie = QMovie(gif_path)
-            gif_label.setMovie(self.movie)
-            gif_label.setFixedSize(QSize(350, 300))
-            gif_label.setScaledContents(True)
-            self.movie.start()
-            gif_label.setAlignment(Qt.AlignCenter)
-        else:
-            gif_label.setText(self.tr("GIF '{0}' non trouvé.").format(chosen_gif_name))
-            gif_label.setStyleSheet("color: red;")
-            gif_label.setAlignment(Qt.AlignCenter)
-        center_h_layout.addWidget(gif_label, 1)
-
-        # Button Grid
-        button_scroll_area = QScrollArea()
-        button_scroll_area.setWidgetResizable(True)
-        button_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        button_scroll_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        button_scroll_area.setStyleSheet("QScrollArea { border: none; background-color: transparent; }")
-
-        button_container_widget = QWidget()
-        button_container_widget.setObjectName("homePageButtonGridContainer")
-        button_container_widget.setStyleSheet("background-color: transparent;")
-
-        grid_layout = QGridLayout(button_container_widget)
-        grid_layout.setContentsMargins(5, 5, 5, 5)
-        grid_layout.setSpacing(10)
-
-        # self.modules is defined in _init_ui or constructor
-        row, col = 0, 0
-        num_columns = 3 # Ajusté pour des cartes potentiellement plus larges
-
-        # S'assurer que self.module_cards_list est initialisé pour stocker les cartes
-        if not hasattr(self, 'module_cards_list'):
-            self.module_cards_list = []
-        else: # Vider la liste si elle existe déjà (ex: lors d'un rafraîchissement)
-            for card_ref in self.module_cards_list:
-                if card_ref: # Si la référence n'est pas None
-                    card_ref.deleteLater() # S'assurer que les anciens widgets sont supprimés
-            self.module_cards_list.clear()
-
-        for i, module_data in enumerate(self.modules):
-            # Définir une clé de couleur d'accent basée sur l'object_name ou un mapping
-            # Ceci est un exemple, vous pouvez avoir un mapping plus explicite
-            accent_color_key = module_data["object_name"].replace("btn", "").lower()
-
-            card = ModuleCardWidget(
-                module_id=module_data["object_name"], # Utiliser object_name comme ID unique
-                title=module_data["name"],
-                icon_path=module_data["icon"],
-                tooltip=module_data["name"], # Utiliser le nom comme tooltip de base
-                navigation_slot=module_data["slot"],
-                accent_color_key=accent_color_key
-            )
-            # card.setGraphicsEffect(shadow) # L'ombre peut être gérée par QSS sur ModuleCardWidget
-
-            # Connecter le signal cardClicked au slot de navigation du module
-            if module_data["slot"]:
-                card.cardClicked.connect(module_data["slot"])
-
-            self.module_cards_list.append(card) # Garder une référence si besoin de les mettre à jour
-            grid_layout.addWidget(card, row, col)
-
-            col += 1
-            if col >= num_columns:
-                col = 0
-                row += 1
-        grid_layout.setRowStretch(row + 1, 1)
-        grid_layout.setColumnStretch(num_columns, 1)
-        button_container_widget.setLayout(grid_layout)
-        button_scroll_area.setWidget(button_container_widget)
-        center_h_layout.addWidget(button_scroll_area, 2)
-
-        # Right Sidebar
+        # Right Sidebar pour les aperçus rapides
         self.right_sidebar_container = QFrame()
         self.right_sidebar_container.setObjectName("homePageRightSidebar")
         self.right_sidebar_container.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
         self.right_sidebar_layout = QVBoxLayout(self.right_sidebar_container)
-        self.right_sidebar_layout.setContentsMargins(0,0,0,0)
+        self.right_sidebar_layout.setContentsMargins(0, 0, 0, 0)
         self.right_sidebar_container.setLayout(self.right_sidebar_layout)
 
         self.quick_stats = QuickStatsWidget(self)
         self.quick_stats.refresh_requested.connect(self._refresh_quick_stats_data)
         self.set_right_sidebar_widget(self.quick_stats)
-        self._refresh_quick_stats_data() # Initial data load
+        self._refresh_quick_stats_data()
 
-        center_h_layout.addWidget(self.right_sidebar_container, 1)
+        top_h_layout.addWidget(self.right_sidebar_container, 1) # Stretch factor 1
 
-        return center_h_layout
+        return top_h_layout
 
 
     def _refresh_quick_stats_data(self):
@@ -393,61 +290,124 @@ class HomePageWidget(QWidget):
 
 
 
+    def _setup_middle_layout(self):
+        """Crée le layout du milieu pour la barre de recherche."""
+        middle_layout = QHBoxLayout()
+        middle_layout.setContentsMargins(10, 5, 10, 5)
+        middle_layout.setSpacing(5)
+        middle_layout.setAlignment(Qt.AlignCenter) # Centrer la barre
+
+        self.search_input = QLineEdit()
+        self.search_input.setObjectName("homePageSearchInput")
+        self.search_input.setPlaceholderText(self.tr("Rechercher dans l'application..."))
+        self.search_input.returnPressed.connect(self._handle_search_query)
+        self.search_input.setMaximumWidth(600) # Limiter la largeur
+        middle_layout.addWidget(self.search_input)
+
+        self.search_button = QPushButton()
+        self.search_button.setObjectName("homePageSearchButton")
+        search_icon = QIcon.fromTheme("search", QIcon(":/icons/search.svg"))
+        if not search_icon.isNull():
+            self.search_button.setIcon(search_icon)
+        else:
+            self.search_button.setText("🔍")
+        self.search_button.setToolTip(self.tr("Lancer la recherche"))
+        self.search_button.clicked.connect(self._handle_search_query)
+        middle_layout.addWidget(self.search_button)
+
+        return middle_layout
+
     def _setup_bottom_layout(self):
-        """Creates and configures the bottom layout with promotional widgets and content area."""
+        """Crée le layout du bas avec la grille de boutons et les astuces."""
         bottom_h_layout = QHBoxLayout()
         bottom_h_layout.setContentsMargins(10, 5, 10, 10)
         bottom_h_layout.setSpacing(10)
 
-        # Promo Content Manager - self.promo_manager needs to be accessible
-        # self.promo_manager is initialized in _init_ui or constructor
+        # Grille de boutons
+        button_scroll_area = self._create_button_grid()
+        bottom_h_layout.addWidget(button_scroll_area, 3)
 
-        # Left Promotional Area
-        self.left_promo_widget = PromoSectionWidget() # self.left_promo_widget needs to be accessible
-        self.left_promo_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        left_message = self.promo_manager.get_random_message()
-        if left_message:
-            self.left_promo_widget.set_content(
-                left_message.get("title", ""),
-                left_message.get("body", ""),
-                left_message.get("category", "generic")
-            )
-        else:
-            self.left_promo_widget.set_content(self.tr("Info"), self.tr("Aucun message promotionnel disponible."), "generic")
-        self.left_promo_widget.clicked.connect(lambda: self.update_promo_widget_content(self.left_promo_widget))
-
-        # Center Map Area / Bottom Content Area
-        self.bottom_content_area = QStackedWidget() # self.bottom_content_area needs to be accessible
-        self.bottom_content_area.setObjectName("homePageBottomContentArea")
-        self.bottom_content_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-
-        # Right Promotional Area
-        self.right_promo_widget = PromoSectionWidget() # self.right_promo_widget needs to be accessible
-        self.right_promo_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        right_message = self.promo_manager.get_random_message()
-        if self.promo_manager.messages and len(self.promo_manager.messages) > 1:
-            current_left_title = self.left_promo_widget.title_label.text() # Need a way to get original title if prefixed
-            current_left_body = self.left_promo_widget.body_label.text()
-            # This comparison might be tricky if titles are prefixed.
-            # For simplicity, we assume left_message holds the original chosen message.
-            while right_message == left_message:
-                right_message = self.promo_manager.get_random_message()
-
-        if right_message:
-            self.right_promo_widget.set_content(
-                right_message.get("title", ""),
-                right_message.get("body", ""),
-                right_message.get("category", "generic")
-            )
-        else:
-            self.right_promo_widget.set_content(self.tr("Avis"), self.tr("Consultez nos dernières mises à jour."), "generic")
-        self.right_promo_widget.clicked.connect(lambda: self.update_promo_widget_content(self.right_promo_widget))
-
-        bottom_h_layout.addWidget(self.left_promo_widget, 1)
-        bottom_h_layout.addWidget(self.bottom_content_area, 3)
-        bottom_h_layout.addWidget(self.right_promo_widget, 1)
+        # Zone d'astuce avec le GIF
+        tip_area = self._create_tip_area()
+        bottom_h_layout.addWidget(tip_area, 1)
 
         return bottom_h_layout
+
+    def _create_button_grid(self):
+        """Crée la grille de cartes de modules."""
+        button_scroll_area = QScrollArea()
+        button_scroll_area.setWidgetResizable(True)
+        button_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        button_scroll_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        button_scroll_area.setStyleSheet("QScrollArea { border: none; background-color: transparent; }")
+
+        button_container_widget = QWidget()
+        button_container_widget.setObjectName("homePageButtonGridContainer")
+        grid_layout = QGridLayout(button_container_widget)
+        grid_layout.setSpacing(10)
+
+        if not hasattr(self, 'module_cards_list'):
+            self.module_cards_list = []
+        else:
+            for card_ref in self.module_cards_list:
+                if card_ref: card_ref.deleteLater()
+            self.module_cards_list.clear()
+
+        row, col, num_columns = 0, 0, 3
+        for module_data in self.modules:
+            accent_color_key = module_data["object_name"].replace("btn", "").lower()
+            card = ModuleCardWidget(
+                module_id=module_data["object_name"],
+                title=module_data["name"],
+                icon_path=module_data["icon"],
+                tooltip=module_data["name"],
+                navigation_slot=module_data["slot"],
+                accent_color_key=accent_color_key
+            )
+            if module_data["slot"]:
+                card.cardClicked.connect(module_data["slot"])
+            self.module_cards_list.append(card)
+            grid_layout.addWidget(card, row, col)
+            col += 1
+            if col >= num_columns:
+                col = 0
+                row += 1
+
+        button_container_widget.setLayout(grid_layout)
+        button_scroll_area.setWidget(button_container_widget)
+        return button_scroll_area
+
+    def _create_tip_area(self):
+        """Crée la zone d'astuce avec un message et le GIF."""
+        tip_widget = QFrame()
+        tip_widget.setObjectName("tipAreaFrame")
+        tip_layout = QVBoxLayout(tip_widget)
+
+        # Astuce du jour
+        self.tip_promo_widget = PromoSectionWidget()
+        tip_message = self.promo_manager.get_random_message()
+        if tip_message:
+            self.tip_promo_widget.set_content(
+                tip_message.get("title", self.tr("Astuce du Jour")),
+                tip_message.get("body", ""),
+                tip_message.get("category", "generic")
+            )
+        else:
+            self.tip_promo_widget.set_content(self.tr("Astuce du Jour"), self.tr("Pensez à sauvegarder régulièrement."), "generic")
+        self.tip_promo_widget.clicked.connect(lambda: self.update_promo_widget_content(self.tip_promo_widget))
+
+        tip_layout.addWidget(self.tip_promo_widget)
+
+        # Conteneur pour le GIF pour qu'il s'adapte à l'espace restant
+        gif_container = QWidget()
+        gif_container_layout = QVBoxLayout(gif_container)
+        gif_container_layout.setContentsMargins(0,0,0,0)
+        gif_container_layout.addWidget(self.gif_label)
+        self.gif_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+        tip_layout.addWidget(gif_container, 1) # Le GIF prend l'espace restant
+
+        return tip_widget
 
     def update_promo_widget_content(self, promo_widget_instance):
         """Fetches a new random message and updates the given PromoSectionWidget."""
@@ -490,19 +450,32 @@ class HomePageWidget(QWidget):
             )
 
 
+    def set_map_widget(self, map_widget):
+        """Place le widget de la carte dans le conteneur prévu."""
+        if hasattr(self, 'map_widget_container'):
+            # Vider le conteneur au cas où
+            while self.map_widget_container.layout() and self.map_widget_container.layout().count():
+                item = self.map_widget_container.layout().takeAt(0)
+                widget = item.widget()
+                if widget:
+                    widget.deleteLater()
+
+            # Mettre en place un layout si ce n'est pas déjà fait
+            if not self.map_widget_container.layout():
+                layout = QVBoxLayout(self.map_widget_container)
+                layout.setContentsMargins(0,0,0,0)
+                self.map_widget_container.setLayout(layout)
+
+            # Ajouter le nouveau widget de carte
+            if map_widget:
+                self.map_widget_container.layout().addWidget(map_widget)
+                self.map_widget_container.setVisible(True)
+            else:
+                self.map_widget_container.setVisible(False)
+
     def set_bottom_widget(self, widget_to_display):
-        while self.bottom_content_area.count() > 0:
-            widget = self.bottom_content_area.widget(0)
-            self.bottom_content_area.removeWidget(widget)
-            widget.deleteLater() # Important pour éviter les fuites de mémoire si les widgets ne sont pas réutilisés
-
-
-        if widget_to_display:
-            self.bottom_content_area.addWidget(widget_to_display)
-            self.bottom_content_area.setCurrentWidget(widget_to_display)
-            self.bottom_content_area.setVisible(True)
-        else:
-            self.bottom_content_area.setVisible(False)
+        # Cette méthode est maintenant utilisée pour placer la carte.
+        self.set_map_widget(widget_to_display)
 
     def set_right_sidebar_widget(self, widget_to_display):
         # Clear existing widgets from the right sidebar layout
