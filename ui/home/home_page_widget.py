@@ -103,13 +103,11 @@ class HomePageWidget(QWidget):
         self.map_widget_container = QFrame() # Conteneur pour la carte
         self.map_widget_container.setObjectName("homePageMapContainer")
 
-        top_layout = self._setup_top_layout() # Nouveau layout pour la carte et la sidebar
-        middle_layout = self._setup_middle_layout() # Pour la barre de recherche
-        bottom_layout = self._setup_bottom_layout() # Pour les boutons et astuces
+        top_layout = self._setup_top_layout()
+        bottom_layout = self._setup_bottom_layout()
 
-        main_v_layout.addLayout(top_layout, 2) # Plus d'espace pour la partie haute
-        main_v_layout.addLayout(middle_layout)
-        main_v_layout.addLayout(bottom_layout, 1)
+        main_v_layout.addLayout(top_layout, 1)
+        main_v_layout.addLayout(bottom_layout, 2)
 
         self.setLayout(main_v_layout)
         self._load_all_module_card_stats()
@@ -256,6 +254,10 @@ class HomePageWidget(QWidget):
         self.set_right_sidebar_widget(self.quick_stats)
         self._refresh_quick_stats_data()
 
+        # Ajout de la barre de recherche sous les statistiques rapides
+        search_layout = self._setup_search_layout()
+        self.right_sidebar_layout.addLayout(search_layout)
+
         top_h_layout.addWidget(self.right_sidebar_container, 1) # Stretch factor 1
 
         return top_h_layout
@@ -291,19 +293,18 @@ class HomePageWidget(QWidget):
 
 
 
-    def _setup_middle_layout(self):
-        """Crée le layout du milieu pour la barre de recherche."""
-        middle_layout = QHBoxLayout()
-        middle_layout.setContentsMargins(10, 5, 10, 5)
-        middle_layout.setSpacing(5)
-        middle_layout.setAlignment(Qt.AlignCenter) # Centrer la barre
+    def _setup_search_layout(self):
+        """Crée le layout pour la barre de recherche."""
+        search_layout = QHBoxLayout()
+        search_layout.setContentsMargins(10, 5, 10, 5)
+        search_layout.setSpacing(5)
+        search_layout.setAlignment(Qt.AlignCenter) # Centrer la barre
 
         self.search_input = QLineEdit()
         self.search_input.setObjectName("homePageSearchInput")
-        self.search_input.setPlaceholderText(self.tr("Rechercher dans l'application..."))
+        self.search_input.setPlaceholderText(self.tr("Rechercher..."))
         self.search_input.returnPressed.connect(self._handle_search_query)
-        self.search_input.setMaximumWidth(600) # Limiter la largeur
-        middle_layout.addWidget(self.search_input)
+        search_layout.addWidget(self.search_input)
 
         self.search_button = QPushButton()
         self.search_button.setObjectName("homePageSearchButton")
@@ -314,23 +315,19 @@ class HomePageWidget(QWidget):
             self.search_button.setText("🔍")
         self.search_button.setToolTip(self.tr("Lancer la recherche"))
         self.search_button.clicked.connect(self._handle_search_query)
-        middle_layout.addWidget(self.search_button)
+        search_layout.addWidget(self.search_button)
 
-        return middle_layout
+        return search_layout
 
     def _setup_bottom_layout(self):
-        """Crée le layout du bas avec la grille de boutons et les astuces."""
+        """Crée le layout du bas avec la grille de boutons."""
         bottom_h_layout = QHBoxLayout()
         bottom_h_layout.setContentsMargins(10, 5, 10, 10)
         bottom_h_layout.setSpacing(10)
 
         # Grille de boutons
         button_scroll_area = self._create_button_grid()
-        bottom_h_layout.addWidget(button_scroll_area, 3)
-
-        # Zone d'astuce avec le GIF
-        tip_area = self._create_tip_area()
-        bottom_h_layout.addWidget(tip_area, 1)
+        bottom_h_layout.addWidget(button_scroll_area, 1)
 
         return bottom_h_layout
 
@@ -354,8 +351,9 @@ class HomePageWidget(QWidget):
                 if card_ref: card_ref.deleteLater()
             self.module_cards_list.clear()
 
-        row, col, num_columns = 0, 0, 3
-        for module_data in self.modules:
+        if self.modules:
+            # Afficher uniquement la première carte, plus grande
+            module_data = self.modules[0]
             accent_color_key = module_data["object_name"].replace("btn", "").lower()
             card = ModuleCardWidget(
                 module_id=module_data["object_name"],
@@ -368,47 +366,11 @@ class HomePageWidget(QWidget):
             if module_data["slot"]:
                 card.cardClicked.connect(module_data["slot"])
             self.module_cards_list.append(card)
-            grid_layout.addWidget(card, row, col)
-            col += 1
-            if col >= num_columns:
-                col = 0
-                row += 1
+            grid_layout.addWidget(card, 0, 0)
 
         button_container_widget.setLayout(grid_layout)
         button_scroll_area.setWidget(button_container_widget)
         return button_scroll_area
-
-    def _create_tip_area(self):
-        """Crée la zone d'astuce avec un message et le GIF."""
-        tip_widget = QFrame()
-        tip_widget.setObjectName("tipAreaFrame")
-        tip_layout = QVBoxLayout(tip_widget)
-
-        # Astuce du jour
-        self.tip_promo_widget = PromoSectionWidget()
-        tip_message = self.promo_manager.get_random_message()
-        if tip_message:
-            self.tip_promo_widget.set_content(
-                tip_message.get("title", self.tr("Astuce du Jour")),
-                tip_message.get("body", ""),
-                tip_message.get("category", "generic")
-            )
-        else:
-            self.tip_promo_widget.set_content(self.tr("Astuce du Jour"), self.tr("Pensez à sauvegarder régulièrement."), "generic")
-        self.tip_promo_widget.clicked.connect(lambda: self.update_promo_widget_content(self.tip_promo_widget))
-
-        tip_layout.addWidget(self.tip_promo_widget)
-
-        # Conteneur pour le GIF pour qu'il s'adapte à l'espace restant
-        gif_container = QWidget()
-        gif_container_layout = QVBoxLayout(gif_container)
-        gif_container_layout.setContentsMargins(0,0,0,0)
-        gif_container_layout.addWidget(self.gif_label)
-        self.gif_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-
-        tip_layout.addWidget(gif_container, 1) # Le GIF prend l'espace restant
-
-        return tip_widget
 
     def update_promo_widget_content(self, promo_widget_instance):
         """Fetches a new random message and updates the given PromoSectionWidget."""
