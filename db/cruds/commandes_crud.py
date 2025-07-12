@@ -3,7 +3,8 @@ import uuid
 from datetime import datetime, timezone
 import logging
 from sqlalchemy.sql import text
-from .generic_crud import _manage_conn
+from sqlalchemy.orm import Session # For type hinting Session
+from .generic_crud import _manage_conn, _is_sqlalchemy_obj # Import helper
 from . import clients_crud  # For updating client status
 from . import status_settings_crud # For fetching status definitions
 
@@ -62,7 +63,10 @@ def add_commande(data: dict, conn = None) -> str | None: # conn is Session
         "created_by_user_id": data['created_by_user_id']
     }
     try:
-        conn.execute(sql_query, params_dict)
+        if _is_sqlalchemy_obj(conn):
+            conn.execute(sql_query, params_dict)
+        else:
+            conn.execute(str(sql_query), params_dict)
         # _manage_conn handles commit/rollback
         logger.info(f"Commande '{data['commande_reference']}' added with ID: {new_commande_id} for client {data['client_id']}.")
         return new_commande_id
@@ -91,9 +95,14 @@ def get_commande_by_id(commande_id: str, conn = None) -> dict | None: # conn is 
         WHERE cmd.commande_id = :commande_id
     """)
     try:
-        result = conn.execute(sql_query, {"commande_id": commande_id})
+        if _is_sqlalchemy_obj(conn):
+            result = conn.execute(sql_query, {"commande_id": commande_id})
+        else:
+            result = conn.execute(str(sql_query), {"commande_id": commande_id})
         row = result.fetchone()
-        return dict(row._mapping) if row else None
+        if row:
+            return dict(row._mapping) if hasattr(row, '_mapping') else dict(row)
+        return None
     except Exception as e:
         logger.error(f"Error getting commande by ID {commande_id}: {e}", exc_info=True)
         return None
@@ -139,8 +148,11 @@ def get_commandes_for_client(client_id: str, filters: dict = None, conn = None, 
 
     sql_query = text(base_sql)
     try:
-        result = conn.execute(sql_query, params_dict)
-        return [dict(row._mapping) for row in result.fetchall()]
+        if _is_sqlalchemy_obj(conn):
+            result = conn.execute(sql_query, params_dict)
+        else:
+            result = conn.execute(str(sql_query), params_dict)
+        return [dict(row._mapping) if hasattr(row, '_mapping') else dict(row) for row in result.fetchall()]
     except Exception as e:
         logger.error(f"Error getting commandes for client {client_id}: {e}", exc_info=True)
         return []
@@ -172,7 +184,10 @@ def update_commande(commande_id: str, data: dict, conn = None) -> bool: # conn i
     sql_query = text(sql_query_str)
 
     try:
-        result = conn.execute(sql_query, fields_to_update)
+        if _is_sqlalchemy_obj(conn):
+            result = conn.execute(sql_query, fields_to_update)
+        else:
+            result = conn.execute(str(sql_query), fields_to_update)
         # _manage_conn handles commit/rollback
         return result.rowcount > 0
     except Exception as e: # Changed to general Exception
@@ -192,7 +207,10 @@ def delete_commande(commande_id: str, conn = None) -> bool: # conn is Session
     sql_query = text("UPDATE Commandes SET deleted_at = :deleted_at WHERE commande_id = :commande_id")
     params_dict = {"deleted_at": now_utc_iso, "commande_id": commande_id}
     try:
-        result = conn.execute(sql_query, params_dict)
+        if _is_sqlalchemy_obj(conn):
+            result = conn.execute(sql_query, params_dict)
+        else:
+            result = conn.execute(str(sql_query), params_dict)
         # _manage_conn handles commit/rollback
         if result.rowcount > 0:
             logger.info(f"Commande {commande_id} marked as deleted (deleted_at set).")
@@ -253,7 +271,10 @@ def add_commande_item(data: dict, conn = None) -> str | None: # conn is Session
         "product_language_code": data.get('product_language_code')
     }
     try:
-        conn.execute(sql_query, params_dict)
+        if _is_sqlalchemy_obj(conn):
+            conn.execute(sql_query, params_dict)
+        else:
+            conn.execute(str(sql_query), params_dict)
         # _manage_conn handles commit/rollback
         logger.info(f"CommandeItem added with ID: {new_item_id} for commande {data['commande_id']}.")
         return new_item_id
@@ -275,8 +296,11 @@ def get_items_for_commande(commande_id: str, conn = None) -> list[dict]: # conn 
         ORDER BY ci.item_id -- Or some other ordering if items have a sequence
     """)
     try:
-        result = conn.execute(sql_query, {"commande_id": commande_id})
-        return [dict(row._mapping) for row in result.fetchall()]
+        if _is_sqlalchemy_obj(conn):
+            result = conn.execute(sql_query, {"commande_id": commande_id})
+        else:
+            result = conn.execute(str(sql_query), {"commande_id": commande_id})
+        return [dict(row._mapping) if hasattr(row, '_mapping') else dict(row) for row in result.fetchall()]
     except Exception as e:
         logger.error(f"Error getting items for commande {commande_id}: {e}", exc_info=True)
         return []
@@ -301,7 +325,10 @@ def update_commande_item(item_id: str, data: dict, conn = None) -> bool: # conn 
         # Fetch current values if not all are being updated, to ensure correct calculation
         if not all(k in fields_to_update for k in ['quantity', 'unit_price_ht', 'vat_rate']): # vat_rate also needed if not in fields_to_update for calc
             current_item_sql = text("SELECT quantity, unit_price_ht, vat_rate FROM CommandeItems WHERE item_id = :item_id")
-            current_item_result = conn.execute(current_item_sql, {"item_id": item_id})
+            if _is_sqlalchemy_obj(conn):
+                current_item_result = conn.execute(current_item_sql, {"item_id": item_id})
+            else:
+                current_item_result = conn.execute(str(current_item_sql), {"item_id": item_id})
             current_item_row = current_item_result.fetchone()
             if not current_item_row:
                 logger.error(f"Cannot find item {item_id} to update for recalculating totals.")
@@ -330,7 +357,10 @@ def update_commande_item(item_id: str, data: dict, conn = None) -> bool: # conn 
     sql_query = text(sql_query_str)
 
     try:
-        result = conn.execute(sql_query, params_for_update)
+        if _is_sqlalchemy_obj(conn):
+            result = conn.execute(sql_query, params_for_update)
+        else:
+            result = conn.execute(str(sql_query), params_for_update)
         # _manage_conn handles commit/rollback
         return result.rowcount > 0
     except Exception as e: # Changed to general Exception
@@ -342,7 +372,10 @@ def delete_commande_item(item_id: str, conn = None) -> bool: # conn is Session
     """Deletes a commande item by its ID."""
     sql_query = text("DELETE FROM CommandeItems WHERE item_id = :item_id")
     try:
-        result = conn.execute(sql_query, {"item_id": item_id})
+        if _is_sqlalchemy_obj(conn):
+            result = conn.execute(sql_query, {"item_id": item_id})
+        else:
+            result = conn.execute(str(sql_query), {"item_id": item_id})
         # _manage_conn handles commit/rollback
         return result.rowcount > 0
     except Exception as e: # Changed to general Exception
@@ -361,7 +394,10 @@ def get_next_commande_reference(conn = None, prefix="CMD") -> str: # conn is Ses
     sql_query = text("SELECT commande_reference FROM Commandes WHERE commande_reference LIKE :year_prefix_like ORDER BY commande_reference DESC LIMIT 1")
 
     try:
-        result = conn.execute(sql_query, {"year_prefix_like": year_prefix_like})
+        if _is_sqlalchemy_obj(conn):
+            result = conn.execute(sql_query, {"year_prefix_like": year_prefix_like})
+        else:
+            result = conn.execute(str(sql_query), {"year_prefix_like": year_prefix_like})
         last_ref_row = result.fetchone()
 
         next_num = 1
@@ -452,8 +488,11 @@ def get_all_commandes_with_details(filters: dict = None, limit: int = None, offs
 
     sql_query = text(base_sql)
     try:
-        result = conn.execute(sql_query, params_dict)
-        return [dict(row._mapping) for row in result.fetchall()]
+        if _is_sqlalchemy_obj(conn):
+            result = conn.execute(sql_query, params_dict)
+        else:
+            result = conn.execute(str(sql_query), params_dict)
+        return [dict(row._mapping) if hasattr(row, '_mapping') else dict(row) for row in result.fetchall()]
     except Exception as e: # Changed to general Exception
         logger.error(f"Failed to get all commandes with details. Filters: {filters}. SQL: {base_sql} Params: {params_dict} Error: {e}", exc_info=True)
         return []
@@ -492,8 +531,18 @@ def get_all_commandes_count(filters: dict = None, conn = None) -> int: # conn is
 
     sql_query = text(full_sql_str)
     try:
-        result = conn.execute(sql_query, params_dict)
-        count_result = result.scalar_one_or_none() # scalar_one_or_none() is good for single value results
+        if _is_sqlalchemy_obj(conn):
+            result = conn.execute(sql_query, params_dict)
+        else:
+            result = conn.execute(str(sql_query), params_dict)
+
+        count_result = None
+        if hasattr(result, 'scalar_one_or_none'):
+            count_result = result.scalar_one_or_none()
+        elif hasattr(result, 'fetchone'):
+            raw_row = result.fetchone()
+            count_result = raw_row[0] if raw_row else None
+
         return count_result if count_result is not None else 0
     except Exception as e: # Changed to general Exception
         logger.error(f"Failed to count commandes. Filters: {filters}. SQL: {full_sql_str} Params: {params_dict} Error: {e}", exc_info=True)
