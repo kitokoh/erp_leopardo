@@ -255,10 +255,10 @@ class SAVTab(QWidget):
         except Exception as e:
             logging.error(f"Error loading purchase history for client {client_id}: {e}", exc_info=True)
             if self.notification_manager:
-                self.notification_manager.show_notification(
+                self.notification_manager.show(
                     self.tr("Erreur Historique Achats"),
                     self.tr("Impossible de charger l'historique des achats. Détails: {0}").format(str(e)),
-                    'ERROR'
+                    type='ERROR'
                 )
             else:
                 QMessageBox.critical(self, self.tr("Erreur"), self.tr("Impossible de charger l'historique des achats."))

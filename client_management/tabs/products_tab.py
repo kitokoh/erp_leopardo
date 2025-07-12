@@ -12,6 +12,7 @@ import os # For path operations
 import uuid # For unique filenames
 
 import db as db_manager
+from db.cruds import products_crud
 from db.cruds import commandes_crud
 from db.cruds import proforma_invoices_crud # If creating a proforma DB record
 from utils.proforma_invoice_utils import get_proforma_invoice_context_data # For context
@@ -830,7 +831,7 @@ class ProductsTab(QWidget):
 
             # Call products_crud.add_product
             # Assuming products_crud.add_product returns a dict like {'success': bool, 'id': new_id, 'error': str}
-            add_global_prod_result = db_manager.products_crud.add_product(global_product_details)
+            add_global_prod_result = products_crud.add_product(global_product_details)
 
             if not add_global_prod_result or not add_global_prod_result.get('success'):
                 error_msg = add_global_prod_result.get('error', self.tr("une erreur inconnue"))
