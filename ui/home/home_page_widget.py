@@ -16,8 +16,11 @@ from .quick_stats_widget import QuickStatsWidget # Import the new widget
 
 
 
-from .quick_stats_widget import QuickStatsWidget
-from .module_card_widget import ModuleCardWidget
+from .quick_stats_widget import QuickStatsWidget # Import the new widget
+from .module_card_widget import ModuleCardWidget # Ajout de l'import
+from statistics.map_widget import HomePageMapWidget
+from client_management.add_new_client_dialog import AddNewClientDialog
+from client_management.client_controller import ClientController
 from db.cruds import clients_crud, projects_crud, products_crud
 from db.cruds import recruitment_job_openings_crud, recruitment_candidates_crud
 
@@ -325,27 +328,52 @@ class HomePageWidget(QWidget):
         bottom_h_layout.setContentsMargins(10, 5, 10, 10)
         bottom_h_layout.setSpacing(10)
 
-        # Grille de boutons
-        button_scroll_area = self._create_button_grid()
-        bottom_h_layout.addWidget(button_scroll_area, 1)
+        # Promo Content Manager - self.promo_manager needs to be accessible
+        # self.promo_manager is initialized in _init_ui or constructor
 
-        return bottom_h_layout
+        # Left Promotional Area
+        self.left_promo_widget = PromoSectionWidget() # self.left_promo_widget needs to be accessible
+        self.left_promo_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        left_message = self.promo_manager.get_random_message()
+        if left_message:
+            self.left_promo_widget.set_content(
+                left_message.get("title", ""),
+                left_message.get("body", ""),
+                left_message.get("category", "generic")
+            )
+        else:
+            self.left_promo_widget.set_content(self.tr("Info"), self.tr("Aucun message promotionnel disponible."), "generic")
+        self.left_promo_widget.clicked.connect(lambda: self.update_promo_widget_content(self.left_promo_widget))
 
-    def _create_button_grid(self):
-        """Crée la grille de cartes de modules."""
-        button_scroll_area = QScrollArea()
-        button_scroll_area.setWidgetResizable(True)
-        button_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        button_scroll_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        button_scroll_area.setStyleSheet("QScrollArea { border: none; background-color: transparent; }")
+        # Center Map Area / Bottom Content Area
+        self.bottom_content_area = QStackedWidget() # self.bottom_content_area needs to be accessible
+        self.bottom_content_area.setObjectName("homePageBottomContentArea")
+        self.bottom_content_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
-        button_container_widget = QWidget()
-        button_container_widget.setObjectName("homePageButtonGridContainer")
-        grid_layout = QGridLayout(button_container_widget)
-        grid_layout.setSpacing(10)
+        self.home_map_widget = HomePageMapWidget(app_translator_func=self.tr)
+        self.bottom_content_area.addWidget(self.home_map_widget)
+        if hasattr(self.home_map_widget.interaction_handler, 'country_clicked_signal'):
+            self.home_map_widget.interaction_handler.country_clicked_signal.connect(self._handle_add_client_for_country)
 
-        if not hasattr(self, 'module_cards_list'):
-            self.module_cards_list = []
+        # Right Promotional Area
+        self.right_promo_widget = PromoSectionWidget() # self.right_promo_widget needs to be accessible
+        self.right_promo_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        right_message = self.promo_manager.get_random_message()
+        if self.promo_manager.messages and len(self.promo_manager.messages) > 1:
+            current_left_title = self.left_promo_widget.title_label.text() # Need a way to get original title if prefixed
+            current_left_body = self.left_promo_widget.body_label.text()
+            # This comparison might be tricky if titles are prefixed.
+            # For simplicity, we assume left_message holds the original chosen message.
+            while right_message == left_message:
+                right_message = self.promo_manager.get_random_message()
+
+        if right_message:
+            self.right_promo_widget.set_content(
+                right_message.get("title", ""),
+                right_message.get("body", ""),
+                right_message.get("category", "generic")
+            )
+
         else:
             for card_ref in self.module_cards_list:
                 if card_ref: card_ref.deleteLater()
@@ -530,6 +558,18 @@ class HomePageWidget(QWidget):
             self.main_window.show_settings_page()
         else:
             print(f"HomePageWidget: main_window does NOT have show_settings_page.")
+
+    def _handle_add_client_for_country(self, country_name):
+        dialog = AddNewClientDialog(parent=self, initial_country_name=country_name)
+        if dialog.exec_() == AddNewClientDialog.Accepted:
+            client_data = dialog.get_data()
+            controller = ClientController()
+            try:
+                controller.add_new_client(client_data)
+                QMessageBox.information(self, self.tr("Client Ajouté"), self.tr("Le nouveau client a été ajouté avec succès."))
+                self.home_map_widget.refresh_map()
+            except Exception as e:
+                QMessageBox.critical(self, self.tr("Erreur"), self.tr("Erreur lors de l'ajout du client: {0}").format(str(e)))
 
 
 

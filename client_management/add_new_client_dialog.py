@@ -9,6 +9,7 @@ from PyQt5.QtCore import Qt
 from .client_controller import ClientController # Added
 # from db.cruds.templates_crud import get_all_templates # Removed
 from auth.authentication import get_current_user_id # Added import
+from db import db_manager, get_db_connection
 
 class AddNewClientDialog(QDialog):
     def __init__(self, parent=None, initial_country_name=None):
@@ -16,6 +17,11 @@ class AddNewClientDialog(QDialog):
         self.client_controller = ClientController() # Added
         self.initial_country_name = initial_country_name
         self.setWindowTitle(self.tr("Ajouter un Nouveau Client"))
+        db_session = get_db_connection()
+        try:
+            self.geo_scope = db_manager.get_setting('geographic_scope', 'international', db_session)
+        finally:
+            db_session.close()
         self.setMinimumSize(500, 400)
         # self.country_id = None # Removed, controller will handle ID resolution
         # self.city_id = None # Removed, controller will handle ID resolution
@@ -104,6 +110,11 @@ class AddNewClientDialog(QDialog):
         self.load_countries_into_combo()
         # self.populate_template_combo() # Removed call
         self._handle_initial_country()
+        if self.geo_scope != "international":
+            # TODO: Make the default country configurable
+            self.country_select_combo.setCurrentText("France")
+            self.country_select_combo.setEnabled(False)
+            self.add_country_button.setEnabled(False)
 
     # def populate_template_combo(self): # Removed
     #     self.default_template_combo.clear() # Removed

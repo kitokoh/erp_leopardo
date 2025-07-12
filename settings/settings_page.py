@@ -549,6 +549,23 @@ class SettingsPage(QWidget):
         behavior_layout.addRow(self.check_license_on_startup_checkbox) # Add to the form layout
 
         main_layout.addWidget(behavior_group)
+
+        # --- Geographic Scope Settings Group ---
+        geo_scope_group = QGroupBox(self.tr("Portée Géographique de l'Activité"))
+        geo_scope_layout = QFormLayout(geo_scope_group)
+        geo_scope_layout.setSpacing(10)
+
+        self.geo_scope_combo = QComboBox()
+        self.geo_scope_options = {
+            self.tr("Internationale"): "international",
+            self.tr("Régionale"): "regional",
+            self.tr("Locale (Ville)"): "local"
+        }
+        self.geo_scope_combo.addItems(list(self.geo_scope_options.keys()))
+        self.geo_scope_combo.setToolTip(self.tr("Définissez la portée géographique de votre activité pour adapter l'affichage des cartes."))
+        geo_scope_layout.addRow(self.tr("Portée de l'activité :"), self.geo_scope_combo)
+
+        main_layout.addWidget(geo_scope_group)
         main_layout.addStretch(1) # Push content to the top
         self.tabs_widget.addTab(tab_widget, self.tr("General"))
 
@@ -1636,6 +1653,13 @@ class SettingsPage(QWidget):
         if db_manager:
             check_license_str = db_manager.get_setting('check_license_on_startup', default='True')
             self.check_license_on_startup_checkbox.setChecked(check_license_str.lower() == 'true')
+
+            # Load geographic scope
+            geo_scope_value = db_manager.get_setting('geographic_scope', default='international')
+            for display_text, value in self.geo_scope_options.items():
+                if value == geo_scope_value:
+                    self.geo_scope_combo.setCurrentText(display_text)
+                    break
         else:
             self.check_license_on_startup_checkbox.setChecked(True) # Default to True if db_manager is not available
             print("WARNING: db_manager not available, 'check_license_on_startup' defaulted to True for UI.")
@@ -1895,6 +1919,12 @@ class SettingsPage(QWidget):
             check_license_value = self.check_license_on_startup_checkbox.isChecked()
             db_manager.set_setting('check_license_on_startup', 'True' if check_license_value else 'False')
             print(f"License check on startup setting saved to DB: {check_license_value}")
+
+            # Save geographic scope
+            selected_geo_scope_display_text = self.geo_scope_combo.currentText()
+            geo_scope_value = self.geo_scope_options.get(selected_geo_scope_display_text, "international")
+            db_manager.set_setting('geographic_scope', geo_scope_value)
+            print(f"Geographic scope setting saved to DB: {geo_scope_value}")
         else:
             print("WARNING: db_manager not available. Default footer notes and license check setting not saved to DB.")
 

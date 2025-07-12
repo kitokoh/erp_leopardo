@@ -16,15 +16,21 @@ from db import get_client_counts_by_country # Example, might need more data
 class HomePageMapInteractionHandler(QObject):
     # Define signals if the home page map needs to communicate back to Python
     # For example: home_country_clicked = pyqtSignal(str)
+    map_view_changed_signal = pyqtSignal(float, float, int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
 
+    country_clicked_signal = pyqtSignal(str)
+
     # Define @pyqtSlot decorated methods if JS needs to call Python
-    # @pyqtSlot(str)
-    # def onHomeCountryClicked(self, country_name):
-    #     self.home_country_clicked.emit(country_name)
-    pass # No specific interactions defined for now
+    @pyqtSlot(str)
+    def countryClicked(self, country_name):
+        self.country_clicked_signal.emit(country_name)
+
+    @pyqtSlot(float, float, int)
+    def onMapViewChanged(self, lat, lng, zoom):
+        self.map_view_changed_signal.emit(lat, lng, zoom)
 
 
 class HomePageMapWidget(QWidget):
@@ -53,6 +59,17 @@ class HomePageMapWidget(QWidget):
         self.map_view.page().setWebChannel(self.web_channel)
         # Use a distinct name if both maps could be active and have channels.
         self.web_channel.registerObject("pyHomePageMapConnector", self.interaction_handler)
+        self.interaction_handler.map_view_changed_signal.connect(self._on_map_view_changed)
+
+    def _on_map_view_changed(self, lat, lng, zoom):
+        from db import db_manager, get_db_connection
+        db_session = get_db_connection()
+        try:
+            db_manager.set_setting('map_last_lat', str(lat), db_session)
+            db_manager.set_setting('map_last_lng', str(lng), db_session)
+            db_manager.set_setting('map_last_zoom', str(zoom), db_session)
+        finally:
+            db_session.close()
 
     def refresh_map(self):
         logging.info("HomePageMapWidget: Refreshing map...")
@@ -70,13 +87,32 @@ class HomePageMapWidget(QWidget):
             geojson_path = os.path.join(APP_ROOT_DIR, "resources", "assets", "world_countries.geojson")
 
             # 2. Generate Map HTML using the utility function
+            from db import db_manager, get_db_connection
+            db_session = get_db_connection()
+            try:
+                scope = db_manager.get_setting('geographic_scope', 'international', db_session)
+            finally:
+                db_session.close()
+
+            from db import db_manager, get_db_connection
+            db_session = get_db_connection()
+            try:
+                scope = db_manager.get_setting('geographic_scope', 'international', db_session)
+                last_lat = float(db_manager.get_setting('map_last_lat', '20', db_session))
+                last_lng = float(db_manager.get_setting('map_last_lng', '0', db_session))
+                last_zoom = int(db_manager.get_setting('map_last_zoom', '2', db_session))
+            finally:
+                db_session.close()
+
             map_html = generate_folium_map_html(
                 geojson_path=geojson_path,
                 clients_by_country_counts=clients_by_country,
                 all_clients_details_for_popups=all_clients_details, # Passing None for simpler popups
                 app_translator_func=self.app_translator_func,
                 map_interaction_handler_name="pyHomePageMapConnector", # Use the specific handler name
-                initial_zoom=1 # Overview map might be more zoomed out
+                initial_location=[last_lat, last_lng],
+                initial_zoom=last_zoom,
+                scope=scope
             )
 
             if map_html:
