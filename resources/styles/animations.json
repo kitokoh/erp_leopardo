@@ -1,18 +1,34 @@
-[
-    {
-        "name": "Subtle Glow",
-        "stylesheet": "color: #2563eb; font-size: 18px; font-weight: bold; padding-right: 15px; text-shadow: 0 0 5px rgba(37, 99, 235, 0.5);"
-    },
-    {
-        "name": "Slightly Darker",
-        "stylesheet": "color: #1e40af; font-size: 18px; font-weight: bold; padding-right: 15px;"
-    },
-    {
-        "name": "Original",
-        "stylesheet": "color: #2563eb; font-size: 18px; font-weight: bold; padding-right: 15px;"
-    },
-    {
-        "name": "Faded Glow",
-        "stylesheet": "color: #2563eb; font-size: 18px; font-weight: bold; padding-right: 15px; text-shadow: 0 0 2px rgba(37, 99, 235, 0.2);"
-    }
-]
+{
+    "sequences": [
+        {
+            "type": "calm",
+            "duration": 20000
+        },
+        {
+            "type": "typewriter",
+            "duration": 5000
+        },
+        {
+            "type": "calm",
+            "duration": 40000
+        },
+        {
+            "type": "glow_pulse",
+            "duration": 10000,
+            "start_color": "#3b82f6",
+            "end_color": "#2563eb",
+            "start_blur": 10,
+            "end_blur": 25
+        },
+        {
+            "type": "calm",
+            "duration": 60000
+        },
+        {
+            "type": "color_slide",
+            "duration": 15000,
+            "start_color": "#3b82f6",
+            "end_color": "#1e40af"
+        }
+    ]
+}

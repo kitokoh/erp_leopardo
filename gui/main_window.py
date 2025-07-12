@@ -211,8 +211,8 @@ from license_management import (
 from dialogs.menu_customization_dialog import MenuCustomizationDialog
 from utils.app_constants import CONFIGURABLE_MODULES # For menu customization and default order
 import json # For handling menu config storage
-from PyQt5.QtCore import pyqtSignal, QTimer, QEasingCurve # Added QTimer, QEasingCurve
-from PyQt5.QtGui import QColor # Added QColor
+from PyQt5.QtCore import pyqtSignal, QTimer, QEasingCurve, pyqtProperty # Added QTimer, QEasingCurve
+from PyQt5.QtGui import QColor, QLinearGradient, QPalette # Added QColor
 from PyQt5.QtWidgets import QGraphicsDropShadowEffect # Added QGraphicsDropShadowEffect
 from PyQt5.QtCore import QPropertyAnimation # Added QPropertyAnimation
 from PyQt5.QtWidgets import QFrame
@@ -569,10 +569,13 @@ class DocumentManager(QMainWindow):
         # For App Title Animation
         # self.app_title_label is set in create_menus_main
         # self.app_title_shadow_effect is initialized earlier
-        self.app_title_animation = QPropertyAnimation(self.app_title_shadow_effect, b"color", self) # parent `self` for QPropertyAnimation
+        self.app_title_animation = QPropertyAnimation(self.app_title_shadow_effect, b"color", self)
+        self.blur_animation = QPropertyAnimation(self.app_title_shadow_effect, b"blurRadius", self)
+        self.gradient_animation = QPropertyAnimation(self, b"_gradient_position", self)
         self.app_title_animation_timer = QTimer(self)
-        self.animation_styles = []
-        self.current_animation_index = 0
+        self.animation_sequences = []
+        self.current_sequence_index = 0
+        self._gradient_position = 0
         self._setup_app_title_animation()
 
 
@@ -585,70 +588,122 @@ class DocumentManager(QMainWindow):
             self.showMaximized()
 
     def _load_animation_styles(self):
-        """Loads animation styles from a JSON file."""
+        """Loads animation sequences from a JSON file."""
         try:
-            # Correctly construct the path to the animations.json file
             animations_file_path = os.path.join(self.app_root_dir, "resources", "styles", "animations.json")
-            logging.info(f"Loading animation styles from: {animations_file_path}")
+            logging.info(f"Loading animation sequences from: {animations_file_path}")
             with open(animations_file_path, 'r', encoding='utf-8') as f:
-                self.animation_styles = json.load(f)
-            if not self.animation_styles:
-                logging.warning("Animation styles file is empty or invalid.")
-                self._create_default_animation_style()
+                animation_data = json.load(f)
+                self.animation_sequences = animation_data.get("sequences", [])
+            if not self.animation_sequences:
+                logging.warning("Animation sequences file is empty or invalid.")
+                self._create_default_animation_sequences()
         except (FileNotFoundError, json.JSONDecodeError) as e:
-            logging.error(f"Could not load or parse animation styles: {e}", exc_info=True)
-            self._create_default_animation_style()
+            logging.error(f"Could not load or parse animation sequences: {e}", exc_info=True)
+            self._create_default_animation_sequences()
 
-    def _create_default_animation_style(self):
-        """Creates a default animation style if the JSON file is missing or corrupt."""
-        logging.info("Creating default animation style.")
-        self.animation_styles = [{
-            "name": "Default",
-            "stylesheet": "color: #2563eb; font-size: 18px; font-weight: bold; padding-right: 15px;"
-        }]
+    def _create_default_animation_sequences(self):
+        """Creates default animation sequences if the JSON file is missing or corrupt."""
+        logging.info("Creating default animation sequences.")
+        self.animation_sequences = [
+            {"type": "calm", "duration": 20000},
+            {"type": "glow_pulse", "duration": 10000, "start_color": "#3b82f6", "end_color": "#2563eb", "start_blur": 10, "end_blur": 25}
+        ]
 
 
     def _setup_app_title_animation(self):
-        if not self.app_title_label: # Ensure label is created
-            logging.warning("App title label not initialized before animation setup.")
+        if not self.app_title_label:
+            logging.warning("App title label not initialized, cannot setup animation.")
             return
 
         self._load_animation_styles()
-
-        if not self.animation_styles:
-            logging.error("No animation styles loaded, cannot setup title animation.")
+        if not self.animation_sequences:
+            logging.error("No animation sequences loaded, cannot setup title animation.")
             return
 
-        # The QPropertyAnimation will now target the 'styleSheet' property of the label
-        # We don't need to create it again if it exists, just reconfigure.
-        # Let's create a new animation object for clarity.
-        self.title_stylesheet_animation = QPropertyAnimation(self.app_title_label, b"styleSheet", self)
-        self.title_stylesheet_animation.setDuration(2000) # Duration for transitioning between styles
-        self.title_stylesheet_animation.setEasingCurve(QEasingCurve.InOutQuad)
+        self.app_title_animation_timer.setSingleShot(True)
+        self.app_title_animation_timer.timeout.connect(self._start_next_sequence)
+        self._start_next_sequence()
 
-        # The timer will now trigger the cycling of styles
-        self.app_title_animation_timer.setInterval(3000) # Change style every 3 seconds
-        self.app_title_animation_timer.timeout.connect(self._trigger_app_title_animation)
-        self.app_title_animation_timer.start()
-        logging.info("App title stylesheet animation setup complete and timer started.")
+    @pyqtProperty(float)
+    def _gradient_position(self):
+        return self._gradient_pos
 
+    @_gradient_position.setter
+    def _gradient_position(self, pos):
+        self._gradient_pos = pos
+        self._update_gradient()
 
-    def _trigger_app_title_animation(self):
-        if not self.animation_styles or self.title_stylesheet_animation.state() == QPropertyAnimation.Running:
+    def _update_gradient(self):
+        if not hasattr(self, 'gradient_animation_running') or not self.gradient_animation_running:
             return
 
-        # Get the current and next stylesheet
-        start_style = self.app_title_label.styleSheet()
-        self.current_animation_index = (self.current_animation_index + 1) % len(self.animation_styles)
-        end_style_info = self.animation_styles[self.current_animation_index]
-        end_style = end_style_info['stylesheet']
+        palette = self.app_title_label.palette()
+        gradient = QLinearGradient(0, 0, self.app_title_label.width(), 0)
+        gradient.setColorAt(self._gradient_pos - 0.5, QColor(self.gradient_start_color))
+        gradient.setColorAt(self._gradient_pos, QColor(self.gradient_end_color))
+        gradient.setColorAt(self._gradient_pos + 0.5, QColor(self.gradient_start_color))
+        palette.setBrush(QPalette.WindowText, gradient)
+        self.app_title_label.setPalette(palette)
 
-        # Configure the animation from current to next style
-        self.title_stylesheet_animation.setStartValue(start_style)
-        self.title_stylesheet_animation.setEndValue(end_style)
+    def _start_next_sequence(self):
+        if not self.animation_sequences:
+            return
 
-        logging.debug(f"Animating title style to: {end_style_info['name']}")
-        self.title_stylesheet_animation.start()
+        sequence = self.animation_sequences[self.current_sequence_index]
+        self.current_sequence_index = (self.current_sequence_index + 1) % len(self.animation_sequences)
+
+        seq_type = sequence.get("type")
+        duration = sequence.get("duration", 1000)
+
+        logging.debug(f"Starting animation sequence: {seq_type} for {duration}ms")
+        self.gradient_animation_running = False
+        self.app_title_label.setPalette(QApplication.style().standardPalette())
+
+
+        if seq_type == "calm":
+            self.app_title_shadow_effect.setColor(QColor(0,0,0,0))
+            self.app_title_shadow_effect.setBlurRadius(0)
+        elif seq_type == "glow_pulse":
+            self.app_title_animation.setDuration(duration // 2)
+            self.app_title_animation.setLoopCount(2)
+            self.app_title_animation.setStartValue(QColor(sequence["start_color"]))
+            self.app_title_animation.setEndValue(QColor(sequence["end_color"]))
+            self.app_title_animation.start()
+
+            self.blur_animation.setDuration(duration // 2)
+            self.blur_animation.setLoopCount(2)
+            self.blur_animation.setStartValue(sequence["start_blur"])
+            self.blur_animation.setEndValue(sequence["end_blur"])
+            self.blur_animation.start()
+        elif seq_type == "subtle_glow":
+            self.app_title_shadow_effect.setColor(QColor(sequence["color"]))
+            self.app_title_shadow_effect.setBlurRadius(sequence["blur"])
+        elif seq_type == "typewriter":
+            self.app_title_label.setText("")
+            self.typewriter_timer = QTimer(self)
+            self.typewriter_text = "Leopardo ERP"
+            self.typewriter_index = 0
+            self.typewriter_timer.timeout.connect(self._typewriter_update)
+            self.typewriter_timer.start(duration // len(self.typewriter_text))
+        elif seq_type == "color_slide":
+            self.gradient_animation_running = True
+            self.gradient_start_color = sequence["start_color"]
+            self.gradient_end_color = sequence["end_color"]
+            self.gradient_animation.setDuration(duration)
+            self.gradient_animation.setStartValue(0)
+            self.gradient_animation.setEndValue(1)
+            self.gradient_animation.start()
+
+
+        self.app_title_animation_timer.start(duration)
+
+    def _typewriter_update(self):
+        if self.typewriter_index < len(self.typewriter_text):
+            self.typewriter_index += 1
+            self.app_title_label.setText(self.typewriter_text[:self.typewriter_index])
+        else:
+            self.typewriter_timer.stop()
 
 
 
@@ -1551,7 +1606,7 @@ class DocumentManager(QMainWindow):
         # App Logo/Title (Optional)
         self.app_title_label = QLabel("Leopardo ERP") # Changed title & assign to self
         self.app_title_label.setObjectName("topMenuAppTitle")
-        self.app_title_label.setStyleSheet("color: #2563eb; font-size: 18px; font-weight: bold; padding-right: 15px;")
+        self.app_title_label.setStyleSheet("color: blue; font-size: 18px; font-weight: bold; padding-right: 15px;")
 
         # Setup shadow effect for animation
         self.app_title_shadow_effect.setBlurRadius(15)
