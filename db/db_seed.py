@@ -446,85 +446,87 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                     logger.info(f"No existing active license found for admin user {super_admin_user_id}.")
 
                 if not suitable_license_exists:
-
+                    from license_management.manager import create_default_admin_license
                     logger.info(f"No suitable active 'complet' license found for admin. Creating a new 6-month 'complet' license.")
-                    activation_date = datetime.utcnow()
-                    expiration_date = activation_date + timedelta(days=180)
-                    license_data = {
-                        "user_id": super_admin_user_id,
-                        "license_type": "complet", # Assuming 'complet' grants full access
-                        "license_key": str(uuid.uuid4()), # Generate a new unique license key
-                        "activation_date": activation_date.isoformat() + "Z",
-                        "expiration_date": expiration_date.isoformat() + "Z",
-                        "is_active": True
-                        # 'license_id' and 'machine_info' will be added next
-                    }
+                    # activation_date = datetime.utcnow()
+                    # expiration_date = activation_date + timedelta(days=180)
+                    create_default_admin_license(conn=conn, user_id=super_admin_user_id)
+                    # license_data = {
+                    #     "user_id": super_admin_user_id,
+                    #     "license_type": "complet", # Assuming 'complet' grants full access
+                    #     "license_key": str(uuid.uuid4()), # Generate a new unique license key
+                    #     "activation_date": activation_date.isoformat() + "Z",
+                    #     "expiration_date": expiration_date.isoformat() + "Z",
+                    #     "is_active": True
+                    #     # 'license_id' and 'machine_info' will be added next
+                    # }
 
-                    # Ensure license_id is generated and added
-                    license_data["license_id"] = str(uuid.uuid4())
+                    # # Ensure license_id is generated and added
+                    # license_data["license_id"] = str(uuid.uuid4())
 
-                    # Add machine_info (placeholder or dynamic)
-                    # Attempting to get it dynamically, fallback to placeholder
-                    try:
-                        from license_management import manager as license_manager_instance
-                        license_data["machine_info"] = license_manager_instance.get_machine_identifier()
-                        logger.info(f"Using dynamic machine_info: {license_data['machine_info']}")
-                    except ImportError:
-                        logger.warning("Could not import LicenseManager to get dynamic machine_id for seeding. Using placeholder.")
-                        license_data["machine_info"] = "default_seed_machine_placeholder"
-                    except Exception as e_machine_id:
-                        logger.warning(f"Error getting dynamic machine_id: {e_machine_id}. Using placeholder.")
-                        license_data["machine_info"] = "error_seed_machine_placeholder"
+                    # # Add machine_info (placeholder or dynamic)
+                    # # Attempting to get it dynamically, fallback to placeholder
+                    # try:
+                    #     from license_management import manager as license_manager_instance
+                    #     license_data["machine_info"] = license_manager_instance.get_machine_identifier()
+                    #     logger.info(f"Using dynamic machine_info: {license_data['machine_info']}")
+                    # except ImportError:
+                    #     logger.warning("Could not import LicenseManager to get dynamic machine_id for seeding. Using placeholder.")
+                    #     license_data["machine_info"] = "default_seed_machine_placeholder"
+                    # except Exception as e_machine_id:
+                    #     logger.warning(f"Error getting dynamic machine_id: {e_machine_id}. Using placeholder.")
+                    #     license_data["machine_info"] = "error_seed_machine_placeholder"
 
-                    logger.info(f"Attempting to add license for admin with data: {license_data}")
+                    # logger.info(f"Attempting to add license for admin with data: {license_data}")
 
-                    new_license_id = licenses_crud.add_license(conn, license_data)
-                    if new_license_id:
-                        logger.info(f"Successfully added 'complet' license (ID: {new_license_id}) for admin user {super_admin_user_id}, valid for 6 months.")
-                    else:
-                        logger.error(f"Failed to add 'complet' license for admin user {super_admin_user_id}.")
+                    # new_license_id = licenses_crud.add_license(conn, license_data)
+                    # if new_license_id:
+                    #     logger.info(f"Successfully added 'complet' license (ID: {new_license_id}) for admin user {super_admin_user_id}, valid for 6 months.")
+                    # else:
+                    #     logger.error(f"Failed to add 'complet' license for admin user {super_admin_user_id}.")
 
                 else:
                     logger.info(f"No existing active license found for admin user {super_admin_user_id}.")
 
                 if not suitable_license_exists:
-
+                    from license_management.manager import create_default_admin_license
                     logger.info(f"No suitable active 'complet' license found for admin. Creating a new 6-month 'complet' license.")
-                    activation_date = datetime.utcnow()
-                    expiration_date = activation_date + timedelta(days=180)
-                    license_data = {
-                        "user_id": super_admin_user_id,
-                        "license_type": "complet", # Assuming 'complet' grants full access
-                        "license_key": str(uuid.uuid4()), # Generate a new unique license key
-                        "activation_date": activation_date.isoformat() + "Z",
-                        "expiration_date": expiration_date.isoformat() + "Z",
-                        "is_active": True
-                        # 'license_id' and 'machine_info' will be added next
-                    }
+                    # activation_date = datetime.utcnow()
+                    # expiration_date = activation_date + timedelta(days=180)
+                    create_default_admin_license(conn=conn, user_id=super_admin_user_id)
+                    # license_data = {
+                    #     "user_id": super_admin_user_id,
+                    #     "license_type": "complet", # Assuming 'complet' grants full access
+                    #     "license_key": str(uuid.uuid4()), # Generate a new unique license key
+                    #     "activation_date": activation_date.isoformat() + "Z",
+                    #     "expiration_date": expiration_date.isoformat() + "Z",
+                    #     "is_active": True
+                    #     # 'license_id' and 'machine_info' will be added next
+                    # }
 
-                    # Ensure license_id is generated and added
-                    license_data["license_id"] = str(uuid.uuid4())
+                    # # Ensure license_id is generated and added
+                    # license_data["license_id"] = str(uuid.uuid4())
 
-                    # Add machine_info (placeholder or dynamic)
-                    # Attempting to get it dynamically, fallback to placeholder
-                    try:
-                        from license_management import manager as license_manager_instance
-                        license_data["machine_info"] = license_manager_instance.get_machine_identifier()
-                        logger.info(f"Using dynamic machine_info: {license_data['machine_info']}")
-                    except ImportError:
-                        logger.warning("Could not import LicenseManager to get dynamic machine_id for seeding. Using placeholder.")
-                        license_data["machine_info"] = "default_seed_machine_placeholder"
-                    except Exception as e_machine_id:
-                        logger.warning(f"Error getting dynamic machine_id: {e_machine_id}. Using placeholder.")
-                        license_data["machine_info"] = "error_seed_machine_placeholder"
+                    # # Add machine_info (placeholder or dynamic)
+                    # # Attempting to get it dynamically, fallback to placeholder
+                    # try:
+                    #     from license_management import manager as license_manager_instance
+                    #     license_data["machine_info"] = license_manager_instance.get_machine_identifier()
+                    #     logger.info(f"Using dynamic machine_info: {license_data['machine_info']}")
+                    # except ImportError:
+                    #     logger.warning("Could not import LicenseManager to get dynamic machine_id for seeding. Using placeholder.")
+                    #     license_data["machine_info"] = "default_seed_machine_placeholder"
+                    # except Exception as e_machine_id:
+                    #     logger.warning(f"Error getting dynamic machine_id: {e_machine_id}. Using placeholder.")
+                    #     license_data["machine_info"] = "error_seed_machine_placeholder"
 
-                    logger.info(f"Attempting to add license for admin with data: {license_data}")
+                    # logger.info(f"Attempting to add license for admin with data: {license_data}")
 
-                    new_license_id = licenses_crud.add_license(conn, license_data)
-                    if new_license_id:
-                        logger.info(f"Successfully added 'complet' license (ID: {new_license_id}) for admin user {super_admin_user_id}, valid for 6 months.")
-                    else:
-                        logger.error(f"Failed to add 'complet' license for admin user {super_admin_user_id}.")
+                    # new_license_id = licenses_crud.add_license(conn, license_data)
+                    # if new_license_id:
+                    #     logger.info(f"Successfully added 'complet' license (ID: {new_license_id}) for admin user {super_admin_user_id}, valid for 6 months.")
+                    # else:
+                    #     logger.error(f"Failed to add 'complet' license for admin user {super_admin_user_id}.")
                 else:
                     logger.info(f"Admin user {super_admin_user_id} already has a suitable active 'complet' license. Skipping new license creation.")
 
@@ -629,7 +631,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                 # 5. Countries & 6. Cities
                 # print("DEBUG_DB_SEED: Just before countries_cities loop in _original_seed_initial_data_func_placeholder", flush=True) # Removed
                 logger.info("Seeding default countries and cities...")
-                countries_cities = {'France': 'Paris', 'USA': 'New York', 'Algeria': 'Algiers'}
+                countries_cities = {'France': 'Paris', 'USA': 'New York', 'Algeria': 'Algiers', 'Maroc': "Rabat"}
                 for country_name, city_name in countries_cities.items():
                     logger.info(f"Attempting to seed country: {country_name} and city: {city_name}")
                     country_dict = get_or_add_country(country_name, conn=conn) # This function now has logging
@@ -665,7 +667,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
 
                     if admin_user_id and actual_france_country_id and actual_paris_city_id and actual_actif_status_id:
                         client_data = {
-                            'client_name': "Sample Client SARL",
+                            'client_name': "MOg",
                             'country_id': actual_france_country_id,
                             'city_id': actual_paris_city_id,
                             'status_id': actual_actif_status_id,

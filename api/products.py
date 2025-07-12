@@ -115,13 +115,13 @@ async def get_product_by_code_api(
     # The current format_product_response uses ProductBase from ..models which is fine.
     return format_product_response(db_product, request)
 
-@router.get("", response_model=List[ProductResponse]) # Simplified response for list view
+@router.get("", response_model=List[ProductResponse])
 async def get_all_products_api(
+    request: Request,
     category: Optional[str] = Query(None),
     language_code: Optional[str] = Query(None),
     is_active: Optional[bool] = Query(None),
-    current_user: UserInDB = Depends(get_current_active_user), # Optional auth
-    request: Request # Moved to last
+    current_user: UserInDB = Depends(get_current_active_user)
 ):
     filters = {}
     if category is not None: filters['category'] = category

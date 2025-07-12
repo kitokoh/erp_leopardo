@@ -571,6 +571,8 @@ class DocumentManager(QMainWindow):
         # self.app_title_shadow_effect is initialized earlier
         self.app_title_animation = QPropertyAnimation(self.app_title_shadow_effect, b"color", self) # parent `self` for QPropertyAnimation
         self.app_title_animation_timer = QTimer(self)
+        self.animation_styles = []
+        self.current_animation_index = 0
         self._setup_app_title_animation()
 
 
@@ -582,42 +584,71 @@ class DocumentManager(QMainWindow):
         else:
             self.showMaximized()
 
+    def _load_animation_styles(self):
+        """Loads animation styles from a JSON file."""
+        try:
+            # Correctly construct the path to the animations.json file
+            animations_file_path = os.path.join(self.app_root_dir, "resources", "styles", "animations.json")
+            logging.info(f"Loading animation styles from: {animations_file_path}")
+            with open(animations_file_path, 'r', encoding='utf-8') as f:
+                self.animation_styles = json.load(f)
+            if not self.animation_styles:
+                logging.warning("Animation styles file is empty or invalid.")
+                self._create_default_animation_style()
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            logging.error(f"Could not load or parse animation styles: {e}", exc_info=True)
+            self._create_default_animation_style()
+
+    def _create_default_animation_style(self):
+        """Creates a default animation style if the JSON file is missing or corrupt."""
+        logging.info("Creating default animation style.")
+        self.animation_styles = [{
+            "name": "Default",
+            "stylesheet": "color: #2563eb; font-size: 18px; font-weight: bold; padding-right: 15px;"
+        }]
+
+
     def _setup_app_title_animation(self):
         if not self.app_title_label: # Ensure label is created
             logging.warning("App title label not initialized before animation setup.")
             return
 
-        # Configure the QPropertyAnimation for the shadow color
-        self.app_title_animation.setDuration(1500) # Duration of one pulse (e.g., 1.5 seconds)
-        self.app_title_animation.setLoopCount(1)    # We run it once per timer tick
+        self._load_animation_styles()
 
-        # Define keyframes for the color animation (glow effect)
-        # Accent color from your QSS: #007BFF (blueish)
-        # Let's use a lighter shade of this blue for the glow
-        glow_color = QColor(0, 123, 255, 90) # Accent blue with alpha for subtlety
+        if not self.animation_styles:
+            logging.error("No animation styles loaded, cannot setup title animation.")
+            return
 
-        self.app_title_animation.setKeyValueAt(0, QColor(0, 0, 0, 0))      # Start transparent
-        self.app_title_animation.setKeyValueAt(0.5, glow_color)           # Mid-point glow
-        self.app_title_animation.setKeyValueAt(1, QColor(0, 0, 0, 0))      # End transparent
+        # The QPropertyAnimation will now target the 'styleSheet' property of the label
+        # We don't need to create it again if it exists, just reconfigure.
+        # Let's create a new animation object for clarity.
+        self.title_stylesheet_animation = QPropertyAnimation(self.app_title_label, b"styleSheet", self)
+        self.title_stylesheet_animation.setDuration(2000) # Duration for transitioning between styles
+        self.title_stylesheet_animation.setEasingCurve(QEasingCurve.InOutQuad)
 
-        self.app_title_animation.setEasingCurve(QEasingCurve.InOutQuad) # Smooth animation curve
-
-        # Configure and start the QTimer
-        self.app_title_animation_timer.setInterval(15000) # e.g., trigger every 15 seconds
+        # The timer will now trigger the cycling of styles
+        self.app_title_animation_timer.setInterval(3000) # Change style every 3 seconds
         self.app_title_animation_timer.timeout.connect(self._trigger_app_title_animation)
         self.app_title_animation_timer.start()
-        logging.info("App title animation setup complete and timer started.")
+        logging.info("App title stylesheet animation setup complete and timer started.")
+
 
     def _trigger_app_title_animation(self):
-        if self.app_title_animation.state() == QPropertyAnimation.Stopped:
-            self.app_title_animation.start()
-            # Optional: Add randomization for the next interval
-            # import random
-            # next_interval = random.randint(10000, 20000) # e.g., between 10 and 20 seconds
-            # self.app_title_animation_timer.setInterval(next_interval)
-            # logging.debug(f"App title animation triggered. Next in {next_interval / 1000}s")
-        else:
-            logging.debug("App title animation triggered but already running.")
+        if not self.animation_styles or self.title_stylesheet_animation.state() == QPropertyAnimation.Running:
+            return
+
+        # Get the current and next stylesheet
+        start_style = self.app_title_label.styleSheet()
+        self.current_animation_index = (self.current_animation_index + 1) % len(self.animation_styles)
+        end_style_info = self.animation_styles[self.current_animation_index]
+        end_style = end_style_info['stylesheet']
+
+        # Configure the animation from current to next style
+        self.title_stylesheet_animation.setStartValue(start_style)
+        self.title_stylesheet_animation.setEndValue(end_style)
+
+        logging.debug(f"Animating title style to: {end_style_info['name']}")
+        self.title_stylesheet_animation.start()
 
 
 
