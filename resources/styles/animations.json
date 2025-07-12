@@ -1,17 +1,26 @@
-[
-    {
-        "name": "Bright Glow",
-        "color": "#2563eb",
-        "blur_radius": 20
-    },
-    {
-        "name": "Subtle Glow",
-        "color": "#3b82f6",
-        "blur_radius": 10
-    },
-    {
-        "name": "No Glow",
-        "color": "#1e40af",
-        "blur_radius": 0
-    }
-]
+{
+    "sequences": [
+        {
+            "type": "calm",
+            "duration": 30000
+        },
+        {
+            "type": "glow_pulse",
+            "duration": 10000,
+            "start_color": "#3b82f6",
+            "end_color": "#2563eb",
+            "start_blur": 10,
+            "end_blur": 25
+        },
+        {
+            "type": "calm",
+            "duration": 60000
+        },
+        {
+            "type": "subtle_glow",
+            "duration": 15000,
+            "color": "#3b82f6",
+            "blur": 15
+        }
+    ]
+}

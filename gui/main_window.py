@@ -569,10 +569,11 @@ class DocumentManager(QMainWindow):
         # For App Title Animation
         # self.app_title_label is set in create_menus_main
         # self.app_title_shadow_effect is initialized earlier
-        self.app_title_animation = QPropertyAnimation(self.app_title_shadow_effect, b"color", self) # parent `self` for QPropertyAnimation
+        self.app_title_animation = QPropertyAnimation(self.app_title_shadow_effect, b"color", self)
+        self.blur_animation = QPropertyAnimation(self.app_title_shadow_effect, b"blurRadius", self)
         self.app_title_animation_timer = QTimer(self)
-        self.animation_styles = []
-        self.current_animation_index = 0
+        self.animation_sequences = []
+        self.current_sequence_index = 0
         self._setup_app_title_animation()
 
 
@@ -585,75 +586,75 @@ class DocumentManager(QMainWindow):
             self.showMaximized()
 
     def _load_animation_styles(self):
-        """Loads animation styles from a JSON file."""
+        """Loads animation sequences from a JSON file."""
         try:
-            # Correctly construct the path to the animations.json file
             animations_file_path = os.path.join(self.app_root_dir, "resources", "styles", "animations.json")
-            logging.info(f"Loading animation styles from: {animations_file_path}")
+            logging.info(f"Loading animation sequences from: {animations_file_path}")
             with open(animations_file_path, 'r', encoding='utf-8') as f:
-                self.animation_styles = json.load(f)
-            if not self.animation_styles:
-                logging.warning("Animation styles file is empty or invalid.")
-                self._create_default_animation_style()
+                animation_data = json.load(f)
+                self.animation_sequences = animation_data.get("sequences", [])
+            if not self.animation_sequences:
+                logging.warning("Animation sequences file is empty or invalid.")
+                self._create_default_animation_sequences()
         except (FileNotFoundError, json.JSONDecodeError) as e:
-            logging.error(f"Could not load or parse animation styles: {e}", exc_info=True)
-            self._create_default_animation_style()
+            logging.error(f"Could not load or parse animation sequences: {e}", exc_info=True)
+            self._create_default_animation_sequences()
 
-    def _create_default_animation_style(self):
-        """Creates a default animation style if the JSON file is missing or corrupt."""
-        logging.info("Creating default animation style.")
-        self.animation_styles = [{
-            "name": "Default",
-            "color": "#2563eb",
-            "blur_radius": 15
-        }]
+    def _create_default_animation_sequences(self):
+        """Creates default animation sequences if the JSON file is missing or corrupt."""
+        logging.info("Creating default animation sequences.")
+        self.animation_sequences = [
+            {"type": "calm", "duration": 20000},
+            {"type": "glow_pulse", "duration": 10000, "start_color": "#3b82f6", "end_color": "#2563eb", "start_blur": 10, "end_blur": 25}
+        ]
 
 
     def _setup_app_title_animation(self):
         if not self.app_title_label:
-            logging.warning("App title label not initialized before setting up animation.")
+            logging.warning("App title label not initialized, cannot setup animation.")
             return
 
         self._load_animation_styles()
-        if not self.animation_styles:
-            logging.error("No animation styles loaded, cannot set up title animation.")
+        if not self.animation_sequences:
+            logging.error("No animation sequences loaded, cannot setup title animation.")
             return
 
-        # Main animation for the shadow color
-        self.app_title_animation = QPropertyAnimation(self.app_title_shadow_effect, b"color", self)
-        self.app_title_animation.setDuration(1500)
-        self.app_title_animation.setEasingCurve(QEasingCurve.InOutQuad)
+        self.app_title_animation_timer.setSingleShot(True)
+        self.app_title_animation_timer.timeout.connect(self._start_next_sequence)
+        self._start_next_sequence()
 
-        # Animation for the blur radius
-        self.blur_animation = QPropertyAnimation(self.app_title_shadow_effect, b"blurRadius", self)
-        self.blur_animation.setDuration(1500)
-        self.blur_animation.setEasingCurve(QEasingCurve.InOutQuad)
-
-        self.app_title_animation_timer.setInterval(3000)  # Total cycle time for one style
-        self.app_title_animation_timer.timeout.connect(self._trigger_app_title_animation)
-        self.app_title_animation_timer.start()
-        logging.info("App title glow animation setup complete and timer started.")
-
-
-    def _trigger_app_title_animation(self):
-        if not self.animation_styles or self.app_title_animation.state() == QPropertyAnimation.Running:
+    def _start_next_sequence(self):
+        if not self.animation_sequences:
             return
 
-        # Get the next style
-        self.current_animation_index = (self.current_animation_index + 1) % len(self.animation_styles)
-        style_info = self.animation_styles[self.current_animation_index]
+        sequence = self.animation_sequences[self.current_sequence_index]
+        self.current_sequence_index = (self.current_sequence_index + 1) % len(self.animation_sequences)
 
-        # Animate color
-        self.app_title_animation.setStartValue(self.app_title_shadow_effect.color())
-        self.app_title_animation.setEndValue(QColor(style_info['color']))
+        seq_type = sequence.get("type")
+        duration = sequence.get("duration", 1000)
 
-        # Animate blur radius
-        self.blur_animation.setStartValue(self.app_title_shadow_effect.blurRadius())
-        self.blur_animation.setEndValue(style_info['blur_radius'])
+        logging.debug(f"Starting animation sequence: {seq_type} for {duration}ms")
 
-        logging.debug(f"Animating title glow to: {style_info['name']}")
-        self.app_title_animation.start()
-        self.blur_animation.start()
+        if seq_type == "calm":
+            self.app_title_shadow_effect.setColor(QColor(0,0,0,0))
+            self.app_title_shadow_effect.setBlurRadius(0)
+        elif seq_type == "glow_pulse":
+            self.app_title_animation.setDuration(duration // 2)
+            self.app_title_animation.setLoopCount(2)
+            self.app_title_animation.setStartValue(QColor(sequence["start_color"]))
+            self.app_title_animation.setEndValue(QColor(sequence["end_color"]))
+            self.app_title_animation.start()
+
+            self.blur_animation.setDuration(duration // 2)
+            self.blur_animation.setLoopCount(2)
+            self.blur_animation.setStartValue(sequence["start_blur"])
+            self.blur_animation.setEndValue(sequence["end_blur"])
+            self.blur_animation.start()
+        elif seq_type == "subtle_glow":
+            self.app_title_shadow_effect.setColor(QColor(sequence["color"]))
+            self.app_title_shadow_effect.setBlurRadius(sequence["blur"])
+
+        self.app_title_animation_timer.start(duration)
 
 
 
