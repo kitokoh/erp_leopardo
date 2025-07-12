@@ -11,6 +11,7 @@
         {
             "type": "calm",
             "duration": 40000
+
         },
         {
             "type": "glow_pulse",
@@ -29,6 +30,7 @@
             "duration": 15000,
             "start_color": "#3b82f6",
             "end_color": "#1e40af"
+
         }
     ]
 }

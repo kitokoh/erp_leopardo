@@ -66,7 +66,9 @@ def generate_folium_map_html(
     map_interaction_handler_name: str = "pyMapConnector",
     initial_location=[20, 0], # Default global view
     initial_zoom=2,           # Default global zoom
-    focused_country_iso_a2: str = None # New parameter
+    focused_country_iso_a2: str = None, # New parameter
+    scope: str = "international", # New parameter
+    map_bounds=None
 ):
     """
     Generates the HTML content for a Folium map with client distribution and popups.
@@ -88,7 +90,7 @@ def generate_folium_map_html(
     Returns:
         str: HTML content of the generated map, or None if a critical error occurs.
     """
-    logging.info(f"map_utils.generate_folium_map_html: Starting map generation. Focus: {focused_country_iso_a2}")
+    logging.info(f"map_utils.generate_folium_map_html: Starting map generation. Focus: {focused_country_iso_a2}, Scope: {scope}")
 
     if not os.path.exists(geojson_path):
         logging.error(f"map_utils: GeoJSON file not found at: {geojson_path}")
@@ -268,6 +270,13 @@ def generate_folium_map_html(
                             console.error("{map_interaction_handler_name} object not found. Available:", Object.keys(channel.objects));
                         }} else {{
                             console.log("{map_interaction_handler_name} initialized successfully via WebChannel.");
+
+                            // Add event listener to the map
+                            m.on('moveend', function(e) {{
+                                var center = m.getCenter();
+                                var zoom = m.getZoom();
+                                window.{map_interaction_handler_name}.onMapViewChanged(center.lat, center.lng, zoom);
+                            }});
                         }}
                     }});
                 }} else {{
@@ -276,6 +285,9 @@ def generate_folium_map_html(
             }});
         </script>
         """
+        if map_bounds:
+            m.fit_bounds(map_bounds)
+
         if "</body>" in map_html_content:
             map_html_content = map_html_content.replace("</body>", webchannel_setup_js + "</body>", 1)
         elif "</html>" in map_html_content:
