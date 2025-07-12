@@ -358,6 +358,11 @@ class ManageGlobalProductsDialog(QDialog):
             else:
                 QMessageBox.critical(self, self.tr("Erreur de Suppression"), self.tr("Impossible de supprimer le produit: {0}").format(result.get('error')))
 
+    def handle_manage_equivalencies(self):
+        logging.warning("Placeholder for handle_manage_equivalencies called.")
+        QMessageBox.information(self, self.tr("Fonctionnalité en cours de développement"),
+                                self.tr("La gestion des équivalences de produits sera bientôt disponible."))
+
 if __name__ == '__main__':
     app = QApplication([])
 
