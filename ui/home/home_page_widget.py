@@ -18,6 +18,9 @@ from .quick_stats_widget import QuickStatsWidget # Import the new widget
 
 from .quick_stats_widget import QuickStatsWidget # Import the new widget
 from .module_card_widget import ModuleCardWidget # Ajout de l'import
+from statistics.map_widget import HomePageMapWidget
+from client_management.add_new_client_dialog import AddNewClientDialog
+from client_management.client_controller import ClientController
 
 
 class HomePageWidget(QWidget):
@@ -421,6 +424,11 @@ class HomePageWidget(QWidget):
         self.bottom_content_area.setObjectName("homePageBottomContentArea")
         self.bottom_content_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
+        self.home_map_widget = HomePageMapWidget(app_translator_func=self.tr)
+        self.bottom_content_area.addWidget(self.home_map_widget)
+        if hasattr(self.home_map_widget.interaction_handler, 'country_clicked_signal'):
+            self.home_map_widget.interaction_handler.country_clicked_signal.connect(self._handle_add_client_for_country)
+
         # Right Promotional Area
         self.right_promo_widget = PromoSectionWidget() # self.right_promo_widget needs to be accessible
         self.right_promo_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -594,6 +602,18 @@ class HomePageWidget(QWidget):
             self.main_window.show_settings_page()
         else:
             print(f"HomePageWidget: main_window does NOT have show_settings_page.")
+
+    def _handle_add_client_for_country(self, country_name):
+        dialog = AddNewClientDialog(parent=self, initial_country_name=country_name)
+        if dialog.exec_() == AddNewClientDialog.Accepted:
+            client_data = dialog.get_data()
+            controller = ClientController()
+            try:
+                controller.add_new_client(client_data)
+                QMessageBox.information(self, self.tr("Client Ajouté"), self.tr("Le nouveau client a été ajouté avec succès."))
+                self.home_map_widget.refresh_map()
+            except Exception as e:
+                QMessageBox.critical(self, self.tr("Erreur"), self.tr("Erreur lors de l'ajout du client: {0}").format(str(e)))
 
 
 

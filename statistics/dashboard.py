@@ -48,6 +48,9 @@ from db.cruds.client_project_products_crud import get_product_usage_counts
 from db.cruds.proforma_invoices_crud import get_total_sales_amount_for_period, get_total_proforma_sales_for_country_id
 from db.cruds.projects_crud import get_active_project_count_by_country_id
 
+from client_management.add_new_client_dialog import AddNewClientDialog
+from client_management.client_controller import ClientController
+
 
 from app_setup import APP_ROOT_DIR
 
@@ -57,6 +60,7 @@ class MapInteractionHandler(QObject):
     client_clicked_on_map_signal = pyqtSignal(str, str)
     # New signal for JS to request map refresh
     request_map_refresh_signal = pyqtSignal()
+    map_view_changed_signal = pyqtSignal(float, float, int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -76,6 +80,10 @@ class MapInteractionHandler(QObject):
         """Slot callable from JavaScript to request a map refresh."""
         logging.info("MapInteractionHandler: requestMapRefresh called from JS.")
         self.request_map_refresh_signal.emit()
+
+    @pyqtSlot(float, float, int)
+    def onMapViewChanged(self, lat, lng, zoom):
+        self.map_view_changed_signal.emit(lat, lng, zoom)
 
 
 class StatisticsDashboard(QWidget):
@@ -154,6 +162,7 @@ class StatisticsDashboard(QWidget):
             self.map_interaction_handler.client_clicked_on_map_signal.connect(self._display_client_details_in_panel)
             if hasattr(self.map_interaction_handler, 'request_map_refresh_signal'):
                 self.map_interaction_handler.request_map_refresh_signal.connect(self.update_map)
+            self.map_interaction_handler.map_view_changed_signal.connect(self._on_map_view_changed)
 
 
             web_channel = QWebChannel(self.map_view.page())
@@ -174,6 +183,15 @@ class StatisticsDashboard(QWidget):
     def _on_map_client_clicked(self, client_id, client_name):
         logging.info(f"Map client clicked: {client_name} (ID: {client_id}). Displaying details in panel.")
         self._display_client_details_in_panel(client_id, client_name)
+
+    def _on_map_view_changed(self, lat, lng, zoom):
+        db_session = get_db_connection()
+        try:
+            db_manager.set_setting('map_last_lat', str(lat), db_session)
+            db_manager.set_setting('map_last_lng', str(lng), db_session)
+            db_manager.set_setting('map_last_zoom', str(zoom), db_session)
+        finally:
+            db_session.close()
 
     def refresh_all_dashboard_content(self):
         logging.info("Refreshing all dashboard content...")
@@ -318,6 +336,7 @@ class StatisticsDashboard(QWidget):
         self.stats_stack.addWidget(self.country_stats_display_widget)
         self.country_stats_display_widget.back_to_global_requested.connect(self._show_global_stats_view)
         self.country_stats_display_widget.add_client_to_country_requested.connect(self.request_add_client_for_country)
+        self.request_add_client_for_country.connect(self._handle_add_client_for_country)
 
         # Status Client List Widget
         self.status_client_list_widget = StatusClientListWidget(self)
@@ -330,6 +349,18 @@ class StatisticsDashboard(QWidget):
     def _show_global_stats_view(self):
         self.stats_stack.setCurrentWidget(self.global_stats_widget)
         self.update_map() # Refresh map to show global view when returning
+
+    def _handle_add_client_for_country(self, country_name):
+        dialog = AddNewClientDialog(parent=self, initial_country_name=country_name)
+        if dialog.exec_() == AddNewClientDialog.Accepted:
+            client_data = dialog.get_data()
+            controller = ClientController()
+            try:
+                controller.add_new_client(client_data)
+                QMessageBox.information(self, self.tr("Client Ajouté"), self.tr("Le nouveau client a été ajouté avec succès."))
+                self.refresh_all_dashboard_content()
+            except Exception as e:
+                QMessageBox.critical(self, self.tr("Erreur"), self.tr("Erreur lors de l'ajout du client: {0}").format(str(e)))
 
     def _show_country_stats_view(self, country_name: str):
         logging.info(f"Fetching and showing stats for country: {country_name}")
@@ -453,13 +484,31 @@ class StatisticsDashboard(QWidget):
             clients_by_country_counts = get_client_counts_by_country()
             all_clients_for_main_map_popups = clients_crud_instance.get_all_clients_with_details(include_deleted=False)
 
+            db_session = get_db_connection()
+            try:
+                scope = db_manager.get_setting('geographic_scope', 'international', db_session)
+            finally:
+                db_session.close()
+
+            db_session = get_db_connection()
+            try:
+                scope = db_manager.get_setting('geographic_scope', 'international', db_session)
+                last_lat = float(db_manager.get_setting('map_last_lat', '20', db_session))
+                last_lng = float(db_manager.get_setting('map_last_lng', '0', db_session))
+                last_zoom = int(db_manager.get_setting('map_last_zoom', '2', db_session))
+            finally:
+                db_session.close()
+
             map_html_content = generate_folium_map_html(
                 geojson_path=geojson_path,
                 clients_by_country_counts=clients_by_country_counts,
                 all_clients_details_for_popups=all_clients_for_main_map_popups,
                 app_translator_func=self.tr,
                 map_interaction_handler_name="pyMapConnector",
-                focused_country_iso_a2=focus_country_iso_a2
+                focused_country_iso_a2=focus_country_iso_a2,
+                scope=scope,
+                initial_location=[last_lat, last_lng],
+                initial_zoom=last_zoom
             )
 
             if map_html_content is None:
