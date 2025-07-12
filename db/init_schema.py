@@ -1223,6 +1223,35 @@ CREATE TABLE IF NOT EXISTS Templates (
     )
     """)
     print("DEBUG_INIT_DB: Table CommandeItems created or exists.")
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS ClientDocuments (
+        document_id TEXT PRIMARY KEY,
+        client_id TEXT NOT NULL,
+        project_id TEXT,
+        order_identifier TEXT,
+        document_name TEXT NOT NULL,
+        file_name_on_disk TEXT NOT NULL,
+        file_path_relative TEXT NOT NULL,
+        document_type_generated TEXT,
+        source_template_id INTEGER,
+        version_tag TEXT,
+        notes TEXT,
+        footer_notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_by_user_id TEXT,
+        is_deleted INTEGER DEFAULT 0,
+        deleted_at TEXT,
+        parent_document_id TEXT,
+        is_latest_version INTEGER DEFAULT 1,
+        FOREIGN KEY (client_id) REFERENCES Clients (client_id) ON DELETE CASCADE,
+        FOREIGN KEY (project_id) REFERENCES Projects (project_id) ON DELETE SET NULL,
+        FOREIGN KEY (source_template_id) REFERENCES Templates (template_id) ON DELETE SET NULL,
+        FOREIGN KEY (created_by_user_id) REFERENCES Users (user_id) ON DELETE SET NULL,
+        FOREIGN KEY (parent_document_id) REFERENCES ClientDocuments (document_id) ON DELETE SET NULL
+    )
+    """)
     # --- End Commandes Module Tables ---
 
     # Create ClientDocuments table (logic from ca.py to add order_identifier if missing)

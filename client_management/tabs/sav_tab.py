@@ -10,6 +10,7 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QLocale, QDate # Added QLocale, QDate
 
 import db as db_manager
+from auth.permissions import has_permission, P_MANAGE_CLIENT_DOCUMENTS
 # SAVTicketDialog will be imported locally or passed if it's a shared component.
 # For now, assume it might be imported locally if specific to SAV.
 # from sav.ticket_dialog import SAVTicketDialog # Placeholder
@@ -254,10 +255,10 @@ class SAVTab(QWidget):
         except Exception as e:
             logging.error(f"Error loading purchase history for client {client_id}: {e}", exc_info=True)
             if self.notification_manager:
-                self.notification_manager.show_notification(
+                self.notification_manager.show(
                     self.tr("Erreur Historique Achats"),
                     self.tr("Impossible de charger l'historique des achats. Détails: {0}").format(str(e)),
-                    'ERROR'
+                    type='ERROR'
                 )
             else:
                 QMessageBox.critical(self, self.tr("Erreur"), self.tr("Impossible de charger l'historique des achats."))
