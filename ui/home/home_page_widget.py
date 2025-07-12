@@ -18,7 +18,8 @@ from .quick_stats_widget import QuickStatsWidget # Import the new widget
 
 from .quick_stats_widget import QuickStatsWidget
 from .module_card_widget import ModuleCardWidget
-from db.cruds import clients_crud, projects_crud, products_crud, recruitment_cruds
+from db.cruds import clients_crud, projects_crud, products_crud
+from db.cruds import recruitment_job_openings_crud, recruitment_candidates_crud
 
 
 class HomePageWidget(QWidget):
@@ -150,8 +151,8 @@ class HomePageWidget(QWidget):
                     {'value': str(total_products), 'label': self.tr('Produits Actifs')}
                 ]
             elif module_id == "btnRecruitment":
-                open_positions = recruitment_cruds.get_open_positions_count()
-                new_candidates = recruitment_cruds.get_new_candidates_count()
+                open_positions = len(recruitment_job_openings_crud.get_all_job_openings())
+                new_candidates = len(recruitment_candidates_crud.get_all_candidates())
                 return [
                     {'value': str(open_positions), 'label': self.tr('Postes Ouverts')},
                     {'value': str(new_candidates), 'label': self.tr('Nouv. Candidatures')}
