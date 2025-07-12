@@ -9,7 +9,7 @@ from PyQt5.QtCore import Qt
 from .client_controller import ClientController # Added
 # from db.cruds.templates_crud import get_all_templates # Removed
 from auth.authentication import get_current_user_id # Added import
-from db import db_manager, get_db_connection
+from db import get_db_connection, get_setting
 
 class AddNewClientDialog(QDialog):
     def __init__(self, parent=None, initial_country_name=None):
@@ -19,7 +19,7 @@ class AddNewClientDialog(QDialog):
         self.setWindowTitle(self.tr("Ajouter un Nouveau Client"))
         db_session = get_db_connection()
         try:
-            self.geo_scope = db_manager.get_setting('geographic_scope', 'international', db_session)
+            self.geo_scope = get_setting('geographic_scope', 'international', db_session)
         finally:
             db_session.close()
         self.setMinimumSize(500, 400)
