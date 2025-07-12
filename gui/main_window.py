@@ -604,51 +604,56 @@ class DocumentManager(QMainWindow):
         logging.info("Creating default animation style.")
         self.animation_styles = [{
             "name": "Default",
-            "stylesheet": "color: #2563eb; font-size: 18px; font-weight: bold; padding-right: 15px;"
+            "color": "#2563eb",
+            "blur_radius": 15
         }]
 
 
     def _setup_app_title_animation(self):
-        if not self.app_title_label: # Ensure label is created
-            logging.warning("App title label not initialized before animation setup.")
+        if not self.app_title_label:
+            logging.warning("App title label not initialized before setting up animation.")
             return
 
         self._load_animation_styles()
-
         if not self.animation_styles:
-            logging.error("No animation styles loaded, cannot setup title animation.")
+            logging.error("No animation styles loaded, cannot set up title animation.")
             return
 
-        # The QPropertyAnimation will now target the 'styleSheet' property of the label
-        # We don't need to create it again if it exists, just reconfigure.
-        # Let's create a new animation object for clarity.
-        self.title_stylesheet_animation = QPropertyAnimation(self.app_title_label, b"styleSheet", self)
-        self.title_stylesheet_animation.setDuration(2000) # Duration for transitioning between styles
-        self.title_stylesheet_animation.setEasingCurve(QEasingCurve.InOutQuad)
+        # Main animation for the shadow color
+        self.app_title_animation = QPropertyAnimation(self.app_title_shadow_effect, b"color", self)
+        self.app_title_animation.setDuration(1500)
+        self.app_title_animation.setEasingCurve(QEasingCurve.InOutQuad)
 
-        # The timer will now trigger the cycling of styles
-        self.app_title_animation_timer.setInterval(3000) # Change style every 3 seconds
+        # Animation for the blur radius
+        self.blur_animation = QPropertyAnimation(self.app_title_shadow_effect, b"blurRadius", self)
+        self.blur_animation.setDuration(1500)
+        self.blur_animation.setEasingCurve(QEasingCurve.InOutQuad)
+
+        self.app_title_animation_timer.setInterval(3000)  # Total cycle time for one style
         self.app_title_animation_timer.timeout.connect(self._trigger_app_title_animation)
         self.app_title_animation_timer.start()
-        logging.info("App title stylesheet animation setup complete and timer started.")
+        logging.info("App title glow animation setup complete and timer started.")
 
 
     def _trigger_app_title_animation(self):
-        if not self.animation_styles or self.title_stylesheet_animation.state() == QPropertyAnimation.Running:
+        if not self.animation_styles or self.app_title_animation.state() == QPropertyAnimation.Running:
             return
 
-        # Get the current and next stylesheet
-        start_style = self.app_title_label.styleSheet()
+        # Get the next style
         self.current_animation_index = (self.current_animation_index + 1) % len(self.animation_styles)
-        end_style_info = self.animation_styles[self.current_animation_index]
-        end_style = end_style_info['stylesheet']
+        style_info = self.animation_styles[self.current_animation_index]
 
-        # Configure the animation from current to next style
-        self.title_stylesheet_animation.setStartValue(start_style)
-        self.title_stylesheet_animation.setEndValue(end_style)
+        # Animate color
+        self.app_title_animation.setStartValue(self.app_title_shadow_effect.color())
+        self.app_title_animation.setEndValue(QColor(style_info['color']))
 
-        logging.debug(f"Animating title style to: {end_style_info['name']}")
-        self.title_stylesheet_animation.start()
+        # Animate blur radius
+        self.blur_animation.setStartValue(self.app_title_shadow_effect.blurRadius())
+        self.blur_animation.setEndValue(style_info['blur_radius'])
+
+        logging.debug(f"Animating title glow to: {style_info['name']}")
+        self.app_title_animation.start()
+        self.blur_animation.start()
 
 
 
@@ -1551,7 +1556,7 @@ class DocumentManager(QMainWindow):
         # App Logo/Title (Optional)
         self.app_title_label = QLabel("Leopardo ERP") # Changed title & assign to self
         self.app_title_label.setObjectName("topMenuAppTitle")
-        self.app_title_label.setStyleSheet("color: #2563eb; font-size: 18px; font-weight: bold; padding-right: 15px;")
+        self.app_title_label.setStyleSheet("color: blue; font-size: 18px; font-weight: bold; padding-right: 15px;")
 
         # Setup shadow effect for animation
         self.app_title_shadow_effect.setBlurRadius(15)
