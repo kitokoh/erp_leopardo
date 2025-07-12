@@ -10,6 +10,7 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QLocale, QDate # Added QLocale, QDate
 
 import db as db_manager
+from auth.permissions import has_permission, P_MANAGE_CLIENT_DOCUMENTS
 # SAVTicketDialog will be imported locally or passed if it's a shared component.
 # For now, assume it might be imported locally if specific to SAV.
 # from sav.ticket_dialog import SAVTicketDialog # Placeholder
