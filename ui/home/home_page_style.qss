@@ -195,34 +195,51 @@ QLabel#promoBodyLabel {
 
 /* Styling for QuickStatsWidget */
 QFrame#QuickStatsWidget {
-    background-color: #FFFFFF; /* Match promo widget background for consistency */
-    border: 1px solid #DEE2E6; /* Consistent border */
-    border-radius: 6px;        /* Consistent border radius */
-    /* min-width: 200px; */ /* Ensure it has some minimum width */
-    /* max-width: 280px; */ /* And not too wide */
+    background-color: #FFFFFF;
+    border: 1px solid #DEE2E6;
+    border-radius: 8px;
 }
 
 QLabel#quickStatsTitleLabel {
     font-family: "Open Sans", "Segoe UI", Arial, sans-serif;
     font-size: 15px;
     font-weight: bold;
-    color: #0056B3; /* Dark Blue, consistent with promo titles */
-    padding-bottom: 8px; /* Space below title */
-    margin-bottom: 5px; /* Space before the first item */
-    border-bottom: 1px solid #E9ECEF; /* Light separator */
+    color: #0056B3;
+    padding-bottom: 8px;
+    margin-bottom: 5px;
+    border-bottom: 1px solid #E9ECEF;
 }
 
 QLabel#quickStatItemLabel {
     font-family: "Open Sans", "Segoe UI", Arial, sans-serif;
     font-size: 12px;
-    color: #343A40; /* Standard dark grey, consistent with promo body */
-    padding-top: 4px; /* Space above each stat item */
+    color: #343A40;
+}
+
+QLabel#quickStatValueLabel {
+    font-family: "Open Sans", "Segoe UI", Arial, sans-serif;
+    font-size: 12px;
+    font-weight: bold;
+    color: #0056B3;
+}
+
+QProgressBar#quickStatProgressBar {
+    height: 6px;
+    text-align: center;
+    border: none;
+    border-radius: 3px;
+    background-color: #E9ECEF;
+}
+
+QProgressBar#quickStatProgressBar::chunk {
+    background-color: #007BFF;
+    border-radius: 3px;
 }
 
 QLabel#quickStatItemPlaceholderLabel {
     font-family: "Open Sans", "Segoe UI", Arial, sans-serif;
     font-size: 12px;
-    color: #6c757d; /* Grey text for placeholder */
+    color: #6c757d;
     font-style: italic;
     padding: 10px;
 }
@@ -245,11 +262,15 @@ QPushButton#quickStatsRefreshButton:pressed {
 
 
 
-/* Styling for the right sidebar container itself, if needed */
 QFrame#homePageRightSidebar {
-    /* background-color: lightyellow; */ /* For debugging layout */
-    /* border-left: 1px solid #DDE2E6; */ /* Optional: a line to separate from button grid */
-    /* padding: 5px; */ /* If the sidebar itself needs padding around the widget it contains */
+    background-color: transparent;
+}
+
+QFrame#tipAreaFrame {
+    background-color: #FFFFFF;
+    border: 1px solid #DEE2E6;
+    border-radius: 8px;
+    padding: 10px;
 }
 
 /* Search Bar Styling */
