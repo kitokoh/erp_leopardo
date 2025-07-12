@@ -569,8 +569,11 @@ class DocumentManager(QMainWindow):
         # For App Title Animation
         # self.app_title_label is set in create_menus_main
         # self.app_title_shadow_effect is initialized earlier
-        self.app_title_animation = QPropertyAnimation(self.app_title_shadow_effect, b"color", self) # parent `self` for QPropertyAnimation
+        self.app_title_animation = QPropertyAnimation(self.app_title_shadow_effect, b"color", self)
+        self.blur_animation = QPropertyAnimation(self.app_title_shadow_effect, b"blurRadius", self)
         self.app_title_animation_timer = QTimer(self)
+        self.animation_sequences = []
+        self.current_sequence_index = 0
         self._setup_app_title_animation()
 
 
@@ -582,42 +585,76 @@ class DocumentManager(QMainWindow):
         else:
             self.showMaximized()
 
+    def _load_animation_styles(self):
+        """Loads animation sequences from a JSON file."""
+        try:
+            animations_file_path = os.path.join(self.app_root_dir, "resources", "styles", "animations.json")
+            logging.info(f"Loading animation sequences from: {animations_file_path}")
+            with open(animations_file_path, 'r', encoding='utf-8') as f:
+                animation_data = json.load(f)
+                self.animation_sequences = animation_data.get("sequences", [])
+            if not self.animation_sequences:
+                logging.warning("Animation sequences file is empty or invalid.")
+                self._create_default_animation_sequences()
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            logging.error(f"Could not load or parse animation sequences: {e}", exc_info=True)
+            self._create_default_animation_sequences()
+
+    def _create_default_animation_sequences(self):
+        """Creates default animation sequences if the JSON file is missing or corrupt."""
+        logging.info("Creating default animation sequences.")
+        self.animation_sequences = [
+            {"type": "calm", "duration": 20000},
+            {"type": "glow_pulse", "duration": 10000, "start_color": "#3b82f6", "end_color": "#2563eb", "start_blur": 10, "end_blur": 25}
+        ]
+
+
     def _setup_app_title_animation(self):
-        if not self.app_title_label: # Ensure label is created
-            logging.warning("App title label not initialized before animation setup.")
+        if not self.app_title_label:
+            logging.warning("App title label not initialized, cannot setup animation.")
             return
 
-        # Configure the QPropertyAnimation for the shadow color
-        self.app_title_animation.setDuration(1500) # Duration of one pulse (e.g., 1.5 seconds)
-        self.app_title_animation.setLoopCount(1)    # We run it once per timer tick
+        self._load_animation_styles()
+        if not self.animation_sequences:
+            logging.error("No animation sequences loaded, cannot setup title animation.")
+            return
 
-        # Define keyframes for the color animation (glow effect)
-        # Accent color from your QSS: #007BFF (blueish)
-        # Let's use a lighter shade of this blue for the glow
-        glow_color = QColor(0, 123, 255, 90) # Accent blue with alpha for subtlety
+        self.app_title_animation_timer.setSingleShot(True)
+        self.app_title_animation_timer.timeout.connect(self._start_next_sequence)
+        self._start_next_sequence()
 
-        self.app_title_animation.setKeyValueAt(0, QColor(0, 0, 0, 0))      # Start transparent
-        self.app_title_animation.setKeyValueAt(0.5, glow_color)           # Mid-point glow
-        self.app_title_animation.setKeyValueAt(1, QColor(0, 0, 0, 0))      # End transparent
+    def _start_next_sequence(self):
+        if not self.animation_sequences:
+            return
 
-        self.app_title_animation.setEasingCurve(QEasingCurve.InOutQuad) # Smooth animation curve
+        sequence = self.animation_sequences[self.current_sequence_index]
+        self.current_sequence_index = (self.current_sequence_index + 1) % len(self.animation_sequences)
 
-        # Configure and start the QTimer
-        self.app_title_animation_timer.setInterval(15000) # e.g., trigger every 15 seconds
-        self.app_title_animation_timer.timeout.connect(self._trigger_app_title_animation)
-        self.app_title_animation_timer.start()
-        logging.info("App title animation setup complete and timer started.")
+        seq_type = sequence.get("type")
+        duration = sequence.get("duration", 1000)
 
-    def _trigger_app_title_animation(self):
-        if self.app_title_animation.state() == QPropertyAnimation.Stopped:
+        logging.debug(f"Starting animation sequence: {seq_type} for {duration}ms")
+
+        if seq_type == "calm":
+            self.app_title_shadow_effect.setColor(QColor(0,0,0,0))
+            self.app_title_shadow_effect.setBlurRadius(0)
+        elif seq_type == "glow_pulse":
+            self.app_title_animation.setDuration(duration // 2)
+            self.app_title_animation.setLoopCount(2)
+            self.app_title_animation.setStartValue(QColor(sequence["start_color"]))
+            self.app_title_animation.setEndValue(QColor(sequence["end_color"]))
             self.app_title_animation.start()
-            # Optional: Add randomization for the next interval
-            # import random
-            # next_interval = random.randint(10000, 20000) # e.g., between 10 and 20 seconds
-            # self.app_title_animation_timer.setInterval(next_interval)
-            # logging.debug(f"App title animation triggered. Next in {next_interval / 1000}s")
-        else:
-            logging.debug("App title animation triggered but already running.")
+
+            self.blur_animation.setDuration(duration // 2)
+            self.blur_animation.setLoopCount(2)
+            self.blur_animation.setStartValue(sequence["start_blur"])
+            self.blur_animation.setEndValue(sequence["end_blur"])
+            self.blur_animation.start()
+        elif seq_type == "subtle_glow":
+            self.app_title_shadow_effect.setColor(QColor(sequence["color"]))
+            self.app_title_shadow_effect.setBlurRadius(sequence["blur"])
+
+        self.app_title_animation_timer.start(duration)
 
 
 
@@ -1520,7 +1557,7 @@ class DocumentManager(QMainWindow):
         # App Logo/Title (Optional)
         self.app_title_label = QLabel("Leopardo ERP") # Changed title & assign to self
         self.app_title_label.setObjectName("topMenuAppTitle")
-        self.app_title_label.setStyleSheet("color: #2563eb; font-size: 18px; font-weight: bold; padding-right: 15px;")
+        self.app_title_label.setStyleSheet("color: blue; font-size: 18px; font-weight: bold; padding-right: 15px;")
 
         # Setup shadow effect for animation
         self.app_title_shadow_effect.setBlurRadius(15)

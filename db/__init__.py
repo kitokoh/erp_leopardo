@@ -107,6 +107,7 @@ from .cruds.client_project_products_crud import (
     add_product_to_client_or_project,
     update_client_project_product,
     remove_product_from_client_or_project,
+
     get_client_project_product_by_id,
     get_client_purchase_history
 )
@@ -340,6 +341,7 @@ __all__ = [
     "update_client_project_product",
     "remove_product_from_client_or_project",
     "get_client_project_product_by_id",
+    "get_client_purchase_history",
     "get_cover_pages_for_client",
     "add_cover_page",
     "update_cover_page",
