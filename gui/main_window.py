@@ -211,8 +211,8 @@ from license_management import (
 from dialogs.menu_customization_dialog import MenuCustomizationDialog
 from utils.app_constants import CONFIGURABLE_MODULES # For menu customization and default order
 import json # For handling menu config storage
-from PyQt5.QtCore import pyqtSignal, QTimer, QEasingCurve # Added QTimer, QEasingCurve
-from PyQt5.QtGui import QColor # Added QColor
+from PyQt5.QtCore import pyqtSignal, QTimer, QEasingCurve, pyqtProperty # Added QTimer, QEasingCurve
+from PyQt5.QtGui import QColor, QLinearGradient, QPalette # Added QColor
 from PyQt5.QtWidgets import QGraphicsDropShadowEffect # Added QGraphicsDropShadowEffect
 from PyQt5.QtCore import QPropertyAnimation # Added QPropertyAnimation
 from PyQt5.QtWidgets import QFrame
@@ -571,9 +571,12 @@ class DocumentManager(QMainWindow):
         # self.app_title_shadow_effect is initialized earlier
         self.app_title_animation = QPropertyAnimation(self.app_title_shadow_effect, b"color", self)
         self.blur_animation = QPropertyAnimation(self.app_title_shadow_effect, b"blurRadius", self)
+        self.gradient_animation = QPropertyAnimation(self, b"_gradient_position", self)
         self.app_title_animation_timer = QTimer(self)
         self.animation_sequences = []
         self.current_sequence_index = 0
+        self._gradient_position = 0
+
         self._setup_app_title_animation()
 
 
@@ -623,6 +626,27 @@ class DocumentManager(QMainWindow):
         self.app_title_animation_timer.timeout.connect(self._start_next_sequence)
         self._start_next_sequence()
 
+    @pyqtProperty(float)
+    def _gradient_position(self):
+        return self._gradient_pos
+
+    @_gradient_position.setter
+    def _gradient_position(self, pos):
+        self._gradient_pos = pos
+        self._update_gradient()
+
+    def _update_gradient(self):
+        if not hasattr(self, 'gradient_animation_running') or not self.gradient_animation_running:
+            return
+
+        palette = self.app_title_label.palette()
+        gradient = QLinearGradient(0, 0, self.app_title_label.width(), 0)
+        gradient.setColorAt(self._gradient_pos - 0.5, QColor(self.gradient_start_color))
+        gradient.setColorAt(self._gradient_pos, QColor(self.gradient_end_color))
+        gradient.setColorAt(self._gradient_pos + 0.5, QColor(self.gradient_start_color))
+        palette.setBrush(QPalette.WindowText, gradient)
+        self.app_title_label.setPalette(palette)
+
     def _start_next_sequence(self):
         if not self.animation_sequences:
             return
@@ -634,6 +658,9 @@ class DocumentManager(QMainWindow):
         duration = sequence.get("duration", 1000)
 
         logging.debug(f"Starting animation sequence: {seq_type} for {duration}ms")
+        self.gradient_animation_running = False
+        self.app_title_label.setPalette(QApplication.style().standardPalette())
+
 
         if seq_type == "calm":
             self.app_title_shadow_effect.setColor(QColor(0,0,0,0))
@@ -653,8 +680,31 @@ class DocumentManager(QMainWindow):
         elif seq_type == "subtle_glow":
             self.app_title_shadow_effect.setColor(QColor(sequence["color"]))
             self.app_title_shadow_effect.setBlurRadius(sequence["blur"])
+        elif seq_type == "typewriter":
+            self.app_title_label.setText("")
+            self.typewriter_timer = QTimer(self)
+            self.typewriter_text = "Leopardo ERP"
+            self.typewriter_index = 0
+            self.typewriter_timer.timeout.connect(self._typewriter_update)
+            self.typewriter_timer.start(duration // len(self.typewriter_text))
+        elif seq_type == "color_slide":
+            self.gradient_animation_running = True
+            self.gradient_start_color = sequence["start_color"]
+            self.gradient_end_color = sequence["end_color"]
+            self.gradient_animation.setDuration(duration)
+            self.gradient_animation.setStartValue(0)
+            self.gradient_animation.setEndValue(1)
+            self.gradient_animation.start()
+
 
         self.app_title_animation_timer.start(duration)
+
+    def _typewriter_update(self):
+        if self.typewriter_index < len(self.typewriter_text):
+            self.typewriter_index += 1
+            self.app_title_label.setText(self.typewriter_text[:self.typewriter_index])
+        else:
+            self.typewriter_timer.stop()
 
 
 

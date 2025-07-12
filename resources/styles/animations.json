@@ -2,7 +2,16 @@
     "sequences": [
         {
             "type": "calm",
-            "duration": 30000
+            "duration": 20000
+        },
+        {
+            "type": "typewriter",
+            "duration": 5000
+        },
+        {
+            "type": "calm",
+            "duration": 40000
+
         },
         {
             "type": "glow_pulse",
@@ -17,10 +26,11 @@
             "duration": 60000
         },
         {
-            "type": "subtle_glow",
+            "type": "color_slide",
             "duration": 15000,
-            "color": "#3b82f6",
-            "blur": 15
+            "start_color": "#3b82f6",
+            "end_color": "#1e40af"
+
         }
     ]
 }
