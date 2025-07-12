@@ -49,6 +49,8 @@ class HomePageWidget(QWidget):
             "Produit: Y200 Super", "Tâche: Finaliser la présentation client"
         ]
 
+        self.module_cards_list = []
+
         self._init_ui()
         self._load_styles()
 
