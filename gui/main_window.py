@@ -192,6 +192,8 @@ from commande_management.commandes_dashboard_widget import CommandesDashboardWid
 from utils.app_constants import CONFIGURABLE_MODULES # Import from new location
 from gui.widgets.sidebar_navigation_widget import SidebarNavigationWidget # Import de la Sidebar
 from gui.widgets.notification_panel import NotificationPanel
+from gui.widgets.categorized_completer import CategorizedCompleter, CategoryDelegate
+
 
 # B2C Restaurant Module Import
 from b2c.ges_restaurant.ui.main_widget import RestaurantMainWidget
@@ -1549,6 +1551,10 @@ class DocumentManager(QMainWindow):
         self.about_action.triggered.connect(self.show_about_dialog)
         self.searchable_actions_map[self.tr("À propos")] = self.about_action
 
+        self.search_timer = QTimer(self)
+        self.search_timer.setSingleShot(True)
+        self.search_timer.timeout.connect(self._update_search_completer)
+
 
     def _placeholder_manage_users(self):
         # This is a placeholder. Actual user management UI would be complex.
@@ -1704,6 +1710,12 @@ class DocumentManager(QMainWindow):
             }
         """)
         # Completer is already set up in create_actions_main
+        self.search_completer = CategorizedCompleter(self)
+        delegate = CategoryDelegate(self.search_completer.popup())
+        self.search_completer.popup().setItemDelegate(delegate)
+        self.search_bar_line_edit.setCompleter(self.search_completer)
+        self.search_bar_line_edit.textChanged.connect(self.on_search_text_changed)
+        self.search_completer.activated.connect(self.on_search_item_activated)
         top_bar_layout.addWidget(self.search_bar_line_edit)
 
         # Notifications Button
@@ -1714,6 +1726,14 @@ class DocumentManager(QMainWindow):
         self.notification_panel = NotificationPanel(self)
         self.notifications_button.clicked.connect(self.notification_panel.toggle_panel)
         top_bar_layout.addWidget(self.notifications_button)
+
+        # Notifications Button
+        self.notifications_button = QPushButton()
+        self.notifications_button.setIcon(QIcon(":/icons/bell.svg"))
+        self.notifications_button.setToolTip(self.tr("Notifications"))
+        self.notifications_button.setObjectName("notificationButton")
+        top_bar_layout.addWidget(self.notifications_button)
+
 
         # User Menu Button (already initialized in create_actions_main)
         if not hasattr(self, 'user_menu_button_instance'): # Ensure it's created
@@ -3376,5 +3396,61 @@ class DocumentManager(QMainWindow):
 
     # --- Sidebar Population and State Management --- (ALL REMOVED)
     # --- End Slots for Sidebar Interaction --- (ALL REMOVED)
+    def on_search_text_changed(self, text):
+        self.search_timer.start(300) # Debounce search queries
+
+    def _update_search_completer(self):
+        text = self.search_bar_line_edit.text()
+        if len(text) < 2:
+            self.search_completer.update_model({})
+            return
+
+        categories = {}
+
+        # Actions
+        action_results = [f"Action: {name}" for name in self.searchable_actions_map.keys() if text.lower() in name.lower()]
+        if action_results:
+            categories["Actions"] = action_results
+
+        # Clients
+        client_results = [f"Client: {client['client_name']}" for client in clients_crud_instance.search_clients_by_name(text)]
+        if client_results:
+            categories["Clients"] = client_results
+
+        # Products
+        product_results = [f"Product: {product['product_name']}" for product in products_crud_instance.search_products_by_name(text)]
+        if product_results:
+            categories["Products"] = product_results
+
+        # Projects
+        # project_results = [f"Project: {project['project_name']}" for project in projects_crud.search_projects_by_name(text)]
+        # if project_results:
+        #     categories["Projects"] = project_results
+
+        self.search_completer.update_model(categories)
+
+    def on_search_item_activated(self, activated_text):
+        if activated_text.startswith("---"):
+            return
+
+        parts = activated_text.split(": ", 1)
+        if len(parts) != 2:
+            return
+
+        item_type, item_name = parts
+        if item_type == "Action":
+            action = self.searchable_actions_map.get(item_name)
+            if action:
+                action.trigger()
+        elif item_type == "Client":
+            clients = clients_crud_instance.search_clients_by_name(item_name)
+            if clients:
+                self.open_client_tab_by_id(clients[0]['client_id'])
+        elif item_type == "Product":
+            # This would require a way to show a product's details, e.g., a product dialog
+            pass
+        # elif item_type == "Project":
+            # This would require a way to show a project's details
+            # pass
 
 # [end of main_window.py]
