@@ -2518,7 +2518,7 @@ class DocumentManager(QMainWindow):
     def open_client_tab_by_id(self, client_id_to_open):
         # Attempt to fetch fresh client data directly from the database
         logging.info(f"open_client_tab_by_id: Called with client_id_to_open={client_id_to_open}")
-        client_data_to_show = clients_crud_instance.get_client_by_id(client_id_to_open, include_deleted=False)
+        client_data_to_show = clients_crud_instance.get_client_by_id(client_id_to_open, include_deleted=True)
         logging.info(f"open_client_tab_by_id: client_data_to_show after fetching from DB: {client_data_to_show}")
 
         if client_data_to_show:
@@ -3452,5 +3452,3 @@ class DocumentManager(QMainWindow):
         # elif item_type == "Project":
             # This would require a way to show a project's details
             # pass
-
-# [end of main_window.py]

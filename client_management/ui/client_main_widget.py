@@ -1678,52 +1678,16 @@ class ClientMainWidget(QWidget):
            QMessageBox.critical(self, self.tr("Error Fetching Contacts"), self.tr("Could not retrieve contact information: {0}").format(str(e)))
 
     def _handle_client_info_section_toggled(self, checked):
-        if not hasattr(self, 'info_container_widget'):
-            return
         self.info_container_widget.setVisible(checked)
         if checked:
-            if hasattr(self, 'notes_group_box'):
-                self.notes_group_box.blockSignals(True)
-                self.notes_group_box.setChecked(False)
-                if hasattr(self, 'notes_container_widget'):
-                    self.notes_container_widget.setVisible(False)
-                self.notes_group_box.blockSignals(False)
-            if hasattr(self, 'tabs_group_box'):
-                self.tabs_group_box.blockSignals(True)
-                self.tabs_group_box.setChecked(False)
-                if hasattr(self, 'tab_widget'):
-                    self.tab_widget.setVisible(False)
-                self.tabs_group_box.blockSignals(False)
-        elif hasattr(self, 'notes_group_box') and not self.notes_group_box.isChecked() and \
-             hasattr(self, 'tabs_group_box') and not self.tabs_group_box.isChecked():
-            self.client_info_group_box.blockSignals(True)
-            self.client_info_group_box.setChecked(True)
-            self.info_container_widget.setVisible(True)
-            self.client_info_group_box.blockSignals(False)
+            self.notes_group_box.setChecked(False)
+            self.tabs_group_box.setChecked(False)
 
     def _handle_notes_section_toggled(self, checked):
-        if not hasattr(self, 'notes_container_widget'):
-            return
         self.notes_container_widget.setVisible(checked)
         if checked:
-            if hasattr(self, 'client_info_group_box'):
-                self.client_info_group_box.blockSignals(True)
-                self.client_info_group_box.setChecked(False)
-                if hasattr(self, 'info_container_widget'):
-                    self.info_container_widget.setVisible(False)
-                self.client_info_group_box.blockSignals(False)
-            if hasattr(self, 'tabs_group_box'):
-                self.tabs_group_box.blockSignals(True)
-                self.tabs_group_box.setChecked(False)
-                if hasattr(self, 'tab_widget'):
-                     self.tab_widget.setVisible(False)
-                self.tabs_group_box.blockSignals(False)
-        elif hasattr(self, 'client_info_group_box') and not self.client_info_group_box.isChecked() and \
-             hasattr(self, 'tabs_group_box') and not self.tabs_group_box.isChecked():
-            self.notes_group_box.blockSignals(True)
-            self.notes_group_box.setChecked(True)
-            self.notes_container_widget.setVisible(True)
-            self.notes_group_box.blockSignals(False)
+            self.client_info_group_box.setChecked(False)
+            self.tabs_group_box.setChecked(False)
 
     def _handle_tabs_section_toggled(self, checked):
         if not hasattr(self, 'tab_widget'):
