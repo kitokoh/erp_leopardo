@@ -861,6 +861,31 @@ class ProductsCRUD(GenericCRUD):
             logging.error(f"Error getting product by code '{product_code}': {e}", exc_info=True)
             return None
 
+    @_manage_conn
+    def search_products_by_name(self, name_query: str, conn=None, limit: int = 10) -> list[dict]:
+        """
+        Searches for products by name.
+        """
+        if not name_query:
+            return []
+
+        sql_query = text("""
+            SELECT product_id, product_name, description
+            FROM Products
+            WHERE (product_name LIKE :query OR description LIKE :query)
+              AND (is_deleted IS NULL OR is_deleted = 0)
+            ORDER BY product_name
+            LIMIT :limit
+        """)
+        params = {"query": f"%{name_query}%", "limit": limit}
+
+        try:
+            result = conn.execute(sql_query, params)
+            return [dict(row._mapping) for row in result.fetchall()]
+        except Exception as e:
+            logging.error(f"Failed to search products by name '{name_query}': {e}", exc_info=True)
+            return []
+
 # Instantiate the CRUD class for easy import and use elsewhere
 products_crud_instance = ProductsCRUD()
 
@@ -905,31 +930,7 @@ __all__ = [
     "get_all_product_equivalencies",
     "remove_product_equivalence",
     "get_product_by_code", # Added new function
+    "search_products_by_name",
     "ProductsCRUD", # Exporting the class itself for type hinting or direct instantiation
     "products_crud_instance" # Exporting the instance if needed elsewhere
 ]
-
-    @_manage_conn
-    def search_products_by_name(self, name_query: str, conn=None, limit: int = 10) -> list[dict]:
-        """
-        Searches for products by name.
-        """
-        if not name_query:
-            return []
-
-        sql_query = text("""
-            SELECT product_id, product_name, description
-            FROM Products
-            WHERE (product_name LIKE :query OR description LIKE :query)
-              AND (is_deleted IS NULL OR is_deleted = 0)
-            ORDER BY product_name
-            LIMIT :limit
-        """)
-        params = {"query": f"%{name_query}%", "limit": limit}
-
-        try:
-            result = conn.execute(sql_query, params)
-            return [dict(row._mapping) for row in result.fetchall()]
-        except Exception as e:
-            logging.error(f"Failed to search products by name '{name_query}': {e}", exc_info=True)
-            return []

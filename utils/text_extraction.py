@@ -88,7 +88,7 @@ AMOUNT_PATTERN_SIMPLE = re.compile(r"\b\d{1,3}(?:[,\s]\d{3})*(?:\.\d{2})\b|\b\d+
 # More specific for "Total", "Montant Total", "Net Amount" type lines
 TOTAL_KEYWORDS = ["total", "net amount", "montant total", "payable", "due amount", "balance due"]
 AMOUNT_LINE_PATTERN = re.compile(
-    r"^(.*(?:{}).*?)(\d{1,3}(?:[,\s]\d{3})*(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)\b".format("|".join(TOTAL_KEYWORDS)),
+    r"^(.*(?:{}).*?)(\d{{1,3}}(?:[,\s]\d{{3}})*(?:\.\d{{1,2}})?|\d+(?:\.\d{{1,2}})?)\b".format("|".join(TOTAL_KEYWORDS)),
     re.IGNORECASE | re.MULTILINE
 )
 
