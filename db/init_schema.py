@@ -2998,6 +2998,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         # MainBase.metadata.create_all(bind=actual_main_engine) # This is now handled in main.py
         logging.info("DEBUG_INIT_DB: Tables for MainBase (SQLAlchemy models) will be created in main.py.")
 
+
         # --- Manual check and addition for Products.product_code ---
         # This is a short-term fix. Alembic should be used for migrations.
         # try:
