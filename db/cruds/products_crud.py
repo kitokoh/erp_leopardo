@@ -519,7 +519,7 @@ class ProductsCRUD(GenericCRUD):
             int: The total count of products based on the criteria.
         """
         cursor = conn.cursor()
-        sql = f"SELECT COUNT({self.id_column}) as total_count FROM {self.table_name} p"
+        sql = f"SELECT COUNT(p.{self.id_column}) as total_count FROM {self.table_name} p"
         params = []
         conditions = []
 
