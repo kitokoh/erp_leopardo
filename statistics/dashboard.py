@@ -486,16 +486,16 @@ class StatisticsDashboard(QWidget):
 
             db_session = get_db_connection()
             try:
-                scope = db_manager.get_setting('geographic_scope', 'international', db_session)
+                scope = get_setting('geographic_scope', 'international', db_session)
             finally:
                 db_session.close()
 
             db_session = get_db_connection()
             try:
-                scope = db_manager.get_setting('geographic_scope', 'international', db_session)
-                last_lat = float(db_manager.get_setting('map_last_lat', '20', db_session))
-                last_lng = float(db_manager.get_setting('map_last_lng', '0', db_session))
-                last_zoom = int(db_manager.get_setting('map_last_zoom', '2', db_session))
+                scope = get_setting('geographic_scope', 'international', db_session)
+                last_lat = float(get_setting('map_last_lat', '20', db_session))
+                last_lng = float(get_setting('map_last_lng', '0', db_session))
+                last_zoom = int(get_setting('map_last_zoom', '2', db_session))
             finally:
                 db_session.close()
 
