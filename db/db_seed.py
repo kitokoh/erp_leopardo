@@ -939,13 +939,7 @@ def _seed_accounting_data(engine_to_use, logger_passed: logging.Logger): # Expec
         from decimal import Decimal
         # datetime and date are already imported at the top of db_seed.py
 
-        # Dynamically get the engine from db_connection_module
-        current_engine = db_connection_module.engine
-        if not current_engine:
-            logger.error("db.connection.engine is None in _seed_accounting_data. Cannot proceed.")
-            return
-
-        with Session(current_engine) as session: # Use dynamically fetched engine
+        with Session(engine_to_use) as session:
             base_curr = acc_cruds.currency.get_base_currency(db=session)
             if not base_curr:
                 logger.info("No base currency found. Seeding USD as base.")
@@ -1379,6 +1373,11 @@ def _seed_motivational_messages(cursor: sqlite3.Cursor, conn: sqlite3.Connection
 def run_seed():
     logger = logging.getLogger(__name__)
     logger.info(f"Attempting to seed database: {DATABASE_PATH}")
+
+    # Ensure SQLAlchemy engine is initialized
+    if not db_connection_module.engine:
+        from db.connection import initialize_engine_and_session
+        initialize_engine_and_session(CONFIG)
 
     # Phase 1: Raw SQL seeding (most of seed_initial_data_master)
     raw_conn = None

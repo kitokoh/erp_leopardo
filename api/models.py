@@ -26,7 +26,7 @@ class User(Base):
     # salt column removed as passlib handles it
     full_name = Column(String, nullable=True)
 
-    role_id = Column(Integer, ForeignKey("Roles.role_id"), nullable=True)
+    role_id = Column(Integer, ForeignKey("roles.role_id"), nullable=True)
 
     is_active = Column(Boolean, default=True, nullable=False)
     last_login_at = Column(DateTime(timezone=True), nullable=True)
