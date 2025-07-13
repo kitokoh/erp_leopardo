@@ -575,7 +575,7 @@ class DocumentManager(QMainWindow):
         self.app_title_animation_timer = QTimer(self)
         self.animation_sequences = []
         self.current_sequence_index = 0
-        self._gradient_position = 0
+        self._gradient_pos = 0.0
 
         self._setup_app_title_animation()
 
