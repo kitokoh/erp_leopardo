@@ -433,7 +433,16 @@ def main():
 
     # 7. Load Global Stylesheet
     # load_stylesheet_global is imported from app_setup
-    load_stylesheet_global(app) 
+    theme = db.get_setting('theme', default='Light')
+    if theme == 'Dark':
+        dark_theme_path = os.path.join(APP_ROOT_DIR, "resources", "styles", "dark_theme.qss")
+        if os.path.exists(dark_theme_path):
+            with open(dark_theme_path, "r") as f:
+                app.setStyleSheet(f.read())
+        else:
+            load_stylesheet_global(app)
+    else:
+        load_stylesheet_global(app)
     
     # The following app.setStyleSheet call has been removed to ensure style.qss is the single source of truth.
     # Basic styles that were here should be covered by or merged into style.qss.

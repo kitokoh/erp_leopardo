@@ -191,6 +191,7 @@ from dialogs.role_management_dialog import RoleManagementDialog # Added for Role
 from commande_management.commandes_dashboard_widget import CommandesDashboardWidget # Import CommandesDashboardWidget
 from utils.app_constants import CONFIGURABLE_MODULES # Import from new location
 from gui.widgets.sidebar_navigation_widget import SidebarNavigationWidget # Import de la Sidebar
+from gui.widgets.notification_panel import NotificationPanel
 
 # B2C Restaurant Module Import
 from b2c.ges_restaurant.ui.main_widget import RestaurantMainWidget
@@ -949,8 +950,12 @@ class DocumentManager(QMainWindow):
         from main import get_notification_manager # Local import
 
         manager = get_notification_manager()
-        if manager: manager.show(title, message, type=type, duration=duration, icon_path=icon_path)
-        else: logging.warning(f"Notification Manager not found. Notification: {title} - {message}")
+        if manager:
+            manager.show(title, message, type=type, duration=duration, icon_path=icon_path)
+            if hasattr(self, 'notification_panel'):
+                self.notification_panel.add_notification(title, message)
+        else:
+            logging.warning(f"Notification Manager not found. Notification: {title} - {message}")
 
     def setup_ui_main(self):
         central_widget = QWidget()
@@ -1649,19 +1654,13 @@ class DocumentManager(QMainWindow):
             (self.tr("Modules"), None, module_menu_actions), # Dropdown for all other modules
             (self.tr("Outils"), None, [
                 (self.tr("Paramètres"), self.settings_action),
-                (self.tr("Gérer les Statuts"), self.status_action)
-                # (self.tr("Personnaliser la Barre Latérale"), self.customize_sidebar_action) # REMOVED
+                (self.tr("Gérer les Statuts"), self.status_action),
+                (self.tr("À propos"), self.about_action)
             ]),
             (self.tr("Administration"), None, [
                 (self.tr("Gérer les Utilisateurs"), self.manage_users_action),
                 (self.tr("Gérer les Rôles"), self.manage_roles_action)
             ]),
-            (self.tr("Fichier"), None, [
-                (self.tr("Quitter"), self.exit_action)
-            ]),
-            (self.tr("Aide"), None, [
-                (self.tr("À propos"), self.searchable_actions_map.get(self.tr("À propos")))
-            ])
         ]
 
         for menu_title, menu_icon_path, actions_or_action_defs in menu_definitions:
@@ -1706,6 +1705,15 @@ class DocumentManager(QMainWindow):
         """)
         # Completer is already set up in create_actions_main
         top_bar_layout.addWidget(self.search_bar_line_edit)
+
+        # Notifications Button
+        self.notifications_button = QPushButton()
+        self.notifications_button.setIcon(QIcon(":/icons/bell.svg"))
+        self.notifications_button.setToolTip(self.tr("Notifications"))
+        self.notifications_button.setObjectName("notificationButton")
+        self.notification_panel = NotificationPanel(self)
+        self.notifications_button.clicked.connect(self.notification_panel.toggle_panel)
+        top_bar_layout.addWidget(self.notifications_button)
 
         # User Menu Button (already initialized in create_actions_main)
         if not hasattr(self, 'user_menu_button_instance'): # Ensure it's created

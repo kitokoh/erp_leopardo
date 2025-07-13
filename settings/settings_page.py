@@ -523,6 +523,11 @@ class SettingsPage(QWidget):
         self.session_timeout_spinbox.setToolTip(self.tr("Set session inactivity timeout. Examples: 1440 (1 day), 10080 (1 week), 43200 (30 days)."))
         interface_layout.addRow(self.tr("Session Timeout:"), self.session_timeout_spinbox)
 
+        self.theme_combo = QComboBox()
+        self.theme_combo.addItems([self.tr("Light"), self.tr("Dark")])
+        self.theme_combo.setToolTip(self.tr("Select the application theme. A restart may be required for all elements to update."))
+        interface_layout.addRow(self.tr("Theme:"), self.theme_combo)
+
         main_layout.addWidget(interface_group)
 
         # --- Behavior Settings Group ---
@@ -1654,6 +1659,10 @@ class SettingsPage(QWidget):
             check_license_str = db_manager.get_setting('check_license_on_startup', default='True')
             self.check_license_on_startup_checkbox.setChecked(check_license_str.lower() == 'true')
 
+            # Load theme setting
+            theme_value = db_manager.get_setting('theme', default='Light')
+            self.theme_combo.setCurrentText(theme_value)
+
             # Load geographic scope
             geo_scope_value = db_manager.get_setting('geographic_scope', default='international')
             for display_text, value in self.geo_scope_options.items():
@@ -1919,6 +1928,11 @@ class SettingsPage(QWidget):
             check_license_value = self.check_license_on_startup_checkbox.isChecked()
             db_manager.set_setting('check_license_on_startup', 'True' if check_license_value else 'False')
             print(f"License check on startup setting saved to DB: {check_license_value}")
+
+            # Save theme setting
+            theme_value = self.theme_combo.currentText()
+            db_manager.set_setting('theme', theme_value)
+            print(f"Theme setting saved to DB: {theme_value}")
 
             # Save geographic scope
             selected_geo_scope_display_text = self.geo_scope_combo.currentText()
