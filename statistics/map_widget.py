@@ -88,21 +88,11 @@ class HomePageMapWidget(QWidget):
 
             # 2. Generate Map HTML using the utility function
             from db import get_setting, get_db_connection
-            db_session = get_db_connection()
-            try:
-                scope = get_setting('geographic_scope', 'international', db_session)
-            finally:
-                db_session.close()
+            scope = get_setting('geographic_scope', 'international')
+            last_lat = float(get_setting('map_last_lat', '20'))
+            last_lng = float(get_setting('map_last_lng', '0'))
+            last_zoom = int(get_setting('map_last_zoom', '2'))
 
-            from db import get_setting, get_db_connection
-            db_session = get_db_connection()
-            try:
-                scope = get_setting('geographic_scope', 'international', db_session)
-                last_lat = float(get_setting('map_last_lat', '20', db_session))
-                last_lng = float(get_setting('map_last_lng', '0', db_session))
-                last_zoom = int(get_setting('map_last_zoom', '2', db_session))
-            finally:
-                db_session.close()
 
             map_html = generate_folium_map_html(
                 geojson_path=geojson_path,
