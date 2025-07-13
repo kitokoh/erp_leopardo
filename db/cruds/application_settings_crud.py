@@ -8,7 +8,7 @@ from .generic_crud import _manage_conn
 
 # --- ApplicationSettings CRUD ---
 @_manage_conn
-def get_setting(key: str, default: any = None, conn = None) -> any: # conn type can be Session or Connection
+def get_setting(key: str, default: any = None, conn=None) -> any:
     value_to_return = default
     try:
         # Check if conn is SQLAlchemy Session, Engine, or Connection

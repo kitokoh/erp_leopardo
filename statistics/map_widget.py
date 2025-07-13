@@ -87,7 +87,8 @@ class HomePageMapWidget(QWidget):
             geojson_path = os.path.join(APP_ROOT_DIR, "resources", "assets", "world_countries.geojson")
 
             # 2. Generate Map HTML using the utility function
-            from db import get_setting, get_db_connection
+            from db import get_setting
+
             scope = get_setting('geographic_scope', 'international')
             last_lat = float(get_setting('map_last_lat', '20'))
             last_lng = float(get_setting('map_last_lng', '0'))
