@@ -331,6 +331,15 @@ def main():
         logging.error(f"main.py: Error setting document_generator config: {e_docgen_conf}", exc_info=True)
 
 
+    # --- Create all tables ---
+    from db.connection import Base as MainBase, engine as actual_main_engine
+    if MainBase and actual_main_engine:
+        logging.info("main.py: Creating all tables from MainBase metadata...")
+        MainBase.metadata.create_all(bind=actual_main_engine)
+        logging.info("main.py: All tables from MainBase metadata created.")
+    else:
+        logging.error("main.py: MainBase or actual_main_engine not available. Cannot create tables.")
+
     # --- Coordinated Data Seeding ---
     # This block handles the seeding of initial data after the schema is created,
     # using the dedicated seeding module.
