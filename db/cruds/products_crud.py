@@ -519,12 +519,13 @@ class ProductsCRUD(GenericCRUD):
             int: The total count of products based on the criteria.
         """
         cursor = conn.cursor()
-        sql = f"SELECT COUNT(p.{self.id_column}) as total_count FROM {self.table_name} p"
+        sql = f"SELECT COUNT({self.id_column}) as total_count FROM {self.table_name}"
+
         params = []
         conditions = []
 
         if not include_deleted:
-            conditions.append("(p.is_deleted IS NULL OR p.is_deleted = 0)")
+            conditions.append("(is_deleted IS NULL OR is_deleted = 0)")
 
         if conditions: # Though for count, this might always be true if we add more conditions later
             sql += " WHERE " + " AND ".join(conditions)
