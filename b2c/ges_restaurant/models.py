@@ -87,9 +87,10 @@ class RestaurantLigneCommande(Base):
     commande_id = Column(Integer, ForeignKey('restaurant_commandes.id'), nullable=False)
     # Assuming your existing product table is named 'Products' and has 'product_id'
     # If the table name or pk is different, adjust ForeignKey('your_product_table_name.your_product_pk_column')
-    produit_id = Column(Integer, ForeignKey('Products.product_id'), nullable=False)
+    produit_id = Column(Integer, ForeignKey('products.product_id'), nullable=False)
 
     quantite = Column(Integer, nullable=False, default=1)
+    __table_args__ = {'extend_existing': True}
     prix_unitaire_ht_commande = Column(Float, nullable=False) # Price at the time of order
     prix_total_ht_ligne = Column(Float, nullable=False) # Should be calculated: quantite * prix_unitaire_ht_commande
 
