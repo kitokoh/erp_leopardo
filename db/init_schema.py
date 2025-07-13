@@ -2804,10 +2804,10 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
                 except Exception as e_drop_specific:
                     logging.error(f"DEBUG_INIT_DB: Error explicitly dropping targeted tables: {e_drop_specific}", exc_info=True)
             # --- END DEBUG ---
-            logging.critical("DEBUG_INIT_DB: SKIPPING MainBase.metadata.create_all() - Alembic should handle SQLAlchemy model tables.")
+            MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True)
 
-            # logging.info("DEBUG_INIT_DB: MainBase.metadata.create_all() EXECUTED.")
-            # logging.info("DEBUG_INIT_DB: All tables for MainBase created successfully by SQLAlchemy (using checkfirst=True).")
+            logging.info("DEBUG_INIT_DB: MainBase.metadata.create_all() EXECUTED.")
+            logging.info("DEBUG_INIT_DB: All tables for MainBase created successfully by SQLAlchemy (using checkfirst=True).")
             # At this point, tables like Products, acc_currencies, etc., should exist if defined via SQLAlchemy.
         except Exception as e_main_base_create_all:
             logging.error(f"DEBUG_INIT_DB: CRITICAL ERROR creating tables for MainBase with SQLAlchemy: {e_main_base_create_all}", exc_info=True)
@@ -3019,8 +3019,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
 
         try:
             logging.info("DEBUG_INIT_DB: Creating tables for MainBase (e.g., CalculatorHistory, Products, Accounting, Restaurant*) using SQLAlchemy actual_main_engine.")
-            # MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True) # INTENTIONALLY SKIPPED - Alembic should handle
-            logging.info("DEBUG_INIT_DB: SKIPPED MainBase.metadata.create_all() here as Alembic should handle SQLAlchemy model tables.")
+            MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True) # INTENTIONALLY SKIPPED - Alembic should handle
             logging.info("DEBUG_INIT_DB: Tables for MainBase (SQLAlchemy models) should be created by Alembic migration.")
 
             # Diagnostic: Check Products table schema right after creation by SQLAlchemy
