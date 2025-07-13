@@ -93,6 +93,7 @@ class HomePageMapWidget(QWidget):
             last_lng = float(get_setting('map_last_lng', '0'))
             last_zoom = int(get_setting('map_last_zoom', '2'))
 
+
             map_html = generate_folium_map_html(
                 geojson_path=geojson_path,
                 clients_by_country_counts=clients_by_country,
