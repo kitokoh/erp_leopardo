@@ -1,7 +1,7 @@
 import sqlite3
 import uuid
 from datetime import datetime
-from db.connection import get_db_connection
+from db.connection import get_raw_sqlite_connection as get_db_connection
 
 # TODO: Add StatusSettings related functions if needed for status validation.
 # TODO: Consider how to handle file paths for resumes and cover letters.

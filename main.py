@@ -292,6 +292,7 @@ def main():
 
             logging.info("Attempting to upgrade database schema to head using Alembic...")
             # logging.warning("DEBUG_MAIN: ALEMBIC UPGRADE TEMPORARILY COMMENTED OUT FOR TESTING.")
+            alembic_command.stamp(alembic_cfg, "head")
             alembic_command.upgrade(alembic_cfg, "head") # RESTORED
             logging.info("Alembic upgrade head command completed.")
     except ImportError:

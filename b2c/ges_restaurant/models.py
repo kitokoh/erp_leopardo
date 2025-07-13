@@ -25,6 +25,7 @@ try:
     # This requires that the Python path is correctly configured when this module is loaded.
     # sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..')) # Add project root
     from db.connection import Base
+    from db.common_models import Products
     print("Successfully imported Base from db.connection in b2c.ges_restaurant.models")
 except ImportError:
     print("Failed to import Base from db.connection in b2c.ges_restaurant.models. Using a local Base.")
