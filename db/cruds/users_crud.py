@@ -588,7 +588,7 @@ def is_users_table_empty(conn=None, logger_passed: logging.Logger | None = None)
         return True  # Assume empty on error to be safe
 
     try:
-        result = _execute_query(db_obj, sql_sa, {}, dialect)
+        result = _execute_query(db_obj, sql_sqlite if dialect == "sqlite" else sql_sa, {}, dialect)
         return result.fetchone() is None
     except (sqlite3.Error, SQLAlchemyError) as e:
         current_logger.error(f"Database error checking if users table is empty: {e}", exc_info=True)
