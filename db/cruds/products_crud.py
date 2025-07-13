@@ -520,6 +520,7 @@ class ProductsCRUD(GenericCRUD):
         """
         cursor = conn.cursor()
         sql = f"SELECT COUNT({self.id_column}) as total_count FROM {self.table_name}"
+
         params = []
         conditions = []
 
