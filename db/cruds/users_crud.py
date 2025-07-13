@@ -571,3 +571,25 @@ def get_user_by_email(email: str, conn=None, logger_passed: logging.Logger | Non
     else: current_logger.debug(f"User with email '{email}' not found.")
     return user_data
         # # return None
+
+
+@_manage_conn
+def is_users_table_empty(conn=None, logger_passed: logging.Logger | None = None) -> bool:
+    """
+    Checks if the Users table is empty.
+    """
+    current_logger = logger_passed if logger_passed else module_logger
+    sql_sqlite = "SELECT 1 FROM Users LIMIT 1"
+    sql_sa = text(sql_sqlite)
+
+    db_obj, dialect = _get_cursor_and_dialect(conn)
+    if not db_obj or not dialect:
+        current_logger.error(f"Unsupported connection type: {type(conn)}")
+        return True  # Assume empty on error to be safe
+
+    try:
+        result = _execute_query(db_obj, sql_sa, {}, dialect)
+        return result.fetchone() is None
+    except (sqlite3.Error, SQLAlchemyError) as e:
+        current_logger.error(f"Database error checking if users table is empty: {e}", exc_info=True)
+        return True # Assume empty on error
