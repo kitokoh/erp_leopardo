@@ -61,33 +61,24 @@ def _get_batch_products_and_equivalents(product_ids: list[int], target_language_
 def get_document_context_data(
     client_id: str, company_id: str, target_language_code: str,
     project_id: str = None,
-
-    # linked_product_ids_for_doc is now primarily handled by the logic within the enhanced context builder
-    # based on what's in additional_context or by fetching all for client/project.
-    # We can remove it from this wrapper's direct signature if it's fully managed by the callee.
-    # For now, keep it to pass through if present in additional_context.
     linked_product_ids_for_doc: list[int] = None,
     document_type: str = None,
     additional_context: dict = None,
-
-    conn_passed: sqlite3.Connection = None, # conn_passed might be for the enhanced context builder if it needs one
-    app_root_dir: str = None # New argument
+    conn_passed: sqlite3.Connection = None,
+    app_root_dir: str = None,
+    **kwargs
 ) -> dict:
     """
-    Wrapper function to call the enhanced document context builder.
+    Wrapper function to call the enhanced document context builder, passing through any extra arguments.
     """
-    logging.info(f"db.utils.get_document_context_data called, forwarding to enhanced context builder. app_root_dir: {app_root_dir}")
+    logging.info(f"db.utils.get_document_context_data called, forwarding to enhanced context builder. app_root_dir: {app_root_dir}, kwargs: {kwargs}")
 
-    # Prepare additional_data for the enhanced context builder
-    # The enhanced context builder uses 'additional_data' as its kwarg name.
     effective_additional_data = additional_context if isinstance(additional_context, dict) else {}
-    if linked_product_ids_for_doc: # If this old param is still passed, put it in additional_data
+    if linked_product_ids_for_doc:
         effective_additional_data.setdefault('linked_product_ids_for_doc', linked_product_ids_for_doc)
 
-    # Ensure conn_passed is included in additional_data if the enhanced context builder needs it
-    # The enhanced context builder in context_builder.py handles its own connection if db_conn is None.
-    # So, we don't strictly need to pass conn_passed via additional_data unless it's specifically designed for it.
-    # The enhanced context builder takes `db_conn` as a direct argument.
+    # Merge kwargs into additional_data, allowing kwargs to override initial additional_context keys if needed
+    effective_additional_data.update(kwargs)
 
     return _get_enhanced_document_context(
         client_id=client_id,
@@ -95,9 +86,9 @@ def get_document_context_data(
         language_code=target_language_code,
         project_id=project_id,
         document_type=document_type,
-        additional_data=effective_additional_data, # Pass the prepared dict
-        db_conn=conn_passed, # Pass the connection object directly
-        app_root_dir=app_root_dir # Pass the new argument
+        additional_data=effective_additional_data,
+        db_conn=conn_passed,
+        app_root_dir=app_root_dir
     )
 
 __all__ = [

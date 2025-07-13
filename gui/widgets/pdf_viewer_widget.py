@@ -222,7 +222,7 @@ class PdfViewerWidget(QDialog):
         try:
             page = self.current_pdf_document.load_page(self.current_page_number)
             if not page: raise RuntimeError(self.tr("Impossible charger page {0}.").format(self.current_page_number + 1))
-            matrix = fitz.Matrix(self.current_zoom_factor, self.current_zoom_factor); matrix.preRotate(self.current_view_rotation_angle)
+            matrix = fitz.Matrix(self.current_zoom_factor, self.current_zoom_factor); matrix.prerotate(self.current_view_rotation_angle)
             pix = page.get_pixmap(matrix=matrix, alpha=False)
             qimage = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format_RGB888); pixmap = QPixmap.fromImage(qimage)
             if self.pdf_scene: self.pdf_scene.clear()

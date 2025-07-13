@@ -194,6 +194,7 @@ from gui.widgets.sidebar_navigation_widget import SidebarNavigationWidget # Impo
 from gui.widgets.notification_panel import NotificationPanel
 from gui.widgets.categorized_completer import CategorizedCompleter, CategoryDelegate
 
+
 # B2C Restaurant Module Import
 from b2c.ges_restaurant.ui.main_widget import RestaurantMainWidget
 
@@ -1732,6 +1733,7 @@ class DocumentManager(QMainWindow):
         self.notifications_button.setToolTip(self.tr("Notifications"))
         self.notifications_button.setObjectName("notificationButton")
         top_bar_layout.addWidget(self.notifications_button)
+
 
         # User Menu Button (already initialized in create_actions_main)
         if not hasattr(self, 'user_menu_button_instance'): # Ensure it's created
