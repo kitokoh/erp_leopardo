@@ -5,7 +5,7 @@ from sqlalchemy.sql import func
 from db.connection import Base # Shared Base
 
 class Products(Base):
-    __tablename__ = "Products"
+    __tablename__ = "products"
 
     product_id = Column(Integer, primary_key=True, autoincrement=True)
     product_name = Column(String, nullable=False)
@@ -26,6 +26,7 @@ class Products(Base):
 
     __table_args__ = (
         UniqueConstraint('product_name', 'language_code', name='uq_products_product_name_language_code'),
+        {'extend_existing': True}
     )
 
     def __repr__(self):
@@ -33,7 +34,7 @@ class Products(Base):
 
 
 class Role(Base):
-    __tablename__ = "Roles" # Matches the table name from init_schema.py
+    __tablename__ = "roles" # Matches the table name from init_schema.py
 
     role_id = Column(Integer, primary_key=True, autoincrement=True)
     role_name = Column(String, nullable=False, unique=True)
@@ -41,6 +42,7 @@ class Role(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
+    __table_args__ = {'extend_existing': True}
     # If you need to access users associated with a role from the Role object:
     # users = relationship("User", back_populates="role") # Assumes "User" model is defined and has a "role" backref
 
