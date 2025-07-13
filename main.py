@@ -256,8 +256,13 @@ def main():
     atexit.register(logging.shutdown)
     logging.info("logging.shutdown registered with atexit.")
 
+    # Check if the database file already exists.
+    db_path = CONFIG.get('database_path')
+    db_exists = os.path.exists(db_path)
+
     # Initialize database after logging and API server start attempt
-    db.initialize_database(CONFIG) # Pass CONFIG here
+    if not db_exists:
+        db.initialize_database(CONFIG) # Pass CONFIG here
 
     # Apply Alembic migrations
     try:
@@ -346,9 +351,12 @@ def main():
     # MOVED EARLIER: run_seed() needs to happen AFTER initialize_database() and BEFORE UI elements try to read seeded settings.
     try:
         logging.info("Attempting to run data seeding if necessary...")
-        run_seed() # Call the main seeding function from db_seed.py
-        # run_seed() handles its own connection, commit, rollback, and logging.
-        logging.info("Data seeding process via run_seed() completed.")
+        if not db_exists:
+            run_seed() # Call the main seeding function from db_seed.py
+            # run_seed() handles its own connection, commit, rollback, and logging.
+            logging.info("Data seeding process via run_seed() completed.")
+        else:
+            logging.info("Database already exists, skipping seeding.")
     except Exception as e_seed_run:
         # Catch any unexpected error from run_seed() itself, though it should handle its own.
         logging.error(f"An unexpected error occurred when calling run_seed(): {e_seed_run}", exc_info=True)
