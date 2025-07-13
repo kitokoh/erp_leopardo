@@ -2994,36 +2994,9 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         except Exception as e_generic_import_for_mainbase:
             logging.error(f"DEBUG_INIT_DB: An unexpected error occurred during import of additional models for MainBase: {e_generic_import_for_mainbase}", exc_info=True)
 
-        try:
-            logging.info("DEBUG_INIT_DB: Creating tables for MainBase (e.g., CalculatorHistory, Products, Accounting, Restaurant*) using SQLAlchemy actual_main_engine.")
-            MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True) # INTENTIONALLY SKIPPED - Alembic should handle
-            logging.info("DEBUG_INIT_DB: Tables for MainBase (SQLAlchemy models) should be created by Alembic migration.")
-
-            # Diagnostic: Check Products table schema right after creation by SQLAlchemy
-            try:
-                logging.info("DEBUG_INIT_DB: Checking 'Products' table schema immediately after MainBase.metadata.create_all()...")
-                # Use the existing raw cursor 'cursor' which is still associated with 'conn'
-                # Ensure 'conn' is still open and valid here.
-                # Based on code flow, 'conn' is closed much later in the finally block of initialize_database.
-                products_pragma_cursor = conn.cursor() # Create a new cursor instance from conn
-                products_pragma_cursor.execute("PRAGMA table_info(Products)")
-                products_columns_info = products_pragma_cursor.fetchall()
-                if products_columns_info:
-                    col_details = []
-                    for col in products_columns_info:
-                        # col is a sqlite3.Row object if conn.row_factory was set, or tuple
-                        # Assuming conn.row_factory = sqlite3.Row is active on 'conn'
-                        col_details.append(f"Name: {col['name']}, Type: {col['type']}, PK: {col['pk']}")
-                    logging.info(f"DEBUG_INIT_DB: 'Products' table schema: {', '.join(col_details)}")
-                else:
-                    logging.warning("DEBUG_INIT_DB: 'Products' table not found or no schema info via PRAGMA after create_all.")
-                products_pragma_cursor.close() # Close the temporary cursor
-            except Exception as e_pragma_check:
-                logging.error(f"DEBUG_INIT_DB: Error checking 'Products' table schema with PRAGMA: {e_pragma_check}", exc_info=True)
-
-        except Exception as e_main_base_create:
-            # This is where the original "NoReferencedTableError" for Products.created_by_user_id occurred.
-            logging.error(f"DEBUG_INIT_DB: Error creating tables for MainBase: {e_main_base_create}", exc_info=True)
+        logging.info("DEBUG_INIT_DB: Creating tables for MainBase (e.g., CalculatorHistory, Products, Accounting, Restaurant*) using SQLAlchemy actual_main_engine.")
+        MainBase.metadata.create_all(bind=actual_main_engine)
+        logging.info("DEBUG_INIT_DB: Tables for MainBase (SQLAlchemy models) created.")
 
         # --- Manual check and addition for Products.product_code ---
         # This is a short-term fix. Alembic should be used for migrations.

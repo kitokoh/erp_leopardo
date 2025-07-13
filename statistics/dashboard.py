@@ -695,7 +695,7 @@ class StatisticsDashboard(QWidget):
         """Helper to calculate trend text and style."""
         trend_text = ""
         style = "color: #555; font-style: italic; font-size: 9pt;"
-        if previous_value is not None and previous_value != 0 :
+        if previous_value is not None and previous_value > 0:
             percentage_change = ((current_value - previous_value) / previous_value) * 100
             arrow = "→"
             if percentage_change > 0.5:
@@ -759,7 +759,7 @@ class StatisticsDashboard(QWidget):
         try:
             total_clients_count = get_total_clients_count()
             active_clients_count = get_active_clients_count()
-            health_score = (active_clients_count / total_clients_count) * 100 if total_clients_count > 0 else 0
+            health_score = (active_clients_count / total_clients_count) * 100 if total_clients_count and total_clients_count > 0 else 0
             self.health_score_value_label.setText(f"{health_score:.0f} %")
             self.health_score_progress_bar.setValue(int(health_score))
 
@@ -946,6 +946,9 @@ class StatisticsDashboard(QWidget):
                 wedgeprops=dict(width=0.35, edgecolor='w')
             )
             ax.axis('equal')
+
+            if not sizes:
+                return
 
             for text_obj in texts + autotexts:
                 text_obj.set_fontsize(8)
