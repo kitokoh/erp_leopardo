@@ -417,6 +417,7 @@ class DocumentManager(QMainWindow):
         # Make the window frameless
         self.setWindowFlags(Qt.FramelessWindowHint | self.windowFlags())
 
+        self._gradient_pos = 0.0
         self.app_root_dir = app_root_dir
         self.current_user_info = current_user_info # Store the full user info dictionary
         self.current_license_info = current_license_info # Store license information
