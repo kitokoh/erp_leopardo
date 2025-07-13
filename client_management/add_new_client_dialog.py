@@ -17,11 +17,7 @@ class AddNewClientDialog(QDialog):
         self.client_controller = ClientController() # Added
         self.initial_country_name = initial_country_name
         self.setWindowTitle(self.tr("Ajouter un Nouveau Client"))
-        db_session = get_db_connection()
-        try:
-            self.geo_scope = get_setting('geographic_scope', 'international', db_session)
-        finally:
-            db_session.close()
+        self.geo_scope = get_setting('geographic_scope', 'international')
         self.setMinimumSize(500, 400)
         # self.country_id = None # Removed, controller will handle ID resolution
         # self.city_id = None # Removed, controller will handle ID resolution

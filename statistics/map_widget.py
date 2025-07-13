@@ -87,22 +87,11 @@ class HomePageMapWidget(QWidget):
             geojson_path = os.path.join(APP_ROOT_DIR, "resources", "assets", "world_countries.geojson")
 
             # 2. Generate Map HTML using the utility function
-            from db import db_manager, get_db_connection
-            db_session = get_db_connection()
-            try:
-                scope = db_manager.get_setting('geographic_scope', 'international', db_session)
-            finally:
-                db_session.close()
-
-            from db import db_manager, get_db_connection
-            db_session = get_db_connection()
-            try:
-                scope = db_manager.get_setting('geographic_scope', 'international', db_session)
-                last_lat = float(db_manager.get_setting('map_last_lat', '20', db_session))
-                last_lng = float(db_manager.get_setting('map_last_lng', '0', db_session))
-                last_zoom = int(db_manager.get_setting('map_last_zoom', '2', db_session))
-            finally:
-                db_session.close()
+            from db import get_setting
+            scope = get_setting('geographic_scope', 'international')
+            last_lat = float(get_setting('map_last_lat', '20'))
+            last_lng = float(get_setting('map_last_lng', '0'))
+            last_zoom = int(get_setting('map_last_zoom', '2'))
 
             map_html = generate_folium_map_html(
                 geojson_path=geojson_path,
