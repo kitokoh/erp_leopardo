@@ -237,18 +237,6 @@ def check_session_timeout() -> bool:
 def main():
     global CURRENT_SESSION_TOKEN, CURRENT_USER_ROLE, CURRENT_USER_ID, SESSION_START_TIME
 
-    # --- DEBUG: Ensure fresh database for testing startup ---
-    try:
-        db_path_to_delete = CONFIG.get('database_path')
-        if db_path_to_delete and os.path.exists(db_path_to_delete):
-            os.remove(db_path_to_delete)
-            logging.warning(f"DEBUG: Deleted existing database {db_path_to_delete} for fresh start.")
-        else:
-            logging.info(f"DEBUG: Database {db_path_to_delete} not found, starting fresh.")
-    except Exception as e_del_db:
-        logging.error(f"DEBUG: Error deleting database {db_path_to_delete}: {e_del_db}")
-    # --- END DEBUG ---
-
     # 1. Configure logging as the very first step.
     setup_logging()
     logging.info("Application starting...")
@@ -445,7 +433,16 @@ def main():
 
     # 7. Load Global Stylesheet
     # load_stylesheet_global is imported from app_setup
-    load_stylesheet_global(app) 
+    theme = db.get_setting('theme', default='Light')
+    if theme == 'Dark':
+        dark_theme_path = os.path.join(APP_ROOT_DIR, "resources", "styles", "dark_theme.qss")
+        if os.path.exists(dark_theme_path):
+            with open(dark_theme_path, "r") as f:
+                app.setStyleSheet(f.read())
+        else:
+            load_stylesheet_global(app)
+    else:
+        load_stylesheet_global(app)
     
     # The following app.setStyleSheet call has been removed to ensure style.qss is the single source of truth.
     # Basic styles that were here should be covered by or merged into style.qss.
@@ -528,9 +525,13 @@ def main():
     # using the dedicated seeding module.
     try:
         logging.info("Attempting to run data seeding if necessary...")
-        run_seed() # Call the main seeding function from db_seed.py
-        # run_seed() handles its own connection, commit, rollback, and logging.
-        logging.info("Data seeding process via run_seed() completed.")
+        # Check if the database is empty before seeding
+        if users_crud.is_users_table_empty():
+            logging.info("Users table is empty, running data seeding...")
+            run_seed() # Call the main seeding function from db_seed.py
+            logging.info("Data seeding process via run_seed() completed.")
+        else:
+            logging.info("Users table is not empty, skipping data seeding.")
     except Exception as e_seed_run:
         # Catch any unexpected error from run_seed() itself, though it should handle its own.
         logging.error(f"An unexpected error occurred when calling run_seed(): {e_seed_run}", exc_info=True)

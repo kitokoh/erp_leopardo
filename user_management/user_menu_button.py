@@ -1,8 +1,8 @@
 # user_management/user_menu_button.py
 import logging
 from PyQt5.QtWidgets import QPushButton, QMenu, QAction, QLabel, QWidgetAction, QApplication, QMessageBox
-from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import Qt, pyqtSignal, QPoint # Import QPoint
+from PyQt5.QtGui import QIcon, QPixmap, QPainter, QBrush, QColor
+from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QSize # Import QPoint
 
 from PyQt5.QtCore import Qt, pyqtSignal
 
@@ -24,20 +24,48 @@ class UserMenuButton(QPushButton):
         self.current_user_info = current_user_info
         self.main_window_ref = parent # Assuming parent is DocumentManager (main window)
 
-        self.setIcon(QIcon(":/icons/user.svg"))
         self.setFixedSize(32, 32) # Default size, can be styled further with QSS
         self.setToolTip(self.tr("Options Utilisateur"))
         self.setFlat(True) # Make it look less like a bulky button
+        self.setStyleSheet("QPushButton { border: none; border-radius: 16px; }")
+
 
         self.user_menu = QMenu(self)
         self.clicked.connect(self._show_user_menu)
 
         self._build_menu()
+        self._set_avatar()
 
     def update_user_info(self, new_user_info: dict | None):
         """Updates the user info and rebuilds the menu if necessary."""
         self.current_user_info = new_user_info
         self._build_menu() # Rebuild menu as permissions/info might change
+        self._set_avatar()
+
+    def _set_avatar(self):
+        avatar_path = self.current_user_info.get('avatar_path') if self.current_user_info else None
+
+        if avatar_path and os.path.exists(avatar_path):
+            pixmap = QPixmap(avatar_path)
+        else:
+            pixmap = QPixmap(":/icons/user.svg")
+
+        # Create a circular pixmap
+        size = 28
+        circular_pixmap = QPixmap(size, size)
+        circular_pixmap.fill(Qt.transparent)
+
+        painter = QPainter(circular_pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        brush = QBrush(pixmap.scaled(size, size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
+        painter.setBrush(brush)
+        painter.setPen(Qt.NoPen)
+        painter.drawEllipse(0, 0, size, size)
+        painter.end()
+
+        self.setIcon(QIcon(circular_pixmap))
+        self.setIconSize(QSize(size, size))
 
     def _build_menu(self):
         self.user_menu.clear()
@@ -70,6 +98,11 @@ class UserMenuButton(QPushButton):
         logout_action = QAction(QIcon(":/icons/log-out.svg"), self.tr("Déconnexion"), self.user_menu)
         logout_action.triggered.connect(self._handle_logout) # Emit signal
         self.user_menu.addAction(logout_action)
+
+        # 4. Quit
+        quit_action = QAction(QIcon(":/icons/log-out.svg"), self.tr("Quitter"), self.user_menu)
+        quit_action.triggered.connect(QApplication.instance().quit)
+        self.user_menu.addAction(quit_action)
 
         # 4. Admin-only section
         # Check P_MANAGE_USERS permission for the current user
