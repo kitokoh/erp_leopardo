@@ -112,7 +112,7 @@ class HomePageWidget(QWidget):
         bottom_layout = self._setup_bottom_layout()
 
         main_v_layout.addLayout(top_layout, 1)
-        main_v_layout.addLayout(bottom_layout, 2)
+        main_v_layout.addWidget(bottom_layout, 2)
 
         self.setLayout(main_v_layout)
         self._load_all_module_card_stats()
@@ -380,6 +380,17 @@ class HomePageWidget(QWidget):
             for card_ref in self.module_cards_list:
                 if card_ref: card_ref.deleteLater()
             self.module_cards_list.clear()
+
+        button_scroll_area = QScrollArea()
+        button_scroll_area.setWidgetResizable(True)
+        button_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        button_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        button_scroll_area.setObjectName("homePageButtonScrollArea")
+
+        button_container_widget = QWidget()
+        grid_layout = QGridLayout(button_container_widget)
+        grid_layout.setSpacing(15)
+        grid_layout.setContentsMargins(10, 10, 10, 10)
 
         if self.modules:
             # Afficher uniquement la première carte, plus grande
