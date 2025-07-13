@@ -2790,31 +2790,8 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
             # especially if the manual drop loop had issues or for general robustness.
             # logging.critical("DEBUG_INIT_DB: INTENTIONALLY SKIPPING MainBase.metadata.create_all() HERE TO LET ALEMBIC HANDLE IT.")
 
-            # --- DEBUG: Explicitly drop problematic tables before MainBase.create_all ---
-            if actual_main_engine:
-                try:
-                    with actual_main_engine.connect() as connection:
-                        logging.info("DEBUG_INIT_DB: Explicitly dropping 'Products', 'acc_chart_of_accounts', 'calculation_history' tables if they exist before MainBase.create_all...")
-                        connection.execute(text("DROP TABLE IF EXISTS Products"))
-                        connection.execute(text("DROP TABLE IF EXISTS acc_chart_of_accounts"))
-                        connection.execute(text("DROP TABLE IF EXISTS calculation_history"))
-                        # Add other tables here if they cause "already exists" with MainBase.create_all
-                        connection.commit()
-                        logging.info("DEBUG_INIT_DB: Targeted tables explicitly dropped (if they existed).")
-                except Exception as e_drop_specific:
-                    logging.error(f"DEBUG_INIT_DB: Error explicitly dropping targeted tables: {e_drop_specific}", exc_info=True)
-            # --- END DEBUG ---
-            MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True)
-
-            logging.info("DEBUG_INIT_DB: MainBase.metadata.create_all() EXECUTED.")
-            logging.info("DEBUG_INIT_DB: All tables for MainBase created successfully by SQLAlchemy (using checkfirst=True).")
-            # At this point, tables like Products, acc_currencies, etc., should exist if defined via SQLAlchemy.
-        except Exception as e_main_base_create_all:
-            logging.error(f"DEBUG_INIT_DB: CRITICAL ERROR creating tables for MainBase with SQLAlchemy: {e_main_base_create_all}", exc_info=True)
-            # This is a major failure point. Subsequent seeding will likely fail.
-            # Depending on the error, conn might need rollback/close.
-            # Re-raise to ensure this critical failure stops initialization.
-            raise e_main_base_create_all
+            # MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True)
+            logging.info("DEBUG_INIT_DB: MainBase.metadata.create_all() is now handled by Alembic migrations and is skipped here.")
 
     # Create remaining indexes for raw SQL tables (if any; many are now SQLAlchemy models)
     # And also for SQLAlchemy tables if not defined in model with index=True
