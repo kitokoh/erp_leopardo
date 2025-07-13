@@ -2792,6 +2792,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
         # MainBase.metadata.create_all(bind=actual_main_engine, checkfirst=True)
         logging.info("DEBUG_INIT_DB: MainBase.metadata.create_all() is now handled by Alembic migrations and is skipped here.")
 
+
     # Create remaining indexes for raw SQL tables (if any; many are now SQLAlchemy models)
     # And also for SQLAlchemy tables if not defined in model with index=True
     # The existing index creation logic can run here.
