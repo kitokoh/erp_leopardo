@@ -1223,3 +1223,28 @@ __all__ = [
     "ClientsCRUD", # Exporting the class itself for type hinting or direct instantiation
     "clients_crud_instance" # Exporting the instance if needed elsewhere
 ]
+
+    @_manage_conn
+    def search_clients_by_name(self, name_query: str, conn=None, limit: int = 10) -> list[dict]:
+        """
+        Searches for clients by name (client_name or company_name).
+        """
+        if not name_query:
+            return []
+
+        sql_query = text("""
+            SELECT client_id, client_name, company_name
+            FROM Clients
+            WHERE (client_name LIKE :query OR company_name LIKE :query)
+              AND (is_deleted IS NULL OR is_deleted = 0)
+            ORDER BY client_name
+            LIMIT :limit
+        """)
+        params = {"query": f"%{name_query}%", "limit": limit}
+
+        try:
+            result = conn.execute(sql_query, params)
+            return [dict(row._mapping) for row in result.fetchall()]
+        except Exception as e:
+            self.logger.error(f"Failed to search clients by name '{name_query}': {e}", exc_info=True)
+            return []
