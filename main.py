@@ -237,18 +237,6 @@ def check_session_timeout() -> bool:
 def main():
     global CURRENT_SESSION_TOKEN, CURRENT_USER_ROLE, CURRENT_USER_ID, SESSION_START_TIME
 
-    # --- DEBUG: Ensure fresh database for testing startup ---
-    try:
-        db_path_to_delete = CONFIG.get('database_path')
-        if db_path_to_delete and os.path.exists(db_path_to_delete):
-            os.remove(db_path_to_delete)
-            logging.warning(f"DEBUG: Deleted existing database {db_path_to_delete} for fresh start.")
-        else:
-            logging.info(f"DEBUG: Database {db_path_to_delete} not found, starting fresh.")
-    except Exception as e_del_db:
-        logging.error(f"DEBUG: Error deleting database {db_path_to_delete}: {e_del_db}")
-    # --- END DEBUG ---
-
     # 1. Configure logging as the very first step.
     setup_logging()
     logging.info("Application starting...")
@@ -528,9 +516,13 @@ def main():
     # using the dedicated seeding module.
     try:
         logging.info("Attempting to run data seeding if necessary...")
-        run_seed() # Call the main seeding function from db_seed.py
-        # run_seed() handles its own connection, commit, rollback, and logging.
-        logging.info("Data seeding process via run_seed() completed.")
+        # Check if the database is empty before seeding
+        if users_crud.is_users_table_empty():
+            logging.info("Users table is empty, running data seeding...")
+            run_seed() # Call the main seeding function from db_seed.py
+            logging.info("Data seeding process via run_seed() completed.")
+        else:
+            logging.info("Users table is not empty, skipping data seeding.")
     except Exception as e_seed_run:
         # Catch any unexpected error from run_seed() itself, though it should handle its own.
         logging.error(f"An unexpected error occurred when calling run_seed(): {e_seed_run}", exc_info=True)

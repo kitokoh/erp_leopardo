@@ -99,12 +99,23 @@ class StatisticsDashboard(QWidget):
         main_layout.setContentsMargins(10,10,10,10)
         main_layout.setSpacing(10)
 
-        # Global Refresh Button
-        self.global_refresh_button = QPushButton(self.tr("Rafraîchir Tout le Tableau de Bord"))
-        self.global_refresh_button.setIcon(QIcon.fromTheme("view-refresh", QIcon(":/icons/refresh-cw.svg")))
-        self.global_refresh_button.setObjectName("globalRefreshButton")
+        # Top layout for Title and Refresh button
+        top_bar_layout = QHBoxLayout()
+
+        self.dashboard_tabs = QTabWidget()
+        self.dashboard_tabs.addTab(QWidget(), self.tr("Dashboard Principal"))
+        self.dashboard_tabs.addTab(QWidget(), self.tr("Analyses Approfondies"))
+
+        top_bar_layout.addWidget(self.dashboard_tabs)
+
+        self.global_refresh_button = QPushButton()
+        self.global_refresh_button.setIcon(QIcon(":/icons/refresh-cw.svg"))
+        self.global_refresh_button.setToolTip(self.tr("Rafraîchir les données"))
+        self.global_refresh_button.setObjectName("refreshButton")
         self.global_refresh_button.clicked.connect(self.refresh_all_dashboard_content)
-        main_layout.addWidget(self.global_refresh_button)
+        top_bar_layout.addWidget(self.global_refresh_button)
+
+        main_layout.addLayout(top_bar_layout)
 
         # Main horizontal splitter
         self.main_splitter = QSplitter(Qt.Horizontal, self)
@@ -129,7 +140,7 @@ class StatisticsDashboard(QWidget):
 
         QTimer.singleShot(0, lambda: self.main_splitter.setSizes([int(self.width() * 0.6), int(self.width() * 0.4)]))
 
-
+        self.dashboard_tabs.widget(0).setLayout(main_layout)
         main_layout.addWidget(self.main_splitter)
         self.setLayout(main_layout)
 
@@ -486,18 +497,14 @@ class StatisticsDashboard(QWidget):
 
             db_session = get_db_connection()
             try:
-                scope = db_manager.get_setting('geographic_scope', 'international', db_session)
+                from db.cruds.application_settings_crud import get_setting
+                scope = get_setting('geographic_scope', 'international', conn=db_session)
+                last_lat = float(get_setting('map_last_lat', '20', conn=db_session))
+                last_lng = float(get_setting('map_last_lng', '0', conn=db_session))
+                last_zoom = int(get_setting('map_last_zoom', '2', conn=db_session))
             finally:
-                db_session.close()
-
-            db_session = get_db_connection()
-            try:
-                scope = db_manager.get_setting('geographic_scope', 'international', db_session)
-                last_lat = float(db_manager.get_setting('map_last_lat', '20', db_session))
-                last_lng = float(db_manager.get_setting('map_last_lng', '0', db_session))
-                last_zoom = int(db_manager.get_setting('map_last_zoom', '2', db_session))
-            finally:
-                db_session.close()
+                if db_session:
+                    db_session.close()
 
             map_html_content = generate_folium_map_html(
                 geojson_path=geojson_path,

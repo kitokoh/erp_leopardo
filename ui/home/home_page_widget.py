@@ -112,7 +112,7 @@ class HomePageWidget(QWidget):
         bottom_layout = self._setup_bottom_layout()
 
         main_v_layout.addLayout(top_layout, 1)
-        main_v_layout.addLayout(bottom_layout, 2)
+        main_v_layout.addWidget(bottom_layout, 2)
 
         self.setLayout(main_v_layout)
         self._load_all_module_card_stats()
@@ -381,22 +381,37 @@ class HomePageWidget(QWidget):
                 if card_ref: card_ref.deleteLater()
             self.module_cards_list.clear()
 
+        button_scroll_area = QScrollArea()
+        button_scroll_area.setWidgetResizable(True)
+        button_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        button_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        button_scroll_area.setObjectName("homePageButtonScrollArea")
+
+        button_container_widget = QWidget()
+        grid_layout = QGridLayout(button_container_widget)
+        grid_layout.setSpacing(15)
+        grid_layout.setContentsMargins(10, 10, 10, 10)
+
         if self.modules:
-            # Afficher uniquement la première carte, plus grande
-            module_data = self.modules[0]
-            accent_color_key = module_data["object_name"].replace("btn", "").lower()
-            card = ModuleCardWidget(
-                module_id=module_data["object_name"],
-                title=module_data["name"],
-                icon_path=module_data["icon"],
-                tooltip=module_data["name"],
-                navigation_slot=module_data["slot"],
-                accent_color_key=accent_color_key
-            )
-            if module_data["slot"]:
-                card.cardClicked.connect(module_data["slot"])
-            self.module_cards_list.append(card)
-            grid_layout.addWidget(card, 0, 0)
+            row, col = 0, 0
+            for module_data in self.modules:
+                accent_color_key = module_data["object_name"].replace("btn", "").lower()
+                card = ModuleCardWidget(
+                    module_id=module_data["object_name"],
+                    title=module_data["name"],
+                    icon_path=module_data["icon"],
+                    tooltip=module_data["name"],
+                    navigation_slot=module_data["slot"],
+                    accent_color_key=accent_color_key
+                )
+                if module_data["slot"]:
+                    card.cardClicked.connect(module_data["slot"])
+                self.module_cards_list.append(card)
+                grid_layout.addWidget(card, row, col)
+                col += 1
+                if col >= 4:
+                    col = 0
+                    row += 1
 
         button_container_widget.setLayout(grid_layout)
         button_scroll_area.setWidget(button_container_widget)

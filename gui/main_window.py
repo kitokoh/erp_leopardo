@@ -211,6 +211,7 @@ from license_management import (
 from dialogs.menu_customization_dialog import MenuCustomizationDialog
 from utils.app_constants import CONFIGURABLE_MODULES # For menu customization and default order
 import json # For handling menu config storage
+import random
 from PyQt5.QtCore import pyqtSignal, QTimer, QEasingCurve, pyqtProperty # Added QTimer, QEasingCurve
 from PyQt5.QtGui import QColor, QLinearGradient, QPalette # Added QColor
 from PyQt5.QtWidgets import QGraphicsDropShadowEffect # Added QGraphicsDropShadowEffect
@@ -417,6 +418,7 @@ class DocumentManager(QMainWindow):
         # Make the window frameless
         self.setWindowFlags(Qt.FramelessWindowHint | self.windowFlags())
 
+        self._gradient_pos = 0.0
         self.app_root_dir = app_root_dir
         self.current_user_info = current_user_info # Store the full user info dictionary
         self.current_license_info = current_license_info # Store license information
@@ -575,7 +577,7 @@ class DocumentManager(QMainWindow):
         self.app_title_animation_timer = QTimer(self)
         self.animation_sequences = []
         self.current_sequence_index = 0
-        self._gradient_position = 0
+        self._gradient_pos = 0.0
 
         self._setup_app_title_animation()
 
@@ -651,8 +653,8 @@ class DocumentManager(QMainWindow):
         if not self.animation_sequences:
             return
 
-        sequence = self.animation_sequences[self.current_sequence_index]
-        self.current_sequence_index = (self.current_sequence_index + 1) % len(self.animation_sequences)
+        # Choose a random sequence
+        sequence = random.choice(self.animation_sequences)
 
         seq_type = sequence.get("type")
         duration = sequence.get("duration", 1000)
@@ -1608,6 +1610,7 @@ class DocumentManager(QMainWindow):
         self.app_title_label = QLabel("Leopardo ERP") # Changed title & assign to self
         self.app_title_label.setObjectName("topMenuAppTitle")
         self.app_title_label.setStyleSheet("color: blue; font-size: 18px; font-weight: bold; padding-right: 15px;")
+        self.app_title_label.setFixedWidth(200)
 
         # Setup shadow effect for animation
         self.app_title_shadow_effect.setBlurRadius(15)
@@ -1988,7 +1991,6 @@ class DocumentManager(QMainWindow):
             return
 
         auth_service.logout()
-        auth_service.clear_remember_me_preference() # Clear remember me on manual logout
         self.current_user_info = None # Clear user info in main window
         self._update_user_display()
 
