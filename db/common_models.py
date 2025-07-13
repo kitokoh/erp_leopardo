@@ -5,7 +5,7 @@ from sqlalchemy.sql import func
 from db.connection import Base # Shared Base
 
 class Products(Base):
-    __tablename__ = "Products"
+    __tablename__ = "products"
 
     product_id = Column(Integer, primary_key=True, autoincrement=True)
     product_name = Column(String, nullable=False)
@@ -33,7 +33,7 @@ class Products(Base):
 
 
 class Role(Base):
-    __tablename__ = "Roles" # Matches the table name from init_schema.py
+    __tablename__ = "roles" # Matches the table name from init_schema.py
 
     role_id = Column(Integer, primary_key=True, autoincrement=True)
     role_name = Column(String, nullable=False, unique=True)
