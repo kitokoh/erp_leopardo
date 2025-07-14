@@ -145,7 +145,7 @@ def generate_folium_map_html(
 
     try:
 
-        m = folium.Map(location=map_location, zoom_start=map_zoom, tiles="CartoDB positron", no_wrap=True)
+        m = folium.Map(location=map_location, zoom_start=map_zoom, tiles="CartoDB positron", no_wrap=True, attr='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>')
         logging.info(f"map_utils: folium.Map object created: {m}")
 
         # Client Distribution Layer (Choropleth)
