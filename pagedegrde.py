@@ -454,7 +454,7 @@ class AnimatedButton(QPushButton):
         if self.style_type == "primary":
             self.setStyleSheet(common_style + f"""
                 QPushButton {{
-                    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #007BFF, stop:1 #0056b3);
+                    background-color: #007BFF;
                     color: white;
                 }}
                 QPushButton:hover {{ background-color: #0069D9; border-color: #0056b3; }}
@@ -463,7 +463,7 @@ class AnimatedButton(QPushButton):
         elif self.style_type == "secondary":
             self.setStyleSheet(common_style + f"""
                 QPushButton {{
-                    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #6c757d, stop:1 #545b62);
+                    background-color: #6c757d;
                     color: white;
                 }}
                 QPushButton:hover {{ background-color: #5a6268; border-color: #4e555b;}}
@@ -472,7 +472,7 @@ class AnimatedButton(QPushButton):
         elif self.style_type == "danger":
              self.setStyleSheet(common_style + f"""
                 QPushButton {{
-                    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #dc3545, stop:1 #c82333);
+                    background-color: #dc3545;
                     color: white;
                 }}
                 QPushButton:hover {{ background-color: #c82333; border-color: #b21f2d;}}
