@@ -1,8 +1,18 @@
-import sqlite3 # Keep for type hints if necessary, but conn will be Session
+import sqlite3
+from sqlalchemy.engine.row import RowProxy
 from sqlalchemy.sql import text
-# from .generic_crud import _manage_conn # Decorator removed
-from ..connection import get_db_connection # Direct import
+from ..connection import get_db_connection
 import logging
+
+def _convert_to_dict(row):
+    """
+    Converts a SQLAlchemy RowProxy or sqlite3.Row object to a dictionary.
+    """
+    if isinstance(row, RowProxy):
+        return dict(row._mapping)
+    elif isinstance(row, sqlite3.Row):
+        return dict(row)
+    return row
 
 # --- StatusSettings CRUD ---
 def get_status_setting_by_name(name: str, type: str, conn = None) -> dict | None:
@@ -37,7 +47,7 @@ def get_status_setting_by_name(name: str, type: str, conn = None) -> dict | None
             # It's a SQLAlchemy connection, which can handle TextClause directly
             result = conn.execute(sql_query, {"name": name, "type": type})
         row = result.fetchone()
-        return dict(row._mapping) if row else None # Use row._mapping for RowProxy
+        return _convert_to_dict(row) if row else None
     except Exception as e: # Changed to general Exception
         logging.error(f"Error getting status setting by name '{name}' (original_param_type: {type(original_name_param).__name__}) and type '{type}': {e}", exc_info=True)
         return None
@@ -60,7 +70,7 @@ def get_status_setting_by_id(id: int, conn = None) -> dict | None:
             # It's a SQLAlchemy connection, which can handle TextClause directly
             result = conn.execute(sql_query, {"id": id})
         row = result.fetchone()
-        return dict(row._mapping) if row else None
+        return _convert_to_dict(row) if row else None
     except Exception as e: # Changed to general Exception
         logging.error(f"Error getting status setting by id {id}: {e}", exc_info=True)
         return None
@@ -98,7 +108,7 @@ def get_all_status_settings(type_filter: str = None, conn = None) -> list[dict]:
         else:
              # It's a SQLAlchemy connection, which can handle TextClause directly
              result = conn.execute(sql_query, params)
-        return [dict(row._mapping) for row in result.fetchall()]
+        return [_convert_to_dict(row) for row in result.fetchall()]
     except Exception as e: # Changed to general Exception
         logging.error(f"Database error in get_all_status_settings (filter: {type_filter}): {e}", exc_info=True)
         return []
