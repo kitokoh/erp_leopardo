@@ -41,7 +41,7 @@ from settings.initial_setup_dialog import InitialSetupDialog, PromptCompanyInfoD
 from PyQt5.QtWidgets import QDialog # Required for QDialog.Accepted check
 # Import specific db functions needed
 import db # Added import for db module
-from db.db_seed import run_seed
+from db.db_seed import run_seed, seed_only_hidroguc_products
 from db import get_all_companies, add_company # Specific imports for company check
 from db.cruds import users_crud # Corrected import for users_crud
 # from db.cruds.application_settings_crud import get_setting # Removed direct import
@@ -324,6 +324,7 @@ def main():
 
     # Initialize the database. This function now encapsulates all DB setup.
     initialize_database()
+    seed_only_hidroguc_products()
 
     # Set the database configuration for db.connection module
     # This must be done after app_setup.CONFIG is loaded and db structure might be initialized
