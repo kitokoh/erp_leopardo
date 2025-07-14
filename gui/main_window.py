@@ -198,6 +198,8 @@ from gui.widgets.categorized_completer import CategorizedCompleter, CategoryDele
 # B2C Restaurant Module Import
 from b2c.ges_restaurant.ui.main_widget import RestaurantMainWidget
 
+from addons.widgets import AddonsPage
+
 
 # License Management Imports for feature constants and manager
 from license_management import manager as license_manager # To call get_allowed_features
@@ -1546,6 +1548,10 @@ class DocumentManager(QMainWindow):
         # self.customize_sidebar_action.triggered.connect(self.open_sidebar_customization_dialog) # Renommer la méthode cible
         # self.searchable_actions_map[self.tr("Personnaliser la Barre Latérale")] = self.customize_sidebar_action
 
+        self.addons_action = QAction(QIcon(":/icons/plus-circle.svg"), self.tr("Addons"), self)
+        self.addons_action.triggered.connect(self.show_addons_page)
+        self.searchable_actions_map[self.tr("Addons")] = self.addons_action
+
         # B2C Restaurant Module Action
         # TODO: Find or create a suitable icon e.g., :/icons/restaurant.svg or :/icons/utensils.svg
         self.restaurant_module_action = QAction(QIcon(":/icons/placeholder_icon.svg"), self.tr("Service Restaurant (B2C)"), self)
@@ -1674,6 +1680,7 @@ class DocumentManager(QMainWindow):
                 (self.tr("Gérer les Utilisateurs"), self.manage_users_action),
                 (self.tr("Gérer les Rôles"), self.manage_roles_action)
             ]),
+            (self.tr("Addons"), None, self.addons_action),
         ]
 
         for menu_title, menu_icon_path, actions_or_action_defs in menu_definitions:
@@ -2882,6 +2889,12 @@ class DocumentManager(QMainWindow):
 
         self.main_area_stack.setCurrentWidget(self.calculator_module_widget_instance)
         logging.info("Switched to Calculator module view.")
+
+    def show_addons_page(self):
+        if not hasattr(self, 'addons_page_instance'):
+            self.addons_page_instance = AddonsPage(self)
+            self.main_area_stack.addWidget(self.addons_page_instance)
+        self.main_area_stack.setCurrentWidget(self.addons_page_instance)
 
     def show_commande_management_view(self):
         # This page (self.commandes_dashboard_widget_instance) is initialized at startup.
