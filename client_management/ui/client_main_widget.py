@@ -346,20 +346,16 @@ class ClientMainWidget(QWidget):
             self.details_layout.addRow(self.created_by_label_static, self.created_by_value_label)
 
         # Placeholder for client statuses - to be populated by _setup_client_statuses_section
+        self.client_statuses_widget = QWidget()
+        self.client_statuses_layout = QHBoxLayout(self.client_statuses_widget)
+        self.client_statuses_layout.setContentsMargins(0,0,0,0)
+        self.details_layout.addRow(self.tr("Statuts Client:"), self.client_statuses_widget)
 
+        details_tab_layout.addLayout(self.details_layout)
+        self.internal_client_info_tabs.addTab(self.client_details_tab, self.client_info.get('client_name', self.tr("Détails Client")))
 
-
-
-            self.client_statuses_widget = QWidget()
-            self.client_statuses_layout = QHBoxLayout(self.client_statuses_widget)
-            self.client_statuses_layout.setContentsMargins(0,0,0,0)
-            self.details_layout.addRow(self.tr("Statuts Client:"), self.client_statuses_widget)
-
-            details_tab_layout.addLayout(self.details_layout)
-            self.internal_client_info_tabs.addTab(self.client_details_tab, self.client_info.get('client_name', self.tr("Détails Client")))
-
-        # Call populate_details_layout which will also call _setup_client_statuses_section
-            self.populate_details_layout()
+    # Call populate_details_layout which will also call _setup_client_statuses_section
+        self.populate_details_layout()
 
 
             contacts_tab_widget = QWidget()
@@ -2710,11 +2706,16 @@ class ClientMainWidget(QWidget):
     def _setup_client_statuses_section(self):
         """Sets up the UI for displaying and modifying client statuses."""
         # Clear previous status widgets if any (important for refresh_display)
-        while self.client_statuses_layout.count():
-            item = self.client_statuses_layout.takeAt(0)
-            widget = item.widget()
-            if widget:
-                widget.deleteLater()
+        if hasattr(self, 'client_statuses_layout'):
+            while self.client_statuses_layout.count():
+                item = self.client_statuses_layout.takeAt(0)
+                widget = item.widget()
+                if widget:
+                    widget.deleteLater()
+        else:
+            # If the layout doesn't even exist, we can't proceed. Log an error.
+            logging.error("ClientMainWidget._setup_client_statuses_section: client_statuses_layout is missing.")
+            return
 
         if not self.client_info:
             return

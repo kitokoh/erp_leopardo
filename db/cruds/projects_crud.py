@@ -161,12 +161,10 @@ def get_active_projects_count(conn: sqlite3.Connection = None) -> int:
     sql = """
         SELECT COUNT(p.project_id)
         FROM Projects p
-        JOIN StatusSettings ss ON p.status_id = ss.status_id
-        WHERE ss.is_completion_status = FALSE AND ss.is_archival_status = FALSE
+        LEFT JOIN StatusSettings ss ON p.status_id = ss.status_id
+        WHERE (ss.is_completion_status = FALSE OR ss.is_completion_status IS NULL)
+          AND (ss.is_archival_status = FALSE OR ss.is_archival_status IS NULL)
     """
-    # Alternative: If StatusSettings table is small or statuses are fixed,
-    # one might hardcode non-active status_ids:
-    # sql = "SELECT COUNT(*) FROM Projects WHERE status_id NOT IN (id1, id2, ...)"
     try:
         cursor.execute(sql)
         count = cursor.fetchone()[0]
@@ -188,13 +186,13 @@ def get_active_project_count_by_country_id(country_id: int, conn: sqlite3.Connec
         SELECT COUNT(p.project_id) as active_project_count
         FROM Projects p
         JOIN Clients c ON p.client_id = c.client_id
-        JOIN StatusSettings ss ON p.status_id = ss.status_id
+        LEFT JOIN StatusSettings ss ON p.status_id = ss.status_id
         WHERE c.country_id = ?
-          AND (c.is_deleted IS NULL OR c.is_deleted = 0)      -- Client not deleted
-          AND (p.is_deleted IS NULL OR p.is_deleted = 0)      -- Project not deleted
-          AND (ss.is_completion_status = FALSE OR ss.is_completion_status = 0)
-          AND (ss.is_archival_status = FALSE OR ss.is_archival_status = 0)
-          AND ss.status_type = 'Project' -- Ensure we are looking at Project statuses
+          AND (c.is_deleted IS NULL OR c.is_deleted = 0)
+          AND (p.is_deleted IS NULL OR p.is_deleted = 0)
+          AND (ss.is_completion_status = FALSE OR ss.is_completion_status IS NULL)
+          AND (ss.is_archival_status = FALSE OR ss.is_archival_status IS NULL)
+          AND (ss.status_type = 'Project' OR ss.status_type IS NULL)
     """
     try:
         cursor.execute(sql, (country_id,))
