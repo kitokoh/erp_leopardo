@@ -646,9 +646,15 @@ class DocumentManager(QMainWindow):
 
         palette = self.app_title_label.palette()
         gradient = QLinearGradient(0, 0, self.app_title_label.width(), 0)
-        gradient.setColorAt(self._gradient_pos - 0.5, QColor(self.gradient_start_color))
+
+        # Clamping the gradient position to the valid range of 0 to 1
+        start_pos = max(0, self._gradient_pos - 0.5)
+        end_pos = min(1, self._gradient_pos + 0.5)
+
+        gradient.setColorAt(start_pos, QColor(self.gradient_start_color))
         gradient.setColorAt(self._gradient_pos, QColor(self.gradient_end_color))
-        gradient.setColorAt(self._gradient_pos + 0.5, QColor(self.gradient_start_color))
+        gradient.setColorAt(end_pos, QColor(self.gradient_start_color))
+
         palette.setBrush(QPalette.WindowText, gradient)
         self.app_title_label.setPalette(palette)
 
