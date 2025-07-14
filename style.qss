@@ -1,16 +1,16 @@
 /*
-    Modern Theme for ClientDocManager
+Modern Theme for ClientDocManager
 
-    Color Palette:
-    *   Primary Background: #FFFFFF (White)
-    *   Secondary Background (e.g., for main window, some panels): #F5F7FA
-    *   Primary Text: #263238 (Dark Slate Grey)
-    *   Secondary Text: #546E7A (Lighter Slate Grey)
-    *   Accent Color: #007BFF (Vibrant Blue)
-    *   Border Color: #DDE2E6 (Light Grey)
-    *   Success Color: #28A745 (Green)
-    *   Warning Color: #FFC107 (Yellow)
-    *   Error Color: #DC3545 (Red)
+Color Palette:
+*   Primary Background: #FFFFFF (White)
+*   Secondary Background (e.g., for main window, some panels): #F5F7FA
+*   Primary Text: #263238 (Dark Slate Grey)
+*   Secondary Text: #546E7A (Lighter Slate Grey)
+*   Accent Color: #007BFF (Vibrant Blue)
+*   Border Color: #DDE2E6 (Light Grey)
+*   Success Color: #28A745 (Green)
+*   Warning Color: #FFC107 (Yellow)
+*   Error Color: #DC3545 (Red)
 */
 
 /* Base QWidget Style */
@@ -1301,6 +1301,7 @@ QPushButton#userMenuButton {
 QPushButton#userMenuButton:hover {
     background-color: #E0E0E0; /* Light grey hover */
 }
+
 
 QPushButton#userMenuButton:pressed {
     background-color: #CFD8DC; /* Slightly darker grey when pressed */
