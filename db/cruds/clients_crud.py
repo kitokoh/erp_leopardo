@@ -77,6 +77,12 @@ class ClientsCRUD(GenericCRUD):
         is_deleted_val = data.get('is_deleted', 0) # Default to not deleted
         deleted_at_val = data.get('deleted_at', None)
 
+        # Create client folder
+        folder_path = self.create_client_folder(new_id, data.get('client_name'), conn=conn)
+        if not folder_path:
+            # Even if folder creation fails, we can still proceed with adding the client
+            self.logger.error(f"Could not create folder for new client {data.get('client_name')}. The client will be created without a default folder path.")
+
         sql_query = text("""INSERT INTO Clients
                  (client_id, client_name, company_name, primary_need_description, project_identifier,
                   country_id, city_id, default_base_folder_path, status_id, selected_languages,
@@ -92,7 +98,7 @@ class ClientsCRUD(GenericCRUD):
             "primary_need_description": data.get('primary_need_description'),
             "project_identifier": data.get('project_identifier', 'N/A'),
             "country_id": data.get('country_id'), "city_id": data.get('city_id'),
-            "default_base_folder_path": data.get('default_base_folder_path'),
+            "default_base_folder_path": folder_path, # Use the created folder path
             "status_id": data.get('status_id'), "selected_languages": data.get('selected_languages'),
             "price": data.get('price', 0), "notes": data.get('notes'), "category": data.get('category'),
             "lead_source": data.get('lead_source'), "created_at": now_utc_iso, "updated_at": now_utc_iso,
@@ -180,6 +186,22 @@ class ClientsCRUD(GenericCRUD):
         except Exception as e: # Changed to general Exception
             self.logger.error(f"Failed to add client '{data.get('client_name')}': {e}", exc_info=True)
             return {'success': False, 'error': str(e)}
+
+    @_manage_conn
+    def create_client_folder(self, client_id: str, client_name: str, conn=None) -> str | None:
+        """
+        Creates a folder for the client if it doesn't exist.
+        """
+        try:
+            from app_setup import APP_ROOT_DIR
+            sane_client_name = "".join(c if c.isalnum() else "_" for c in client_name)
+            folder_name = f"{sane_client_name}_{client_id[:8]}"
+            folder_path = os.path.join(APP_ROOT_DIR, "clients", folder_name)
+            os.makedirs(folder_path, exist_ok=True)
+            return folder_path
+        except Exception as e:
+            self.logger.error(f"Failed to create folder for client {client_id}: {e}", exc_info=True)
+            return None
 
     @_manage_conn
     def get_client_by_id(self, client_id: str, conn = None, include_deleted: bool = False) -> dict | None: # conn is Session
