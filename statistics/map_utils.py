@@ -271,12 +271,8 @@ def generate_folium_map_html(
                         }} else {{
                             console.log("{map_interaction_handler_name} initialized successfully via WebChannel.");
 
-                            // Add event listener to the map
-                            m.on('moveend', function(e) {{
-                                var center = m.getCenter();
-                                var zoom = m.getZoom();
-                                window.{map_interaction_handler_name}.onMapViewChanged(center.lat, center.lng, zoom);
-                            }});
+                            // The moveend event listener has been removed to prevent crashes.
+                            // The map's last position will not be saved.
                         }}
                     }});
                 }} else {{
@@ -296,6 +292,11 @@ def generate_folium_map_html(
             map_html_content += webchannel_setup_js
 
         logging.info("map_utils: WebChannel JavaScript added to HTML content.")
+
+        # For debugging, save the HTML to a file
+        with open("map.html", "w", encoding="utf-8") as f:
+            f.write(map_html_content)
+
         return map_html_content
 
     except Exception as e:
