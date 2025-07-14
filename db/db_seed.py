@@ -967,6 +967,7 @@ def seed_initial_data_master(cursor: sqlite3.Cursor):
     _seed_default_regions(cursor, conn, logger_passed=logger)
     _seed_sample_referents(cursor, conn, logger_passed=logger)
     _seed_calendar_data(cursor, conn, logger_passed=logger)
+    _seed_countries_from_geojson(cursor, conn, logger_passed=logger)
 
     # Accounting data is seeded separately using SQLAlchemy engine after raw connection operations are done.
     # The actual call to _seed_accounting_data will be managed by run_seed() to ensure
@@ -1056,6 +1057,58 @@ def _seed_calendar_data(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger
     #                        (admin_user['user_id'], 'US')) # Default to US
     #         logger.info(f"Seeded default CompanyCalendarSettings for admin user {admin_user['user_id']}.")
     logger.info("Calendar module data seeding placeholder complete.")
+
+
+def _seed_countries_from_geojson(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
+    """Seeds countries from the world_countries.geojson file."""
+    logger = logger_passed
+    logger.info("Attempting to seed countries from GeoJSON file...")
+
+    geojson_path = os.path.join(PROJECT_ROOT_FOR_SEED, "resources", "assets", "world_countries.geojson")
+    if not os.path.exists(geojson_path):
+        logger.error(f"GeoJSON file not found at: {geojson_path}. Skipping country seeding from GeoJSON.")
+        return
+
+    with open(geojson_path, 'r', encoding='utf-8') as f:
+        geojson_data = json.load(f)
+
+    added_count = 0
+    skipped_count = 0
+    for feature in geojson_data['features']:
+        country_name = feature['properties']['name']
+        country_iso_a2 = feature['properties']['iso_a2']
+
+        # Check if country already exists
+        existing_country = get_country_by_name(country_name, conn=conn)
+        if existing_country:
+            # If it exists, check if iso_a2_code is missing and update it
+            if not existing_country.get('iso_a2_code'):
+                try:
+                    cursor.execute("UPDATE Countries SET iso_a2_code = ? WHERE country_id = ?", (country_iso_a2, existing_country['country_id']))
+                    logger.info(f"Updated missing iso_a2_code for existing country: {country_name}")
+                except sqlite3.Error as e:
+                    logger.error(f"Error updating iso_a2_code for {country_name}: {e}")
+            skipped_count += 1
+            continue
+
+        # If country does not exist, add it
+        country_data = {
+            'country_name': country_name,
+            'iso_a2_code': country_iso_a2
+        }
+        country_id = str(uuid.uuid4())
+        try:
+            cursor.execute("INSERT INTO Countries (country_id, country_name, iso_a2_code) VALUES (?, ?, ?)",
+                           (country_id, country_data['country_name'], country_data['iso_a2_code']))
+            added_count += 1
+        except sqlite3.IntegrityError:
+            logger.warning(f"Country '{country_name}' already exists (IntegrityError). Skipping.")
+            skipped_count += 1
+        except Exception as e:
+            logger.error(f"Error adding country '{country_name}': {e}")
+            skipped_count += 1
+
+    logger.info(f"Finished seeding countries from GeoJSON. Added: {added_count}, Skipped/Existing: {skipped_count}")
 
 
 def _seed_default_regions(cursor: sqlite3.Cursor, conn: sqlite3.Connection, logger_passed: logging.Logger):
