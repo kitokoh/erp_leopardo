@@ -221,7 +221,33 @@ __all__ = [
     "search_projects",
     "get_projects_by_status",
     "get_projects_by_user",
+    "get_overdue_tasks_count",
 ]
+
+@_manage_conn
+def get_overdue_tasks_count(conn: sqlite3.Connection = None) -> int:
+    """
+    Counts the number of overdue tasks.
+    A task is considered overdue if its due_date has passed and it is not completed.
+    """
+    cursor = conn.cursor()
+    # Get the current date in YYYY-MM-DD format for comparison
+    current_date = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+
+    # SQL to count tasks where due_date is past and completed_at is NULL
+    # This assumes due_date is stored in a format comparable to the current_date string.
+    sql = """
+        SELECT COUNT(task_id)
+        FROM Tasks
+        WHERE due_date < ? AND (completed_at IS NULL OR completed_at = '')
+    """
+    try:
+        cursor.execute(sql, (current_date,))
+        count = cursor.fetchone()[0]
+        return count if count is not None else 0
+    except sqlite3.Error as e:
+        logger.error(f"Database error in get_overdue_tasks_count: {e}", exc_info=True)
+        return 0
 
 # Placeholder functions
 @_manage_conn

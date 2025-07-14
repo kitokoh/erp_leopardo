@@ -29,7 +29,13 @@ def get_status_setting_by_name(name: str, type: str, conn = None) -> dict | None
 
     try:
         sql_query = text("SELECT * FROM StatusSettings WHERE status_name = :name AND status_type = :type")
-        result = conn.execute(sql_query, {"name": name, "type": type})
+        # Check if the connection is a raw sqlite3 connection
+        if hasattr(conn, 'execute') and not hasattr(conn, 'begin'):
+            # It's a raw connection, so convert TextClause to string
+            result = conn.execute(str(sql_query), {"name": name, "type": type})
+        else:
+            # It's a SQLAlchemy connection, which can handle TextClause directly
+            result = conn.execute(sql_query, {"name": name, "type": type})
         row = result.fetchone()
         return dict(row._mapping) if row else None # Use row._mapping for RowProxy
     except Exception as e: # Changed to general Exception
@@ -46,7 +52,13 @@ def get_status_setting_by_id(id: int, conn = None) -> dict | None:
 
     try:
         sql_query = text("SELECT * FROM StatusSettings WHERE status_id = :id")
-        result = conn.execute(sql_query, {"id": id})
+        # Check if the connection is a raw sqlite3 connection
+        if hasattr(conn, 'execute') and not hasattr(conn, 'begin'):
+            # It's a raw connection, so convert TextClause to string
+            result = conn.execute(str(sql_query), {"id": id})
+        else:
+            # It's a SQLAlchemy connection, which can handle TextClause directly
+            result = conn.execute(sql_query, {"id": id})
         row = result.fetchone()
         return dict(row._mapping) if row else None
     except Exception as e: # Changed to general Exception
@@ -79,7 +91,13 @@ def get_all_status_settings(type_filter: str = None, conn = None) -> list[dict]:
     sql_query = text(sql_base)
 
     try:
-        result = conn.execute(sql_query, params)
+        # Check if the connection is a raw sqlite3 connection
+        if hasattr(conn, 'execute') and not hasattr(conn, 'begin'):
+             # It's a raw connection, so convert TextClause to string
+             result = conn.execute(str(sql_query), params)
+        else:
+             # It's a SQLAlchemy connection, which can handle TextClause directly
+             result = conn.execute(sql_query, params)
         return [dict(row._mapping) for row in result.fetchall()]
     except Exception as e: # Changed to general Exception
         logging.error(f"Database error in get_all_status_settings (filter: {type_filter}): {e}", exc_info=True)
@@ -117,7 +135,13 @@ def add_status_setting(status_name: str, status_type: str, color_hex: str = None
             "status_name": status_name, "status_type": status_type,
             "color_hex": color_hex, "sort_order": sort_order
         }
-        result = conn.execute(sql_query, params)
+        # Check if the connection is a raw sqlite3 connection
+        if hasattr(conn, 'execute') and not hasattr(conn, 'begin'):
+            # It's a raw connection, so convert TextClause to string
+            result = conn.execute(str(sql_query), params)
+        else:
+            # It's a SQLAlchemy connection, which can handle TextClause directly
+            result = conn.execute(sql_query, params)
         if not conn_is_external:
             conn.commit()
 
@@ -172,7 +196,13 @@ def update_status_setting(status_id: int, status_name: str, status_type: str, co
     sql_query = text(sql_base)
 
     try:
-        result = conn.execute(sql_query, params_dict)
+        # Check if the connection is a raw sqlite3 connection
+        if hasattr(conn, 'execute') and not hasattr(conn, 'begin'):
+            # It's a raw connection, so convert TextClause to string
+            result = conn.execute(str(sql_query), params_dict)
+        else:
+            # It's a SQLAlchemy connection, which can handle TextClause directly
+            result = conn.execute(sql_query, params_dict)
         if not conn_is_external:
             conn.commit()
         return result.rowcount > 0
@@ -202,7 +232,13 @@ def is_status_in_use(status_id: int, conn = None) -> bool:
     """
     sql_query = text("SELECT 1 FROM Clients WHERE status_id = :status_id LIMIT 1")
     try:
-        result = conn.execute(sql_query, {"status_id": status_id})
+        # Check if the connection is a raw sqlite3 connection
+        if hasattr(conn, 'execute') and not hasattr(conn, 'begin'):
+            # It's a raw connection, so convert TextClause to string
+            result = conn.execute(str(sql_query), {"status_id": status_id})
+        else:
+            # It's a SQLAlchemy connection, which can handle TextClause directly
+            result = conn.execute(sql_query, {"status_id": status_id})
         return result.fetchone() is not None
     except Exception as e: # Changed to general Exception
         logging.error(f"Database error in is_status_in_use for status_id {status_id}: {e}", exc_info=True)
@@ -229,7 +265,13 @@ def delete_status_setting(status_id: int, conn = None) -> bool:
     """
     sql_query = text("DELETE FROM StatusSettings WHERE status_id = :status_id")
     try:
-        result = conn.execute(sql_query, {"status_id": status_id})
+        # Check if the connection is a raw sqlite3 connection
+        if hasattr(conn, 'execute') and not hasattr(conn, 'begin'):
+            # It's a raw connection, so convert TextClause to string
+            result = conn.execute(str(sql_query), {"status_id": status_id})
+        else:
+            # It's a SQLAlchemy connection, which can handle TextClause directly
+            result = conn.execute(sql_query, {"status_id": status_id})
         if not conn_is_external:
             conn.commit()
         return result.rowcount > 0
