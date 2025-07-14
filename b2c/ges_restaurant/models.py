@@ -229,7 +229,7 @@ class RestaurantTableInDB(RestaurantTableBase):
     updated_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Schemas for RestaurantLigneCommande
 class RestaurantLigneCommandeBase(BaseModel):
@@ -257,7 +257,7 @@ class RestaurantLigneCommandeInDB(RestaurantLigneCommandeBase):
     # produit_nom: Optional[str] = None # Example if joining
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Schemas for RestaurantPaiement
 class RestaurantPaiementBase(BaseModel):
@@ -276,7 +276,7 @@ class RestaurantPaiementInDB(RestaurantPaiementBase):
     updated_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # Schemas for RestaurantCommande
 class RestaurantCommandeBase(BaseModel):
@@ -310,7 +310,7 @@ class RestaurantCommandeInDB(RestaurantCommandeBase):
     table: Optional[RestaurantTableInDB] = None # For richer responses
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # ```
 # Je vais créer ce fichier également.

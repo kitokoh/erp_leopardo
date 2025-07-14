@@ -519,7 +519,7 @@ class ProductsCRUD(GenericCRUD):
             int: The total count of products based on the criteria.
         """
         cursor = conn.cursor()
-        sql = f"SELECT COUNT({self.id_column}) as total_count FROM {self.table_name}"
+        sql = f"SELECT COUNT(*) as total_count FROM {self.table_name}"
 
         params = []
         conditions = []
@@ -881,7 +881,13 @@ class ProductsCRUD(GenericCRUD):
         params = {"query": f"%{name_query}%", "limit": limit}
 
         try:
-            result = conn.execute(sql_query, params)
+            # Check if the connection is a raw sqlite3 connection
+            if hasattr(conn, 'execute') and not hasattr(conn, 'begin'):
+                # It's a raw connection, so convert TextClause to string
+                result = conn.execute(str(sql_query), params)
+            else:
+                # It's a SQLAlchemy connection, which can handle TextClause directly
+                result = conn.execute(sql_query, params)
             return [dict(row._mapping) for row in result.fetchall()]
         except Exception as e:
             logging.error(f"Failed to search products by name '{name_query}': {e}", exc_info=True)

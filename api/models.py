@@ -494,7 +494,7 @@ class CompanyFactureReadPydantic(CompanyFactureBasePydantic):
     is_deleted: bool = False # Include soft delete status
 
     class Config:
-        from_attributes = True # Changed from orm_mode for Pydantic v2 compatibility if needed, but from_attributes is better.
+        from_attributes = True
 
 class CompanyFactureUpdatePydantic(BaseModel):
     original_file_name: Optional[str] = None
