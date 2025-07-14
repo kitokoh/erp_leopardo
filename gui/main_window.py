@@ -1664,6 +1664,7 @@ class DocumentManager(QMainWindow):
         menu_definitions = [
             (self.tr("Accueil"), None, self.home_action), # Direct action, not a dropdown
             (self.tr("Modules"), None, module_menu_actions), # Dropdown for all other modules
+            (self.tr("Statistiques"), None, self.statistics_action),
             (self.tr("Outils"), None, [
                 (self.tr("Paramètres"), self.settings_action),
                 (self.tr("Gérer les Statuts"), self.status_action),
