@@ -322,17 +322,17 @@ def main():
     atexit.register(logging.shutdown)
     logging.info("logging.shutdown registered with atexit.")
 
-    # Initialize the database. This function now encapsulates all DB setup.
-    initialize_database()
-    seed_only_hidroguc_products()
-
     # Set the database configuration for db.connection module
-    # This must be done after app_setup.CONFIG is loaded and db structure might be initialized
+    # This must be done after app_setup.CONFIG is loaded and before any db operations
     if hasattr(db, 'connection') and hasattr(db.connection, 'set_db_config'):
         db.connection.set_db_config(CONFIG)
         logging.info("main.py: db.connection.set_db_config(CONFIG) called.")
     else:
         logging.error("main.py: Could not find db.connection.set_db_config. DB calls might fail.")
+
+    # Initialize the database. This function now encapsulates all DB setup.
+    initialize_database()
+    seed_only_hidroguc_products()
 
     # Set the configuration for document_generator.context_builder
     try:
