@@ -1357,13 +1357,13 @@ CREATE TABLE IF NOT EXISTS Templates (
     )""")
 
     # Create SmtpConfigs table (from ca.py)
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS SmtpConfigs (
-        smtp_config_id INTEGER PRIMARY KEY AUTOINCREMENT, config_name TEXT NOT NULL UNIQUE,
-        smtp_server TEXT NOT NULL, smtp_port INTEGER NOT NULL, username TEXT,
-        password_encrypted TEXT, use_tls BOOLEAN DEFAULT TRUE, is_default BOOLEAN DEFAULT FALSE,
-        sender_email_address TEXT NOT NULL, sender_display_name TEXT
-    )""")
+    # cursor.execute("""
+    # CREATE TABLE IF NOT EXISTS SmtpConfigs (
+    #     smtp_config_id INTEGER PRIMARY KEY AUTOINCREMENT, config_name TEXT NOT NULL UNIQUE,
+    #     smtp_server TEXT NOT NULL, smtp_port INTEGER NOT NULL, username TEXT,
+    #     password_encrypted TEXT, use_tls BOOLEAN DEFAULT TRUE, is_default BOOLEAN DEFAULT FALSE,
+    #     sender_email_address TEXT NOT NULL, sender_display_name TEXT
+    # )""")
 
     # Create ApplicationSettings table (from ca.py)
     cursor.execute("""

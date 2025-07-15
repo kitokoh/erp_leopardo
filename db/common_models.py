@@ -23,6 +23,7 @@ class Products(Base):
     is_deleted = Column(Integer, default=0, nullable=False)
     deleted_at = Column(DateTime(timezone=True), nullable=True)
     created_by_user_id = Column(String, ForeignKey('users.user_id', name='fk_products_created_by_user_id', ondelete='SET NULL'), nullable=True) # Changed Users.user_id to users.user_id
+    next_erp_id = Column(String, unique=True, nullable=True)
 
     __table_args__ = (
         UniqueConstraint('product_name', 'language_code', name='uq_products_product_name_language_code'),
@@ -48,6 +49,20 @@ class Role(Base):
 
     def __repr__(self):
         return f"<Role(role_id={self.role_id}, role_name='{self.role_name}')>"
+
+class SmtpConfigs(Base):
+    __tablename__ = 'SmtpConfigs'
+
+    smtp_config_id = Column(Integer, primary_key=True, autoincrement=True)
+    config_name = Column(String, nullable=False, unique=True)
+    smtp_server = Column(String, nullable=False)
+    smtp_port = Column(Integer, nullable=False)
+    username = Column(String)
+    password_encrypted = Column(String)
+    use_tls = Column(Boolean, default=True)
+    is_default = Column(Boolean, default=False)
+    sender_email_address = Column(String, nullable=False)
+    sender_display_name = Column(String)
 
 # Ensure that alembic/env.py imports db.common_models to pick up this Role model.
 # The raw SQL creation of 'Roles' table in db/init_schema.py should be removed.
