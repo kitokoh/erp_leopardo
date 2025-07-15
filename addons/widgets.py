@@ -57,9 +57,9 @@ class AddonCard(QWidget):
         self.buttons_layout.addWidget(self.config_button)
         self.buttons_layout.addWidget(self.update_button)
 
-        if self.app_id == "invoice-ninja" or self.app_id == "next-erp":
+        if self.app_id == "next-erp" and platform.system() != "Linux":
             self.install_button.setEnabled(False)
-            self.status_label.setText("Désactivé")
+            self.status_label.setText("Désactivé (Linux seulement)")
 
         self.layout.addWidget(self.icon_label)
         self.layout.addWidget(self.name_label)

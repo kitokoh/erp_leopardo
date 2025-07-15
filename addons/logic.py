@@ -43,12 +43,52 @@ def install_n8n():
     subprocess.run([commands["npm"], "install", "-g", "n8n"])
 
 def install_invoice_ninja():
-    print("Installation of Invoice Ninja is currently disabled.")
-    return
+    commands = get_os_commands()
+    if not commands:
+        print("Unsupported OS")
+        return
+
+    # Install dependencies
+    subprocess.run(commands["install"] + ["git", "php", "composer"])
+
+    # Clone the repo
+    if not os.path.exists("installed_addons/invoice-ninja"):
+        os.makedirs("installed_addons/invoice-ninja")
+    if not os.listdir("installed_addons/invoice-ninja"):
+        subprocess.run(["git", "clone", "https://github.com/invoiceninja/invoiceninja.git", "installed_addons/invoice-ninja"])
+
+    # Install PHP dependencies
+    os.chdir("installed_addons/invoice-ninja")
+    subprocess.run([commands["php_deps"][0], commands["php_deps"][1], "install"])
+    os.chdir("../..")
 
 def install_next_erp():
-    print("Installation of NextERP is currently disabled.")
-    return
+    commands = get_os_commands()
+    if not commands:
+        print("Unsupported OS")
+        return
+
+    # Install dependencies
+    subprocess.run(commands["install"] + ["git", "python3", "python3-pip"])
+
+    # Clone the repo
+    if not os.path.exists("installed_addons/bench"):
+        os.makedirs("installed_addons/bench")
+    if not os.listdir("installed_addons/bench"):
+        subprocess.run(["git", "clone", "https://github.com/frappe/bench.git", "installed_addons/bench"])
+
+    # Install bench
+    os.chdir("installed_addons/bench")
+    subprocess.run([commands["python_deps"], "install", "--editable", "."])
+
+    # Create a new site
+    subprocess.run(["bench", "new-site", "leopardo-web-erp.com"])
+
+    # Install erpnext
+    subprocess.run(["bench", "get-app", "erpnext"])
+    subprocess.run(["bench", "install-app", "erpnext"])
+
+    os.chdir("../..")
 
 def get_installer_command(app_id):
     if app_id == "n8n":
@@ -78,9 +118,9 @@ def is_installed(app_id):
     if app_id == "n8n":
         return shutil.which("n8n") is not None
     elif app_id == "invoice-ninja":
-        return os.path.exists("invoiceninja/artisan")
+        return os.path.exists("installed_addons/invoice-ninja/artisan")
     elif app_id == "next-erp":
-        return os.path.exists("bench/bench")
+        return os.path.exists("installed_addons/bench/bench")
     return False
 
 def rename_app(app_id, new_name):
@@ -156,10 +196,6 @@ def install_and_launch_app(app_id, main_window):
     if os.path.exists(os.path.join("plugins", app_id)):
         launch_plugin(app_id, main_window)
         return QUrl("about:blank")
-
-    if app_id == "invoice-ninja" or app_id == "next-erp":
-        print(f"Installation of {app_id} is currently disabled.")
-        return None
 
     if not check_dependencies(app_id):
         print(f"Dependencies for {app_id} are not installed. Please install them manually.")
