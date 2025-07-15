@@ -119,6 +119,12 @@ except ImportError as e:
 except Exception as e:
     print(f"  Error importing user_profile_management.models: {e}")
 
+try:
+    from db.models.client_documents import *
+    print("  Successfully imported db.models.client_documents")
+except ImportError as e:
+    print(f"  Warning: Could not import db.models.client_documents: {e}")
+
 # Any other modules with SQLAlchemy models should be imported here as well.
 # For example:
 # from invoicing.models import * (if it has SQLAlchemy models)

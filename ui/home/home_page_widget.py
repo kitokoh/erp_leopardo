@@ -84,6 +84,7 @@ class HomePageWidget(QWidget):
             {"name": self.tr("Gestion des Connaissances"), "object_name": "btnExperienceManagement", "icon": ":/icons/book.svg", "slot": self.go_to_experience_management},
             {"name": self.tr("Intégration Botpress"), "object_name": "btnBotpressIntegration", "icon": ":/icons/placeholder_icon.svg", "slot": self.go_to_botpress_integration},
             {"name": self.tr("Gestion Caméras"), "object_name": "btnCameraManagement", "icon": ":/icons/video.svg", "slot": self.go_to_camera_management},
+            {"name": self.tr("Synchronisation"), "object_name": "btnSynchronization", "icon": ":/icons/refresh-cw.svg", "slot": self.go_to_synchronization},
             {"name": self.tr("Paramètres"), "object_name": "btnSettings", "icon": ":/icons/modern/settings.svg", "slot": self.go_to_settings},
         ]
 
@@ -575,6 +576,13 @@ class HomePageWidget(QWidget):
             self.main_window.show_settings_page()
         else:
             print(f"HomePageWidget: main_window does NOT have show_settings_page.")
+
+    @pyqtSlot()
+    def go_to_synchronization(self):
+        if hasattr(self.main_window, 'show_synchronization_view'):
+            self.main_window.show_synchronization_view()
+        else:
+            print(f"HomePageWidget: main_window does NOT have show_synchronization_view.")
 
     def _handle_add_client_for_country(self, country_name):
         dialog = AddNewClientDialog(parent=self, initial_country_name=country_name)

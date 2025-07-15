@@ -199,6 +199,7 @@ from gui.widgets.categorized_completer import CategorizedCompleter, CategoryDele
 from b2c.ges_restaurant.ui.main_widget import RestaurantMainWidget
 
 from addons.widgets import AddonsPage
+from synchronization.synchronization_widget import SynchronizationWidget
 
 
 # License Management Imports for feature constants and manager
@@ -511,6 +512,7 @@ class DocumentManager(QMainWindow):
         self.experience_management_widget_instance = None
         self.calendar_module_widget_instance = None
         self.calculator_module_widget_instance = None
+        self.synchronization_widget_instance = None
         self.restaurant_widget_instance = None # For B2C Restaurant Module
         
         # For HomePage related widgets that might depend on other modules (like statistics)
@@ -1259,7 +1261,18 @@ class DocumentManager(QMainWindow):
         self.client_list_widget.setContextMenuPolicy(Qt.CustomContextMenu)
         self.client_list_widget.customContextMenuRequested.connect(self.show_client_context_menu)
         self.client_list_widget.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff) # Often better for lists
-        left_pane_layout.addWidget(self.client_list_widget)
+
+        # Add a placeholder label for when the list is empty
+        self.empty_list_label = QLabel(self.tr("Aucun client à afficher.\nCliquez sur 'Ajouter Nouveau Client' pour commencer."))
+        self.empty_list_label.setAlignment(Qt.AlignCenter)
+        self.empty_list_label.setObjectName("emptyListLabel")
+
+        # Stack the list widget and the label
+        self.client_list_stack = QStackedWidget()
+        self.client_list_stack.addWidget(self.client_list_widget)
+        self.client_list_stack.addWidget(self.empty_list_label)
+
+        left_pane_layout.addWidget(self.client_list_stack)
         
         pagination_layout = QHBoxLayout()
         self.prev_page_button = QPushButton(self.tr("Précédent"))
@@ -1552,6 +1565,10 @@ class DocumentManager(QMainWindow):
         self.addons_action.triggered.connect(self.show_addons_page)
         self.searchable_actions_map[self.tr("Addons")] = self.addons_action
 
+        self.synchronization_action = QAction(QIcon(":/icons/refresh-cw.svg"), self.tr("Synchronisation"), self)
+        self.synchronization_action.triggered.connect(self.show_synchronization_view)
+        self.searchable_actions_map[self.tr("Synchronisation")] = self.synchronization_action
+
         # B2C Restaurant Module Action
         # TODO: Find or create a suitable icon e.g., :/icons/restaurant.svg or :/icons/utensils.svg
         self.restaurant_module_action = QAction(QIcon(":/icons/placeholder_icon.svg"), self.tr("Service Restaurant (B2C)"), self)
@@ -1670,6 +1687,7 @@ class DocumentManager(QMainWindow):
         menu_definitions = [
             (self.tr("Accueil"), None, self.home_action), # Direct action, not a dropdown
             (self.tr("Modules"), None, module_menu_actions), # Dropdown for all other modules
+            (self.tr("Synchronisation"), None, self.synchronization_action),
             (self.tr("Statistiques"), None, self.statistics_action),
             (self.tr("Outils"), None, [
                 (self.tr("Paramètres"), self.settings_action),
@@ -2527,7 +2545,10 @@ class DocumentManager(QMainWindow):
         logging.info(f"handle_client_list_click entered. Item text: {item.text()}, Item data: {item.data(Qt.UserRole)}")
         client_data = item.data(Qt.UserRole)
         if client_data and client_data.get("client_id"):
+            logging.info(f"Opening tab for client: {client_data.get('client_name')}")
             self.open_client_tab_by_id(client_data["client_id"])
+        else:
+            logging.warning("handle_client_list_click: No client_data or client_id found in item data.")
         
     def open_client_tab_by_id(self, client_id_to_open):
         # Attempt to fetch fresh client data directly from the database
@@ -2895,6 +2916,15 @@ class DocumentManager(QMainWindow):
             self.addons_page_instance = AddonsPage(self)
             self.main_area_stack.addWidget(self.addons_page_instance)
         self.main_area_stack.setCurrentWidget(self.addons_page_instance)
+
+    def show_synchronization_view(self):
+        if self.synchronization_widget_instance is None:
+            logging.info("DocumentManager: Lazily creating SynchronizationWidget...")
+            self.synchronization_widget_instance = SynchronizationWidget(parent=self)
+            self.main_area_stack.addWidget(self.synchronization_widget_instance)
+            logging.info("DocumentManager: SynchronizationWidget instance created and added to stack.")
+        self.main_area_stack.setCurrentWidget(self.synchronization_widget_instance)
+        logging.info("Switched to Synchronization view.")
 
     def show_commande_management_view(self):
         # This page (self.commandes_dashboard_widget_instance) is initialized at startup.
