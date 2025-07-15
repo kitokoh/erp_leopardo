@@ -8,9 +8,15 @@ class NextERPClient:
     def get_products(self):
         # Placeholder for fetching products from Next-ERP
         print("Fetching products from Next-ERP...")
-        return []
+        # In a real implementation, this would make an API call.
+        # For now, we'll return some mock data.
+        return [
+            {"id": "next-erp-1", "product_name": "Produit A de Next-ERP", "price": 10.0},
+            {"id": "next-erp-2", "product_name": "Produit B de Next-ERP", "price": 20.0},
+        ]
 
     def sync_product(self, product_data):
         # Placeholder for syncing a single product to Next-ERP
-        print(f"Syncing product: {product_data.get('name')}")
-        return {"status": "success", "id": "next-erp-123"}
+        print(f"Syncing product: {product_data.get('product_name')}")
+        # In a real implementation, this would make an API call.
+        return {"status": "success", "id": f"next-erp-{product_data.get('id')}"}
