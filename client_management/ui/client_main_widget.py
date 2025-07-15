@@ -345,17 +345,17 @@ class ClientMainWidget(QWidget):
             self.created_by_value_label = QLabel(self.tr("N/A"))
             self.details_layout.addRow(self.created_by_label_static, self.created_by_value_label)
 
-        # Placeholder for client statuses - to be populated by _setup_client_statuses_section
-        self.client_statuses_widget = QWidget()
-        self.client_statuses_layout = QHBoxLayout(self.client_statuses_widget)
-        self.client_statuses_layout.setContentsMargins(0,0,0,0)
-        self.details_layout.addRow(self.tr("Statuts Client:"), self.client_statuses_widget)
+            # Placeholder for client statuses - to be populated by _setup_client_statuses_section
+            self.client_statuses_widget = QWidget()
+            self.client_statuses_layout = QHBoxLayout(self.client_statuses_widget)
+            self.client_statuses_layout.setContentsMargins(0,0,0,0)
+            self.details_layout.addRow(self.tr("Statuts Client:"), self.client_statuses_widget)
 
-        details_tab_layout.addLayout(self.details_layout)
-        self.internal_client_info_tabs.addTab(self.client_details_tab, self.client_info.get('client_name', self.tr("Détails Client")))
+            details_tab_layout.addLayout(self.details_layout)
+            self.internal_client_info_tabs.addTab(self.client_details_tab, self.client_info.get('client_name', self.tr("Détails Client")))
 
-    # Call populate_details_layout which will also call _setup_client_statuses_section
-        self.populate_details_layout()
+        # Call populate_details_layout which will also call _setup_client_statuses_section
+            self.populate_details_layout()
 
 
             contacts_tab_widget = QWidget()
