@@ -34,7 +34,6 @@ def upgrade() -> None:
     op.execute("DROP TABLE IF EXISTS leave_requests")
     op.execute("DROP TABLE IF EXISTS leave_balances")
     op.execute("DROP TABLE IF EXISTS employee_documents")
-    op.execute("DROP TABLE IF EXISTS client_documents")
     op.execute("DROP TABLE IF EXISTS projects")
     op.execute("DROP TABLE IF EXISTS user_prompts")
     op.execute("DROP TABLE IF EXISTS messages")
