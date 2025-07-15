@@ -72,6 +72,12 @@ class AddonCard(QWidget):
 
         self.update_status()
 
+        process_manager.process_finished.connect(self.on_process_finished)
+
+    def on_process_finished(self, app_id):
+        if app_id == self.app_id:
+            self.update_status()
+
     def update_status(self):
         if process_manager.is_running(self.app_id):
             self.status = "En cours d'exécution"
