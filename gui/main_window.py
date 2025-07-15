@@ -1669,7 +1669,6 @@ class DocumentManager(QMainWindow):
 
         menu_definitions = [
             (self.tr("Accueil"), None, self.home_action), # Direct action, not a dropdown
-            (self.tr("Modules"), None, module_menu_actions), # Dropdown for all other modules
             (self.tr("Statistiques"), None, self.statistics_action),
             (self.tr("Outils"), None, [
                 (self.tr("Paramètres"), self.settings_action),
@@ -2202,7 +2201,6 @@ class DocumentManager(QMainWindow):
 
     def show_statistics_view(self):
         if not self.module_states.get('statistics', True):
-            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Statistiques est désactivé ou n'a pas pu être initialisé."))
             logging.info("Statistics module is disabled by settings. View not shown.")
             return
 
