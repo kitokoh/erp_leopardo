@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, QObject, pyqtSignal, pyqtSlot, QTimer, QRunnable, QThreadPool, QDate
 from PyQt5.QtWidgets import QDateEdit
+
 from PyQt5.QtWebChannel import QWebChannel
 from PyQt5.QtGui import QIcon, QFont
 from PyQt5.QtWebEngineWidgets import QWebEngineView
@@ -628,12 +629,14 @@ class StatisticsDashboard(QWidget):
         # This function runs in a separate thread
         start_date = self.start_date_edit.date()
         end_date = self.end_date_edit.date()
+
         current_total_clients = get_total_clients_count()
         current_active_clients = get_active_clients_count()
         total_projects = get_total_projects_count()
         active_projects = get_active_projects_count()
         total_products = get_total_products_count()
         sales_in_period = self.get_total_sales_from_proforma(start_date, end_date)
+
         return {
             "total_clients": current_total_clients,
             "active_clients": current_active_clients,
@@ -641,6 +644,7 @@ class StatisticsDashboard(QWidget):
             "active_projects": active_projects,
             "total_products": total_products,
             "sales_in_period": sales_in_period,
+
         }
 
     def _update_global_stats_labels(self, stats):
@@ -653,6 +657,7 @@ class StatisticsDashboard(QWidget):
         self.stats_labels["total_products"].setText(f"<b>{stats['total_products']}</b>")
         self.stats_labels["total_sales_proforma"].setText("<b>€ {:,.2f}</b>".format(stats['sales_in_period']))
         self.update_total_sales_proforma_trend(stats['sales_in_period'])
+
         self.update_client_acquisition_stats()
 
     def update_global_stats(self):
@@ -1006,6 +1011,7 @@ class StatisticsDashboard(QWidget):
                         QMessageBox.information(self, "Exportation réussie", "Le graphique a été exporté en PNG avec succès.")
                     except Exception as e:
                         QMessageBox.critical(self, "Erreur d'exportation", f"Une erreur est survenue lors de l'exportation du graphique : {e}")
+
         for key, args in {
             "country": (get_client_counts_by_country, ["country_name", "client_count"]),
             "city": (get_client_segmentation_by_city, ["country_name", "city_name", "client_count"]),
