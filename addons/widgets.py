@@ -23,7 +23,7 @@ class AddonCard(QWidget):
         self.uninstall_button.clicked.connect(self.uninstall)
         self.uninstall_button.setVisible(False)
 
-        if self.app_id == "invoice-ninja":
+        if self.app_id == "invoice-ninja" or self.app_id == "next-erp":
             self.install_button.setEnabled(False)
             self.status_label.setText("Désactivé")
 

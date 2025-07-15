@@ -47,29 +47,8 @@ def install_invoice_ninja():
     return
 
 def install_next_erp():
-    commands = get_os_commands()
-    if not commands:
-        print("Unsupported OS")
-        return
-
-    # Install dependencies
-    subprocess.run([commands["install"], "git", "python3", "python3-pip"])
-
-    # Clone the repo
-    subprocess.run(["git", "clone", "https://github.com/frappe/bench.git"])
-
-    # Install bench
-    os.chdir("bench")
-    subprocess.run([commands["python_deps"], "install", "--editable", "."])
-
-    # Create a new site
-    subprocess.run(["bench", "new-site", "leopardo-web-erp.com"])
-
-    # Install erpnext
-    subprocess.run(["bench", "get-app", "erpnext"])
-    subprocess.run(["bench", "install-app", "erpnext"])
-
-    os.chdir("..")
+    print("Installation of NextERP is currently disabled.")
+    return
 
 def get_installer_command(app_id):
     if app_id == "n8n":
@@ -141,8 +120,8 @@ def check_dependencies(app_id):
     return False
 
 def install_and_launch_app(app_id):
-    if app_id == "invoice-ninja":
-        print("Installation of Invoice Ninja is currently disabled.")
+    if app_id == "invoice-ninja" or app_id == "next-erp":
+        print(f"Installation of {app_id} is currently disabled.")
         return False
 
     if not check_dependencies(app_id):
