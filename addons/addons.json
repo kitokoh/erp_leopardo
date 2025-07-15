@@ -1,0 +1,20 @@
+[
+    {
+        "name": "Leopardo Agent",
+        "app_id": "n8n",
+        "description": "Automatisez vos workflows et connectez vos applications.",
+        "icon": ":/icons/n8n.svg"
+    },
+    {
+        "name": "Leopardo Invoice",
+        "app_id": "invoice-ninja",
+        "description": "Générez des factures et des devis professionnels.",
+        "icon": ":/icons/invoice-ninja.svg"
+    },
+    {
+        "name": "Leopardo Web ERP",
+        "app_id": "next-erp",
+        "description": "Gérez votre entreprise avec un ERP complet.",
+        "icon": ":/icons/next-erp.svg"
+    }
+]

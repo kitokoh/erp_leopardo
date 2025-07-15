@@ -5,7 +5,7 @@ from .logic import install_and_launch_app
 from .logic import is_installed
 
 class AddonCard(QWidget):
-    def __init__(self, name, app_id, parent=None):
+    def __init__(self, name, app_id, description, icon, parent=None):
         super().__init__(parent)
         self.name = name
         self.app_id = app_id
@@ -13,6 +13,9 @@ class AddonCard(QWidget):
 
         self.layout = QVBoxLayout(self)
         self.name_label = QLabel(self.name)
+        self.description_label = QLabel(description)
+        self.icon_label = QLabel()
+        self.icon_label.setPixmap(QPixmap(icon))
         self.status_label = QLabel(self.status)
         self.install_button = QPushButton("Installer")
         self.install_button.clicked.connect(self.install)
@@ -35,9 +38,12 @@ from .config_dialog import ConfigDialog
             self.install_button.setEnabled(False)
             self.status_label.setText("Désactivé")
 
+from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QProgressBar
 
+        self.layout.addWidget(self.icon_label)
         self.layout.addWidget(self.name_label)
+        self.layout.addWidget(self.description_label)
         self.layout.addWidget(self.status_label)
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
@@ -113,6 +119,8 @@ from PyQt5.QtWidgets import QMessageBox
 
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 
+import json
+
 class AddonsPage(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -121,12 +129,23 @@ class AddonsPage(QWidget):
         self.web_view.setVisible(False)
         self.layout.addWidget(self.web_view, 0, 0, 1, 3)
 
-        self.addons = [
-            {"name": "Leopardo Agent", "app_id": "n8n"},
-            {"name": "Leopardo Invoice", "app_id": "invoice-ninja"},
-            {"name": "Leopardo Web ERP", "app_id": "next-erp"},
-        ]
+        self.load_addons()
 
-        for i, addon in enumerate(self.addons):
-            card = AddonCard(addon["name"], addon["app_id"], self)
+    def load_addons(self):
+        # Load addons from json
+        with open("addons/addons.json", "r") as f:
+            addons = json.load(f)
+
+        for i, addon in enumerate(addons):
+            card = AddonCard(addon["name"], addon["app_id"], addon["description"], addon["icon"], self)
             self.layout.addWidget(card, (i // 3) + 1, i % 3)
+
+        # Load addons from plugins
+        for i, plugin_dir in enumerate(os.listdir("plugins")):
+            manifest_path = os.path.join("plugins", plugin_dir, "manifest.json")
+            if os.path.exists(manifest_path):
+                with open(manifest_path, "r") as f:
+                    manifest = json.load(f)
+
+                card = AddonCard(manifest["name"], manifest["app_id"], manifest["description"], manifest["icon"], self)
+                self.layout.addWidget(card, (len(addons) // 3) + (i // 3) + 1, i % 3)

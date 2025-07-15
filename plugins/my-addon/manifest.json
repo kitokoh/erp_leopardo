@@ -1,0 +1,7 @@
+{
+    "name": "My Addon",
+    "app_id": "my-addon",
+    "description": "This is an example addon.",
+    "icon": ":/icons/placeholder.svg",
+    "entry_point": "my_addon:main"
+}

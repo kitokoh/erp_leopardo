@@ -123,7 +123,34 @@ def check_dependencies(app_id):
         return shutil.which("git") is not None and shutil.which("python3") is not None and shutil.which("pip") is not None
     return False
 
+import importlib
+
+def launch_plugin(app_id):
+    manifest_path = os.path.join("plugins", app_id, "manifest.json")
+    if not os.path.exists(manifest_path):
+        print(f"Manifest for plugin {app_id} not found.")
+        return
+
+    with open(manifest_path, "r") as f:
+        manifest = json.load(f)
+
+    entry_point = manifest["entry_point"]
+    module_name, function_name = entry_point.split(":")
+
+    plugin_path = os.path.join("plugins", app_id)
+    sys.path.insert(0, plugin_path)
+
+    module = importlib.import_module(module_name)
+    function = getattr(module, function_name)
+    function()
+
+    sys.path.pop(0)
+
 def install_and_launch_app(app_id):
+    if os.path.exists(os.path.join("plugins", app_id)):
+        launch_plugin(app_id)
+        return QUrl("about:blank")
+
     if app_id == "invoice-ninja" or app_id == "next-erp":
         print(f"Installation of {app_id} is currently disabled.")
         return None
