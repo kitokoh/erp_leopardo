@@ -125,7 +125,9 @@ def check_dependencies(app_id):
 
 import importlib
 
-def launch_plugin(app_id):
+from .context import AppContext
+
+def launch_plugin(app_id, main_window):
     manifest_path = os.path.join("plugins", app_id, "manifest.json")
     if not os.path.exists(manifest_path):
         print(f"Manifest for plugin {app_id} not found.")
@@ -142,13 +144,15 @@ def launch_plugin(app_id):
 
     module = importlib.import_module(module_name)
     function = getattr(module, function_name)
-    function()
+
+    context = AppContext(main_window)
+    function(context)
 
     sys.path.pop(0)
 
-def install_and_launch_app(app_id):
+def install_and_launch_app(app_id, main_window):
     if os.path.exists(os.path.join("plugins", app_id)):
-        launch_plugin(app_id)
+        launch_plugin(app_id, main_window)
         return QUrl("about:blank")
 
     if app_id == "invoice-ninja" or app_id == "next-erp":

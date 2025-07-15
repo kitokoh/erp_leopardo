@@ -86,7 +86,7 @@ from PyQt5.QtWidgets import QProgressBar
             save_config(self.app_id, dialog.get_config())
 
     def launch(self):
-        url = install_and_launch_app(self.app_id)
+        url = install_and_launch_app(self.app_id, self.parent().parent())
         if url and self.parent():
             self.parent().web_view.setUrl(url)
             self.parent().web_view.setVisible(True)
@@ -105,7 +105,7 @@ from PyQt5.QtWidgets import QMessageBox
         self.progress_bar.setVisible(True)
         self.progress_bar.setRange(0, 0)
 
-        success = install_and_launch_app(self.app_id)
+        success = install_and_launch_app(self.app_id, self.parent().parent())
 
         self.progress_bar.setVisible(False)
 
