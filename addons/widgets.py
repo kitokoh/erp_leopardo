@@ -7,7 +7,7 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView
 import json
 import os
 from PyQt5.QtGui import QPixmap
-from PyQt5.QtWidgets import QProgressBar, QHBoxLayout
+from PyQt5.QtWidgets import QProgressBar, QHBoxLayout, QTextEdit
 from PyQt5.QtGui import QIcon
 from .config_dialog import ConfigDialog
 
@@ -50,12 +50,17 @@ class AddonCard(QWidget):
         self.update_button.clicked.connect(self.update_app)
         self.update_button.setVisible(False)
 
+        self.logs_button = QPushButton(QIcon(":/icons/file-text.svg"), " Logs")
+        self.logs_button.clicked.connect(self.toggle_logs)
+        self.logs_button.setVisible(False)
+
         self.buttons_layout.addWidget(self.install_button)
         self.buttons_layout.addWidget(self.launch_button)
         self.buttons_layout.addWidget(self.stop_button)
         self.buttons_layout.addWidget(self.uninstall_button)
         self.buttons_layout.addWidget(self.config_button)
         self.buttons_layout.addWidget(self.update_button)
+        self.buttons_layout.addWidget(self.logs_button)
 
         if self.app_id == "next-erp" and platform.system() != "Linux":
             self.install_button.setEnabled(False)
@@ -87,6 +92,7 @@ class AddonCard(QWidget):
             self.uninstall_button.setVisible(False)
             self.config_button.setVisible(False)
             self.update_button.setVisible(False)
+            self.logs_button.setVisible(True)
         elif is_installed(self.app_id):
             self.status = "Installé"
             self.install_button.setVisible(False)
@@ -95,6 +101,7 @@ class AddonCard(QWidget):
             self.uninstall_button.setVisible(True)
             self.config_button.setVisible(True)
             self.update_button.setVisible(True)
+            self.logs_button.setVisible(False)
         else:
             self.status = "Non installé"
             self.install_button.setVisible(True)
@@ -103,7 +110,12 @@ class AddonCard(QWidget):
             self.uninstall_button.setVisible(False)
             self.config_button.setVisible(False)
             self.update_button.setVisible(False)
+            self.logs_button.setVisible(False)
         self.status_label.setText(self.status)
+
+    def toggle_logs(self):
+        if self.parent():
+            self.parent().log_console.setVisible(not self.parent().log_console.isVisible())
 
     def update_app(self):
         from .logic import update_app
@@ -165,7 +177,17 @@ class AddonsPage(QWidget):
         self.web_view.setVisible(False)
         self.layout.addWidget(self.web_view, 0, 0, 1, 3)
 
+        self.log_console = QTextEdit()
+        self.log_console.setReadOnly(True)
+        self.log_console.setVisible(False)
+        self.layout.addWidget(self.log_console, 1, 0, 1, 3)
+
         self.load_addons()
+
+        process_manager.process_output.connect(self.on_process_output)
+
+    def on_process_output(self, app_id, output):
+        self.log_console.append(f"[{app_id}] {output}")
 
     def load_addons(self):
         # Load addons from json

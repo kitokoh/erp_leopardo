@@ -4,6 +4,7 @@ from PyQt5.QtCore import QObject, pyqtSignal, QProcess
 class ProcessManager(QObject):
     _instance = None
     process_finished = pyqtSignal(str)
+    process_output = pyqtSignal(str, str)
 
     def __new__(cls):
         if cls._instance is None:
@@ -28,6 +29,7 @@ class ProcessManager(QObject):
         process = QProcess()
         process.setProcessChannelMode(QProcess.MergedChannels)
         process.finished.connect(lambda: self.on_process_finished(app_id))
+        process.readyReadStandardOutput.connect(lambda: self.on_ready_read_standard_output(app_id))
 
         # Correctly unpack command for start
         program = command[0]
@@ -51,6 +53,12 @@ class ProcessManager(QObject):
         process = self.processes[app_id]
         process.terminate()
         # No need to wait, the finished signal will handle the cleanup
+
+    def on_ready_read_standard_output(self, app_id):
+        if app_id in self.processes:
+            process = self.processes[app_id]
+            output = process.readAllStandardOutput().data().decode()
+            self.process_output.emit(app_id, output)
 
     def is_running(self, app_id):
         return app_id in self.processes and self.processes[app_id].state() != QProcess.NotRunning
