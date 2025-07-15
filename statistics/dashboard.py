@@ -8,7 +8,9 @@ from PyQt5.QtWidgets import (
     QGroupBox, QFormLayout, QTableWidget, QHeaderView, QTabWidget, QProgressBar,
     QTableWidgetItem, QStackedWidget, QApplication
 )
-from PyQt5.QtCore import Qt, QObject, pyqtSignal, pyqtSlot, QTimer, QRunnable, QThreadPool
+from PyQt5.QtCore import Qt, QObject, pyqtSignal, pyqtSlot, QTimer, QRunnable, QThreadPool, QDate
+from PyQt5.QtWidgets import QDateEdit
+
 from PyQt5.QtWebChannel import QWebChannel
 from PyQt5.QtGui import QIcon, QFont
 from PyQt5.QtWebEngineWidgets import QWebEngineView
@@ -24,6 +26,7 @@ from dateutil.relativedelta import relativedelta
 import json
 import folium
 from branca.colormap import StepColormap
+import csv
 
 from .map_utils import generate_folium_map_html
 
@@ -312,6 +315,21 @@ class StatisticsDashboard(QWidget):
 
         global_stats_layout.addRow(self.tr("Nouveaux Clients (Mois Dernier):"), self.stats_labels["new_clients_last_month"])
         global_stats_layout.addRow(self.tr("Nouveaux Clients (Trimestre Dernier):"), self.stats_labels["new_clients_last_quarter"])
+
+        date_filter_layout = QHBoxLayout()
+        self.start_date_edit = QDateEdit(calendarPopup=True)
+        self.start_date_edit.setDate(QDate.currentDate().addMonths(-1))
+        self.end_date_edit = QDateEdit(calendarPopup=True)
+        self.end_date_edit.setDate(QDate.currentDate())
+        self.start_date_edit.dateChanged.connect(self.refresh_all_dashboard_content)
+        self.end_date_edit.dateChanged.connect(self.refresh_all_dashboard_content)
+        date_filter_layout.addWidget(QLabel("De:"))
+        date_filter_layout.addWidget(self.start_date_edit)
+        date_filter_layout.addWidget(QLabel("à:"))
+        date_filter_layout.addWidget(self.end_date_edit)
+
+        global_stats_layout.addRow(self.tr("Période:"), date_filter_layout)
+
         global_stats_page_layout.addWidget(global_stats_group)
 
         health_score_group = QGroupBox(self.tr("Indice de Santé Commerciale"))
@@ -609,19 +627,24 @@ class StatisticsDashboard(QWidget):
 
     def _fetch_global_stats(self):
         # This function runs in a separate thread
+        start_date = self.start_date_edit.date()
+        end_date = self.end_date_edit.date()
+
         current_total_clients = get_total_clients_count()
         current_active_clients = get_active_clients_count()
         total_projects = get_total_projects_count()
         active_projects = get_active_projects_count()
         total_products = get_total_products_count()
-        sales_current_month = self.get_total_sales_from_proforma_current_month()
+        sales_in_period = self.get_total_sales_from_proforma(start_date, end_date)
+
         return {
             "total_clients": current_total_clients,
             "active_clients": current_active_clients,
             "total_projects": total_projects,
             "active_projects": active_projects,
             "total_products": total_products,
-            "sales_current_month": sales_current_month,
+            "sales_in_period": sales_in_period,
+
         }
 
     def _update_global_stats_labels(self, stats):
@@ -632,8 +655,9 @@ class StatisticsDashboard(QWidget):
         self.stats_labels["total_projects"].setText(f"<b>{stats['total_projects']}</b>")
         self.stats_labels["active_projects"].setText(f"<b>{stats['active_projects']}</b>")
         self.stats_labels["total_products"].setText(f"<b>{stats['total_products']}</b>")
-        self.stats_labels["total_sales_proforma"].setText("<b>€ {:,.2f}</b>".format(stats['sales_current_month']))
-        self.update_total_sales_proforma_trend(stats['sales_current_month'])
+        self.stats_labels["total_sales_proforma"].setText("<b>€ {:,.2f}</b>".format(stats['sales_in_period']))
+        self.update_total_sales_proforma_trend(stats['sales_in_period'])
+
         self.update_client_acquisition_stats()
 
     def update_global_stats(self):
@@ -642,80 +666,34 @@ class StatisticsDashboard(QWidget):
         self.threadpool.start(worker)
 
 
-    def get_total_sales_from_proforma_current_month(self) -> float:
+    def get_total_sales_from_proforma(self, start_date, end_date) -> float:
         db_session = None
         try:
-            today = datetime.utcnow().date()
-            start_of_current_month = today.replace(day=1)
-            end_of_current_month = (today.replace(day=1) + relativedelta(months=1)) - relativedelta(days=1)
-            start_iso = start_of_current_month.strftime('%Y-%m-%dT00:00:00.000000Z')
-            end_iso = end_of_current_month.strftime('%Y-%m-%dT23:59:59.999999Z')
+            start_iso = start_date.toString(Qt.ISODate) + "T00:00:00.000000Z"
+            end_iso = end_date.toString(Qt.ISODate) + "T23:59:59.999999Z"
             db_session = get_db_connection()
-            current_month_sales = get_total_sales_amount_for_period(db_session, start_iso, end_iso)
-            return current_month_sales
+            total_sales = get_total_sales_amount_for_period(db_session, start_iso, end_iso)
+            return total_sales
         except Exception as e:
-            logging.error(f"Error calculating total sales from proforma for current month: {e}", exc_info=True)
+            logging.error(f"Error calculating total sales from proforma for period: {e}", exc_info=True)
             return 0.0
         finally:
             if db_session:
-                try: db_session.close()
-                except Exception as e_close: logging.error(f"Error closing db_session in get_total_sales_from_proforma_current_month: {e_close}", exc_info=True)
+                try:
+                    db_session.close()
+                except Exception as e_close:
+                    logging.error(f"Error closing db_session in get_total_sales_from_proforma: {e_close}", exc_info=True)
 
 
     def update_total_clients_trend(self, current_total_clients: int):
-        try:
-            today = datetime.utcnow().date()
-            end_of_last_month_date = today.replace(day=1) - relativedelta(days=1)
-            end_of_last_month_iso = end_of_last_month_date.strftime('%Y-%m-%dT23:59:59.999999Z')
-            previous_total_clients = clients_crud_instance.get_total_clients_count_up_to_date(end_of_last_month_iso)
-
-            trend_text, style = self._calculate_trend_display(current_total_clients, previous_total_clients)
-            self.stats_labels["total_clients_trend"].setText(trend_text)
-            self.stats_labels["total_clients_trend"].setStyleSheet(style)
-        except Exception as e:
-            logging.error(f"Error updating total clients trend: {e}", exc_info=True)
-            self.stats_labels["total_clients_trend"].setText("")
-            self.stats_labels["total_clients_trend"].setStyleSheet("")
+        pass
 
 
     def update_active_clients_trend(self, current_active_clients: int):
-        try:
-            today = datetime.utcnow().date()
-            end_of_last_month_date = today.replace(day=1) - relativedelta(days=1)
-            end_of_last_month_iso = end_of_last_month_date.strftime('%Y-%m-%dT23:59:59.999999Z')
-            previous_active_clients = clients_crud_instance.get_active_clients_count_up_to_date(end_of_last_month_iso)
-
-            trend_text, style = self._calculate_trend_display(current_active_clients, previous_active_clients)
-            self.stats_labels["active_clients_trend"].setText(trend_text)
-            self.stats_labels["active_clients_trend"].setStyleSheet(style)
-        except Exception as e:
-            logging.error(f"Error updating active clients trend: {e}", exc_info=True)
-            self.stats_labels["active_clients_trend"].setText("")
-            self.stats_labels["active_clients_trend"].setStyleSheet("")
-
+        pass
 
     def update_total_sales_proforma_trend(self, current_month_sales: float):
-        db_session = None
-        try:
-            today = datetime.utcnow().date()
-            end_of_last_month_date = today.replace(day=1) - relativedelta(days=1)
-            start_of_last_month_date = end_of_last_month_date.replace(day=1)
-            start_prev_month_iso = start_of_last_month_date.strftime('%Y-%m-%dT00:00:00.000000Z')
-            end_prev_month_iso = end_of_last_month_date.strftime('%Y-%m-%dT23:59:59.999999Z')
-            db_session = get_db_connection()
-            previous_month_total_sales = get_total_sales_amount_for_period(db_session, start_prev_month_iso, end_prev_month_iso)
-
-            trend_text, style = self._calculate_trend_display(current_month_sales, previous_month_total_sales, is_currency=True)
-            self.stats_labels["total_sales_proforma_trend"].setText(trend_text)
-            self.stats_labels["total_sales_proforma_trend"].setStyleSheet(style)
-        except Exception as e:
-            logging.error(f"Error updating total sales proforma trend: {e}", exc_info=True)
-            self.stats_labels["total_sales_proforma_trend"].setText("")
-            self.stats_labels["total_sales_proforma_trend"].setStyleSheet("")
-        finally:
-            if db_session:
-                try: db_session.close()
-                except Exception as e_close: logging.error(f"Error closing db_session in update_total_sales_proforma_trend: {e_close}", exc_info=True)
+        pass
 
     def _calculate_trend_display(self, current_value, previous_value, is_currency=False):
         """Helper to calculate trend text and style."""
@@ -745,40 +723,7 @@ class StatisticsDashboard(QWidget):
 
 
     def update_client_acquisition_stats(self):
-        try:
-            today = datetime.utcnow().date()
-            end_of_last_month_date = today.replace(day=1) - relativedelta(days=1)
-            start_of_last_month_date = end_of_last_month_date.replace(day=1)
-            start_of_last_month_iso = start_of_last_month_date.strftime('%Y-%m-%dT00:00:00.000000Z')
-            end_of_last_month_iso = end_of_last_month_date.strftime('%Y-%m-%dT23:59:59.999999Z')
-            count_last_month = clients_crud_instance.get_clients_count_created_between(
-                start_date_iso=start_of_last_month_iso, end_date_iso=end_of_last_month_iso
-            )
-            self.stats_labels["new_clients_last_month"].setText(f"<b>{count_last_month}</b>")
-
-            current_quarter = (today.month - 1) // 3 + 1
-            if current_quarter == 1:
-                start_of_last_quarter_date = datetime(today.year - 1, 10, 1).date()
-                end_of_last_quarter_date = datetime(today.year - 1, 12, 31).date()
-            else:
-                start_month_of_last_quarter = 3 * (current_quarter - 2) + 1
-                end_month_of_last_quarter = 3 * (current_quarter - 1)
-                start_of_last_quarter_date = datetime(today.year, start_month_of_last_quarter, 1).date()
-                if end_month_of_last_quarter < 12:
-                    last_day_of_end_month = (datetime(today.year, end_month_of_last_quarter + 1, 1).date() - relativedelta(days=1)).day
-                else:
-                    last_day_of_end_month = 31
-                end_of_last_quarter_date = datetime(today.year, end_month_of_last_quarter, last_day_of_end_month).date()
-            start_of_last_quarter_iso = start_of_last_quarter_date.strftime('%Y-%m-%dT00:00:00.000000Z')
-            end_of_last_quarter_iso = end_of_last_quarter_date.strftime('%Y-%m-%dT23:59:59.999999Z')
-            count_last_quarter = clients_crud_instance.get_clients_count_created_between(
-                start_date_iso=start_of_last_quarter_iso, end_date_iso=end_of_last_quarter_iso
-            )
-            self.stats_labels["new_clients_last_quarter"].setText(f"<b>{count_last_quarter}</b>")
-        except Exception as e:
-            logging.error(f"Error updating client acquisition stats: {e}", exc_info=True)
-            self.stats_labels["new_clients_last_month"].setText(self.tr("<i>Erreur</i>"))
-            self.stats_labels["new_clients_last_quarter"].setText(self.tr("<i>Erreur</i>"))
+        pass
 
 
     def update_business_health_score(self):
@@ -815,6 +760,11 @@ class StatisticsDashboard(QWidget):
             tab_widget = QWidget()
             tab_layout = QVBoxLayout(tab_widget)
             tab_widget.setObjectName(f"segmentationTab_{key}")
+
+            export_button = QPushButton(self.tr("Exporter"))
+            export_button.setIcon(QIcon(":/icons/download.svg"))
+            export_button.clicked.connect(lambda _, k=key: self.export_segmentation_data(k))
+            tab_layout.addWidget(export_button, 0, Qt.AlignRight)
 
             if tab_type == "table":
                 table_widget = QTableWidget()
@@ -1020,11 +970,48 @@ class StatisticsDashboard(QWidget):
 
 
     def update_customer_segmentation_views(self):
-        # self._populate_table("country", get_client_counts_by_country, ["country_name", "client_count"])
-        # self._populate_table("city", get_client_segmentation_by_city, ["country_name", "city_name", "client_count"])
+        for key, args in {
+            "country": (get_client_counts_by_country, ["country_name", "client_count"]),
+            "city": (get_client_segmentation_by_city, ["country_name", "city_name", "client_count"]),
+            "category": (get_client_segmentation_by_category, ["category", "client_count"]),
+            "product_popularity": (get_product_usage_counts, ["product_name", "usage_count"]),
+        }.items():
+            worker = GlobalStatsWorker(self._populate_table, key, args[0], args[1])
+            self.threadpool.start(worker)
         self._update_status_segmentation_chart()
-        # self._populate_table("category", get_client_segmentation_by_category, ["category", "client_count"])
-        # self._populate_table("product_popularity", get_product_usage_counts, ["product_name", "usage_count"])
+
+    def export_segmentation_data(self, key):
+        if key in self.segmentation_tables:
+            self.export_table_to_csv(self.segmentation_tables[key])
+        elif key in self.segmentation_chart_pages:
+            self.export_chart_to_png(key)
+
+    def export_table_to_csv(self, table_widget):
+        path, _ = QFileDialog.getSaveFileName(self, "Sauvegarder le fichier CSV", "", "CSV Files (*.csv)")
+        if path:
+            try:
+                with open(path, 'w', newline='', encoding='utf-8') as file:
+                    writer = csv.writer(file)
+                    headers = [table_widget.horizontalHeaderItem(i).text() for i in range(table_widget.columnCount())]
+                    writer.writerow(headers)
+                    for row in range(table_widget.rowCount()):
+                        row_data = [table_widget.item(row, column).text() for column in range(table_widget.columnCount())]
+                        writer.writerow(row_data)
+                QMessageBox.information(self, "Exportation réussie", "Le tableau a été exporté en CSV avec succès.")
+            except Exception as e:
+                QMessageBox.critical(self, "Erreur d'exportation", f"Une erreur est survenue lors de l'exportation du tableau : {e}")
+
+    def export_chart_to_png(self, key):
+        if key == "status":
+            if hasattr(self, 'status_chart_canvas'):
+                path, _ = QFileDialog.getSaveFileName(self, "Sauvegarder le graphique", "", "PNG Files (*.png)")
+                if path:
+                    try:
+                        self.status_chart_canvas.figure.savefig(path)
+                        QMessageBox.information(self, "Exportation réussie", "Le graphique a été exporté en PNG avec succès.")
+                    except Exception as e:
+                        QMessageBox.critical(self, "Erreur d'exportation", f"Une erreur est survenue lors de l'exportation du graphique : {e}")
+
         for key, args in {
             "country": (get_client_counts_by_country, ["country_name", "client_count"]),
             "city": (get_client_segmentation_by_city, ["country_name", "city_name", "client_count"]),
