@@ -1,8 +1,14 @@
 # -*- coding: utf-8 -*-
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QGridLayout
-from .logic import install_and_launch_app
-
-from .logic import is_installed
+from .logic import install_and_launch_app, is_installed
+from .process_manager import process_manager
+from PyQt5.QtWidgets import QMessageBox
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+import json
+import os
+from PyQt5.QtGui import QPixmap
+from PyQt5.QtWidgets import QProgressBar
+from .config_dialog import ConfigDialog
 
 class AddonCard(QWidget):
     def __init__(self, name, app_id, description, icon, parent=None):
@@ -22,8 +28,9 @@ class AddonCard(QWidget):
         self.launch_button = QPushButton("Lancer")
         self.launch_button.clicked.connect(self.launch)
         self.launch_button.setVisible(False)
-from .config_dialog import ConfigDialog
-
+        self.stop_button = QPushButton("Arrêter")
+        self.stop_button.clicked.connect(self.stop)
+        self.stop_button.setVisible(False)
         self.uninstall_button = QPushButton("Désinstaller")
         self.uninstall_button.clicked.connect(self.uninstall)
         self.uninstall_button.setVisible(False)
@@ -38,9 +45,6 @@ from .config_dialog import ConfigDialog
             self.install_button.setEnabled(False)
             self.status_label.setText("Désactivé")
 
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtWidgets import QProgressBar
-
         self.layout.addWidget(self.icon_label)
         self.layout.addWidget(self.name_label)
         self.layout.addWidget(self.description_label)
@@ -50,6 +54,7 @@ from PyQt5.QtWidgets import QProgressBar
         self.layout.addWidget(self.progress_bar)
         self.layout.addWidget(self.install_button)
         self.layout.addWidget(self.launch_button)
+        self.layout.addWidget(self.stop_button)
         self.layout.addWidget(self.uninstall_button)
         self.layout.addWidget(self.config_button)
         self.layout.addWidget(self.update_button)
@@ -57,10 +62,19 @@ from PyQt5.QtWidgets import QProgressBar
         self.update_status()
 
     def update_status(self):
-        if is_installed(self.app_id):
+        if process_manager.is_running(self.app_id):
+            self.status = "En cours d'exécution"
+            self.install_button.setVisible(False)
+            self.launch_button.setVisible(False)
+            self.stop_button.setVisible(True)
+            self.uninstall_button.setVisible(False)
+            self.config_button.setVisible(False)
+            self.update_button.setVisible(False)
+        elif is_installed(self.app_id):
             self.status = "Installé"
             self.install_button.setVisible(False)
             self.launch_button.setVisible(True)
+            self.stop_button.setVisible(False)
             self.uninstall_button.setVisible(True)
             self.config_button.setVisible(True)
             self.update_button.setVisible(True)
@@ -68,6 +82,7 @@ from PyQt5.QtWidgets import QProgressBar
             self.status = "Non installé"
             self.install_button.setVisible(True)
             self.launch_button.setVisible(False)
+            self.stop_button.setVisible(False)
             self.uninstall_button.setVisible(False)
             self.config_button.setVisible(False)
             self.update_button.setVisible(False)
@@ -90,13 +105,18 @@ from PyQt5.QtWidgets import QProgressBar
         if url and self.parent():
             self.parent().web_view.setUrl(url)
             self.parent().web_view.setVisible(True)
+        self.update_status()
+
+    def stop(self):
+        process_manager.stop(self.app_id)
+        self.update_status()
 
     def uninstall(self):
         from .logic import uninstall_app
         uninstall_app(self.app_id)
         self.update_status()
 
-from PyQt5.QtWidgets import QMessageBox
+from .thread import Thread
 
     def install(self):
         self.install_button.setText("En cours...")
@@ -105,8 +125,11 @@ from PyQt5.QtWidgets import QMessageBox
         self.progress_bar.setVisible(True)
         self.progress_bar.setRange(0, 0)
 
-        success = install_and_launch_app(self.app_id, self.parent().parent())
+        self.thread = Thread(install_and_launch_app, self.app_id, self.parent().parent())
+        self.thread.finished.connect(self.on_install_finished)
+        self.thread.start()
 
+    def on_install_finished(self, success):
         self.progress_bar.setVisible(False)
 
         if not success:
@@ -116,10 +139,6 @@ from PyQt5.QtWidgets import QMessageBox
 
         self.update_status()
         self.install_button.setEnabled(True)
-
-from PyQt5.QtWebEngineWidgets import QWebEngineView
-
-import json
 
 class AddonsPage(QWidget):
     def __init__(self, parent=None):

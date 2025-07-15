@@ -150,6 +150,8 @@ def launch_plugin(app_id, main_window):
 
     sys.path.pop(0)
 
+from .process_manager import process_manager
+
 def install_and_launch_app(app_id, main_window):
     if os.path.exists(os.path.join("plugins", app_id)):
         launch_plugin(app_id, main_window)
@@ -188,13 +190,8 @@ def install_and_launch_app(app_id, main_window):
     if is_installed(app_id):
         launch_command, url = get_launch_command(app_id)
         if launch_command:
-            print(f"Launching {app_id}...")
-            try:
-                subprocess.Popen(launch_command)
-                return url
-            except (subprocess.CalledProcessError, FileNotFoundError) as e:
-                print(f"Error launching {app_id}: {e}")
-                return None
+            process_manager.start(app_id, launch_command)
+            return url
         else:
             print(f"Launch command for {app_id} not found.")
             return None

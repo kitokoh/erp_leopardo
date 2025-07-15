@@ -2797,11 +2797,14 @@ class DocumentManager(QMainWindow):
         self.load_clients_from_db_slot() # Refresh main client list
         self.notify(self.tr("Mise à jour"), self.tr("Interface mise à jour suite aux changements de statuts."), "INFO")
 
+from addons.process_manager import process_manager
+
     def closeEvent(self, event):
         logging.info("Close event triggered. Stopping services and saving config.")
         if self.download_monitor_service:
             logging.info("Stopping download monitor service due to application close.")
             self.download_monitor_service.stop()
+        process_manager.stop_all()
         save_config(self.config)
         super().closeEvent(event)
 
