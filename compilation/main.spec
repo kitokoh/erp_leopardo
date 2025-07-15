@@ -1,40 +1,61 @@
 # -*- mode: python ; coding: utf-8 -*-
+
 import os
 from PyInstaller.utils.hooks import collect_data_files
 
-# Collect qtwebengine locale files
-qtwebengine_locales = collect_data_files(
-    'PyQt5',
-    subdir='Qt5/translations/qtwebengine_locales',
-    include_py_files=False
-)
+# --- Application Information ---
+APP_NAME = "Leopardo AI"
+APP_VERSION = "1.9"
+APP_ICON = "nova360.ico"
 
+# --- Paths ---
+DLLS_PATH = 'dlls'
+RESOURCES_PATH = 'resources'
+KEYS_PATH = os.path.join(RESOURCES_PATH, 'lesClesNova360', 'icons', 'exeCle')
+
+# --- PyInstaller Analysis ---
 a = Analysis(
     ['main.py'],
-    pathex=['.'],  # Chemin relatif corrigé (il manquait les guillemets)
-    
+    pathex=['.'],
     binaries=[
-        (os.path.join('dlls', 'liblzma.dll'), '.'),
-        (os.path.join('dlls', 'libssl-3-x64.dll'), '.'),
-        (os.path.join('dlls', 'libcrypto-3-x64.dll'), '.')
+        (os.path.join(DLLS_PATH, 'liblzma.dll'), '.'),
+        (os.path.join(DLLS_PATH, 'libssl-3-x64.dll'), '.'),
+        (os.path.join(DLLS_PATH, 'libcrypto-3-x64.dll'), '.')
     ],
     datas=[
-        (os.path.join('resources', 'icons', '*.ico'), os.path.join('resources', 'icons')),
-        (os.path.join('resources', 'icons', '*.png'), os.path.join('resources', 'icons')),
-        (os.path.join('resources', 'data', '*.json'), os.path.join('resources', 'data')),
-        (os.path.join('resources', 'images', '*'), os.path.join('resources', 'images')),
-        (os.path.join('resources', 'videos', '*'), os.path.join('resources', 'videos')),
-        (os.path.join('lesClesNova360', 'icons', 'exeCle', '*'), os.path.join('resources', 'tools')),
-        (os.path.join('resources', 'sounds', '*'), os.path.join('resources', 'sounds')),
-        (os.path.join('resources', 'gifs', '*'), os.path.join('resources', 'gifs')),
-        (os.path.join('resources', '*.key'), 'resources'),
-        (os.path.join('resources', 'lang', '*'), os.path.join('resources', 'lang'))
+        # --- Resources ---
+        (os.path.join(RESOURCES_PATH, 'icons', '*.ico'), os.path.join(RESOURCES_PATH, 'icons')),
+        (os.path.join(RESOURCES_PATH, 'icons', '*.png'), os.path.join(RESOURCES_PATH, 'icons')),
+        (os.path.join(RESOURCES_PATH, 'data', '*.json'), os.path.join(RESOURCES_PATH, 'data')),
+        (os.path.join(RESOURCES_PATH, 'images', '*'), os.path.join(RESOURCES_PATH, 'images')),
+        (os.path.join(RESOURCES_PATH, 'videos', '*'), os.path.join(RESOURCES_PATH, 'videos')),
+        (os.path.join(RESOURCES_PATH, 'sounds', '*'), os.path.join(RESOURCES_PATH, 'sounds')),
+        (os.path.join(RESOURCES_PATH, 'gifs', '*'), os.path.join(RESOURCES_PATH, 'gifs')),
+        (os.path.join(RESOURCES_PATH, '*.key'), RESOURCES_PATH),
+        (os.path.join(RESOURCES_PATH, 'lang', '*'), os.path.join(RESOURCES_PATH, 'lang')),
+        (KEYS_PATH, os.path.join(RESOURCES_PATH, 'tools')),
+
+        # --- PyQt5 ---
+        *collect_data_files(
+            'PyQt5',
+            subdir='Qt5/translations/qtwebengine_locales',
+            include_py_files=False
+        )
     ],
     hiddenimports=[
-        'sip', 'pymysql', 'pysqlite2', 'MySQLdb', 'psycopg2',
-        'ssl', 'PyQt5.QtWebEngineWidgets', 'cryptography',
-        'smtplib', 'email.mime.multipart', 'email.mime.text',
-        'email.mime.base', 'email.encoders'
+        'sip',
+        'pymysql',
+        'pysqlite2',
+        'MySQLdb',
+        'psycopg2',
+        'ssl',
+        'PyQt5.QtWebEngineWidgets',
+        'cryptography',
+        'smtplib',
+        'email.mime.multipart',
+        'email.mime.text',
+        'email.mime.base',
+        'email.encoders'
     ],
     hookspath=[],
     hooksconfig={},
@@ -44,15 +65,17 @@ a = Analysis(
     optimize=0,
 )
 
+# --- PYZ ---
 pyz = PYZ(a.pure)
 
+# --- EXE ---
 exe = EXE(
     pyz,
     a.scripts,
     a.binaries,
     a.datas,
     [],
-    name='main',
+    name=APP_NAME,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -65,7 +88,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='nova360.ico',
+    icon=APP_ICON,
     distpath='dist',
     workpath='build',
     onefile=True
