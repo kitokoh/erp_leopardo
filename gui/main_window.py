@@ -1261,7 +1261,18 @@ class DocumentManager(QMainWindow):
         self.client_list_widget.setContextMenuPolicy(Qt.CustomContextMenu)
         self.client_list_widget.customContextMenuRequested.connect(self.show_client_context_menu)
         self.client_list_widget.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff) # Often better for lists
-        left_pane_layout.addWidget(self.client_list_widget)
+
+        # Add a placeholder label for when the list is empty
+        self.empty_list_label = QLabel(self.tr("Aucun client à afficher.\nCliquez sur 'Ajouter Nouveau Client' pour commencer."))
+        self.empty_list_label.setAlignment(Qt.AlignCenter)
+        self.empty_list_label.setObjectName("emptyListLabel")
+
+        # Stack the list widget and the label
+        self.client_list_stack = QStackedWidget()
+        self.client_list_stack.addWidget(self.client_list_widget)
+        self.client_list_stack.addWidget(self.empty_list_label)
+
+        left_pane_layout.addWidget(self.client_list_stack)
         
         pagination_layout = QHBoxLayout()
         self.prev_page_button = QPushButton(self.tr("Précédent"))
@@ -2534,7 +2545,10 @@ class DocumentManager(QMainWindow):
         logging.info(f"handle_client_list_click entered. Item text: {item.text()}, Item data: {item.data(Qt.UserRole)}")
         client_data = item.data(Qt.UserRole)
         if client_data and client_data.get("client_id"):
+            logging.info(f"Opening tab for client: {client_data.get('client_name')}")
             self.open_client_tab_by_id(client_data["client_id"])
+        else:
+            logging.warning("handle_client_list_click: No client_data or client_id found in item data.")
         
     def open_client_tab_by_id(self, client_id_to_open):
         # Attempt to fetch fresh client data directly from the database
@@ -3488,3 +3502,5 @@ class DocumentManager(QMainWindow):
         # elif item_type == "Project":
             # This would require a way to show a project's details
             # pass
+
+[end of gui/main_window.py]
