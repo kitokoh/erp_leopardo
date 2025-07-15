@@ -87,9 +87,9 @@ def rename_app(app_id, new_name):
     original_name = ""
     app_path = ""
     if app_id == "n8n":
-        original_name = "n8n"
-        # n8n is a global npm package, so we can't easily rename it.
-        # We will focus on the other two for now.
+        config_path = os.path.expanduser("~/.n8n/config")
+        with open(config_path, "a") as f:
+            f.write("\nexport N8N_CUSTOM_ASSETS_DIR=$(pwd)/addons")
         return
     elif app_id == "invoice-ninja":
         original_name = "Invoice Ninja"

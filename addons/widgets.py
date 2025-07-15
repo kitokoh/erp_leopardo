@@ -7,7 +7,8 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView
 import json
 import os
 from PyQt5.QtGui import QPixmap
-from PyQt5.QtWidgets import QProgressBar
+from PyQt5.QtWidgets import QProgressBar, QHBoxLayout
+from PyQt5.QtGui import QIcon
 from .config_dialog import ConfigDialog
 
 class AddonCard(QWidget):
@@ -23,23 +24,38 @@ class AddonCard(QWidget):
         self.icon_label = QLabel()
         self.icon_label.setPixmap(QPixmap(icon))
         self.status_label = QLabel(self.status)
-        self.install_button = QPushButton("Installer")
+
+        self.buttons_layout = QHBoxLayout()
+
+        self.install_button = QPushButton(QIcon(":/icons/download.svg"), " Installer")
         self.install_button.clicked.connect(self.install)
-        self.launch_button = QPushButton("Lancer")
+
+        self.launch_button = QPushButton(QIcon(":/icons/play.svg"), " Lancer")
         self.launch_button.clicked.connect(self.launch)
         self.launch_button.setVisible(False)
-        self.stop_button = QPushButton("Arrêter")
+
+        self.stop_button = QPushButton(QIcon(":/icons/stop-circle.svg"), " Arrêter")
         self.stop_button.clicked.connect(self.stop)
         self.stop_button.setVisible(False)
-        self.uninstall_button = QPushButton("Désinstaller")
+
+        self.uninstall_button = QPushButton(QIcon(":/icons/trash-2.svg"), " Désinstaller")
         self.uninstall_button.clicked.connect(self.uninstall)
         self.uninstall_button.setVisible(False)
-        self.config_button = QPushButton("Configurer")
+
+        self.config_button = QPushButton(QIcon(":/icons/settings.svg"), " Configurer")
         self.config_button.clicked.connect(self.configure)
         self.config_button.setVisible(False)
-        self.update_button = QPushButton("Mettre à jour")
+
+        self.update_button = QPushButton(QIcon(":/icons/refresh-cw.svg"), " Mettre à jour")
         self.update_button.clicked.connect(self.update_app)
         self.update_button.setVisible(False)
+
+        self.buttons_layout.addWidget(self.install_button)
+        self.buttons_layout.addWidget(self.launch_button)
+        self.buttons_layout.addWidget(self.stop_button)
+        self.buttons_layout.addWidget(self.uninstall_button)
+        self.buttons_layout.addWidget(self.config_button)
+        self.buttons_layout.addWidget(self.update_button)
 
         if self.app_id == "invoice-ninja" or self.app_id == "next-erp":
             self.install_button.setEnabled(False)
@@ -52,12 +68,7 @@ class AddonCard(QWidget):
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
         self.layout.addWidget(self.progress_bar)
-        self.layout.addWidget(self.install_button)
-        self.layout.addWidget(self.launch_button)
-        self.layout.addWidget(self.stop_button)
-        self.layout.addWidget(self.uninstall_button)
-        self.layout.addWidget(self.config_button)
-        self.layout.addWidget(self.update_button)
+        self.layout.addLayout(self.buttons_layout)
 
         self.update_status()
 
