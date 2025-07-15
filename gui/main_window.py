@@ -3502,5 +3502,3 @@ class DocumentManager(QMainWindow):
         # elif item_type == "Project":
             # This would require a way to show a project's details
             # pass
-
-[end of gui/main_window.py]
