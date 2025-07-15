@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 import os
 import logging
+import traceback
 import sip # For checking if C++ object is deleted
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QSplitter, QHBoxLayout,
     QGroupBox, QFormLayout, QTableWidget, QHeaderView, QTabWidget, QProgressBar,
     QTableWidgetItem, QStackedWidget, QApplication
 )
-from PyQt5.QtCore import Qt, QObject, pyqtSignal, pyqtSlot, QTimer
+from PyQt5.QtCore import Qt, QObject, pyqtSignal, pyqtSlot, QTimer, QRunnable, QThreadPool
 from PyQt5.QtWebChannel import QWebChannel
 from PyQt5.QtGui import QIcon, QFont
 from PyQt5.QtWebEngineWidgets import QWebEngineView
@@ -55,6 +56,32 @@ from client_management.client_controller import ClientController
 from app_setup import APP_ROOT_DIR
 
 
+class WorkerSignals(QObject):
+    finished = pyqtSignal()
+    error = pyqtSignal(tuple)
+    result = pyqtSignal(object)
+
+
+class GlobalStatsWorker(QRunnable):
+    def __init__(self, fn, *args, **kwargs):
+        super(GlobalStatsWorker, self).__init__()
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+        self.signals = WorkerSignals()
+
+    @pyqtSlot()
+    def run(self):
+        try:
+            result = self.fn(*self.args, **self.kwargs)
+        except Exception as e:
+            self.signals.error.emit((e, traceback.format_exc()))
+        else:
+            self.signals.result.emit(result)
+        finally:
+            self.signals.finished.emit()
+
+
 class MapInteractionHandler(QObject):
     country_clicked_signal = pyqtSignal(str)
     client_clicked_on_map_signal = pyqtSignal(str, str)
@@ -94,6 +121,8 @@ class StatisticsDashboard(QWidget):
         super().__init__(parent)
         self.setObjectName("StatisticsDashboard")
         self.setWindowTitle(self.tr("Tableau de Bord Statistiques Interactif"))
+        self.threadpool = QThreadPool()
+        logging.info(f"Multithreading with maximum {self.threadpool.maxThreadCount()} threads")
 
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(10,10,10,10)
@@ -482,57 +511,56 @@ class StatisticsDashboard(QWidget):
             QApplication.restoreOverrideCursor()
         logging.info("Statistics data panel refresh complete.")
 
-    def update_map(self, focus_country_iso_a2=None):
-        logging.info(f"update_map called. Focus country ISO A2: {focus_country_iso_a2}")
-        QApplication.setOverrideCursor(Qt.WaitCursor)
+    def _generate_map_html_worker(self, focus_country_iso_a2):
+        geojson_path = os.path.join(APP_ROOT_DIR, "resources", "assets", "world_countries.geojson")
+        if not os.path.exists(geojson_path):
+            return None, self.tr("Les données géographiques de la carte (GeoJSON) sont introuvables.")
+
+        clients_by_country_counts = get_client_counts_by_country()
+        all_clients_for_main_map_popups = clients_crud_instance.get_all_clients_with_details(include_deleted=False)
+
+        db_session = get_db_connection()
         try:
-            geojson_path = os.path.join(APP_ROOT_DIR, "resources", "assets", "world_countries.geojson")
-            if not os.path.exists(geojson_path):
-                logging.error(f"GeoJSON file not found at: {geojson_path}.")
-                self._set_map_error_html(self.tr("Les données géographiques de la carte (GeoJSON) sont introuvables."))
-                return
+            from db.cruds.application_settings_crud import get_setting
+            scope = get_setting('geographic_scope', 'international', conn=db_session)
+            last_lat = float(get_setting('map_last_lat', '20', conn=db_session))
+            last_lng = float(get_setting('map_last_lng', '0', conn=db_session))
+            last_zoom = int(get_setting('map_last_zoom', '2', conn=db_session))
+        finally:
+            if db_session:
+                db_session.close()
 
-            clients_by_country_counts = get_client_counts_by_country()
-            all_clients_for_main_map_popups = clients_crud_instance.get_all_clients_with_details(include_deleted=False)
+        map_html_content = generate_folium_map_html(
+            geojson_path=geojson_path,
+            clients_by_country_counts=clients_by_country_counts,
+            all_clients_details_for_popups=all_clients_for_main_map_popups,
+            app_translator_func=self.tr,
+            map_interaction_handler_name="pyMapConnector",
+            focused_country_iso_a2=focus_country_iso_a2,
+            scope=scope,
+            initial_location=[last_lat, last_lng],
+            initial_zoom=last_zoom
+        )
+        return map_html_content, None
 
-            db_session = get_db_connection()
-            try:
-                from db.cruds.application_settings_crud import get_setting
-                scope = get_setting('geographic_scope', 'international', conn=db_session)
-                last_lat = float(get_setting('map_last_lat', '20', conn=db_session))
-                last_lng = float(get_setting('map_last_lng', '0', conn=db_session))
-                last_zoom = int(get_setting('map_last_zoom', '2', conn=db_session))
-            finally:
-                if db_session:
-                    db_session.close()
-
-            map_html_content = generate_folium_map_html(
-                geojson_path=geojson_path,
-                clients_by_country_counts=clients_by_country_counts,
-                all_clients_details_for_popups=all_clients_for_main_map_popups,
-                app_translator_func=self.tr,
-                map_interaction_handler_name="pyMapConnector",
-                focused_country_iso_a2=focus_country_iso_a2,
-                scope=scope,
-                initial_location=[last_lat, last_lng],
-                initial_zoom=last_zoom
-            )
-
-            if map_html_content is None:
-                self._set_map_error_html(self.tr("La génération du contenu HTML de la carte a échoué."))
-                return
-
+    def _on_map_html_generated(self, result):
+        map_html_content, error_message = result
+        if error_message:
+            self._set_map_error_html(error_message)
+        elif map_html_content:
             if self.map_view:
                 self.map_view.setHtml(map_html_content)
-                logging.info(f"Map HTML content set. Focus: {focus_country_iso_a2 if focus_country_iso_a2 else 'Global'}")
             else:
                 logging.error("self.map_view is None. Cannot set HTML for the map.")
+        else:
+            self._set_map_error_html(self.tr("La génération du contenu HTML de la carte a échoué."))
 
-        except Exception as e:
-            logging.error(f"General error in update_map: {e}", exc_info=True)
-            self._set_map_error_html(self.tr("Une erreur inattendue est survenue lors de la mise à jour de la carte."))
-        finally:
-            QApplication.restoreOverrideCursor()
+    def update_map(self, focus_country_iso_a2=None):
+        logging.info(f"update_map called. Focus country ISO A2: {focus_country_iso_a2}")
+        worker = GlobalStatsWorker(self._generate_map_html_worker, focus_country_iso_a2)
+        worker.signals.result.connect(self._on_map_html_generated)
+        worker.signals.error.connect(lambda err: self._set_map_error_html(str(err[0])))
+        self.threadpool.start(worker)
 
 
     def _set_map_error_html(self, message: str):
@@ -579,41 +607,39 @@ class StatisticsDashboard(QWidget):
             logging.error("StatisticsDashboard: self.map_view is None. Cannot display error message in map_view.")
 
 
+    def _fetch_global_stats(self):
+        # This function runs in a separate thread
+        current_total_clients = get_total_clients_count()
+        current_active_clients = get_active_clients_count()
+        total_projects = get_total_projects_count()
+        active_projects = get_active_projects_count()
+        total_products = get_total_products_count()
+        sales_current_month = self.get_total_sales_from_proforma_current_month()
+        return {
+            "total_clients": current_total_clients,
+            "active_clients": current_active_clients,
+            "total_projects": total_projects,
+            "active_projects": active_projects,
+            "total_products": total_products,
+            "sales_current_month": sales_current_month,
+        }
+
+    def _update_global_stats_labels(self, stats):
+        self.stats_labels["total_clients"].setText(f"<b>{stats['total_clients']}</b>")
+        self.update_total_clients_trend(stats['total_clients'])
+        self.stats_labels["active_clients"].setText(f"<b>{stats['active_clients']}</b>")
+        self.update_active_clients_trend(stats['active_clients'])
+        self.stats_labels["total_projects"].setText(f"<b>{stats['total_projects']}</b>")
+        self.stats_labels["active_projects"].setText(f"<b>{stats['active_projects']}</b>")
+        self.stats_labels["total_products"].setText(f"<b>{stats['total_products']}</b>")
+        self.stats_labels["total_sales_proforma"].setText("<b>€ {:,.2f}</b>".format(stats['sales_current_month']))
+        self.update_total_sales_proforma_trend(stats['sales_current_month'])
+        self.update_client_acquisition_stats()
+
     def update_global_stats(self):
-        QApplication.setOverrideCursor(Qt.WaitCursor)
-        try:
-            current_total_clients = get_total_clients_count()
-            self.stats_labels["total_clients"].setText(f"<b>{current_total_clients}</b>")
-            self.update_total_clients_trend(current_total_clients)
-
-            current_active_clients = get_active_clients_count()
-            self.stats_labels["active_clients"].setText(f"<b>{current_active_clients}</b>")
-            self.update_active_clients_trend(current_active_clients)
-
-            total_projects = get_total_projects_count()
-            self.stats_labels["total_projects"].setText(f"<b>{total_projects}</b>")
-
-            active_projects = get_active_projects_count()
-            self.stats_labels["active_projects"].setText(f"<b>{active_projects}</b>")
-
-            total_products = get_total_products_count()
-            self.stats_labels["total_products"].setText(f"<b>{total_products}</b>")
-
-            sales_current_month = self.get_total_sales_from_proforma_current_month()
-            self.stats_labels["total_sales_proforma"].setText("<b>€ {:,.2f}</b>".format(sales_current_month))
-            self.update_total_sales_proforma_trend(sales_current_month)
-
-            self.update_client_acquisition_stats()
-
-        except Exception as e:
-            logging.error(f"Error updating global stats: {e}", exc_info=True)
-            for key in self.stats_labels:
-                self.stats_labels[key].setText(self.tr("<i>Erreur</i>"))
-            self.stats_labels["total_clients_trend"].setText("")
-            self.stats_labels["active_clients_trend"].setText("")
-            self.stats_labels["total_sales_proforma_trend"].setText("")
-        finally:
-            QApplication.restoreOverrideCursor()
+        worker = GlobalStatsWorker(self._fetch_global_stats)
+        worker.signals.result.connect(self._update_global_stats_labels)
+        self.threadpool.start(worker)
 
 
     def get_total_sales_from_proforma_current_month(self) -> float:
@@ -994,11 +1020,19 @@ class StatisticsDashboard(QWidget):
 
 
     def update_customer_segmentation_views(self):
-        self._populate_table("country", get_client_counts_by_country, ["country_name", "client_count"])
-        self._populate_table("city", get_client_segmentation_by_city, ["country_name", "city_name", "client_count"])
+        # self._populate_table("country", get_client_counts_by_country, ["country_name", "client_count"])
+        # self._populate_table("city", get_client_segmentation_by_city, ["country_name", "city_name", "client_count"])
         self._update_status_segmentation_chart()
-        self._populate_table("category", get_client_segmentation_by_category, ["category", "client_count"])
-        self._populate_table("product_popularity", get_product_usage_counts, ["product_name", "usage_count"])
+        # self._populate_table("category", get_client_segmentation_by_category, ["category", "client_count"])
+        # self._populate_table("product_popularity", get_product_usage_counts, ["product_name", "usage_count"])
+        for key, args in {
+            "country": (get_client_counts_by_country, ["country_name", "client_count"]),
+            "city": (get_client_segmentation_by_city, ["country_name", "city_name", "client_count"]),
+            "category": (get_client_segmentation_by_category, ["category", "client_count"]),
+            "product_popularity": (get_product_usage_counts, ["product_name", "usage_count"]),
+        }.items():
+            worker = GlobalStatsWorker(self._populate_table, key, args[0], args[1])
+            self.threadpool.start(worker)
 
 
 class StatisticsSummaryWidget(QWidget):
