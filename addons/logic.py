@@ -60,15 +60,19 @@ def get_installer_command(app_id):
     return None
 
 import webbrowser
+from PyQt5.QtCore import QUrl
 
 def get_launch_command(app_id):
+    config = get_config(app_id)
     if app_id == "n8n":
-        return ["n8n"]
+        port = config.get("port", "5678")
+        return ["n8n", "start", f"--port={port}"], QUrl(f"http://localhost:{port}")
     elif app_id == "invoice-ninja":
-        return lambda: webbrowser.open("http://localhost:8000")
+        return ["php", "invoiceninja/artisan", "serve"], QUrl("http://localhost:8000")
     elif app_id == "next-erp":
-        return lambda: webbrowser.open("http://localhost:8000")
-    return None
+        os.chdir("bench")
+        return ["bench", "start"], QUrl("http://localhost:8000")
+    return None, None
 
 def is_installed(app_id):
     if app_id == "n8n":
@@ -122,11 +126,11 @@ def check_dependencies(app_id):
 def install_and_launch_app(app_id):
     if app_id == "invoice-ninja" or app_id == "next-erp":
         print(f"Installation of {app_id} is currently disabled.")
-        return False
+        return None
 
     if not check_dependencies(app_id):
         print(f"Dependencies for {app_id} are not installed. Please install them manually.")
-        return False
+        return None
 
     new_name = ""
     if app_id == "n8n":
@@ -145,28 +149,26 @@ def install_and_launch_app(app_id):
                 rename_app(app_id, new_name)
             except Exception as e:
                 print(f"Error installing {app_id}: {e}")
-                return False
+                return None
         else:
             print(f"Installer for {app_id} not found.")
-            return False
+            return None
 
-    # if is_installed(app_id):
-    #     launch_command = get_launch_command(app_id)
-    #     if launch_command:
-    #         print(f"Launching {app_id}...")
-    #         if callable(launch_command):
-    #             launch_command()
-    #         else:
-    #             try:
-    #                 subprocess.run(launch_command, check=True)
-    #             except (subprocess.CalledProcessError, FileNotFoundError) as e:
-    #                 print(f"Error launching {app_id}: {e}")
-    #                 return False
-    #     else:
-    #         print(f"Launch command for {app_id} not found.")
-    #         return False
+    if is_installed(app_id):
+        launch_command, url = get_launch_command(app_id)
+        if launch_command:
+            print(f"Launching {app_id}...")
+            try:
+                subprocess.Popen(launch_command)
+                return url
+            except (subprocess.CalledProcessError, FileNotFoundError) as e:
+                print(f"Error launching {app_id}: {e}")
+                return None
+        else:
+            print(f"Launch command for {app_id} not found.")
+            return None
 
-    return True
+    return None
 
 def uninstall_app(app_id):
     if not is_installed(app_id):
@@ -183,3 +185,38 @@ def uninstall_app(app_id):
         shutil.rmtree("invoiceninja")
     elif app_id == "next-erp":
         shutil.rmtree("bench")
+
+def get_config_path(app_id):
+    return f"addons/{app_id}_config.json"
+
+def get_config(app_id):
+    path = get_config_path(app_id)
+    if os.path.exists(path):
+        with open(path, "r") as f:
+            return json.load(f)
+    return {}
+
+def save_config(app_id, config):
+    path = get_config_path(app_id)
+    with open(path, "w") as f:
+        json.dump(config, f, indent=4)
+
+def update_app(app_id):
+    if not is_installed(app_id):
+        return
+
+    commands = get_os_commands()
+    if not commands:
+        print("Unsupported OS")
+        return
+
+    if app_id == "n8n":
+        subprocess.run([commands["npm"], "install", "-g", "n8n@latest"])
+    elif app_id == "invoice-ninja":
+        os.chdir("invoiceninja")
+        subprocess.run(["git", "pull"])
+        os.chdir("..")
+    elif app_id == "next-erp":
+        os.chdir("bench")
+        subprocess.run(["bench", "update"])
+        os.chdir("..")

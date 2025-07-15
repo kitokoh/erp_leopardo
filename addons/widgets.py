@@ -19,9 +19,17 @@ class AddonCard(QWidget):
         self.launch_button = QPushButton("Lancer")
         self.launch_button.clicked.connect(self.launch)
         self.launch_button.setVisible(False)
+from .config_dialog import ConfigDialog
+
         self.uninstall_button = QPushButton("Désinstaller")
         self.uninstall_button.clicked.connect(self.uninstall)
         self.uninstall_button.setVisible(False)
+        self.config_button = QPushButton("Configurer")
+        self.config_button.clicked.connect(self.configure)
+        self.config_button.setVisible(False)
+        self.update_button = QPushButton("Mettre à jour")
+        self.update_button.clicked.connect(self.update_app)
+        self.update_button.setVisible(False)
 
         if self.app_id == "invoice-ninja" or self.app_id == "next-erp":
             self.install_button.setEnabled(False)
@@ -37,6 +45,8 @@ from PyQt5.QtWidgets import QProgressBar
         self.layout.addWidget(self.install_button)
         self.layout.addWidget(self.launch_button)
         self.layout.addWidget(self.uninstall_button)
+        self.layout.addWidget(self.config_button)
+        self.layout.addWidget(self.update_button)
 
         self.update_status()
 
@@ -46,15 +56,34 @@ from PyQt5.QtWidgets import QProgressBar
             self.install_button.setVisible(False)
             self.launch_button.setVisible(True)
             self.uninstall_button.setVisible(True)
+            self.config_button.setVisible(True)
+            self.update_button.setVisible(True)
         else:
             self.status = "Non installé"
             self.install_button.setVisible(True)
             self.launch_button.setVisible(False)
             self.uninstall_button.setVisible(False)
+            self.config_button.setVisible(False)
+            self.update_button.setVisible(False)
         self.status_label.setText(self.status)
 
+    def update_app(self):
+        from .logic import update_app
+        update_app(self.app_id)
+        self.update_status()
+
+    def configure(self):
+        from .logic import get_config, save_config
+        config = get_config(self.app_id)
+        dialog = ConfigDialog(self.app_id, config, self)
+        if dialog.exec_():
+            save_config(self.app_id, dialog.get_config())
+
     def launch(self):
-        install_and_launch_app(self.app_id)
+        url = install_and_launch_app(self.app_id)
+        if url and self.parent():
+            self.parent().web_view.setUrl(url)
+            self.parent().web_view.setVisible(True)
 
     def uninstall(self):
         from .logic import uninstall_app
@@ -82,10 +111,15 @@ from PyQt5.QtWidgets import QMessageBox
         self.update_status()
         self.install_button.setEnabled(True)
 
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+
 class AddonsPage(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.layout = QGridLayout(self)
+        self.web_view = QWebEngineView()
+        self.web_view.setVisible(False)
+        self.layout.addWidget(self.web_view, 0, 0, 1, 3)
 
         self.addons = [
             {"name": "Leopardo Agent", "app_id": "n8n"},
@@ -94,5 +128,5 @@ class AddonsPage(QWidget):
         ]
 
         for i, addon in enumerate(self.addons):
-            card = AddonCard(addon["name"], addon["app_id"])
-            self.layout.addWidget(card, i // 3, i % 3)
+            card = AddonCard(addon["name"], addon["app_id"], self)
+            self.layout.addWidget(card, (i // 3) + 1, i % 3)
