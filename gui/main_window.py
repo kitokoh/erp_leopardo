@@ -3503,4 +3503,4 @@ class DocumentManager(QMainWindow):
             # This would require a way to show a project's details
             # pass
 
-[end of gui/main_window.py]
+# [end of gui/main_window.py]
