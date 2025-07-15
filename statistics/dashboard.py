@@ -6,7 +6,7 @@ import sip # For checking if C++ object is deleted
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QSplitter, QHBoxLayout,
     QGroupBox, QFormLayout, QTableWidget, QHeaderView, QTabWidget, QProgressBar,
-    QTableWidgetItem, QStackedWidget, QApplication
+    QTableWidgetItem, QStackedWidget, QApplication, QMessageBox
 )
 from PyQt5.QtCore import Qt, QObject, pyqtSignal, pyqtSlot, QTimer, QRunnable, QThreadPool, QDate
 from PyQt5.QtWidgets import QDateEdit
@@ -179,6 +179,7 @@ class StatisticsDashboard(QWidget):
         self.map_interaction_handler = None
 
         self._setup_stats_display_ui(right_stats_layout)
+        self.populate_views_combo()
 
         QTimer.singleShot(100, self._initialize_map_and_load_data)
         logging.info("StatisticsDashboard initialized. Map components and initial data load deferred.")
@@ -330,7 +331,64 @@ class StatisticsDashboard(QWidget):
 
         global_stats_layout.addRow(self.tr("Période:"), date_filter_layout)
 
+        save_load_layout = QHBoxLayout()
+        self.view_name_input = QLineEdit()
+        self.view_name_input.setPlaceholderText(self.tr("Nom de la vue"))
+        save_load_layout.addWidget(self.view_name_input)
+        self.save_view_button = QPushButton(self.tr("Sauvegarder la vue"))
+        save_load_layout.addWidget(self.save_view_button)
+        self.load_view_combo = QComboBox()
+        save_load_layout.addWidget(self.load_view_combo)
+        self.save_view_button.clicked.connect(self.save_view)
+        self.load_view_combo.currentIndexChanged.connect(self.load_view)
+        global_stats_layout.addRow(self.tr("Vues:"), save_load_layout)
+
+
         global_stats_page_layout.addWidget(global_stats_group)
+
+    def get_current_view_config(self):
+        return {
+            "start_date": self.start_date_edit.date().toString(Qt.ISODate),
+            "end_date": self.end_date_edit.date().toString(Qt.ISODate),
+        }
+
+    def save_view(self):
+        view_name = self.view_name_input.text()
+        if not view_name:
+            QMessageBox.warning(self, "Nom manquant", "Veuillez entrer un nom pour la vue.")
+            return
+
+        config = self.get_current_view_config()
+
+        # This would be a call to a new CRUD function
+        # For now, we'll just log it
+        logging.info(f"Saving view '{view_name}' with config: {config}")
+        self.populate_views_combo()
+
+    def load_view(self, index):
+        if index == 0:
+            return
+
+        view_name = self.load_view_combo.itemText(index)
+
+        # This would be a call to a new CRUD function
+        # For now, we'll just log it and use a dummy config
+        logging.info(f"Loading view '{view_name}'")
+        config = {
+            "start_date": "2023-01-01",
+            "end_date": "2023-12-31",
+        }
+
+        self.start_date_edit.setDate(QDate.fromString(config["start_date"], Qt.ISODate))
+        self.end_date_edit.setDate(QDate.fromString(config["end_date"], Qt.ISODate))
+        self.refresh_all_dashboard_content()
+
+    def populate_views_combo(self):
+        self.load_view_combo.clear()
+        self.load_view_combo.addItem("Sélectionner une vue...")
+        # This would be a call to a new CRUD function
+        # For now, we'll just add a dummy item
+        self.load_view_combo.addItem("Vue Annuelle 2023")
 
         health_score_group = QGroupBox(self.tr("Indice de Santé Commerciale"))
         health_score_group.setObjectName("healthScoreGroup")
@@ -644,7 +702,6 @@ class StatisticsDashboard(QWidget):
             "active_projects": active_projects,
             "total_products": total_products,
             "sales_in_period": sales_in_period,
-
         }
 
     def _update_global_stats_labels(self, stats):
