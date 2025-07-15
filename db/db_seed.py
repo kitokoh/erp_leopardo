@@ -1518,6 +1518,33 @@ def run_seed():
     logger.info("Full seeding process run_seed() completed.")
 
 
+def seed_only_hidroguc_products():
+    """
+    Seeds only the HİDROGÜÇ PRES products without running the full initial data seeding.
+    """
+    logger = logging.getLogger(__name__)
+    logger.info("Starting HİDROGÜÇ PRES products specific seeding.")
+
+    raw_conn = None
+    try:
+        raw_conn = db_connection_module.get_raw_sqlite_connection()
+        cursor = raw_conn.cursor()
+
+        from db.hidroguc_product_seeder import seed_hidroguc_products
+        seed_hidroguc_products(raw_conn, cursor, logger_passed=logger)
+
+        raw_conn.commit()
+        logger.info("HİDROGÜÇ PRES products specific seeding committed successfully.")
+    except Exception as e:
+        logger.error(f"Error during HİDROGÜÇ PRES products specific seeding: {e}", exc_info=True)
+        if raw_conn:
+            raw_conn.rollback()
+    finally:
+        if raw_conn:
+            raw_conn.close()
+            logger.info("Raw SQLite connection for HİDROGÜÇ PRES products seeding closed.")
+
+
 if __name__ == '__main__':
     # Adjust sys.path to allow finding 'config' module from project root
     import sys

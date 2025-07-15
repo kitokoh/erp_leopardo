@@ -345,11 +345,7 @@ class ClientMainWidget(QWidget):
             self.created_by_value_label = QLabel(self.tr("N/A"))
             self.details_layout.addRow(self.created_by_label_static, self.created_by_value_label)
 
-        # Placeholder for client statuses - to be populated by _setup_client_statuses_section
-
-
-
-
+            # Placeholder for client statuses - to be populated by _setup_client_statuses_section
             self.client_statuses_widget = QWidget()
             self.client_statuses_layout = QHBoxLayout(self.client_statuses_widget)
             self.client_statuses_layout.setContentsMargins(0,0,0,0)
@@ -2710,11 +2706,16 @@ class ClientMainWidget(QWidget):
     def _setup_client_statuses_section(self):
         """Sets up the UI for displaying and modifying client statuses."""
         # Clear previous status widgets if any (important for refresh_display)
-        while self.client_statuses_layout.count():
-            item = self.client_statuses_layout.takeAt(0)
-            widget = item.widget()
-            if widget:
-                widget.deleteLater()
+        if hasattr(self, 'client_statuses_layout'):
+            while self.client_statuses_layout.count():
+                item = self.client_statuses_layout.takeAt(0)
+                widget = item.widget()
+                if widget:
+                    widget.deleteLater()
+        else:
+            # If the layout doesn't even exist, we can't proceed. Log an error.
+            logging.error("ClientMainWidget._setup_client_statuses_section: client_statuses_layout is missing.")
+            return
 
         if not self.client_info:
             return
