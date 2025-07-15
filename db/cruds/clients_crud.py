@@ -459,6 +459,7 @@ class ClientsCRUD(GenericCRUD):
         Returns:
             list[dict]: A list of client records with joined details.
         """
+        logging.info(f"get_all_clients_with_details called with filters: {filters}, include_deleted: {include_deleted}")
         params_dict = {} # For named parameters
 
         # Sorting parameters
@@ -558,7 +559,10 @@ class ClientsCRUD(GenericCRUD):
                 result = conn.execute(sql_query, params_dict)
             else:
                 result = conn.execute(str(sql_query), params_dict)
-            return [dict(row._mapping) if hasattr(row, '_mapping') else dict(row) for row in result.fetchall()]
+
+            results_list = [dict(row._mapping) if hasattr(row, '_mapping') else dict(row) for row in result.fetchall()]
+            logging.info(f"Found {len(results_list)} clients after filtering.")
+            return results_list
         except Exception as e: # Changed to general Exception
             self.logger.error(f"Failed to get all clients with details: {e}", exc_info=True)
             return []
