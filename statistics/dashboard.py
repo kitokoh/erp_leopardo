@@ -148,7 +148,7 @@ class StatisticsDashboard(QWidget):
 
         self._setup_stats_display_ui(right_stats_layout)
 
-        QTimer.singleShot(0, self._initialize_map_and_load_data)
+        QTimer.singleShot(100, self._initialize_map_and_load_data)
         logging.info("StatisticsDashboard initialized. Map components and initial data load deferred.")
 
     def _initialize_map_and_load_data(self):
