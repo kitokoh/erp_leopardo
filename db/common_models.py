@@ -53,3 +53,27 @@ class Role(Base):
 # The raw SQL creation of 'Roles' table in db/init_schema.py should be removed.
 # The Alembic migration 26cc1deb3763_create_initial_tables.py should be updated to create 'Roles' table.
 
+
+class Clients(Base):
+    __tablename__ = 'Clients'
+
+    client_id = Column(String, primary_key=True)
+    client_name = Column(String)
+    company_name = Column(String)
+    primary_need_description = Column(Text)
+    project_identifier = Column(String)
+    country_id = Column(Integer)
+    city_id = Column(Integer)
+    default_base_folder_path = Column(String)
+    status_id = Column(Integer)
+    selected_languages = Column(String)
+    price = Column(Numeric)
+    notes = Column(Text)
+    category = Column(String)
+    lead_source = Column(String)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_by_user_id = Column(String, ForeignKey('users.user_id'))
+    is_deleted = Column(Integer, default=0)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    default_template_id = Column(Integer)

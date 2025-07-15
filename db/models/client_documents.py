@@ -6,7 +6,7 @@ class ClientDocuments(Base):
     __tablename__ = 'ClientDocuments'
 
     document_id = Column(String, primary_key=True)
-    client_id = Column(String, ForeignKey('clients.client_id'))
+    client_id = Column(String, ForeignKey('Clients.client_id'))
     project_id = Column(String)
     order_identifier = Column(String)
     document_name = Column(String)
