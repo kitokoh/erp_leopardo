@@ -2,10 +2,14 @@
 
 import os
 from PyInstaller.utils.hooks import collect_data_files
+import glob
+
+# --- Version Information ---
+with open("version.txt", "r") as f:
+    APP_VERSION = f.read().strip()
 
 # --- Application Information ---
 APP_NAME = "Leopardo AI"
-APP_VERSION = "1.9"
 APP_ICON = "nova360.ico"
 
 # --- Paths ---
@@ -13,15 +17,17 @@ DLLS_PATH = 'dlls'
 RESOURCES_PATH = 'resources'
 KEYS_PATH = os.path.join(RESOURCES_PATH, 'lesClesNova360', 'icons', 'exeCle')
 
+# --- Hooks ---
+def hook(hook_api):
+    # Example hook to include all files from a specific module
+    # hook_api.add_data_files('my_module', 'my_module')
+    pass
+
 # --- PyInstaller Analysis ---
 a = Analysis(
     ['main.py'],
     pathex=['.'],
-    binaries=[
-        (os.path.join(DLLS_PATH, 'liblzma.dll'), '.'),
-        (os.path.join(DLLS_PATH, 'libssl-3-x64.dll'), '.'),
-        (os.path.join(DLLS_PATH, 'libcrypto-3-x64.dll'), '.')
-    ],
+    binaries=[(os.path.join(DLLS_PATH, '*'), '.')],
     datas=[
         # --- Resources ---
         (os.path.join(RESOURCES_PATH, 'icons', '*.ico'), os.path.join(RESOURCES_PATH, 'icons')),
@@ -57,7 +63,7 @@ a = Analysis(
         'email.mime.base',
         'email.encoders'
     ],
-    hookspath=[],
+    hookspath=[hook],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],

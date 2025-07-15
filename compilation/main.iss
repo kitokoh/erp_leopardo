@@ -3,7 +3,7 @@
 
 ; --- Application Information ---
 #define MyAppName "Leopardo AI"
-#define MyAppVersion "1.9"
+#define MyAppVersion "1.9.0"
 #define MyAppPublisher "Leopardo, Inc."
 #define MyAppURL "https://www.leopardo.com/"
 #define MyAppExeName "main.exe"
@@ -74,29 +74,7 @@ ButtonFinish=Finish and Launch Leopardo AI
 ; --- Languages Section ---
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
-Name: "armenian"; MessagesFile: "compiler:Languages\Armenian.isl"
-Name: "bulgarian"; MessagesFile: "compiler:Languages\Bulgarian.isl"
-Name: "catalan"; MessagesFile: "compiler:Languages\Catalan.isl"
-Name: "corsican"; MessagesFile: "compiler:Languages\Corsican.isl"
-Name: "czech"; MessagesFile: "compiler:Languages\Czech.isl"
-Name: "danish"; MessagesFile: "compiler:Languages\Danish.isl"
-Name: "dutch"; MessagesFile: "compiler:Languages\Dutch.isl"
-Name: "finnish"; MessagesFile: "compiler:Languages\Finnish.isl"
 Name: "french"; MessagesFile: "compiler:Languages\French.isl"
-Name: "german"; MessagesFile: "compiler:Languages\German.isl"
-Name: "hebrew"; MessagesFile: "compiler:Languages\Hebrew.isl"
-Name: "icelandic"; MessagesFile: "compiler:Languages\Icelandic.isl"
-Name: "italian"; MessagesFile: "compiler:Languages\Italian.isl"
-Name: "japanese"; MessagesFile: "compiler:Languages\Japanese.isl"
-Name: "norwegian"; MessagesFile: "compiler:Languages\Norwegian.isl"
-Name: "polish"; MessagesFile: "compiler:Languages\Polish.isl"
-Name: "portuguese"; MessagesFile: "compiler:Languages\Portuguese.isl"
-Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
-Name: "slovak"; MessagesFile: "compiler:Languages\Slovak.isl"
-Name: "slovenian"; MessagesFile: "compiler:Languages\Slovenian.isl"
-Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
-Name: "turkish"; MessagesFile: "compiler:Languages\Turkish.isl"
-Name: "ukrainian"; MessagesFile: "compiler:Languages\Ukrainian.isl"
 
 ; --- Tasks Section ---
 [Tasks]
@@ -104,6 +82,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "startmenuicon"; Description: "{cm:CreateStartMenuIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 Name: "allusers"; Description: "Install for all users"; GroupDescription: "Installation Type:"; Flags: exclusive
 Name: "currentuser"; Description: "Install for current user only"; GroupDescription: "Installation Type:"; Flags: exclusive unchecked
+Name: "installPython"; Description: "Install Python 3.11"; GroupDescription: "Optional Components";
+Name: "installGit"; Description: "Install Git 2.42"; GroupDescription: "Optional Components";
 
 ; --- Files Section ---
 [Files]
@@ -129,7 +109,25 @@ const
     GitURL = 'https://github.com/git-for-windows/git/releases/download/v2.42.0.windows.1/Git-2.42.0-64-bit.exe';
 
 var
-    TempDir: String;
+    ComponentsPage: TNewCheckListBox;
+    ProgressBar: TProgressBar;
+
+procedure DownloadAndInstall(URL: String; FileName: String);
+var
+    ResultCode: Integer;
+begin
+    if not DownloadFile(URL, FileName, ProgressBar) then
+    begin
+        MsgBox('Failed to download ' + FileName, mbError, MB_OK);
+        exit;
+    end;
+
+    if not Exec(FileName, '/quiet', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
+    begin
+        MsgBox('Failed to install ' + FileName, mbError, MB_OK);
+        exit;
+    end;
+end;
 
 function IsDependencyInstalled(command: String; version: String): Boolean;
 var
@@ -138,11 +136,7 @@ var
     VersionFile: String;
     FileContents: TStringList;
 begin
-    if not DirExists(TempDir) then
-        ForceDirectories(TempDir);
-
-    VersionFile := TempDir + '\version.txt';
-
+    VersionFile := ExpandConstant('{tmp}\version.txt');
     if Exec('cmd.exe', '/C ' + command + ' > "' + VersionFile + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
     begin
         if FileExists(VersionFile) then
@@ -157,48 +151,58 @@ begin
             end;
         end
         else
-        begin
-            Log('Error: Version file does not exist.');
             Result := False;
-        end;
     end
     else
-    begin
-        Log('Error: Could not execute command: ' + command);
         Result := False;
-    end;
 end;
 
 procedure InitializeWizard();
 begin
-    TempDir := ExpandConstant('{tmp}') + '\InstallDependencies';
+    ComponentsPage := TNewCheckListBox.Create(WizardForm);
+    ComponentsPage.Parent := WizardForm.SelectComponentsPage;
+    ComponentsPage.Top := 0;
+    ComponentsPage.Left := 0;
+    ComponentsPage.Width := WizardForm.SelectComponentsPage.ClientWidth;
+    ComponentsPage.Height := WizardForm.SelectComponentsPage.ClientHeight;
+    ComponentsPage.AddCheckBox('Install Python 3.11', '', 0, True, True, False, True, nil);
+    ComponentsPage.AddCheckBox('Install Git 2.42', '', 0, True, True, False, True, nil);
+
+    ProgressBar := TProgressBar.Create(WizardForm);
+    ProgressBar.Parent := WizardForm;
+    ProgressBar.Top := WizardForm.ClientHeight - 50;
+    ProgressBar.Left := 10;
+    ProgressBar.Width := WizardForm.ClientWidth - 20;
+    ProgressBar.Height := 15;
+    ProgressBar.Visible := False;
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
+var
+    PythonInstalled: Boolean;
+    GitInstalled: Boolean;
 begin
     if CurPageID = wpReady then
     begin
-        if not IsDependencyInstalled('python --version', '3.11') then
-        begin
-            MsgBox('Python 3.11 is not installed. Please install it before continuing.', mbError, MB_OK);
-            Result := False;
-        end
-        else if not IsDependencyInstalled('git --version', '2.42') then
-        begin
-            MsgBox('Git 2.42 is not installed. Please install it before continuing.', mbError, MB_OK);
-            Result := False;
-        end
-        else
-        begin
-            Result := True;
-        end;
-    end
-    else
-    begin
-        Result := True;
-    end;
-end;
+        PythonInstalled := IsDependencyInstalled('python --version', '3.11');
+        GitInstalled := IsDependencyInstalled('git --version', '2.42');
 
+        if ComponentsPage.Checked[0] and not PythonInstalled then
+        begin
+            ProgressBar.Visible := True;
+            DownloadAndInstall(PythonURL, 'python_installer.exe');
+            ProgressBar.Visible := False;
+        end;
+
+        if ComponentsPage.Checked[1] and not GitInstalled then
+        begin
+            ProgressBar.Visible := True;
+            DownloadAndInstall(GitURL, 'git_installer.exe');
+            ProgressBar.Visible := False;
+        end;
+    end;
+    Result := True;
+end;
 
 ; --- Registry Section ---
 [Registry]
@@ -226,15 +230,3 @@ Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: no
 ; --- UninstallDelete Section ---
 [UninstallDelete]
 Type: files; Name: "{app}\temp\*.*"
-
-; --- CustomMessages Section ---
-[CustomMessages]
-CreateShortcutsMsg=Would you like to create desktop and start menu shortcuts?
-EnableLogAnalysis=Do you want to enable installation log analysis?
-ControlCenterIntegration=Integrate with the remote control center for easier management?
-SelectLogLocation=Please choose a location to save the installation logs.
-EnableAPIAccess=Enable API access for third-party integrations?
-AdditionalComponents=Would you like to install additional components for extended functionality?
-EnableAutoUpdate=Do you want to enable automatic updates for future versions?
-CompatWarning=This software may not be fully compatible with Windows versions older than 10.
-CustomizeAppearance=Would you like to customize the application's appearance after installation?

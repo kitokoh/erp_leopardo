@@ -10,6 +10,8 @@ This script will use pyarmor to obfuscate the python source code.
 import os
 import shutil
 import subprocess
+import logging
+import argparse
 
 # --- Configuration ---
 # The directory containing the source code to be obfuscated.
@@ -18,42 +20,60 @@ SRC_DIR = "src"
 OBFUSCATED_DIR = "dist/obfuscated_src"
 # The entry point of the application.
 ENTRY_POINT = "main.py"
+# The log file for the obfuscation process.
+LOG_FILE = "obfuscation.log"
+
+# --- Logging ---
+logging.basicConfig(filename=LOG_FILE, level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
 def clean_up():
     """
     Cleans up temporary files and directories created during the obfuscation process.
     """
-    print("Cleaning up temporary files...")
+    logging.info("Cleaning up temporary files...")
     if os.path.exists(OBFUSCATED_DIR):
         shutil.rmtree(OBFUSCATED_DIR)
-    print("Clean up complete.")
+    logging.info("Clean up complete.")
 
-def obfuscate_files():
+def obfuscate_files(obfuscation_level):
     """
     Obfuscates the python files in the project using pyarmor.
     """
-    print("Obfuscating files...")
+    logging.info(f"Obfuscating files with level: {obfuscation_level}")
     try:
         # The command to obfuscate the code.
         command = [
             "pyarmor",
             "obfuscate",
             "--recursive",
+            f"--obf-level={obfuscation_level}",
             "--output",
             OBFUSCATED_DIR,
             os.path.join(SRC_DIR, ENTRY_POINT)
         ]
         # Execute the command.
         subprocess.run(command, check=True)
-        print("Files obfuscated successfully.")
+        logging.info("Files obfuscated successfully.")
     except subprocess.CalledProcessError as e:
-        print(f"An error occurred during obfuscation: {e}")
+        logging.error(f"An error occurred during obfuscation: {e}")
     except FileNotFoundError:
-        print("Error: pyarmor is not installed or not in the system's PATH.")
-        print("Please install it using: pip install pyarmor")
+        logging.error("Error: pyarmor is not installed or not in the system's PATH.")
+        logging.error("Please install it using: pip install pyarmor")
 
-if __name__ == "__main__":
+def main():
+    """
+    The main function of the script.
+    """
+    parser = argparse.ArgumentParser(description="Obfuscate Python source code.")
+    parser.add_argument("--level", type=int, default=1,
+                        help="The obfuscation level (1-3).")
+    args = parser.parse_args()
+
     # Clean up previous obfuscated files before running the process.
     clean_up()
     # Obfuscate the files.
-    obfuscate_files()
+    obfuscate_files(args.level)
+
+if __name__ == "__main__":
+    main()
