@@ -33,6 +33,7 @@ from .map_utils import generate_folium_map_html
 from db import (
     get_total_clients_count,
     get_active_clients_count,
+    db_manager,
     get_country_by_name,
     get_total_projects_count,
     get_active_projects_count,
