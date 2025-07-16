@@ -1,0 +1,34 @@
+Using version ^8.4.1 for pytest
+Using version ^4.5.0 for pytest-qt
+Using version ^0.0.20 for python-multipart
+Using version ^25.1.0 for black
+Using version ^7.3.0 for flake8
+Using version ^6.3.1 for icalendar
+Using version ^5.15.7 for pyqtwebengine
+Using version ^6.0.1 for isort
+
+Updating dependencies
+Resolving dependencies...
+
+Package operations: 18 installs, 0 updates, 0 removals
+
+  - Installing iniconfig (2.1.0)
+  - Installing pluggy (1.6.0)
+  - Installing pygments (2.19.2)
+  - Installing mccabe (0.7.0)
+  - Installing mypy-extensions (1.1.0)
+  - Installing pathspec (0.12.1)
+  - Installing platformdirs (4.3.8)
+  - Installing pycodestyle (2.14.0)
+  - Installing pyflakes (3.4.0)
+  - Installing pyqtwebengine-qt5 (5.15.17)
+  - Installing pytest (8.4.1)
+  - Installing black (25.1.0)
+  - Installing flake8 (7.3.0)
+  - Installing icalendar (6.3.1)
+  - Installing isort (6.0.1)
+  - Installing pyqtwebengine (5.15.7)
+  - Installing pytest-qt (4.5.0)
+  - Installing python-multipart (0.0.20)
+
+Writing lock file
