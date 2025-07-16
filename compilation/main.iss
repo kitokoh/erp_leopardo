@@ -8,7 +8,7 @@
 #define MyAppURL "https://www.leopardo.com/"
 #define MyAppExeName "main.exe"
 #define MyAppDataDir "saadiya"
-#define MyAppIcon "resources\icons\robot-icons-30504-Windows.ico"
+
 
 ; --- File Associations ---
 #define MyAppAssocName MyAppName + " File"
@@ -48,6 +48,7 @@ InfoBeforeFile={#BeforeInstallFile}
 InfoAfterFile={#AfterInstallFile}
 OutputBaseFilename=Leopardo-ai
 SetupIconFile={#MyAppIcon}
+
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -57,6 +58,7 @@ AlwaysShowDirOnReadyPage=yes
 PrivilegesRequired=admin
 OutputManifestFile=setup.log
 UninstallDisplayIcon={#MyAppIcon}
+
 OutputDir={#OutputDir}
 UninstallDisplayName={#MyAppName} v{#MyAppVersion} Uninstall
 ; Custom window images
@@ -64,6 +66,7 @@ WizardImageFile=resources\icons\robot-icons-30504.bmp
 WizardSmallImageFile=resources\icons\robot-icons-30504.bmp
 ; Silent Installer
 SilentInstall=yes
+
 
 ; --- Messages Section ---
 [Messages]

@@ -37,6 +37,7 @@ def clean_up():
     logging.info("Clean up complete.")
 
 def obfuscate_files(obfuscation_level, exclude):
+
     """
     Obfuscates the python files in the project using pyarmor.
     """
@@ -55,6 +56,7 @@ def obfuscate_files(obfuscation_level, exclude):
         # Add exclude patterns to the command.
         for pattern in exclude:
             command.extend(["--exclude", pattern])
+
         # Execute the command.
         subprocess.run(command, check=True)
         logging.info("Files obfuscated successfully.")
@@ -72,6 +74,7 @@ def sign_code():
     # Add code signing logic here
     logging.info("Code signed successfully.")
 
+
 def main():
     """
     The main function of the script.
@@ -83,6 +86,7 @@ def main():
                         help="A list of patterns to exclude from obfuscation.")
     parser.add_argument("--sign", action="store_true",
                         help="Sign the code after obfuscation.")
+
     args = parser.parse_args()
 
     # Clean up previous obfuscated files before running the process.
@@ -93,6 +97,7 @@ def main():
     # Sign the code if requested.
     if args.sign:
         sign_code()
+
 
 if __name__ == "__main__":
     main()
