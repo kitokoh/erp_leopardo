@@ -9,6 +9,7 @@
 #define MyAppExeName "main.exe"
 #define MyAppDataDir "saadiya"
 
+
 ; --- File Associations ---
 #define MyAppAssocName MyAppName + " File"
 #define MyAppAssocExt ".myp"
@@ -46,7 +47,8 @@ LicenseFile={#LicenseFile}
 InfoBeforeFile={#BeforeInstallFile}
 InfoAfterFile={#AfterInstallFile}
 OutputBaseFilename=Leopardo-ai
-SetupIconFile=resources\icons\robot-icons-30504-Windows.ico
+SetupIconFile={#MyAppIcon}
+
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -55,12 +57,16 @@ MinVersion=10.0.0
 AlwaysShowDirOnReadyPage=yes
 PrivilegesRequired=admin
 OutputManifestFile=setup.log
-UninstallDisplayIcon=resources\robot-icons-30504-Windows.ico
+UninstallDisplayIcon={#MyAppIcon}
+
 OutputDir={#OutputDir}
 UninstallDisplayName={#MyAppName} v{#MyAppVersion} Uninstall
 ; Custom window images
 WizardImageFile=resources\icons\robot-icons-30504.bmp
 WizardSmallImageFile=resources\icons\robot-icons-30504.bmp
+; Silent Installer
+SilentInstall=yes
+
 
 ; --- Messages Section ---
 [Messages]
