@@ -273,6 +273,11 @@ def generate_folium_map_html(
 
                             // The moveend event listener has been removed to prevent crashes.
                             // The map's last position will not be saved.
+                            map.on('moveend', function() {{
+                                var center = map.getCenter();
+                                var zoom = map.getZoom();
+                                window.{map_interaction_handler_name}.onMapViewChanged(center.lat, center.lng, zoom);
+                            }});
                         }}
                     }});
                 }} else {{
