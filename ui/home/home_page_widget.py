@@ -241,18 +241,20 @@ class HomePageWidget(QWidget):
     def _setup_top_layout(self):
         """Crée le layout du haut avec la carte et la sidebar de statistiques."""
         top_h_layout = QHBoxLayout()
-        top_h_layout.setContentsMargins(10, 10, 10, 10)
-        top_h_layout.setSpacing(15)
+        top_h_layout.setContentsMargins(20, 20, 20, 20)
+        top_h_layout.setSpacing(20)
 
-        # La carte prend la place principale
-        top_h_layout.addWidget(self.map_widget_container, 3) # Stretch factor 3
+        # La carte prend la place principale, avec un ratio plus grand
+        top_h_layout.addWidget(self.map_widget_container, 4) # Stretch factor 4
 
         # Right Sidebar pour les aperçus rapides
         self.right_sidebar_container = QFrame()
         self.right_sidebar_container.setObjectName("homePageRightSidebar")
         self.right_sidebar_container.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        # Augmenter la largeur minimale de la sidebar
+        self.right_sidebar_container.setMinimumWidth(350)
         self.right_sidebar_layout = QVBoxLayout(self.right_sidebar_container)
-        self.right_sidebar_layout.setContentsMargins(0, 0, 0, 0)
+        self.right_sidebar_layout.setContentsMargins(10, 10, 10, 10)
         self.right_sidebar_container.setLayout(self.right_sidebar_layout)
 
         self.quick_stats = QuickStatsWidget(self)
@@ -264,7 +266,7 @@ class HomePageWidget(QWidget):
         search_layout = self._setup_search_layout()
         self.right_sidebar_layout.addLayout(search_layout)
 
-        top_h_layout.addWidget(self.right_sidebar_container, 1) # Stretch factor 1
+        top_h_layout.addWidget(self.right_sidebar_container, 2) # Stretch factor 2
 
         return top_h_layout
 
@@ -302,23 +304,26 @@ class HomePageWidget(QWidget):
     def _setup_search_layout(self):
         """Crée le layout pour la barre de recherche."""
         search_layout = QHBoxLayout()
-        search_layout.setContentsMargins(10, 5, 10, 5)
-        search_layout.setSpacing(5)
-        search_layout.setAlignment(Qt.AlignCenter) # Centrer la barre
+        search_layout.setContentsMargins(15, 10, 15, 10)
+        search_layout.setSpacing(10)
+        # Ne pas centrer pour utiliser tout l'espace disponible
+        # search_layout.setAlignment(Qt.AlignCenter)
 
         self.search_input = QLineEdit()
         self.search_input.setObjectName("homePageSearchInput")
-        self.search_input.setPlaceholderText(self.tr("Rechercher..."))
+        self.search_input.setPlaceholderText(self.tr("Rechercher dans tout le système..."))
+        # Augmenter la hauteur du champ de recherche
+        self.search_input.setFixedHeight(40)
         self.search_input.returnPressed.connect(self._handle_search_query)
         search_layout.addWidget(self.search_input)
 
         self.search_button = QPushButton()
         self.search_button.setObjectName("homePageSearchButton")
-        search_icon = QIcon.fromTheme("search", QIcon(":/icons/search.svg"))
-        if not search_icon.isNull():
-            self.search_button.setIcon(search_icon)
-        else:
-            self.search_button.setText("🔍")
+        # S'assurer que l'icône est bien chargée et visible
+        search_icon = QIcon(":/icons/search.svg")
+        self.search_button.setIcon(search_icon)
+        self.search_button.setIconSize(QSize(20, 20)) # Taille de l'icône
+        self.search_button.setFixedSize(40, 40) # Bouton carré
         self.search_button.setToolTip(self.tr("Lancer la recherche"))
         self.search_button.clicked.connect(self._handle_search_query)
         search_layout.addWidget(self.search_button)
@@ -410,7 +415,7 @@ class HomePageWidget(QWidget):
                 self.module_cards_list.append(card)
                 grid_layout.addWidget(card, row, col)
                 col += 1
-                if col >= 4:
+                if col >= 3: # Passage à 3 colonnes
                     col = 0
                     row += 1
 
