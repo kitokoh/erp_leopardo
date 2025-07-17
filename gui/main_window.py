@@ -2348,8 +2348,8 @@ class DocumentManager(QMainWindow):
         elif isinstance(archive_filter_data, bool): include_deleted_filter = archive_filter_data
 
         filters_for_crud = {}
-        if self.selected_status_ids_filter: # Use the list of selected status IDs
-            filters_for_crud['status_ids'] = self.selected_status_ids_filter
+        # if self.selected_status_ids_filter: # Use the list of selected status IDs
+        #     filters_for_crud['status_ids'] = self.selected_status_ids_filter
 
         if country_id_filter is not None: filters_for_crud['country_id'] = country_id_filter
         if category_filter_text: filters_for_crud['category'] = category_filter_text
