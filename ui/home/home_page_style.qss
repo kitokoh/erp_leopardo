@@ -42,17 +42,18 @@ QWidget#homePageButtonGridContainer QPushButton:pressed {
 /* Styles pour ModuleCardWidget */
 QWidget#moduleCard {
     background-color: #FFFFFF;
-    border: 1px solid #DDE2E6;
-    border-radius: 8px;
-    padding: 15px;
-    min-height: 170px; /* Augmenté pour stats */
-    max-width: 280px;
-    /* Consider adding QGraphicsDropShadowEffect in Python for better shadow */
+    border: 1px solid #E0E0E0;
+    border-radius: 12px; /* Coins plus arrondis */
+    padding: 20px;
+    min-height: 180px; /* Hauteur augmentée */
+    max-width: 320px; /* Largeur augmentée */
+    /* Effet d'ombre via Python pour un meilleur contrôle */
 }
 
 QWidget#moduleCard:hover {
     border-color: #007BFF;
-    background-color: #F8FAFC;
+    background-color: #F9F9F9;
+    transform: scale(1.02); /* Effet de zoom léger */
 }
 
 QLabel#moduleIconLabel {
@@ -272,28 +273,27 @@ QFrame#tipAreaFrame {
 /* Search Bar Styling */
 QLineEdit#homePageSearchInput {
     font-family: "Open Sans", "Segoe UI", Arial, sans-serif;
-    font-size: 13px;
-    padding: 6px 10px;
-    border: 1px solid #CED4DA;
-    border-radius: 15px; /* Rounded corners */
-    background-color: #FFFFFF;
+    font-size: 14px; /* Taille de police augmentée */
+    padding: 10px 15px; /* Padding augmenté */
+    border: 1px solid #CCCCCC;
+    border-radius: 20px; /* Coins encore plus arrondis */
+    background-color: #FDFDFD;
 }
 
 QLineEdit#homePageSearchInput:focus {
-    border-color: #007BFF; /* Highlight color on focus */
-    /* box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25); */ /* QSS doesn't support box-shadow directly like CSS */
+    border-color: #007BFF;
+    background-color: #FFFFFF;
 }
 
 QPushButton#homePageSearchButton {
-    background-color: #007BFF; /* Primary button color */
-    border: 1px solid #007BFF;
-    color: white; /* Icon color should ideally be white if it's from a font or styled SVG */
-    border-radius: 15px; /* Match input field's rounding */
-    padding: 6px 8px; /* Adjust padding to make it squarish if icon only */
-    min-width: 30px; /* Ensure button has some width */
-    max-width: 30px; /* Ensure button has some width */
-    min-height: 30px; /* Ensure button has some height */
-    max-height: 30px; /* Ensure button has some height */
+    background-color: #007BFF;
+    border: none;
+    color: white;
+    border-radius: 20px; /* Match du champ de recherche */
+    min-width: 40px;
+    max-width: 40px;
+    min-height: 40px;
+    max-height: 40px;
 }
 
 QPushButton#homePageSearchButton:hover {

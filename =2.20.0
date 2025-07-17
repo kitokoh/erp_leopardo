@@ -1,0 +1,14 @@
+Using version ^3.1.1 for flask
+Using version ^2.32.4 for requests
+
+Updating dependencies
+Resolving dependencies...
+
+Package operations: 4 installs, 0 updates, 0 removals
+
+  - Installing blinker (1.9.0)
+  - Installing itsdangerous (2.2.0)
+  - Installing flask (3.1.1)
+  - Installing speechrecognition (3.14.3)
+
+Writing lock file

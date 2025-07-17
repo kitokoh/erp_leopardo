@@ -33,6 +33,7 @@ from .map_utils import generate_folium_map_html
 from db import (
     get_total_clients_count,
     get_active_clients_count,
+    db_manager,
     get_country_by_name,
     get_total_projects_count,
     get_active_projects_count,
@@ -94,6 +95,10 @@ class MapInteractionHandler(QObject):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+
+    @pyqtSlot(float, float, int)
+    def onMapViewChanged(self, lat, lng, zoom):
+        self.map_view_changed_signal.emit(lat, lng, zoom)
 
     @pyqtSlot(str)
     def countryClicked(self, country_name):
@@ -231,9 +236,10 @@ class StatisticsDashboard(QWidget):
     def _on_map_view_changed(self, lat, lng, zoom):
         db_session = get_db_connection()
         try:
-            db_manager.set_setting('map_last_lat', str(lat), db_session)
-            db_manager.set_setting('map_last_lng', str(lng), db_session)
-            db_manager.set_setting('map_last_zoom', str(zoom), db_session)
+            from db.cruds.application_settings_crud import set_setting
+            set_setting('map_last_lat', str(lat), db_session)
+            set_setting('map_last_lng', str(lng), db_session)
+            set_setting('map_last_zoom', str(zoom), db_session)
         finally:
             db_session.close()
 
