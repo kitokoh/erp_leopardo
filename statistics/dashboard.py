@@ -179,7 +179,7 @@ class StatisticsDashboard(QWidget):
             logging.error(f"Failed to initialize StatisticsDashboard: {e}", exc_info=True)
             error_layout = QVBoxLayout(self)
             error_label = QLabel(self.tr("Could not initialize the statistics dashboard.\nPlease check the logs for more information."))
-                error_label.setAlignment(Qt.AlignCenter)
+            error_label.setAlignment(Qt.AlignCenter)
             error_layout.addWidget(error_label)
             self.setLayout(error_layout)
 
@@ -194,7 +194,7 @@ class StatisticsDashboard(QWidget):
             self.map_interaction_handler = MapInteractionHandler(self)
             self.map_interaction_handler.country_clicked_signal.connect(self._on_map_country_clicked)
             self.map_interaction_handler.client_clicked_on_map_signal.connect(self._display_client_details_in_panel)
-                self.map_interaction_handler.request_map_refresh_signal.connect(self.update_map)
+            self.map_interaction_handler.request_map_refresh_signal.connect(self.update_map)
             self.map_interaction_handler.map_view_changed_signal.connect(self._on_map_view_changed)
 
             self.web_channel = QWebChannel(self.map_view.page())
