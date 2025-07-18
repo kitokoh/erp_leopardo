@@ -88,16 +88,11 @@ class GlobalStatsWorker(QRunnable):
 class MapInteractionHandler(QObject):
     country_clicked_signal = pyqtSignal(str)
     client_clicked_on_map_signal = pyqtSignal(str, str)
-    # New signal for JS to request map refresh
     request_map_refresh_signal = pyqtSignal()
     map_view_changed_signal = pyqtSignal(float, float, int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
-
-    @pyqtSlot(float, float, int)
-    def onMapViewChanged(self, lat, lng, zoom):
-        self.map_view_changed_signal.emit(lat, lng, zoom)
 
     @pyqtSlot(str)
     def countryClicked(self, country_name):
@@ -184,23 +179,14 @@ class StatisticsDashboard(QWidget):
             logging.error(f"Failed to initialize StatisticsDashboard: {e}", exc_info=True)
             error_layout = QVBoxLayout(self)
             error_label = QLabel(self.tr("Could not initialize the statistics dashboard.\nPlease check the logs for more information."))
-            error_label.setAlignment(Qt.AlignCenter)
+                error_label.setAlignment(Qt.AlignCenter)
             error_layout.addWidget(error_label)
             self.setLayout(error_layout)
 
     def _initialize_map_and_load_data(self):
         logging.info("StatisticsDashboard: _initialize_map_and_load_data called.")
-
-        if self.left_widget_for_map is None or self._left_map_actual_layout is None:
-            logging.critical("Map container or its layout is not initialized. Cannot proceed.")
-            if self._left_map_actual_layout:
-                error_label = QLabel(self.tr("Erreur critique: Conteneur de carte non initialisé."))
-                error_label.setAlignment(Qt.AlignCenter)
-                self._left_map_actual_layout.addWidget(error_label)
-            return
-
         if self.map_view is None:
-            self.map_view = QWebEngineView(self.left_widget_for_map)
+            self.map_view = QWebEngineView()
             self.map_view.setObjectName("mapViewWidget")
             self._left_map_actual_layout.addWidget(self.map_view)
             logging.info("QWebEngineView (self.map_view) created and added to layout.")
@@ -208,15 +194,23 @@ class StatisticsDashboard(QWidget):
             self.map_interaction_handler = MapInteractionHandler(self)
             self.map_interaction_handler.country_clicked_signal.connect(self._on_map_country_clicked)
             self.map_interaction_handler.client_clicked_on_map_signal.connect(self._display_client_details_in_panel)
-            if hasattr(self.map_interaction_handler, 'request_map_refresh_signal'):
                 self.map_interaction_handler.request_map_refresh_signal.connect(self.update_map)
             self.map_interaction_handler.map_view_changed_signal.connect(self._on_map_view_changed)
 
-
-            web_channel = QWebChannel(self.map_view.page())
-            self.map_view.page().setWebChannel(web_channel)
-            web_channel.registerObject("pyMapConnector", self.map_interaction_handler)
+            self.web_channel = QWebChannel(self.map_view.page())
+            self.map_view.page().setWebChannel(self.web_channel)
+            self.web_channel.registerObject("pyMapConnector", self.map_interaction_handler)
             logging.info("MapInteractionHandler and QWebChannel set up.")
+
+            # Load the local HTML file
+            map_file_path = os.path.join(APP_ROOT_DIR, "map.html")
+            if os.path.exists(map_file_path):
+                with open(map_file_path, 'r') as f:
+                    html_content = f.read()
+                self.map_view.setHtml(html_content)
+            else:
+                logging.error(f"map.html not found at {map_file_path}")
+                self.map_view.setHtml("<h1>Error: map.html not found</h1>")
 
         self.refresh_all_dashboard_content()
         logging.info("Initial map and data load sequence completed.")

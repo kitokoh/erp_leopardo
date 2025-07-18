@@ -17,13 +17,11 @@ class HomePageMapInteractionHandler(QObject):
     # Define signals if the home page map needs to communicate back to Python
     # For example: home_country_clicked = pyqtSignal(str)
     map_view_changed_signal = pyqtSignal(float, float, int)
+    country_clicked_signal = pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
 
-    country_clicked_signal = pyqtSignal(str)
-
-    # Define @pyqtSlot decorated methods if JS needs to call Python
     @pyqtSlot(str)
     def countryClicked(self, country_name):
         self.country_clicked_signal.emit(country_name)
