@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSizePolicy
-from PyQt5.QtCore import Qt, pyqtSignal, QSize
-from PyQt5.QtGui import QIcon, QMouseEvent, QFontMetrics # Added QFontMetrics
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSizePolicy, QGraphicsDropShadowEffect
+from PyQt5.QtCore import Qt, pyqtSignal, QSize, QPropertyAnimation, QEasingCurve, QEvent
+from PyQt5.QtGui import QIcon, QMouseEvent, QFontMetrics, QColor
 from PyQt5.QtCore import QFile
 
 class ModuleCardWidget(QWidget):
@@ -31,6 +31,16 @@ class ModuleCardWidget(QWidget):
         self._init_ui()
         self.setToolTip(self.card_tooltip)
         self.setCursor(Qt.PointingHandCursor) # Indiquer que c'est cliquable
+        self._apply_shadow()
+
+    def _apply_shadow(self):
+        """Applique un effet d'ombre portée à la carte."""
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(15)
+        shadow.setXOffset(0)
+        shadow.setYOffset(4)
+        shadow.setColor(QColor(0, 0, 0, 60))
+        self.setGraphicsEffect(shadow)
 
     def _init_ui(self):
         """Initialise l'interface utilisateur de la carte."""
@@ -170,14 +180,31 @@ class ModuleCardWidget(QWidget):
             self.cardClicked.emit()
         super().mousePressEvent(event)
 
-    # Optionnel : enterEvent et leaveEvent pour des effets de survol plus complexes
-    # def enterEvent(self, event: QEvent):
-    #     # Exemple: self.setProperty("hovered", True); self.style().polish(self)
-    #     super().enterEvent(event)
+    def enterEvent(self, event: QEvent):
+        """Effet de survol à l'entrée de la souris."""
+        if not hasattr(self, 'zoom_animation'):
+            self.zoom_animation = QPropertyAnimation(self, b"geometry")
+            self.zoom_animation.setDuration(150)
+            self.zoom_animation.setEasingCurve(QEasingCurve.InOutQuad)
 
-    # def leaveEvent(self, event: QEvent):
-    #     # Exemple: self.setProperty("hovered", False); self.style().polish(self)
-    #     super().leaveEvent(event)
+        start_rect = self.geometry()
+        end_rect = start_rect.adjusted(-5, -5, 5, 5)
+
+        self.zoom_animation.setStartValue(start_rect)
+        self.zoom_animation.setEndValue(end_rect)
+        self.zoom_animation.start()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event: QEvent):
+        """Effet de survol à la sortie de la souris."""
+        if hasattr(self, 'zoom_animation'):
+            start_rect = self.geometry()
+            end_rect = start_rect.adjusted(5, 5, -5, -5)
+
+            self.zoom_animation.setStartValue(start_rect)
+            self.zoom_animation.setEndValue(end_rect)
+            self.zoom_animation.start()
+        super().leaveEvent(event)
 
 # Nécessaire pour les tests si exécuté directement
 if __name__ == '__main__':
