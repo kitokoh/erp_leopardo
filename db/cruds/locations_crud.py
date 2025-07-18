@@ -1,6 +1,8 @@
 import sqlite3
 import logging
 from datetime import datetime
+from sqlalchemy.orm import Session
+from db.models.locations import Country, City
 from .generic_crud import _manage_conn # get_db_connection is not used directly
 
 # --- Countries CRUD ---
@@ -106,16 +108,22 @@ def add_country(data: dict, conn: sqlite3.Connection = None) -> int | None:
         return None
 
 @_manage_conn
-def get_all_countries(conn: sqlite3.Connection = None) -> list[dict]:
+def get_all_countries(conn: Session = None) -> list[dict]:
     """
     Retrieves all countries.
     """
-    cursor = conn.cursor()
     try:
-        cursor.execute("SELECT * FROM Countries ORDER BY country_name")
-        # return [dict(row) for row in cursor.fetchall()]
-        return [{key: item[key] for key in item.keys()} for item in cursor.fetchall()]
-    except sqlite3.Error as e:
+        countries = conn.query(Country).order_by(Country.country_name).all()
+        return [
+            {
+                "country_id": c.country_id,
+                "country_name": c.country_name,
+                "created_at": c.created_at.isoformat() if c.created_at else None,
+                "updated_at": c.updated_at.isoformat() if c.updated_at else None,
+            }
+            for c in countries
+        ]
+    except Exception as e:
         logging.error(f"Database error in get_all_countries: {e}")
         return []
 
