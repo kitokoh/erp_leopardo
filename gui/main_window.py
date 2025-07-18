@@ -900,38 +900,52 @@ class DocumentManager(QMainWindow):
 
     @pyqtSlot(str)
     def handle_add_client_from_stats_map(self, country_name_str):
-        logging.info(f"Received request to add client for country: {country_name_str} from statistics map using new dialog.")        
+        logging.info(f"Received request to add client for country: {country_name_str} from statistics map.")
         try:
-            dialog = StatisticsAddClientDialog(initial_country_name=country_name_str, parent=self)
+            # Utiliser AddNewClientDialog au lieu de StatisticsAddClientDialog
+            dialog = AddNewClientDialog(parent=self, initial_country_name=country_name_str)
 
             if dialog.exec_() == QDialog.Accepted:
-                new_client_data = dialog.get_data()
-                logging.info(f"StatisticsAddClientDialog accepted. Data: {new_client_data}")
+                client_data_from_dialog = dialog.get_data()
+                logging.info(f"AddNewClientDialog accepted. Data: {client_data_from_dialog}")
 
-                if not new_client_data.get('country_id'):
-                    QMessageBox.critical(self, self.tr("Erreur Pays"), self.tr("ID du pays non obtenu depuis le dialogue. Impossible de continuer."))
+                # AddNewClientDialog.get_data() retourne déjà created_by_user_id
+                # et les noms de pays/ville qui seront résolus par client_controller.
+                # Le client_controller s'attend à country_name et city_name, pas IDs.
+
+                if not client_data_from_dialog.get('client_name'):
+                    QMessageBox.critical(self, self.tr("Erreur Données"), self.tr("Le nom du client est requis."))
                     return
 
-                client_data_for_db = {
-                    "client_name": new_client_data["client_name"],
-                    "company_name": new_client_data.get("company_name"),
-                    "country_id": new_client_data["country_id"],
-                    "city_id": new_client_data.get("city_id"),
-                    "project_identifier": new_client_data.get("project_identifier"),
-                    "primary_need_description": new_client_data.get("primary_need_description"),
-                    "selected_languages": new_client_data.get("selected_languages"),
-                    "created_by_user_id": self.current_user_id
-                }
+                if not client_data_from_dialog.get('country_name'):
+                    QMessageBox.critical(self, self.tr("Erreur Données"), self.tr("Le nom du pays est requis."))
+                    return
 
-                logging.info(f"Proceeding to call handle_create_client_execution with data from new dialog: {client_data_for_db}")
-                handle_create_client_execution(self, client_data_dict=client_data_for_db)
+                # Appeler directement le client_controller pour créer le client
+                created_client_info = self.client_controller_instance.create_client(client_data_from_dialog)
+
+                if created_client_info and created_client_info.get('success'):
+                    new_client_id = created_client_info.get('client_id')
+                    if new_client_id:
+                        self.notify(self.tr("Client Créé"),
+                                    self.tr("Le client '{0}' a été créé avec succès.").format(created_client_info.get('client_name')),
+                                    type='SUCCESS')
+                        self.load_clients_from_db_slot() # Recharger la liste des clients
+                        self.open_client_tab_by_id(new_client_id) # Ouvrir l'onglet du nouveau client
+                    else:
+                        QMessageBox.critical(self, self.tr("Erreur Création Client"),
+                                             self.tr("Le client a été créé mais son ID n'a pas été retourné."))
+                else:
+                    error_msg = created_client_info.get('error', self.tr("Erreur inconnue lors de la création du client."))
+                    QMessageBox.critical(self, self.tr("Erreur Création Client"), error_msg)
+                    # Pas besoin de recharger la liste des clients ici car la création a échoué
             else:
-                logging.info("StatisticsAddClientDialog cancelled by user.")
+                logging.info("AddNewClientDialog cancelled by user.")
         except Exception as e:
-            logging.error(f"Error opening or executing StatisticsAddClientDialog for country {country_name_str}: {e}", exc_info=True)
+            logging.error(f"Error opening or executing AddNewClientDialog for country {country_name_str}: {e}", exc_info=True)
             QMessageBox.critical(self,
                                  self.tr("Erreur Dialogue"),
-                                 self.tr("Impossible d'ouvrir le dialogue 'Ajouter Client'. Veuillez consulter les logs de l'application pour plus de détails."))
+                                 self.tr("Impossible d'ouvrir le dialogue 'Ajouter Nouveau Client'. Veuillez consulter les logs pour plus de détails."))
 
 
     @pyqtSlot(str)
@@ -1419,7 +1433,26 @@ class DocumentManager(QMainWindow):
         dialog = AddNewClientDialog(self)
         if dialog.exec_() == QDialog.Accepted:
             client_data = dialog.get_data()
-            if client_data: handle_create_client_execution(self, client_data_dict=client_data)
+            if not client_data or not client_data.get('client_name'):
+                QMessageBox.warning(self, self.tr("Données Incomplètes"), self.tr("Le nom du client est requis."))
+                return
+
+            created_client_info = self.client_controller_instance.create_client(client_data)
+
+            if created_client_info and created_client_info.get('success'):
+                new_client_id = created_client_info.get('client_id')
+                if new_client_id:
+                    self.notify(self.tr("Client Créé"),
+                                self.tr("Le client '{0}' a été créé avec succès.").format(created_client_info.get('client_name')),
+                                type='SUCCESS')
+                    self.load_clients_from_db_slot()  # Rafraîchit la liste des clients
+                    self.open_client_tab_by_id(new_client_id)  # Ouvre l'onglet du nouveau client
+                else:
+                    QMessageBox.critical(self, self.tr("Erreur Création Client"),
+                                         self.tr("Le client a été créé mais son ID n'a pas été retourné."))
+            else:
+                error_msg = created_client_info.get('error', self.tr("Erreur inconnue lors de la création du client."))
+                QMessageBox.critical(self, self.tr("Erreur Création Client"), error_msg)
 
     def handle_add_client_by_voice_clicked(self):
         # Notify user that listening has started
