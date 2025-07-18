@@ -17,4 +17,5 @@ class City(Base):
     country_id = Column(Integer, ForeignKey('Countries.country_id'), nullable=False)
     city_name = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=Tuez), onupdate=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
