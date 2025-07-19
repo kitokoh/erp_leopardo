@@ -2,6 +2,9 @@ import sqlite3
 import uuid
 from datetime import datetime, timezone
 import logging
+from sqlalchemy.orm import Session
+from db.models.project import Project
+from db.models.status_setting import StatusSetting
 from .generic_crud import _manage_conn # get_db_connection is not used directly
 
 logger = logging.getLogger(__name__)
@@ -150,26 +153,25 @@ def get_total_projects_count(conn: sqlite3.Connection = None) -> int:
         return 0
 
 @_manage_conn
-def get_active_projects_count(conn: sqlite3.Connection = None) -> int:
+def get_active_projects_count(conn: Session = None) -> int:
     """
     Returns the count of active projects.
     'Active' is defined by not having a status that is marked as 'is_completion_status = TRUE'
     or 'is_archival_status = TRUE' in StatusSettings table.
     This requires a JOIN with StatusSettings.
     """
-    cursor = conn.cursor()
-    sql = """
-        SELECT COUNT(p.project_id)
-        FROM Projects p
-        LEFT JOIN StatusSettings ss ON p.status_id = ss.status_id
-        WHERE (ss.is_completion_status = FALSE OR ss.is_completion_status IS NULL)
-          AND (ss.is_archival_status = FALSE OR ss.is_archival_status IS NULL)
-    """
     try:
-        cursor.execute(sql)
-        count = cursor.fetchone()[0]
-        return count if count is not None else 0
-    except sqlite3.Error as e:
+        count = (
+            conn.query(Project)
+            .join(StatusSetting, Project.status_id == StatusSetting.status_id, isouter=True)
+            .filter(
+                (StatusSetting.is_completion_status == False) | (StatusSetting.is_completion_status == None),
+                (StatusSetting.is_archival_status == False) | (StatusSetting.is_archival_status == None),
+            )
+            .count()
+        )
+        return count
+    except Exception as e:
         logger.error(f"Database error in get_active_projects_count: {e}", exc_info=True)
         return 0
 

@@ -743,38 +743,34 @@ class ClientMainWidget(QWidget):
         dialog.exec_()
 
     def load_contacts(self):
-        logging.info(f"ClientMainWidget.load_contacts called for client ID: {self.client_info.get('client_id')}")
-        if not hasattr(self, 'contacts_table'):
-            logging.warning("load_contacts: contacts_table not initialized.")
-            return
-
-        self.contacts_table.setRowCount(0) # Clear table
-        client_id = self.client_info.get("client_id")
-        if not client_id:
-            self.contacts_empty_label.setVisible(True)
-            self.contacts_table.setVisible(False)
-            self.total_contacts_count = 0
-            self.update_contact_pagination_controls()
-            return
-
         try:
-            # This is a simplified load. A full implementation would handle pagination,
-            # fetching total count, and more robust error checking.
+            logging.info(f"ClientMainWidget.load_contacts called for client ID: {self.client_info.get('client_id')}")
+            if not hasattr(self, 'contacts_table'):
+                logging.warning("load_contacts: contacts_table not initialized.")
+                return
+
+            self.contacts_table.setRowCount(0)
+            client_id = self.client_info.get("client_id")
+            if not client_id:
+                self.contacts_empty_label.setVisible(True)
+                self.contacts_table.setVisible(False)
+                self.total_contacts_count = 0
+                self.update_contact_pagination_controls()
+                return
+
             contacts_data = db_manager.get_contacts_for_client(
                 client_id,
                 limit=self.CONTACT_PAGE_LIMIT,
                 offset=self.current_contact_offset
             )
-            # Assuming get_contacts_for_client_count exists or is added to db_manager
             if hasattr(db_manager, 'get_contacts_for_client_count'):
-                 self.total_contacts_count = db_manager.get_contacts_for_client_count(client_id)
-            else: # Estimate total count if specific count function is missing
-                 self.total_contacts_count = len(contacts_data) if self.current_contact_offset == 0 else self.current_contact_offset + len(contacts_data)
-                 if len(contacts_data) < self.CONTACT_PAGE_LIMIT and self.current_contact_offset > 0 : # If on a later page and less than full page, this is the end
-                    pass # total_contacts_count is likely correct
-                 elif len(contacts_data) == self.CONTACT_PAGE_LIMIT:
+                self.total_contacts_count = db_manager.get_contacts_for_client_count(client_id)
+            else:
+                self.total_contacts_count = len(contacts_data) if self.current_contact_offset == 0 else self.current_contact_offset + len(contacts_data)
+                if len(contacts_data) < self.CONTACT_PAGE_LIMIT and self.current_contact_offset > 0:
+                    pass
+                elif len(contacts_data) == self.CONTACT_PAGE_LIMIT:
                     logging.warning("Missing get_contacts_for_client_count; pagination might be inaccurate if there are more pages.")
-
 
             if not contacts_data:
                 self.contacts_empty_label.setVisible(True)
@@ -784,9 +780,8 @@ class ClientMainWidget(QWidget):
                 self.contacts_table.setVisible(True)
                 self.contacts_table.setRowCount(len(contacts_data))
                 for row, contact in enumerate(contacts_data):
-                    # Populate table rows - simplified
                     name_item = QTableWidgetItem(contact.get("contact_name", "N/A"))
-                    name_item.setData(Qt.UserRole, contact.get("contact_id")) # Store contact_id
+                    name_item.setData(Qt.UserRole, contact.get("contact_id"))
                     self.contacts_table.setItem(row, 0, name_item)
                     self.contacts_table.setItem(row, 1, QTableWidgetItem(contact.get("email", "N/A")))
                     self.contacts_table.setItem(row, 2, QTableWidgetItem(contact.get("phone", "N/A")))
@@ -796,7 +791,6 @@ class ClientMainWidget(QWidget):
                     primary_item.setTextAlignment(Qt.AlignCenter)
                     self.contacts_table.setItem(row, 4, primary_item)
 
-                    # Colonne Actions (index 5)
                     actions_widget = QWidget()
                     actions_layout = QHBoxLayout(actions_widget)
                     actions_layout.setContentsMargins(5, 0, 5, 0)
@@ -804,15 +798,13 @@ class ClientMainWidget(QWidget):
 
                     edit_button = QPushButton(QIcon(":/icons/edit-2.svg"), "")
                     edit_button.setToolTip(self.tr("Modifier ce contact"))
-                    edit_button.setProperty("class", "tableActionButton") # For QSS styling
-                    # edit_button.setStyleSheet("QPushButton { padding: 4px; border: none; background-color: transparent; } QPushButton:hover { background-color: #e2e8f0; }")
+                    edit_button.setProperty("class", "tableActionButton")
                     edit_button.clicked.connect(lambda checked, r=row: self.handle_edit_contact_action(r))
                     actions_layout.addWidget(edit_button)
 
                     remove_button = QPushButton(QIcon(":/icons/trash-2.svg"), "")
                     remove_button.setToolTip(self.tr("Supprimer le lien vers ce contact"))
-                    remove_button.setProperty("class", "dangerButtonTable") # For QSS styling
-                    # remove_button.setStyleSheet("QPushButton { padding: 4px; border: none; background-color: transparent; } QPushButton:hover { background-color: #fed7d7; }")
+                    remove_button.setProperty("class", "dangerButtonTable")
                     remove_button.clicked.connect(lambda checked, r=row: self.handle_remove_contact_action(r))
                     actions_layout.addWidget(remove_button)
 
@@ -821,55 +813,46 @@ class ClientMainWidget(QWidget):
                     self.contacts_table.setCellWidget(row, 5, actions_widget)
 
                 self.contacts_table.resizeRowsToContents()
-
-
         except Exception as e:
-            logging.error(f"Error loading contacts into table: {e}", exc_info=True)
-            QMessageBox.warning(self, self.tr("Erreur Chargement Contacts"), self.tr("Impossible de charger les contacts: {0}").format(str(e)))
+            logging.error(f"Error in load_contacts: {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur Inattendue"), self.tr("Une erreur inattendue est survenue lors du chargement des contacts: {0}").format(str(e)))
             self.contacts_empty_label.setVisible(True)
             self.contacts_table.setVisible(False)
             self.total_contacts_count = 0
 
         self.update_contact_pagination_controls()
-        self._apply_permissions() # Re-apply permissions that might depend on selection state
+        self._apply_permissions()
 
     def add_contact(self):
-        client_id = self.client_info.get("client_id")
-        if not client_id:
-            QMessageBox.warning(self, self.tr("Erreur Client"), self.tr("ID Client non disponible pour ajouter un contact."))
-            return
+        try:
+            client_id = self.client_info.get("client_id")
+            if not client_id:
+                QMessageBox.warning(self, self.tr("Erreur Client"), self.tr("ID Client non disponible pour ajouter un contact."))
+                return
 
-        if not hasattr(self, 'ContactDialog') or self.ContactDialog is None:
-            logging.error("ContactDialog component not available in ClientMainWidget.")
-            QMessageBox.critical(self, self.tr("Erreur Composant"), self.tr("Le composant d'ajout de contact n'est pas chargé."))
-            return
+            if not hasattr(self, 'ContactDialog') or self.ContactDialog is None:
+                logging.error("ContactDialog component not available in ClientMainWidget.")
+                QMessageBox.critical(self, self.tr("Erreur Composant"), self.tr("Le composant d'ajout de contact n'est pas chargé."))
+                return
 
-        # Open dialog to create/select a contact (manage_link_fields=True to show link-specific fields)
-        dialog = self.ContactDialog(manage_link_fields=True, parent=self)
-        if dialog.exec_() == QDialog.Accepted:
-            contact_core_data = dialog.get_contact_data()
-            contact_link_data = dialog.get_link_data() # Contains role, is_primary, link_notes
+            dialog = self.ContactDialog(manage_link_fields=True, parent=self)
+            if dialog.exec_() == QDialog.Accepted:
+                contact_core_data = dialog.get_contact_data()
+                contact_link_data = dialog.get_link_data()
 
-            if not contact_core_data or not contact_core_data.get('name'):
-                 QMessageBox.warning(self, self.tr("Données Incomplètes"), self.tr("Le nom du contact est requis."))
-                 return
+                if not contact_core_data or not contact_core_data.get('name'):
+                    QMessageBox.warning(self, self.tr("Données Incomplètes"), self.tr("Le nom du contact est requis."))
+                    return
 
-            try:
-                # Check if contact exists or create new one
-                # This logic might be better inside db_manager or a contact_controller
                 existing_contact = None
-                if contact_core_data.get('email'): # Try to find by email
+                if contact_core_data.get('email'):
                     existing_contact = db_manager.get_contact_by_email(contact_core_data['email'])
-                # Add more sophisticated matching if needed (e.g., name + phone)
 
                 contact_id_to_link = None
                 if existing_contact:
                     contact_id_to_link = existing_contact['contact_id']
-                    # Optionally, update existing contact details if changed in dialog
-                    # db_manager.update_contact(contact_id_to_link, contact_core_data)
                     logging.info(f"Using existing contact ID: {contact_id_to_link} for client {client_id}")
                 else:
-                    # Create new contact
                     new_contact_id = db_manager.add_contact(contact_core_data)
                     if new_contact_id:
                         contact_id_to_link = new_contact_id
@@ -879,42 +862,28 @@ class ClientMainWidget(QWidget):
                         return
 
                 if contact_id_to_link:
-                    # Prepare data for linking, including fields from contact_link_data
-                    link_payload = {
-                        'client_id': client_id,
-                        'contact_id': contact_id_to_link,
-                        'role_in_project': contact_link_data.get('role_in_entity', ''), # Or 'role_in_client'
-                        'is_primary_for_client': contact_link_data.get('is_primary', False),
-                        'notes': contact_link_data.get('notes', ''), # Link-specific notes
-                        'can_receive_documents': contact_link_data.get('can_receive_documents', True)
-                    }
-                    # If is_primary_for_client is True, ensure other contacts for this client are not primary.
-                    if link_payload['is_primary_for_client']:
+                    if contact_link_data.get('is_primary', False):
                         db_manager.clear_primary_contact_for_client(client_id, except_contact_id=contact_id_to_link)
 
-                    # Corrected call to link_contact_to_client
                     link_success = db_manager.link_contact_to_client(
-                        client_id=link_payload['client_id'],
-                        contact_id=link_payload['contact_id'],
-                        is_primary=link_payload.get('is_primary_for_client', False), # Use .get for safety
-                        can_receive_documents=link_payload.get('can_receive_documents', True),
-                        role_in_client=link_payload.get('role_in_project'), # Map key
-                        notes=link_payload.get('notes')
+                        client_id=client_id,
+                        contact_id=contact_id_to_link,
+                        is_primary=contact_link_data.get('is_primary', False),
+                        can_receive_documents=contact_link_data.get('can_receive_documents', True),
+                        role_in_client=contact_link_data.get('role_in_entity', ''),
+                        notes=contact_link_data.get('notes', '')
                     )
 
-                    if link_success: # link_contact_to_client returns link_id (int) or None
-
+                    if link_success:
                         self.notification_manager.show(self.tr("Succès"), self.tr("Contact ajouté et lié au client avec succès."), type='SUCCESS')
-                        self.load_contacts() # Refresh the contacts table
+                        self.load_contacts()
                     else:
                         QMessageBox.critical(self, self.tr("Erreur DB"), self.tr("Impossible de lier le contact au client."))
                 else:
-                    # This case should ideally be caught by previous checks
                     QMessageBox.critical(self, self.tr("Erreur Interne"), self.tr("ID de contact non déterminé pour la liaison."))
-
-            except Exception as e:
-                logging.error(f"Error adding/linking contact: {e}", exc_info=True)
-                QMessageBox.critical(self, self.tr("Erreur Inattendue"), self.tr("Une erreur est survenue: {0}").format(str(e)))
+        except Exception as e:
+            logging.error(f"Error in add_contact: {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur Inattendue"), self.tr("Une erreur inattendue est survenue lors de l'ajout du contact: {0}").format(str(e)))
 
     def open_compile_pdf_dialog(self):
         if not self.client_info or not self.client_info.get("client_id"):

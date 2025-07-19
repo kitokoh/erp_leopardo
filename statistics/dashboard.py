@@ -88,16 +88,11 @@ class GlobalStatsWorker(QRunnable):
 class MapInteractionHandler(QObject):
     country_clicked_signal = pyqtSignal(str)
     client_clicked_on_map_signal = pyqtSignal(str, str)
-    # New signal for JS to request map refresh
     request_map_refresh_signal = pyqtSignal()
     map_view_changed_signal = pyqtSignal(float, float, int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
-
-    @pyqtSlot(float, float, int)
-    def onMapViewChanged(self, lat, lng, zoom):
-        self.map_view_changed_signal.emit(lat, lng, zoom)
 
     @pyqtSlot(str)
     def countryClicked(self, country_name):
@@ -128,79 +123,70 @@ class StatisticsDashboard(QWidget):
         super().__init__(parent)
         self.setObjectName("StatisticsDashboard")
         self.setWindowTitle(self.tr("Tableau de Bord Statistiques Interactif"))
-        self.threadpool = QThreadPool()
-        logging.info(f"Multithreading with maximum {self.threadpool.maxThreadCount()} threads")
+        try:
+            self.threadpool = QThreadPool()
+            logging.info(f"Multithreading with maximum {self.threadpool.maxThreadCount()} threads")
 
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(10,10,10,10)
-        main_layout.setSpacing(10)
+            main_layout = QVBoxLayout(self)
+            main_layout.setContentsMargins(10,10,10,10)
+            main_layout.setSpacing(10)
 
-        # Top layout for Title and Refresh button
-        top_bar_layout = QHBoxLayout()
+            top_bar_layout = QHBoxLayout()
+            self.dashboard_tabs = QTabWidget()
+            self.dashboard_tabs.addTab(QWidget(), self.tr("Dashboard Principal"))
+            self.dashboard_tabs.addTab(QWidget(), self.tr("Analyses Approfondies"))
+            top_bar_layout.addWidget(self.dashboard_tabs)
 
-        self.dashboard_tabs = QTabWidget()
-        self.dashboard_tabs.addTab(QWidget(), self.tr("Dashboard Principal"))
-        self.dashboard_tabs.addTab(QWidget(), self.tr("Analyses Approfondies"))
+            self.global_refresh_button = QPushButton()
+            self.global_refresh_button.setIcon(QIcon(":/icons/refresh-cw.svg"))
+            self.global_refresh_button.setToolTip(self.tr("Rafraîchir les données"))
+            self.global_refresh_button.setObjectName("refreshButton")
+            self.global_refresh_button.clicked.connect(self.refresh_all_dashboard_content)
+            top_bar_layout.addWidget(self.global_refresh_button)
 
-        top_bar_layout.addWidget(self.dashboard_tabs)
+            main_layout.addLayout(top_bar_layout)
 
-        self.global_refresh_button = QPushButton()
-        self.global_refresh_button.setIcon(QIcon(":/icons/refresh-cw.svg"))
-        self.global_refresh_button.setToolTip(self.tr("Rafraîchir les données"))
-        self.global_refresh_button.setObjectName("refreshButton")
-        self.global_refresh_button.clicked.connect(self.refresh_all_dashboard_content)
-        top_bar_layout.addWidget(self.global_refresh_button)
+            self.main_splitter = QSplitter(Qt.Horizontal, self)
+            self.left_widget_for_map = QWidget()
+            self.left_widget_for_map.setObjectName("mapContainerWidget")
+            self._left_map_actual_layout = QVBoxLayout()
+            self._left_map_actual_layout.setContentsMargins(0,0,0,0)
+            self.left_widget_for_map.setLayout(self._left_map_actual_layout)
 
-        main_layout.addLayout(top_bar_layout)
+            self.map_view = None
+            self.main_splitter.addWidget(self.left_widget_for_map)
 
-        # Main horizontal splitter
-        self.main_splitter = QSplitter(Qt.Horizontal, self)
+            self.right_widget_for_stats = QWidget()
+            self.right_widget_for_stats.setObjectName("statsContainerWidget")
+            right_stats_layout = QVBoxLayout(self.right_widget_for_stats)
+            right_stats_layout.setContentsMargins(10,10,10,10)
+            self.right_widget_for_stats.setLayout(right_stats_layout)
+            self.main_splitter.addWidget(self.right_widget_for_stats)
 
-        # Left widget for Map
-        self.left_widget_for_map = QWidget()
-        self.left_widget_for_map.setObjectName("mapContainerWidget")
-        self._left_map_actual_layout = QVBoxLayout()
-        self._left_map_actual_layout.setContentsMargins(0,0,0,0)
-        self.left_widget_for_map.setLayout(self._left_map_actual_layout)
+            QTimer.singleShot(0, lambda: self.main_splitter.setSizes([int(self.width() * 0.6), int(self.width() * 0.4)]))
 
-        self.map_view = None
-        self.main_splitter.addWidget(self.left_widget_for_map)
+            self.dashboard_tabs.widget(0).setLayout(main_layout)
+            main_layout.addWidget(self.main_splitter)
+            self.setLayout(main_layout)
 
-        # Right widget for Stats
-        self.right_widget_for_stats = QWidget()
-        self.right_widget_for_stats.setObjectName("statsContainerWidget")
-        right_stats_layout = QVBoxLayout(self.right_widget_for_stats)
-        right_stats_layout.setContentsMargins(10,10,10,10)
-        self.right_widget_for_stats.setLayout(right_stats_layout)
-        self.main_splitter.addWidget(self.right_widget_for_stats)
+            self.map_interaction_handler = None
+            self._setup_stats_display_ui(right_stats_layout)
+            self.populate_views_combo()
 
-        QTimer.singleShot(0, lambda: self.main_splitter.setSizes([int(self.width() * 0.6), int(self.width() * 0.4)]))
-
-        self.dashboard_tabs.widget(0).setLayout(main_layout)
-        main_layout.addWidget(self.main_splitter)
-        self.setLayout(main_layout)
-
-        self.map_interaction_handler = None
-
-        self._setup_stats_display_ui(right_stats_layout)
-        self.populate_views_combo()
-
-        QTimer.singleShot(100, self._initialize_map_and_load_data)
-        logging.info("StatisticsDashboard initialized. Map components and initial data load deferred.")
+            QTimer.singleShot(100, self._initialize_map_and_load_data)
+            logging.info("StatisticsDashboard initialized. Map components and initial data load deferred.")
+        except Exception as e:
+            logging.error(f"Failed to initialize StatisticsDashboard: {e}", exc_info=True)
+            error_layout = QVBoxLayout(self)
+            error_label = QLabel(self.tr("Could not initialize the statistics dashboard.\nPlease check the logs for more information."))
+            error_label.setAlignment(Qt.AlignCenter)
+            error_layout.addWidget(error_label)
+            self.setLayout(error_layout)
 
     def _initialize_map_and_load_data(self):
         logging.info("StatisticsDashboard: _initialize_map_and_load_data called.")
-
-        if self.left_widget_for_map is None or self._left_map_actual_layout is None:
-            logging.critical("Map container or its layout is not initialized. Cannot proceed.")
-            if self._left_map_actual_layout:
-                error_label = QLabel(self.tr("Erreur critique: Conteneur de carte non initialisé."))
-                error_label.setAlignment(Qt.AlignCenter)
-                self._left_map_actual_layout.addWidget(error_label)
-            return
-
         if self.map_view is None:
-            self.map_view = QWebEngineView(self.left_widget_for_map)
+            self.map_view = QWebEngineView()
             self.map_view.setObjectName("mapViewWidget")
             self._left_map_actual_layout.addWidget(self.map_view)
             logging.info("QWebEngineView (self.map_view) created and added to layout.")
@@ -208,15 +194,23 @@ class StatisticsDashboard(QWidget):
             self.map_interaction_handler = MapInteractionHandler(self)
             self.map_interaction_handler.country_clicked_signal.connect(self._on_map_country_clicked)
             self.map_interaction_handler.client_clicked_on_map_signal.connect(self._display_client_details_in_panel)
-            if hasattr(self.map_interaction_handler, 'request_map_refresh_signal'):
-                self.map_interaction_handler.request_map_refresh_signal.connect(self.update_map)
+            self.map_interaction_handler.request_map_refresh_signal.connect(self.update_map)
             self.map_interaction_handler.map_view_changed_signal.connect(self._on_map_view_changed)
 
-
-            web_channel = QWebChannel(self.map_view.page())
-            self.map_view.page().setWebChannel(web_channel)
-            web_channel.registerObject("pyMapConnector", self.map_interaction_handler)
+            self.web_channel = QWebChannel(self.map_view.page())
+            self.map_view.page().setWebChannel(self.web_channel)
+            self.web_channel.registerObject("pyMapConnector", self.map_interaction_handler)
             logging.info("MapInteractionHandler and QWebChannel set up.")
+
+            # Load the local HTML file
+            map_file_path = os.path.join(APP_ROOT_DIR, "map.html")
+            if os.path.exists(map_file_path):
+                with open(map_file_path, 'r') as f:
+                    html_content = f.read()
+                self.map_view.setHtml(html_content)
+            else:
+                logging.error(f"map.html not found at {map_file_path}")
+                self.map_view.setHtml("<h1>Error: map.html not found</h1>")
 
         self.refresh_all_dashboard_content()
         logging.info("Initial map and data load sequence completed.")
