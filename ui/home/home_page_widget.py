@@ -601,6 +601,30 @@ class HomePageWidget(QWidget):
             except Exception as e:
                 QMessageBox.critical(self, self.tr("Erreur"), self.tr("Erreur lors de l'ajout du client: {0}").format(str(e)))
 
+    def showEvent(self, event):
+        """Déclenche l'animation de la carte lorsque le widget est affiché."""
+        super().showEvent(event)
+        if not hasattr(self, 'map_animation_started'):
+            self.map_animation_started = True
+            map_container = self.map_widget_container
+
+            # Animation de la taille de la carte
+            self.map_animation = QPropertyAnimation(map_container, b"maximumHeight")
+            self.map_animation.setDuration(1000)
+            self.map_animation.setStartValue(0)
+            self.map_animation.setEndValue(map_container.sizeHint().height())
+            self.map_animation.setEasingCurve(QEasingCurve.OutCubic)
+
+            # Animation de l'opacité
+            self.opacity_animation = QPropertyAnimation(map_container, b"windowOpacity")
+            self.opacity_animation.setDuration(500)
+            self.opacity_animation.setStartValue(0.0)
+            self.opacity_animation.setEndValue(1.0)
+            self.opacity_animation.setEasingCurve(QEasingCurve.InQuad)
+
+            self.map_animation.start()
+            self.opacity_animation.start()
+
 
 
 if __name__ == '__main__':
