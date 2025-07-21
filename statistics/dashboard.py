@@ -114,6 +114,10 @@ class MapInteractionHandler(QObject):
     def onMapViewChanged(self, lat, lng, zoom):
         self.map_view_changed_signal.emit(lat, lng, zoom)
 
+    @pyqtSlot(str, str, int)
+    def logJavaScriptError(self, message, source, lineno):
+        logging.error(f"JavaScript Error: {message} at {source}:{lineno}")
+
 
 class StatisticsDashboard(QWidget):
     request_add_client_for_country = pyqtSignal(str)
@@ -185,35 +189,39 @@ class StatisticsDashboard(QWidget):
 
     def _initialize_map_and_load_data(self):
         logging.info("StatisticsDashboard: _initialize_map_and_load_data called.")
-        if self.map_view is None:
-            self.map_view = QWebEngineView()
-            self.map_view.setObjectName("mapViewWidget")
-            self._left_map_actual_layout.addWidget(self.map_view)
-            logging.info("QWebEngineView (self.map_view) created and added to layout.")
+        try:
+            if self.map_view is None:
+                self.map_view = QWebEngineView()
+                self.map_view.setObjectName("mapViewWidget")
+                self._left_map_actual_layout.addWidget(self.map_view)
+                logging.info("QWebEngineView (self.map_view) created and added to layout.")
 
-            self.map_interaction_handler = MapInteractionHandler(self)
-            self.map_interaction_handler.country_clicked_signal.connect(self._on_map_country_clicked)
-            self.map_interaction_handler.client_clicked_on_map_signal.connect(self._display_client_details_in_panel)
-            self.map_interaction_handler.request_map_refresh_signal.connect(self.update_map)
-            self.map_interaction_handler.map_view_changed_signal.connect(self._on_map_view_changed)
+                self.map_interaction_handler = MapInteractionHandler(self)
+                self.map_interaction_handler.country_clicked_signal.connect(self._on_map_country_clicked)
+                self.map_interaction_handler.client_clicked_on_map_signal.connect(self._display_client_details_in_panel)
+                self.map_interaction_handler.request_map_refresh_signal.connect(self.update_map)
+                self.map_interaction_handler.map_view_changed_signal.connect(self._on_map_view_changed)
 
-            self.web_channel = QWebChannel(self.map_view.page())
-            self.map_view.page().setWebChannel(self.web_channel)
-            self.web_channel.registerObject("pyMapConnector", self.map_interaction_handler)
-            logging.info("MapInteractionHandler and QWebChannel set up.")
+                self.web_channel = QWebChannel(self.map_view.page())
+                self.map_view.page().setWebChannel(self.web_channel)
+                self.web_channel.registerObject("pyMapConnector", self.map_interaction_handler)
+                logging.info("MapInteractionHandler and QWebChannel set up.")
 
-            # Load the local HTML file
-            map_file_path = os.path.join(APP_ROOT_DIR, "map.html")
-            if os.path.exists(map_file_path):
-                with open(map_file_path, 'r') as f:
-                    html_content = f.read()
-                self.map_view.setHtml(html_content)
-            else:
-                logging.error(f"map.html not found at {map_file_path}")
-                self.map_view.setHtml("<h1>Error: map.html not found</h1>")
+                # Load the local HTML file
+                map_file_path = os.path.join(APP_ROOT_DIR, "map.html")
+                if os.path.exists(map_file_path):
+                    with open(map_file_path, 'r') as f:
+                        html_content = f.read()
+                    self.map_view.setHtml(html_content)
+                else:
+                    logging.error(f"map.html not found at {map_file_path}")
+                    self.map_view.setHtml("<h1>Error: map.html not found</h1>")
 
-        self.refresh_all_dashboard_content()
-        logging.info("Initial map and data load sequence completed.")
+            self.refresh_all_dashboard_content()
+            logging.info("Initial map and data load sequence completed.")
+        except Exception as e:
+            logging.critical(f"Failed to initialize map view: {e}", exc_info=True)
+            self._set_map_error_html(self.tr("An error occurred while initializing the map view: {0}").format(str(e)))
 
 
     @pyqtSlot(str)
