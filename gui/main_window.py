@@ -1528,7 +1528,7 @@ class DocumentManager(QMainWindow):
         self.documents_view_action = QAction(QIcon(":/icons/modern/folder-docs.svg"), self.tr("Gestion Documents"), self); self.documents_view_action.triggered.connect(self.show_documents_view)
         self.product_list_action = QAction(QIcon(":/icons/book.svg"), self.tr("Product Management"), self); self.product_list_action.triggered.connect(self.show_product_management_page) # Connect to new method
         self.partner_management_action = QAction(QIcon(":/icons/team.svg"), self.tr("Partner Management"), self); self.partner_management_action.triggered.connect(self.show_partner_management_view)
-        self.statistics_action = QAction(QIcon(":/icons/bar-chart.svg"), self.tr("Statistiques"), self); self.statistics_action.triggered.connect(self.show_statistics_view)
+        self.statistics_action = QAction(QIcon(":/icons/bar-chart-2.svg"), self.tr("Statistiques"), self); self.statistics_action.triggered.connect(self.show_statistics_view)
         self.open_carrier_map_action = QAction(QIcon(":/icons/map.svg"), self.tr("Carrier Map"), self) # Assuming map.svg or similar exists
         self.open_carrier_map_action.triggered.connect(self.open_carrier_map_dialog)
         self.botpress_integration_action = QAction(QIcon(":/icons/placeholder_icon.svg"), self.tr("Botpress Integration"), self) # Add a placeholder icon
@@ -1719,9 +1719,10 @@ class DocumentManager(QMainWindow):
 
         menu_definitions = [
             (self.tr("Accueil"), None, self.home_action), # Direct action, not a dropdown
-            (self.tr("Modules"), None, module_menu_actions), # Dropdown for all other modules
-            (self.tr("Synchronisation"), None, self.synchronization_action),
-            (self.tr("Statistiques"), None, self.statistics_action),
+            (self.tr("Modules"), None, module_menu_actions + [
+                (self.tr("Synchronisation"), self.synchronization_action),
+                (self.tr("Statistiques"), self.statistics_action)
+            ]), # Dropdown for all other modules
             (self.tr("Outils"), None, [
                 (self.tr("Paramètres"), self.settings_action),
                 (self.tr("Gérer les Statuts"), self.status_action),
