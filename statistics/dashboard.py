@@ -114,6 +114,7 @@ from .widgets.client_list_widget import StatusClientListWidget
 from .widgets.panels import ClientDetailsPanel
 from .widgets.charts import StatusChart
 
+
 class StatisticsDashboard(QWidget):
     request_add_client_for_country = pyqtSignal(str)
     request_view_client_details = pyqtSignal(str)

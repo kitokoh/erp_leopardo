@@ -256,8 +256,10 @@ def generate_folium_map_html(
         folium.LayerControl().add_to(m)
 
         logging.info("map_utils: Rendering map to HTML...")
-        map_html_content = m.get_root().render()
-        logging.info(f"map_utils: Map HTML rendered. Content length: {len(map_html_content) if map_html_content else 0}")
+
+        # The map object 'm' is a folium.Map. Its name is stored in m.get_name()
+        # This name is used as the JS variable name for the map, e.g., "map_a1b2c3d4..."
+        map_variable_name = m.get_name()
 
         webchannel_setup_js = f"""
         <script type="text/javascript" src="qrc:///qtwebchannel/qwebchannel.js"></script>
@@ -299,12 +301,31 @@ def generate_folium_map_html(
                     }}
                 }} catch (e) {{
                     console.error('Error during DOMContentLoaded event listener:', e);
+
                 }}
-            }});
+            }}
+
+            // We need to wait for the map variable to be defined.
+            // A simple way is to check for it periodically.
+            function waitForMapAndInitialize() {{
+                if (typeof {map_variable_name} !== 'undefined') {{
+                    // The map variable is now defined, we can call it 'map' for simplicity inside our functions
+                    const map = {map_variable_name};
+                    initializeMapInteraction(map);
+                }} else {{
+                    console.log("Waiting for map object '{map_variable_name}' to be defined...");
+                    setTimeout(waitForMapAndInitialize, 100);
+                }}
+            }}
+
+            document.addEventListener("DOMContentLoaded", waitForMapAndInitialize);
         </script>
         """
+
         if map_bounds:
             m.fit_bounds(map_bounds)
+
+        map_html_content = m.get_root().render()
 
         if "</body>" in map_html_content:
             map_html_content = map_html_content.replace("</body>", webchannel_setup_js + "</body>", 1)
