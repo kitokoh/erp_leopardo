@@ -262,26 +262,43 @@ def generate_folium_map_html(
         webchannel_setup_js = f"""
         <script type="text/javascript" src="qrc:///qtwebchannel/qwebchannel.js"></script>
         <script type="text/javascript">
-            document.addEventListener("DOMContentLoaded", function() {{
-                if (typeof QWebChannel !== 'undefined') {{
-                    new QWebChannel(qt.webChannelTransport, function(channel) {{
-                        window.{map_interaction_handler_name} = channel.objects.{map_interaction_handler_name};
-                        if (window.{map_interaction_handler_name} === undefined) {{
-                            console.error("{map_interaction_handler_name} object not found. Available:", Object.keys(channel.objects));
-                        }} else {{
-                            console.log("{map_interaction_handler_name} initialized successfully via WebChannel.");
+            window.onerror = function(message, source, lineno, colno, error) {{
+                console.error("JavaScript Error: " + message + " at " + source + ":" + lineno);
+                if (window.{map_interaction_handler_name} && typeof window.{map_interaction_handler_name}.logJavaScriptError === 'function') {{
+                    window.{map_interaction_handler_name}.logJavaScriptError(message, source, lineno);
+                }}
+            }};
 
-                            // The moveend event listener has been removed to prevent crashes.
-                            // The map's last position will not be saved.
-                            map.on('moveend', function() {{
-                                var center = map.getCenter();
-                                var zoom = map.getZoom();
-                                window.{map_interaction_handler_name}.onMapViewChanged(center.lat, center.lng, zoom);
-                            }});
-                        }}
-                    }});
-                }} else {{
-                    console.error("QWebChannel JavaScript library not loaded.");
+            document.addEventListener("DOMContentLoaded", function() {{
+                try {{
+                    if (typeof QWebChannel !== 'undefined') {{
+                        new QWebChannel(qt.webChannelTransport, function(channel) {{
+                            window.{map_interaction_handler_name} = channel.objects.{map_interaction_handler_name};
+                            if (window.{map_interaction_handler_name} === undefined) {{
+                                console.error("{map_interaction_handler_name} object not found. Available:", Object.keys(channel.objects));
+                            }} else {{
+                                console.log("{map_interaction_handler_name} initialized successfully via WebChannel.");
+
+                                map.on('moveend', function() {{
+                                    try {{
+                                        var center = map.getCenter();
+                                        var zoom = map.getZoom();
+                                        if (window.{map_interaction_handler_name} && typeof window.{map_interaction_handler_name}.onMapViewChanged === 'function') {{
+                                            window.{map_interaction_handler_name}.onMapViewChanged(center.lat, center.lng, zoom);
+                                        }} else {{
+                                            console.error('{map_interaction_handler_name} or onMapViewChanged is not available.');
+                                        }}
+                                    }} catch (e) {{
+                                        console.error('Error in moveend event handler:', e);
+                                    }}
+                                }});
+                            }}
+                        }});
+                    }} else {{
+                        console.error("QWebChannel JavaScript library not loaded.");
+                    }}
+                }} catch (e) {{
+                    console.error('Error during DOMContentLoaded event listener:', e);
                 }}
             }});
         </script>
