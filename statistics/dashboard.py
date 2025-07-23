@@ -30,27 +30,17 @@ import csv
 
 from .map_utils import generate_folium_map_html
 
-from db import (
-    get_total_clients_count,
-    get_active_clients_count,
-    get_country_by_name,
-    get_total_projects_count,
-    get_active_projects_count,
-    get_total_products_count,
+from .data_loader import (
+    fetch_global_stats,
+    get_country_stats,
     get_client_segmentation_by_city,
     get_client_segmentation_by_status,
     get_client_segmentation_by_category,
     get_client_counts_by_country,
-    get_country_by_id,
-    get_city_by_id,
-    get_status_setting_by_id,
-    get_status_setting_by_name # Added for chart click
+    get_product_usage_counts
 )
 from db.cruds.clients_crud import clients_crud_instance
 from db.connection import get_db_connection
-from db.cruds.client_project_products_crud import get_product_usage_counts
-from db.cruds.proforma_invoices_crud import get_total_sales_amount_for_period, get_total_proforma_sales_for_country_id
-from db.cruds.projects_crud import get_active_project_count_by_country_id
 
 from client_management.add_new_client_dialog import AddNewClientDialog
 from client_management.client_controller import ClientController
@@ -119,6 +109,12 @@ class MapInteractionHandler(QObject):
         logging.error(f"JavaScript Error: {message} at {source}:{lineno}")
 
 
+from .widgets.country_stats_widget import CountryStatsDisplayWidget
+from .widgets.client_list_widget import StatusClientListWidget
+from .widgets.panels import ClientDetailsPanel
+from .widgets.charts import StatusChart
+
+
 class StatisticsDashboard(QWidget):
     request_add_client_for_country = pyqtSignal(str)
     request_view_client_details = pyqtSignal(str)
@@ -143,9 +139,9 @@ class StatisticsDashboard(QWidget):
 
             self.global_refresh_button = QPushButton()
             self.global_refresh_button.setIcon(QIcon(":/icons/refresh-cw.svg"))
-            self.global_refresh_button.setToolTip(self.tr("Rafraîchir les données"))
+            self.global_refresh_button.setToolTip(self.tr("Rafraîchir les données (Ctrl+clic pour forcer)"))
             self.global_refresh_button.setObjectName("refreshButton")
-            self.global_refresh_button.clicked.connect(self.refresh_all_dashboard_content)
+            self.global_refresh_button.clicked.connect(self.handle_refresh_button_clicked)
             top_bar_layout.addWidget(self.global_refresh_button)
 
             main_layout.addLayout(top_bar_layout)
@@ -244,8 +240,18 @@ class StatisticsDashboard(QWidget):
         finally:
             db_session.close()
 
-    def refresh_all_dashboard_content(self):
-        logging.info("Refreshing all dashboard content...")
+    def handle_refresh_button_clicked(self):
+        modifiers = QApplication.keyboardModifiers()
+        force_refresh = (modifiers == Qt.ControlModifier)
+        self.refresh_all_dashboard_content(force_refresh)
+
+    def refresh_all_dashboard_content(self, force_refresh=False):
+        logging.info(f"Refreshing all dashboard content (force_refresh={force_refresh})...")
+        if force_refresh:
+            from .cache import cache
+            cache.clear()
+            logging.info("Cache cleared.")
+
         QApplication.setOverrideCursor(Qt.WaitCursor)
         try:
             self.refresh_statistics_data()
@@ -424,34 +430,7 @@ class StatisticsDashboard(QWidget):
         self.stats_stack.addWidget(self.global_stats_widget)
 
         # --- Client Details Widget ---
-        self.client_details_widget = QWidget()
-        self.client_details_widget.setObjectName("clientDetailsWidget")
-        client_details_page_layout = QVBoxLayout(self.client_details_widget)
-
-        client_details_title = QLabel(self.tr("Détails du Client"))
-        client_details_title.setObjectName("clientDetailsTitleLabel")
-        title_font_details = QFont()
-        title_font_details.setPointSize(14)
-        title_font_details.setBold(True)
-        client_details_title.setFont(title_font_details)
-        client_details_title.setAlignment(Qt.AlignCenter)
-        client_details_page_layout.addWidget(client_details_title)
-
-        self.client_details_layout = QFormLayout()
-        self.client_details_layout.setObjectName("clientDetailsFormLayout")
-        self.client_details_layout.setLabelAlignment(Qt.AlignRight)
-        self.client_details_layout.setSpacing(8)
-        client_details_page_layout.addLayout(self.client_details_layout)
-
-        client_details_page_layout.addStretch(1)
-
-        self.back_to_global_stats_button = QPushButton(self.tr("Retour aux Statistiques Globales"))
-        self.back_to_global_stats_button.setObjectName("backToGlobalButton")
-        self.back_to_global_stats_button.setIcon(QIcon.fromTheme("go-previous", QIcon(":/icons/arrow-left-circle.svg")))
-        self.back_to_global_stats_button.clicked.connect(self._show_global_stats_view)
-        client_details_page_layout.addWidget(self.back_to_global_stats_button)
-
-        self.client_details_widget.setLayout(client_details_page_layout)
+        self.client_details_widget = ClientDetailsPanel(self)
         self.stats_stack.addWidget(self.client_details_widget)
 
         # Country Stats Display Widget
@@ -488,32 +467,19 @@ class StatisticsDashboard(QWidget):
     def _show_country_stats_view(self, country_name: str):
         logging.info(f"Fetching and showing stats for country: {country_name}")
         QApplication.setOverrideCursor(Qt.WaitCursor)
-        country_obj = None
         try:
-            country_obj = get_country_by_name(country_name)
-            if not country_obj:
-                logging.error(f"Country '{country_name}' not found in DB.")
+            stats = get_country_stats(country_name)
+            if not stats:
                 self._show_global_stats_view()
                 if hasattr(self, 'parent') and callable(self.parent) and hasattr(self.parent(), 'notify'):
                      self.parent().notify(self.tr("Erreur Données"), self.tr("Pays '{0}' non trouvé.").format(country_name), "ERROR")
                 return
 
-            country_id = country_obj['country_id']
-            client_count = clients_crud_instance.get_client_count_by_country_id(country_id=country_id, include_deleted=False)
-            project_count = get_active_project_count_by_country_id(country_id=country_id)
-
-            db_session_proforma = get_db_connection()
-            sales_value = 0.0
-            try:
-                sales_value = get_total_proforma_sales_for_country_id(db_session_proforma, country_id=country_id)
-            finally:
-                if db_session_proforma: db_session_proforma.close()
-
-            self.country_stats_display_widget.update_display(country_name, client_count, project_count, sales_value)
+            self.country_stats_display_widget.update_display(
+                country_name, stats["client_count"], stats["project_count"], stats["sales_value"]
+            )
             self.stats_stack.setCurrentWidget(self.country_stats_display_widget)
-            self.update_map(focus_country_iso_a2=country_obj.get('iso_a2_code')) # Use iso_a2_code from DB
-
-
+            self.update_map(focus_country_iso_a2=stats["country_obj"].get('iso_a2_code'))
         except Exception as e:
             logging.error(f"Error in _show_country_stats_view for {country_name}: {e}", exc_info=True)
             self._show_global_stats_view()
@@ -528,57 +494,12 @@ class StatisticsDashboard(QWidget):
         logging.info(f"Displaying details for client: {client_name_str} (ID: {client_id_str}) in panel.")
         QApplication.setOverrideCursor(Qt.WaitCursor)
         try:
-            while self.client_details_layout.rowCount() > 0:
-                self.client_details_layout.removeRow(0)
-
             client_data = clients_crud_instance.get_client_by_id(client_id_str, include_deleted=True, include_details=True)
-            if not client_data:
-                self.client_details_layout.addRow(QLabel(self.tr("Erreur:")), QLabel(self.tr("Client non trouvé.")))
-                self.stats_stack.setCurrentWidget(self.client_details_widget)
-                return
-
-            country_name = client_data.get('country', self.tr("N/A")) # Assumes get_client_by_id now returns country name
-            city_name = client_data.get('city', self.tr("N/A")) # Assumes get_client_by_id now returns city name
-            status_name = client_data.get('status', self.tr("N/A")) # Assumes get_client_by_id now returns status name
-
-            created_at_val = client_data.get('created_at')
-            created_at_display = self.tr("N/A")
-            if created_at_val:
-                try:
-                    if isinstance(created_at_val, str):
-                        dt_obj = datetime.fromisoformat(created_at_val.replace('Z', '+00:00'))
-                    else:
-                        dt_obj = created_at_val
-                    created_at_display = dt_obj.strftime('%d %b %Y, %H:%M')
-                except ValueError:
-                    logging.warning(f"Could not parse date: {created_at_val}")
-                    created_at_display = str(created_at_val)
-
-            details_to_display = {
-                self.tr("Nom Client:"): client_data.get('client_name', self.tr("N/A")),
-                self.tr("Société:"): client_data.get('company_name') or self.tr("N/A"),
-                self.tr("Pays:"): country_name,
-                self.tr("Ville:"): city_name,
-                self.tr("Statut:"): status_name,
-                self.tr("Email:"): client_data.get('email') or self.tr("N/A"),
-                self.tr("Téléphone:"): client_data.get('phone') or self.tr("N/A"),
-                self.tr("Date Création:"): created_at_display,
-                self.tr("Ident. Projet:"): client_data.get('project_identifier') or self.tr("N/A"),
-                self.tr("Besoin Principal:"): client_data.get('primary_need_description') or self.tr("N/A")
-            }
-
-            for label_text, value_text in details_to_display.items():
-                key_label = QLabel(f"<b>{label_text}</b>")
-                value_label = QLabel(str(value_text))
-                value_label.setWordWrap(True)
-                value_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-                self.client_details_layout.addRow(key_label, value_label)
-
+            self.client_details_widget.update_details(client_data)
             self.stats_stack.setCurrentWidget(self.client_details_widget)
-
         except Exception as e:
             logging.error(f"Error fetching/displaying client details for ID {client_id_str}: {e}", exc_info=True)
-            self.client_details_layout.addRow(QLabel(self.tr("Erreur:")), QLabel(self.tr("Impossible de charger les détails du client.")))
+            self.client_details_widget.update_details(None) # Show error message
         finally:
             QApplication.restoreOverrideCursor()
 
@@ -691,25 +612,9 @@ class StatisticsDashboard(QWidget):
 
 
     def _fetch_global_stats(self):
-        # This function runs in a separate thread
         start_date = self.start_date_edit.date()
         end_date = self.end_date_edit.date()
-
-        current_total_clients = get_total_clients_count()
-        current_active_clients = get_active_clients_count()
-        total_projects = get_total_projects_count()
-        active_projects = get_active_projects_count()
-        total_products = get_total_products_count()
-        sales_in_period = self.get_total_sales_from_proforma(start_date, end_date)
-
-        return {
-            "total_clients": current_total_clients,
-            "active_clients": current_active_clients,
-            "total_projects": total_projects,
-            "active_projects": active_projects,
-            "total_products": total_products,
-            "sales_in_period": sales_in_period,
-        }
+        return fetch_global_stats(start_date, end_date)
 
     def _update_global_stats_labels(self, stats):
         self.stats_labels["total_clients"].setText(f"<b>{stats['total_clients']}</b>")
@@ -730,23 +635,6 @@ class StatisticsDashboard(QWidget):
         self.threadpool.start(worker)
 
 
-    def get_total_sales_from_proforma(self, start_date, end_date) -> float:
-        db_session = None
-        try:
-            start_iso = start_date.toString(Qt.ISODate) + "T00:00:00.000000Z"
-            end_iso = end_date.toString(Qt.ISODate) + "T23:59:59.999999Z"
-            db_session = get_db_connection()
-            total_sales = get_total_sales_amount_for_period(db_session, start_iso, end_iso)
-            return total_sales
-        except Exception as e:
-            logging.error(f"Error calculating total sales from proforma for period: {e}", exc_info=True)
-            return 0.0
-        finally:
-            if db_session:
-                try:
-                    db_session.close()
-                except Exception as e_close:
-                    logging.error(f"Error closing db_session in get_total_sales_from_proforma: {e_close}", exc_info=True)
 
 
     def update_total_clients_trend(self, current_total_clients: int):
@@ -845,10 +733,10 @@ class StatisticsDashboard(QWidget):
                 tab_layout.addWidget(table_widget)
                 self.segmentation_tables[key] = table_widget
             elif tab_type == "chart":
-                self.segmentation_chart_pages[key] = tab_widget
+                self.status_chart = StatusChart(self)
+                tab_layout.addWidget(self.status_chart)
 
             self.segmentation_tabs.addTab(tab_widget, title)
-        logging.debug(f"segmentation_chart_pages initialized: {self.segmentation_chart_pages}")
         logging.debug(f"segmentation_tables initialized: {self.segmentation_tables}")
 
 
@@ -934,103 +822,8 @@ class StatisticsDashboard(QWidget):
 
     def _update_status_segmentation_chart(self):
         logging.info("Updating status segmentation chart...")
-        page_widget = self.segmentation_chart_pages.get("status")
-        if page_widget is None:
-            logging.error("Page widget for 'status' chart not found.")
-            return
-
-        chart_layout = page_widget.layout()
-        if chart_layout is None:
-            logging.error("Chart layout for 'status' is None. Re-creating.")
-            chart_layout = QVBoxLayout(page_widget)
-            page_widget.setLayout(chart_layout)
-
-        while chart_layout.count():
-            item = chart_layout.takeAt(0)
-            widget = item.widget()
-            if widget: widget.deleteLater()
-
-        QApplication.setOverrideCursor(Qt.WaitCursor)
-        try:
-            status_data = get_client_segmentation_by_status()
-            if not status_data:
-                no_data_label = QLabel(self.tr("Aucune donnée de statut client disponible."))
-                no_data_label.setAlignment(Qt.AlignCenter)
-                chart_layout.addWidget(no_data_label)
-                return
-
-            # Filter out statuses with 0 clients before creating labels and sizes
-            filtered_status_data = [item for item in status_data if item.get('client_count', 0) > 0]
-
-            if not filtered_status_data:
-                no_data_label = QLabel(self.tr("Aucun client trouvé pour les statuts existants."))
-                no_data_label.setAlignment(Qt.AlignCenter)
-                chart_layout.addWidget(no_data_label)
-                return
-
-            labels = [item.get('status_name', 'N/A') for item in filtered_status_data]
-            sizes = [item.get('client_count', 0) for item in filtered_status_data]
-
-
-            plt.style.use('seaborn-v0_8-pastel')
-            fig = Figure(figsize=(5.5, 4.5), dpi=90)
-            fig.patch.set_alpha(0)
-            ax = fig.add_subplot(111)
-            ax.patch.set_alpha(0)
-
-            wedges, texts, autotexts = ax.pie(
-                sizes,
-                autopct=lambda p: '{:.1f}%\n({:.0f})'.format(p, p * sum(sizes) / 100.0),
-                startangle=90,
-                pctdistance=0.80,
-                wedgeprops=dict(width=0.35, edgecolor='w')
-            )
-            ax.axis('equal')
-
-            if not sizes:
-                return
-
-            for text_obj in texts + autotexts:
-                text_obj.set_fontsize(8)
-
-            for wedge in wedges:
-                wedge.set_picker(True)
-                # wedge.set_pickradius(5) # AttributeError: 'Wedge' object has no attribute 'set_pickradius'. Did you mean: 'set_radius'?
-                # Picking is usually enabled by set_picker(True). Radius affects the wedge size.
-                # If the intent was to make wedges easier to click, set_picker(True) is the main part.
-                # If a visual change of radius was intended, set_radius() would be used, but pickradius is not standard.
-                # For now, let's assume set_picker(True) is sufficient for clickability.
-                # If a hover effect or similar was intended by pickradius, that's a more complex change.
-
-            self.last_pie_chart_labels = list(labels)
-
-            if len(labels) <= 7:
-                 ax.legend(wedges, labels, title=self.tr("Statuts"), loc="center left", bbox_to_anchor=(1.05, 0.5), prop={'size': 7})
-                 fig.subplots_adjust(right=0.75)
-            else:
-                 fig.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.05)
-
-
-            if hasattr(self, 'status_chart_canvas') and self.status_chart_canvas:
-                if hasattr(self, '_pick_event_cid') and self._pick_event_cid is not None:
-                    try: self.status_chart_canvas.mpl_disconnect(self._pick_event_cid)
-                    except: pass
-
-            self.status_chart_canvas = FigureCanvas(fig)
-            self.status_chart_canvas.setObjectName("statusPieChartCanvas")
-            self._pick_event_cid = self.status_chart_canvas.mpl_connect('pick_event', self._on_status_chart_slice_picked)
-
-            chart_layout.addWidget(self.status_chart_canvas)
-            self.status_chart_canvas.draw_idle()
-            logging.info("Status segmentation chart updated.")
-
-        except Exception as e:
-            logging.error(f"Error updating status segmentation chart: {e}", exc_info=True)
-            error_label = QLabel(self.tr("Erreur génération graphique des statuts."))
-            error_label.setAlignment(Qt.AlignCenter)
-            chart_layout.addWidget(error_label)
-        finally:
-            QApplication.restoreOverrideCursor()
+        status_data = get_client_segmentation_by_status()
+        self.status_chart.update_chart(status_data, self._on_status_chart_slice_picked)
 
 
     def update_customer_segmentation_views(self):
@@ -1177,207 +970,3 @@ class StatisticsSummaryWidget(QWidget):
     def refresh_data(self):
         self.update_summary_stats()
 
-
-class StatusClientListWidget(QWidget):
-    back_to_global_requested = pyqtSignal()
-    view_client_detail_requested = pyqtSignal(str)
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setObjectName("StatusClientListWidget")
-        self._init_ui()
-
-    def _init_ui(self):
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(10, 10, 10, 10)
-        main_layout.setSpacing(10)
-
-        self.title_label = QLabel(self.tr("Clients par Statut"))
-        self.title_label.setObjectName("statusClientListTitle")
-        title_font = QFont()
-        title_font.setPointSize(14)
-        title_font.setBold(True)
-        self.title_label.setFont(title_font)
-        self.title_label.setAlignment(Qt.AlignCenter)
-        main_layout.addWidget(self.title_label)
-
-        self.clients_table = QTableWidget()
-        self.clients_table.setObjectName("statusClientsTable")
-        self.clients_table.setColumnCount(4)
-        self.clients_table.setHorizontalHeaderLabels([
-            self.tr("Nom Client"), self.tr("Société"), self.tr("Pays"), self.tr("Ville")
-        ])
-        self.clients_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.clients_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.clients_table.setSelectionMode(QTableWidget.SingleSelection)
-        self.clients_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.clients_table.horizontalHeader().setStyleSheet("QHeaderView::section { background-color: #e9ecef; padding: 4px; border: 1px solid #dee2e6; font-weight: bold; }")
-        self.clients_table.verticalHeader().setVisible(False)
-        self.clients_table.setAlternatingRowColors(True)
-        self.clients_table.itemSelectionChanged.connect(self._on_table_selection_changed)
-        self.clients_table.doubleClicked.connect(self._on_table_double_clicked)
-        main_layout.addWidget(self.clients_table)
-
-        buttons_layout = QHBoxLayout()
-        self.view_client_button = QPushButton(self.tr("Voir Fiche Client"))
-        self.view_client_button.setObjectName("viewClientButton")
-        self.view_client_button.setIcon(QIcon(":/icons/eye.svg"))
-        self.view_client_button.setEnabled(False)
-        self.view_client_button.clicked.connect(self._emit_view_client_detail_signal)
-        buttons_layout.addWidget(self.view_client_button)
-
-        buttons_layout.addStretch()
-
-        self.back_button = QPushButton(self.tr("Retour aux Stats Globales"))
-        self.back_button.setObjectName("backToGlobalButton")
-        self.back_button.setIcon(QIcon(":/icons/arrow-left-circle.svg"))
-        self.back_button.clicked.connect(self.back_to_global_requested.emit)
-        buttons_layout.addWidget(self.back_button)
-
-        main_layout.addLayout(buttons_layout)
-        self.setLayout(main_layout)
-
-    def update_display(self, status_name: str, clients: list[dict]):
-        self.title_label.setText(self.tr("Clients - Statut: <b>{0}</b>").format(status_name))
-
-        self.clients_table.setRowCount(0)
-        self.clients_table.setSortingEnabled(False)
-
-        if not clients:
-            logging.info(f"StatusClientListWidget: No clients to display for status '{status_name}'.")
-            self.clients_table.setRowCount(1)
-            no_data_item = QTableWidgetItem(self.tr("Aucun client trouvé pour ce statut."))
-            no_data_item.setTextAlignment(Qt.AlignCenter)
-            self.clients_table.setItem(0, 0, no_data_item)
-            if self.clients_table.columnCount() > 0:
-                self.clients_table.setSpan(0, 0, 1, self.clients_table.columnCount())
-            self.view_client_button.setEnabled(False)
-            return
-
-        self.clients_table.setRowCount(len(clients))
-        for row, client_data in enumerate(clients):
-            name_item = QTableWidgetItem(client_data.get("client_name", "N/A"))
-            name_item.setData(Qt.UserRole, client_data.get("client_id"))
-            self.clients_table.setItem(row, 0, name_item)
-            self.clients_table.setItem(row, 1, QTableWidgetItem(client_data.get("company_name") or "N/A"))
-            self.clients_table.setItem(row, 2, QTableWidgetItem(client_data.get("country", "N/A")))
-            self.clients_table.setItem(row, 3, QTableWidgetItem(client_data.get("city", "N/A")))
-
-        self.clients_table.setSortingEnabled(True)
-        self.view_client_button.setEnabled(False)
-        logging.info(f"StatusClientListWidget updated for status '{status_name}' with {len(clients)} clients.")
-
-    def _on_table_selection_changed(self):
-        if self.clients_table.rowCount() == 1 and self.clients_table.item(0,0) and \
-           self.clients_table.item(0,0).text() == self.tr("Aucun client trouvé pour ce statut."):
-            self.view_client_button.setEnabled(False)
-        else:
-            self.view_client_button.setEnabled(len(self.clients_table.selectedItems()) > 0)
-
-
-    def _emit_view_client_detail_signal(self):
-        selected_items = self.clients_table.selectedItems()
-        if selected_items:
-            selected_row = selected_items[0].row()
-            client_id_item = self.clients_table.item(selected_row, 0)
-            if client_id_item:
-                client_id = client_id_item.data(Qt.UserRole)
-                if client_id:
-                    self.view_client_detail_requested.emit(str(client_id))
-                else: logging.warning("No client_id in selected row's UserRole.")
-            else: logging.warning("First item in selected row is None.")
-
-    def _on_table_double_clicked(self, index):
-        client_id_item = self.clients_table.item(index.row(), 0)
-        if client_id_item:
-            client_id = client_id_item.data(Qt.UserRole)
-            if client_id: self.view_client_detail_requested.emit(str(client_id))
-            else: logging.warning("No client_id in double-clicked row's UserRole.")
-        else: logging.warning("First item in double-clicked row is None.")
-
-
-class CountryStatsDisplayWidget(QWidget):
-    back_to_global_requested = pyqtSignal()
-    add_client_to_country_requested = pyqtSignal(str)
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setObjectName("CountryStatsDisplayWidget")
-        self.current_country_name = None
-        self._init_ui()
-
-    def _init_ui(self):
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(10, 10, 10, 10)
-        main_layout.setSpacing(10)
-
-        self.title_label = QLabel(self.tr("Statistiques par Pays"))
-        self.title_label.setObjectName("countryStatsTitle")
-        title_font = QFont()
-        title_font.setPointSize(14)
-        title_font.setBold(True)
-        self.title_label.setFont(title_font)
-        self.title_label.setAlignment(Qt.AlignCenter)
-        main_layout.addWidget(self.title_label)
-
-        stats_group = QGroupBox(self.tr("Détails"))
-        stats_group.setObjectName("countryStatsGroup")
-        form_layout = QFormLayout(stats_group)
-        form_layout.setLabelAlignment(Qt.AlignRight)
-        form_layout.setSpacing(8)
-        form_layout.setContentsMargins(10, 12, 10, 10)
-
-
-        self.client_count_label = QLabel("N/A")
-        self.project_count_label = QLabel("N/A")
-        self.sales_value_label = QLabel("N/A")
-
-        value_font = QFont()
-        value_font.setBold(True)
-        self.client_count_label.setFont(value_font)
-        self.project_count_label.setFont(value_font)
-        self.sales_value_label.setFont(value_font)
-
-        self.client_count_label.setObjectName("countryStatLabelClientCount")
-        self.project_count_label.setObjectName("countryStatLabelProjectCount")
-        self.sales_value_label.setObjectName("countryStatLabelSalesValue")
-
-
-        form_layout.addRow(self.tr("Clients Totaux:"), self.client_count_label)
-        form_layout.addRow(self.tr("Projets Actifs:"), self.project_count_label)
-        form_layout.addRow(self.tr("Ventes Proforma Totales:"), self.sales_value_label)
-
-        main_layout.addWidget(stats_group)
-
-        buttons_layout = QHBoxLayout()
-        self.add_client_button = QPushButton(self.tr("Ajouter Client à ce Pays"))
-        self.add_client_button.setObjectName("addClientToCountryButton")
-        self.add_client_button.setIcon(QIcon(":/icons/user-add.svg"))
-        self.add_client_button.clicked.connect(self._emit_add_client_signal)
-        buttons_layout.addWidget(self.add_client_button)
-
-        buttons_layout.addStretch()
-
-        self.back_button = QPushButton(self.tr("Retour aux Stats Globales"))
-        self.back_button.setObjectName("backToGlobalButton")
-        self.back_button.setIcon(QIcon(":/icons/arrow-left-circle.svg"))
-        self.back_button.clicked.connect(self.back_to_global_requested)
-        buttons_layout.addWidget(self.back_button)
-
-        main_layout.addLayout(buttons_layout)
-        main_layout.addStretch(1)
-        self.setLayout(main_layout)
-
-    def update_display(self, country_name: str, client_count: int, project_count: int, sales_value: float):
-        self.current_country_name = country_name
-        self.title_label.setText(self.tr("Statistiques pour: <b>{0}</b>").format(country_name))
-        self.client_count_label.setText(str(client_count))
-        self.project_count_label.setText(str(project_count))
-        self.sales_value_label.setText("€ {:,.2f}".format(sales_value))
-        logging.info(f"CountryStatsDisplayWidget updated for {country_name}.")
-
-    def _emit_add_client_signal(self):
-        if self.current_country_name:
-            self.add_client_to_country_requested.emit(self.current_country_name)
-        else:
-            logging.warning("CountryStatsDisplayWidget: _emit_add_client_signal called but current_country_name is not set.")
