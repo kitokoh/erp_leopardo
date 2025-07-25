@@ -1,30 +1,18 @@
 import sys
 import subprocess
-from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, QMessageBox
-from PyQt5.QtGui import QFont, QPalette, QColor
-from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, QMessageBox, QHBoxLayout, QGraphicsDropShadowEffect
+from PyQt5.QtGui import QFont, QPalette, QColor, QIcon
+from PyQt5.QtCore import Qt, QSize
 
-class ModernApp(QMainWindow):
+class SpartanApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Main Application")
-        self.setGeometry(100, 100, 400, 300)
+        self.setWindowTitle("Leopard")
+        self.setGeometry(100, 100, 600, 400)
 
-        # Set a modern, dark theme
+        # A clean, minimalist palette
         palette = self.palette()
-        palette.setColor(QPalette.Window, QColor(53, 53, 53))
-        palette.setColor(QPalette.WindowText, Qt.white)
-        palette.setColor(QPalette.Base, QColor(25, 25, 25))
-        palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
-        palette.setColor(QPalette.ToolTipBase, Qt.white)
-        palette.setColor(QPalette.ToolTipText, Qt.white)
-        palette.setColor(QPalette.Text, Qt.white)
-        palette.setColor(QPalette.Button, QColor(53, 53, 53))
-        palette.setColor(QPalette.ButtonText, Qt.white)
-        palette.setColor(QPalette.BrightText, Qt.red)
-        palette.setColor(QPalette.Link, QColor(42, 130, 218))
-        palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
-        palette.setColor(QPalette.HighlightedText, Qt.black)
+        palette.setColor(QPalette.Window, QColor("#f0f0f0"))
         self.setPalette(palette)
 
         self.init_ui()
@@ -32,57 +20,81 @@ class ModernApp(QMainWindow):
     def init_ui(self):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        layout = QVBoxLayout(central_widget)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(20)
+        main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(50, 50, 50, 50)
+        main_layout.setSpacing(40)
+        main_layout.setAlignment(Qt.AlignCenter)
 
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(30)
+
+        # Button styles
         button_style = """
-            QPushButton {
-                background-color: #3f87f5;
-                color: white;
-                font-size: 18px;
+            QPushButton {{
+                background-color: #ffffff;
+                color: #333333;
+                font-size: 16px;
                 font-weight: bold;
-                border-radius: 10px;
-                padding: 15px;
-            }
-            QPushButton:hover {
-                background-color: #3672cf;
-            }
-            QPushButton:pressed {
-                background-color: #2a5a9e;
-            }
+                border: 2px solid #cccccc;
+                border-radius: 15px;
+                padding: 20px;
+                min-width: 120px;
+            }}
+            QPushButton:hover {{
+                border-color: #3f87f5;
+                color: #3f87f5;
+            }}
+            QPushButton:pressed {{
+                background-color: #e8e8e8;
+            }}
         """
 
-        marketing_button = QPushButton("Marketing Automation")
+        # Shadow effect for buttons
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(15)
+        shadow.setXOffset(0)
+        shadow.setYOffset(5)
+        shadow.setColor(QColor(0, 0, 0, 60))
+
+        marketing_button = QPushButton("Marketing")
         marketing_button.setStyleSheet(button_style)
+        marketing_button.setGraphicsEffect(QGraphicsDropShadowEffect(blurRadius=10, xOffset=2, yOffset=2))
         marketing_button.clicked.connect(self.open_marketing_app)
-        layout.addWidget(marketing_button)
+        button_layout.addWidget(marketing_button)
 
         crm_button = QPushButton("CRM")
         crm_button.setStyleSheet(button_style)
+        crm_button.setGraphicsEffect(QGraphicsDropShadowEffect(blurRadius=10, xOffset=2, yOffset=2))
         crm_button.clicked.connect(self.open_crm_app)
-        layout.addWidget(crm_button)
+        button_layout.addWidget(crm_button)
+
+        erp_button = QPushButton("ERP")
+        erp_button.setStyleSheet(button_style)
+        erp_button.setGraphicsEffect(QGraphicsDropShadowEffect(blurRadius=10, xOffset=2, yOffset=2))
+        erp_button.clicked.connect(self.open_erp_app)
+        button_layout.addWidget(erp_button)
+
+        main_layout.addLayout(button_layout)
 
     def open_marketing_app(self):
-        try:
-            # Note: This assumes the script is run from the root directory
-            subprocess.Popen(["python3", "marketing_automation/main.py"])
-        except FileNotFoundError:
-            QMessageBox.warning(self, "Error", "Could not find the Marketing Automation application.")
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"An error occurred: {e}")
+        self._open_app("marketing_automation/main.py", "Marketing Automation")
 
     def open_crm_app(self):
+        self._open_app("crm/main.py", "CRM")
+
+    def open_erp_app(self):
+        self._open_app("erp/main.py", "ERP")
+
+    def _open_app(self, script_path, app_name):
         try:
-            # Note: This assumes the script is run from the root directory
-            subprocess.Popen(["python3", "crm/main.py"])
+            subprocess.Popen(["python3", script_path])
         except FileNotFoundError:
-            QMessageBox.warning(self, "Error", "Could not find the CRM application.")
+            QMessageBox.warning(self, "Error", f"Could not find the {app_name} application.")
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"An error occurred: {e}")
+            QMessageBox.critical(self, "Error", f"An error occurred while opening {app_name}: {e}")
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    window = ModernApp()
+    window = SpartanApp()
     window.show()
     sys.exit(app.exec_())
