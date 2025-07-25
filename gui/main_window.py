@@ -491,12 +491,7 @@ class DocumentManager(QMainWindow):
         self.user_management_page_instance = UserManagementPage(current_user_info=self.current_user_info, parent=self)
         self.main_area_stack.addWidget(self.user_management_page_instance)
 
-        self.commandes_dashboard_widget_instance = CommandesDashboardWidget(
-            parent=self,
-            current_user_info=self.current_user_info,
-            app_root_dir=self.app_root_dir
-        )
-        self.main_area_stack.addWidget(self.commandes_dashboard_widget_instance)
+        self.commandes_dashboard_widget_instance = None
 
         # Documents page (client list and tabs) is setup in setup_ui_main and added to stack there.
 
@@ -1528,7 +1523,7 @@ class DocumentManager(QMainWindow):
         self.documents_view_action = QAction(QIcon(":/icons/modern/folder-docs.svg"), self.tr("Gestion Documents"), self); self.documents_view_action.triggered.connect(self.show_documents_view)
         self.product_list_action = QAction(QIcon(":/icons/book.svg"), self.tr("Product Management"), self); self.product_list_action.triggered.connect(self.show_product_management_page) # Connect to new method
         self.partner_management_action = QAction(QIcon(":/icons/team.svg"), self.tr("Partner Management"), self); self.partner_management_action.triggered.connect(self.show_partner_management_view)
-        self.statistics_action = QAction(QIcon(":/icons/bar-chart.svg"), self.tr("Statistiques"), self); self.statistics_action.triggered.connect(self.show_statistics_view)
+        self.statistics_action = QAction(QIcon(":/icons/bar-chart-2.svg"), self.tr("Statistiques"), self); self.statistics_action.triggered.connect(self.show_statistics_view)
         self.open_carrier_map_action = QAction(QIcon(":/icons/map.svg"), self.tr("Carrier Map"), self) # Assuming map.svg or similar exists
         self.open_carrier_map_action.triggered.connect(self.open_carrier_map_dialog)
         self.botpress_integration_action = QAction(QIcon(":/icons/placeholder_icon.svg"), self.tr("Botpress Integration"), self) # Add a placeholder icon
@@ -1719,9 +1714,10 @@ class DocumentManager(QMainWindow):
 
         menu_definitions = [
             (self.tr("Accueil"), None, self.home_action), # Direct action, not a dropdown
-            (self.tr("Modules"), None, module_menu_actions), # Dropdown for all other modules
-            (self.tr("Synchronisation"), None, self.synchronization_action),
-            (self.tr("Statistiques"), None, self.statistics_action),
+            (self.tr("Modules"), None, module_menu_actions + [
+                (self.tr("Synchronisation"), self.synchronization_action),
+                (self.tr("Statistiques"), self.statistics_action)
+            ]), # Dropdown for all other modules
             (self.tr("Outils"), None, [
                 (self.tr("Paramètres"), self.settings_action),
                 (self.tr("Gérer les Statuts"), self.status_action),
@@ -2960,15 +2956,20 @@ class DocumentManager(QMainWindow):
         logging.info("Switched to Synchronization view.")
 
     def show_commande_management_view(self):
-        # This page (self.commandes_dashboard_widget_instance) is initialized at startup.
-        if self.commandes_dashboard_widget_instance:
-            if hasattr(self.commandes_dashboard_widget_instance, '_load_initial_data'):
-                self.commandes_dashboard_widget_instance._load_initial_data() # Refresh data
-            self.main_area_stack.setCurrentWidget(self.commandes_dashboard_widget_instance)
-            logging.info("Switched to CommandesDashboardWidget.")
-        else: # Should not happen
-            logging.error("CommandesDashboardWidget instance is None. Cannot show view.")
-            QMessageBox.critical(self, self.tr("Erreur Module Commande"), self.tr("Le module de gestion des commandes n'a pas pu être chargé."))
+        if self.commandes_dashboard_widget_instance is None:
+            logging.info("DocumentManager: Lazily creating CommandesDashboardWidget...")
+            self.commandes_dashboard_widget_instance = CommandesDashboardWidget(
+                parent=self,
+                current_user_info=self.current_user_info,
+                app_root_dir=self.app_root_dir
+            )
+            self.main_area_stack.addWidget(self.commandes_dashboard_widget_instance)
+            logging.info("DocumentManager: CommandesDashboardWidget instance created and added to stack.")
+
+        if hasattr(self.commandes_dashboard_widget_instance, '_load_initial_data'):
+            self.commandes_dashboard_widget_instance._load_initial_data() # Refresh data
+        self.main_area_stack.setCurrentWidget(self.commandes_dashboard_widget_instance)
+        logging.info("Switched to CommandesDashboardWidget.")
 
     def focus_on_project(self, project_id: str):
         """

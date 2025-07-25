@@ -22,6 +22,7 @@ ADMIN_LICENSE_DURATION_DAYS = 180 # At least 6 months
 
 def get_machine_identifier() -> str:
     """Generates a unique identifier for the current machine."""
+    logger = logging.getLogger(__name__)
     try:
         # Concatenate various machine-specific details
         # Using a fixed string if some info is unavailable to ensure it still runs
