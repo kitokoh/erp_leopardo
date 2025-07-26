@@ -1,89 +1,86 @@
 import sys
 import subprocess
-from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, QMessageBox, QHBoxLayout, QGraphicsDropShadowEffect
-from PyQt5.QtGui import QFont, QPalette, QColor, QIcon
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget,
+                             QMessageBox, QHBoxLayout, QGraphicsDropShadowEffect, QLabel)
+from PyQt5.QtGui import QFont, QPalette, QColor, QLinearGradient, QBrush, QFontDatabase
 from PyQt5.QtCore import Qt, QSize
 
-class SpartanApp(QMainWindow):
+class ModernUIMain(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Leopard")
-        self.setGeometry(100, 100, 600, 400)
+        self.setGeometry(100, 100, 800, 600)
 
-        # A clean, minimalist palette
-        palette = self.palette()
-        palette.setColor(QPalette.Window, QColor("#f0f0f0"))
+        # Adding a modern font
+        QFontDatabase.addApplicationFont(":/fonts/Roboto-Regular.ttf")
+tte.setColor(QPalette.Window, QColor("#f0f0f0"))
         self.setPalette(palette)
-
-        self.init_ui()
-
-    def init_ui(self):
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(50, 50, 50, 50)
-        main_layout.setSpacing(40)
-        main_layout.setAlignment(Qt.AlignCenter)
-
-        button_layout = QHBoxLayout()
-        button_layout.setSpacing(30)
 
         # Button styles
         button_style = """
             QPushButton {{
-                background-color: #ffffff;
-                color: #333333;
-                font-size: 16px;
+                background-color: rgba(255, 255, 255, 0.1);
+                color: #ecf0f1;
+                font-size: 18px;
                 font-weight: bold;
-                border: 2px solid #cccccc;
-                border-radius: 15px;
-                padding: 20px;
-                min-width: 120px;
+                border: 2px solid #ecf0f1;
+                border-radius: 20px;
+                padding: 25px;
+                min-width: 150px;
+                transition: all 0.3s ease;
             }}
             QPushButton:hover {{
-                border-color: #3f87f5;
-                color: #3f87f5;
+                background-color: rgba(255, 255, 255, 0.2);
+                border-color: #3498db;
             }}
             QPushButton:pressed {{
-                background-color: #e8e8e8;
+                background-color: rgba(255, 255, 255, 0.3);
+
             }}
         """
 
         # Shadow effect for buttons
         shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(15)
+        shadow.setBlurRadius(25)
         shadow.setXOffset(0)
-        shadow.setYOffset(5)
-        shadow.setColor(QColor(0, 0, 0, 60))
+        shadow.setYOffset(8)
+        shadow.setColor(QColor(0, 0, 0, 100))
 
+        # Create and add buttons
         marketing_button = QPushButton("Marketing")
         marketing_button.setStyleSheet(button_style)
-        marketing_button.setGraphicsEffect(QGraphicsDropShadowEffect(blurRadius=10, xOffset=2, yOffset=2))
+        marketing_button.setGraphicsEffect(QGraphicsDropShadowEffect(blurRadius=15, xOffset=5, yOffset=5, color=QColor(0,0,0,80)))
+
         marketing_button.clicked.connect(self.open_marketing_app)
         button_layout.addWidget(marketing_button)
 
         crm_button = QPushButton("CRM")
         crm_button.setStyleSheet(button_style)
-        crm_button.setGraphicsEffect(QGraphicsDropShadowEffect(blurRadius=10, xOffset=2, yOffset=2))
+        crm_button.setGraphicsEffect(QGraphicsDropShadowEffect(blurRadius=15, xOffset=5, yOffset=5, color=QColor(0,0,0,80)))
+
         crm_button.clicked.connect(self.open_crm_app)
         button_layout.addWidget(crm_button)
 
         erp_button = QPushButton("ERP")
         erp_button.setStyleSheet(button_style)
-        erp_button.setGraphicsEffect(QGraphicsDropShadowEffect(blurRadius=10, xOffset=2, yOffset=2))
+        erp_button.setGraphicsEffect(QGraphicsDropShadowEffect(blurRadius=15, xOffset=5, yOffset=5, color=QColor(0,0,0,80)))
+
         erp_button.clicked.connect(self.open_erp_app)
         button_layout.addWidget(erp_button)
 
         main_layout.addLayout(button_layout)
+        main_layout.addStretch()
 
     def open_marketing_app(self):
-        QMessageBox.information(self, "Marketing Automation", "This feature is not yet implemented.")
+        QMessageBox.information(self, "Marketing", "This module is under development.")
+
 
     def open_crm_app(self):
         self._open_app("cleCRM/main.py", "CRM")
 
     def open_erp_app(self):
-        QMessageBox.information(self, "ERP", "This feature is not yet implemented.")
+        QMessageBox.information(self, "ERP", "This module is under development.")
+
 
     def _open_app(self, script_path, app_name):
         try:
@@ -95,6 +92,11 @@ class SpartanApp(QMainWindow):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    window = SpartanApp()
+    # This is for the font to be loaded correctly
+    # You would typically use a resource file (.qrc) for this
+    # For now, we assume the font is in a 'fonts' directory
+    # QFontDatabase.addApplicationFont("fonts/Roboto-Regular.ttf")
+    window = ModernUIMain()
+
     window.show()
     sys.exit(app.exec_())
