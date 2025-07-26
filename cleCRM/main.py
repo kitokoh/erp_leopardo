@@ -2,14 +2,11 @@
 import sys
 import os
 
-# Determine project root and add it to sys.path
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-elif sys.path[0] != PROJECT_ROOT:
-    # If it's in sys.path but not at the start, move it to the start
-    sys.path.remove(PROJECT_ROOT)
-    sys.path.insert(0, PROJECT_ROOT)
+# Add the project root to the Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 
 # Ensure this debug print is AFTER the sys.path modification and BEFORE any project imports
 # print(f"DEBUG main.py: Initial PROJECT_ROOT: {PROJECT_ROOT}")

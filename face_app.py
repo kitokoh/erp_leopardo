@@ -1,6 +1,7 @@
 import sys
 import subprocess
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, 
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget,
+
                              QMessageBox, QHBoxLayout, QGraphicsDropShadowEffect, QLabel)
 from PyQt5.QtGui import QFont, QPalette, QColor, QLinearGradient, QBrush, QFontDatabase
 from PyQt5.QtCore import Qt, QSize
@@ -117,7 +118,8 @@ if __name__ == '__main__':
     # This is for the font to be loaded correctly
     # You would typically use a resource file (.qrc) for this
     # For now, we assume the font is in a 'fonts' directory
-    # QFontDatabase.addApplicationFont("fonts/Roboto-Regular.ttf") 
+    # QFontDatabase.addApplicationFont("fonts/Roboto-Regular.ttf")
+
     window = ModernUIMain()
     window.show()
     sys.exit(app.exec_())
