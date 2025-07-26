@@ -7,6 +7,7 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
+
 # Ensure this debug print is AFTER the sys.path modification and BEFORE any project imports
 # print(f"DEBUG main.py: Initial PROJECT_ROOT: {PROJECT_ROOT}")
 # print(f"DEBUG main.py: sys.path after modification in main.py: {sys.path}")
@@ -251,6 +252,7 @@ def initialize_database():
         from alembic.config import Config as AlembicConfig
         from alembic import command as alembic_command
         alembic_ini_path = os.path.join(project_root, 'alembic.ini')
+
 
         if not os.path.exists(alembic_ini_path):
             raise FileNotFoundError(f"Alembic configuration file not found at: {alembic_ini_path}")
