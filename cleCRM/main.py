@@ -251,7 +251,8 @@ def initialize_database():
     try:
         from alembic.config import Config as AlembicConfig
         from alembic import command as alembic_command
-        alembic_ini_path = os.path.join(PROJECT_ROOT, 'alembic.ini')
+        alembic_ini_path = os.path.join(project_root, 'alembic.ini')
+
 
         if not os.path.exists(alembic_ini_path):
             raise FileNotFoundError(f"Alembic configuration file not found at: {alembic_ini_path}")
