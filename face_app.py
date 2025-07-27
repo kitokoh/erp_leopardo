@@ -1,7 +1,6 @@
 import sys
 import subprocess
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget,
-
                              QMessageBox, QHBoxLayout, QGraphicsDropShadowEffect, QLabel)
 from PyQt5.QtGui import QFont, QPalette, QColor, QLinearGradient, QBrush, QFontDatabase
 from PyQt5.QtCore import Qt, QSize
@@ -100,7 +99,11 @@ class ModernUIMain(QMainWindow):
         QMessageBox.information(self, "Marketing", "This module is under development.")
 
     def open_crm_app(self):
-        self._open_app("cleCRM/main.py", "CRM")
+        try:
+            from crm_module import launch_crm
+            self.crm_window = launch_crm()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"An error occurred while opening CRM: {e}")
 
     def open_erp_app(self):
         QMessageBox.information(self, "ERP", "This module is under development.")
@@ -119,7 +122,6 @@ if __name__ == '__main__':
     # You would typically use a resource file (.qrc) for this
     # For now, we assume the font is in a 'fonts' directory
     # QFontDatabase.addApplicationFont("fonts/Roboto-Regular.ttf")
-
     window = ModernUIMain()
     window.show()
     sys.exit(app.exec_())
