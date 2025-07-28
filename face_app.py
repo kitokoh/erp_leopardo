@@ -106,6 +106,7 @@ class ModernUIMain(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"An error occurred: {e}")
 
+
     def open_erp_app(self):
         QMessageBox.information(self, "ERP", "This module is under development.")
 

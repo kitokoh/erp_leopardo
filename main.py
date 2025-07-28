@@ -4,6 +4,7 @@ from face_app import ModernUIMain # Assurez-vous que face_app.py est dans le mê
 
 def main():
     QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
+
     app = QApplication(sys.argv)
     main_window = ModernUIMain()
     main_window.show()
