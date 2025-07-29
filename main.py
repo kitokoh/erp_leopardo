@@ -5,13 +5,10 @@ import sys
 import os
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QLabel, QPushButton, QFrame, QSizePolicy,
-                             QGridLayout, QSpacerItem, QMessageBox)
+                             QGridLayout, QSpacerItem, QMessageBox, QProgressDialog)
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QFont, QIcon, QPalette, QColor, QPixmap, QFontDatabase
 
-# Modül importları
-from main_crm import CRMModule
-from main_marketing import MarketingModule
 
 class MainBusinessApp(QMainWindow):
     """
@@ -385,7 +382,6 @@ class MainBusinessApp(QMainWindow):
                 background-image: url(resources/gifshome/background.jpg);
                 background-repeat: no-repeat;
                 background-position: center;
-
             }
             
             #headerFrame {
@@ -486,31 +482,41 @@ class MainBusinessApp(QMainWindow):
     # Modül açma metodları
     def open_crm_module(self):
         """CRM modülünü açar"""
-        try:
-            if self.crm_window is None:
-                self.crm_window = CRMModule()
-            self.crm_window.show()
-            self.crm_window.raise_()
-            self.crm_window.activateWindow()
+        if self.crm_window is None:
+            progress = QProgressDialog("CRM modülü yükleniyor...", "İptal", 0, 0, self)
+            progress.setCancelButton(None)
+            progress.setWindowModality(Qt.WindowModal)
+            progress.show()
 
-            self.status_label.setText("CRM modülü başarıyla açıldı")
-        except Exception as e:
-            self.status_label.setText(f"CRM modülü açılırken hata: {str(e)}")
-            QMessageBox.critical(self, "Hata", f"CRM modülü açılırken bir hata oluştu:\n{str(e)}")
+            QApplication.processEvents()
+
+            from main_crm import CRMModule
+            self.crm_window = CRMModule()
+            progress.close()
+
+        self.crm_window.show()
+        self.crm_window.raise_()
+        self.crm_window.activateWindow()
+        self.status_label.setText("CRM modülü başarıyla açıldı")
 
     def open_marketing_module(self):
         """Marketing modülünü açar"""
-        try:
-            if self.marketing_window is None:
-                self.marketing_window = MarketingModule()
-            self.marketing_window.show()
-            self.marketing_window.raise_()
-            self.marketing_window.activateWindow()
+        if self.marketing_window is None:
+            progress = QProgressDialog("Marketing modülü yükleniyor...", "İptal", 0, 0, self)
+            progress.setCancelButton(None)
+            progress.setWindowModality(Qt.WindowModal)
+            progress.show()
 
-            self.status_label.setText("Marketing modülü başarıyla açıldı")
-        except Exception as e:
-            self.status_label.setText(f"Marketing modülü açılırken hata: {str(e)}")
-            QMessageBox.critical(self, "Hata", f"Marketing modülü açılırken bir hata oluştu:\n{str(e)}")
+            QApplication.processEvents()
+
+            from main_marketing import MarketingModule
+            self.marketing_window = MarketingModule()
+            progress.close()
+
+        self.marketing_window.show()
+        self.marketing_window.raise_()
+        self.marketing_window.activateWindow()
+        self.status_label.setText("Marketing modülü başarıyla açıldı")
             
     def closeEvent(self, event):
         """Uygulama kapatılırken çalışır"""
