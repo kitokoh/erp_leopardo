@@ -90,17 +90,17 @@ class UserMenuButton(QPushButton):
         self.user_menu.addSeparator()
 
         # 2. Modify My Account
-        edit_my_account_action = QAction(QIcon(":/icons/settings.svg"), self.tr("Modifier Mon Compte"), self.user_menu)
+        edit_my_account_action = QAction("✏️ " + self.tr("Modifier Mon Compte"), self.user_menu)
         edit_my_account_action.triggered.connect(self._handle_edit_my_account)
         self.user_menu.addAction(edit_my_account_action)
 
         # 3. Logout
-        logout_action = QAction(QIcon(":/icons/log-out.svg"), self.tr("Déconnexion"), self.user_menu)
+        logout_action = QAction("🚪 " + self.tr("Déconnexion"), self.user_menu)
         logout_action.triggered.connect(self._handle_logout) # Emit signal
         self.user_menu.addAction(logout_action)
 
         # 4. Quit
-        quit_action = QAction(QIcon(":/icons/log-out.svg"), self.tr("Quitter"), self.user_menu)
+        quit_action = QAction("❌ " + self.tr("Quitter"), self.user_menu)
         quit_action.triggered.connect(QApplication.instance().quit)
         self.user_menu.addAction(quit_action)
 
@@ -110,11 +110,11 @@ class UserMenuButton(QPushButton):
         if has_permission(user_role, P_MANAGE_USERS):
             self.user_menu.addSeparator()
 
-            manage_users_action = QAction(QIcon(":/icons/users.svg"), self.tr("Gérer les Utilisateurs"), self.user_menu)
+            manage_users_action = QAction("👥 " + self.tr("Gérer les Utilisateurs"), self.user_menu)
             manage_users_action.triggered.connect(self._handle_show_user_management) # Emit signal
             self.user_menu.addAction(manage_users_action)
 
-            create_user_action = QAction(QIcon(":/icons/user-plus.svg"), self.tr("Créer un Nouvel Utilisateur"), self.user_menu)
+            create_user_action = QAction("➕ " + self.tr("Créer un Nouvel Utilisateur"), self.user_menu)
             create_user_action.triggered.connect(self._handle_add_user) # Emit signal
             self.user_menu.addAction(create_user_action)
 
