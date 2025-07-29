@@ -1823,7 +1823,6 @@ class DocumentManager(QMainWindow):
         """)
         top_bar_layout.addWidget(self.user_menu_button_instance)
 
-
         # Window Controls (Minimize, Maximize, Close)
         window_controls_layout = QHBoxLayout()
         window_controls_layout.setSpacing(5)
@@ -1872,6 +1871,7 @@ class DocumentManager(QMainWindow):
         window_controls_layout.addWidget(maximize_button)
         window_controls_layout.addWidget(close_button)
         top_bar_layout.addLayout(window_controls_layout)
+
 
         self._update_user_display() # Initial update of user display
         self._apply_permissions() # Apply permissions on initial load
