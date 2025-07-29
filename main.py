@@ -5,13 +5,9 @@ import sys
 import os
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QLabel, QPushButton, QFrame, QSizePolicy,
-                             QGridLayout, QSpacerItem, QMessageBox)
+                             QGridLayout, QSpacerItem, QMessageBox, QProgressDialog)
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
-from PyQt5.QtGui import QFont, QIcon, QPalette, QColor, QPixmap
-
-# Modül importları
-from main_crm import CRMModule
-from main_marketing import MarketingModule
+from PyQt5.QtGui import QFont, QIcon, QPalette, QColor, QPixmap, QFontDatabase
 
 class MainBusinessApp(QMainWindow):
     """
@@ -80,6 +76,10 @@ class MainBusinessApp(QMainWindow):
         subtitle_label.setAlignment(Qt.AlignCenter)
         header_layout.addWidget(subtitle_label)
         
+        # Fontları yükle
+        QFontDatabase.addApplicationFont("fonts/Roboto-Regular.ttf")
+        QFontDatabase.addApplicationFont("fonts/Roboto-Bold.ttf")
+
         # Açıklama
         description_label = QLabel("CRM ve Marketing modüllerinize aşağıdaki butonlardan erişebilirsiniz")
         description_label.setObjectName("description")
@@ -98,7 +98,7 @@ class MainBusinessApp(QMainWindow):
         
         # CRM Modülü Kartı
         crm_card = self.create_module_card(
-            icon="👥",
+            icon="users",
             title="CRM",
             subtitle="Müşteri İlişkileri Yönetimi",
             description="Müşteri bilgilerinizi yönetin, satış fırsatlarını takip edin, görevlerinizi organize edin ve iletişim geçmişinizi kaydedin.",
@@ -116,7 +116,7 @@ class MainBusinessApp(QMainWindow):
         
         # Marketing Modülü Kartı
         marketing_card = self.create_module_card(
-            icon="📈",
+            icon="bar-chart-2",
             title="Marketing",
             subtitle="Pazarlama Yönetimi",
             description="Pazarlama kampanyalarınızı oluşturun, sosyal medyayı yönetin, e-posta pazarlama yapın ve performansınızı analiz edin.",
@@ -151,6 +151,7 @@ class MainBusinessApp(QMainWindow):
             #moduleCard:hover {{
                 box-shadow: 0 10px 25px rgba(0,0,0,0.15);
                 transform: translateY(-5px);
+                border-color: #007bff;
             }}
         """)
         
@@ -177,7 +178,8 @@ class MainBusinessApp(QMainWindow):
         title_label = QLabel(title)
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setStyleSheet(f"""
-            font-size: 28px;
+            font-family: "Roboto", sans-serif;
+            font-size: 32px;
             font-weight: bold;
             color: {color};
             margin-bottom: 5px;
@@ -188,7 +190,8 @@ class MainBusinessApp(QMainWindow):
         subtitle_label = QLabel(subtitle)
         subtitle_label.setAlignment(Qt.AlignCenter)
         subtitle_label.setStyleSheet("""
-            font-size: 16px;
+            font-family: "Roboto", sans-serif;
+            font-size: 18px;
             color: #6c757d;
             font-weight: 500;
         """)
@@ -201,7 +204,8 @@ class MainBusinessApp(QMainWindow):
         desc_label.setAlignment(Qt.AlignCenter)
         desc_label.setWordWrap(True)
         desc_label.setStyleSheet("""
-            font-size: 14px;
+            font-family: "Roboto", sans-serif;
+            font-size: 16px;
             color: #495057;
             line-height: 1.5;
             margin: 10px 0px;
@@ -215,7 +219,8 @@ class MainBusinessApp(QMainWindow):
         for feature in features:
             feature_label = QLabel(feature)
             feature_label.setStyleSheet(f"""
-                font-size: 13px;
+            font-family: "Roboto", sans-serif;
+            font-size: 14px;
                 color: {color};
                 font-weight: 500;
                 padding: 2px 0px;
@@ -228,18 +233,19 @@ class MainBusinessApp(QMainWindow):
         card_layout.addStretch()
         
         # Buton
-        button = QPushButton(f"{title} Modülünü Aç")
+        button = QPushButton(QIcon(f"resources/icons/{icon}.svg"), f"  {title} Modülünü Aç")
         button.setObjectName("moduleButton")
         button.setFixedHeight(50)
         button.setStyleSheet(f"""
             QPushButton {{
+                font-family: "Roboto", sans-serif;
                 background-color: {color};
                 color: white;
                 border: none;
                 padding: 15px 25px;
                 border-radius: 10px;
                 font-weight: bold;
-                font-size: 16px;
+                font-size: 18px;
             }}
             QPushButton:hover {{
                 background-color: {self.darken_color(color)};
@@ -372,13 +378,14 @@ class MainBusinessApp(QMainWindow):
         """Stil tanımlamaları"""
         self.setStyleSheet("""
             QMainWindow {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #f8f9fa, stop:1 #e9ecef);
+                background-image: url(resources/gifshome/background.jpg);
+                background-repeat: no-repeat;
+                background-position: center;
             }
             
             #headerFrame {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #343a40, stop:1 #495057);
+                    stop:0 #007bff, stop:1 #0056b3);
                 color: white;
                 border-radius: 20px;
                 padding: 40px;
@@ -386,21 +393,24 @@ class MainBusinessApp(QMainWindow):
             }
             
             #mainTitle {
-                font-size: 42px;
+                font-family: "Roboto", sans-serif;
+                font-size: 48px;
                 font-weight: bold;
                 color: white;
                 margin-bottom: 10px;
             }
             
             #subtitle {
-                font-size: 20px;
+                font-family: "Roboto", sans-serif;
+                font-size: 24px;
                 color: rgba(255, 255, 255, 0.9);
                 font-weight: 300;
                 margin-bottom: 15px;
             }
             
             #description {
-                font-size: 16px;
+                font-family: "Roboto", sans-serif;
+                font-size: 18px;
                 color: rgba(255, 255, 255, 0.8);
                 font-style: italic;
             }
@@ -418,7 +428,8 @@ class MainBusinessApp(QMainWindow):
             }
             
             #infoTitle {
-                font-size: 24px;
+                font-family: "Roboto", sans-serif;
+                font-size: 28px;
                 font-weight: bold;
                 color: #343a40;
                 margin-bottom: 20px;
@@ -432,13 +443,15 @@ class MainBusinessApp(QMainWindow):
             }
             
             #featureTitle {
-                font-size: 16px;
+                font-family: "Roboto", sans-serif;
+                font-size: 18px;
                 font-weight: bold;
                 color: #495057;
             }
             
             #featureDesc {
-                font-size: 13px;
+                font-family: "Roboto", sans-serif;
+                font-size: 14px;
                 color: #6c757d;
             }
             
@@ -451,13 +464,15 @@ class MainBusinessApp(QMainWindow):
             }
             
             #statusLabel {
-                font-size: 14px;
+                font-family: "Roboto", sans-serif;
+                font-size: 16px;
                 color: white;
                 font-weight: 500;
             }
             
             #userLabel, #timeLabel, #versionLabel {
-                font-size: 12px;
+                font-family: "Roboto", sans-serif;
+                font-size: 14px;
                 color: rgba(255, 255, 255, 0.8);
                 margin-left: 20px;
             }
@@ -466,37 +481,41 @@ class MainBusinessApp(QMainWindow):
     # Modül açma metodları
     def open_crm_module(self):
         """CRM modülünü açar"""
-        try:
-            if self.crm_window is None or not self.crm_window.isVisible():
-                self.crm_window = CRMModule()
-                self.status_label.setText("CRM modülü açılıyor...")
-                
-            self.crm_window.show()
-            self.crm_window.raise_()
-            self.crm_window.activateWindow()
-            
-            self.status_label.setText("CRM modülü başarıyla açıldı")
-            
-        except Exception as e:
-            self.status_label.setText(f"CRM modülü açılırken hata: {str(e)}")
-            QMessageBox.critical(self, "Hata", f"CRM modülü açılırken bir hata oluştu:\n{str(e)}")
-            
+        if self.crm_window is None:
+            progress = QProgressDialog("CRM modülü yükleniyor...", "İptal", 0, 0, self)
+            progress.setCancelButton(None)
+            progress.setWindowModality(Qt.WindowModal)
+            progress.show()
+
+            QApplication.processEvents()
+
+            from main_crm import CRMModule
+            self.crm_window = CRMModule()
+            progress.close()
+
+        self.crm_window.show()
+        self.crm_window.raise_()
+        self.crm_window.activateWindow()
+        self.status_label.setText("CRM modülü başarıyla açıldı")
+
     def open_marketing_module(self):
         """Marketing modülünü açar"""
-        try:
-            if self.marketing_window is None or not self.marketing_window.isVisible():
-                self.marketing_window = MarketingModule()
-                self.status_label.setText("Marketing modülü açılıyor...")
-                
-            self.marketing_window.show()
-            self.marketing_window.raise_()
-            self.marketing_window.activateWindow()
-            
-            self.status_label.setText("Marketing modülü başarıyla açıldı")
-            
-        except Exception as e:
-            self.status_label.setText(f"Marketing modülü açılırken hata: {str(e)}")
-            QMessageBox.critical(self, "Hata", f"Marketing modülü açılırken bir hata oluştu:\n{str(e)}")
+        if self.marketing_window is None:
+            progress = QProgressDialog("Marketing modülü yükleniyor...", "İptal", 0, 0, self)
+            progress.setCancelButton(None)
+            progress.setWindowModality(Qt.WindowModal)
+            progress.show()
+
+            QApplication.processEvents()
+
+            from main_marketing import MarketingModule
+            self.marketing_window = MarketingModule()
+            progress.close()
+
+        self.marketing_window.show()
+        self.marketing_window.raise_()
+        self.marketing_window.activateWindow()
+        self.status_label.setText("Marketing modülü başarıyla açıldı")
             
     def closeEvent(self, event):
         """Uygulama kapatılırken çalışır"""
