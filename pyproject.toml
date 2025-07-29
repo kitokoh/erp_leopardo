@@ -36,7 +36,6 @@ version = "0.1.0"
 description = ""
 authors = ["google-labs-jules[bot] <161369871+google-labs-jules[bot]@users.noreply.github.com>"]
 readme = "README.md"
-packages = [{include = "."}]
 
 [tool.poetry.dependencies]
 python = ">=3.12"
