@@ -420,7 +420,6 @@ class ClientListItemWidget(QWidget):
 class DocumentManager(QMainWindow):
     def __init__(self, app_root_dir, current_user_info: dict, current_license_info: dict | None):
         super().__init__()
-
         self.setWindowFlags(Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
 
@@ -1833,6 +1832,7 @@ class DocumentManager(QMainWindow):
             }
         """)
         top_bar_layout.addWidget(self.user_menu_button_instance)
+
 
 
 

@@ -95,6 +95,7 @@ from PyQt5.QtCore import QSettings # Added for Remember Me
 from PyQt5.QtWidgets import QMainWindow
 from PyQt5.QtCore import Qt
 
+
 # Imports pour la gestion de licence
 from db.connection import get_db_connection
 from license_management import manager as license_manager
@@ -311,6 +312,7 @@ class CRMModule(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowFlags(Qt.FramelessWindowHint | self.windowFlags())
+
         self.setWindowTitle("CRM Module")
         self.setGeometry(100, 100, 1200, 800)
         self.main_widget = None

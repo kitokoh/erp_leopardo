@@ -98,7 +98,7 @@ class MainBusinessApp(QMainWindow):
         
         # CRM Modülü Kartı
         crm_card = self.create_module_card(
-            icon="👥",
+            icon="users",
             title="CRM",
             subtitle="Müşteri İlişkileri Yönetimi",
             description="Müşteri bilgilerinizi yönetin, satış fırsatlarını takip edin, görevlerinizi organize edin ve iletişim geçmişinizi kaydedin.",
@@ -116,7 +116,7 @@ class MainBusinessApp(QMainWindow):
         
         # Marketing Modülü Kartı
         marketing_card = self.create_module_card(
-            icon="📈",
+            icon="bar-chart-2",
             title="Marketing",
             subtitle="Pazarlama Yönetimi",
             description="Pazarlama kampanyalarınızı oluşturun, sosyal medyayı yönetin, e-posta pazarlama yapın ve performansınızı analiz edin.",
@@ -233,7 +233,7 @@ class MainBusinessApp(QMainWindow):
         card_layout.addStretch()
         
         # Buton
-        button = QPushButton(f"{title} Modülünü Aç")
+        button = QPushButton(QIcon(f"resources/icons/{icon}.svg"), f"  {title} Modülünü Aç")
         button.setObjectName("moduleButton")
         button.setFixedHeight(50)
         button.setStyleSheet(f"""
