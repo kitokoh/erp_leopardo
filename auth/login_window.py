@@ -63,7 +63,7 @@ class LoginWindow(QDialog):
 
         # Logo
         logo_label = QLabel()
-        pixmap = QPixmap(":/icons/logo.svg")
+        pixmap = QPixmap()
         if pixmap.isNull():
             logo_label.setText(self.tr("Company Logo"))
             logo_label.setAlignment(Qt.AlignCenter)
@@ -122,21 +122,21 @@ class LoginWindow(QDialog):
         self.login_button.clicked.connect(self.handle_password_login)
         login_buttons_layout.addWidget(self.login_button, 0, 0, 1, 2) # Span 2 columns
 
-        self.fingerprint_login_button = QPushButton(QIcon(":/icons/fingerprint.svg"), self.tr("Login with Fingerprint")) # Assuming fingerprint.svg icon
+        self.fingerprint_login_button = QPushButton("👆 " + self.tr("Login with Fingerprint"))
         self.fingerprint_login_button.setObjectName("secondaryButton") # Or a specific biometric button style
         self.fingerprint_login_button.setMinimumHeight(35)
         self.fingerprint_login_button.clicked.connect(self.handle_fingerprint_login)
         self.fingerprint_login_button.setVisible(False) # Initially hidden
         login_buttons_layout.addWidget(self.fingerprint_login_button, 1, 0, 1, 2) # Span 2 columns
 
-        self.face_login_button = QPushButton(QIcon(":/icons/face-recognition.svg"), self.tr("Login with Face")) # Assuming face-recognition.svg icon
+        self.face_login_button = QPushButton("😀 " + self.tr("Login with Face"))
         self.face_login_button.setObjectName("secondaryButton")
         self.face_login_button.setMinimumHeight(35)
         self.face_login_button.clicked.connect(self.handle_face_login)
         self.face_login_button.setVisible(False) # Initially hidden
         login_buttons_layout.addWidget(self.face_login_button, 2, 0, 1, 2) # Row 2
 
-        self.voice_login_button = QPushButton(QIcon(":/icons/voice-recognition.svg"), self.tr("Login with Voice")) # Assuming voice-recognition.svg icon
+        self.voice_login_button = QPushButton("🗣️ " + self.tr("Login with Voice"))
         self.voice_login_button.setObjectName("secondaryButton")
         self.voice_login_button.setMinimumHeight(35)
         self.voice_login_button.clicked.connect(self.handle_voice_login)

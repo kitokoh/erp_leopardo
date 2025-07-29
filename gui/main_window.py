@@ -1719,9 +1719,11 @@ class DocumentManager(QMainWindow):
 
         menu_definitions = [
             (self.tr("Accueil"), None, self.home_action), # Direct action, not a dropdown
-            (self.tr("Modules"), None, module_menu_actions), # Dropdown for all other modules
-            (self.tr("Synchronisation"), None, self.synchronization_action),
-            (self.tr("Statistiques"), None, self.statistics_action),
+            (self.tr("Modules"), None, [
+                (self.tr("Synchronisation"), self.synchronization_action),
+                (self.tr("Statistiques"), self.statistics_action),
+                (self.tr("Addons"), self.addons_action)
+            ] + module_menu_actions), # Dropdown for all other modules
             (self.tr("Outils"), None, [
                 (self.tr("Paramètres"), self.settings_action),
                 (self.tr("Gérer les Statuts"), self.status_action),
@@ -1731,7 +1733,6 @@ class DocumentManager(QMainWindow):
                 (self.tr("Gérer les Utilisateurs"), self.manage_users_action),
                 (self.tr("Gérer les Rôles"), self.manage_roles_action)
             ]),
-            (self.tr("Addons"), None, self.addons_action),
         ]
 
         for menu_title, menu_icon_path, actions_or_action_defs in menu_definitions:
