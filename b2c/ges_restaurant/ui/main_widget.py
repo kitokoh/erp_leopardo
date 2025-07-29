@@ -275,14 +275,14 @@ class RestaurantMainWidget(QWidget):
         # Action Buttons (Add Table, Refresh)
         action_layout = QHBoxLayout()
         self.add_table_button = QPushButton(self.tr("Add Table"))
-        self.add_table_button.setIcon(QIcon(":/icons/plus-circle.svg"))
+        self.add_table_button.setText("➕ " + self.tr("Ajouter une table"))
         self.add_table_button.setObjectName("primaryActionButton") # For QSS styling
         # self.add_table_button.setStyleSheet("padding: 8px 15px; font-size: 10pt;")
         self.add_table_button.clicked.connect(self.open_add_table_dialog)
 
 
         self.refresh_button = QPushButton(self.tr("Refresh Tables"))
-        self.refresh_button.setIcon(QIcon(":/icons/refresh-cw.svg"))
+        self.refresh_button.setText("🔄 " + self.tr("Actualiser"))
         self.refresh_button.setObjectName("refreshButton") # For QSS styling
         # self.refresh_button.setStyleSheet("padding: 8px 15px; font-size: 10pt;")
         self.refresh_button.clicked.connect(self.load_tables_display)
@@ -323,14 +323,14 @@ class RestaurantMainWidget(QWidget):
         self.manage_commande_button = QPushButton(self.tr("Manage Order for this Table"))
         self.manage_commande_button.setObjectName("primaryActionButton")
         self.manage_commande_button.setProperty("primaryAction", True) # Custom property for QSS
-        self.manage_commande_button.setIcon(QIcon(":/icons/file-text.svg"))
+        self.manage_commande_button.setText("📝 " + self.tr("Gérer la Commande"))
         self.manage_commande_button.clicked.connect(self.manage_selected_table_order)
         self.manage_commande_button.setEnabled(False)
         # self.manage_commande_button.setStyleSheet("padding: 8px 15px; font-size: 10pt; background-color: #3498db; color: white; border-radius: 5px;")
 
         self.edit_table_button_detail = QPushButton(self.tr("Edit Table Details"))
         self.edit_table_button_detail.setObjectName("editTableDetailButton")
-        self.edit_table_button_detail.setIcon(QIcon(":/icons/edit.svg"))
+        self.edit_table_button_detail.setText("✏️ " + self.tr("Modifier la Table"))
         self.edit_table_button_detail.clicked.connect(self.edit_selected_table_details)
         self.edit_table_button_detail.setEnabled(False)
         # self.edit_table_button_detail.setStyleSheet("padding: 6px 12px; font-size: 9pt;")
