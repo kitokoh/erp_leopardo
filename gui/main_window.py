@@ -420,9 +420,12 @@ class ClientListItemWidget(QWidget):
 class DocumentManager(QMainWindow):
     def __init__(self, app_root_dir, current_user_info: dict, current_license_info: dict | None):
         super().__init__()
+        self.setWindowFlags(Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_TranslucentBackground)
 
         self.setWindowFlags(Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
+
 
 
         self._gradient_pos = 0.0

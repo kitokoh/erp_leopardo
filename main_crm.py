@@ -340,7 +340,6 @@ class CRMModule(QMainWindow):
             logging.info("main.py: db.connection.set_db_config(CONFIG) called.")
         else:
             logging.error("main.py: Could not find db.connection.set_db_config. DB calls might fail.")
-
         # Initialize the database. This function now encapsulates all DB setup.
         initialize_database()
         seed_only_hidroguc_products()
@@ -367,7 +366,6 @@ class CRMModule(QMainWindow):
 
                 cleaned_session_tokens = user_session_tokens_crud.cleanup_expired_tokens(conn_cleanup)
                 logging.info(f"Cleaned up {cleaned_session_tokens} expired 'Remember Me' session tokens on startup.")
-
                 cleaned_reset_tokens = password_reset_tokens_crud.cleanup_expired_or_used_tokens(conn_cleanup)
                 logging.info(f"Cleaned up {cleaned_reset_tokens} expired/used password reset tokens on startup.")
 
