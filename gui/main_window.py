@@ -421,8 +421,17 @@ class DocumentManager(QMainWindow):
     def __init__(self, app_root_dir, current_user_info: dict, current_license_info: dict | None):
         super().__init__()
 
-        # Make the window frameless
-        self.setWindowFlags(Qt.FramelessWindowHint | self.windowFlags())
+        self.setWindowFlags(Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+
+        # Window Controls
+        self.minimize_button = QPushButton("—")
+        self.maximize_button = QPushButton("[]")
+        self.close_button = QPushButton("X")
+
+        self.minimize_button.clicked.connect(self.showMinimized)
+        self.maximize_button.clicked.connect(self.toggleMaximized)
+        self.close_button.clicked.connect(self.close)
 
         self._gradient_pos = 0.0
         self.app_root_dir = app_root_dir
@@ -1719,9 +1728,11 @@ class DocumentManager(QMainWindow):
 
         menu_definitions = [
             (self.tr("Accueil"), None, self.home_action), # Direct action, not a dropdown
-            (self.tr("Modules"), None, module_menu_actions), # Dropdown for all other modules
-            (self.tr("Synchronisation"), None, self.synchronization_action),
-            (self.tr("Statistiques"), None, self.statistics_action),
+            (self.tr("Modules"), None, [
+                (self.tr("Synchronisation"), self.synchronization_action),
+                (self.tr("Statistiques"), self.statistics_action),
+                (self.tr("Addons"), self.addons_action)
+            ] + module_menu_actions), # Dropdown for all other modules
             (self.tr("Outils"), None, [
                 (self.tr("Paramètres"), self.settings_action),
                 (self.tr("Gérer les Statuts"), self.status_action),
@@ -1731,7 +1742,6 @@ class DocumentManager(QMainWindow):
                 (self.tr("Gérer les Utilisateurs"), self.manage_users_action),
                 (self.tr("Gérer les Rôles"), self.manage_roles_action)
             ]),
-            (self.tr("Addons"), None, self.addons_action),
         ]
 
         for menu_title, menu_icon_path, actions_or_action_defs in menu_definitions:
@@ -1824,57 +1834,17 @@ class DocumentManager(QMainWindow):
         """)
         top_bar_layout.addWidget(self.user_menu_button_instance)
 
-        # Window Controls (Minimize, Maximize, Close)
-        window_controls_layout = QHBoxLayout()
-        window_controls_layout.setSpacing(5)
 
-        minimize_button = QToolButton()
-        minimize_button.setText("—") # Or use an icon
-        minimize_button.setToolTip(self.tr("Minimiser"))
-        minimize_button.clicked.connect(self.showMinimized)
-
-        maximize_button = QToolButton()
-        maximize_button.setText("□") # Or use an icon
-        maximize_button.setToolTip(self.tr("Agrandir / Restaurer"))
-        maximize_button.clicked.connect(self.toggleMaximized)
-
-        close_button = QToolButton()
-        close_button.setText("✕") # Or use an icon
-        close_button.setToolTip(self.tr("Fermer"))
-        close_button.clicked.connect(self.close)
-
-        for btn in [minimize_button, maximize_button, close_button]:
-            btn.setObjectName("windowControlButton")
-            btn.setFixedSize(28, 28)
-            btn.setStyleSheet("""
-                QToolButton#windowControlButton {
-                    background-color: transparent;
-                    border: none;
-                    font-size: 16px;
-                    color: #6b7280; /* Muted color */
-                }
-                QToolButton#windowControlButton:hover {
-                    background-color: #e5e7eb;
-                    border-radius: 4px;
-                    color: #1f2937;
-                }
-            """)
-
-        # Specific hover for close button
-        close_button.setStyleSheet(close_button.styleSheet() + """
-            QToolButton#windowControlButton:hover {
-                background-color: #fee2e2; /* Light red on hover for close */
-                color: #ef4444; /* Red text/icon */
-            }
-        """)
-
-        window_controls_layout.addWidget(minimize_button)
-        window_controls_layout.addWidget(maximize_button)
-        window_controls_layout.addWidget(close_button)
-        top_bar_layout.addLayout(window_controls_layout)
 
         self._update_user_display() # Initial update of user display
         self._apply_permissions() # Apply permissions on initial load
+
+        # Add window controls to the layout
+        window_controls_layout = QHBoxLayout()
+        window_controls_layout.addWidget(self.minimize_button)
+        window_controls_layout.addWidget(self.maximize_button)
+        window_controls_layout.addWidget(self.close_button)
+        top_bar_layout.addLayout(window_controls_layout)
 
     def _apply_permissions(self):
         """Applies role-based permissions to UI elements."""
