@@ -9,7 +9,6 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QFont, QIcon, QPalette, QColor, QPixmap, QFontDatabase
 
-
 class MainBusinessApp(QMainWindow):
     """
     Ana İş Yönetim Uygulaması
@@ -531,6 +530,7 @@ class MainBusinessApp(QMainWindow):
 
 def main():
     """Ana fonksiyon"""
+    QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
     
