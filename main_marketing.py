@@ -1,1307 +1,1364 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 import sys
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                             QHBoxLayout, QLabel, QPushButton, QFrame, QSizePolicy,
-                             QTextEdit, QTableWidget, QTableWidgetItem, QTabWidget,
-                             QSplitter, QGroupBox, QFormLayout, QLineEdit, QComboBox,
-                             QDateEdit, QSpinBox, QCheckBox, QProgressBar, QSlider,
-                             QListWidget, QTreeWidget, QTreeWidgetItem, QScrollArea,
-                             QHeaderView, QMessageBox, QListWidgetItem)
-from PyQt5.QtCore import Qt, QDate, QTimer, pyqtSignal
-from PyQt5.QtGui import QFont, QIcon, QPalette, QColor, QPixmap
+from PyQt5.QtCore import Qt, QTranslator, QLocale, QLibraryInfo, QPropertyAnimation, QThread, pyqtSignal, QTimer, QUrl, QSize
+from PyQt5.QtGui import QIcon, QPixmap, QFont, QPainter, QColor, QLinearGradient, QGuiApplication
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtWidgets import (
+    QApplication, QMainWindow, QVBoxLayout, QHBoxLayout,
+    QLineEdit, QPushButton, QTabWidget, QTabBar, QFrame, QLabel, QWidget,
+    QSplitter, QStackedWidget, QTableWidget, QTableWidgetItem,
+    QHeaderView, QAbstractItemView, QComboBox,
+    QDialog, QDialogButtonBox, QFormLayout, QMenu, QMessageBox, QProgressDialog, QScrollArea, QToolButton,
+    QCheckBox, QStatusBar, QSplashScreen, QWidgetAction, QLayout, QWidgetItem, QListWidget, QListWidgetItem, QGraphicsDropShadowEffect
+)
 
-class MarketingModule(QMainWindow):
-    """
-    Marketing Modülü
-    Bu sınıf, pazarlama kampanyaları, sosyal medya yönetimi ve analytics özelliklerini içerir.
-    """
-    
+class SplitScreenView(QWidget):
+    def __init__(self, main_app):
+        super().__init__()
+
+class Nova360ProApp(QWidget):
+    def __init__(self, main_app):
+        super().__init__()
+
+class Nova360Ultimate(QWidget):
+    def __init__(self, main_app):
+        super().__init__()
+
+class LoaderThread(QThread):
+    finished = pyqtSignal(object)
+    def __init__(self, main_app):
+        super().__init__()
+
+class LoaderThreadTelecommande(QThread):
+    finished = pyqtSignal(object)
+    def __init__(self, main_app):
+        super().__init__()
+
+class LoadingScreen(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+class QOverlayLayout(QLayout):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.items = []
+        self.positions = {}
+
+    def addWidget(self, widget, alignment=None):
+        item = QWidgetItem(widget)
+        self.addItem(item)
+        if alignment is not None:
+            self.positions[widget] = alignment
+        return item
+
+    def addItem(self, item):
+        self.items.append(item)
+
+    def count(self):
+        return len(self.items)
+
+    def itemAt(self, index):
+        if 0 <= index < len(self.items):
+            return self.items[index]
+        return None
+
+    def takeAt(self, index):
+        if 0 <= index < len(self.items):
+            return self.items.pop(index)
+        return None
+
+    def setGeometry(self, rect):
+        super().setGeometry(rect)
+        for i in range(self.count()):
+            item = self.itemAt(i)
+            if item is None:
+                continue
+            widget = item.widget()
+            if widget is None:
+                continue
+            widget_rect = rect
+            if widget in self.positions:
+                alignment = self.positions[widget]
+                size = widget.sizeHint()
+                if alignment & Qt.AlignTop:
+                    widget_rect.setTop(rect.top())
+                    widget_rect.setBottom(rect.top() + size.height())
+                elif alignment & Qt.AlignBottom:
+                    widget_rect.setTop(rect.bottom() - size.height())
+                    widget_rect.setBottom(rect.bottom())
+                if alignment & Qt.AlignLeft:
+                    widget_rect.setLeft(rect.left())
+                    widget_rect.setRight(rect.left() + size.width())
+                elif alignment & Qt.AlignRight:
+                    widget_rect.setLeft(rect.right() - size.width())
+                    widget_rect.setRight(rect.right())
+                if alignment & Qt.AlignHCenter:
+                    widget_rect.setLeft(rect.left() + (rect.width() - size.width()) // 2)
+                    widget_rect.setRight(widget_rect.left() + size.width())
+                elif alignment & Qt.AlignVCenter:
+                    widget_rect.setTop(rect.top() + (rect.height() - size.height()) // 2)
+                    widget_rect.setBottom(widget_rect.top() + size.height())
+            widget.setGeometry(widget_rect)
+
+class AccueilWidget(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("📈 Marketing - Pazarlama Yönetimi")
-        self.setGeometry(100, 100, 1200, 800)
-        self.setup_ui()
-        self.setup_styles()
-        self.load_sample_data()
+
+class SearchWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+
+class SettingsWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+
+class HelpWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+
+class AboutDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+class CertificateDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+class Activite(QWidget):
+    def __init__(self):
+        super().__init__()
+
+class InstanceTable(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+class MainWindow1(QWidget):
+    def __init__(self, main_app):
+        super().__init__()
+
+class PDFEditorApp(QWidget):
+    def __init__(self):
+        super().__init__()
+
+class WatermarkApp(QWidget):
+    def __init__(self):
+        super().__init__()
+
+class MainWindowLink(QWidget):
+    def __init__(self, main_app):
+        super().__init__()
+
+class PromptManager(QWidget):
+    def __init__(self, main_app):
+        super().__init__()
+
+class ContactDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+class FlowManager:
+    def __init__(self, db):
+        pass
+    def start_session(self):
+        return {'dialogs': []}
+    def end_session(self):
+        pass
+
+class DatabaseManager:
+    def __init__(self):
+        pass
+    def close(self):
+        pass
+
+class InstallerPage(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+class ContactTable(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+class GroupTable(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+class MediaTable(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+class UpdaterWindow(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+class LicenseChecker:
+    def __init__(self, license_dir):
+        pass
+    def is_license_valid(self):
+        return True
+
+class GroupCounter:
+    def __init__(self, file_path):
+        pass
+    def count_groups(self):
+        return 0
+
+class Dashboard(QWidget):
+    def __init__(self, title, subtitle, validiter, Nombregroupes, totalshare, nexttimeshare):
+        super().__init__()
+
+class SpecialOfferWindow(QWidget):
+    def __init__(self, main_app):
+        super().__init__()
+
+class DescriptionManager(QWidget):
+    def __init__(self):
+        super().__init__()
+
+class MarketingAIAnalyzer(QWidget):
+    def __init__(self, parent=None):
+        super().__init__()
+
+class CryptoStrategyApp(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+class MainWindowMail(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+class MainWindowattak(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+class MainWindowsales(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+class MarketingModule(Browser):
+    def __init__(self):
+        super().__init__()
+
+class LoginModule(QWidget):
+    def __init__(self):
+        super().__init__()
         
-    def setup_ui(self):
-        """Ana kullanıcı arayüzünü kurar"""
+class Browser(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.splash = None
+        self.show_splash_screen()
+        self.translator = QTranslator()
+        self.init_language()
+        self.setWindowTitle(self.tr("Modern Browser"))
+        self.setWindowIcon(QIcon("browser_icon.png"))
+        self.setGeometry(220, 80,1200, 800)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowSystemMenuHint)
+        self.setAttribute(Qt.WA_TranslucentBackground, False)
+        self.initUI()
+        import time
+        time.sleep(3)
+        self.splash.finish(self)
+        self.menu_config = {
+            'visible_buttons': {
+                'Tools': True,
+                'Settings': True,
+                'Data': True,
+                'Support': True
+            }
+        }
+        self.load_menu_config()
+    def control_application(self):
+        self.db = DatabaseManager()
+        self.flow_manager = FlowManager( self.db)
+        self.current_flow = self.flow_manager.start_session()
+        self.current_step = 0
+        self.run_next_dialog()
+    def run_next_dialog(self):
+        if self.current_step < len(self.current_flow['dialogs']):
+            dialog_class, title = self.current_flow['dialogs'][self.current_step]
+            self.dialog = dialog_class(title)
+            self.dialog.finished.connect(self.on_dialog_finished)
+            self.dialog.show()
+        else:
+            self.flow_manager.end_session()
+    def on_dialog_finished(self, result):
+        if result == QDialog.Accepted:
+            self.current_step += 1
+            self.run_next_dialog()
+        else:
+            self.flow_manager.end_session()
+    def show_splash_screen(self):
+        self.splash_pix = QPixmap("resources/images/splashScreer.png")
+        if self.splash_pix.isNull():
+                    print("Error: Splash screen image not found.")
+                    return
+        self.splash = QSplashScreen(self.splash_pix, Qt.WindowStaysOnTopHint)
+        self.splash.setStyleSheet("background-color: #2E7D32;")
+        self.splash.setFont(QFont("Arial", 12))
+        self.splash.show()
+        loading_message = "Loading, please wait..."
+        self.splash.showMessage(
+            loading_message,
+            Qt.AlignBottom | Qt.AlignCenter,
+            Qt.white
+        )
+    def initUI(self):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        
-        # Ana layout
-        main_layout = QVBoxLayout(central_widget)
-        main_layout.setSpacing(15)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        
-        # Başlık alanı
-        header_frame = self.create_header()
-        main_layout.addWidget(header_frame)
-        
-        # Ana içerik alanı - Tab widget
+        self.main_layout = QVBoxLayout(central_widget)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.main_layout.setSpacing(0)
+        self.create_top_menu()
+        self.main_layout.addWidget(self.top_menu, stretch=0)
+        self.central_container = QSplitter(Qt.Horizontal)
+        self.central_container.setChildrenCollapsible(False)
+        self.central_container.setHandleWidth(10)
+        self.central_container.setStyleSheet("""
+            QSplitter::handle {
+                background: #333333;
+                width: 5px;
+            }
+            QSplitter::handle:hover {
+                background: #444444;
+            }
+        """)
+        self.browser_container = QWidget()
+        self.browser_layout = QVBoxLayout(self.browser_container)
+        self.browser_layout.setContentsMargins(0, 0, 0, 0)
         self.tab_widget = QTabWidget()
-        self.tab_widget.setObjectName("mainTabWidget")
-        
-        # Kampanyalar sekmesi
-        campaigns_tab = self.create_campaigns_tab()
-        self.tab_widget.addTab(campaigns_tab, "🎯 Kampanyalar")
-        
-        # Sosyal medya sekmesi
-        social_tab = self.create_social_media_tab()
-        self.tab_widget.addTab(social_tab, "📱 Sosyal Medya")
-        
-        # E-posta pazarlama sekmesi
-        email_tab = self.create_email_marketing_tab()
-        self.tab_widget.addTab(email_tab, "📧 E-posta Pazarlama")
-        
-        # Analytics sekmesi
-        analytics_tab = self.create_analytics_tab()
-        self.tab_widget.addTab(analytics_tab, "📊 Analytics")
-        
-        # İçerik yönetimi sekmesi
-        content_tab = self.create_content_management_tab()
-        self.tab_widget.addTab(content_tab, "📝 İçerik Yönetimi")
-        
-        main_layout.addWidget(self.tab_widget)
-        
-        # Alt durum çubuğu
-        status_frame = self.create_status_bar()
-        main_layout.addWidget(status_frame)
-        
-    def create_header(self):
-        """Başlık alanını oluşturur"""
-        header_frame = QFrame()
-        header_frame.setObjectName("headerFrame")
-        header_layout = QHBoxLayout(header_frame)
-        
-        # Sol taraf - Başlık ve açıklama
-        left_layout = QVBoxLayout()
-        
-        title_label = QLabel("📈 Marketing - Pazarlama Yönetimi")
-        title_label.setObjectName("headerTitle")
-        left_layout.addWidget(title_label)
-        
-        subtitle_label = QLabel("Kampanyalarınızı yönetin, sosyal medyayı takip edin, performansı analiz edin")
-        subtitle_label.setObjectName("headerSubtitle")
-        left_layout.addWidget(subtitle_label)
-        
-        header_layout.addLayout(left_layout)
-        header_layout.addStretch()
-        
-        # Sağ taraf - Hızlı eylemler
-        quick_actions_layout = QHBoxLayout()
-        
-        new_campaign_btn = QPushButton("🎯 Yeni Kampanya")
-        new_campaign_btn.setObjectName("primaryButton")
-        new_campaign_btn.clicked.connect(self.create_new_campaign)
-        quick_actions_layout.addWidget(new_campaign_btn)
-        
-        new_post_btn = QPushButton("📱 Yeni Post")
-        new_post_btn.setObjectName("secondaryButton")
-        new_post_btn.clicked.connect(self.create_new_post)
-        quick_actions_layout.addWidget(new_post_btn)
-        
-        header_layout.addLayout(quick_actions_layout)
-        
-        return header_frame
-        
-    def create_campaigns_tab(self):
-        """Kampanyalar sekmesini oluşturur"""
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        layout.setSpacing(20)
-        
-        # Üst panel - Kampanya oluşturma formu
-        campaign_group = QGroupBox("🎯 Kampanya Yönetimi")
-        campaign_layout = QFormLayout(campaign_group)
-        
-        self.campaign_name_edit = QLineEdit()
-        self.campaign_type_combo = QComboBox()
-        self.campaign_type_combo.addItems([
-            "E-posta Kampanyası", "SMS Kampanyası", "Sosyal Medya", 
-            "Google Ads", "Facebook Ads", "İnfluencer", "Etkinlik"
-        ])
-        
-        self.campaign_budget_spin = QSpinBox()
-        self.campaign_budget_spin.setRange(0, 1000000)
-        self.campaign_budget_spin.setSuffix(" ₺")
-        self.campaign_budget_spin.setValue(10000)
-        
-        self.campaign_start_date = QDateEdit()
-        self.campaign_start_date.setDate(QDate.currentDate())
-        
-        self.campaign_end_date = QDateEdit()
-        self.campaign_end_date.setDate(QDate.currentDate().addDays(30))
-        
-        self.campaign_target_combo = QComboBox()
-        self.campaign_target_combo.addItems([
-            "Tüm Müşteriler", "Yeni Müşteriler", "Mevcut Müşteriler", 
-            "VIP Müşteriler", "18-25 Yaş", "26-35 Yaş", "36+ Yaş"
-        ])
-        
-        self.campaign_description_edit = QTextEdit()
-        self.campaign_description_edit.setMaximumHeight(80)
-        
-        campaign_layout.addRow("Kampanya Adı:", self.campaign_name_edit)
-        campaign_layout.addRow("Kampanya Türü:", self.campaign_type_combo)
-        campaign_layout.addRow("Bütçe:", self.campaign_budget_spin)
-        campaign_layout.addRow("Başlangıç Tarihi:", self.campaign_start_date)
-        campaign_layout.addRow("Bitiş Tarihi:", self.campaign_end_date)
-        campaign_layout.addRow("Hedef Kitle:", self.campaign_target_combo)
-        campaign_layout.addRow("Açıklama:", self.campaign_description_edit)
-        
-        # Kampanya butonları
-        campaign_buttons_layout = QHBoxLayout()
-        create_campaign_btn = QPushButton("✨ Kampanya Oluştur")
-        create_campaign_btn.setObjectName("primaryButton")
-        create_campaign_btn.clicked.connect(self.create_campaign)
-        
-        update_campaign_btn = QPushButton("📝 Güncelle")
-        update_campaign_btn.clicked.connect(self.update_campaign)
-        
-        campaign_buttons_layout.addWidget(create_campaign_btn)
-        campaign_buttons_layout.addWidget(update_campaign_btn)
-        campaign_layout.addRow(campaign_buttons_layout)
-        
-        layout.addWidget(campaign_group)
-        
-        # Alt panel - Kampanya listesi ve performans
-        bottom_layout = QHBoxLayout()
-        
-        # Sol taraf - Kampanya listesi
-        campaigns_list_group = QGroupBox("📋 Aktif Kampanyalar")
-        campaigns_list_layout = QVBoxLayout(campaigns_list_group)
-        
-        self.campaigns_table = QTableWidget()
-        self.campaigns_table.setColumnCount(6)
-        self.campaigns_table.setHorizontalHeaderLabels([
-            "Kampanya", "Tür", "Durum", "Bütçe", "Harcanan", "ROI"
-        ])
-        
-        # Tablo ayarları
-        campaigns_header = self.campaigns_table.horizontalHeader()
-        campaigns_header.setStretchLastSection(True)
-        campaigns_header.setSectionResizeMode(QHeaderView.Interactive)
-        
-        self.campaigns_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.campaigns_table.setAlternatingRowColors(True)
-        self.campaigns_table.itemSelectionChanged.connect(self.on_campaign_selected)
-        
-        campaigns_list_layout.addWidget(self.campaigns_table)
-        bottom_layout.addWidget(campaigns_list_group, 2)
-        
-        # Sağ taraf - Performans kartları
-        performance_group = QGroupBox("📊 Performans Özeti")
-        performance_layout = QVBoxLayout(performance_group)
-        
-        # Performans kartları
-        perf_cards_layout = QVBoxLayout()
-        
-        perf_data = [
-            ("👁️", "Görüntülenme", "45,678", "#17a2b8"),
-            ("👆", "Tıklama", "3,456", "#28a745"),
-            ("💰", "Dönüşüm", "234", "#ffc107"),
-            ("📈", "CTR", "%7.6", "#dc3545"),
-        ]
-        
-        for icon, title, value, color in perf_data:
-            perf_card = self.create_performance_card(icon, title, value, color)
-            perf_cards_layout.addWidget(perf_card)
-            
-        performance_layout.addLayout(perf_cards_layout)
-        performance_layout.addStretch()
-        
-        bottom_layout.addWidget(performance_group, 1)
-        layout.addLayout(bottom_layout)
-        
-        return widget
-        
-    def create_social_media_tab(self):
-        """Sosyal medya sekmesini oluşturur"""
-        widget = QWidget()
-        layout = QHBoxLayout(widget)
-        layout.setSpacing(20)
-        
-        # Sol panel - Post oluşturma
-        post_group = QGroupBox("📱 Yeni Post Oluştur")
-        post_layout = QVBoxLayout(post_group)
-        
-        # Platform seçimi
-        platform_layout = QHBoxLayout()
-        platform_layout.addWidget(QLabel("Platform:"))
-        
-        self.platform_combo = QComboBox()
-        self.platform_combo.addItems([
-            "📘 Facebook", "📷 Instagram", "🐦 Twitter", 
-            "💼 LinkedIn", "📺 YouTube", "📌 Pinterest"
-        ])
-        platform_layout.addWidget(self.platform_combo)
-        platform_layout.addStretch()
-        
-        post_layout.addLayout(platform_layout)
-        
-        # Post içeriği
-        post_layout.addWidget(QLabel("Post İçeriği:"))
-        self.post_content_edit = QTextEdit()
-        self.post_content_edit.setPlaceholderText("Post içeriğinizi buraya yazın...")
-        self.post_content_edit.setMaximumHeight(120)
-        post_layout.addWidget(self.post_content_edit)
-        
-        # Hashtag'ler
-        post_layout.addWidget(QLabel("Hashtag'ler:"))
-        self.hashtags_edit = QLineEdit()
-        self.hashtags_edit.setPlaceholderText("#pazarlama #sosyalmedya #dijital")
-        post_layout.addWidget(self.hashtags_edit)
-        
-        # Zamanlama
-        schedule_layout = QHBoxLayout()
-        self.schedule_check = QCheckBox("📅 Zamanla")
-        schedule_layout.addWidget(self.schedule_check)
-        
-        self.schedule_date = QDateEdit()
-        self.schedule_date.setDate(QDate.currentDate())
-        self.schedule_date.setEnabled(False)
-        schedule_layout.addWidget(self.schedule_date)
-        
-        self.schedule_check.toggled.connect(self.schedule_date.setEnabled)
-        post_layout.addLayout(schedule_layout)
-        
-        # Post butonları
-        post_buttons_layout = QHBoxLayout()
-        post_now_btn = QPushButton("📤 Hemen Paylaş")
-        post_now_btn.setObjectName("primaryButton")
-        post_now_btn.clicked.connect(self.post_now)
-        
-        save_draft_btn = QPushButton("💾 Taslak Kaydet")
-        save_draft_btn.clicked.connect(self.save_draft)
-        
-        post_buttons_layout.addWidget(post_now_btn)
-        post_buttons_layout.addWidget(save_draft_btn)
-        post_layout.addLayout(post_buttons_layout)
-        
-        post_layout.addStretch()
-        layout.addWidget(post_group, 1)
-        
-        # Sağ panel - Sosyal medya istatistikleri
-        stats_group = QGroupBox("📊 Sosyal Medya İstatistikleri")
-        stats_layout = QVBoxLayout(stats_group)
-        
-        # Platform istatistikleri
-        platforms_data = [
-            ("📘 Facebook", "1,234 Takipçi", "89 Beğeni/Gün", "12 Paylaşım/Hafta"),
-            ("📷 Instagram", "2,567 Takipçi", "156 Beğeni/Gün", "8 Post/Hafta"),
-            ("🐦 Twitter", "987 Takipçi", "45 RT/Gün", "15 Tweet/Hafta"),
-            ("💼 LinkedIn", "543 Bağlantı", "23 Etkileşim/Gün", "5 Post/Hafta"),
-        ]
-        
-        for platform, followers, engagement, frequency in platforms_data:
-            platform_frame = QFrame()
-            platform_frame.setObjectName("platformFrame")
-            platform_layout = QVBoxLayout(platform_frame)
-            
-            platform_header = QLabel(platform)
-            platform_header.setObjectName("platformHeader")
-            platform_layout.addWidget(platform_header)
-            
-            followers_label = QLabel(followers)
-            followers_label.setObjectName("platformStat")
-            platform_layout.addWidget(followers_label)
-            
-            engagement_label = QLabel(engagement)
-            engagement_label.setObjectName("platformStat")
-            platform_layout.addWidget(engagement_label)
-            
-            frequency_label = QLabel(frequency)
-            frequency_label.setObjectName("platformStat")
-            platform_layout.addWidget(frequency_label)
-            
-            stats_layout.addWidget(platform_frame)
-            
-        # Son postlar
-        recent_posts_group = QGroupBox("📝 Son Postlar")
-        recent_posts_layout = QVBoxLayout(recent_posts_group)
-        
-        self.recent_posts_list = QListWidget()
-        recent_posts = [
-            "📘 Facebook: Yeni ürün lansmanı duyurusu",
-            "📷 Instagram: Ofis arkası fotoğrafları",
-            "🐦 Twitter: Sektör haberleri paylaşımı",
-            "💼 LinkedIn: Şirket başarı hikayesi",
-        ]
-        
-        for post in recent_posts:
-            self.recent_posts_list.addItem(post)
-            
-        recent_posts_layout.addWidget(self.recent_posts_list)
-        stats_layout.addWidget(recent_posts_group)
-        
-        layout.addWidget(stats_group, 1)
-        
-        return widget
-        
-    def create_email_marketing_tab(self):
-        """E-posta pazarlama sekmesini oluşturur"""
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        
-        # Üst panel - E-posta kampanyası oluşturma
-        email_group = QGroupBox("📧 E-posta Kampanyası")
-        email_layout = QFormLayout(email_group)
-        
-        self.email_subject_edit = QLineEdit()
-        self.email_template_combo = QComboBox()
-        self.email_template_combo.addItems([
-            "Hoş Geldin E-postası", "Promosyon Duyurusu", "Haber Bülteni", 
-            "Ürün Lansmanı", "Etkinlik Daveti", "Özel Template"
-        ])
-        
-        self.email_recipient_combo = QComboBox()
-        self.email_recipient_combo.addItems([
-            "Tüm Aboneler", "Yeni Aboneler", "VIP Müşteriler", 
-            "Aktif Müşteriler", "Özel Liste"
-        ])
-        
-        self.email_send_date = QDateEdit()
-        self.email_send_date.setDate(QDate.currentDate())
-        
-        email_layout.addRow("E-posta Konusu:", self.email_subject_edit)
-        email_layout.addRow("Template:", self.email_template_combo)
-        email_layout.addRow("Alıcı Grubu:", self.email_recipient_combo)
-        email_layout.addRow("Gönderim Tarihi:", self.email_send_date)
-        
-        # E-posta içeriği
-        email_layout.addRow("E-posta İçeriği:")
-        self.email_content_edit = QTextEdit()
-        self.email_content_edit.setMaximumHeight(150)
-        self.email_content_edit.setPlaceholderText("E-posta içeriğinizi buraya yazın...")
-        email_layout.addRow(self.email_content_edit)
-        
-        # E-posta butonları
-        email_buttons_layout = QHBoxLayout()
-        send_test_btn = QPushButton("🧪 Test Gönder")
-        send_test_btn.clicked.connect(self.send_test_email)
-        
-        schedule_email_btn = QPushButton("📅 Zamanla")
-        schedule_email_btn.clicked.connect(self.schedule_email)
-        
-        send_now_btn = QPushButton("📤 Hemen Gönder")
-        send_now_btn.setObjectName("primaryButton")
-        send_now_btn.clicked.connect(self.send_email_now)
-        
-        email_buttons_layout.addWidget(send_test_btn)
-        email_buttons_layout.addWidget(schedule_email_btn)
-        email_buttons_layout.addWidget(send_now_btn)
-        email_layout.addRow(email_buttons_layout)
-        
-        layout.addWidget(email_group)
-        
-        # Alt panel - E-posta istatistikleri
-        email_stats_layout = QHBoxLayout()
-        
-        # Sol taraf - Gönderim geçmişi
-        history_group = QGroupBox("📋 Gönderim Geçmişi")
-        history_layout = QVBoxLayout(history_group)
-        
-        self.email_history_table = QTableWidget()
-        self.email_history_table.setColumnCount(5)
-        self.email_history_table.setHorizontalHeaderLabels([
-            "Konu", "Alıcı Sayısı", "Açılma Oranı", "Tıklama Oranı", "Tarih"
-        ])
-        
-        history_layout.addWidget(self.email_history_table)
-        email_stats_layout.addWidget(history_group, 2)
-        
-        # Sağ taraf - E-posta metrikleri
-        metrics_group = QGroupBox("📊 E-posta Metrikleri")
-        metrics_layout = QVBoxLayout(metrics_group)
-        
-        email_metrics = [
-            ("📧", "Gönderilen", "12,456"),
-            ("👁️", "Açılan", "8,234"),
-            ("👆", "Tıklanan", "1,567"),
-            ("📈", "Açılma Oranı", "%66.1"),
-        ]
-        
-        for icon, title, value in email_metrics:
-            metric_card = self.create_metric_card(icon, title, value)
-            metrics_layout.addWidget(metric_card)
-            
-        metrics_layout.addStretch()
-        email_stats_layout.addWidget(metrics_group, 1)
-        
-        layout.addLayout(email_stats_layout)
-        
-        return widget
-        
-    def create_analytics_tab(self):
-        """Analytics sekmesini oluşturur"""
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        
-        # Üst panel - Metrikler
-        metrics_layout = QHBoxLayout()
-        
-        analytics_metrics = [
-            ("👁️", "Toplam Görüntülenme", "145,678", "#17a2b8"),
-            ("👆", "Toplam Tıklama", "13,456", "#28a745"),
-            ("💰", "Toplam Dönüşüm", "1,234", "#ffc107"),
-            ("📈", "Ortalama CTR", "%9.2", "#dc3545"),
-            ("💵", "Toplam Gelir", "₺234,567", "#6f42c1"),
-            ("📊", "ROAS", "4.2x", "#fd7e14"),
-        ]
-        
-        for icon, title, value, color in analytics_metrics:
-            metric_card = self.create_analytics_card(icon, title, value, color)
-            metrics_layout.addWidget(metric_card)
-            
-        layout.addLayout(metrics_layout)
-        
-        # Orta panel - Grafik alanı
-        chart_group = QGroupBox("📈 Performans Grafikleri")
-        chart_layout = QVBoxLayout(chart_group)
-        
-        # Grafik seçenekleri
-        chart_options_layout = QHBoxLayout()
-        
-        chart_type_combo = QComboBox()
-        chart_type_combo.addItems([
-            "Günlük Performans", "Haftalık Trend", "Aylık Özet", 
-            "Kanal Karşılaştırması", "Kampanya Analizi"
-        ])
-        chart_options_layout.addWidget(QLabel("Grafik Türü:"))
-        chart_options_layout.addWidget(chart_type_combo)
-        
-        date_range_combo = QComboBox()
-        date_range_combo.addItems([
-            "Son 7 Gün", "Son 30 Gün", "Son 3 Ay", "Son Yıl", "Özel Aralık"
-        ])
-        chart_options_layout.addWidget(QLabel("Tarih Aralığı:"))
-        chart_options_layout.addWidget(date_range_combo)
-        
-        chart_options_layout.addStretch()
-        
-        update_chart_btn = QPushButton("🔄 Grafiği Güncelle")
-        update_chart_btn.setObjectName("primaryButton")
-        chart_options_layout.addWidget(update_chart_btn)
-        
-        chart_layout.addLayout(chart_options_layout)
-        
-        # Grafik placeholder
-        chart_placeholder = QLabel("📊 Grafik Alanı\n\nBurada gerçek zamanlı performans grafikleri gösterilecek")
-        chart_placeholder.setAlignment(Qt.AlignCenter)
-        chart_placeholder.setObjectName("chartPlaceholder")
-        chart_layout.addWidget(chart_placeholder)
-        
-        layout.addWidget(chart_group)
-        
-        # Alt panel - Detaylı analiz
-        detailed_analysis_layout = QHBoxLayout()
-        
-        # Sol taraf - Kanal performansı
-        channels_group = QGroupBox("📊 Kanal Performansı")
-        channels_layout = QVBoxLayout(channels_group)
-        
-        self.channels_table = QTableWidget()
-        self.channels_table.setColumnCount(4)
-        self.channels_table.setHorizontalHeaderLabels([
-            "Kanal", "Görüntülenme", "Tıklama", "Dönüşüm"
-        ])
-        
-        channels_layout.addWidget(self.channels_table)
-        detailed_analysis_layout.addWidget(channels_group, 1)
-        
-        # Sağ taraf - Top performanslar
-        top_performance_group = QGroupBox("🏆 En İyi Performanslar")
-        top_performance_layout = QVBoxLayout(top_performance_group)
-        
-        self.top_campaigns_list = QListWidget()
-        top_campaigns = [
-            "🥇 Yaz İndirimi 2024 - CTR: %12.5",
-            "🥈 Sosyal Medya Boost - CTR: %9.8",
-            "🥉 E-posta Kampanyası - CTR: %8.2",
-            "4️⃣ Google Ads - CTR: %7.1",
-            "5️⃣ Facebook Ads - CTR: %6.9",
-        ]
-        
-        for campaign in top_campaigns:
-            self.top_campaigns_list.addItem(campaign)
-            
-        top_performance_layout.addWidget(self.top_campaigns_list)
-        detailed_analysis_layout.addWidget(top_performance_group, 1)
-        
-        layout.addLayout(detailed_analysis_layout)
-        
-        return widget
-        
-    def create_content_management_tab(self):
-        """İçerik yönetimi sekmesini oluşturur"""
-        widget = QWidget()
-        layout = QHBoxLayout(widget)
-        
-        # Sol panel - İçerik oluşturma
-        content_group = QGroupBox("📝 İçerik Oluştur")
-        content_layout = QVBoxLayout(content_group)
-        
-        # İçerik türü
-        content_type_layout = QHBoxLayout()
-        content_type_layout.addWidget(QLabel("İçerik Türü:"))
-        
-        self.content_type_combo = QComboBox()
-        self.content_type_combo.addItems([
-            "Blog Yazısı", "Sosyal Medya Postu", "E-posta İçeriği", 
-            "Reklam Metni", "Ürün Açıklaması", "Haber Bülteni"
-        ])
-        content_type_layout.addWidget(self.content_type_combo)
-        content_type_layout.addStretch()
-        
-        content_layout.addLayout(content_type_layout)
-        
-        # İçerik başlığı
-        content_layout.addWidget(QLabel("Başlık:"))
-        self.content_title_edit = QLineEdit()
-        content_layout.addWidget(self.content_title_edit)
-        
-        # İçerik metni
-        content_layout.addWidget(QLabel("İçerik:"))
-        self.content_text_edit = QTextEdit()
-        self.content_text_edit.setMinimumHeight(200)
-        content_layout.addWidget(self.content_text_edit)
-        
-        # Anahtar kelimeler
-        content_layout.addWidget(QLabel("Anahtar Kelimeler:"))
-        self.keywords_edit = QLineEdit()
-        self.keywords_edit.setPlaceholderText("pazarlama, dijital, sosyal medya")
-        content_layout.addWidget(self.keywords_edit)
-        
-        # İçerik durumu
-        status_layout = QHBoxLayout()
-        status_layout.addWidget(QLabel("Durum:"))
-        
-        self.content_status_combo = QComboBox()
-        self.content_status_combo.addItems([
-            "📝 Taslak", "👀 İnceleme", "✅ Onaylandı", "📤 Yayınlandı"
-        ])
-        status_layout.addWidget(self.content_status_combo)
-        status_layout.addStretch()
-        
-        content_layout.addLayout(status_layout)
-        
-        # İçerik butonları
-        content_buttons_layout = QHBoxLayout()
-        save_content_btn = QPushButton("💾 Kaydet")
-        save_content_btn.setObjectName("primaryButton")
-        save_content_btn.clicked.connect(self.save_content)
-        
-        preview_btn = QPushButton("👀 Önizleme")
-        preview_btn.clicked.connect(self.preview_content)
-        
-        publish_btn = QPushButton("📤 Yayınla")
-        publish_btn.clicked.connect(self.publish_content)
-        
-        content_buttons_layout.addWidget(save_content_btn)
-        content_buttons_layout.addWidget(preview_btn)
-        content_buttons_layout.addWidget(publish_btn)
-        content_layout.addLayout(content_buttons_layout)
-        
-        layout.addWidget(content_group, 1)
-        
-        # Sağ panel - İçerik kütüphanesi
-        library_group = QGroupBox("📚 İçerik Kütüphanesi")
-        library_layout = QVBoxLayout(library_group)
-        
-        # Filtreleme
-        filter_layout = QHBoxLayout()
-        
-        type_filter = QComboBox()
-        type_filter.addItems(["Tüm Türler", "Blog", "Sosyal Medya", "E-posta", "Reklam"])
-        filter_layout.addWidget(QLabel("Tür:"))
-        filter_layout.addWidget(type_filter)
-        
-        status_filter = QComboBox()
-        status_filter.addItems(["Tüm Durumlar", "Taslak", "İnceleme", "Onaylandı", "Yayınlandı"])
-        filter_layout.addWidget(QLabel("Durum:"))
-        filter_layout.addWidget(status_filter)
-        
-        filter_layout.addStretch()
-        library_layout.addLayout(filter_layout)
-        
-        # İçerik listesi
-        self.content_table = QTableWidget()
-        self.content_table.setColumnCount(4)
-        self.content_table.setHorizontalHeaderLabels([
-            "Başlık", "Tür", "Durum", "Tarih"
-        ])
-        
-        # Tablo ayarları
-        content_header = self.content_table.horizontalHeader()
-        content_header.setStretchLastSection(True)
-        content_header.setSectionResizeMode(QHeaderView.Interactive)
-        
-        self.content_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.content_table.setAlternatingRowColors(True)
-        self.content_table.itemSelectionChanged.connect(self.on_content_selected)
-        
-        library_layout.addWidget(self.content_table)
-        layout.addWidget(library_group, 1)
-        
-        return widget
-        
-    def create_status_bar(self):
-        """Alt durum çubuğunu oluşturur"""
-        status_frame = QFrame()
-        status_frame.setObjectName("statusFrame")
-        status_layout = QHBoxLayout(status_frame)
-        
-        self.status_label = QLabel("Hazır")
-        status_layout.addWidget(self.status_label)
-        
-        status_layout.addStretch()
-        
-        # Kullanıcı bilgisi
-        user_label = QLabel("👤 Pazarlama Uzmanı: Admin")
-        status_layout.addWidget(user_label)
-        
-        # Tarih/saat
-        from datetime import datetime
-        current_time = datetime.now().strftime("%d.%m.%Y %H:%M")
-        time_label = QLabel(f"🕒 {current_time}")
-        status_layout.addWidget(time_label)
-        
-        return status_frame
-        
-    def create_performance_card(self, icon, title, value, color):
-        """Performans kartı oluşturur"""
-        card = QFrame()
-        card.setObjectName("performanceCard")
-        card.setStyleSheet(f"""
-            #performanceCard {{
-                background-color: white;
-                border-left: 4px solid {color};
-                border-radius: 8px;
-                padding: 15px;
-                margin: 5px;
-            }}
-        """)
-        
-        card_layout = QHBoxLayout(card)
-        
-        # İkon
-        icon_label = QLabel(icon)
-        icon_label.setStyleSheet("font-size: 24px;")
-        card_layout.addWidget(icon_label)
-        
-        # Metin alanı
-        text_layout = QVBoxLayout()
-        
-        title_label = QLabel(title)
-        title_label.setObjectName("perfCardTitle")
-        text_layout.addWidget(title_label)
-        
-        value_label = QLabel(value)
-        value_label.setObjectName("perfCardValue")
-        text_layout.addWidget(value_label)
-        
-        card_layout.addLayout(text_layout)
-        card_layout.addStretch()
-        
-        return card
-        
-    def create_metric_card(self, icon, title, value):
-        """Metrik kartı oluşturur"""
-        card = QFrame()
-        card.setObjectName("metricCard")
-        card_layout = QVBoxLayout(card)
-        card_layout.setAlignment(Qt.AlignCenter)
-        
-        icon_label = QLabel(icon)
-        icon_label.setAlignment(Qt.AlignCenter)
-        icon_label.setStyleSheet("font-size: 20px; margin-bottom: 5px;")
-        card_layout.addWidget(icon_label)
-        
-        title_label = QLabel(title)
-        title_label.setAlignment(Qt.AlignCenter)
-        title_label.setObjectName("metricTitle")
-        card_layout.addWidget(title_label)
-        
-        value_label = QLabel(value)
-        value_label.setAlignment(Qt.AlignCenter)
-        value_label.setObjectName("metricValue")
-        card_layout.addWidget(value_label)
-        
-        return card
-        
-    def create_analytics_card(self, icon, title, value, color):
-        """Analytics kartı oluşturur"""
-        card = QFrame()
-        card.setObjectName("analyticsCard")
-        card.setStyleSheet(f"""
-            #analyticsCard {{
-                background-color: white;
-                border: 2px solid {color};
-                border-radius: 10px;
-                padding: 15px;
-                margin: 5px;
-                min-height: 100px;
-            }}
-            #analyticsCard:hover {{
-                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-                transform: translateY(-2px);
-            }}
-        """)
-        
-        card_layout = QVBoxLayout(card)
-        card_layout.setAlignment(Qt.AlignCenter)
-        
-        icon_label = QLabel(icon)
-        icon_label.setAlignment(Qt.AlignCenter)
-        icon_label.setStyleSheet("font-size: 28px; margin-bottom: 8px;")
-        card_layout.addWidget(icon_label)
-        
-        title_label = QLabel(title)
-        title_label.setAlignment(Qt.AlignCenter)
-        title_label.setObjectName("analyticsTitle")
-        card_layout.addWidget(title_label)
-        
-        value_label = QLabel(value)
-        value_label.setAlignment(Qt.AlignCenter)
-        value_label.setObjectName("analyticsValue")
-        value_label.setStyleSheet(f"color: {color}; font-size: 20px; font-weight: bold;")
-        card_layout.addWidget(value_label)
-        
-        return card
-        
-    def load_sample_data(self):
-        """Örnek verileri yükler"""
-        # Kampanya verileri
-        campaigns_data = [
-            ("Yaz İndirimi 2024", "E-posta", "🟢 Aktif", "₺15,000", "₺12,000", "%125"),
-            ("Sosyal Medya Boost", "Facebook Ads", "🟡 Beklemede", "₺8,500", "₺5,200", "%89"),
-            ("Google Ads Kampanyası", "Google Ads", "🟢 Aktif", "₺25,000", "₺18,000", "%156"),
-            ("İnfluencer İşbirliği", "İnfluencer", "🔴 Tamamlandı", "₺10,000", "₺10,000", "%78"),
-        ]
-        
-        self.campaigns_table.setRowCount(len(campaigns_data))
-        for row, campaign in enumerate(campaigns_data):
-            for col, data in enumerate(campaign):
-                self.campaigns_table.setItem(row, col, QTableWidgetItem(data))
-                
-        # E-posta geçmişi verileri
-        email_history_data = [
-            ("Yeni Ürün Lansmanı", "2,456", "%68.2", "%12.4", "15.01.2024"),
-            ("Haftalık Haber Bülteni", "3,789", "%72.1", "%8.9", "12.01.2024"),
-            ("Özel İndirim Teklifi", "1,234", "%81.3", "%15.7", "08.01.2024"),
-            ("Etkinlik Daveti", "987", "%65.4", "%22.1", "05.01.2024"),
-        ]
-        
-        self.email_history_table.setRowCount(len(email_history_data))
-        for row, email in enumerate(email_history_data):
-            for col, data in enumerate(email):
-                self.email_history_table.setItem(row, col, QTableWidgetItem(data))
-                
-        # Kanal performansı verileri
-        channels_data = [
-            ("Google Ads", "45,678", "3,456", "234"),
-            ("Facebook", "32,145", "2,789", "189"),
-            ("Instagram", "28,934", "2,234", "156"),
-            ("E-posta", "15,678", "1,234", "98"),
-        ]
-        
-        self.channels_table.setRowCount(len(channels_data))
-        for row, channel in enumerate(channels_data):
-            for col, data in enumerate(channel):
-                self.channels_table.setItem(row, col, QTableWidgetItem(data))
-                
-        # İçerik kütüphanesi verileri
-        content_data = [
-            ("Dijital Pazarlama Trendleri", "Blog", "✅ Onaylandı", "15.01.2024"),
-            ("Sosyal Medya İpuçları", "Sosyal Medya", "📝 Taslak", "14.01.2024"),
-            ("Ürün Tanıtım E-postası", "E-posta", "👀 İnceleme", "13.01.2024"),
-            ("Google Ads Reklam Metni", "Reklam", "📤 Yayınlandı", "12.01.2024"),
-        ]
-        
-        self.content_table.setRowCount(len(content_data))
-        for row, content in enumerate(content_data):
-            for col, data in enumerate(content):
-                self.content_table.setItem(row, col, QTableWidgetItem(data))
-                
-    def setup_styles(self):
-        """Stil tanımlamaları"""
-        self.setStyleSheet("""
-            QMainWindow {
-                background-color: #f8f9fa;
+        self.tab_widget.setTabsClosable(True)
+        self.tab_widget.setDocumentMode(True)
+        self.tab_widget.setMovable(True)
+        self.tab_widget.tabCloseRequested.connect(self.close_tab)
+        self.tab_widget.currentChanged.connect(self.update_search_bar_visibility)
+        self.tab_widget.setStyleSheet(self.tab_widget_style())
+        self.browser_layout.addWidget(self.tab_widget)
+        self.create_search_bar(self.browser_layout)
+        self.central_container.addWidget(self.browser_container)
+        self.main_layout.addWidget(self.central_container, stretch=1)
+        self.status_bar = QStatusBar()
+        self.setStatusBar(self.status_bar)
+        self.open_home()
+        QTimer.singleShot(200, self.control_application)
+    def create_top_menu(self):
+        self.is_user_logged_in = False
+        self.is_enterprise_mode = False
+        self.current_username = "Guest"
+        self.load_session_state()
+        self.menu_config = {
+            'visible_buttons': {
+                'Tools': False,
+                'Data': False,
+                'Support': False
             }
-            
-            #headerFrame {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #28a745, stop:1 #20c997);
-                color: white;
-                padding: 20px;
-                border-radius: 10px;
-                margin-bottom: 10px;
+        }
+        self.load_menu_config()
+        self.top_menu = QFrame()
+        self.top_menu.setFixedHeight(50)
+        self.top_menu.setStyleSheet("""
+            QFrame {
+                background-color: #f8fafc;
+                border-bottom: 1px solid #e2e8f0;
             }
-            
-            #headerTitle {
-                font-size: 28px;
+        """)
+        self.top_menu_layout = QHBoxLayout(self.top_menu)
+        self.top_menu_layout.setContentsMargins(5, 5, 5, 5)
+        self.top_menu_layout.setSpacing(10)
+        self.app_title = QLabel("Leopardo AI")
+        self.app_title.setStyleSheet("""
+            QLabel {
+                color: #2563eb;
+                font-size: 18px;
                 font-weight: bold;
-                color: white;
-                margin-bottom: 5px;
+                padding: 0 15px;
             }
-            
-            #headerSubtitle {
+        """)
+        self.top_menu_layout.addWidget(self.app_title)
+        self.menu_bar = QHBoxLayout()
+        self.menu_bar.setSpacing(5)
+        menu_items = [
+            ("🏠", self.tr("Home"), "home", self.open_home, self.tr("Main dashboard"), []),
+            ("🧰", self.tr("Tools"), "tools", None, self.tr("Document tools"), [
+                ("🧠", self.tr("Management"), "Management", self.open_management, self.tr("Management tools"), []),
+                ("📺", self.tr("Media"), "media", self.add_media_page, self.tr("Media Management"), []),
+                ("🌍", self.tr("My Groups"), "grups", self.open_grups_window, self.tr("Group list"), []),
+                ("👥", self.tr("Address book"), "contact", self.open_contacts_window, self.tr("Contact list"), []),
+                ("🔗", self.tr("Links"), "links", self.open_links_window, self.tr("Manage links"), []),
+                ("📝", self.tr("Desc & Prompts"), "prompts", self.open_prompts_window, self.tr("Useful prompts"), []),
+            ]),
+            ("✨", self.tr("Plans"), "Plans", None, self.tr("Plans options"), [
+                ("🎯", self.tr("Marketing"), "Marketing", self.open_marketing, self.tr("Marketing tools"), []),
+                ("📜", self.tr("Protocles"), "Protocoles", self.open_management, self.tr("Protocoles tools"), []),
+                ("💸", self.tr("ADS"), "Ads", self.open_management, self.tr("Ads tools"), []),
+                ("⏰", self.tr("Scheduler"), "scheduler", self.open_sheduling_window, self.tr("Task scheduling"), []),
+            ]),
+            ("⏯️", self.tr("Run"), "Run", self.open_manuelle_window, self.tr("Run Now"), []),
+            ("💡", self.tr("Data"), "data", None, self.tr("Data management"), [
+                ("🎭", self.tr("Prospects "), "Persona", self.open_persona_window, self.tr("View statistics"), []),
+                ("🌍", self.tr("Groups "), "grups", self.open_grups_window, self.tr("Group list"), []),
+                ("📈", self.tr("Stats"), "stats", self.open_statistics_window, self.tr("View statistics"), []),
+                ("📥", self.tr("Import Data"), "import", self.open_imports_window, self.tr("Import data"), []),
+                ("🗃️", self.tr("ADN Backup"), "backup", self.open_imports_window, self.tr("Backup enterprise data"), []),
+            ]),
+        ]
+        self.menu_buttons = []
+        self.sub_menus = {}
+        self.current_open_menu = None
+        self.menu_button_refs = {}
+        for icon, text, identifier, action, tooltip, sub_items in menu_items:
+            button = QPushButton(f"{icon} {text}")
+            button.setFixedHeight(36)
+            button.setStyleSheet("""
+                QPushButton {
+                    background-color: transparent;
+                    color: #4b5563;
+                    border: none;
+                    font-size: 14px;
+                    padding: 5px 10px;
+                    border-radius: 4px;
+                    transition: all 0.2s ease;
+                }
+                QPushButton:hover {
+                    background-color: #e5e7eb;
+                    color: #1f2937;
+                    transform: translateY(-1px);
+                }
+            """)
+            button.setToolTip(f"<b>{text}</b><br>{tooltip}")
+            if action:
+                button.clicked.connect(action)
+            if identifier not in ["home", "tools", "data", "support", "upgrade", "settings", "beta"]:
+                self.menu_button_refs[text] = button
+            if sub_items:
+                menu = QMenu()
+                menu.setStyleSheet("""
+                    QMenu {
+                        background-color: #ffffff;
+                        border: 1px solid #d1d5db;
+                        padding: 5px;
+                        border-radius: 8px;
+                        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+                    }
+                    QMenu::item {
+                        color: #4b5563;
+                        padding: 8px 25px;
+                        margin: 2px;
+                        border-radius: 4px;
+                        font-size: 13px;
+                        min-width: 150px;
+                    }
+                    QMenu::item:selected {
+                        background-color: #f3f4f6;
+                        color: #111827;
+                    }
+                    QMenu::item:disabled {
+                        color: #9ca3af;
+                    }
+                    QMenu::icon {
+                        padding-left: 10px;
+                    }
+                """)
+                for sub_icon, sub_text, sub_id, sub_action, sub_tooltip, nested_sub_items in sub_items:
+                    if nested_sub_items:
+                        submenu = QMenu(sub_text)
+                        submenu.setStyleSheet(menu.styleSheet())
+                        for nest_icon, nest_text, nest_id, nest_action, nest_tooltip, _ in nested_sub_items:
+                            action = submenu.addAction(f"{nest_icon} {nest_text}")
+                            action.setToolTip(nest_tooltip)
+                            if nest_action:
+                                action.triggered.connect(nest_action)
+                        menu.addMenu(submenu)
+                    else:
+                        action = menu.addAction(f"{sub_icon} {sub_text}")
+                        action.setToolTip(sub_tooltip)
+                        if sub_action:
+                            action.triggered.connect(sub_action)
+                button.setMenu(menu)
+            self.menu_bar.addWidget(button)
+            self.menu_buttons.append(button)
+        self.top_menu_layout.addLayout(self.menu_bar)
+        self.top_menu_layout.addStretch()
+        self.create_notif()
+        self.top_menu_layout.addStretch()
+        self.control_buttons_layout = QHBoxLayout()
+        self.control_buttons_layout.setSpacing(5)
+        minimize_button = QPushButton("—")
+        minimize_button.setFixedSize(26, 26)
+        minimize_button.setStyleSheet(self.get_control_button_style("minimize"))
+        minimize_button.clicked.connect(self.minimize_window)
+        maximize_button = QPushButton("□")
+        maximize_button.setFixedSize(26, 26)
+        maximize_button.setStyleSheet(self.get_control_button_style("maximize"))
+        maximize_button.clicked.connect(self.maximize_window)
+        close_button = QPushButton("✕")
+        close_button.setFixedSize(26, 26)
+        close_button.setStyleSheet(self.get_control_button_style("close"))
+        close_button.clicked.connect(self.close_window)
+        self.control_buttons_layout.addWidget(minimize_button)
+        self.control_buttons_layout.addWidget(maximize_button)
+        self.control_buttons_layout.addWidget(close_button)
+        self.user_button = QPushButton(f"👤 {self.current_username}")
+        self.user_button.setFixedHeight(36)
+        self.user_button.setStyleSheet("""
+            QPushButton {
+                background-color: #ffffff;
+                color: #4b5563;
+                border: 1px solid #d1d5db;
                 font-size: 14px;
-                color: rgba(255, 255, 255, 0.9);
+                padding: 5px 15px 5px 10px;
+                border-radius: 18px;
+                min-width: 100px;
+                transition: all 0.2s ease;
             }
-            
-            #mainTabWidget::pane {
-                border: 1px solid #dee2e6;
-                background-color: white;
-                border-radius: 8px;
+            QPushButton:hover {
+                background-color: #f3f4f6;
+                transform: translateY(-1px);
+            }
+        """)
+        self.user_menu = QMenu()
+        self.user_menu.setStyleSheet("""
+            QMenu {
+                background-color: #ffffff;
+                border: 1px solid #d1d5db;
+                padding: 8px;
+                border-radius: 12px;
+                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
                 margin-top: 5px;
             }
-            
-            QTabBar::tab {
-                background-color: #e9ecef;
-                padding: 12px 20px;
-                margin-right: 2px;
-                border-top-left-radius: 8px;
-                border-top-right-radius: 8px;
-                font-weight: bold;
-                font-size: 14px;
-            }
-            
-            QTabBar::tab:selected {
-                background-color: white;
-                border-bottom: 3px solid #28a745;
-                color: #28a745;
-            }
-            
-            QTabBar::tab:hover:!selected {
-                background-color: #f8f9fa;
-            }
-            
-            #primaryButton {
-                background-color: #28a745;
-                color: white;
-                border: none;
-                padding: 10px 20px;
+            QMenu::item {
+                color: #4b5563;
+                padding: 10px 25px;
+                margin: 2px;
                 border-radius: 6px;
-                font-weight: bold;
-                font-size: 14px;
+                font-size: 13px;
+                min-width: 180px;
             }
-            
-            #primaryButton:hover {
-                background-color: #218838;
+            QMenu::item:selected {
+                background-color: #f3f4f6;
+                color: #111827;
             }
-            
-            #primaryButton:pressed {
-                background-color: #1e7e34;
+            QMenu::separator {
+                height: 1px;
+                background: #e5e7eb;
+                margin: 8px 2px;
             }
-            
-            #secondaryButton {
-                background-color: #6c757d;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 6px;
-                font-weight: bold;
-                font-size: 14px;
-            }
-            
-            #secondaryButton:hover {
-                background-color: #5a6268;
-            }
-            
-            QGroupBox {
-                font-weight: bold;
-                border: 2px solid #dee2e6;
-                border-radius: 8px;
-                margin-top: 15px;
-                padding-top: 15px;
-                background-color: white;
-            }
-            
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 15px;
-                padding: 0 8px 0 8px;
-                background-color: white;
-                font-size: 14px;
-                color: #495057;
-            }
-            
-            QTableWidget {
-                background-color: white;
-                border: 1px solid #dee2e6;
-                border-radius: 6px;
-                gridline-color: #e9ecef;
-                selection-background-color: #28a745;
-                selection-color: white;
-            }
-            
-            QTableWidget::item {
-                padding: 8px;
-                border-bottom: 1px solid #f8f9fa;
-            }
-            
-            QTableWidget::item:selected {
-                background-color: #28a745;
-                color: white;
-            }
-            
-            QTableWidget::item:hover {
-                background-color: #f8f9fa;
-            }
-            
-            QHeaderView::section {
-                background-color: #e9ecef;
-                padding: 8px;
-                border: none;
-                border-right: 1px solid #dee2e6;
-                font-weight: bold;
-                color: #495057;
-            }
-            
-            QLineEdit, QComboBox, QDateEdit, QSpinBox {
-                padding: 8px 12px;
-                border: 2px solid #ced4da;
-                border-radius: 6px;
-                background-color: white;
-                font-size: 14px;
-            }
-            
-            QLineEdit:focus, QComboBox:focus, QDateEdit:focus, QSpinBox:focus {
-                border-color: #28a745;
-                outline: none;
-            }
-            
-            QTextEdit {
-                border: 2px solid #ced4da;
-                border-radius: 6px;
-                background-color: white;
-                padding: 8px;
-                font-size: 14px;
-            }
-            
-            QTextEdit:focus {
-                border-color: #28a745;
-            }
-            
-            QCheckBox {
-                font-size: 14px;
-                color: #495057;
-            }
-            
-            QCheckBox::indicator {
-                width: 18px;
-                height: 18px;
-            }
-            
-            QCheckBox::indicator:unchecked {
-                border: 2px solid #ced4da;
-                background-color: white;
-                border-radius: 3px;
-            }
-            
-            QCheckBox::indicator:checked {
-                border: 2px solid #28a745;
-                background-color: #28a745;
-                border-radius: 3px;
-            }
-            
-            #platformFrame {
-                background-color: #f8f9fa;
-                border: 1px solid #dee2e6;
-                border-radius: 8px;
-                padding: 15px;
-                margin: 5px;
-            }
-            
-            #platformHeader {
-                font-size: 16px;
-                font-weight: bold;
-                color: #495057;
-                margin-bottom: 8px;
-            }
-            
-            #platformStat {
-                font-size: 12px;
-                color: #6c757d;
-                margin-bottom: 3px;
-            }
-            
-            #perfCardTitle {
-                font-size: 12px;
-                color: #6c757d;
-                font-weight: bold;
-            }
-            
-            #perfCardValue {
-                font-size: 18px;
-                color: #495057;
-                font-weight: bold;
-            }
-            
-            #metricCard {
-                background-color: white;
-                border: 1px solid #dee2e6;
-                border-radius: 8px;
-                padding: 15px;
-                margin: 5px;
-                min-height: 80px;
-            }
-            
-            #metricCard:hover {
-                border-color: #28a745;
-                box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
-            }
-            
-            #metricTitle {
-                font-size: 11px;
-                color: #6c757d;
-                font-weight: bold;
-            }
-            
-            #metricValue {
-                font-size: 16px;
-                color: #28a745;
-                font-weight: bold;
-            }
-            
-            #analyticsTitle {
-                font-size: 12px;
-                color: #6c757d;
-                font-weight: bold;
-                text-align: center;
-            }
-            
-            #chartPlaceholder {
-                background-color: #f8f9fa;
-                border: 2px dashed #dee2e6;
-                border-radius: 8px;
-                padding: 80px;
-                font-size: 16px;
-                color: #6c757d;
-                margin: 20px;
-            }
-            
-            QListWidget {
-                background-color: white;
-                border: 1px solid #dee2e6;
-                border-radius: 6px;
-            }
-            
-            QListWidget::item {
-                padding: 8px;
-                border-bottom: 1px solid #f8f9fa;
-            }
-            
-            QListWidget::item:hover {
-                background-color: #f8f9fa;
-            }
-            
-            QListWidget::item:selected {
-                background-color: #28a745;
-                color: white;
-            }
-            
-            #statusFrame {
-                background-color: #e9ecef;
-                padding: 8px 15px;
-                border-radius: 6px;
-                margin-top: 10px;
-                border: 1px solid #dee2e6;
+            QMenu::icon {
+                padding-left: 10px;
             }
         """)
-        
-    # Event handlers
-    def on_campaign_selected(self):
-        """Kampanya seçildiğinde çalışır"""
-        current_row = self.campaigns_table.currentRow()
-        if current_row >= 0:
-            name = self.campaigns_table.item(current_row, 0).text()
-            self.status_label.setText(f"Seçili kampanya: {name}")
-            
-    def on_content_selected(self):
-        """İçerik seçildiğinde çalışır"""
-        current_row = self.content_table.currentRow()
-        if current_row >= 0:
-            title = self.content_table.item(current_row, 0).text()
-            self.status_label.setText(f"Seçili içerik: {title}")
-            
-    # Action methods
-    def create_new_campaign(self):
-        """Yeni kampanya oluşturma"""
-        self.tab_widget.setCurrentIndex(0)  # Kampanyalar sekmesine geç
-        self.campaign_name_edit.setFocus()
-        self.status_label.setText("Yeni kampanya oluşturma modu")
-        
-    def create_new_post(self):
-        """Yeni post oluşturma"""
-        self.tab_widget.setCurrentIndex(1)  # Sosyal medya sekmesine geç
-        self.post_content_edit.setFocus()
-        self.status_label.setText("Yeni post oluşturma modu")
-        
-    def create_campaign(self):
-        """Kampanya oluşturma"""
-        name = self.campaign_name_edit.text().strip()
-        if not name:
-            QMessageBox.warning(self, "Uyarı", "Kampanya adı boş olamaz!")
-            return
-            
-        row_count = self.campaigns_table.rowCount()
-        self.campaigns_table.insertRow(row_count)
-        
-        self.campaigns_table.setItem(row_count, 0, QTableWidgetItem(name))
-        self.campaigns_table.setItem(row_count, 1, QTableWidgetItem(self.campaign_type_combo.currentText()))
-        self.campaigns_table.setItem(row_count, 2, QTableWidgetItem("🟡 Beklemede"))
-        self.campaigns_table.setItem(row_count, 3, QTableWidgetItem(f"₺{self.campaign_budget_spin.value():,}"))
-        self.campaigns_table.setItem(row_count, 4, QTableWidgetItem("₺0"))
-        self.campaigns_table.setItem(row_count, 5, QTableWidgetItem("-%"))
-        
-        self.status_label.setText(f"Kampanya '{name}' başarıyla oluşturuldu")
-        QMessageBox.information(self, "Başarılı", f"Kampanya '{name}' başarıyla oluşturuldu!")
-        
-    def update_campaign(self):
-        """Kampanya güncelleme"""
-        current_row = self.campaigns_table.currentRow()
-        if current_row >= 0:
-            name = self.campaign_name_edit.text().strip()
-            if name:
-                self.campaigns_table.setItem(current_row, 0, QTableWidgetItem(name))
-                self.campaigns_table.setItem(current_row, 1, QTableWidgetItem(self.campaign_type_combo.currentText()))
-                self.campaigns_table.setItem(current_row, 3, QTableWidgetItem(f"₺{self.campaign_budget_spin.value():,}"))
-                
-                self.status_label.setText(f"Kampanya '{name}' güncellendi")
-                QMessageBox.information(self, "Başarılı", f"Kampanya '{name}' başarıyla güncellendi!")
+        self.login_action = self.user_menu.addAction("🔑 " + self.tr("Login"))
+        self.logout_action = self.user_menu.addAction("🚪 " + self.tr("Logout"))
+        self.user_menu.addSeparator()
+        plan_section = self.user_menu.addAction("📋 " + self.tr("Data"))
+        plan_section.setEnabled(False)
+        self.marketing_plan_action = self.user_menu.addAction("   📢 " + self.tr("Contacts Prospect"))
+        self.sales_plan_action = self.user_menu.addAction("   💰 " + self.tr("Data Groups"))
+        self.user_menu.addSeparator()
+        self.settings_action = self.user_menu.addAction("♻️ " + self.tr("Update"))
+        settings_menu = self.user_menu.addMenu("⚙️ " + self.tr("Settings"))
+        settings_menu.setStyleSheet(self.user_menu.styleSheet())
+        settings_items = [
+            ("🔌", self.tr("Add-On"), "add-on", self.add_on_page, self.tr("Add app")),
+            ("📡", self.tr("Remote"), "remote", self.open_telecommande_window, self.tr("Remote control")),
+            ("📦", self.tr("Installer"), "Installer", self.open_installer_window, self.tr("Add app")),
+            ("🌐", self.tr("Connection"), "online_connect", self.connect_via_ssh, self.tr("Remote connection settings")),
+            ("🗂️", self.tr("Instances"), "instances", self.open_instance, self.tr("Manage instances")),
+            ("💎", self.tr("Upgrade"), "upgrade", self.open_upgrade_window, self.tr("Upgrade options")),
+            ("📞", self.tr("Contact"), "contact", self.open_contact_window, self.tr("Contact us")),
+            ("♟️", self.tr("Strategies"), "strategies", self.open_strategies_window, self.tr("Possible strategies")),
+        ]
+        for icon, text, identifier, action, tooltip in settings_items:
+            act = settings_menu.addAction(f"{icon} {text}")
+            act.setToolTip(tooltip)
+            if action:
+                act.triggered.connect(lambda _, f=action: self.check_pro_mode(f))
+        self.user_menu.addSeparator()
+        account_section = self.user_menu.addAction("👤 " + self.tr("Account"))
+        account_section.setEnabled(False)
+        self.switch_action = self.user_menu.addAction("   👥 " + self.tr("Switch Account"))
+        self.subscription_action = self.user_menu.addAction("   🛒 " + self.tr("Subscription"))
+        self.my_persona_action = self.user_menu.addAction("   🎭 " + self.tr("My Persona"))
+        language_menu = self.user_menu.addMenu("   🌍 " + self.tr("Language"))
+        language_menu.setStyleSheet(self.user_menu.styleSheet())
+        language_items = [
+            ("🗼", self.tr("French"), "french", lambda: self.switch_language("fr"), self.tr("French language")),
+            ("🏰", self.tr("English"), "english", lambda: self.switch_language("en"), self.tr("English language")),
+            ("🕋", self.tr("Arabic"), "arabic", lambda: self.switch_language("ar"), self.tr("Arabic language")),
+            ("🕌", self.tr("Turkish"), "turkish", lambda: self.switch_language("tr"), self.tr("Turkish language")),
+            ("🏖️", self.tr("Portuguese"), "portuguese", lambda: self.switch_language("pt"), self.tr("Portuguese language")),
+        ]
+        for icon, text, identifier, action, tooltip in language_items:
+            act = language_menu.addAction(f"{icon} {text}")
+            act.setToolTip(tooltip)
+            if action:
+                act.triggered.connect(action)
+        self.login_action.triggered.connect(self.user_login)
+        self.logout_action.triggered.connect(self.user_logout)
+        self.marketing_plan_action.triggered.connect(lambda: self.open_plan("marketing"))
+        self.sales_plan_action.triggered.connect(lambda: self.open_plan("sales"))
+        self.settings_action.triggered.connect(self.open_user_settings)
+        self.switch_action.triggered.connect(self.switch_account)
+        self.subscription_action.triggered.connect(self.open_subscription)
+        self.my_persona_action.triggered.connect(self.open_my_persona)
+        self.user_button.setMenu(self.user_menu)
+        self.top_menu_layout.addWidget(self.user_button)
+        self.top_menu_layout.addLayout(self.control_buttons_layout)
+        self.update_user_profile_section()
+        self.update_menu_visibility()
+        self.main_layout.insertWidget(0, self.top_menu)
+        self.update_notification_count()
+        self.update_message_count()
+    def check_pro_mode(self, action_function):
+        if self.is_enterprise_mode:
+            action_function()
         else:
-            QMessageBox.warning(self, "Uyarı", "Güncellenecek kampanya seçiniz!")
-            
-    def post_now(self):
-        """Hemen post paylaşma"""
-        content = self.post_content_edit.toPlainText().strip()
-        if not content:
-            QMessageBox.warning(self, "Uyarı", "Post içeriği boş olamaz!")
+            QMessageBox.information(self,
+                                self.tr("Pro Feature"),
+                                self.tr("This feature is only available in Pro mode. Please upgrade to access all professional features."),
+                                QMessageBox.Ok)
+            self.open_upgrade_window()
+    def create_notif(self):
+        def create_button_with_badge(emoji_text, badge_color):
+            button = QToolButton()
+            button.setText(emoji_text)
+            button.setFont(QFont("Segoe UI Emoji", 10))
+            button.setStyleSheet("""
+                QToolButton {
+                    background-color: transparent;
+                    border: none;
+                    padding: 5px;
+                }
+                QToolButton:hover {
+                    background-color: #e5e7eb;
+                    border-radius: 6px;
+                }
+            """)
+            badge = QLabel("0")
+            badge.setStyleSheet(f"""
+                QLabel {{
+                    background-color: {badge_color};
+                    color: white;
+                    border-radius: 8px;
+                    padding: 1px 5px;
+                    font-size: 10px;
+                    min-width: 6px;
+                    max-width: 6px;
+                    min-height: 6px;
+                    max-height: 6px;
+                }}
+            """)
+            badge.setAlignment(Qt.AlignCenter)
+            overlay = QOverlayLayout(button)
+            overlay.addWidget(badge, alignment=Qt.AlignTop | Qt.AlignRight)
+            return button, badge
+        self.notification_button, self.notification_badge = create_button_with_badge("🔔", "#ef4444")
+        self.notification_menu = QMenu()
+        self.notification_menu.setStyleSheet("""
+            QMenu {
+                background-color: white;
+                border: 1px solid #d1d5db;
+                min-width: 100px;
+                max-height: 200px;
+            }
+            QMenu::item {
+                padding: 8px 15px;
+                border-bottom: 1px solid #f3f4f6;
+            }
+            QMenu::item:selected {
+                background-color: #f3f4f6;
+            }
+        """)
+        notif_header = QWidgetAction(self.notification_menu)
+        notif_widget = QWidget()
+        notif_layout = QHBoxLayout(notif_widget)
+        notif_label = QLabel("🔔 Notifications")
+        notif_label.setStyleSheet("font-weight: bold;")
+        clear_btn = QPushButton("Tout marquer comme lu")
+        clear_btn.setStyleSheet("""
+            QPushButton {
+                border: none;
+                color: #3b82f6;
+                background: transparent;
+                padding: 0;
+            }
+            QPushButton:hover {
+                text-decoration: underline;
+            }
+        """)
+        clear_btn.clicked.connect(self.clear_all_notifications)
+        notif_layout.addWidget(notif_label)
+        notif_layout.addStretch()
+        notif_layout.addWidget(clear_btn)
+        notif_header.setDefaultWidget(notif_widget)
+        self.notification_menu.addAction(notif_header)
+        self.notification_menu.addSeparator()
+        self.add_sample_notification("Nouveau message", "Visite https://leopardo-ai.web.app/ ", "5 min")
+        self.notification_button.setMenu(self.notification_menu)
+        self.notification_button.setPopupMode(QToolButton.InstantPopup)
+        self.message_button, self.message_badge = create_button_with_badge("💬", "#3b82f6")
+        self.message_menu = QMenu()
+        self.message_menu.setStyleSheet(self.notification_menu.styleSheet())
+        msg_header = QWidgetAction(self.message_menu)
+        msg_widget = QWidget()
+        msg_layout = QHBoxLayout(msg_widget)
+        msg_label = QLabel("💬 Messages")
+        msg_label.setStyleSheet("font-weight: bold;")
+        new_msg_btn = QPushButton("Nouveau message")
+        new_msg_btn.setStyleSheet(clear_btn.styleSheet())
+        new_msg_btn.clicked.connect(self.open_new_message)
+        msg_layout.addWidget(msg_label)
+        msg_layout.addStretch()
+        msg_layout.addWidget(new_msg_btn)
+        msg_header.setDefaultWidget(msg_widget)
+        self.message_menu.addAction(msg_header)
+        self.message_menu.addSeparator()
+        self.add_sample_message("Jean Dupont", "Réunion demain", "Bonjour, nous avons une réunion demain à 10h...", "10 min")
+        self.message_button.setMenu(self.message_menu)
+        self.message_button.setPopupMode(QToolButton.InstantPopup)
+        self.top_menu_layout.addWidget(self.notification_button)
+    def add_sample_notification(self, title, content, time):
+        notification_action = QWidgetAction(self.notification_menu)
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        title_label = QLabel(title)
+        title_label.setStyleSheet("font-weight: bold;")
+        content_label = QLabel(content)
+        content_label.setWordWrap(True)
+        content_label.setStyleSheet("color: #6b7280; font-size: 12px;")
+        time_label = QLabel(time)
+        time_label.setStyleSheet("color: #9ca3af; font-size: 10px;")
+        time_label.setAlignment(Qt.AlignRight)
+        layout.addWidget(title_label)
+        layout.addWidget(content_label)
+        layout.addWidget(time_label)
+        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setSpacing(2)
+        notification_action.setDefaultWidget(widget)
+        self.notification_menu.insertAction(self.notification_menu.actions()[1], notification_action)
+        current_count = int(self.notification_badge.text())
+        self.notification_badge.setText(str(current_count + 1))
+    def add_sample_message(self, sender, subject, preview, time):
+        message_action = QWidgetAction(self.message_menu)
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        sender_label = QLabel(sender)
+        sender_label.setStyleSheet("font-weight: bold;")
+        subject_label = QLabel(subject)
+        subject_label.setStyleSheet("color: #3b82f6;")
+        preview_label = QLabel(preview)
+        preview_label.setWordWrap(True)
+        preview_label.setStyleSheet("color: #6b7280; font-size: 12px;")
+        time_label = QLabel(time)
+        time_label.setStyleSheet("color: #9ca3af; font-size: 10px;")
+        time_label.setAlignment(Qt.AlignRight)
+        layout.addWidget(sender_label)
+        layout.addWidget(subject_label)
+        layout.addWidget(preview_label)
+        layout.addWidget(time_label)
+        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setSpacing(2)
+        message_action.setDefaultWidget(widget)
+        self.message_menu.insertAction(self.message_menu.actions()[1], message_action)
+        current_count = int(self.message_badge.text())
+        self.message_badge.setText(str(current_count + 1))
+    def clear_all_notifications(self):
+        self.notification_badge.setText("0")
+    def open_new_message(self):
+        print("Ouvrir l'éditeur de message")
+    def update_notification_count(self):
+        pass
+    def update_message_count(self):
+        pass
+    def get_control_button_style(self, button_type):
+        base_style = """
+            QPushButton {
+                color: white;
+                border: none;
+                font-weight: bold;
+                border-radius: 13px;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: %s;
+            }
+        """
+        if button_type == "minimize":
+            return base_style % "#d97706" + """
+                QPushButton {
+                    background-color: #f59e0b;
+                }
+                QPushButton:hover {
+                    background-color: #d97706;
+                }
+            """
+        elif button_type == "maximize":
+            return base_style % "#059669" + """
+                QPushButton {
+                    background-color: #10b981;
+                }
+                QPushButton:hover {
+                    background-color: #059669;
+                }
+            """
+        elif button_type == "close":
+            return base_style % "#dc2626" + """
+                QPushButton {
+                    background-color: #ef4444;
+                }
+                QPushButton:hover {
+                    background-color: #dc2626;
+                }
+            """
+        return base_style % "#e5e7eb"
+    def load_session_state(self):
+        import json, os
+        user_data_dir = os.path.join(os.path.expanduser('~'), 'Leopardo')
+        session_file = os.path.join(user_data_dir, 'resources', 'data', 'session.json')
+        try:
+            with open(session_file, 'r') as f:
+                session_data = json.load(f)
+                self.is_user_logged_in = session_data.get('is_logged_in', False)
+                self.current_username = session_data.get('username', 'Guest')
+        except (FileNotFoundError, json.JSONDecodeError):
+            self.is_user_logged_in = False
+            self.current_username = 'Guest'
+    def update_user_profile_section(self):
+        if self.is_user_logged_in:
+            self.user_button.setText(f"👤 {self.current_username}")
+            self.login_action.setVisible(False)
+            self.logout_action.setVisible(True)
+            self.switch_action.setVisible(True)
+        else:
+            self.user_button.setText("👤 Guest")
+            self.login_action.setVisible(True)
+            self.logout_action.setVisible(False)
+            self.switch_action.setVisible(False)
+    def user_login(self):
+        from ui.login import LoginModule
+        self.login_module = LoginModule()
+        self.login_module.show()
+    def user_logout(self):
+        import os
+        user_data_dir = os.path.join(os.path.expanduser('~'), 'Leopardo')
+        session_file = os.path.join(user_data_dir, 'resources', 'data', 'session.json')
+        if os.path.exists(session_file):
+            os.remove(session_file)
+        self.is_user_logged_in = False
+        self.current_username = 'Guest'
+        self.update_user_profile_section()
+        QMessageBox.information(
+            self,
+            self.tr("Déconnexion réussie"),
+            self.tr("Vous avez été déconnecté avec succès.")
+        )
+    def switch_account(self):
+        self.user_logout()
+        self.user_login()
+    def open_user_settings(self):
+        from Updater.auto import UpdaterWindow
+        window = UpdaterWindow(parent=self)
+        window.show()
+    def open_subscription(self):
+        print("Subscription page opened")
+    def open_my_persona(self):
+        print("Subscription page opened")
+    def open_plan(self, plan_type):
+        if plan_type == "marketing":
+            print("Opening Marketing Plan")
+        elif plan_type == "sales":
+            print("Opening Sales Plan")
+    def open_home(self):
+        tab_name = self.tr("🏠 Home")
+        existing_tab_index = self.find_tab_by_name(tab_name)
+        if existing_tab_index != -1:
+            self.tab_widget.setCurrentIndex(existing_tab_index)
             return
-            
-        platform = self.platform_combo.currentText()
-        self.status_label.setText(f"Post {platform} platformunda paylaşıldı")
-        QMessageBox.information(self, "Başarılı", f"Post başarıyla {platform} platformunda paylaşıldı!")
-        
-        # Post listesine ekle
-        post_text = f"{platform}: {content[:50]}..."
-        self.recent_posts_list.insertItem(0, post_text)
-        
-    def save_draft(self):
-        """Taslak kaydetme"""
-        content = self.post_content_edit.toPlainText().strip()
-        if not content:
-            QMessageBox.warning(self, "Uyarı", "Post içeriği boş olamaz!")
+        if not hasattr(self, 'home') or self.home is None:
+            from promptes.promptmarketing import MarketingAIAnalyzer
+            self.marketing = MarketingAIAnalyzer(parent=self)
+        self.add_custom_tab(self.marketing, tab_name, "📊")
+    def open_management(self):
+        tab_name = self.tr("🧠 Management")
+        existing_tab_index = self.find_tab_by_name(tab_name)
+        if existing_tab_index != -1:
+            self.tab_widget.setCurrentIndex(existing_tab_index)
             return
-            
-        self.status_label.setText("Post taslak olarak kaydedildi")
-        QMessageBox.information(self, "Başarılı", "Post taslak olarak kaydedildi!")
-        
-    def send_test_email(self):
-        """Test e-postası gönderme"""
-        subject = self.email_subject_edit.text().strip()
-        if not subject:
-            QMessageBox.warning(self, "Uyarı", "E-posta konusu boş olamaz!")
+        if not hasattr(self, '🧠 Management') or self.management is None:
+            from Home.homeManagement import MainDashboard
+            self.management = MainDashboard()
+        self.add_custom_tab(self.management, tab_name, "resources/icons/management.ico")
+    def open_marketing(self):
+        tab_name = self.tr("📣 Marketing Auto")
+        existing_tab_index = self.find_tab_by_name(tab_name)
+        if existing_tab_index != -1:
+            self.tab_widget.setCurrentIndex(existing_tab_index)
             return
-            
-        self.status_label.setText("Test e-postası gönderildi")
-        QMessageBox.information(self, "Başarılı", "Test e-postası başarıyla gönderildi!")
-        
-    def schedule_email(self):
-        """E-posta zamanlama"""
-        subject = self.email_subject_edit.text().strip()
-        if not subject:
-            QMessageBox.warning(self, "Uyarı", "E-posta konusu boş olamaz!")
+        if not hasattr(self, '📣 Marketing Auto') or self.marketingauto is None:
+            from Home.home import HomePage
+            self.marketingauto = HomePage(main_app=self)
+        self.add_custom_tab(self.marketingauto, tab_name, "resources/icons/marketing.ico")
+    def add_media_page(self):
+        from facebooksmodule.media_manager import MediaTable
+        tab_name = self.tr("📺 Medias")
+        existing_tab_index = self.find_tab_by_name(tab_name)
+        if existing_tab_index != -1:
+            self.tab_widget.setCurrentIndex(existing_tab_index)
             return
-            
-        date = self.email_send_date.date().toString("dd.MM.yyyy")
-        self.status_label.setText(f"E-posta {date} tarihine zamanlandı")
-        QMessageBox.information(self, "Başarılı", f"E-posta {date} tarihine başarıyla zamanlandı!")
-        
-    def send_email_now(self):
-        """E-postayı hemen gönderme"""
-        subject = self.email_subject_edit.text().strip()
-        if not subject:
-            QMessageBox.warning(self, "Uyarı", "E-posta konusu boş olamaz!")
+        if not hasattr(self, '📺 Medias') or self.medias is None:
+            self.medias = MediaTable(parent=self)
+        self.add_custom_tab(self.medias, tab_name, "resources/icons/multi_fbb.ico")
+    def open_grups_window(self):
+        from facebooksmodule.group_manager import GroupTable
+        tab_name = self.tr("👥 groups")
+        existing_tab_index = self.find_tab_by_name(tab_name)
+        if existing_tab_index != -1:
+            self.tab_widget.setCurrentIndex(existing_tab_index)
             return
-            
-        # E-posta geçmişine ekle
-        row_count = self.email_history_table.rowCount()
-        self.email_history_table.insertRow(row_count)
-        
-        recipient_count = "1,234"  # Örnek değer
-        
-        self.email_history_table.setItem(row_count, 0, QTableWidgetItem(subject))
-        self.email_history_table.setItem(row_count, 1, QTableWidgetItem(recipient_count))
-        self.email_history_table.setItem(row_count, 2, QTableWidgetItem("-%"))
-        self.email_history_table.setItem(row_count, 3, QTableWidgetItem("-%"))
-        self.email_history_table.setItem(row_count, 4, QTableWidgetItem(QDate.currentDate().toString("dd.MM.yyyy")))
-        
-        self.status_label.setText("E-posta başarıyla gönderildi")
-        QMessageBox.information(self, "Başarılı", "E-posta başarıyla gönderildi!")
-        
-    def save_content(self):
-        """İçerik kaydetme"""
-        title = self.content_title_edit.text().strip()
-        if not title:
-            QMessageBox.warning(self, "Uyarı", "İçerik başlığı boş olamaz!")
+        if not hasattr(self, '👥 groups') or self.groups is None:
+            self.groups = GroupTable(parent=self)
+        self.add_custom_tab(self.groups, tab_name, "resources/icons/multi_fbb.ico")
+    def open_contacts_window(self):
+        from ModulesUI.whasapping.group_manager import ContactTable
+        tab_name = self.tr("👥 contacts")
+        existing_tab_index = self.find_tab_by_name(tab_name)
+        if existing_tab_index != -1:
+            self.tab_widget.setCurrentIndex(existing_tab_index)
             return
-            
-        # İçerik tablosuna ekle
-        row_count = self.content_table.rowCount()
-        self.content_table.insertRow(row_count)
-        
-        self.content_table.setItem(row_count, 0, QTableWidgetItem(title))
-        self.content_table.setItem(row_count, 1, QTableWidgetItem(self.content_type_combo.currentText()))
-        self.content_table.setItem(row_count, 2, QTableWidgetItem(self.content_status_combo.currentText()))
-        self.content_table.setItem(row_count, 3, QTableWidgetItem(QDate.currentDate().toString("dd.MM.yyyy")))
-        
-        self.status_label.setText(f"İçerik '{title}' kaydedildi")
-        QMessageBox.information(self, "Başarılı", f"İçerik '{title}' başarıyla kaydedildi!")
-        
-    def preview_content(self):
-        """İçerik önizleme"""
-        title = self.content_title_edit.text().strip()
-        if not title:
-            QMessageBox.warning(self, "Uyarı", "İçerik başlığı boş olamaz!")
+        if not hasattr(self, '👥 contacts') or self.contacts is None:
+            self.contacts = ContactTable(parent=self)
+        self.add_custom_tab(self.contacts, tab_name, "resources/icons/multi_fbb.ico")
+    def open_links_window(self):
+        from liens.gestionliens import MainWindowLink
+        tab_name = self.tr("🔗 links")
+        existing_tab_index = self.find_tab_by_name(tab_name)
+        if existing_tab_index != -1:
+            self.tab_widget.setCurrentIndex(existing_tab_index)
             return
-            
-        self.status_label.setText(f"İçerik '{title}' önizleme modunda")
-        QMessageBox.information(self, "Önizleme", f"İçerik '{title}' önizleme penceresinde açılacak.")
-        
-    def publish_content(self):
-        """İçerik yayınlama"""
-        title = self.content_title_edit.text().strip()
-        if not title:
-            QMessageBox.warning(self, "Uyarı", "İçerik başlığı boş olamaz!")
+        if not hasattr(self, '🔗 links') or self.links is None:
+            self.links = MainWindowLink(main_app=self)
+        self.add_custom_tab(self.links, tab_name, "resources/icons/multi_fbb.ico")
+    def open_prompts_window(self):
+        from promptes.promptes import PromptManager
+        tab_name = self.tr("⚡prompts")
+        existing_tab_index = self.find_tab_by_name(tab_name)
+        if existing_tab_index != -1:
+            self.tab_widget.setCurrentIndex(existing_tab_index)
             return
-            
-        self.content_status_combo.setCurrentText("📤 Yayınlandı")
-        self.status_label.setText(f"İçerik '{title}' yayınlandı")
-        QMessageBox.information(self, "Başarılı", f"İçerik '{title}' başarıyla yayınlandı!")
-
-def main():
-    """Ana fonksiyon"""
-    app = QApplication(sys.argv)
-    app.setStyle("Fusion")
-    
-    # Uygulama bilgileri
-    app.setApplicationName("Marketing Modülü")
-    app.setApplicationVersion("1.0")
-    app.setOrganizationName("İş Yönetim Sistemi")
-    
-    # Ana pencereyi oluştur ve göster
-    marketing_window = MarketingModule()
-    marketing_window.show()
-    
-    sys.exit(app.exec_())
-
+        if not hasattr(self, '⚡ prompts') or self.prompts is None:
+            self.prompts = PromptManager(main_app=self)
+        self.add_custom_tab(self.prompts, tab_name, "resources/icons/multi_fbc.ico")
+    def open_sheduling_window(self):
+        from statistique.activiteprogramme import Activite
+        tab_name = self.tr("⏰ shedulings")
+        existing_tab_index = self.find_tab_by_name(tab_name)
+        if existing_tab_index != -1:
+            self.tab_widget.setCurrentIndex(existing_tab_index)
+            return
+        if not hasattr(self, '⏰ shedulings') or self.sheduling is None:
+            self.sheduling = Activite()
+        self.add_custom_tab(self.sheduling, tab_name, "resources/icons/multi_fbb.ico")
+    def open_manuelle_window(self):
+        from Home.homerun import MainWindow
+        tab_name = self.tr("🚀 Run")
+        existing_tab_index = self.find_tab_by_name(tab_name)
+        if existing_tab_index != -1:
+            self.tab_widget.setCurrentIndex(existing_tab_index)
+            return
+        if not hasattr(self, ' 🚀 Run') or self.Manu is None:
+            self.Manu = MainWindow(parent=self)
+        self.add_custom_tab(self.Manu, tab_name, "resources/icons/multi_sfb.ico")
+    def open_persona_window(self):
+        tab_name = self.tr("statistiques")
+        existing_tab_index = self.find_tab_by_name(tab_name)
+        if existing_tab_index != -1:
+            self.tab_widget.setCurrentIndex(existing_tab_index)
+            return
+        loading_screen = LoadingScreen(self)
+        loading_widget = QWidget()
+        layout = QVBoxLayout()
+        layout.addWidget(loading_screen)
+        loading_widget.setLayout(layout)
+        new_tab_index = self.add_custom_ta(loading_widget, tab_name, "resources/icons/multi_fb.ico")
+        if new_tab_index is None:
+            raise RuntimeError("Failed to add a new tab. add_custom_tab returned None.")
+        self.tab_widget.setCurrentIndex(new_tab_index)
+        QTimer.singleShot(1000, lambda: self.load_statistics_content(new_tab_index))
+    def open_statistics_window(self):
+        tab_name = self.tr("statistiques")
+        existing_tab_index = self.find_tab_by_name(tab_name)
+        if existing_tab_index != -1:
+            self.tab_widget.setCurrentIndex(existing_tab_index)
+            return
+        loading_screen = LoadingScreen(self)
+        loading_widget = QWidget()
+        layout = QVBoxLayout()
+        layout.addWidget(loading_screen)
+        loading_widget.setLayout(layout)
+        new_tab_index = self.add_custom_ta(loading_widget, tab_name, "resources/icons/multi_fb.ico")
+        if new_tab_index is None:
+            raise RuntimeError("Failed to add a new tab. add_custom_tab returned None.")
+        self.tab_widget.setCurrentIndex(new_tab_index)
+        QTimer.singleShot(1000, lambda: self.load_statistics_content(new_tab_index))
+    def open_imports_window(self):
+        tab_name = self.tr("imports")
+        existing_tab_index = self.find_tab_by_name(tab_name)
+        if existing_tab_index != -1:
+            self.tab_widget.setCurrentIndex(existing_tab_index)
+            return
+        if not hasattr(self, 'imports') or self.settings is None:
+            self.settings = Nova360Ultimate(main_app=self)
+        self.add_custom_tab(self.settings, tab_name, "resources/icons/multi_fb.ico")
+    def add_on_page(self):
+        from Installsweb.installdisign import InstallerDialog
+        installer = InstallerDialog(self)
+        installer.exec_()
+    def open_telecommande_window(self):
+        tab_name = self.tr("Remote Control")
+        existing_tab_index = self.find_tab_by_name(tab_name)
+        if existing_tab_index != -1:
+            self.tab_widget.setCurrentIndex(existing_tab_index)
+            return
+        if not hasattr(self, 'telecommande') or self.telecommande is None:
+            self.telecommande = SplitScreenView(main_app=self)
+        self.add_custom_tab(self.telecommande, tab_name, "resources/icons/multi_fb.ico")
+    def open_installer_window(self):
+        from Installsweb.installdisign import InstallerPage
+        tab_name = self.tr("Installer Premium")
+        existing_tab_index = self.find_tab_by_name(tab_name)
+        if existing_tab_index != -1:
+            self.tab_widget.setCurrentIndex(existing_tab_index)
+            return
+        installer_page = InstallerPage(self)
+        new_tab_index = self.add_custom_ta(installer_page, tab_name, "resources/icons/installer.ico")
+        if new_tab_index is None:
+            raise RuntimeError("Failed to add a new tab.")
+        self.tab_widget.setCurrentIndex(new_tab_index)
+    def connect_via_ssh(self):
+        import atexit
+        from online.online1 import RemoteAccessModal
+        modal = RemoteAccessModal(self)
+        modal.exec_()
+        atexit.register(self.cleanup)
+    def cleanup(self):
+        if hasattr(self, 'remote_manager') and self.remote_manager.server:
+            self.remote_manager.stop_server()
+    def open_instance(self):
+        tab_name = self.tr("Instances")
+        existing_tab_index = self.find_tab_by_name(tab_name)
+        if existing_tab_index != -1:
+            self.tab_widget.setCurrentIndex(existing_tab_index)
+            return
+        if not hasattr(self, 'Instances') or self.instances is None:
+            self.instances =InstanceTable(self)
+        self.add_custom_tab(self.instances, tab_name, "resources/icons/multi_fb.ico")
+    def open_upgrade_window(self):
+        tab_name = self.tr("🚀 Upgrade")
+        self.add_new_tab(QUrl("https://www.nova360.turknovatech.com/pricing"), tab_name, "resources/icons/tokk.ico")
+        from Upgrade.upgrade import ContactDialog
+        self.upgrades = ContactDialog()
+        self.upgrades.show()
+        existing_tab_index = self.find_tab_by_name(tab_name)
+        if existing_tab_index != -1:
+            self.tab_widget.setCurrentIndex(existing_tab_index)
+            return
+        if not hasattr(self, 'upgrades') or self.upgrades is None:
+            from Upgrade.upgrade import ContactDialog
+            self.upgrades = ContactDialog(parent=self)
+            self.upgrades.show()
+        self.add_custom_tab(self.upgrades, tab_name, "resources/icons/multi_fb.ico")
+    def open_contact_window(self):
+        self.add_new_tab(QUrl("https://script.google.com/macros/s/AKfycbzjBEtoeGcosEFv7yULAxa4RdPdTWUb7Tovtlr6Ym4EkDdttIYz2SU1s5HUHmqSaIDk1Q/exec"), self.tr("Contact"), "resources/icons/multi_fb.ico")
+    def open_strategies_window(self):
+        tab_name = self.tr("strategies")
+        existing_tab_index = self.find_tab_by_name(tab_name)
+        if existing_tab_index != -1:
+            self.tab_widget.setCurrentIndex(existing_tab_index)
+            return
+        if not hasattr(self, 'strategies') or self.settings is None:
+            self.settings = Nova360Ultimate(main_app=self)
+        self.add_custom_tab(self.settings, tab_name, "resources/icons/multi_fb.ico")
+    def find_tab_by_name(self, name):
+        for i in range(self.tab_widget.count()):
+            if self.tab_widget.tabText(i) == name:
+                return i
+        return -1
+    def close_tab(self, index):
+        if self.tab_widget.count() > 1:
+            self.tab_widget.removeTab(index)
+    def update_search_bar_visibility(self, index):
+        current_widget = self.tab_widget.widget(index)
+        if isinstance(current_widget, QWebEngineView):
+            self.url_bar.show()
+        else:
+            self.url_bar.hide()
+    def tab_widget_style(self):
+        return """
+        QTabWidget::pane { border: 0; }
+        QTabBar::tab {
+            background: #3A3A3A;
+            color: #FFFFFF;
+            padding: 5px 15px;
+            margin: 2px;
+            border-radius: 5px;
+        }
+        QTabBar::tab:selected {
+            background: #555555;
+        }
+        QTabBar::tab:hover {
+            background: #4A4A4A;
+        }
+        """
+    def create_search_bar(self, layout):
+        search_bar_frame = QFrame()
+        search_bar_frame.setStyleSheet("background-color: #333;")
+        search_bar_layout = QHBoxLayout(search_bar_frame)
+        search_bar_layout.setContentsMargins(5, 5, 5, 5)
+        self.back_button = QPushButton("<")
+        self.forward_button = QPushButton(">")
+        self.refresh_button = QPushButton("⟳")
+        self.home_button = QPushButton("🏠")
+        for btn in [self.back_button, self.forward_button, self.refresh_button, self.home_button]:
+            btn.setFixedSize(30, 30)
+            btn.setStyleSheet(self.button_style())
+            search_bar_layout.addWidget(btn)
+        self.url_bar = QLineEdit()
+        self.url_bar.setPlaceholderText(self.tr("Search or enter URL"))
+        self.url_bar.setStyleSheet(self.url_bar_style())
+        search_bar_layout.addWidget(self.url_bar, stretch=1)
+        self.back_button.clicked.connect(self.navigate_back)
+        self.forward_button.clicked.connect(self.navigate_forward)
+        self.refresh_button.clicked.connect(self.refresh_page)
+        self.home_button.clicked.connect(self.open_accueil_window)
+        self.url_bar.returnPressed.connect(self.load_url)
+        layout.addWidget(search_bar_frame)
+        self.new_tab_button = QPushButton("+")
+        self.new_tab_button.setFixedSize(30, 30)
+        self.new_tab_button.setStyleSheet(self.button_style())
+        self.new_tab_button.clicked.connect(self.open_new_tab)
+        search_bar_layout.addWidget(self.new_tab_button)
+    def button_style(self):
+        return """
+        QPushButton {
+            background-color: #3A3A3A;
+            color: #FFFFFF;
+            border: none;
+            border-radius: 5px;
+        }
+        QPushButton:hover {
+            background-color: #555555;
+        }
+        QPushButton:pressed {
+            background-color: #2A2A2A;
+        }
+        """
+    def url_bar_style(self):
+        return """
+        QLineEdit {
+            background-color: #3A3A3A;
+            color: #FFFFFF;
+            border: 1px solid #555555;
+            border-radius: 5px;
+            padding: 5px;
+        }
+        QLineEdit:focus {
+            border: 1px solid #AAAAAA;
+        }
+        """
+    def navigate_back(self):
+        current_browser = self.tab_widget.currentWidget()
+        if isinstance(current_browser, QWebEngineView):
+            current_browser.back()
+    def navigate_forward(self):
+        current_browser = self.tab_widget.currentWidget()
+        if isinstance(current_browser, QWebEngineView):
+            current_browser.forward()
+    def refresh_page(self):
+        current_browser = self.tab_widget.currentWidget()
+        if isinstance(current_browser, QWebEngineView):
+            current_browser.reload()
+    def load_url(self):
+        current_browser = self.tab_widget.currentWidget()
+        url = QUrl(self.url_bar.text())
+        if url.scheme() == "":
+            url.setScheme("http")
+        current_browser.setUrl(url)
+    def open_new_tab(self, tab_name="Dashboard", icon_path="resources/icons/tok.ico"):
+        self.add_new_tab(QUrl("https://leopardo-ai.web.app/"), self.tr("Leopardo"), "resources/icons/tok.ico")
+    def add_new_tab(self, content, label, icon_path="resources/icons/tok.ico"):
+        existing_tab_index = self.find_tab_by_name(label)
+        if existing_tab_index != -1:
+            self.tab_widget.setCurrentIndex(existing_tab_index)
+            return
+        if isinstance(content, QUrl):
+            browser = QWebEngineView()
+            browser.setUrl(content)
+            browser.setStyleSheet("""
+                QWebEngineView {
+                    background-color: white;
+                    color: black;
+                }
+            """)
+            widget_to_add = browser
+        elif isinstance(content, QWidget):
+            content.setStyleSheet("""
+                QWidget {
+                    background-color: white;
+                    color: black;
+                }
+            """)
+            widget_to_add = content
+        else:
+            raise TypeError(f"Unsupported type for 'content': {type(content)}")
+        index = self.tab_widget.addTab(widget_to_add, "")
+        self.tab_widget.setTabIcon(index, QIcon(icon_path))
+        self.tab_widget.setTabText(index, label)
+        self.tab_widget.setCurrentIndex(index)
+        if isinstance(content, QUrl):
+            widget_to_add.urlChanged.connect(self.update_url)
+        self.tab_widget.setStyleSheet("""
+            QTabWidget::pane {
+                background: white;
+            }
+            QTabWidget::tab-bar {
+                background: lightgray;
+            }
+            QTabBar::tab {
+                background: lightgray;
+                color: black;
+                padding: 5px;
+            }
+            QTabBar::tab:selected {
+                background: white;
+                color: black;
+            }
+        """)
+    def add_custom_tab(self, widget, title, icon_path=None):
+        if not hasattr(self, "tab_widget"):
+            print("Error: The 'Browser' object does not have a 'tab_widget' attribute.")
+            return
+        index = self.tab_widget.addTab(widget, title)
+        if icon_path:
+            icon = QIcon(icon_path)
+            self.tab_widget.setTabIcon(index, icon)
+        self.tab_widget.setCurrentIndex(index)
+    def add_custom_ta(self, widget, tab_name, icon_path):
+        icon = QIcon(icon_path) if icon_path else QIcon()
+        new_tab_index = self.tab_widget.addTab(widget, icon, tab_name)
+        return new_tab_index
+    def load_statistics_content(self, tab_index):
+        if tab_index < 0 or tab_index >= self.tab_widget.count():
+            print(f"Invalid tab index: {tab_index}")
+            return
+        try:
+            license_checker = LicenseChecker(license_dir="C:\\bon")
+            file_path = 'C:\\bon\\robot1\\data.json'
+            group_counter = GroupCounter(file_path)
+            Nombregroup = group_counter.count_groups()
+            dash = Dashboard(
+                title="wa+ CRM",
+                subtitle="Analytics Overview",
+                validiter=license_checker.is_license_valid(),
+                Nombregroupes=Nombregroup,
+                totalshare="Total partagé",
+                nexttimeshare="Aucune"
+            )
+            self.tab_widget.removeTab(tab_index)
+            self.add_custom_ta(dash, self.tr("statistiques"), "resources/icons/multi_fb.ico")
+        except Exception as e:
+            print(f"Erreur lors du chargement des statistiques : {e}")
+    def init_language(self):
+        import json, os
+        user_data_dir = os.path.join(os.path.expanduser('~'), 'Leopardo')
+        try:
+            if os.path.exists(os.path.join(user_data_dir, 'resources', 'settings.json')):
+                with open(os.path.join(user_data_dir, 'resources', 'settings.json'), 'r') as f:
+                    preferences = json.load(f)
+                    selected_language = preferences.get('language', 'en')
+            else:
+                system_locale = QLocale.system().name()[:2]
+                language_map = {'en': 'en', 'fr': 'fr', 'tr': 'tr', 'ar': 'ar'}
+                selected_language = language_map.get(system_locale, 'en')
+        except (FileNotFoundError, json.JSONDecodeError):
+            selected_language = 'en'
+        self.switch_language(selected_language)
+    def switch_language(self, language):
+        import os
+        user_data_dir = os.path.join(os.path.expanduser('~'), 'Leopardo')
+        translator_path = os.path.join(user_data_dir, 'resources', 'lang', language, 'modules', 'main_fb_robot_translated.qm')
+        if os.path.exists(translator_path):
+            self.translator.load(translator_path)
+        else:
+            self.translator.load("")
+        QApplication.instance().installTranslator(self.translator)
+        self.save_language_choice(language)
+        self.retranslateUi()
+        self.show_success_message(self.tr("Language changed successfully!"))
+    def save_language_choice(self, language):
+        import json, os
+        user_data_dir = os.path.join(os.path.expanduser('~'), 'Leopardo')
+        preferences = {'language': language}
+        with open(os.path.join(user_data_dir, 'resources', 'settings.json'), 'w') as f:
+            json.dump(preferences, f)
+    def retranslateUi(self):
+        self.setWindowTitle(self.tr('AI FB ROBOT Pro'))
+    def show_success_message(self, message):
+        label = QLabel(message, self)
+        label.setStyleSheet("""
+            QLabel {
+                background-color: #d4edda;
+                color: #155724;
+                border: 1px solid #c3e6cb;
+                border-radius: 5px;
+                padding: 10px;
+                font-size: 14px;
+            }
+        """)
+        label.setAlignment(Qt.AlignCenter)
+        label.setWindowFlags(Qt.FramelessWindowHint | Qt.ToolTip)
+        label.adjustSize()
+        label.move(
+            (self.width() - label.width()) // 2,
+            (self.height() - label.height()) // 2
+        )
+        label.show()
+        QTimer.singleShot(3000, label.close)
+    def load_menu_config(self):
+        pass
+    def update_menu_visibility(self):
+        pass
+    def minimize_window(self):
+        self.showMinimized()
+    def maximize_window(self):
+        if self.isMaximized():
+            self.showNormal()
+        else:
+            self.showMaximized()
+    def close_window(self):
+        self.close()
+    def update_url(self, url):
+        self.url_bar.setText(url.toString())
+    def open_accueil_window(self):
+        from Installsweb.installdisign import InstallerPage
+        tab_name = self.tr("Home")
+        existing_tab_index = self.find_tab_by_name(tab_name)
+        if existing_tab_index != -1:
+            self.tab_widget.setCurrentIndex(existing_tab_index)
+            return
+        installer_page = MainWindow1(main_app=self)
+        new_tab_index = self.add_custom_ta(installer_page, tab_name, "resources/icons/installer.ico")
+        if new_tab_index is None:
+            raise RuntimeError("Failed to add a new tab.")
+        self.tab_widget.setCurrentIndex(new_tab_index)
+    def switch_to_enterprise(self):
+        self.is_enterprise_mode = True
+        self.update_user_buttons()
+    def switch_to_personal(self):
+        self.is_enterprise_mode = False
+        self.update_user_buttons()
+    def update_user_buttons(self):
+        pass
 if __name__ == "__main__":
-    main()
-
+    app = QApplication(sys.argv)
+    window = Browser()
+    window.show()
+    sys.exit(app.exec_())

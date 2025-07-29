@@ -174,7 +174,7 @@ class ClientWidget(QWidget):
 
             action_layout = QHBoxLayout()
             self.create_docs_btn = QPushButton(self.tr("Envoyer Mail"))
-            self.create_docs_btn.setIcon(QIcon.fromTheme("mail-send", QIcon(":/icons/bell.svg")))
+            self.create_docs_btn.setText("🔔 " + self.tr("Créer des documents"))
             self.create_docs_btn.setToolTip(self.tr("Envoyer un email au client"))
             self.create_docs_btn.setObjectName("primaryButton")
             try:
@@ -191,19 +191,19 @@ class ClientWidget(QWidget):
             # action_layout.addWidget(self.compile_pdf_btn) # Moved to documents tab filters
 
             self.edit_save_client_btn = QPushButton(self.tr("Modifier Client"))
-            self.edit_save_client_btn.setIcon(QIcon.fromTheme("document-edit", QIcon(":/icons/pencil.svg")))
+            self.edit_save_client_btn.setText("✏️ " + self.tr("Modifier le client"))
             self.edit_save_client_btn.setToolTip(self.tr("Modifier les informations du client"))
             self.edit_save_client_btn.clicked.connect(self.toggle_client_edit_mode)
             action_layout.addWidget(self.edit_save_client_btn)
 
             self.send_whatsapp_btn = QPushButton(self.tr("Send WhatsApp"))
-            self.send_whatsapp_btn.setIcon(QIcon.fromTheme("contact-new", QIcon(":/icons/user.svg")))
+            self.send_whatsapp_btn.setText("📱 " + self.tr("Envoyer un message WhatsApp"))
             self.send_whatsapp_btn.setToolTip(self.tr("Send a WhatsApp message to the client"))
             self.send_whatsapp_btn.clicked.connect(self.open_send_whatsapp_dialog)
             # action_layout.addWidget(self.send_whatsapp_btn) # Moved to an internal tab
 
             self.archive_client_btn = QPushButton(self.tr("Archiver Client"))
-            self.archive_client_btn.setIcon(QIcon(":/icons/folder.svg")) # Replaced archive.svg with folder.svg
+            self.archive_client_btn.setText("🗄️ " + self.tr("Archiver le client"))
             self.archive_client_btn.setToolTip(self.tr("Archiver ce client (soft delete)"))
             self.archive_client_btn.clicked.connect(self.handle_archive_client) # Connect to the new handler
             action_layout.addWidget(self.archive_client_btn)
