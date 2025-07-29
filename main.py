@@ -65,7 +65,7 @@ class MainBusinessApp(QMainWindow):
         header_layout.setSpacing(15)
         
         # Ana başlık
-        title_label = QLabel("🚀 İş Yönetim Sistemi")
+        title_label = QLabel("💼 İş Yönetim Sistemi")
         title_label.setObjectName("mainTitle")
         title_label.setAlignment(Qt.AlignCenter)
         header_layout.addWidget(title_label)
@@ -280,10 +280,10 @@ class MainBusinessApp(QMainWindow):
         features_grid.setSpacing(20)
         
         system_features = [
-            ("🔒", "Güvenli", "Verileriniz güvenli bir şekilde saklanır"),
-            ("⚡", "Hızlı", "Optimize edilmiş performans"),
-            ("📱", "Modern", "Kullanıcı dostu arayüz"),
-            ("🔄", "Entegre", "Modüller arası veri paylaşımı"),
+            ("🔒", "Sécurisé", "Vos données sont stockées en toute sécurité"),
+            ("⚡", "Rapide", "Performances optimisées"),
+            ("📱", "Moderne", "Interface utilisateur conviviale"),
+            ("🔄", "Intégré", "Partage de données entre les modules"),
         ]
         
         for i, (icon, title, desc) in enumerate(system_features):

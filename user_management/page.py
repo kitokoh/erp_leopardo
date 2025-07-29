@@ -83,28 +83,28 @@ class UserManagementPage(QWidget):
         # Placeholder for action buttons (Add User, Edit User etc. - for later phases)
         action_layout = QHBoxLayout()
 
-        self.add_user_button = QPushButton(QIcon(":/icons/user-plus.svg"), self.tr("Ajouter Utilisateur"))
+        self.add_user_button = QPushButton("➕ " + self.tr("Ajouter Utilisateur"))
         self.add_user_button.clicked.connect(self._handle_add_user)
         action_layout.addWidget(self.add_user_button)
 
-        self.edit_user_button = QPushButton(QIcon(":/icons/pencil.svg"), self.tr("Modifier Utilisateur"))
+        self.edit_user_button = QPushButton("✏️ " + self.tr("Modifier Utilisateur"))
         self.edit_user_button.clicked.connect(self._handle_edit_user)
         action_layout.addWidget(self.edit_user_button)
 
-        self.toggle_active_button = QPushButton(QIcon(":/icons/log-out.svg"), self.tr("Activer/Désactiver")) # Changed to existing log-out.svg
+        self.toggle_active_button = QPushButton("🔄 " + self.tr("Activer/Désactiver")) # Changed to existing log-out.svg
         self.toggle_active_button.clicked.connect(self._handle_toggle_active)
         action_layout.addWidget(self.toggle_active_button)
 
-        self.reset_password_button = QPushButton(QIcon(":/icons/settings.svg"), self.tr("Réinitialiser MDP")) # Changed to existing settings.svg
+        self.reset_password_button = QPushButton("🔑 " + self.tr("Réinitialiser MDP")) # Changed to existing settings.svg
         self.reset_password_button.clicked.connect(self._handle_reset_password)
         action_layout.addWidget(self.reset_password_button)
 
-        self.delete_user_button = QPushButton(QIcon(":/icons/trash.svg"), self.tr("Supprimer Utilisateur"))
+        self.delete_user_button = QPushButton("🗑️ " + self.tr("Supprimer Utilisateur"))
         self.delete_user_button.clicked.connect(self._handle_soft_delete_user) # Connect method
         action_layout.addWidget(self.delete_user_button)
 
         action_layout.addStretch()
-        self.refresh_button = QPushButton(QIcon(":/icons/refresh-cw.svg"), self.tr("Actualiser"))
+        self.refresh_button = QPushButton("🔄 " + self.tr("Actualiser"))
         self.refresh_button.clicked.connect(self.load_users_to_table)
         action_layout.addWidget(self.refresh_button)
         main_layout.addLayout(action_layout)

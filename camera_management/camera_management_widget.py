@@ -143,7 +143,7 @@ class CameraManagementWidget(QWidget):
         left_pane_layout.addWidget(self.camera_list_widget)
 
         add_button_layout = QHBoxLayout() # Layout for the add button
-        self.add_camera_button = QPushButton(QIcon(":/icons/plus-circle.svg"), self.tr("Ajouter Caméra")) # Icon from existing set
+        self.add_camera_button = QPushButton("➕ " + self.tr("Ajouter Caméra")) # Icon from existing set
         self.add_camera_button.clicked.connect(self._add_camera_dialog)
         add_button_layout.addWidget(self.add_camera_button)
         left_pane_layout.addLayout(add_button_layout)
@@ -335,10 +335,10 @@ class CameraManagementWidget(QWidget):
         if not camera_asset: return
 
         menu = QMenu()
-        edit_action = menu.addAction(QIcon(":/icons/pencil.svg"), self.tr("Modifier"))
+        edit_action = menu.addAction("✏️ " + self.tr("Modifier"))
         edit_action.triggered.connect(lambda: self._edit_camera_dialog(camera_asset))
 
-        delete_action = menu.addAction(QIcon(":/icons/trash.svg"), self.tr("Supprimer (Archiver)"))
+        delete_action = menu.addAction("🗑️ " + self.tr("Supprimer (Archiver)"))
         delete_action.triggered.connect(lambda: self._remove_camera_logic(camera_asset))
 
         menu.exec_(self.camera_list_widget.mapToGlobal(pos))
