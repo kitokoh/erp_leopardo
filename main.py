@@ -385,6 +385,7 @@ class MainBusinessApp(QMainWindow):
                 background-image: url(resources/gifshome/background.jpg);
                 background-repeat: no-repeat;
                 background-position: center;
+
             }
             
             #headerFrame {
@@ -491,6 +492,7 @@ class MainBusinessApp(QMainWindow):
             self.crm_window.show()
             self.crm_window.raise_()
             self.crm_window.activateWindow()
+
             self.status_label.setText("CRM modülü başarıyla açıldı")
         except Exception as e:
             self.status_label.setText(f"CRM modülü açılırken hata: {str(e)}")
@@ -504,6 +506,7 @@ class MainBusinessApp(QMainWindow):
             self.marketing_window.show()
             self.marketing_window.raise_()
             self.marketing_window.activateWindow()
+
             self.status_label.setText("Marketing modülü başarıyla açıldı")
         except Exception as e:
             self.status_label.setText(f"Marketing modülü açılırken hata: {str(e)}")
