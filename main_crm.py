@@ -95,7 +95,6 @@ from PyQt5.QtCore import QSettings # Added for Remember Me
 from PyQt5.QtWidgets import QMainWindow
 from PyQt5.QtCore import Qt
 
-
 # Imports pour la gestion de licence
 from db.connection import get_db_connection
 from license_management import manager as license_manager
@@ -312,7 +311,6 @@ class CRMModule(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowFlags(Qt.FramelessWindowHint | self.windowFlags())
-
         self.setWindowTitle("CRM Module")
         self.setGeometry(100, 100, 1200, 800)
         self.main_widget = None
@@ -342,7 +340,6 @@ class CRMModule(QMainWindow):
             logging.info("main.py: db.connection.set_db_config(CONFIG) called.")
         else:
             logging.error("main.py: Could not find db.connection.set_db_config. DB calls might fail.")
-
         # Initialize the database. This function now encapsulates all DB setup.
         initialize_database()
         seed_only_hidroguc_products()
@@ -369,7 +366,6 @@ class CRMModule(QMainWindow):
 
                 cleaned_session_tokens = user_session_tokens_crud.cleanup_expired_tokens(conn_cleanup)
                 logging.info(f"Cleaned up {cleaned_session_tokens} expired 'Remember Me' session tokens on startup.")
-
                 cleaned_reset_tokens = password_reset_tokens_crud.cleanup_expired_or_used_tokens(conn_cleanup)
                 logging.info(f"Cleaned up {cleaned_reset_tokens} expired/used password reset tokens on startup.")
 

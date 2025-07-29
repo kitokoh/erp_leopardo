@@ -423,6 +423,13 @@ class DocumentManager(QMainWindow):
         self.setWindowFlags(Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
 
+        self.setWindowFlags(Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+
+
+
+        self._gradient_pos = 0.0
+
         # Window Controls
         self.minimize_button = QPushButton("—")
         self.maximize_button = QPushButton("[]")
@@ -432,7 +439,6 @@ class DocumentManager(QMainWindow):
         self.maximize_button.clicked.connect(self.toggleMaximized)
         self.close_button.clicked.connect(self.close)
 
-        self._gradient_pos = 0.0
         self.app_root_dir = app_root_dir
         self.current_user_info = current_user_info # Store the full user info dictionary
         self.current_license_info = current_license_info # Store license information
@@ -1832,7 +1838,6 @@ class DocumentManager(QMainWindow):
             }
         """)
         top_bar_layout.addWidget(self.user_menu_button_instance)
-
 
 
 

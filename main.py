@@ -144,14 +144,15 @@ class MainBusinessApp(QMainWindow):
         card.setStyleSheet(f"""
             #moduleCard {{
                 background-color: white;
-                border: 3px solid {color};
-                border-radius: 20px;
+                border-radius: 15px;
                 padding: 0px;
+                border: 1px solid #e0e0e0;
+                transition: all 0.3s ease;
             }}
             #moduleCard:hover {{
-                box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+                box-shadow: 0 10px 25px rgba(0,0,0,0.1);
                 transform: translateY(-5px);
-                border-color: #007bff;
+                border-left: 5px solid {color};
             }}
         """)
         
@@ -378,41 +379,32 @@ class MainBusinessApp(QMainWindow):
         """Stil tanımlamaları"""
         self.setStyleSheet("""
             QMainWindow {
-                background-image: url(resources/gifshome/background.jpg);
-                background-repeat: no-repeat;
-                background-position: center;
+                background-color: #f0f2f5;
             }
             
             #headerFrame {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #007bff, stop:1 #0056b3);
-                color: white;
-                border-radius: 20px;
-                padding: 40px;
-                margin-bottom: 20px;
+                background: #ffffff;
+                border-bottom: 1px solid #e0e0e0;
+                padding: 20px 40px;
             }
             
             #mainTitle {
                 font-family: "Roboto", sans-serif;
-                font-size: 48px;
+                font-size: 36px;
                 font-weight: bold;
-                color: white;
-                margin-bottom: 10px;
+                color: #333;
             }
             
             #subtitle {
                 font-family: "Roboto", sans-serif;
-                font-size: 24px;
-                color: rgba(255, 255, 255, 0.9);
-                font-weight: 300;
-                margin-bottom: 15px;
+                font-size: 18px;
+                color: #777;
             }
             
             #description {
                 font-family: "Roboto", sans-serif;
-                font-size: 18px;
-                color: rgba(255, 255, 255, 0.8);
-                font-style: italic;
+                font-size: 16px;
+                color: #555;
             }
             
             #modulesFrame {
@@ -420,23 +412,37 @@ class MainBusinessApp(QMainWindow):
                 padding: 20px;
             }
             
+            #moduleCard {
+                background-color: white;
+                border-radius: 15px;
+                padding: 0px;
+                border: 1px solid #e0e0e0;
+                transition: all 0.3s ease;
+            }
+            #moduleCard:hover {
+                box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+                transform: translateY(-5px);
+                border-left: 5px solid #007bff;
+            }
+
             #infoFrame {
-                background-color: rgba(255, 255, 255, 0.9);
+                background-color: #ffffff;
                 border-radius: 15px;
                 padding: 30px;
                 margin: 20px 0px;
+                border: 1px solid #e0e0e0;
             }
             
             #infoTitle {
                 font-family: "Roboto", sans-serif;
-                font-size: 28px;
+                font-size: 24px;
                 font-weight: bold;
-                color: #343a40;
+                color: #333;
                 margin-bottom: 20px;
             }
             
             #featureWidget {
-                background-color: rgba(255, 255, 255, 0.8);
+                background-color: #f8f9fa;
                 border-radius: 10px;
                 padding: 15px;
                 margin: 5px;
@@ -444,36 +450,34 @@ class MainBusinessApp(QMainWindow):
             
             #featureTitle {
                 font-family: "Roboto", sans-serif;
-                font-size: 18px;
+                font-size: 16px;
                 font-weight: bold;
-                color: #495057;
+                color: #333;
             }
             
             #featureDesc {
                 font-family: "Roboto", sans-serif;
                 font-size: 14px;
-                color: #6c757d;
+                color: #777;
             }
             
             #statusFrame {
-                background-color: rgba(52, 58, 64, 0.9);
+                background-color: #343a40;
                 color: white;
-                padding: 12px 20px;
-                border-radius: 10px;
-                margin-top: 20px;
+                padding: 10px 20px;
+                border-top: 1px solid #444;
             }
             
             #statusLabel {
                 font-family: "Roboto", sans-serif;
-                font-size: 16px;
+                font-size: 14px;
                 color: white;
-                font-weight: 500;
             }
             
             #userLabel, #timeLabel, #versionLabel {
                 font-family: "Roboto", sans-serif;
-                font-size: 14px;
-                color: rgba(255, 255, 255, 0.8);
+                font-size: 12px;
+                color: #ccc;
                 margin-left: 20px;
             }
         """)
