@@ -151,6 +151,7 @@ class MainBusinessApp(QMainWindow):
             #moduleCard:hover {{
                 box-shadow: 0 10px 25px rgba(0,0,0,0.15);
                 transform: translateY(-5px);
+                border-color: #007bff;
             }}
         """)
         
@@ -372,13 +373,12 @@ class MainBusinessApp(QMainWindow):
         """Stil tanımlamaları"""
         self.setStyleSheet("""
             QMainWindow {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #f8f9fa, stop:1 #e9ecef);
+                background-color: #f0f2f5;
             }
             
             #headerFrame {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #343a40, stop:1 #495057);
+                    stop:0 #007bff, stop:1 #0056b3);
                 color: white;
                 border-radius: 20px;
                 padding: 40px;
@@ -472,8 +472,6 @@ class MainBusinessApp(QMainWindow):
                 self.status_label.setText("CRM modülü açılıyor...")
                 
             self.crm_window.show()
-            self.crm_window.raise_()
-            self.crm_window.activateWindow()
             
             self.status_label.setText("CRM modülü başarıyla açıldı")
             
@@ -489,8 +487,6 @@ class MainBusinessApp(QMainWindow):
                 self.status_label.setText("Marketing modülü açılıyor...")
                 
             self.marketing_window.show()
-            self.marketing_window.raise_()
-            self.marketing_window.activateWindow()
             
             self.status_label.setText("Marketing modülü başarıyla açıldı")
             
