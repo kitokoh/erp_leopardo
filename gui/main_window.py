@@ -432,12 +432,21 @@ class DocumentManager(QMainWindow):
 
         # Window Controls
         self.minimize_button = QPushButton("—")
+        self.minimize_button.setToolTip(self.tr("Minimiser"))
         self.maximize_button = QPushButton("[]")
+        self.maximize_button.setToolTip(self.tr("Agrandir"))
         self.close_button = QPushButton("X")
+        self.close_button.setToolTip(self.tr("Fermer"))
 
         self.minimize_button.clicked.connect(self.showMinimized)
         self.maximize_button.clicked.connect(self.toggleMaximized)
         self.close_button.clicked.connect(self.close)
+
+        for btn in [self.minimize_button, self.maximize_button, self.close_button]:
+            btn.setFixedSize(30, 30)
+            btn.setObjectName("windowControlButton")
+
+        self.close_button.setObjectName("windowCloseButton")
 
         self.app_root_dir = app_root_dir
         self.current_user_info = current_user_info # Store the full user info dictionary
@@ -464,7 +473,7 @@ class DocumentManager(QMainWindow):
 
 
         self.setWindowTitle(self.tr("Gestionnaire de Documents Client")); self.setGeometry(100, 100, 1200, 800)
-        self.setWindowIcon(QIcon(":/icons/logo.svg"))
+        # self.setWindowIcon(QIcon(":/icons/logo.svg"))
         
         self.config = CONFIG
         self.module_states = {} # Initialize module states

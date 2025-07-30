@@ -74,18 +74,18 @@ class HomePageWidget(QWidget):
         main_v_layout.setSpacing(10)
 
         self.modules = [
-            {"name": self.tr("Gestion Documents Client"), "object_name": "btnClientDocuments", "icon": ":/icons/modern/folder-docs.svg", "slot": self.go_to_documents},
-            {"name": self.tr("Gestion de Projet"), "object_name": "btnProjectManagement", "icon": ":/icons/dashboard.svg", "slot": self.go_to_project_management},
-            {"name": self.tr("Statistiques"), "object_name": "btnStatistics", "icon": ":/icons/bar-chart.svg", "slot": self.go_to_statistics},
-            {"name": self.tr("Gestion des Produits"), "object_name": "btnProductManagement", "icon": ":/icons/book.svg", "slot": self.go_to_product_management},
-            {"name": self.tr("Gestion des Partenaires"), "object_name": "btnPartnerManagement", "icon": ":/icons/team.svg", "slot": self.go_to_partner_management},
-            {"name": self.tr("Gestion Stock Atelier"), "object_name": "btnInventoryManagement", "icon": ":/icons/book.svg", "slot": self.go_to_inventory_management},
-            {"name": self.tr("Recrutement"), "object_name": "btnRecruitment", "icon": ":/icons/users.svg", "slot": self.go_to_recruitment},
-            {"name": self.tr("Gestion des Connaissances"), "object_name": "btnExperienceManagement", "icon": ":/icons/book.svg", "slot": self.go_to_experience_management},
-            {"name": self.tr("Intégration Botpress"), "object_name": "btnBotpressIntegration", "icon": ":/icons/placeholder_icon.svg", "slot": self.go_to_botpress_integration},
-            {"name": self.tr("Gestion Caméras"), "object_name": "btnCameraManagement", "icon": ":/icons/video.svg", "slot": self.go_to_camera_management},
-            {"name": self.tr("Synchronisation"), "object_name": "btnSynchronization", "icon": ":/icons/refresh-cw.svg", "slot": self.go_to_synchronization},
-            {"name": self.tr("Paramètres"), "object_name": "btnSettings", "icon": ":/icons/modern/settings.svg", "slot": self.go_to_settings},
+            {"name": self.tr("Gestion Documents Client"), "object_name": "btnClientDocuments", "icon": "📁", "slot": self.go_to_documents},
+            {"name": self.tr("Gestion de Projet"), "object_name": "btnProjectManagement", "icon": "💼", "slot": self.go_to_project_management},
+            {"name": self.tr("Statistiques"), "object_name": "btnStatistics", "icon": "📊", "slot": self.go_to_statistics},
+            {"name": self.tr("Gestion des Produits"), "object_name": "btnProductManagement", "icon": "📚", "slot": self.go_to_product_management},
+            {"name": self.tr("Gestion des Partenaires"), "object_name": "btnPartnerManagement", "icon": "🤝", "slot": self.go_to_partner_management},
+            {"name": self.tr("Gestion Stock Atelier"), "object_name": "btnInventoryManagement", "icon": "📦", "slot": self.go_to_inventory_management},
+            {"name": self.tr("Recrutement"), "object_name": "btnRecruitment", "icon": "👨‍💼", "slot": self.go_to_recruitment},
+            {"name": self.tr("Gestion des Connaissances"), "object_name": "btnExperienceManagement", "icon": "🧠", "slot": self.go_to_experience_management},
+            {"name": self.tr("Intégration Botpress"), "object_name": "btnBotpressIntegration", "icon": "🤖", "slot": self.go_to_botpress_integration},
+            {"name": self.tr("Gestion Caméras"), "object_name": "btnCameraManagement", "icon": "📹", "slot": self.go_to_camera_management},
+            {"name": self.tr("Synchronisation"), "object_name": "btnSynchronization", "icon": "🔄", "slot": self.go_to_synchronization},
+            {"name": self.tr("Paramètres"), "object_name": "btnSettings", "icon": "⚙️", "slot": self.go_to_settings},
         ]
 
         self.promo_manager = PromoContentManager()
@@ -320,7 +320,7 @@ class HomePageWidget(QWidget):
         self.search_button = QPushButton()
         self.search_button.setObjectName("homePageSearchButton")
         # S'assurer que l'icône est bien chargée et visible
-        search_icon = QIcon(":/icons/search.svg")
+        search_icon = "🔎"
         self.search_button.setIcon(search_icon)
         self.search_button.setIconSize(QSize(20, 20)) # Taille de l'icône
         self.search_button.setFixedSize(40, 40) # Bouton carré
