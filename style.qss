@@ -1,7 +1,7 @@
 /*
   styles.qss - Fichier de style global pour l'application DocumentManager
   Auteur: [Votre Nom]
-  Version: 1.3
+  Version: 1.4
 */
 
 /* Styles globaux pour tous les widgets */
@@ -63,6 +63,7 @@ QPushButton {
     border-radius: 4px;
     font-weight: bold;
     min-width: 80px; /* Largeur minimale */
+    transition: background-color 0.3s ease;
 }
 
 QPushButton:hover {
@@ -146,7 +147,7 @@ QTabWidget::pane {
 }
 
 QTabBar::tab {
-    background: #e9ecef;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f8f9fa, stop:1 #e9ecef);
     color: #495057;
     border: 1px solid #dee2e6;
     border-bottom: none; /* La bordure inférieure est gérée par le pane */

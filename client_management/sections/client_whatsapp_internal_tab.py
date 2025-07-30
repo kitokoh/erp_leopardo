@@ -21,7 +21,7 @@ class ClientWhatsAppInternalTab(QWidget):
         layout = QVBoxLayout(self)
         self.open_whatsapp_dialog_btn = QPushButton(self.tr("Envoyer message WhatsApp..."))
         # Assuming a WhatsApp or phone icon is available, e.g., ":/icons/whatsapp.svg" or ":/icons/phone.svg"
-        self.open_whatsapp_dialog_btn.setIcon(QIcon(":/icons/phone.svg"))
+        self.open_whatsapp_dialog_btn.setText("💬")
         self.open_whatsapp_dialog_btn.clicked.connect(self.open_send_whatsapp_dialog_action)
         layout.addWidget(self.open_whatsapp_dialog_btn)
         layout.addStretch()
