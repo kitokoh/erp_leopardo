@@ -420,24 +420,8 @@ class ClientListItemWidget(QWidget):
 class DocumentManager(QMainWindow):
     def __init__(self, app_root_dir, current_user_info: dict, current_license_info: dict | None):
         super().__init__()
-        self.setWindowFlags(Qt.FramelessWindowHint)
-        self.setAttribute(Qt.WA_TranslucentBackground)
-
-        self.setWindowFlags(Qt.FramelessWindowHint)
-        self.setAttribute(Qt.WA_TranslucentBackground)
-
-
 
         self._gradient_pos = 0.0
-
-        # Window Controls
-        self.minimize_button = QPushButton("—")
-        self.maximize_button = QPushButton("[]")
-        self.close_button = QPushButton("X")
-
-        self.minimize_button.clicked.connect(self.showMinimized)
-        self.maximize_button.clicked.connect(self.toggleMaximized)
-        self.close_button.clicked.connect(self.close)
 
         self.app_root_dir = app_root_dir
         self.current_user_info = current_user_info # Store the full user info dictionary
@@ -1338,8 +1322,6 @@ class DocumentManager(QMainWindow):
         
         # Buttons in a single row
         client_actions_layout = QHBoxLayout()
-        self.add_new_client_button = QPushButton(self.tr("Ajouter Nouveau Client")); self.add_new_client_button.setIcon(QIcon(":/icons/user-add.svg")); self.add_new_client_button.setObjectName("primaryButton"); self.add_new_client_button.clicked.connect(self.open_add_new_client_dialog)
-        client_actions_layout.addWidget(self.add_new_client_button)
 
         self.add_client_by_voice_button = QPushButton(self.tr("Ajouter par Voix")); self.add_client_by_voice_button.setIcon(QIcon(":/icons/mic.svg")); self.add_client_by_voice_button.setObjectName("primaryButton")
         self.add_client_by_voice_button.clicked.connect(self.handle_add_client_by_voice_clicked)
@@ -1540,26 +1522,27 @@ class DocumentManager(QMainWindow):
         self.exit_action = QAction(QIcon(":/icons/log-out.svg"), self.tr("Quitter"), self); self.exit_action.setShortcut("Ctrl+Q"); self.exit_action.triggered.connect(self.close)
         self.project_management_action = QAction(QIcon(":/icons/dashboard.svg"), self.tr("Gestion de Projet"), self); self.project_management_action.triggered.connect(self.show_project_management_view)
         self.documents_view_action = QAction(QIcon(":/icons/modern/folder-docs.svg"), self.tr("Gestion Documents"), self); self.documents_view_action.triggered.connect(self.show_documents_view)
-        self.product_list_action = QAction(QIcon(":/icons/book.svg"), self.tr("Product Management"), self); self.product_list_action.triggered.connect(self.show_product_management_page) # Connect to new method
-        self.partner_management_action = QAction(QIcon(":/icons/team.svg"), self.tr("Partner Management"), self); self.partner_management_action.triggered.connect(self.show_partner_management_view)
-        self.statistics_action = QAction(QIcon(":/icons/bar-chart.svg"), self.tr("Statistiques"), self); self.statistics_action.triggered.connect(self.show_statistics_view)
-        self.open_carrier_map_action = QAction(QIcon(":/icons/map.svg"), self.tr("Carrier Map"), self) # Assuming map.svg or similar exists
+        self.add_new_client_action = QAction("➕ " + self.tr("Ajouter Nouveau Client"), self); self.add_new_client_action.triggered.connect(self.open_add_new_client_dialog)
+        self.product_list_action = QAction("📦 " + self.tr("Product Management"), self); self.product_list_action.triggered.connect(self.show_product_management_page) # Connect to new method
+        self.partner_management_action = QAction("🤝 " + self.tr("Partner Management"), self); self.partner_management_action.triggered.connect(self.show_partner_management_view)
+        self.statistics_action = QAction("📊 " + self.tr("Statistiques"), self); self.statistics_action.triggered.connect(self.show_statistics_view)
+        self.open_carrier_map_action = QAction("🗺️ " + self.tr("Carrier Map"), self) # Assuming map.svg or similar exists
         self.open_carrier_map_action.triggered.connect(self.open_carrier_map_dialog)
-        self.botpress_integration_action = QAction(QIcon(":/icons/placeholder_icon.svg"), self.tr("Botpress Integration"), self) # Add a placeholder icon
+        self.botpress_integration_action = QAction("🤖 " + self.tr("Botpress Integration"), self) # Add a placeholder icon
         self.botpress_integration_action.triggered.connect(self.show_botpress_integration_view)
-        self.inventory_browser_action = QAction(QIcon(":/icons/book.svg"), self.tr("Gestion Stock Atelier"), self) # Updated text
+        self.inventory_browser_action = QAction("📦 " + self.tr("Gestion Stock Atelier"), self) # Updated text
         self.inventory_browser_action.triggered.connect(self.show_inventory_browser_view)
 
-        self.recruitment_action = QAction(QIcon(":/icons/users.svg"), self.tr("Recrutement"), self) # Use an existing icon or add new one
+        self.recruitment_action = QAction("🧑‍💼 " + self.tr("Recrutement"), self) # Use an existing icon or add new one
         self.recruitment_action.triggered.connect(self.show_recruitment_view)
-        self.camera_management_action = QAction(QIcon(":/icons/video.svg"), self.tr("Gestion Caméras"), self)
+        self.camera_management_action = QAction("📷 " + self.tr("Gestion Caméras"), self)
         self.camera_management_action.triggered.connect(self.show_camera_management_view)
 
-        self.experience_management_action = QAction(QIcon(":/icons/book.svg"), self.tr("Gestion des Connaissances"), self) # Consider a more specific icon if available
+        self.experience_management_action = QAction("🧠 " + self.tr("Gestion des Connaissances"), self) # Consider a more specific icon if available
         self.experience_management_action.triggered.connect(self.show_experience_module_view)
 
         # Action for Calendar Module
-        self.calendar_module_action = QAction(QIcon(":/icons/book.svg"), self.tr("Calendrier"), self) # Placeholder icon
+        self.calendar_module_action = QAction("📅 " + self.tr("Calendrier"), self) # Placeholder icon
         self.calendar_module_action.triggered.connect(self.show_calendar_module_view)
 
         # Action for managing users - Placeholder, actual UI for this is not yet built
@@ -1738,6 +1721,9 @@ class DocumentManager(QMainWindow):
                 (self.tr("Statistiques"), self.statistics_action),
                 (self.tr("Addons"), self.addons_action)
             ] + module_menu_actions), # Dropdown for all other modules
+            (self.tr("Clients"), None, [
+                (self.tr("Ajouter Nouveau Client"), self.add_new_client_action),
+            ]),
             (self.tr("Outils"), None, [
                 (self.tr("Paramètres"), self.settings_action),
                 (self.tr("Gérer les Statuts"), self.status_action),
@@ -1844,12 +1830,6 @@ class DocumentManager(QMainWindow):
         self._update_user_display() # Initial update of user display
         self._apply_permissions() # Apply permissions on initial load
 
-        # Add window controls to the layout
-        window_controls_layout = QHBoxLayout()
-        window_controls_layout.addWidget(self.minimize_button)
-        window_controls_layout.addWidget(self.maximize_button)
-        window_controls_layout.addWidget(self.close_button)
-        top_bar_layout.addLayout(window_controls_layout)
 
     def _apply_permissions(self):
         """Applies role-based permissions to UI elements."""
