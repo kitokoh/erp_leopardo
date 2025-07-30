@@ -1,15 +1,15 @@
 /*
   styles.qss - Fichier de style global pour l'application DocumentManager
   Auteur: [Votre Nom]
-  Version: 1.2
+  Version: 1.3
 */
 
 /* Styles globaux pour tous les widgets */
 QWidget {
-    font-family: 'Segoe UI', 'Arial', sans-serif;
+    font-family: 'Inter', 'Arial', sans-serif;
     font-size: 10pt; /* Taille de police de base */
-    color: #343A40; /* Couleur de texte principale (gris foncé) */
-    background-color: #f8f9fa; /* Couleur de fond générale (gris très clair) */
+    color: #333; /* Couleur de texte principale (gris foncé) */
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #fdfbfb, stop:1 #ebedee);
 }
 
 /* Styles pour les QFrame, pour créer des séparateurs visuels */
@@ -124,7 +124,7 @@ QComboBox::drop-down {
 }
 
 QComboBox::down-arrow {
-    image: url(:/icons/chevron-up.svg); /* Chemin vers une icône de chevron */
+    image: url(:/icons/chevron-down.svg); /* Chemin vers une icône de chevron */
     width: 12px;
     height: 12px;
 }
@@ -284,7 +284,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
     subcontrol-origin: margin;
 }
 QScrollBar::up-arrow:vertical, QScrollBar::down-arrow:vertical {
-    image: url(:/icons/chevron-right.svg); /* Utiliser des icônes de chevron */
+    image: url(:/icons/chevron-up.svg); /* Utiliser des icônes de chevron */
 }
 QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
     background: none;

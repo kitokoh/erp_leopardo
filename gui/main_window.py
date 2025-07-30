@@ -1538,54 +1538,54 @@ class DocumentManager(QMainWindow):
         home_icon_path = ":/icons/home.svg"
         # A fallback icon if home.svg is not found in resources, for testing
         # if not QIcon.hasThemeIcon("home"): home_icon_path = ":/icons/dashboard.svg" # Example fallback
-        self.home_action = QAction(QIcon(home_icon_path), self.tr("Accueil"), self)
+        self.home_action = QAction("🏠 " + self.tr("Accueil"), self)
         self.home_action.triggered.connect(self.show_home_view)
 
-        self.settings_action = QAction(QIcon(":/icons/modern/settings.svg"), self.tr("Paramètres"), self); self.settings_action.triggered.connect(self.show_settings_page) # Changed to show_settings_page
+        self.settings_action = QAction("⚙️ " + self.tr("Paramètres"), self); self.settings_action.triggered.connect(self.show_settings_page) # Changed to show_settings_page
         # self.template_action removed
-        self.status_action = QAction(QIcon(":/icons/check-square.svg"), self.tr("Gérer les Statuts"), self); self.status_action.triggered.connect(self.open_status_management_dialog_slot)
+        self.status_action = QAction("📊 " + self.tr("Gérer les Statuts"), self); self.status_action.triggered.connect(self.open_status_management_dialog_slot)
         # self.status_action.setEnabled(False); # No longer hard-disabled
         # self.status_action.setToolTip(self.tr("Fonctionnalité de gestion des statuts prévue pour une future version.")) # Tooltip removed
-        self.exit_action = QAction(QIcon(":/icons/log-out.svg"), self.tr("Quitter"), self); self.exit_action.setShortcut("Ctrl+Q"); self.exit_action.triggered.connect(self.close)
-        self.project_management_action = QAction(QIcon(":/icons/dashboard.svg"), self.tr("Gestion de Projet"), self); self.project_management_action.triggered.connect(self.show_project_management_view)
-        self.documents_view_action = QAction(QIcon(":/icons/modern/folder-docs.svg"), self.tr("Gestion Documents"), self); self.documents_view_action.triggered.connect(self.show_documents_view)
-        self.product_list_action = QAction(QIcon(":/icons/book.svg"), self.tr("Product Management"), self); self.product_list_action.triggered.connect(self.show_product_management_page) # Connect to new method
-        self.partner_management_action = QAction(QIcon(":/icons/team.svg"), self.tr("Partner Management"), self); self.partner_management_action.triggered.connect(self.show_partner_management_view)
-        self.statistics_action = QAction(QIcon(":/icons/bar-chart.svg"), self.tr("Statistiques"), self); self.statistics_action.triggered.connect(self.show_statistics_view)
-        self.open_carrier_map_action = QAction(QIcon(":/icons/map.svg"), self.tr("Carrier Map"), self) # Assuming map.svg or similar exists
+        self.exit_action = QAction("🚪 " + self.tr("Quitter"), self); self.exit_action.setShortcut("Ctrl+Q"); self.exit_action.triggered.connect(self.close)
+        self.project_management_action = QAction("💼 " + self.tr("Gestion de Projet"), self); self.project_management_action.triggered.connect(self.show_project_management_view)
+        self.documents_view_action = QAction("📁 " + self.tr("Gestion Documents"), self); self.documents_view_action.triggered.connect(self.show_documents_view)
+        self.product_list_action = QAction("📚 " + self.tr("Product Management"), self); self.product_list_action.triggered.connect(self.show_product_management_page) # Connect to new method
+        self.partner_management_action = QAction("🤝 " + self.tr("Partner Management"), self); self.partner_management_action.triggered.connect(self.show_partner_management_view)
+        self.statistics_action = QAction("📊 " + self.tr("Statistiques"), self); self.statistics_action.triggered.connect(self.show_statistics_view)
+        self.open_carrier_map_action = QAction("🗺️ " + self.tr("Carrier Map"), self) # Assuming map.svg or similar exists
         self.open_carrier_map_action.triggered.connect(self.open_carrier_map_dialog)
-        self.botpress_integration_action = QAction(QIcon(":/icons/placeholder_icon.svg"), self.tr("Botpress Integration"), self) # Add a placeholder icon
+        self.botpress_integration_action = QAction("🤖 " + self.tr("Botpress Integration"), self) # Add a placeholder icon
         self.botpress_integration_action.triggered.connect(self.show_botpress_integration_view)
-        self.inventory_browser_action = QAction(QIcon(":/icons/book.svg"), self.tr("Gestion Stock Atelier"), self) # Updated text
+        self.inventory_browser_action = QAction("📦 " + self.tr("Gestion Stock Atelier"), self) # Updated text
         self.inventory_browser_action.triggered.connect(self.show_inventory_browser_view)
 
-        self.recruitment_action = QAction(QIcon(":/icons/users.svg"), self.tr("Recrutement"), self) # Use an existing icon or add new one
+        self.recruitment_action = QAction("👨‍💼 " + self.tr("Recrutement"), self) # Use an existing icon or add new one
         self.recruitment_action.triggered.connect(self.show_recruitment_view)
-        self.camera_management_action = QAction(QIcon(":/icons/video.svg"), self.tr("Gestion Caméras"), self)
+        self.camera_management_action = QAction("📹 " + self.tr("Gestion Caméras"), self)
         self.camera_management_action.triggered.connect(self.show_camera_management_view)
 
-        self.experience_management_action = QAction(QIcon(":/icons/book.svg"), self.tr("Gestion des Connaissances"), self) # Consider a more specific icon if available
+        self.experience_management_action = QAction("🧠 " + self.tr("Gestion des Connaissances"), self) # Consider a more specific icon if available
         self.experience_management_action.triggered.connect(self.show_experience_module_view)
 
         # Action for Calendar Module
-        self.calendar_module_action = QAction(QIcon(":/icons/book.svg"), self.tr("Calendrier"), self) # Placeholder icon
+        self.calendar_module_action = QAction("📅 " + self.tr("Calendrier"), self) # Placeholder icon
         self.calendar_module_action.triggered.connect(self.show_calendar_module_view)
 
         # Action for managing users - Placeholder, actual UI for this is not yet built
         # but the action can be controlled by RBAC.
-        self.manage_users_action = QAction(QIcon(":/icons/users.svg"), self.tr("Gérer les Utilisateurs"), self)
+        self.manage_users_action = QAction("👥 " + self.tr("Gérer les Utilisateurs"), self)
         self.manage_users_action.triggered.connect(self.show_user_management_page) # Connect to show page method
 
         # Action for Calculator Module
-        self.calculator_module_action = QAction(QIcon(":/icons/bar-chart.svg"), self.tr("Calculatrices"), self) # Placeholder icon
+        self.calculator_module_action = QAction("🧮 " + self.tr("Calculatrices"), self) # Placeholder icon
         self.calculator_module_action.triggered.connect(self.show_calculator_module_view)
 
         # Action for Commande Management (Global View)
-        self.commande_management_action = QAction(QIcon(":/icons/briefcase.svg"), self.tr("Gestion des Commandes"), self) # Replaced shopping-cart.svg with briefcase.svg
+        self.commande_management_action = QAction("📦 " + self.tr("Gestion des Commandes"), self) # Replaced shopping-cart.svg with briefcase.svg
         self.commande_management_action.triggered.connect(self.show_commande_management_view)
 
         # Action for managing roles
-        self.manage_roles_action = QAction(QIcon(":/icons/settings.svg"), self.tr("Gérer les Rôles"), self) # Replaced shield.svg with settings.svg
+        self.manage_roles_action = QAction("🛡️ " + self.tr("Gérer les Rôles"), self) # Replaced shield.svg with settings.svg
         self.manage_roles_action.triggered.connect(self.open_role_management_dialog)
 
 
@@ -1617,22 +1617,22 @@ class DocumentManager(QMainWindow):
         # self.customize_sidebar_action.triggered.connect(self.open_sidebar_customization_dialog) # Renommer la méthode cible
         # self.searchable_actions_map[self.tr("Personnaliser la Barre Latérale")] = self.customize_sidebar_action
 
-        self.addons_action = QAction(QIcon(":/icons/plus-circle.svg"), self.tr("Addons"), self)
+        self.addons_action = QAction("🧩 " + self.tr("Addons"), self)
         self.addons_action.triggered.connect(self.show_addons_page)
         self.searchable_actions_map[self.tr("Addons")] = self.addons_action
 
-        self.synchronization_action = QAction(QIcon(":/icons/refresh-cw.svg"), self.tr("Synchronisation"), self)
+        self.synchronization_action = QAction("🔄 " + self.tr("Synchronisation"), self)
         self.synchronization_action.triggered.connect(self.show_synchronization_view)
         self.searchable_actions_map[self.tr("Synchronisation")] = self.synchronization_action
 
         # B2C Restaurant Module Action
         # TODO: Find or create a suitable icon e.g., :/icons/restaurant.svg or :/icons/utensils.svg
-        self.restaurant_module_action = QAction(QIcon(":/icons/placeholder_icon.svg"), self.tr("Service Restaurant (B2C)"), self)
+        self.restaurant_module_action = QAction("🍽️ " + self.tr("Service Restaurant (B2C)"), self)
         self.restaurant_module_action.triggered.connect(self.show_restaurant_module_view)
         self.searchable_actions_map[self.tr("Service Restaurant (B2C)")] = self.restaurant_module_action
 
         # About Action (ensure it's created here for the map)
-        self.about_action = QAction(QIcon(":/icons/help-circle.svg"), self.tr("À propos"), self)
+        self.about_action = QAction("❓ " + self.tr("À propos"), self)
         self.about_action.triggered.connect(self.show_about_dialog)
         self.searchable_actions_map[self.tr("À propos")] = self.about_action
 
