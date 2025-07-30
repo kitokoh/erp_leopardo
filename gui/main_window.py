@@ -420,24 +420,8 @@ class ClientListItemWidget(QWidget):
 class DocumentManager(QMainWindow):
     def __init__(self, app_root_dir, current_user_info: dict, current_license_info: dict | None):
         super().__init__()
-        self.setWindowFlags(Qt.FramelessWindowHint)
-        self.setAttribute(Qt.WA_TranslucentBackground)
-
-        self.setWindowFlags(Qt.FramelessWindowHint)
-        self.setAttribute(Qt.WA_TranslucentBackground)
-
-
 
         self._gradient_pos = 0.0
-
-        # Window Controls
-        self.minimize_button = QPushButton("—")
-        self.maximize_button = QPushButton("[]")
-        self.close_button = QPushButton("X")
-
-        self.minimize_button.clicked.connect(self.showMinimized)
-        self.maximize_button.clicked.connect(self.toggleMaximized)
-        self.close_button.clicked.connect(self.close)
 
         self.app_root_dir = app_root_dir
         self.current_user_info = current_user_info # Store the full user info dictionary
@@ -1844,12 +1828,6 @@ class DocumentManager(QMainWindow):
         self._update_user_display() # Initial update of user display
         self._apply_permissions() # Apply permissions on initial load
 
-        # Add window controls to the layout
-        window_controls_layout = QHBoxLayout()
-        window_controls_layout.addWidget(self.minimize_button)
-        window_controls_layout.addWidget(self.maximize_button)
-        window_controls_layout.addWidget(self.close_button)
-        top_bar_layout.addLayout(window_controls_layout)
 
     def _apply_permissions(self):
         """Applies role-based permissions to UI elements."""
