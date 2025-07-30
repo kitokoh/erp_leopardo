@@ -48,7 +48,6 @@ QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox, QDoubleSpinBox, QDateEdit, QDate
 
 QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QDateEdit:focus, QDateTimeEdit:focus {
     border-color: #80bdff; /* Bordure bleue en focus */
-    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25); /* Ombre portée douce */
 }
 
 QLineEdit[readOnly="true"] {
