@@ -185,7 +185,7 @@ class ClientWidget(QWidget):
             action_layout.addWidget(self.create_docs_btn)
 
             self.compile_pdf_btn = QPushButton(self.tr("Compiler PDF"))
-            self.compile_pdf_btn.setIcon(QIcon.fromTheme("document-export"))
+            self.compile_pdf_btn.setText("📄")
             self.compile_pdf_btn.setProperty("primary", True)
             self.compile_pdf_btn.clicked.connect(self.open_compile_pdf_dialog)
             # action_layout.addWidget(self.compile_pdf_btn) # Moved to documents tab filters
@@ -936,7 +936,7 @@ class ClientWidget(QWidget):
             self.add_doc_btn.clicked.connect(self.add_document)
             doc_btn_layout.addWidget(self.add_doc_btn)
             self.refresh_docs_btn = QPushButton(self.tr("Actualiser"))
-            self.refresh_docs_btn.setIcon(QIcon.fromTheme("view-refresh"))
+            self.refresh_docs_btn.setText("🔄")
             self.refresh_docs_btn.clicked.connect(self.populate_doc_table)
             doc_btn_layout.addWidget(self.refresh_docs_btn)
             self.add_template_btn = QPushButton(self.tr("Générer via Modèle"))
@@ -1085,10 +1085,10 @@ class ClientWidget(QWidget):
             doc_notes_layout.addWidget(self.document_notes_table)
             doc_notes_buttons_layout = QHBoxLayout()
             self.add_doc_note_button = QPushButton(self.tr("Ajouter Note")) # Renamed button
-            self.add_doc_note_button.setIcon(QIcon.fromTheme("document-new"))
+            self.add_doc_note_button.setText("➕📝")
             doc_notes_buttons_layout.addWidget(self.add_doc_note_button)
             self.refresh_doc_notes_button = QPushButton(self.tr("Actualiser Liste"))
-            self.refresh_doc_notes_button.setIcon(QIcon.fromTheme("view-refresh"))
+            self.refresh_doc_notes_button.setText("🔄")
             doc_notes_buttons_layout.addWidget(self.refresh_doc_notes_button)
             doc_notes_buttons_layout.addStretch()
             doc_notes_layout.addLayout(doc_notes_buttons_layout)
@@ -1300,7 +1300,7 @@ class ClientWidget(QWidget):
             self.purchase_history_table.itemChanged.connect(self.handle_purchase_history_item_changed)
             sav_layout.addWidget(self.purchase_history_table)
             self.refresh_purchase_history_btn = QPushButton(self.tr("Rafraîchir l'historique"))
-            self.refresh_purchase_history_btn.setIcon(QIcon.fromTheme("view-refresh"))
+            self.refresh_purchase_history_btn.setText("🔄")
             self.refresh_purchase_history_btn.clicked.connect(self.load_purchase_history_table)
             sav_layout.addWidget(self.refresh_purchase_history_btn)
             sav_layout.addWidget(QLabel("<h3>Tickets SAV (Prochainement)</h3>")) # Placeholder for SAV tickets UI
@@ -1726,7 +1726,7 @@ class ClientWidget(QWidget):
             action_layout.addWidget(self.create_docs_btn)
 
             self.compile_pdf_btn = QPushButton(self.tr("Compiler PDF"))
-            self.compile_pdf_btn.setIcon(QIcon.fromTheme("document-export"))
+            self.compile_pdf_btn.setText("📄")
             self.compile_pdf_btn.setProperty("primary", True)
             self.compile_pdf_btn.clicked.connect(self.open_compile_pdf_dialog)
             action_layout.addWidget(self.compile_pdf_btn)
@@ -1865,7 +1865,7 @@ class ClientWidget(QWidget):
             self.add_doc_btn.clicked.connect(self.add_document)
             doc_btn_layout.addWidget(self.add_doc_btn)
             self.refresh_docs_btn = QPushButton(self.tr("Actualiser"))
-            self.refresh_docs_btn.setIcon(QIcon.fromTheme("view-refresh"))
+            self.refresh_docs_btn.setText("🔄")
             self.refresh_docs_btn.clicked.connect(self.populate_doc_table)
             doc_btn_layout.addWidget(self.refresh_docs_btn)
             self.add_template_btn = QPushButton(self.tr("Générer via Modèle"))
@@ -1997,10 +1997,10 @@ class ClientWidget(QWidget):
             doc_notes_layout.addWidget(self.document_notes_table)
             doc_notes_buttons_layout = QHBoxLayout()
             self.add_doc_note_button = QPushButton(self.tr("Ajouter Note de Document"))
-            self.add_doc_note_button.setIcon(QIcon.fromTheme("document-new"))
+            self.add_doc_note_button.setText("➕📝")
             doc_notes_buttons_layout.addWidget(self.add_doc_note_button)
             self.refresh_doc_notes_button = QPushButton(self.tr("Actualiser Liste"))
-            self.refresh_doc_notes_button.setIcon(QIcon.fromTheme("view-refresh"))
+            self.refresh_doc_notes_button.setText("🔄")
             doc_notes_buttons_layout.addWidget(self.refresh_doc_notes_button)
             doc_notes_buttons_layout.addStretch()
             doc_notes_layout.addLayout(doc_notes_buttons_layout)
@@ -2104,7 +2104,7 @@ class ClientWidget(QWidget):
             self.purchase_history_table.itemChanged.connect(self.handle_purchase_history_item_changed)
             sav_layout.addWidget(self.purchase_history_table)
             self.refresh_purchase_history_btn = QPushButton(self.tr("Rafraîchir l'historique"))
-            self.refresh_purchase_history_btn.setIcon(QIcon.fromTheme("view-refresh"))
+            self.refresh_purchase_history_btn.setText("🔄")
             self.refresh_purchase_history_btn.clicked.connect(self.load_purchase_history_table)
             sav_layout.addWidget(self.refresh_purchase_history_btn)
             sav_layout.addWidget(QLabel("<h3>Tickets SAV (Prochainement)</h3>"))
@@ -2455,7 +2455,7 @@ class ClientWidget(QWidget):
         doc_btn_layout.addWidget(self.add_doc_btn)
 
         self.refresh_docs_btn = QPushButton(self.tr("Actualiser"))
-        self.refresh_docs_btn.setIcon(QIcon.fromTheme("view-refresh"))
+        self.refresh_docs_btn.setText("🔄")
         self.refresh_docs_btn.clicked.connect(self.populate_doc_table)
         doc_btn_layout.addWidget(self.refresh_docs_btn)
 
@@ -2588,12 +2588,12 @@ class ClientWidget(QWidget):
 
         doc_notes_buttons_layout = QHBoxLayout()
         self.add_doc_note_button = QPushButton(self.tr("Ajouter Note de Document"))
-        self.add_doc_note_button.setIcon(QIcon.fromTheme("document-new"))
+        self.add_doc_note_button.setText("➕📝")
 
         doc_notes_buttons_layout.addWidget(self.add_doc_note_button)
 
         self.refresh_doc_notes_button = QPushButton(self.tr("Actualiser Liste"))
-        self.refresh_doc_notes_button.setIcon(QIcon.fromTheme("view-refresh"))
+        self.refresh_doc_notes_button.setText("🔄")
         doc_notes_buttons_layout.addWidget(self.refresh_doc_notes_button)
         doc_notes_buttons_layout.addStretch()
         doc_notes_layout.addLayout(doc_notes_buttons_layout)
@@ -2699,7 +2699,7 @@ class ClientWidget(QWidget):
         sav_layout.addWidget(self.purchase_history_table)
 
         self.refresh_purchase_history_btn = QPushButton(self.tr("Rafraîchir l'historique"))
-        self.refresh_purchase_history_btn.setIcon(QIcon.fromTheme("view-refresh"))
+        self.refresh_purchase_history_btn.setText("🔄")
         self.refresh_purchase_history_btn.clicked.connect(self.load_purchase_history_table)
         sav_layout.addWidget(self.refresh_purchase_history_btn)
 
@@ -4717,12 +4717,12 @@ class ClientWidget(QWidget):
                 logging.debug(f"PT_DEBUG: populate_doc_table - Row {row_idx}: Creating action widget.")
                 action_widget = QWidget(); action_layout = QHBoxLayout(action_widget); action_layout.setContentsMargins(2,2,2,2); action_layout.setSpacing(5)
 
-                pdf_btn = QPushButton(""); pdf_btn.setIcon(QIcon(":/icons/file-text.svg")); pdf_btn.setToolTip(self.tr("Générer/Ouvrir PDF")); pdf_btn.setFixedSize(30,30)
+                pdf_btn = QPushButton("📄"); pdf_btn.setToolTip(self.tr("Générer/Ouvrir PDF")); pdf_btn.setFixedSize(30,30)
                 # Pass the full doc_data to the handler
                 pdf_btn.clicked.connect(lambda _, doc=doc_data: self._handle_generate_and_open_pdf_action(doc))
                 action_layout.addWidget(pdf_btn)
 
-                source_btn = QPushButton(""); source_btn.setIcon(QIcon(":/icons/eye.svg")); source_btn.setToolTip(self.tr("Afficher source")); source_btn.setFixedSize(30,30)
+                source_btn = QPushButton("👁️"); source_btn.setToolTip(self.tr("Afficher source")); source_btn.setFixedSize(30,30)
                 source_btn.clicked.connect(lambda _, p=full_file_path: QDesktopServices.openUrl(QUrl.fromLocalFile(p)))
                 action_layout.addWidget(source_btn)
 
@@ -4738,20 +4738,20 @@ class ClientWidget(QWidget):
 
                 if can_manage_docs:
                     if can_edit_source_template:
-                        edit_source_template_btn = QPushButton(""); edit_source_template_btn.setIcon(QIcon(":/icons/edit-2.svg")); edit_source_template_btn.setToolTip(self.tr("Modifier modèle source")); edit_source_template_btn.setFixedSize(30,30)
+                        edit_source_template_btn = QPushButton("✏️"); edit_source_template_btn.setToolTip(self.tr("Modifier modèle source")); edit_source_template_btn.setFixedSize(30,30)
                         edit_source_template_btn.clicked.connect(lambda _, doc_d=doc_data: self.handle_edit_source_template(doc_d))
                         action_layout.addWidget(edit_source_template_btn)
                     elif file_type_str.upper() == "PDF":
-                        edit_pdf_btn = QPushButton(""); edit_pdf_btn.setIcon(QIcon(":/icons/pencil.svg")); edit_pdf_btn.setToolTip(self.tr("Modifier PDF")); edit_pdf_btn.setFixedSize(30, 30)
+                        edit_pdf_btn = QPushButton("✏️"); edit_pdf_btn.setToolTip(self.tr("Modifier PDF")); edit_pdf_btn.setFixedSize(30, 30)
                         edit_pdf_btn.clicked.connect(lambda _, p=full_file_path, doc_id=document_id: self._handle_edit_pdf_action(p, doc_id))
                         action_layout.addWidget(edit_pdf_btn)
                     elif doc_name.lower().endswith('.html'): # Specific to HTML for HtmlEditor and PDF regen
-                        edit_btn = QPushButton(""); edit_btn.setIcon(QIcon(":/icons/pencil.svg")); edit_btn.setToolTip(self.tr("Modifier document HTML")); edit_btn.setFixedSize(30,30)
+                        edit_btn = QPushButton("✏️"); edit_btn.setToolTip(self.tr("Modifier document HTML")); edit_btn.setFixedSize(30,30)
                         # Pass doc_data to open_document
                         edit_btn.clicked.connect(lambda _, d=doc_data: self.open_document(d))
                         action_layout.addWidget(edit_btn)
                     elif doc_name.lower().endswith('.xlsx'): # Specific to Excel for ExcelEditor
-                        edit_btn = QPushButton(""); edit_btn.setIcon(QIcon(":/icons/pencil.svg")); edit_btn.setToolTip(self.tr("Modifier document Excel")); edit_btn.setFixedSize(30,30)
+                        edit_btn = QPushButton("✏️"); edit_btn.setToolTip(self.tr("Modifier document Excel")); edit_btn.setFixedSize(30,30)
                         # Pass only full_file_path for Excel as PDF regen is not directly tied here
                         edit_btn.clicked.connect(lambda _, p=full_file_path: self.open_document(p)) # Keep old behavior for non-HTML
                         action_layout.addWidget(edit_btn)
@@ -4761,7 +4761,7 @@ class ClientWidget(QWidget):
                     spacer_widget = QWidget(); spacer_widget.setFixedSize(30,30); action_layout.addWidget(spacer_widget)
 
                 if can_manage_docs:
-                    delete_btn = QPushButton(""); delete_btn.setIcon(QIcon(":/icons/trash.svg")); delete_btn.setToolTip(self.tr("Supprimer document")); delete_btn.setFixedSize(30,30)
+                    delete_btn = QPushButton("🗑️"); delete_btn.setToolTip(self.tr("Supprimer document")); delete_btn.setFixedSize(30,30)
                     delete_btn.clicked.connect(lambda _, doc_id=document_id, p=full_file_path: self.delete_client_document_entry(doc_id, p))
                     action_layout.addWidget(delete_btn)
                 else: # No permission to delete
@@ -4780,7 +4780,7 @@ class ClientWidget(QWidget):
 
                 btn_preview_quick = QPushButton("")
                 btn_preview_quick.setProperty("class", "tableActionButton") # Added class property
-                btn_preview_quick.setIcon(QIcon(":/icons/eye.svg"))
+                btn_preview_quick.setText("👁️")
                 btn_preview_quick.setToolTip(self.tr("Aperçu rapide du document (meilleur effort)"))
                 btn_preview_quick.setFixedSize(28, 28) # Smaller buttons
                 # Store document data needed for the action
@@ -4792,7 +4792,7 @@ class ClientWidget(QWidget):
 
                 btn_download_quick = QPushButton("")
                 btn_download_quick.setProperty("class", "tableActionButton") # Added class property
-                btn_download_quick.setIcon(QIcon(":/icons/download.svg"))
+                btn_download_quick.setText("💾")
                 btn_download_quick.setToolTip(self.tr("Télécharger ce document"))
                 btn_download_quick.setFixedSize(28, 28)
                 btn_download_quick.setProperty("document_id", document_id)
@@ -4804,7 +4804,7 @@ class ClientWidget(QWidget):
                 # Button for "New Version"
                 btn_new_version = QPushButton("")
                 btn_new_version.setProperty("class", "tableActionButton")
-                btn_new_version.setIcon(QIcon(":/icons/plus-square.svg")) # Placeholder icon
+                btn_new_version.setText("➕📄") # Placeholder icon
                 btn_new_version.setToolTip(self.tr("Créer une nouvelle version de ce document"))
                 btn_new_version.setFixedSize(28, 28)
 
@@ -5814,12 +5814,12 @@ class ClientWidget(QWidget):
         self.is_editing_client = not self.is_editing_client
         if self.is_editing_client:
             self.edit_save_client_btn.setText(self.tr("Sauvegarder"))
-            self.edit_save_client_btn.setIcon(QIcon.fromTheme("document-save", QIcon(":/icons/check.svg")))
+            self.edit_save_client_btn.setText("💾")
             self.switchTo_edit_client_view()
         else: # Was "Sauvegarder", try to save changes
             if self.save_client_changes_from_edit_view(): # If save is successful
                 self.edit_save_client_btn.setText(self.tr("Modifier Client"))
-                self.edit_save_client_btn.setIcon(QIcon.fromTheme("document-edit", QIcon(":/icons/pencil.svg")))
+                self.edit_save_client_btn.setText("✏️")
                 # The view is refreshed by populate_details_layout within save_client_changes_from_edit_view
             else: # Save failed, remain in edit mode
                 self.is_editing_client = True # Keep state as editing
