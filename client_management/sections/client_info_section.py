@@ -225,11 +225,11 @@ class ClientInfoSection(QWidget):
         contacts_tab_layout.addLayout(contacts_pagination_layout)
 
         contacts_btn_layout = QHBoxLayout()
-        self.add_contact_btn = QPushButton(self.tr("Ajouter")); self.add_contact_btn.setIcon(QIcon(":/icons/user-plus.svg"))
+        self.add_contact_btn = QPushButton(self.tr("➕ Ajouter"))
         self.add_contact_btn.setToolTip(self.tr("Ajouter un nouveau contact pour ce client")); self.add_contact_btn.clicked.connect(self.add_contact); contacts_btn_layout.addWidget(self.add_contact_btn) # Method to be moved
-        self.edit_contact_btn = QPushButton(self.tr("Modifier")); self.edit_contact_btn.setIcon(QIcon(":/icons/pencil.svg"))
+        self.edit_contact_btn = QPushButton(self.tr("✏️ Modifier"))
         self.edit_contact_btn.setToolTip(self.tr("Modifier le contact sélectionné")); self.edit_contact_btn.clicked.connect(self.edit_contact); contacts_btn_layout.addWidget(self.edit_contact_btn) # Method to be moved
-        self.remove_contact_btn = QPushButton(self.tr("Supprimer")); self.remove_contact_btn.setIcon(QIcon(":/icons/trash.svg"))
+        self.remove_contact_btn = QPushButton(self.tr("🗑️ Supprimer"))
         self.remove_contact_btn.setToolTip(self.tr("Supprimer le lien vers le contact sélectionné pour ce client")); self.remove_contact_btn.setObjectName("dangerButton"); self.remove_contact_btn.clicked.connect(self.remove_contact); contacts_btn_layout.addWidget(self.remove_contact_btn) # Method to be moved
         contacts_tab_layout.addLayout(contacts_btn_layout)
 
@@ -262,7 +262,7 @@ class ClientInfoSection(QWidget):
         self.email_internal_tab_content = QWidget() # Placeholder
         email_layout = QVBoxLayout(self.email_internal_tab_content)
         self.open_email_dialog_btn_internal = QPushButton(self.tr("Composer un Email..."))
-        self.open_email_dialog_btn_internal.setIcon(QIcon.fromTheme("mail-send", QIcon(":/icons/bell.svg")))
+        self.open_email_dialog_btn_internal.setText("📧")
         self.open_email_dialog_btn_internal.clicked.connect(self.open_send_email_dialog) # Method to be potentially moved or adapted
         email_layout.addWidget(self.open_email_dialog_btn_internal)
         email_layout.addStretch()
@@ -274,7 +274,7 @@ class ClientInfoSection(QWidget):
         whatsapp_layout = QVBoxLayout(self.whatsapp_internal_tab_content)
         self.open_whatsapp_dialog_btn_internal = QPushButton(self.tr("Envoyer message WhatsApp..."))
         # self.open_whatsapp_dialog_btn_internal.setIcon(QIcon.fromTheme("contact-new", QIcon(":/icons/user.svg"))) # Assuming user.svg is a placeholder
-        self.open_whatsapp_dialog_btn_internal.setIcon(QIcon(":/icons/phone.svg")) # Example different icon
+        self.open_whatsapp_dialog_btn_internal.setText("💬") # Example different icon
         self.open_whatsapp_dialog_btn_internal.clicked.connect(self.open_send_whatsapp_dialog) # Method to be potentially moved or adapted
         whatsapp_layout.addWidget(self.open_whatsapp_dialog_btn_internal)
         whatsapp_layout.addStretch()

@@ -37,7 +37,11 @@ from .data_loader import (
     get_client_segmentation_by_status,
     get_client_segmentation_by_category,
     get_client_counts_by_country,
-    get_product_usage_counts
+    get_product_usage_counts,
+    get_total_clients_count,
+    get_active_projects_count,
+    get_total_sales_amount_for_period,
+    get_active_clients_count
 )
 from db.cruds.clients_crud import clients_crud_instance
 from db.connection import get_db_connection
