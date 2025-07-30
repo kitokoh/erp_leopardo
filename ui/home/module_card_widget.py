@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSizePoli
 from PyQt5.QtCore import Qt, pyqtSignal, QSize, QPropertyAnimation, QEasingCurve, QEvent
 from PyQt5.QtGui import QIcon, QMouseEvent, QFontMetrics, QColor
 from PyQt5.QtCore import QFile
-
+import logging
 class ModuleCardWidget(QWidget):
     """
     Widget personnalisé pour afficher une "carte" de module sur la page d'accueil.
