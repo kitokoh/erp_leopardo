@@ -55,7 +55,7 @@ class ModuleCardWidget(QWidget):
             self.icon_label.setPixmap(QIcon(self.card_icon_path).pixmap(QSize(48, 48))) # Taille d'icône augmentée
         else:
             # Fallback or placeholder if icon not found
-            self.icon_label.setPixmap(QIcon(":/icons/placeholder_icon.svg").pixmap(QSize(48,48)))
+            self.icon_label.setText("❓")
             logging.warning(f"ModuleCardWidget: Icon not found at {self.card_icon_path} for module {self.module_id}. Using placeholder.")
 
         self.icon_label.setAlignment(Qt.AlignCenter)

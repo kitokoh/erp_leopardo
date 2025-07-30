@@ -209,7 +209,7 @@ class ClientWidget(QWidget):
             action_layout.addWidget(self.archive_client_btn)
 
             self.mark_distributor_btn = QPushButton(self.tr("Gérer Statut Distributeur"))
-            self.mark_distributor_btn.setIcon(QIcon(":/icons/business.svg")) # Placeholder icon
+            self.mark_distributor_btn.setText("🏢")
             self.mark_distributor_btn.setToolTip(self.tr("Marquer/Démarquer ce client comme distributeur et gérer les informations associées."))
             self.mark_distributor_btn.clicked.connect(self.handle_mark_distributor)
             action_layout.addWidget(self.mark_distributor_btn)
@@ -372,11 +372,11 @@ class ClientWidget(QWidget):
             contacts_tab_layout.addLayout(contacts_pagination_layout)
 
             contacts_btn_layout = QHBoxLayout()
-            self.add_contact_btn = QPushButton(self.tr("Ajouter")); self.add_contact_btn.setIcon(QIcon(":/icons/user-plus.svg"))
+            self.add_contact_btn = QPushButton(self.tr("➕ Ajouter"))
             self.add_contact_btn.setToolTip(self.tr("Ajouter un nouveau contact pour ce client")); self.add_contact_btn.clicked.connect(self.add_contact); contacts_btn_layout.addWidget(self.add_contact_btn)
-            self.edit_contact_btn = QPushButton(self.tr("Modifier")); self.edit_contact_btn.setIcon(QIcon(":/icons/pencil.svg"))
+            self.edit_contact_btn = QPushButton(self.tr("✏️ Modifier"))
             self.edit_contact_btn.setToolTip(self.tr("Modifier le contact sélectionné")); self.edit_contact_btn.clicked.connect(self.edit_contact); contacts_btn_layout.addWidget(self.edit_contact_btn)
-            self.remove_contact_btn = QPushButton(self.tr("Supprimer")); self.remove_contact_btn.setIcon(QIcon(":/icons/trash.svg"))
+            self.remove_contact_btn = QPushButton(self.tr("🗑️ Supprimer"))
             self.remove_contact_btn.setToolTip(self.tr("Supprimer le lien vers le contact sélectionné pour ce client")); self.remove_contact_btn.setObjectName("dangerButton"); self.remove_contact_btn.clicked.connect(self.remove_contact); contacts_btn_layout.addWidget(self.remove_contact_btn)
             contacts_tab_layout.addLayout(contacts_btn_layout)
 
@@ -492,7 +492,7 @@ class ClientWidget(QWidget):
             send_email_tab_widget = QWidget()
             send_email_tab_layout = QVBoxLayout(send_email_tab_widget)
             self.open_email_dialog_btn = QPushButton(self.tr("Composer un Email..."))
-            self.open_email_dialog_btn.setIcon(QIcon.fromTheme("mail-send", QIcon(":/icons/bell.svg")))
+            self.open_email_dialog_btn.setText("📧")
             self.open_email_dialog_btn.clicked.connect(self.open_send_email_dialog)
             send_email_tab_layout.addWidget(self.open_email_dialog_btn)
             send_email_tab_layout.addStretch()
@@ -502,7 +502,7 @@ class ClientWidget(QWidget):
             send_whatsapp_tab_widget = QWidget()
             send_whatsapp_tab_layout = QVBoxLayout(send_whatsapp_tab_widget)
             self.open_whatsapp_dialog_btn = QPushButton(self.tr("Envoyer message WhatsApp..."))
-            self.open_whatsapp_dialog_btn.setIcon(QIcon.fromTheme("contact-new", QIcon(":/icons/user.svg"))) # Placeholder
+            self.open_whatsapp_dialog_btn.setText("💬")
             self.open_whatsapp_dialog_btn.clicked.connect(self.open_send_whatsapp_dialog)
             send_whatsapp_tab_layout.addWidget(self.open_whatsapp_dialog_btn)
             send_whatsapp_tab_layout.addStretch()
@@ -931,7 +931,7 @@ class ClientWidget(QWidget):
             docs_layout.addWidget(self.doc_table)
             doc_btn_layout = QHBoxLayout()
             self.add_doc_btn = QPushButton(self.tr("Importer Document"))
-            self.add_doc_btn.setIcon(QIcon(":/icons/file-plus.svg"))
+            self.add_doc_btn.setText("➕📄")
             self.add_doc_btn.setToolTip(self.tr("Importer un fichier document existant pour ce client"))
             self.add_doc_btn.clicked.connect(self.add_document)
             doc_btn_layout.addWidget(self.add_doc_btn)
@@ -940,7 +940,7 @@ class ClientWidget(QWidget):
             self.refresh_docs_btn.clicked.connect(self.populate_doc_table)
             doc_btn_layout.addWidget(self.refresh_docs_btn)
             self.add_template_btn = QPushButton(self.tr("Générer via Modèle"))
-            self.add_template_btn.setIcon(QIcon.fromTheme("document-new", QIcon(":/icons/file-plus.svg")))
+            self.add_template_btn.setText("➕📄")
             self.add_template_btn.setToolTip(self.tr("Générer un nouveau document pour ce client à partir d'un modèle"))
             self.add_template_btn.clicked.connect(self.open_create_docs_dialog)
             doc_btn_layout.addWidget(self.add_template_btn)
@@ -990,11 +990,11 @@ class ClientWidget(QWidget):
             contacts_pagination_layout.addStretch()
             contacts_layout.addLayout(contacts_pagination_layout)
             contacts_btn_layout = QHBoxLayout()
-            self.add_contact_btn = QPushButton(self.tr("Ajouter")); self.add_contact_btn.setIcon(QIcon(":/icons/user-plus.svg"))
+            self.add_contact_btn = QPushButton(self.tr("➕ Ajouter"))
             self.add_contact_btn.setToolTip(self.tr("Ajouter un nouveau contact pour ce client")); self.add_contact_btn.clicked.connect(self.add_contact); contacts_btn_layout.addWidget(self.add_contact_btn)
-            self.edit_contact_btn = QPushButton(self.tr("Modifier")); self.edit_contact_btn.setIcon(QIcon(":/icons/pencil.svg"))
+            self.edit_contact_btn = QPushButton(self.tr("✏️ Modifier"))
             self.edit_contact_btn.setToolTip(self.tr("Modifier le contact sélectionné")); self.edit_contact_btn.clicked.connect(self.edit_contact); contacts_btn_layout.addWidget(self.edit_contact_btn)
-            self.remove_contact_btn = QPushButton(self.tr("Supprimer")); self.remove_contact_btn.setIcon(QIcon(":/icons/trash.svg"))
+            self.remove_contact_btn = QPushButton(self.tr("🗑️ Supprimer"))
             self.remove_contact_btn.setToolTip(self.tr("Supprimer le lien vers le contact sélectionné pour ce client")); self.remove_contact_btn.setObjectName("dangerButton"); self.remove_contact_btn.clicked.connect(self.remove_contact); contacts_btn_layout.addWidget(self.remove_contact_btn)
             contacts_layout.addLayout(contacts_btn_layout)
             self.tab_widget.addTab(contacts_tab, self.tr("Contacts"))
@@ -1042,11 +1042,11 @@ class ClientWidget(QWidget):
             self.products_table.hideColumn(0)
             products_layout.addWidget(self.products_table)
             products_btn_layout = QHBoxLayout()
-            self.add_product_btn = QPushButton(self.tr("Ajouter")); self.add_product_btn.setIcon(QIcon(":/icons/plus-circle.svg"))
+            self.add_product_btn = QPushButton(self.tr("➕ Ajouter"))
             self.add_product_btn.setToolTip(self.tr("Ajouter un produit pour ce client/projet")); self.add_product_btn.clicked.connect(self.add_product); products_btn_layout.addWidget(self.add_product_btn)
-            self.edit_product_btn = QPushButton(self.tr("Modifier")); self.edit_product_btn.setIcon(QIcon(":/icons/pencil.svg"))
+            self.edit_product_btn = QPushButton(self.tr("✏️ Modifier"))
             self.edit_product_btn.setToolTip(self.tr("Modifier le produit sélectionné")); self.edit_product_btn.clicked.connect(self.edit_product); products_btn_layout.addWidget(self.edit_product_btn)
-            self.remove_product_btn = QPushButton(self.tr("Supprimer")); self.remove_product_btn.setIcon(QIcon(":/icons/trash.svg"))
+            self.remove_product_btn = QPushButton(self.tr("🗑️ Supprimer"))
             self.remove_product_btn.setToolTip(self.tr("Supprimer le produit sélectionné de ce client/projet")); self.remove_product_btn.setObjectName("dangerButton"); self.remove_product_btn.clicked.connect(self.remove_product); products_btn_layout.addWidget(self.remove_product_btn)
             products_layout.addLayout(products_btn_layout)
             self.tab_widget.addTab(products_tab, self.tr("Produits"))
@@ -1124,7 +1124,7 @@ class ClientWidget(QWidget):
             self.edit_client_product_dimensions_button = QPushButton(self.tr("Modifier Dimensions Produit (Global)"))
             logging.debug("ClientWidget._setup_product_dimensions_tab: Created edit_client_product_dimensions_button")
 
-            self.edit_client_product_dimensions_button.setIcon(QIcon.fromTheme("document-edit", QIcon(":/icons/pencil.svg")))
+            self.edit_client_product_dimensions_button.setText("✏️")
             logging.debug("ClientWidget._setup_product_dimensions_tab: Set icon for edit_client_product_dimensions_button")
 
             self.edit_client_product_dimensions_button.setEnabled(False)
@@ -1574,12 +1574,12 @@ class ClientWidget(QWidget):
 
             self.billing_tab = QWidget()
             self.billing_tab_layout = QVBoxLayout(self.billing_tab)
-            self.generate_invoice_button = QPushButton(QIcon(":/icons/file-plus.svg"), self.tr("Generate Final Invoice"))
+            self.generate_invoice_button = QPushButton("📄 " + self.tr("Generate Final Invoice"))
             self.generate_invoice_button.setToolTip(self.tr("Open dialog to prepare and generate a final invoice for this client."))
             self.generate_invoice_button.clicked.connect(self.handle_generate_final_invoice)
             self.billing_tab_layout.addWidget(self.generate_invoice_button)
             self.billing_tab_layout.addStretch()
-            self.tab_widget.addTab(self.billing_tab, QIcon(":/icons/credit-card.svg"), self.tr("Billing"))
+            self.tab_widget.addTab(self.billing_tab, "💳", self.tr("Billing"))
         except Exception as e:
             logging.error(f"Error in _setup_billing_tab: {e}", exc_info=True)
             QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation onglet Facturation:\n{0}").format(str(e)))
@@ -1611,16 +1611,16 @@ class ClientWidget(QWidget):
 
             # Buttons layout
             visits_buttons_layout = QHBoxLayout()
-            self.add_visit_btn = QPushButton(QIcon(":/icons/plus-circle.svg"), self.tr("Ajouter Visite"))
+            self.add_visit_btn = QPushButton("➕ " + self.tr("Ajouter Visite"))
             self.add_visit_btn.clicked.connect(self.handle_add_visit) # Connect add button
             visits_buttons_layout.addWidget(self.add_visit_btn)
 
-            self.edit_visit_btn = QPushButton(QIcon(":/icons/pencil.svg"), self.tr("Voir/Modifier Visite"))
+            self.edit_visit_btn = QPushButton("✏️ " + self.tr("Voir/Modifier Visite"))
             self.edit_visit_btn.clicked.connect(self.handle_view_edit_visit) # Connect edit button
             self.edit_visit_btn.setEnabled(False) # Enabled on selection
             visits_buttons_layout.addWidget(self.edit_visit_btn)
 
-            self.delete_visit_btn = QPushButton(QIcon(":/icons/trash.svg"), self.tr("Supprimer Visite"))
+            self.delete_visit_btn = QPushButton("🗑️ " + self.tr("Supprimer Visite"))
             self.delete_visit_btn.setObjectName("dangerButton")
             self.delete_visit_btn.clicked.connect(self.handle_delete_visit) # Connect delete button
             self.delete_visit_btn.setEnabled(False) # Enabled on selection
@@ -1634,7 +1634,7 @@ class ClientWidget(QWidget):
             visits_layout.addLayout(visits_buttons_layout)
 
             if hasattr(self, 'tab_widget'):
-                self.tab_widget.addTab(self.client_visits_tab, QIcon(":/icons/calendar.svg"), self.tr("Visites Client"))
+                self.tab_widget.addTab(self.client_visits_tab, "📅", self.tr("Visites Client"))
                 logging.info("ClientWidget._setup_client_visits_tab: Client Visits tab added.")
             else:
                 logging.error("ClientWidget._setup_client_visits_tab: self.tab_widget not found. Cannot add Client Visits tab.")
@@ -1714,7 +1714,7 @@ class ClientWidget(QWidget):
 
             action_layout = QHBoxLayout()
             self.create_docs_btn = QPushButton(self.tr("Envoyer Mail"))
-            self.create_docs_btn.setIcon(QIcon.fromTheme("mail-send", QIcon(":/icons/bell.svg"))) # Using bell.svg as fallback
+            self.create_docs_btn.setText("📄")
             self.create_docs_btn.setToolTip(self.tr("Envoyer un email au client"))
             self.create_docs_btn.setObjectName("primaryButton") # Keep primary styling for now
             try:
@@ -1732,13 +1732,13 @@ class ClientWidget(QWidget):
             action_layout.addWidget(self.compile_pdf_btn)
 
             self.edit_save_client_btn = QPushButton(self.tr("Modifier Client"))
-            self.edit_save_client_btn.setIcon(QIcon.fromTheme("document-edit", QIcon(":/icons/pencil.svg")))
+            self.edit_save_client_btn.setText("✏️")
             self.edit_save_client_btn.setToolTip(self.tr("Modifier les informations du client"))
             self.edit_save_client_btn.clicked.connect(self.toggle_client_edit_mode)
             action_layout.addWidget(self.edit_save_client_btn)
 
             self.send_whatsapp_btn = QPushButton(self.tr("Send WhatsApp"))
-            self.send_whatsapp_btn.setIcon(QIcon.fromTheme("contact-new", QIcon(":/icons/user.svg"))) # Changed placeholder
+            self.send_whatsapp_btn.setText("💬")
             self.send_whatsapp_btn.setToolTip(self.tr("Send a WhatsApp message to the client"))
             self.send_whatsapp_btn.clicked.connect(self.open_send_whatsapp_dialog)
             action_layout.addWidget(self.send_whatsapp_btn)
@@ -1860,7 +1860,7 @@ class ClientWidget(QWidget):
             docs_layout.addWidget(self.doc_table)
             doc_btn_layout = QHBoxLayout()
             self.add_doc_btn = QPushButton(self.tr("Importer Document"))
-            self.add_doc_btn.setIcon(QIcon(":/icons/file-plus.svg"))
+            self.add_doc_btn.setText("➕📄")
             self.add_doc_btn.setToolTip(self.tr("Importer un fichier document existant pour ce client"))
             self.add_doc_btn.clicked.connect(self.add_document)
             doc_btn_layout.addWidget(self.add_doc_btn)
@@ -1869,7 +1869,7 @@ class ClientWidget(QWidget):
             self.refresh_docs_btn.clicked.connect(self.populate_doc_table)
             doc_btn_layout.addWidget(self.refresh_docs_btn)
             self.add_template_btn = QPushButton(self.tr("Générer via Modèle"))
-            self.add_template_btn.setIcon(QIcon.fromTheme("document-new", QIcon(":/icons/file-plus.svg")))
+            self.add_template_btn.setText("➕📄")
             self.add_template_btn.setToolTip(self.tr("Générer un nouveau document pour ce client à partir d'un modèle"))
             self.add_template_btn.clicked.connect(self.open_create_docs_dialog)
             doc_btn_layout.addWidget(self.add_template_btn)
@@ -1917,9 +1917,9 @@ class ClientWidget(QWidget):
             contacts_pagination_layout.addStretch()
             contacts_layout.addLayout(contacts_pagination_layout)
             contacts_btn_layout = QHBoxLayout()
-            self.add_contact_btn = QPushButton(self.tr("Ajouter")); self.add_contact_btn.setIcon(QIcon(":/icons/user-plus.svg")); self.add_contact_btn.setToolTip(self.tr("Ajouter un nouveau contact pour ce client")); self.add_contact_btn.clicked.connect(self.add_contact); contacts_btn_layout.addWidget(self.add_contact_btn)
-            self.edit_contact_btn = QPushButton(self.tr("Modifier")); self.edit_contact_btn.setIcon(QIcon(":/icons/pencil.svg")); self.edit_contact_btn.setToolTip(self.tr("Modifier le contact sélectionné")); self.edit_contact_btn.clicked.connect(self.edit_contact); contacts_btn_layout.addWidget(self.edit_contact_btn)
-            self.remove_contact_btn = QPushButton(self.tr("Supprimer")); self.remove_contact_btn.setIcon(QIcon(":/icons/trash.svg")); self.remove_contact_btn.setToolTip(self.tr("Supprimer le lien vers le contact sélectionné pour ce client")); self.remove_contact_btn.setObjectName("dangerButton"); self.remove_contact_btn.clicked.connect(self.remove_contact); contacts_btn_layout.addWidget(self.remove_contact_btn)
+            self.add_contact_btn = QPushButton(self.tr("➕ Ajouter")); self.add_contact_btn.setToolTip(self.tr("Ajouter un nouveau contact pour ce client")); self.add_contact_btn.clicked.connect(self.add_contact); contacts_btn_layout.addWidget(self.add_contact_btn)
+            self.edit_contact_btn = QPushButton(self.tr("✏️ Modifier")); self.edit_contact_btn.setToolTip(self.tr("Modifier le contact sélectionné")); self.edit_contact_btn.clicked.connect(self.edit_contact); contacts_btn_layout.addWidget(self.edit_contact_btn)
+            self.remove_contact_btn = QPushButton(self.tr("🗑️ Supprimer")); self.remove_contact_btn.setToolTip(self.tr("Supprimer le lien vers le contact sélectionné pour ce client")); self.remove_contact_btn.setObjectName("dangerButton"); self.remove_contact_btn.clicked.connect(self.remove_contact); contacts_btn_layout.addWidget(self.remove_contact_btn)
             contacts_layout.addLayout(contacts_btn_layout)
             self.tab_widget.addTab(contacts_tab, self.tr("Contacts"))
         except Exception as e:
@@ -1963,9 +1963,9 @@ class ClientWidget(QWidget):
             self.products_table.hideColumn(0)
             products_layout.addWidget(self.products_table)
             products_btn_layout = QHBoxLayout()
-            self.add_product_btn = QPushButton(self.tr("Ajouter")); self.add_product_btn.setIcon(QIcon(":/icons/plus-circle.svg")); self.add_product_btn.setToolTip(self.tr("Ajouter un produit pour ce client/projet")); self.add_product_btn.clicked.connect(self.add_product); products_btn_layout.addWidget(self.add_product_btn)
-            self.edit_product_btn = QPushButton(self.tr("Modifier")); self.edit_product_btn.setIcon(QIcon(":/icons/pencil.svg")); self.edit_product_btn.setToolTip(self.tr("Modifier le produit sélectionné")); self.edit_product_btn.clicked.connect(self.edit_product); products_btn_layout.addWidget(self.edit_product_btn)
-            self.remove_product_btn = QPushButton(self.tr("Supprimer")); self.remove_product_btn.setIcon(QIcon(":/icons/trash.svg")); self.remove_product_btn.setToolTip(self.tr("Supprimer le produit sélectionné de ce client/projet")); self.remove_product_btn.setObjectName("dangerButton"); self.remove_product_btn.clicked.connect(self.remove_product); products_btn_layout.addWidget(self.remove_product_btn)
+            self.add_product_btn = QPushButton(self.tr("➕ Ajouter")); self.add_product_btn.setToolTip(self.tr("Ajouter un produit pour ce client/projet")); self.add_product_btn.clicked.connect(self.add_product); products_btn_layout.addWidget(self.add_product_btn)
+            self.edit_product_btn = QPushButton(self.tr("✏️ Modifier")); self.edit_product_btn.setToolTip(self.tr("Modifier le produit sélectionné")); self.edit_product_btn.clicked.connect(self.edit_product); products_btn_layout.addWidget(self.edit_product_btn)
+            self.remove_product_btn = QPushButton(self.tr("🗑️ Supprimer")); self.remove_product_btn.setToolTip(self.tr("Supprimer le produit sélectionné de ce client/projet")); self.remove_product_btn.setObjectName("dangerButton"); self.remove_product_btn.clicked.connect(self.remove_product); products_btn_layout.addWidget(self.remove_product_btn)
             products_layout.addLayout(products_btn_layout)
             self.tab_widget.addTab(products_tab, self.tr("Produits"))
         except Exception as e:
@@ -2023,7 +2023,7 @@ class ClientWidget(QWidget):
             self.dim_product_selector_combo.addItem(self.tr("Sélectionner un produit..."), None)
             prod_dims_layout.addWidget(self.dim_product_selector_combo)
             self.edit_client_product_dimensions_button = QPushButton(self.tr("Modifier Dimensions Produit"))
-            self.edit_client_product_dimensions_button.setIcon(QIcon.fromTheme("document-edit", QIcon(":/icons/pencil.svg")))
+            self.edit_client_product_dimensions_button.setText("✏️")
             self.edit_client_product_dimensions_button.setEnabled(False)
             prod_dims_layout.addWidget(self.edit_client_product_dimensions_button)
             prod_dims_layout.addStretch()
@@ -2241,12 +2241,12 @@ class ClientWidget(QWidget):
             # --- Billing Tab ---
             self.billing_tab = QWidget()
             self.billing_tab_layout = QVBoxLayout(self.billing_tab)
-            self.generate_invoice_button = QPushButton(QIcon(":/icons/file-plus.svg"), self.tr("Generate Final Invoice"))
+            self.generate_invoice_button = QPushButton("📄 " + self.tr("Generate Final Invoice"))
             self.generate_invoice_button.setToolTip(self.tr("Open dialog to prepare and generate a final invoice for this client."))
             self.generate_invoice_button.clicked.connect(self.handle_generate_final_invoice)
             self.billing_tab_layout.addWidget(self.generate_invoice_button)
             self.billing_tab_layout.addStretch()
-            self.tab_widget.addTab(self.billing_tab, QIcon(":/icons/credit-card.svg"), self.tr("Billing"))
+            self.tab_widget.addTab(self.billing_tab, "💳", self.tr("Billing"))
         except Exception as e:
             logging.error(f"Error during UI setup of Billing Tab Structure: {e}", exc_info=True)
             QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation structure onglet Facturation:\n{0}").format(str(e)))
@@ -2449,7 +2449,7 @@ class ClientWidget(QWidget):
         docs_layout.addWidget(self.doc_table)
         doc_btn_layout = QHBoxLayout()
         self.add_doc_btn = QPushButton(self.tr("Importer Document"))
-        self.add_doc_btn.setIcon(QIcon(":/icons/file-plus.svg"))
+        self.add_doc_btn.setText("➕📄")
         self.add_doc_btn.setToolTip(self.tr("Importer un fichier document existant pour ce client"))
         self.add_doc_btn.clicked.connect(self.add_document) # Connect the signal
         doc_btn_layout.addWidget(self.add_doc_btn)
@@ -2460,7 +2460,7 @@ class ClientWidget(QWidget):
         doc_btn_layout.addWidget(self.refresh_docs_btn)
 
         self.add_template_btn = QPushButton(self.tr("Générer via Modèle"))
-        self.add_template_btn.setIcon(QIcon.fromTheme("document-new", QIcon(":/icons/file-plus.svg"))) # Reverted
+        self.add_template_btn.setText("➕📄") # Reverted
         self.add_template_btn.setToolTip(self.tr("Générer un nouveau document pour ce client à partir d'un modèle"))
         self.add_template_btn.clicked.connect(self.open_create_docs_dialog)
         doc_btn_layout.addWidget(self.add_template_btn)
@@ -2508,9 +2508,9 @@ class ClientWidget(QWidget):
         contacts_layout.addLayout(contacts_pagination_layout)
 
         contacts_btn_layout = QHBoxLayout()
-        self.add_contact_btn = QPushButton(self.tr("Ajouter")); self.add_contact_btn.setIcon(QIcon(":/icons/user-plus.svg")); self.add_contact_btn.setToolTip(self.tr("Ajouter un nouveau contact pour ce client")); self.add_contact_btn.clicked.connect(self.add_contact); contacts_btn_layout.addWidget(self.add_contact_btn)
-        self.edit_contact_btn = QPushButton(self.tr("Modifier")); self.edit_contact_btn.setIcon(QIcon(":/icons/pencil.svg")); self.edit_contact_btn.setToolTip(self.tr("Modifier le contact sélectionné")); self.edit_contact_btn.clicked.connect(self.edit_contact); contacts_btn_layout.addWidget(self.edit_contact_btn)
-        self.remove_contact_btn = QPushButton(self.tr("Supprimer")); self.remove_contact_btn.setIcon(QIcon(":/icons/trash.svg")); self.remove_contact_btn.setToolTip(self.tr("Supprimer le lien vers le contact sélectionné pour ce client")); self.remove_contact_btn.setObjectName("dangerButton"); self.remove_contact_btn.clicked.connect(self.remove_contact); contacts_btn_layout.addWidget(self.remove_contact_btn)
+        self.add_contact_btn = QPushButton(self.tr("➕ Ajouter")); self.add_contact_btn.setToolTip(self.tr("Ajouter un nouveau contact pour ce client")); self.add_contact_btn.clicked.connect(self.add_contact); contacts_btn_layout.addWidget(self.add_contact_btn)
+        self.edit_contact_btn = QPushButton(self.tr("✏️ Modifier")); self.edit_contact_btn.setToolTip(self.tr("Modifier le contact sélectionné")); self.edit_contact_btn.clicked.connect(self.edit_contact); contacts_btn_layout.addWidget(self.edit_contact_btn)
+        self.remove_contact_btn = QPushButton(self.tr("🗑️ Supprimer")); self.remove_contact_btn.setToolTip(self.tr("Supprimer le lien vers le contact sélectionné pour ce client")); self.remove_contact_btn.setObjectName("dangerButton"); self.remove_contact_btn.clicked.connect(self.remove_contact); contacts_btn_layout.addWidget(self.remove_contact_btn)
         contacts_layout.addLayout(contacts_btn_layout)
         self.tab_widget.addTab(contacts_tab, self.tr("Contacts"))
 
@@ -2553,9 +2553,9 @@ class ClientWidget(QWidget):
         products_layout.addWidget(self.products_table)
 
         products_btn_layout = QHBoxLayout()
-        self.add_product_btn = QPushButton(self.tr("Ajouter")); self.add_product_btn.setIcon(QIcon(":/icons/plus-circle.svg")); self.add_product_btn.setToolTip(self.tr("Ajouter un produit pour ce client/projet")); self.add_product_btn.clicked.connect(self.add_product); products_btn_layout.addWidget(self.add_product_btn)
-        self.edit_product_btn = QPushButton(self.tr("Modifier")); self.edit_product_btn.setIcon(QIcon(":/icons/pencil.svg")); self.edit_product_btn.setToolTip(self.tr("Modifier le produit sélectionné")); self.edit_product_btn.clicked.connect(self.edit_product); products_btn_layout.addWidget(self.edit_product_btn)
-        self.remove_product_btn = QPushButton(self.tr("Supprimer")); self.remove_product_btn.setIcon(QIcon(":/icons/trash.svg")); self.remove_product_btn.setToolTip(self.tr("Supprimer le produit sélectionné de ce client/projet")); self.remove_product_btn.setObjectName("dangerButton"); self.remove_product_btn.clicked.connect(self.remove_product); products_btn_layout.addWidget(self.remove_product_btn)
+        self.add_product_btn = QPushButton(self.tr("➕ Ajouter")); self.add_product_btn.setToolTip(self.tr("Ajouter un produit pour ce client/projet")); self.add_product_btn.clicked.connect(self.add_product); products_btn_layout.addWidget(self.add_product_btn)
+        self.edit_product_btn = QPushButton(self.tr("✏️ Modifier")); self.edit_product_btn.setToolTip(self.tr("Modifier le produit sélectionné")); self.edit_product_btn.clicked.connect(self.edit_product); products_btn_layout.addWidget(self.edit_product_btn)
+        self.remove_product_btn = QPushButton(self.tr("🗑️ Supprimer")); self.remove_product_btn.setToolTip(self.tr("Supprimer le produit sélectionné de ce client/projet")); self.remove_product_btn.setObjectName("dangerButton"); self.remove_product_btn.clicked.connect(self.remove_product); products_btn_layout.addWidget(self.remove_product_btn)
         products_layout.addLayout(products_btn_layout)
         self.tab_widget.addTab(products_tab, self.tr("Produits"))
 
@@ -2614,7 +2614,7 @@ class ClientWidget(QWidget):
         prod_dims_layout.addWidget(self.dim_product_selector_combo)
 
         self.edit_client_product_dimensions_button = QPushButton(self.tr("Modifier Dimensions Produit"))
-        self.edit_client_product_dimensions_button.setIcon(QIcon.fromTheme("document-edit", QIcon(":/icons/pencil.svg")))
+        self.edit_client_product_dimensions_button.setText("✏️")
         self.edit_client_product_dimensions_button.setEnabled(False)
         prod_dims_layout.addWidget(self.edit_client_product_dimensions_button)
 
