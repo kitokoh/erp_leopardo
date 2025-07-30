@@ -432,12 +432,21 @@ class DocumentManager(QMainWindow):
 
         # Window Controls
         self.minimize_button = QPushButton("—")
+        self.minimize_button.setToolTip(self.tr("Minimiser"))
         self.maximize_button = QPushButton("[]")
+        self.maximize_button.setToolTip(self.tr("Agrandir"))
         self.close_button = QPushButton("X")
+        self.close_button.setToolTip(self.tr("Fermer"))
 
         self.minimize_button.clicked.connect(self.showMinimized)
         self.maximize_button.clicked.connect(self.toggleMaximized)
         self.close_button.clicked.connect(self.close)
+
+        for btn in [self.minimize_button, self.maximize_button, self.close_button]:
+            btn.setFixedSize(30, 30)
+            btn.setObjectName("windowControlButton")
+
+        self.close_button.setObjectName("windowCloseButton")
 
         self.app_root_dir = app_root_dir
         self.current_user_info = current_user_info # Store the full user info dictionary
@@ -464,7 +473,7 @@ class DocumentManager(QMainWindow):
 
 
         self.setWindowTitle(self.tr("Gestionnaire de Documents Client")); self.setGeometry(100, 100, 1200, 800)
-        self.setWindowIcon(QIcon(":/icons/logo.svg"))
+        # self.setWindowIcon(QIcon(":/icons/logo.svg"))
         
         self.config = CONFIG
         self.module_states = {} # Initialize module states
@@ -1085,7 +1094,7 @@ class DocumentManager(QMainWindow):
         # "More Filters" Button (Icon Only)
         self.more_filters_button = QPushButton("") # No text
         self.more_filters_button.setObjectName("moreFiltersButton")
-        self.more_filters_button.setIcon(QIcon(":/icons/chevron-down.svg"))
+        self.more_filters_button.setText("🔽")
         self.more_filters_button.setCheckable(True)
         self.more_filters_button.toggled.connect(self.toggle_more_filters_visibility)
         self.more_filters_button.setToolTip(self.tr("Afficher/Masquer plus de filtres"))
@@ -1207,7 +1216,7 @@ class DocumentManager(QMainWindow):
         self.load_filter_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         load_filters_layout.addWidget(self.load_filter_combo)
         self.manage_filters_button = QPushButton(self.tr("Gérer..."))
-        self.manage_filters_button.setIcon(QIcon(":/icons/settings.svg"))
+        self.manage_filters_button.setText("⚙️")
         self.manage_filters_button.setToolTip(self.tr("Gérer les filtres sauvegardés"))
         self.manage_filters_button.clicked.connect(self.open_manage_filters_dialog_slot) # Connect placeholder
         load_filters_layout.addWidget(self.manage_filters_button)
@@ -1222,7 +1231,7 @@ class DocumentManager(QMainWindow):
         self.saved_filter_name_input.setPlaceholderText(self.tr("Nom du nouveau filtre sauvegardé"))
         save_filter_layout.addWidget(self.saved_filter_name_input)
         self.save_filter_button = QPushButton(self.tr("Sauvegarder Actuel"))
-        self.save_filter_button.setIcon(QIcon(":/icons/save.svg"))
+        self.save_filter_button.setText("💾")
         self.save_filter_button.setToolTip(self.tr("Sauvegarder la configuration actuelle des filtres"))
         self.save_filter_button.clicked.connect(self.save_current_filter_slot) # Connect save button
         save_filter_layout.addWidget(self.save_filter_button)
@@ -1235,7 +1244,7 @@ class DocumentManager(QMainWindow):
         # --- "Réinitialiser Filtres" Button (now in collapsible area) ---
         self.reset_filters_button = QPushButton(self.tr("Réinitialiser Tous les Filtres")) # Added text back for clarity in collapsible
         self.reset_filters_button.setObjectName("resetFiltersButton") # Keep object name for styling if any
-        self.reset_filters_button.setIcon(QIcon(":/icons/refresh-cw.svg"))
+        self.reset_filters_button.setText("🔄")
         self.reset_filters_button.clicked.connect(self.reset_all_filters_slot)
         self.reset_filters_button.setToolTip(self.tr("Réinitialiser tous les filtres et masquer cette section"))
         collapsible_layout.addWidget(self.reset_filters_button) # Add to collapsible layout
@@ -1338,10 +1347,10 @@ class DocumentManager(QMainWindow):
         
         # Buttons in a single row
         client_actions_layout = QHBoxLayout()
-        self.add_new_client_button = QPushButton(self.tr("Ajouter Nouveau Client")); self.add_new_client_button.setIcon(QIcon(":/icons/user-add.svg")); self.add_new_client_button.setObjectName("primaryButton"); self.add_new_client_button.clicked.connect(self.open_add_new_client_dialog)
+        self.add_new_client_button = QPushButton(self.tr("➕ Ajouter Nouveau Client")); self.add_new_client_button.setObjectName("primaryButton"); self.add_new_client_button.clicked.connect(self.open_add_new_client_dialog)
         client_actions_layout.addWidget(self.add_new_client_button)
 
-        self.add_client_by_voice_button = QPushButton(self.tr("Ajouter par Voix")); self.add_client_by_voice_button.setIcon(QIcon(":/icons/mic.svg")); self.add_client_by_voice_button.setObjectName("primaryButton")
+        self.add_client_by_voice_button = QPushButton(self.tr("🎤 Ajouter par Voix")); self.add_client_by_voice_button.setObjectName("primaryButton")
         self.add_client_by_voice_button.clicked.connect(self.handle_add_client_by_voice_clicked)
         self.add_client_by_voice_button.setEnabled(False) # Disable as requested
         self.add_client_by_voice_button.setToolTip(self.tr("Fonctionnalité en cours de développement"))
@@ -1390,10 +1399,10 @@ class DocumentManager(QMainWindow):
     def toggle_more_filters_visibility(self, checked):
         self.collapsible_filter_widget.setVisible(checked)
         if checked:
-            self.more_filters_button.setIcon(QIcon(":/icons/chevron-up.svg")) # Change icon to up
+            self.more_filters_button.setText("🔼") # Change icon to up
             # self.more_filters_button.setText(self.tr("Moins de Filtres")) # Text removed
         else:
-            self.more_filters_button.setIcon(QIcon(":/icons/chevron-down.svg")) # Change icon to down
+            self.more_filters_button.setText("🔽") # Change icon to down
             # self.more_filters_button.setText(self.tr("Plus de Filtres")) # Text removed
 
 
@@ -1800,7 +1809,7 @@ class DocumentManager(QMainWindow):
 
         # Notifications Button
         self.notifications_button = QPushButton()
-        self.notifications_button.setIcon(QIcon(":/icons/bell.svg"))
+        self.notifications_button.setText("🔔")
         self.notifications_button.setToolTip(self.tr("Notifications"))
         self.notifications_button.setObjectName("notificationButton")
         self.notification_panel = NotificationPanel(self)
@@ -1809,7 +1818,7 @@ class DocumentManager(QMainWindow):
 
         # Notifications Button
         self.notifications_button = QPushButton()
-        self.notifications_button.setIcon(QIcon(":/icons/bell.svg"))
+        self.notifications_button.setText("🔔")
         self.notifications_button.setToolTip(self.tr("Notifications"))
         self.notifications_button.setObjectName("notificationButton")
         top_bar_layout.addWidget(self.notifications_button)
@@ -2702,12 +2711,12 @@ class DocumentManager(QMainWindow):
         if not client_id_val: return
 
         menu = QMenu()
-        open_action = menu.addAction(QIcon(":/icons/eye.svg"), self.tr("Ouvrir Fiche Client")); open_action.triggered.connect(lambda: self.open_client_tab_by_id(client_id_val))
-        edit_action = menu.addAction(QIcon(":/icons/pencil.svg"), self.tr("Modifier Client")); edit_action.triggered.connect(lambda: self.open_edit_client_dialog_slot(client_id_val))
-        open_folder_action = menu.addAction(QIcon(":/icons/folder.svg"), self.tr("Ouvrir Dossier Client")); open_folder_action.triggered.connect(lambda: self.open_client_folder_fs(client_id_val))
+        open_action = menu.addAction("👁️ " + self.tr("Ouvrir Fiche Client")); open_action.triggered.connect(lambda: self.open_client_tab_by_id(client_id_val))
+        edit_action = menu.addAction("✏️ " + self.tr("Modifier Client")); edit_action.triggered.connect(lambda: self.open_edit_client_dialog_slot(client_id_val))
+        open_folder_action = menu.addAction("📁 " + self.tr("Ouvrir Dossier Client")); open_folder_action.triggered.connect(lambda: self.open_client_folder_fs(client_id_val))
         menu.addSeparator()
-        archive_action = menu.addAction(QIcon(":/icons/briefcase.svg"), self.tr("Archiver Client")); archive_action.triggered.connect(lambda: self.set_client_status_archived_slot(client_id_val))
-        delete_action = menu.addAction(QIcon(":/icons/trash.svg"), self.tr("Supprimer Client")); delete_action.triggered.connect(lambda: self.delete_client_permanently_slot(client_id_val))
+        archive_action = menu.addAction("🗄️ " + self.tr("Archiver Client")); archive_action.triggered.connect(lambda: self.set_client_status_archived_slot(client_id_val))
+        delete_action = menu.addAction("🗑️ " + self.tr("Supprimer Client")); delete_action.triggered.connect(lambda: self.delete_client_permanently_slot(client_id_val))
         menu.exec_(self.client_list_widget.mapToGlobal(pos))
         
     def open_client_folder_fs(self, client_id_val): 
