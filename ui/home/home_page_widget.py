@@ -321,6 +321,7 @@ class HomePageWidget(QWidget):
         self.search_button.setObjectName("homePageSearchButton")
         # S'assurer que l'icône est bien chargée et visible
         self.search_button.setText("🔎")
+
         self.search_button.setIconSize(QSize(20, 20)) # Taille de l'icône
         self.search_button.setFixedSize(40, 40) # Bouton carré
         self.search_button.setToolTip(self.tr("Lancer la recherche"))
