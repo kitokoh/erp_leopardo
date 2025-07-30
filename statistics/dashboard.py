@@ -39,7 +39,10 @@ from .data_loader import (
     get_client_counts_by_country,
     get_product_usage_counts
 )
-from db.cruds.clients_crud import clients_crud_instance
+from db.cruds.clients_crud import clients_crud_instance, get_total_clients_count, get_active_clients_count
+from db.cruds.projects_crud import get_active_projects_count
+from db.cruds.invoices_crud import get_total_sales_amount_for_period
+from db.cruds.status_settings_crud import get_status_setting_by_name
 from db.connection import get_db_connection
 
 from client_management.add_new_client_dialog import AddNewClientDialog

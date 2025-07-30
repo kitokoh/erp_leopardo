@@ -109,11 +109,35 @@ class HomePageWidget(QWidget):
         self.map_widget_container = QFrame() # Conteneur pour la carte
         self.map_widget_container.setObjectName("homePageMapContainer")
 
-        top_layout = self._setup_top_layout()
-        bottom_layout = self._setup_bottom_layout()
+        # main_v_layout.setContentsMargins(20, 20, 20, 20) # Marges pour l'ensemble de la page
 
-        main_v_layout.addLayout(top_layout, 1)
-        main_v_layout.addWidget(bottom_layout, 2)
+        # Header Section
+        header_layout = self._create_header_section()
+        main_v_layout.addLayout(header_layout)
+
+        # Main Content Section
+        main_content_layout = QHBoxLayout()
+        main_content_layout.setSpacing(20)
+
+        # Left side (Module Cards)
+        module_cards_scroll_area = self._create_module_cards_section()
+        main_content_layout.addWidget(module_cards_scroll_area, 2) # Stretch factor 2
+
+        # Right side (Map and Stats)
+        right_side_layout = QVBoxLayout()
+        right_side_layout.setSpacing(20)
+
+        # Map Widget
+        self.map_widget_container = self._create_map_section()
+        right_side_layout.addWidget(self.map_widget_container, 3) # Stretch factor 3
+
+        # Quick Stats Widget
+        self.quick_stats_container = self._create_quick_stats_section()
+        right_side_layout.addWidget(self.quick_stats_container, 1) # Stretch factor 1
+
+        main_content_layout.addLayout(right_side_layout, 3) # Stretch factor 3
+
+        main_v_layout.addLayout(main_content_layout)
 
         self.setLayout(main_v_layout)
         self._load_all_module_card_stats()
@@ -238,37 +262,48 @@ class HomePageWidget(QWidget):
 
         return super().eventFilter(obj, event)
 
-    def _setup_top_layout(self):
-        """Crée le layout du haut avec la carte et la sidebar de statistiques."""
-        top_h_layout = QHBoxLayout()
-        top_h_layout.setContentsMargins(20, 20, 20, 20)
-        top_h_layout.setSpacing(20)
+    def _create_header_section(self):
+        """Crée la section d'en-tête avec le titre et la recherche."""
+        header_layout = QHBoxLayout()
+        header_layout.setContentsMargins(10, 10, 10, 20)
 
-        # La carte prend la place principale, avec un ratio plus grand
-        top_h_layout.addWidget(self.map_widget_container, 4) # Stretch factor 4
+        title_label = QLabel(self.tr("Tableau de Bord Principal"))
+        title_label.setObjectName("homePageTitle")
+        header_layout.addWidget(title_label)
 
-        # Right Sidebar pour les aperçus rapides
-        self.right_sidebar_container = QFrame()
-        self.right_sidebar_container.setObjectName("homePageRightSidebar")
-        self.right_sidebar_container.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-        # Augmenter la largeur minimale de la sidebar
-        self.right_sidebar_container.setMinimumWidth(350)
-        self.right_sidebar_layout = QVBoxLayout(self.right_sidebar_container)
-        self.right_sidebar_layout.setContentsMargins(10, 10, 10, 10)
-        self.right_sidebar_container.setLayout(self.right_sidebar_layout)
+        header_layout.addStretch(1)
+
+        search_layout = self._setup_search_layout()
+        header_layout.addLayout(search_layout)
+        return header_layout
+
+    def _create_map_section(self):
+        """Crée et configure la section de la carte."""
+        map_container = QFrame()
+        map_container.setObjectName("homePageMapContainer")
+        map_layout = QVBoxLayout(map_container)
+        map_layout.setContentsMargins(0,0,0,0)
+
+        self.home_map_widget = HomePageMapWidget(app_translator_func=self.tr)
+        map_layout.addWidget(self.home_map_widget)
+        if hasattr(self.home_map_widget.interaction_handler, 'country_clicked_signal'):
+            self.home_map_widget.interaction_handler.country_clicked_signal.connect(self._handle_add_client_for_country)
+
+        return map_container
+
+    def _create_quick_stats_section(self):
+        """Crée la section des statistiques rapides."""
+        stats_container = QFrame()
+        stats_container.setObjectName("homePageQuickStatsContainer")
+        stats_layout = QVBoxLayout(stats_container)
+        stats_layout.setContentsMargins(15, 15, 15, 15)
 
         self.quick_stats = QuickStatsWidget(self)
         self.quick_stats.refresh_requested.connect(self._refresh_quick_stats_data)
-        self.set_right_sidebar_widget(self.quick_stats)
+        stats_layout.addWidget(self.quick_stats)
         self._refresh_quick_stats_data()
 
-        # Ajout de la barre de recherche sous les statistiques rapides
-        search_layout = self._setup_search_layout()
-        self.right_sidebar_layout.addLayout(search_layout)
-
-        top_h_layout.addWidget(self.right_sidebar_container, 2) # Stretch factor 2
-
-        return top_h_layout
+        return stats_container
 
 
     def _refresh_quick_stats_data(self):
@@ -330,98 +365,41 @@ class HomePageWidget(QWidget):
 
         return search_layout
 
-    def _setup_bottom_layout(self):
-        """Crée le layout du bas avec la grille de boutons."""
-        bottom_h_layout = QHBoxLayout()
-        bottom_h_layout.setContentsMargins(10, 5, 10, 10)
-        bottom_h_layout.setSpacing(10)
+    def _create_module_cards_section(self):
+        """Crée la section des cartes de modules."""
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setObjectName("homePageModuleScrollArea")
 
-        # Promo Content Manager - self.promo_manager needs to be accessible
-        # self.promo_manager is initialized in _init_ui or constructor
-
-        # Left Promotional Area
-        self.left_promo_widget = PromoSectionWidget() # self.left_promo_widget needs to be accessible
-        self.left_promo_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        left_message = self.promo_manager.get_random_message()
-        if left_message:
-            self.left_promo_widget.set_content(
-                left_message.get("title", ""),
-                left_message.get("body", ""),
-                left_message.get("category", "generic")
-            )
-        else:
-            self.left_promo_widget.set_content(self.tr("Info"), self.tr("Aucun message promotionnel disponible."), "generic")
-        self.left_promo_widget.clicked.connect(lambda: self.update_promo_widget_content(self.left_promo_widget))
-
-        # Center Map Area / Bottom Content Area
-        self.bottom_content_area = QStackedWidget() # self.bottom_content_area needs to be accessible
-        self.bottom_content_area.setObjectName("homePageBottomContentArea")
-        self.bottom_content_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-
-        self.home_map_widget = HomePageMapWidget(app_translator_func=self.tr)
-        self.bottom_content_area.addWidget(self.home_map_widget)
-        if hasattr(self.home_map_widget.interaction_handler, 'country_clicked_signal'):
-            self.home_map_widget.interaction_handler.country_clicked_signal.connect(self._handle_add_client_for_country)
-
-        # Right Promotional Area
-        self.right_promo_widget = PromoSectionWidget() # self.right_promo_widget needs to be accessible
-        self.right_promo_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        right_message = self.promo_manager.get_random_message()
-        if self.promo_manager.messages and len(self.promo_manager.messages) > 1:
-            current_left_title = self.left_promo_widget.title_label.text() # Need a way to get original title if prefixed
-            current_left_body = self.left_promo_widget.body_label.text()
-            # This comparison might be tricky if titles are prefixed.
-            # For simplicity, we assume left_message holds the original chosen message.
-            while right_message == left_message:
-                right_message = self.promo_manager.get_random_message()
-
-        if right_message:
-            self.right_promo_widget.set_content(
-                right_message.get("title", ""),
-                right_message.get("body", ""),
-                right_message.get("category", "generic")
-            )
-
-        else:
-            for card_ref in self.module_cards_list:
-                if card_ref: card_ref.deleteLater()
-            self.module_cards_list.clear()
-
-        button_scroll_area = QScrollArea()
-        button_scroll_area.setWidgetResizable(True)
-        button_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        button_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        button_scroll_area.setObjectName("homePageButtonScrollArea")
-
-        button_container_widget = QWidget()
-        grid_layout = QGridLayout(button_container_widget)
-        grid_layout.setSpacing(15)
+        container = QWidget()
+        grid_layout = QGridLayout(container)
+        grid_layout.setSpacing(20)
         grid_layout.setContentsMargins(10, 10, 10, 10)
 
-        if self.modules:
-            row, col = 0, 0
-            for module_data in self.modules:
-                accent_color_key = module_data["object_name"].replace("btn", "").lower()
-                card = ModuleCardWidget(
-                    module_id=module_data["object_name"],
-                    title=module_data["name"],
-                    icon_path=module_data["icon"],
-                    tooltip=module_data["name"],
-                    navigation_slot=module_data["slot"],
-                    accent_color_key=accent_color_key
-                )
-                if module_data["slot"]:
-                    card.cardClicked.connect(module_data["slot"])
-                self.module_cards_list.append(card)
-                grid_layout.addWidget(card, row, col)
-                col += 1
-                if col >= 3: # Passage à 3 colonnes
-                    col = 0
-                    row += 1
+        row, col = 0, 0
+        for module_data in self.modules:
+            card = ModuleCardWidget(
+                module_id=module_data["object_name"],
+                title=module_data["name"],
+                icon_path=module_data["icon"],
+                tooltip=self.tr("Accéder à {0}").format(module_data["name"]),
+                navigation_slot=module_data["slot"],
+                accent_color_key=module_data["object_name"].replace("btn", "").lower()
+            )
+            if module_data["slot"]:
+                card.cardClicked.connect(module_data["slot"])
+            self.module_cards_list.append(card)
+            grid_layout.addWidget(card, row, col)
 
-        button_container_widget.setLayout(grid_layout)
-        button_scroll_area.setWidget(button_container_widget)
-        return button_scroll_area
+            col += 1
+            if col >= 2: # 2 colonnes de cartes de modules
+                col = 0
+                row += 1
+
+        container.setLayout(grid_layout)
+        scroll_area.setWidget(container)
+        return scroll_area
 
     def update_promo_widget_content(self, promo_widget_instance):
         """Fetches a new random message and updates the given PromoSectionWidget."""
@@ -492,6 +470,19 @@ class HomePageWidget(QWidget):
         self.set_map_widget(widget_to_display)
 
     def set_right_sidebar_widget(self, widget_to_display):
+        if not hasattr(self, 'right_sidebar_layout'):
+            # This can happen if the UI initialization changes.
+            # Let's ensure the layout exists.
+            if hasattr(self, 'right_sidebar_container'):
+                if not self.right_sidebar_container.layout():
+                    self.right_sidebar_layout = QVBoxLayout(self.right_sidebar_container)
+                    self.right_sidebar_container.setLayout(self.right_sidebar_layout)
+                else:
+                    self.right_sidebar_layout = self.right_sidebar_container.layout()
+            else:
+                logging.error("HomePageWidget: right_sidebar_container does not exist. Cannot set widget.")
+                return
+
         # Clear existing widgets from the right sidebar layout
         while self.right_sidebar_layout.count() > 0:
             item = self.right_sidebar_layout.takeAt(0)
@@ -500,9 +491,11 @@ class HomePageWidget(QWidget):
 
         if widget_to_display:
             self.right_sidebar_layout.addWidget(widget_to_display)
-            self.right_sidebar_container.setVisible(True)
+            if hasattr(self, 'right_sidebar_container'):
+                self.right_sidebar_container.setVisible(True)
         else:
-            self.right_sidebar_container.setVisible(False)
+            if hasattr(self, 'right_sidebar_container'):
+                self.right_sidebar_container.setVisible(False)
 
     @pyqtSlot()
     def go_to_documents(self):

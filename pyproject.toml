@@ -31,11 +31,13 @@ ensure_newline_before_comments = true
 # skip = ["icons_rc.py"] # Exclure les fichiers générés
 
 [tool.poetry]
-name = "app"
+name = "main-crm"
 version = "0.1.0"
 description = ""
 authors = ["google-labs-jules[bot] <161369871+google-labs-jules[bot]@users.noreply.github.com>"]
 readme = "README.md"
+
+packages = [{include = "main_crm"}]
 
 [tool.poetry.dependencies]
 python = ">=3.12"
