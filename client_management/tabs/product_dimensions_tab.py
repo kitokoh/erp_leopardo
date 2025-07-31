@@ -58,7 +58,7 @@ class ProductDimensionsTab(QWidget):
         action_group_layout = QVBoxLayout(action_group)
 
         self.edit_client_product_dimensions_button = QPushButton(self.tr("Gérer les Dimensions de ce Produit"))
-        self.edit_client_product_dimensions_button.setIcon(QIcon(":/icons/edit-3.svg")) # Updated icon
+        self.edit_client_product_dimensions_button.setText("✏️") # Updated icon
         self.edit_client_product_dimensions_button.setObjectName("primaryButton") # Style as primary action
         self.edit_client_product_dimensions_button.setToolTip(self.tr("Ouvrir le dialogue pour ajouter ou modifier les dimensions spécifiques pour le produit global sélectionné."))
         self.edit_client_product_dimensions_button.setEnabled(False)
