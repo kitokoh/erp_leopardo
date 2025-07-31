@@ -996,7 +996,7 @@ class DocumentManager(QMainWindow):
             icon_path (str, optional): Path to a custom icon. If None, a default icon based
                                        on the 'type' will be used. Defaults to None.
         """
-        from main import get_notification_manager # Local import
+        from main_CRM import get_notification_manager # Local import
 
         manager = get_notification_manager()
         if manager:
