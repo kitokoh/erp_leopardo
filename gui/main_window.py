@@ -1347,8 +1347,9 @@ class DocumentManager(QMainWindow):
         
         # Buttons in a single row
         client_actions_layout = QHBoxLayout()
-        self.add_new_client_button = QPushButton(self.tr("➕ Ajouter Nouveau Client")); self.add_new_client_button.setObjectName("primaryButton"); self.add_new_client_button.clicked.connect(self.open_add_new_client_dialog)
-        client_actions_layout.addWidget(self.add_new_client_button)
+        # self.add_new_client_button is now moved to the main menu as an action
+        # self.add_new_client_button = QPushButton(self.tr("➕ Ajouter Nouveau Client")); self.add_new_client_button.setObjectName("primaryButton"); self.add_new_client_button.clicked.connect(self.open_add_new_client_dialog)
+        # client_actions_layout.addWidget(self.add_new_client_button)
 
         self.add_client_by_voice_button = QPushButton(self.tr("🎤 Ajouter par Voix")); self.add_client_by_voice_button.setObjectName("primaryButton")
         self.add_client_by_voice_button.clicked.connect(self.handle_add_client_by_voice_clicked)
@@ -2038,9 +2039,10 @@ class DocumentManager(QMainWindow):
 
         # Main Buttons on Document View
         log_msg_create_client = f"Permission P_CREATE_CLIENT for role '{role_name}': {'Granted' if can_create_client else 'Denied'}. "
-        log_msg_create_client += f"Add New Client button {'enabled' if can_create_client else 'disabled'}."
+        # The 'Add New Client' button is now an action in the menu, its permissions are handled there.
+        # log_msg_create_client += f"Add New Client button {'enabled' if can_create_client else 'disabled'}."
         logging.info(log_msg_create_client)
-        self.add_new_client_button.setEnabled(can_create_client)
+        # self.add_new_client_button.setEnabled(can_create_client) # This button is removed
         self.add_client_by_voice_button.setEnabled(can_create_client) # Assuming same permission
         logging.info(f"  Button 'add_new_client_button' enabled: {can_create_client}")
         logging.info(f"  Button 'add_client_by_voice_button' enabled: {can_create_client}")
