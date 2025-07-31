@@ -76,12 +76,12 @@ class CommandesDashboardWidget(QWidget):
         filter_buttons_layout.addWidget(self.apply_filters_btn)
 
         self.apply_filters_btn = QPushButton(self.tr("Appliquer Filtres"))
-        self.apply_filters_btn.setIcon(QIcon.fromTheme("system-search")) # Example icon
+        self.apply_filters_btn.setText("🔎") # Example icon
         self.apply_filters_btn.clicked.connect(self._apply_filters_and_reload)
         filter_buttons_layout.addWidget(self.apply_filters_btn)
 
         self.reset_filters_btn = QPushButton(self.tr("Réinitialiser Filtres"))
-        self.reset_filters_btn.setIcon(QIcon.fromTheme("edit-clear")) # Example icon
+        self.reset_filters_btn.setText("🔄") # Example icon
         self.reset_filters_btn.clicked.connect(self._reset_filters_and_reload)
         filter_buttons_layout.addWidget(self.reset_filters_btn)
         filter_buttons_layout.addStretch()
@@ -121,11 +121,11 @@ class CommandesDashboardWidget(QWidget):
         # Pagination
         pagination_layout = QHBoxLayout()
         self.prev_page_btn = QPushButton(self.tr("Précédent"))
-        self.prev_page_btn.setIcon(QIcon.fromTheme("go-previous"))
+        self.prev_page_btn.setText("⬅️")
         self.prev_page_btn.clicked.connect(self._prev_page)
         self.page_info_label = QLabel(self.tr("Page 1/1"))
         self.next_page_btn = QPushButton(self.tr("Suivant"))
-        self.next_page_btn.setIcon(QIcon.fromTheme("go-next"))
+        self.next_page_btn.setText("➡️")
         self.next_page_btn.clicked.connect(self._next_page)
 
         pagination_layout.addStretch()
