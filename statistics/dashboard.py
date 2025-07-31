@@ -49,6 +49,7 @@ from db.connection import get_db_connection
 
 from client_management.add_new_client_dialog import AddNewClientDialog
 from client_management.client_controller import ClientController
+from PyQt5.QtWidgets import QComboBox
 
 
 from app_setup import APP_ROOT_DIR
