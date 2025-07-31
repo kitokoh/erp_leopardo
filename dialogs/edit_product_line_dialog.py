@@ -76,7 +76,7 @@ class EditProductLineDialog(QDialog):
         form_layout.addRow(self.tr("Dimensions (Ligne):"), self.dimensions_input_edit)
 
         self.view_detailed_dimensions_button = QPushButton(self.tr("Voir Dimensions Détaillées (Global Produit)"))
-        self.view_detailed_dimensions_button.setIcon(QIcon.fromTheme("view-fullscreen"))
+        self.view_detailed_dimensions_button.setText("↔️")
         self.view_detailed_dimensions_button.clicked.connect(self.on_view_detailed_dimensions)
         if not self.product_data.get('product_id'):
             self.view_detailed_dimensions_button.setEnabled(False)

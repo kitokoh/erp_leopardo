@@ -51,11 +51,14 @@ class ModuleCardWidget(QWidget):
         # Section Icône
         self.icon_label = QLabel(self)
         self.icon_label.setObjectName("moduleIconLabel")
-        if self.card_icon_path and QFile.exists(self.card_icon_path): # Check if icon exists before setting
+        if self.card_icon_path and not self.card_icon_path.startswith(':'):
+            self.icon_label.setText(self.card_icon_path)
+            self.icon_label.setStyleSheet("font-size: 48px;")
+        elif self.card_icon_path and QFile.exists(self.card_icon_path): # Check if icon exists before setting
             self.icon_label.setPixmap(QIcon(self.card_icon_path).pixmap(QSize(48, 48))) # Taille d'icône augmentée
         else:
             # Fallback or placeholder if icon not found
-            self.icon_label.setPixmap(QIcon(":/icons/placeholder_icon.svg").pixmap(QSize(48,48)))
+            self.icon_label.setText("❓")
             logging.warning(f"ModuleCardWidget: Icon not found at {self.card_icon_path} for module {self.module_id}. Using placeholder.")
 
         self.icon_label.setAlignment(Qt.AlignCenter)

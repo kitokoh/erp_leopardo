@@ -58,7 +58,7 @@ class CountryStatsDisplayWidget(QWidget):
         buttons_layout = QHBoxLayout()
         self.add_client_button = QPushButton(self.tr("Ajouter Client à ce Pays"))
         self.add_client_button.setObjectName("addClientToCountryButton")
-        self.add_client_button.setIcon(QIcon(":/icons/user-add.svg"))
+        self.add_client_button.setText("➕👤")
         self.add_client_button.clicked.connect(self._emit_add_client_signal)
         buttons_layout.addWidget(self.add_client_button)
 
@@ -66,7 +66,7 @@ class CountryStatsDisplayWidget(QWidget):
 
         self.back_button = QPushButton(self.tr("Retour aux Stats Globales"))
         self.back_button.setObjectName("backToGlobalButton")
-        self.back_button.setIcon(QIcon(":/icons/arrow-left-circle.svg"))
+        self.back_button.setText("⬅️")
         self.back_button.clicked.connect(self.back_to_global_requested)
         buttons_layout.addWidget(self.back_button)
 

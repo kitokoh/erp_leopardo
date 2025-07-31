@@ -432,12 +432,21 @@ class DocumentManager(QMainWindow):
 
         # Window Controls
         self.minimize_button = QPushButton("—")
+        self.minimize_button.setToolTip(self.tr("Minimiser"))
         self.maximize_button = QPushButton("[]")
+        self.maximize_button.setToolTip(self.tr("Agrandir"))
         self.close_button = QPushButton("X")
+        self.close_button.setToolTip(self.tr("Fermer"))
 
         self.minimize_button.clicked.connect(self.showMinimized)
         self.maximize_button.clicked.connect(self.toggleMaximized)
         self.close_button.clicked.connect(self.close)
+
+        for btn in [self.minimize_button, self.maximize_button, self.close_button]:
+            btn.setFixedSize(30, 30)
+            btn.setObjectName("windowControlButton")
+
+        self.close_button.setObjectName("windowCloseButton")
 
         self.app_root_dir = app_root_dir
         self.current_user_info = current_user_info # Store the full user info dictionary
@@ -464,7 +473,7 @@ class DocumentManager(QMainWindow):
 
 
         self.setWindowTitle(self.tr("Gestionnaire de Documents Client")); self.setGeometry(100, 100, 1200, 800)
-        self.setWindowIcon(QIcon(":/icons/logo.svg"))
+        # self.setWindowIcon(QIcon(":/icons/logo.svg"))
         
         self.config = CONFIG
         self.module_states = {} # Initialize module states
@@ -987,7 +996,7 @@ class DocumentManager(QMainWindow):
             icon_path (str, optional): Path to a custom icon. If None, a default icon based
                                        on the 'type' will be used. Defaults to None.
         """
-        from main import get_notification_manager # Local import
+        from main_CRM import get_notification_manager # Local import
 
         manager = get_notification_manager()
         if manager:
@@ -1085,7 +1094,7 @@ class DocumentManager(QMainWindow):
         # "More Filters" Button (Icon Only)
         self.more_filters_button = QPushButton("") # No text
         self.more_filters_button.setObjectName("moreFiltersButton")
-        self.more_filters_button.setIcon(QIcon(":/icons/chevron-down.svg"))
+        self.more_filters_button.setText("🔽")
         self.more_filters_button.setCheckable(True)
         self.more_filters_button.toggled.connect(self.toggle_more_filters_visibility)
         self.more_filters_button.setToolTip(self.tr("Afficher/Masquer plus de filtres"))
@@ -1207,7 +1216,7 @@ class DocumentManager(QMainWindow):
         self.load_filter_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         load_filters_layout.addWidget(self.load_filter_combo)
         self.manage_filters_button = QPushButton(self.tr("Gérer..."))
-        self.manage_filters_button.setIcon(QIcon(":/icons/settings.svg"))
+        self.manage_filters_button.setText("⚙️")
         self.manage_filters_button.setToolTip(self.tr("Gérer les filtres sauvegardés"))
         self.manage_filters_button.clicked.connect(self.open_manage_filters_dialog_slot) # Connect placeholder
         load_filters_layout.addWidget(self.manage_filters_button)
@@ -1222,7 +1231,7 @@ class DocumentManager(QMainWindow):
         self.saved_filter_name_input.setPlaceholderText(self.tr("Nom du nouveau filtre sauvegardé"))
         save_filter_layout.addWidget(self.saved_filter_name_input)
         self.save_filter_button = QPushButton(self.tr("Sauvegarder Actuel"))
-        self.save_filter_button.setIcon(QIcon(":/icons/save.svg"))
+        self.save_filter_button.setText("💾")
         self.save_filter_button.setToolTip(self.tr("Sauvegarder la configuration actuelle des filtres"))
         self.save_filter_button.clicked.connect(self.save_current_filter_slot) # Connect save button
         save_filter_layout.addWidget(self.save_filter_button)
@@ -1235,7 +1244,7 @@ class DocumentManager(QMainWindow):
         # --- "Réinitialiser Filtres" Button (now in collapsible area) ---
         self.reset_filters_button = QPushButton(self.tr("Réinitialiser Tous les Filtres")) # Added text back for clarity in collapsible
         self.reset_filters_button.setObjectName("resetFiltersButton") # Keep object name for styling if any
-        self.reset_filters_button.setIcon(QIcon(":/icons/refresh-cw.svg"))
+        self.reset_filters_button.setText("🔄")
         self.reset_filters_button.clicked.connect(self.reset_all_filters_slot)
         self.reset_filters_button.setToolTip(self.tr("Réinitialiser tous les filtres et masquer cette section"))
         collapsible_layout.addWidget(self.reset_filters_button) # Add to collapsible layout
@@ -1338,10 +1347,10 @@ class DocumentManager(QMainWindow):
         
         # Buttons in a single row
         client_actions_layout = QHBoxLayout()
-        self.add_new_client_button = QPushButton(self.tr("Ajouter Nouveau Client")); self.add_new_client_button.setIcon(QIcon(":/icons/user-add.svg")); self.add_new_client_button.setObjectName("primaryButton"); self.add_new_client_button.clicked.connect(self.open_add_new_client_dialog)
+        self.add_new_client_button = QPushButton(self.tr("➕ Ajouter Nouveau Client")); self.add_new_client_button.setObjectName("primaryButton"); self.add_new_client_button.clicked.connect(self.open_add_new_client_dialog)
         client_actions_layout.addWidget(self.add_new_client_button)
 
-        self.add_client_by_voice_button = QPushButton(self.tr("Ajouter par Voix")); self.add_client_by_voice_button.setIcon(QIcon(":/icons/mic.svg")); self.add_client_by_voice_button.setObjectName("primaryButton")
+        self.add_client_by_voice_button = QPushButton(self.tr("🎤 Ajouter par Voix")); self.add_client_by_voice_button.setObjectName("primaryButton")
         self.add_client_by_voice_button.clicked.connect(self.handle_add_client_by_voice_clicked)
         self.add_client_by_voice_button.setEnabled(False) # Disable as requested
         self.add_client_by_voice_button.setToolTip(self.tr("Fonctionnalité en cours de développement"))
@@ -1390,10 +1399,10 @@ class DocumentManager(QMainWindow):
     def toggle_more_filters_visibility(self, checked):
         self.collapsible_filter_widget.setVisible(checked)
         if checked:
-            self.more_filters_button.setIcon(QIcon(":/icons/chevron-up.svg")) # Change icon to up
+            self.more_filters_button.setText("🔼") # Change icon to up
             # self.more_filters_button.setText(self.tr("Moins de Filtres")) # Text removed
         else:
-            self.more_filters_button.setIcon(QIcon(":/icons/chevron-down.svg")) # Change icon to down
+            self.more_filters_button.setText("🔽") # Change icon to down
             # self.more_filters_button.setText(self.tr("Plus de Filtres")) # Text removed
 
 
@@ -1529,54 +1538,54 @@ class DocumentManager(QMainWindow):
         home_icon_path = ":/icons/home.svg"
         # A fallback icon if home.svg is not found in resources, for testing
         # if not QIcon.hasThemeIcon("home"): home_icon_path = ":/icons/dashboard.svg" # Example fallback
-        self.home_action = QAction(QIcon(home_icon_path), self.tr("Accueil"), self)
+        self.home_action = QAction("🏠 " + self.tr("Accueil"), self)
         self.home_action.triggered.connect(self.show_home_view)
 
-        self.settings_action = QAction(QIcon(":/icons/modern/settings.svg"), self.tr("Paramètres"), self); self.settings_action.triggered.connect(self.show_settings_page) # Changed to show_settings_page
+        self.settings_action = QAction("⚙️ " + self.tr("Paramètres"), self); self.settings_action.triggered.connect(self.show_settings_page) # Changed to show_settings_page
         # self.template_action removed
-        self.status_action = QAction(QIcon(":/icons/check-square.svg"), self.tr("Gérer les Statuts"), self); self.status_action.triggered.connect(self.open_status_management_dialog_slot)
+        self.status_action = QAction("📊 " + self.tr("Gérer les Statuts"), self); self.status_action.triggered.connect(self.open_status_management_dialog_slot)
         # self.status_action.setEnabled(False); # No longer hard-disabled
         # self.status_action.setToolTip(self.tr("Fonctionnalité de gestion des statuts prévue pour une future version.")) # Tooltip removed
-        self.exit_action = QAction(QIcon(":/icons/log-out.svg"), self.tr("Quitter"), self); self.exit_action.setShortcut("Ctrl+Q"); self.exit_action.triggered.connect(self.close)
-        self.project_management_action = QAction(QIcon(":/icons/dashboard.svg"), self.tr("Gestion de Projet"), self); self.project_management_action.triggered.connect(self.show_project_management_view)
-        self.documents_view_action = QAction(QIcon(":/icons/modern/folder-docs.svg"), self.tr("Gestion Documents"), self); self.documents_view_action.triggered.connect(self.show_documents_view)
-        self.product_list_action = QAction(QIcon(":/icons/book.svg"), self.tr("Product Management"), self); self.product_list_action.triggered.connect(self.show_product_management_page) # Connect to new method
-        self.partner_management_action = QAction(QIcon(":/icons/team.svg"), self.tr("Partner Management"), self); self.partner_management_action.triggered.connect(self.show_partner_management_view)
-        self.statistics_action = QAction(QIcon(":/icons/bar-chart.svg"), self.tr("Statistiques"), self); self.statistics_action.triggered.connect(self.show_statistics_view)
-        self.open_carrier_map_action = QAction(QIcon(":/icons/map.svg"), self.tr("Carrier Map"), self) # Assuming map.svg or similar exists
+        self.exit_action = QAction("🚪 " + self.tr("Quitter"), self); self.exit_action.setShortcut("Ctrl+Q"); self.exit_action.triggered.connect(self.close)
+        self.project_management_action = QAction("💼 " + self.tr("Gestion de Projet"), self); self.project_management_action.triggered.connect(self.show_project_management_view)
+        self.documents_view_action = QAction("📁 " + self.tr("Gestion Documents"), self); self.documents_view_action.triggered.connect(self.show_documents_view)
+        self.product_list_action = QAction("📚 " + self.tr("Product Management"), self); self.product_list_action.triggered.connect(self.show_product_management_page) # Connect to new method
+        self.partner_management_action = QAction("🤝 " + self.tr("Partner Management"), self); self.partner_management_action.triggered.connect(self.show_partner_management_view)
+        self.statistics_action = QAction("📊 " + self.tr("Statistiques"), self); self.statistics_action.triggered.connect(self.show_statistics_view)
+        self.open_carrier_map_action = QAction("🗺️ " + self.tr("Carrier Map"), self) # Assuming map.svg or similar exists
         self.open_carrier_map_action.triggered.connect(self.open_carrier_map_dialog)
-        self.botpress_integration_action = QAction(QIcon(":/icons/placeholder_icon.svg"), self.tr("Botpress Integration"), self) # Add a placeholder icon
+        self.botpress_integration_action = QAction("🤖 " + self.tr("Botpress Integration"), self) # Add a placeholder icon
         self.botpress_integration_action.triggered.connect(self.show_botpress_integration_view)
-        self.inventory_browser_action = QAction(QIcon(":/icons/book.svg"), self.tr("Gestion Stock Atelier"), self) # Updated text
+        self.inventory_browser_action = QAction("📦 " + self.tr("Gestion Stock Atelier"), self) # Updated text
         self.inventory_browser_action.triggered.connect(self.show_inventory_browser_view)
 
-        self.recruitment_action = QAction(QIcon(":/icons/users.svg"), self.tr("Recrutement"), self) # Use an existing icon or add new one
+        self.recruitment_action = QAction("👨‍💼 " + self.tr("Recrutement"), self) # Use an existing icon or add new one
         self.recruitment_action.triggered.connect(self.show_recruitment_view)
-        self.camera_management_action = QAction(QIcon(":/icons/video.svg"), self.tr("Gestion Caméras"), self)
+        self.camera_management_action = QAction("📹 " + self.tr("Gestion Caméras"), self)
         self.camera_management_action.triggered.connect(self.show_camera_management_view)
 
-        self.experience_management_action = QAction(QIcon(":/icons/book.svg"), self.tr("Gestion des Connaissances"), self) # Consider a more specific icon if available
+        self.experience_management_action = QAction("🧠 " + self.tr("Gestion des Connaissances"), self) # Consider a more specific icon if available
         self.experience_management_action.triggered.connect(self.show_experience_module_view)
 
         # Action for Calendar Module
-        self.calendar_module_action = QAction(QIcon(":/icons/book.svg"), self.tr("Calendrier"), self) # Placeholder icon
+        self.calendar_module_action = QAction("📅 " + self.tr("Calendrier"), self) # Placeholder icon
         self.calendar_module_action.triggered.connect(self.show_calendar_module_view)
 
         # Action for managing users - Placeholder, actual UI for this is not yet built
         # but the action can be controlled by RBAC.
-        self.manage_users_action = QAction(QIcon(":/icons/users.svg"), self.tr("Gérer les Utilisateurs"), self)
+        self.manage_users_action = QAction("👥 " + self.tr("Gérer les Utilisateurs"), self)
         self.manage_users_action.triggered.connect(self.show_user_management_page) # Connect to show page method
 
         # Action for Calculator Module
-        self.calculator_module_action = QAction(QIcon(":/icons/bar-chart.svg"), self.tr("Calculatrices"), self) # Placeholder icon
+        self.calculator_module_action = QAction("🧮 " + self.tr("Calculatrices"), self) # Placeholder icon
         self.calculator_module_action.triggered.connect(self.show_calculator_module_view)
 
         # Action for Commande Management (Global View)
-        self.commande_management_action = QAction(QIcon(":/icons/briefcase.svg"), self.tr("Gestion des Commandes"), self) # Replaced shopping-cart.svg with briefcase.svg
+        self.commande_management_action = QAction("📦 " + self.tr("Gestion des Commandes"), self) # Replaced shopping-cart.svg with briefcase.svg
         self.commande_management_action.triggered.connect(self.show_commande_management_view)
 
         # Action for managing roles
-        self.manage_roles_action = QAction(QIcon(":/icons/settings.svg"), self.tr("Gérer les Rôles"), self) # Replaced shield.svg with settings.svg
+        self.manage_roles_action = QAction("🛡️ " + self.tr("Gérer les Rôles"), self) # Replaced shield.svg with settings.svg
         self.manage_roles_action.triggered.connect(self.open_role_management_dialog)
 
 
@@ -1608,22 +1617,22 @@ class DocumentManager(QMainWindow):
         # self.customize_sidebar_action.triggered.connect(self.open_sidebar_customization_dialog) # Renommer la méthode cible
         # self.searchable_actions_map[self.tr("Personnaliser la Barre Latérale")] = self.customize_sidebar_action
 
-        self.addons_action = QAction(QIcon(":/icons/plus-circle.svg"), self.tr("Addons"), self)
+        self.addons_action = QAction("🧩 " + self.tr("Addons"), self)
         self.addons_action.triggered.connect(self.show_addons_page)
         self.searchable_actions_map[self.tr("Addons")] = self.addons_action
 
-        self.synchronization_action = QAction(QIcon(":/icons/refresh-cw.svg"), self.tr("Synchronisation"), self)
+        self.synchronization_action = QAction("🔄 " + self.tr("Synchronisation"), self)
         self.synchronization_action.triggered.connect(self.show_synchronization_view)
         self.searchable_actions_map[self.tr("Synchronisation")] = self.synchronization_action
 
         # B2C Restaurant Module Action
         # TODO: Find or create a suitable icon e.g., :/icons/restaurant.svg or :/icons/utensils.svg
-        self.restaurant_module_action = QAction(QIcon(":/icons/placeholder_icon.svg"), self.tr("Service Restaurant (B2C)"), self)
+        self.restaurant_module_action = QAction("🍽️ " + self.tr("Service Restaurant (B2C)"), self)
         self.restaurant_module_action.triggered.connect(self.show_restaurant_module_view)
         self.searchable_actions_map[self.tr("Service Restaurant (B2C)")] = self.restaurant_module_action
 
         # About Action (ensure it's created here for the map)
-        self.about_action = QAction(QIcon(":/icons/help-circle.svg"), self.tr("À propos"), self)
+        self.about_action = QAction("❓ " + self.tr("À propos"), self)
         self.about_action.triggered.connect(self.show_about_dialog)
         self.searchable_actions_map[self.tr("À propos")] = self.about_action
 
@@ -1800,7 +1809,7 @@ class DocumentManager(QMainWindow):
 
         # Notifications Button
         self.notifications_button = QPushButton()
-        self.notifications_button.setIcon(QIcon(":/icons/bell.svg"))
+        self.notifications_button.setText("🔔")
         self.notifications_button.setToolTip(self.tr("Notifications"))
         self.notifications_button.setObjectName("notificationButton")
         self.notification_panel = NotificationPanel(self)
@@ -1809,7 +1818,7 @@ class DocumentManager(QMainWindow):
 
         # Notifications Button
         self.notifications_button = QPushButton()
-        self.notifications_button.setIcon(QIcon(":/icons/bell.svg"))
+        self.notifications_button.setText("🔔")
         self.notifications_button.setToolTip(self.tr("Notifications"))
         self.notifications_button.setObjectName("notificationButton")
         top_bar_layout.addWidget(self.notifications_button)
@@ -2702,12 +2711,12 @@ class DocumentManager(QMainWindow):
         if not client_id_val: return
 
         menu = QMenu()
-        open_action = menu.addAction(QIcon(":/icons/eye.svg"), self.tr("Ouvrir Fiche Client")); open_action.triggered.connect(lambda: self.open_client_tab_by_id(client_id_val))
-        edit_action = menu.addAction(QIcon(":/icons/pencil.svg"), self.tr("Modifier Client")); edit_action.triggered.connect(lambda: self.open_edit_client_dialog_slot(client_id_val))
-        open_folder_action = menu.addAction(QIcon(":/icons/folder.svg"), self.tr("Ouvrir Dossier Client")); open_folder_action.triggered.connect(lambda: self.open_client_folder_fs(client_id_val))
+        open_action = menu.addAction("👁️ " + self.tr("Ouvrir Fiche Client")); open_action.triggered.connect(lambda: self.open_client_tab_by_id(client_id_val))
+        edit_action = menu.addAction("✏️ " + self.tr("Modifier Client")); edit_action.triggered.connect(lambda: self.open_edit_client_dialog_slot(client_id_val))
+        open_folder_action = menu.addAction("📁 " + self.tr("Ouvrir Dossier Client")); open_folder_action.triggered.connect(lambda: self.open_client_folder_fs(client_id_val))
         menu.addSeparator()
-        archive_action = menu.addAction(QIcon(":/icons/briefcase.svg"), self.tr("Archiver Client")); archive_action.triggered.connect(lambda: self.set_client_status_archived_slot(client_id_val))
-        delete_action = menu.addAction(QIcon(":/icons/trash.svg"), self.tr("Supprimer Client")); delete_action.triggered.connect(lambda: self.delete_client_permanently_slot(client_id_val))
+        archive_action = menu.addAction("🗄️ " + self.tr("Archiver Client")); archive_action.triggered.connect(lambda: self.set_client_status_archived_slot(client_id_val))
+        delete_action = menu.addAction("🗑️ " + self.tr("Supprimer Client")); delete_action.triggered.connect(lambda: self.delete_client_permanently_slot(client_id_val))
         menu.exec_(self.client_list_widget.mapToGlobal(pos))
         
     def open_client_folder_fs(self, client_id_val): 
