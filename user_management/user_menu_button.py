@@ -48,7 +48,7 @@ class UserMenuButton(QPushButton):
         if avatar_path and os.path.exists(avatar_path):
             pixmap = QPixmap(avatar_path)
         else:
-            pixmap = QPixmap(":/icons/user.svg")
+            pixmap = QPixmap()
 
         # Create a circular pixmap
         size = 28

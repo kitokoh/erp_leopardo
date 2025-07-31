@@ -19,7 +19,7 @@ class ClientEmailInternalTab(QWidget):
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         self.open_email_dialog_btn = QPushButton(self.tr("Composer un Email..."))
-        self.open_email_dialog_btn.setIcon(QIcon.fromTheme("mail-send", QIcon(":/icons/bell.svg")))
+        self.open_email_dialog_btn.setText("📧")
         self.open_email_dialog_btn.clicked.connect(self.open_send_email_dialog_action)
         layout.addWidget(self.open_email_dialog_btn)
         layout.addStretch()
