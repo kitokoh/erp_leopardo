@@ -240,18 +240,17 @@ class HomePageWidget(QWidget):
 
     def _setup_top_layout(self):
         """Crée le layout du haut avec la carte et la sidebar de statistiques."""
-        top_h_layout = QHBoxLayout()
-        top_h_layout.setContentsMargins(20, 20, 20, 20)
-        top_h_layout.setSpacing(20)
+        top_layout = QGridLayout()
+        top_layout.setContentsMargins(20, 20, 20, 20)
+        top_layout.setSpacing(20)
 
-        # La carte prend la place principale, avec un ratio plus grand
-        top_h_layout.addWidget(self.map_widget_container, 4) # Stretch factor 4
+        # La carte prend la place principale
+        top_layout.addWidget(self.map_widget_container, 0, 0, 1, 2) # row, col, rowspan, colspan
 
         # Right Sidebar pour les aperçus rapides
         self.right_sidebar_container = QFrame()
         self.right_sidebar_container.setObjectName("homePageRightSidebar")
         self.right_sidebar_container.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-        # Augmenter la largeur minimale de la sidebar
         self.right_sidebar_container.setMinimumWidth(350)
         self.right_sidebar_layout = QVBoxLayout(self.right_sidebar_container)
         self.right_sidebar_layout.setContentsMargins(10, 10, 10, 10)
@@ -266,9 +265,9 @@ class HomePageWidget(QWidget):
         search_layout = self._setup_search_layout()
         self.right_sidebar_layout.addLayout(search_layout)
 
-        top_h_layout.addWidget(self.right_sidebar_container, 2) # Stretch factor 2
+        top_layout.addWidget(self.right_sidebar_container, 0, 2, 1, 1)
 
-        return top_h_layout
+        return top_layout
 
 
     def _refresh_quick_stats_data(self):
@@ -331,15 +330,15 @@ class HomePageWidget(QWidget):
 
     def _setup_bottom_layout(self):
         """Crée le layout du bas avec la grille de boutons."""
-        bottom_h_layout = QHBoxLayout()
-        bottom_h_layout.setContentsMargins(10, 5, 10, 10)
-        bottom_h_layout.setSpacing(10)
+        bottom_layout = QGridLayout()
+        bottom_layout.setContentsMargins(10, 5, 10, 10)
+        bottom_layout.setSpacing(10)
 
-        # Promo Content Manager - self.promo_manager needs to be accessible
-        # self.promo_manager is initialized in _init_ui or constructor
+        # Promo Content Manager
+        self.promo_manager = PromoContentManager()
 
         # Left Promotional Area
-        self.left_promo_widget = PromoSectionWidget() # self.left_promo_widget needs to be accessible
+        self.left_promo_widget = PromoSectionWidget()
         self.left_promo_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         left_message = self.promo_manager.get_random_message()
         if left_message:
@@ -351,41 +350,9 @@ class HomePageWidget(QWidget):
         else:
             self.left_promo_widget.set_content(self.tr("Info"), self.tr("Aucun message promotionnel disponible."), "generic")
         self.left_promo_widget.clicked.connect(lambda: self.update_promo_widget_content(self.left_promo_widget))
+        bottom_layout.addWidget(self.left_promo_widget, 0, 0)
 
-        # Center Map Area / Bottom Content Area
-        self.bottom_content_area = QStackedWidget() # self.bottom_content_area needs to be accessible
-        self.bottom_content_area.setObjectName("homePageBottomContentArea")
-        self.bottom_content_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-
-        self.home_map_widget = HomePageMapWidget(app_translator_func=self.tr)
-        self.bottom_content_area.addWidget(self.home_map_widget)
-        if hasattr(self.home_map_widget.interaction_handler, 'country_clicked_signal'):
-            self.home_map_widget.interaction_handler.country_clicked_signal.connect(self._handle_add_client_for_country)
-
-        # Right Promotional Area
-        self.right_promo_widget = PromoSectionWidget() # self.right_promo_widget needs to be accessible
-        self.right_promo_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        right_message = self.promo_manager.get_random_message()
-        if self.promo_manager.messages and len(self.promo_manager.messages) > 1:
-            current_left_title = self.left_promo_widget.title_label.text() # Need a way to get original title if prefixed
-            current_left_body = self.left_promo_widget.body_label.text()
-            # This comparison might be tricky if titles are prefixed.
-            # For simplicity, we assume left_message holds the original chosen message.
-            while right_message == left_message:
-                right_message = self.promo_manager.get_random_message()
-
-        if right_message:
-            self.right_promo_widget.set_content(
-                right_message.get("title", ""),
-                right_message.get("body", ""),
-                right_message.get("category", "generic")
-            )
-
-        else:
-            for card_ref in self.module_cards_list:
-                if card_ref: card_ref.deleteLater()
-            self.module_cards_list.clear()
-
+        # Center Module Grid
         button_scroll_area = QScrollArea()
         button_scroll_area.setWidgetResizable(True)
         button_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -414,13 +381,35 @@ class HomePageWidget(QWidget):
                 self.module_cards_list.append(card)
                 grid_layout.addWidget(card, row, col)
                 col += 1
-                if col >= 3: # Passage à 3 colonnes
+                if col >= 3:
                     col = 0
                     row += 1
 
         button_container_widget.setLayout(grid_layout)
         button_scroll_area.setWidget(button_container_widget)
-        return button_scroll_area
+        bottom_layout.addWidget(button_scroll_area, 0, 1)
+
+        # Right Promotional Area
+        self.right_promo_widget = PromoSectionWidget()
+        self.right_promo_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        right_message = self.promo_manager.get_random_message()
+        if self.promo_manager.messages and len(self.promo_manager.messages) > 1:
+            current_left_title = self.left_promo_widget.title_label.text()
+            while right_message == left_message:
+                right_message = self.promo_manager.get_random_message()
+
+        if right_message:
+            self.right_promo_widget.set_content(
+                right_message.get("title", ""),
+                right_message.get("body", ""),
+                right_message.get("category", "generic")
+            )
+        else:
+            self.right_promo_widget.set_content(self.tr("Info"), self.tr("Aucun message promotionnel disponible."), "generic")
+        self.right_promo_widget.clicked.connect(lambda: self.update_promo_widget_content(self.right_promo_widget))
+        bottom_layout.addWidget(self.right_promo_widget, 0, 2)
+
+        return bottom_layout
 
     def update_promo_widget_content(self, promo_widget_instance):
         """Fetches a new random message and updates the given PromoSectionWidget."""

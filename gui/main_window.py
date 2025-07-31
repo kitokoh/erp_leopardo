@@ -654,9 +654,8 @@ class DocumentManager(QMainWindow):
             logging.error("No animation sequences loaded, cannot setup title animation.")
             return
 
-        self.app_title_animation_timer.setSingleShot(True)
         self.app_title_animation_timer.timeout.connect(self._start_next_sequence)
-        self._start_next_sequence()
+        self.app_title_animation_timer.start(100)
 
     @pyqtProperty(float)
     def _gradient_position(self):
@@ -736,6 +735,7 @@ class DocumentManager(QMainWindow):
 
 
         self.app_title_animation_timer.start(duration)
+        self.current_sequence_index = (self.current_sequence_index + 1) % len(self.animation_sequences)
 
     def _typewriter_update(self):
         if self.typewriter_index < len(self.typewriter_text):

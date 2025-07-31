@@ -12,7 +12,6 @@
     --primary-color: #4A90E2; / Bleu doux
     --primary-hover: #357ABD;
     --primary-pressed: #2A6293;
-
     --secondary-color: #50E3C2; / Vert menthe
     --secondary-hover: #3CCBAA;
     --secondary-pressed: #2FA38C;
@@ -61,18 +60,18 @@ QLabel#topMenuAppTitle {
 #windowControlButton {
     background-color: transparent;
     border: none;
-    font-size: 14px;
-    color: #7f8c8d; /* --text-light */
-    border-radius: 5px;
-    min-width: 32px;
-    min-height: 32px;
+    font-size: 16px;
+    font-weight: bold;
+    color: #6c757d; /* Gris */
+    border-radius: 4px;
+    min-width: 35px;
+    min-height: 35px;
 }
 #windowControlButton:hover {
-    background-color: #F0F3F5;
-    color: #34495e; /* --text-main */
+    background-color: #e9ecef; /* Gris clair au survol */
 }
 #windowCloseButton:hover {
-    background-color: #D0021B; /* --danger-color */
+    background-color: #dc3545; /* Rouge pour la fermeture */
     color: white;
 }
 
