@@ -2753,6 +2753,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None:
         try:
             logging.info("DEBUG_INIT_DB: Importing SQLAlchemy model modules...")
+            import db.models.clients
             import db.common_models # For Products, etc.
             import accounting.models
             import b2c.ges_restaurant.models
@@ -2995,8 +2996,8 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
             logging.error(f"DEBUG_INIT_DB: An unexpected error occurred during import of additional models for MainBase: {e_generic_import_for_mainbase}", exc_info=True)
 
         logging.info("DEBUG_INIT_DB: Creating tables for MainBase (e.g., CalculatorHistory, Products, Accounting, Restaurant*) using SQLAlchemy actual_main_engine.")
-        # MainBase.metadata.create_all(bind=actual_main_engine) # This is now handled in main.py
-        logging.info("DEBUG_INIT_DB: Tables for MainBase (SQLAlchemy models) will be created in main.py.")
+        MainBase.metadata.create_all(bind=actual_main_engine)
+        logging.info("DEBUG_INIT_DB: Tables for MainBase (SQLAlchemy models) created.")
 
 
         # --- Manual check and addition for Products.product_code ---
