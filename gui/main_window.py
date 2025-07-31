@@ -1348,8 +1348,6 @@ class DocumentManager(QMainWindow):
         # Buttons in a single row
         client_actions_layout = QHBoxLayout()
         # self.add_new_client_button is now moved to the main menu as an action
-        self.add_new_client_button = QPushButton(self.tr("➕ Ajouter Nouveau Client")); self.add_new_client_button.setObjectName("primaryButton"); self.add_new_client_button.clicked.connect(self.open_add_new_client_dialog)
-        client_actions_layout.addWidget(self.add_new_client_button)
 
         self.add_client_by_voice_button = QPushButton(self.tr("🎤 Ajouter par Voix")); self.add_client_by_voice_button.setObjectName("primaryButton")
         self.add_client_by_voice_button.clicked.connect(self.handle_add_client_by_voice_clicked)
@@ -1897,7 +1895,6 @@ class DocumentManager(QMainWindow):
             self.settings_action.setEnabled(False)
             if hasattr(self, 'status_action'): self.status_action.setEnabled(False)
             # self.admin_menu.menuAction().setVisible(False) # This was causing an error, admin_menu doesn't exist
-            self.add_new_client_button.setEnabled(False)
             self.add_client_action.setEnabled(False)
             self.add_client_by_voice_button.setEnabled(False)
             return
@@ -2043,10 +2040,8 @@ class DocumentManager(QMainWindow):
 
         # Apply permission to the 'Add New Client' action and the voice button
         self.add_client_action.setEnabled(can_create_client)
-        self.add_new_client_button.setEnabled(can_create_client)
         self.add_client_by_voice_button.setEnabled(can_create_client)
         logging.info(f"  Action 'add_client_action' enabled: {can_create_client}")
-        logging.info(f"  Button 'add_new_client_button' enabled: {can_create_client}")
         logging.info(f"  Button 'add_client_by_voice_button' enabled: {can_create_client}")
 
         logging.info(f"Permissions application completed for role: {role_name}")
