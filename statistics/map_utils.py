@@ -336,10 +336,6 @@ def generate_folium_map_html(
 
         logging.info("map_utils: WebChannel JavaScript added to HTML content.")
 
-        # For debugging, save the HTML to a file
-        with open("map.html", "w", encoding="utf-8") as f:
-            f.write(map_html_content)
-
         return map_html_content
 
     except Exception as e:
