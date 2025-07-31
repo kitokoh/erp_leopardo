@@ -2,7 +2,7 @@
 import logging
 import os
 from PyQt5.QtWidgets import QWidget, QVBoxLayout
-from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineSettings
 from PyQt5.QtCore import pyqtSlot, QObject, pyqtSignal, QTimer
 from PyQt5.QtWebChannel import QWebChannel
 
@@ -46,6 +46,8 @@ class HomePageMapWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0) # No margins for the map widget itself
 
         self.map_view = QWebEngineView()
+        self.map_view.settings().setAttribute(QWebEngineSettings.JavascriptEnabled, True)
+        self.map_view.settings().setAttribute(QWebEngineSettings.LocalContentCanAccessRemoteUrls, True)
         layout.addWidget(self.map_view)
         self.setLayout(layout)
 
