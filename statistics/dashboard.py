@@ -373,50 +373,6 @@ class StatisticsDashboard(QWidget):
 
         global_stats_page_layout.addWidget(global_stats_group)
 
-    def get_current_view_config(self):
-        return {
-            "start_date": self.start_date_edit.date().toString(Qt.ISODate),
-            "end_date": self.end_date_edit.date().toString(Qt.ISODate),
-        }
-
-    def save_view(self):
-        view_name = self.view_name_input.text()
-        if not view_name:
-            QMessageBox.warning(self, "Nom manquant", "Veuillez entrer un nom pour la vue.")
-            return
-
-        config = self.get_current_view_config()
-
-        # This would be a call to a new CRUD function
-        # For now, we'll just log it
-        logging.info(f"Saving view '{view_name}' with config: {config}")
-        self.populate_views_combo()
-
-    def load_view(self, index):
-        if index == 0:
-            return
-
-        view_name = self.load_view_combo.itemText(index)
-
-        # This would be a call to a new CRUD function
-        # For now, we'll just log it and use a dummy config
-        logging.info(f"Loading view '{view_name}'")
-        config = {
-            "start_date": "2023-01-01",
-            "end_date": "2023-12-31",
-        }
-
-        self.start_date_edit.setDate(QDate.fromString(config["start_date"], Qt.ISODate))
-        self.end_date_edit.setDate(QDate.fromString(config["end_date"], Qt.ISODate))
-        self.refresh_all_dashboard_content()
-
-    def populate_views_combo(self):
-        self.load_view_combo.clear()
-        self.load_view_combo.addItem("Sélectionner une vue...")
-        # This would be a call to a new CRUD function
-        # For now, we'll just add a dummy item
-        self.load_view_combo.addItem("Vue Annuelle 2023")
-
         health_score_group = QGroupBox(self.tr("Indice de Santé Commerciale"))
         health_score_group.setObjectName("healthScoreGroup")
         health_score_layout = QVBoxLayout(health_score_group)
@@ -461,6 +417,50 @@ class StatisticsDashboard(QWidget):
         self.status_client_list_widget.view_client_detail_requested.connect(self.request_view_client_details.emit)
 
         self.stats_stack.setCurrentWidget(self.global_stats_widget)
+
+    def get_current_view_config(self):
+        return {
+            "start_date": self.start_date_edit.date().toString(Qt.ISODate),
+            "end_date": self.end_date_edit.date().toString(Qt.ISODate),
+        }
+
+    def save_view(self):
+        view_name = self.view_name_input.text()
+        if not view_name:
+            QMessageBox.warning(self, "Nom manquant", "Veuillez entrer un nom pour la vue.")
+            return
+
+        config = self.get_current_view_config()
+
+        # This would be a call to a new CRUD function
+        # For now, we'll just log it
+        logging.info(f"Saving view '{view_name}' with config: {config}")
+        self.populate_views_combo()
+
+    def load_view(self, index):
+        if index == 0:
+            return
+
+        view_name = self.load_view_combo.itemText(index)
+
+        # This would be a call to a new CRUD function
+        # For now, we'll just log it and use a dummy config
+        logging.info(f"Loading view '{view_name}'")
+        config = {
+            "start_date": "2023-01-01",
+            "end_date": "2023-12-31",
+        }
+
+        self.start_date_edit.setDate(QDate.fromString(config["start_date"], Qt.ISODate))
+        self.end_date_edit.setDate(QDate.fromString(config["end_date"], Qt.ISODate))
+        self.refresh_all_dashboard_content()
+
+    def populate_views_combo(self):
+        self.load_view_combo.clear()
+        self.load_view_combo.addItem("Sélectionner une vue...")
+        # This would be a call to a new CRUD function
+        # For now, we'll just add a dummy item
+        self.load_view_combo.addItem("Vue Annuelle 2023")
 
     def _show_global_stats_view(self):
         self.stats_stack.setCurrentWidget(self.global_stats_widget)
