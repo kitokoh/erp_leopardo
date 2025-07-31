@@ -2040,9 +2040,10 @@ class DocumentManager(QMainWindow):
 
         # Main Buttons on Document View
         log_msg_create_client = f"Permission P_CREATE_CLIENT for role '{role_name}': {'Granted' if can_create_client else 'Denied'}. "
-        log_msg_create_client += f"Add New Client button {'enabled' if can_create_client else 'disabled'}."
+        # The 'Add New Client' button is now an action in the menu, its permissions are handled there.
+        # log_msg_create_client += f"Add New Client button {'enabled' if can_create_client else 'disabled'}."
         logging.info(log_msg_create_client)
-        self.add_new_client_button.setEnabled(can_create_client)
+        # self.add_new_client_button.setEnabled(can_create_client) # This button is removed
         self.add_client_by_voice_button.setEnabled(can_create_client) # Assuming same permission
         logging.info(f"  Button 'add_new_client_button' enabled: {can_create_client}")
         logging.info(f"  Button 'add_client_by_voice_button' enabled: {can_create_client}")
