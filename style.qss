@@ -12,6 +12,7 @@
     --primary-color: #4A90E2; / Bleu doux
     --primary-hover: #357ABD;
     --primary-pressed: #2A6293;
+
     --secondary-color: #50E3C2; / Vert menthe
     --secondary-hover: #3CCBAA;
     --secondary-pressed: #2FA38C;
@@ -314,7 +315,6 @@ QTableWidget {
     background-color: white;
     border: 1px solid #E0E6ED;
     border-radius: 8px;
-    selection-behavior: SelectRows;
 }
 
 QHeaderView::section {
@@ -458,6 +458,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
 QSplitter::handle {
     background-color: #E0E6ED;
 }
+
 QSplitter::handle:hover {
     background-color: #4A90E2;
 }
