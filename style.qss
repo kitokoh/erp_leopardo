@@ -12,7 +12,6 @@
     --primary-color: #4A90E2; / Bleu doux
     --primary-hover: #357ABD;
     --primary-pressed: #2A6293;
-
     --secondary-color: #50E3C2; / Vert menthe
     --secondary-hover: #3CCBAA;
     --secondary-pressed: #2FA38C;
