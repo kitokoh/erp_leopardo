@@ -1542,10 +1542,9 @@ class DocumentManager(QMainWindow):
         self.home_action = QAction("🏠 " + self.tr("Accueil"), self)
         self.home_action.triggered.connect(self.show_home_view)
 
-        # Action for adding a new client (moved from button)
+        # Action for adding a new client (copy of button functionality)
         self.add_client_action = QAction("➕ " + self.tr("Ajouter Nouveau Client"), self)
         self.add_client_action.triggered.connect(self.open_add_new_client_dialog)
-
 
         self.settings_action = QAction("⚙️ " + self.tr("Paramètres"), self); self.settings_action.triggered.connect(self.show_settings_page) # Changed to show_settings_page
         # self.template_action removed
