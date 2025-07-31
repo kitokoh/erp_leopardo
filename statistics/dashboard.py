@@ -131,53 +131,62 @@ class StatisticsDashboard(QWidget):
             self.threadpool = QThreadPool()
             logging.info(f"Multithreading with maximum {self.threadpool.maxThreadCount()} threads")
 
+            # Main layout for the entire dashboard widget
             main_layout = QVBoxLayout(self)
-            main_layout.setContentsMargins(10,10,10,10)
-            main_layout.setSpacing(10)
+            main_layout.setContentsMargins(0, 0, 0, 0)
+            self.setLayout(main_layout)
 
-            top_bar_layout = QHBoxLayout()
+            # Tab widget to hold different pages of the dashboard
             self.dashboard_tabs = QTabWidget()
-            self.dashboard_tabs.addTab(QWidget(), self.tr("Dashboard Principal"))
-            self.dashboard_tabs.addTab(QWidget(), self.tr("Analyses Approfondies"))
-            top_bar_layout.addWidget(self.dashboard_tabs)
+            main_layout.addWidget(self.dashboard_tabs)
 
-            self.global_refresh_button = QPushButton()
-            self.global_refresh_button.setIcon(QIcon(":/icons/refresh-cw.svg"))
-            self.global_refresh_button.setToolTip(self.tr("Rafraîchir les données (Ctrl+clic pour forcer)"))
-            self.global_refresh_button.setObjectName("refreshButton")
-            self.global_refresh_button.clicked.connect(self.handle_refresh_button_clicked)
-            top_bar_layout.addWidget(self.global_refresh_button)
+            # --- Page 1: Main Dashboard ---
+            dashboard_page = QWidget()
+            dashboard_page_layout = QVBoxLayout(dashboard_page)
+            dashboard_page_layout.setContentsMargins(0, 0, 0, 0)
 
-            main_layout.addLayout(top_bar_layout)
+            # Splitter for the main dashboard page
+            self.main_splitter = QSplitter(Qt.Horizontal)
+            dashboard_page_layout.addWidget(self.main_splitter)
 
-            self.main_splitter = QSplitter(Qt.Horizontal, self)
+            # Left side of the splitter (Map)
             self.left_widget_for_map = QWidget()
             self.left_widget_for_map.setObjectName("mapContainerWidget")
-            self._left_map_actual_layout = QVBoxLayout()
-            self._left_map_actual_layout.setContentsMargins(0,0,0,0)
-            self.left_widget_for_map.setLayout(self._left_map_actual_layout)
-
-            self.map_view = None
+            self._left_map_actual_layout = QVBoxLayout(self.left_widget_for_map)
+            self._left_map_actual_layout.setContentsMargins(0, 0, 0, 0)
+            self.map_view = None # Will be initialized later
             self.main_splitter.addWidget(self.left_widget_for_map)
 
+            # Right side of the splitter (Stats)
             self.right_widget_for_stats = QWidget()
             self.right_widget_for_stats.setObjectName("statsContainerWidget")
             right_stats_layout = QVBoxLayout(self.right_widget_for_stats)
-            right_stats_layout.setContentsMargins(10,10,10,10)
-            self.right_widget_for_stats.setLayout(right_stats_layout)
+            right_stats_layout.setContentsMargins(10, 10, 10, 10)
             self.main_splitter.addWidget(self.right_widget_for_stats)
 
-            QTimer.singleShot(0, lambda: self.main_splitter.setSizes([int(self.width() * 0.6), int(self.width() * 0.4)]))
+            # Add the configured page to the tab widget
+            self.dashboard_tabs.addTab(dashboard_page, self.tr("Dashboard Principal"))
 
-            self.dashboard_tabs.widget(0).setLayout(main_layout)
-            main_layout.addWidget(self.main_splitter)
-            self.setLayout(main_layout)
+            # --- Page 2: Deep Analysis (Placeholder) ---
+            self.dashboard_tabs.addTab(QWidget(), self.tr("Analyses Approfondies"))
 
+            # --- Global Controls (e.g., Refresh Button) ---
+            self.global_refresh_button = QPushButton(QIcon(":/icons/refresh-cw.svg"), "")
+            self.global_refresh_button.setToolTip(self.tr("Rafraîchir les données (Ctrl+clic pour forcer)"))
+            self.global_refresh_button.setObjectName("refreshButton")
+            self.global_refresh_button.clicked.connect(self.handle_refresh_button_clicked)
+            self.dashboard_tabs.setCornerWidget(self.global_refresh_button, Qt.TopRightCorner)
+
+            # Set initial splitter sizes
+            QTimer.singleShot(50, lambda: self.main_splitter.setSizes([int(self.width() * 0.6), int(self.width() * 0.4)]))
+
+            # Setup the UI content for the stats panel
             self.map_interaction_handler = None
             self._setup_stats_display_ui(right_stats_layout)
             self.populate_views_combo()
 
             QTimer.singleShot(100, self._initialize_map_and_load_data)
+            logging.info("StatisticsDashboard initialized. Map components and initial data load deferred.")
             logging.info("StatisticsDashboard initialized. Map components and initial data load deferred.")
         except Exception as e:
             logging.error(f"Failed to initialize StatisticsDashboard: {e}", exc_info=True)
