@@ -568,7 +568,7 @@ class ClientsCRUD(GenericCRUD):
             return []
 
     @_manage_conn
-    def get_active_clients_count(self, conn = None, include_deleted: bool = False) -> int: # conn is Session
+    def get_active_clients_count(self, conn=None, include_deleted: bool = False) -> int:
         """
         Counts active clients. Active status is determined by `StatusSettings.is_archival_status`.
         Clients with no status are also considered active.
@@ -586,29 +586,22 @@ class ClientsCRUD(GenericCRUD):
                  LEFT JOIN StatusSettings ss ON c.status_id = ss.status_id
                  WHERE ((ss.is_archival_status IS NOT TRUE AND ss.is_archival_status != 1) OR c.status_id IS NULL)"""
 
-        params_dict = {} # No parameters for this base query part, but good practice for consistency
+        params_dict = {}
 
         if not include_deleted:
              sql_str += " AND (c.is_deleted IS NULL OR c.is_deleted = 0)"
 
         sql_query = text(sql_str)
         try:
-            if _is_sqlalchemy_obj(conn):
-                result = conn.execute(sql_query, params_dict)
-            else:
-                result = conn.execute(str(sql_query), params_dict)
-            count = result.scalar_one_or_none() # scalar_one_or_none() is SA specific
-            if not _is_sqlalchemy_obj(conn) and hasattr(result, 'fetchone'): # raw sqlite cursor
-                raw_row = result.fetchone()
-                count = raw_row[0] if raw_row else None
-
+            result = conn.execute(sql_query, params_dict)
+            count = result.scalar_one_or_none()
             return count if count is not None else 0
-        except Exception as e: # Changed to general Exception
+        except Exception as e:
             self.logger.error(f"Failed to get active clients count: {e}", exc_info=True)
             return 0
 
     @_manage_conn
-    def get_client_counts_by_country(self, conn = None, include_deleted: bool = False) -> list[dict]: # conn is Session
+    def get_client_counts_by_country(self, conn=None, include_deleted: bool = False) -> list[dict]:
         """
         Gets client counts grouped by country.
 
@@ -639,17 +632,14 @@ class ClientsCRUD(GenericCRUD):
 
         sql_query = text(sql_str)
         try:
-            if _is_sqlalchemy_obj(conn):
-                result = conn.execute(sql_query, params_dict)
-            else:
-                result = conn.execute(str(sql_query), params_dict)
+            result = conn.execute(sql_query, params_dict)
             return [dict(row._mapping) if hasattr(row, '_mapping') else dict(row) for row in result.fetchall()]
-        except Exception as e: # Changed to general Exception
+        except Exception as e:
             self.logger.error(f"Failed to get client counts by country: {e}", exc_info=True)
             return []
 
     @_manage_conn
-    def get_client_segmentation_by_city(self, conn = None, include_deleted: bool = False) -> list[dict]: # conn is Session
+    def get_client_segmentation_by_city(self, conn=None, include_deleted: bool = False) -> list[dict]:
         """
         Gets client counts grouped by country and city.
 
@@ -681,17 +671,14 @@ class ClientsCRUD(GenericCRUD):
 
         sql_query = text(sql_str)
         try:
-            if _is_sqlalchemy_obj(conn):
-                result = conn.execute(sql_query, params_dict)
-            else:
-                result = conn.execute(str(sql_query), params_dict)
+            result = conn.execute(sql_query, params_dict)
             return [dict(row._mapping) if hasattr(row, '_mapping') else dict(row) for row in result.fetchall()]
-        except Exception as e: # Changed to general Exception
+        except Exception as e:
             self.logger.error(f"Failed to get client segmentation by city: {e}", exc_info=True)
             return []
 
     @_manage_conn
-    def get_client_segmentation_by_status(self, conn = None, include_deleted: bool = False) -> list[dict]: # conn is Session
+    def get_client_segmentation_by_status(self, conn=None, include_deleted: bool = False) -> list[dict]:
         """
         Gets client counts grouped by status name.
 
@@ -718,17 +705,14 @@ class ClientsCRUD(GenericCRUD):
 
         sql_query = text(sql_str)
         try:
-            if _is_sqlalchemy_obj(conn):
-                result = conn.execute(sql_query, params_dict)
-            else:
-                result = conn.execute(str(sql_query), params_dict)
+            result = conn.execute(sql_query, params_dict)
             return [dict(row._mapping) if hasattr(row, '_mapping') else dict(row) for row in result.fetchall()]
-        except Exception as e: # Changed to general Exception
+        except Exception as e:
             self.logger.error(f"Failed to get client segmentation by status: {e}", exc_info=True)
             return []
 
     @_manage_conn
-    def get_client_segmentation_by_category(self, conn = None, include_deleted: bool = False) -> list[dict]: # conn is Session
+    def get_client_segmentation_by_category(self, conn=None, include_deleted: bool = False) -> list[dict]:
         """
         Gets client counts grouped by category.
 
@@ -754,17 +738,14 @@ class ClientsCRUD(GenericCRUD):
 
         sql_query = text(sql_str)
         try:
-            if _is_sqlalchemy_obj(conn):
-                result = conn.execute(sql_query, params_dict)
-            else:
-                result = conn.execute(str(sql_query), params_dict)
+            result = conn.execute(sql_query, params_dict)
             return [dict(row._mapping) if hasattr(row, '_mapping') else dict(row) for row in result.fetchall()]
-        except Exception as e: # Changed to general Exception
+        except Exception as e:
             self.logger.error(f"Failed to get client segmentation by category: {e}", exc_info=True)
             return []
 
     @_manage_conn
-    def get_clients_by_archival_status(self, is_archived: bool, include_null_status_for_active: bool = True, conn = None, include_deleted: bool = False) -> list[dict]: # conn is Session
+    def get_clients_by_archival_status(self, is_archived: bool, include_null_status_for_active: bool = True, conn=None, include_deleted: bool = False) -> list[dict]:
         """
         Retrieves clients based on their archival status (derived from StatusSettings).
 
@@ -781,13 +762,8 @@ class ClientsCRUD(GenericCRUD):
         """
         params_dict = {}
         try:
-            # Initial query to get archival_ids needs to be conditional too
             archival_status_text_query = text("SELECT status_id FROM StatusSettings WHERE status_type = 'Client' AND (is_archival_status = TRUE OR is_archival_status = 1)")
-            if _is_sqlalchemy_obj(conn):
-                archival_status_result = conn.execute(archival_status_text_query)
-            else:
-                archival_status_result = conn.execute(str(archival_status_text_query))
-
+            archival_status_result = conn.execute(archival_status_text_query)
             archival_ids = [row[0] if not hasattr(row, '_mapping') else row.status_id for row in archival_status_result.fetchall()]
 
             base_query_str = """SELECT c.*, co.country_name AS country, ci.city_name AS city,
@@ -806,10 +782,6 @@ class ClientsCRUD(GenericCRUD):
             if not archival_ids:
                 if is_archived: return []
             else:
-                # For IN clauses with SQLAlchemy text(), it's best to use expanding parameters or Tuples.
-                # Example: conditions.append(f"c.status_id IN :archival_ids_list")
-                # params_dict["archival_ids_list"] = tuple(archival_ids)
-                # However, for NOT IN, this can be tricky. We'll build named params for each ID.
                 if is_archived:
                     archival_id_conditions = []
                     for i, aid in enumerate(archival_ids):
@@ -832,26 +804,23 @@ class ClientsCRUD(GenericCRUD):
                     if include_null_status_for_active:
                         if not_in_clause:
                              conditions.append(f"({not_in_clause} OR c.status_id IS NULL)")
-                        else: # No archival IDs, so all non-null statuses are active
-                             conditions.append("c.status_id IS NOT NULL OR c.status_id IS NULL") # Effectively no status filter if no archival
-                    elif not_in_clause: # Must not be archival, and not null status
+                        else:
+                             conditions.append("c.status_id IS NOT NULL OR c.status_id IS NULL")
+                    elif not_in_clause:
                         conditions.append(not_in_clause)
 
 
             sql_final_str = f"{base_query_str} {'WHERE ' + ' AND '.join(conditions) if conditions else ''} ORDER BY c.client_name;"
             sql_query = text(sql_final_str)
 
-            if _is_sqlalchemy_obj(conn):
-                result = conn.execute(sql_query, params_dict)
-            else:
-                result = conn.execute(str(sql_query), params_dict)
+            result = conn.execute(sql_query, params_dict)
             return [dict(row._mapping) if hasattr(row, '_mapping') else dict(row) for row in result.fetchall()]
-        except Exception as e: # Changed to general Exception
+        except Exception as e:
             self.logger.error(f"Failed to get clients by archival status (is_archived={is_archived}): {e}", exc_info=True)
             return []
 
     @_manage_conn
-    def get_active_clients_per_country(self, conn = None, include_deleted: bool = False) -> dict: # conn is Session
+    def get_active_clients_per_country(self, conn=None, include_deleted: bool = False) -> dict:
         """
         Retrieves active clients, mapping them by country.
 
@@ -868,10 +837,7 @@ class ClientsCRUD(GenericCRUD):
         params_dict = {}
         try:
             archival_status_text_query = text("SELECT status_id FROM StatusSettings WHERE (is_archival_status = TRUE OR is_archival_status = 1) AND status_type = 'Client'")
-            if _is_sqlalchemy_obj(conn):
-                archival_status_result = conn.execute(archival_status_text_query)
-            else:
-                archival_status_result = conn.execute(str(archival_status_text_query))
+            archival_status_result = conn.execute(archival_status_text_query)
             archival_ids = [row[0] if not hasattr(row, '_mapping') else row.status_id for row in archival_status_result.fetchall()]
 
             query_parts = [
@@ -901,26 +867,23 @@ class ClientsCRUD(GenericCRUD):
 
             query_parts.append("ORDER BY co.country_name, cl.client_name;")
             sql_query_str = "\n".join(query_parts)
-            sql_query = text(sql_query_str) # This is a TextClause
+            sql_query = text(sql_query_str)
 
-            if _is_sqlalchemy_obj(conn):
-                result = conn.execute(sql_query, params_dict)
-            else:
-                result = conn.execute(str(sql_query), params_dict) # Ensure string for raw conn
+            result = conn.execute(sql_query, params_dict)
 
-            for row in result: # Iterate over ResultProxy or sqlite3.Cursor
+            for row in result:
                 country = row.country_name if hasattr(row, '_mapping') else row['country_name']
                 client_detail = {'client_id': row.client_id, 'client_name': row.client_name}
                 if country not in clients_by_country_map:
                     clients_by_country_map[country] = []
                 clients_by_country_map[country].append(client_detail)
-        except Exception as e: # Changed to general Exception
+        except Exception as e:
             self.logger.error(f"Failed to get active clients per country: {e}", exc_info=True)
         return clients_by_country_map
 
     # --- ClientNotes CRUD ---
     @_manage_conn
-    def add_client_note(self, client_id: str, note_text: str, user_id: str = None, conn = None) -> dict: # conn is Session
+    def add_client_note(self, client_id: str, note_text: str, user_id: str = None, conn=None) -> dict:
         """
         Adds a note for a specific client.
 
@@ -944,24 +907,17 @@ class ClientsCRUD(GenericCRUD):
             "user_id": user_id, "timestamp": now_utc_iso
         }
         try:
-            if _is_sqlalchemy_obj(conn):
-                result = conn.execute(sql_query, params_dict)
-            else:
-                result = conn.execute(str(sql_query), params_dict)
-            # _manage_conn handles commit
-            # For lastrowid with SQLAlchemy, it's on the ResultProxy or its cursor attribute.
-            # For some drivers/versions, it might be result.inserted_primary_key[0]
+            result = conn.execute(sql_query, params_dict)
             last_id = result.lastrowid
             if last_id is None and hasattr(result, 'inserted_primary_key') and result.inserted_primary_key:
                 last_id = result.inserted_primary_key[0]
             return {'success': True, 'note_id': last_id}
-        except Exception as e: # Changed to general Exception
+        except Exception as e:
             self.logger.error(f"Failed to add client note for client {client_id}: {e}", exc_info=True)
-            # _manage_conn handles rollback
             return {'success': False, 'error': str(e)}
 
     @_manage_conn
-    def get_client_notes(self, client_id: str, conn = None) -> list[dict]: # conn is Session
+    def get_client_notes(self, client_id: str, conn=None) -> list[dict]:
         """
         Retrieves all notes for a specific client, ordered by timestamp descending.
         Client notes are not subject to the client's soft delete status directly;
@@ -976,17 +932,14 @@ class ClientsCRUD(GenericCRUD):
         """
         sql_query = text("SELECT note_id, client_id, timestamp, note_text, user_id FROM ClientNotes WHERE client_id = :client_id ORDER BY timestamp DESC")
         try:
-            if _is_sqlalchemy_obj(conn):
-                result = conn.execute(sql_query, {"client_id": client_id})
-            else:
-                result = conn.execute(str(sql_query), {"client_id": client_id})
+            result = conn.execute(sql_query, {"client_id": client_id})
             return [dict(row._mapping) if hasattr(row, '_mapping') else dict(row) for row in result.fetchall()]
-        except Exception as e: # Changed to general Exception
+        except Exception as e:
             self.logger.error(f"Failed to get client notes for client {client_id}: {e}", exc_info=True)
             return []
 
     @_manage_conn
-    def get_total_clients_count(self, conn = None, include_deleted: bool = False) -> int: # conn is Session
+    def get_total_clients_count(self, conn=None, include_deleted: bool = False) -> int:
         sql_str = "SELECT COUNT(client_id) as total_count FROM Clients"
         params_dict = {}
         conditions = []
@@ -998,24 +951,15 @@ class ClientsCRUD(GenericCRUD):
 
         sql_query = text(sql_str)
         try:
-            if _is_sqlalchemy_obj(conn):
-                result = conn.execute(sql_query, params_dict)
-            else:
-                result = conn.execute(str(sql_query), params_dict)
-
-            count = None
-            if hasattr(result, 'scalar_one_or_none'): # SQLAlchemy
-                count = result.scalar_one_or_none()
-            elif hasattr(result, 'fetchone'): # sqlite3 cursor
-                raw_row = result.fetchone()
-                count = raw_row[0] if raw_row else None
+            result = conn.execute(sql_query, params_dict)
+            count = result.scalar_one_or_none()
             return count if count is not None else 0
-        except Exception as e: # Changed to general Exception
+        except Exception as e:
             self.logger.error(f"Error getting total clients count (include_deleted={include_deleted}): {e}", exc_info=True)
             return 0
 
     @_manage_conn
-    def get_clients_count_created_between(self, start_date_iso: str, end_date_iso: str, conn = None, include_deleted: bool = False) -> int: # conn is Session
+    def get_clients_count_created_between(self, start_date_iso: str, end_date_iso: str, conn=None, include_deleted: bool = False) -> int:
         """
         Counts clients created within a specific date range.
 
@@ -1036,96 +980,55 @@ class ClientsCRUD(GenericCRUD):
 
         sql_query = text(query_str)
         try:
-            if _is_sqlalchemy_obj(conn):
-                result = conn.execute(sql_query, params_dict)
-            else:
-                result = conn.execute(str(sql_query), params_dict)
-
-            count = None
-            if hasattr(result, 'scalar_one_or_none'): # SQLAlchemy
-                count = result.scalar_one_or_none()
-            elif hasattr(result, 'fetchone'): # sqlite3 cursor
-                raw_row = result.fetchone()
-                count = raw_row[0] if raw_row else None
+            result = conn.execute(sql_query, params_dict)
+            count = result.scalar_one_or_none()
             return count if count is not None else 0
-        except Exception as e: # Changed to general Exception
+        except Exception as e:
             self.logger.error(f"Error getting clients count created between {start_date_iso} and {end_date_iso} (include_deleted={include_deleted}): {e}", exc_info=True)
             return 0
 
     @_manage_conn
-    def get_total_clients_count_up_to_date(self, date_iso_end: str, conn = None) -> int: # conn is Session
-        # Counts clients created on or before date_iso_end and not deleted before or on date_iso_end.
-        # date_iso_end should be in 'YYYY-MM-DDTHH:MM:SS.ffffffZ' format, representing the end of that day.
+    def get_total_clients_count_up_to_date(self, date_iso_end: str, conn=None) -> int:
         sql = """
             SELECT COUNT(client_id) as count
             FROM Clients
-            WHERE created_at <= ?
-              AND (is_deleted = 0 OR is_deleted IS NULL OR deleted_at > ? OR deleted_at IS NULL)
+            WHERE created_at <= :date_iso_end
+              AND (is_deleted = 0 OR is_deleted IS NULL OR deleted_at > :date_iso_end OR deleted_at IS NULL)
         """
-        # The condition for deleted_at > ? ensures that if a client was deleted, it happened *after* the date_iso_end.
-        # is_deleted IS NULL is for older records that might not have this flag explicitly set to 0.
         params_dict = {"date_iso_end": date_iso_end}
         sql_query = text(sql)
         try:
-            if _is_sqlalchemy_obj(conn):
-                result = conn.execute(sql_query, params_dict)
-            else:
-                # SQLite's '?' placeholders are used in the raw SQL, so params_dict needs to be a tuple/list
-                # The original query was: WHERE created_at <= ? AND (is_deleted = 0 OR is_deleted IS NULL OR deleted_at > ? OR deleted_at IS NULL)
-                # It implies two parameters, both being date_iso_end.
-                result = conn.execute(str(sql_query), (date_iso_end, date_iso_end))
-
-            count = None
-            if hasattr(result, 'scalar_one_or_none'): # SQLAlchemy
-                count = result.scalar_one_or_none()
-            elif hasattr(result, 'fetchone'): # sqlite3 cursor
-                raw_row = result.fetchone()
-                count = raw_row[0] if raw_row else None
-
-            self.logger.debug(f"Total clients count up to {date_iso_end}: {count if count is not None else 0}") # Use self.logger
+            result = conn.execute(sql_query, params_dict)
+            count = result.scalar_one_or_none()
+            self.logger.debug(f"Total clients count up to {date_iso_end}: {count if count is not None else 0}")
             return count if count is not None else 0
-        except Exception as e: # Changed to general Exception
+        except Exception as e:
             self.logger.error(f"DB error in get_total_clients_count_up_to_date for date {date_iso_end}: {e}", exc_info=True)
             return 0
 
     @_manage_conn
-    def get_active_clients_count_up_to_date(self, date_iso_end: str, conn) -> int: # conn is Session
+    def get_active_clients_count_up_to_date(self, date_iso_end: str, conn) -> int:
         sql = """
             SELECT COUNT(c.client_id) as count
             FROM Clients c
             LEFT JOIN StatusSettings ss ON c.status_id = ss.status_id AND ss.status_type = 'Client'
-            WHERE c.created_at <= ?
-              AND (c.is_deleted = 0 OR c.is_deleted IS NULL OR c.deleted_at > ? OR c.deleted_at IS NULL)
+            WHERE c.created_at <= :date_iso_end
+              AND (c.is_deleted = 0 OR c.is_deleted IS NULL OR c.deleted_at > :date_iso_end OR c.deleted_at IS NULL)
               AND ((ss.is_archival_status = 0 OR ss.is_archival_status IS NULL) OR c.status_id IS NULL)
         """
-        # (ss.is_archival_status = 0 OR ss.is_archival_status IS NULL): Client is active if status is not archival or status is not set
-        # OR c.status_id IS NULL: Client is active if status_id is NULL (no status assigned)
         params_dict = {"date_iso_end": date_iso_end}
         sql_query = text(sql)
         try:
-            if _is_sqlalchemy_obj(conn):
-                result = conn.execute(sql_query, params_dict)
-            else:
-                # Similar to get_total_clients_count_up_to_date, this query also uses '?'
-                # WHERE c.created_at <= ? AND (c.is_deleted = 0 OR ... OR c.deleted_at > ? OR ...)
-                # It implies two parameters, both being date_iso_end.
-                result = conn.execute(str(sql_query), (date_iso_end, date_iso_end))
-
-            count = None
-            if hasattr(result, 'scalar_one_or_none'): # SQLAlchemy
-                count = result.scalar_one_or_none()
-            elif hasattr(result, 'fetchone'): # sqlite3 cursor
-                raw_row = result.fetchone()
-                count = raw_row[0] if raw_row else None
-
-            self.logger.debug(f"Active clients count up to {date_iso_end}: {count if count is not None else 0}") # Use self.logger
+            result = conn.execute(sql_query, params_dict)
+            count = result.scalar_one_or_none()
+            self.logger.debug(f"Active clients count up to {date_iso_end}: {count if count is not None else 0}")
             return count if count is not None else 0
-        except Exception as e: # Changed to general Exception
+        except Exception as e:
             self.logger.error(f"DB error in get_active_clients_count_up_to_date for {date_iso_end}: {e}", exc_info=True)
             return 0
 
     @_manage_conn
-    def get_clients_by_status_id(self, status_id: int, conn = None, include_deleted: bool = False) -> list[dict]: # conn is Session
+    def get_clients_by_status_id(self, status_id: int, conn=None, include_deleted: bool = False) -> list[dict]:
         """
         Retrieves clients matching a specific status_id, including details from joined tables.
         """
@@ -1153,17 +1056,14 @@ class ClientsCRUD(GenericCRUD):
 
         sql_query = text(query_str)
         try:
-            if _is_sqlalchemy_obj(conn):
-                result = conn.execute(sql_query, params_dict)
-            else:
-                result = conn.execute(str(sql_query), params_dict)
+            result = conn.execute(sql_query, params_dict)
             return [dict(row._mapping) if hasattr(row, '_mapping') else dict(row) for row in result.fetchall()]
-        except Exception as e: # Changed to general Exception
+        except Exception as e:
             self.logger.error(f"Failed to get clients for status_id {status_id}: {e}", exc_info=True)
             return []
 
     @_manage_conn
-    def get_client_count_by_country_id(self, country_id: int, conn = None, include_deleted: bool = False) -> int: # conn is Session
+    def get_client_count_by_country_id(self, country_id: int, conn=None, include_deleted: bool = False) -> int:
         """
         Counts clients for a specific country_id.
 
@@ -1183,19 +1083,10 @@ class ClientsCRUD(GenericCRUD):
 
         sql_query = text(sql_str)
         try:
-            if _is_sqlalchemy_obj(conn):
-                result = conn.execute(sql_query, params_dict)
-            else:
-                result = conn.execute(str(sql_query), params_dict)
-
-            count = None
-            if hasattr(result, 'scalar_one_or_none'): # SQLAlchemy
-                count = result.scalar_one_or_none()
-            elif hasattr(result, 'fetchone'): # sqlite3 cursor
-                raw_row = result.fetchone()
-                count = raw_row[0] if raw_row else None
+            result = conn.execute(sql_query, params_dict)
+            count = result.scalar_one_or_none()
             return count if count is not None else 0
-        except Exception as e: # Changed to general Exception
+        except Exception as e:
             self.logger.error(f"Error getting client count for country_id {country_id}: {e}", exc_info=True)
             return 0
 

@@ -47,13 +47,13 @@ class ManageSavedFiltersDialog(QDialog):
         button_layout.setSpacing(10)
 
         self.rename_button = QPushButton(self._tr("Renommer"))
-        self.rename_button.setIcon(QIcon(":/icons/pencil.svg"))
+        self.rename_button.setText("✏️")
         self.rename_button.setToolTip(self._tr("Renommer le filtre sélectionné"))
         self.rename_button.clicked.connect(self.rename_selected_filter)
         button_layout.addWidget(self.rename_button)
 
         self.delete_button = QPushButton(self._tr("Supprimer"))
-        self.delete_button.setIcon(QIcon(":/icons/trash.svg"))
+        self.delete_button.setText("🗑️")
         self.delete_button.setObjectName("dangerButton")
         self.delete_button.setToolTip(self._tr("Supprimer le filtre sélectionné"))
         self.delete_button.clicked.connect(self.delete_selected_filter)

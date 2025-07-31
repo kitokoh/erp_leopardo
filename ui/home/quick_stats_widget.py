@@ -24,8 +24,7 @@ class QuickStatsWidget(QFrame):
 
         self.refresh_button = QPushButton()
         self.refresh_button.setObjectName("quickStatsRefreshButton")
-        refresh_icon = QIcon.fromTheme("view-refresh", QIcon(":/icons/refresh-cw.svg"))
-        self.refresh_button.setIcon(refresh_icon)
+        self.refresh_button.setText("🔄")
         self.refresh_button.setToolTip(self.tr("Rafraîchir les statistiques"))
         self.refresh_button.clicked.connect(self.refresh_requested)
         self.refresh_button.setFixedSize(24, 24)

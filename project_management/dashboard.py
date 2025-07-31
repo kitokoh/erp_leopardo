@@ -409,12 +409,10 @@ class MainDashboard(QWidget): # Changed from QMainWindow to QWidget
         self.main_content.addWidget(page)
 
     def update_dashboard(self, selected_date=None):
-        if selected_date is None:
-            # If called by refresh button, use current date from picker
-            selected_date = self.date_picker.date().toPyDate()
+        if isinstance(selected_date, QDate):
+            selected_date = selected_date.toPyDate()
         else:
-            # If called by dateChanged signal, selected_date is a QDate object
-            selected_date = selected_date.toPyDate() # Convert QDate to Python date
+            selected_date = self.date_picker.date().toPyDate()
 
         print(f"update_dashboard called. Selected date: {selected_date}")
 
