@@ -1481,25 +1481,29 @@ def run_seed():
 
     # Phase 1: Raw SQL seeding (most of seed_initial_data_master)
     raw_conn = None
-    try:
-        # Use the new function to ensure a raw sqlite3 connection
-        raw_conn = db_connection_module.get_raw_sqlite_connection()
-        cursor = raw_conn.cursor()
+    db_path = CONFIG.get('database_path')
+    if db_path != ":memory:":
+        try:
+            # Use the new function to ensure a raw sqlite3 connection
+            raw_conn = db_connection_module.get_raw_sqlite_connection()
+            cursor = raw_conn.cursor()
 
-        # Call parts of seed_initial_data_master that primarily use raw SQL cursor
-        # Note: _seed_accounting_data was removed from seed_initial_data_master's direct calls
-        seed_initial_data_master(cursor)
+            # Call parts of seed_initial_data_master that primarily use raw SQL cursor
+            # Note: _seed_accounting_data was removed from seed_initial_data_master's direct calls
+            seed_initial_data_master(cursor)
 
-        raw_conn.commit()
-        logger.info("Raw SQL seeding parts committed successfully.")
-    except Exception as e:
-        logger.error(f"Error during raw SQL seeding phase: {e}", exc_info=True)
-        if raw_conn:
-            raw_conn.rollback()
-    finally:
-        if raw_conn:
-            raw_conn.close()
-            logger.info("Raw SQLite connection for initial seeding parts closed.")
+            raw_conn.commit()
+            logger.info("Raw SQL seeding parts committed successfully.")
+        except Exception as e:
+            logger.error(f"Error during raw SQL seeding phase: {e}", exc_info=True)
+            if raw_conn:
+                raw_conn.rollback()
+        finally:
+            if raw_conn:
+                raw_conn.close()
+                logger.info("Raw SQLite connection for initial seeding parts closed.")
+    else:
+        logger.info("Skipping raw SQL seeding phase for in-memory database.")
 
     # Phase 2: SQLAlchemy based seeding (Accounting)
     # This uses the global db.connection.engine which should be initialized by init_schema
