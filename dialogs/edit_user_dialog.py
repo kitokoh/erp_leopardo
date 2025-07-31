@@ -90,7 +90,7 @@ class EditUserDialog(QDialog):
         save_button_text = self.tr("Créer") if self.add_mode else self.tr("Sauvegarder")
         self.button_box.button(QDialogButtonBox.Save).setText(save_button_text)
         save_button_icon = QIcon(":/icons/user-plus.svg") if self.add_mode else QIcon(":/icons/save.svg")
-        self.button_box.button(QDialogButtonBox.Save).setIcon(save_button_icon)
+        # self.button_box.button(QDialogButtonBox.Save).setIcon(save_button_icon)
         self.button_box.button(QDialogButtonBox.Cancel).setText(self.tr("Annuler"))
 
         self.button_box.accepted.connect(self._save_changes)

@@ -68,11 +68,11 @@ class ClientContactsInternalTab(QWidget):
         layout.addLayout(pagination_layout)
 
         btn_layout = QHBoxLayout()
-        self.add_contact_btn = QPushButton(self.tr("Ajouter")); self.add_contact_btn.setIcon(QIcon(":/icons/user-plus.svg"))
+        self.add_contact_btn = QPushButton(self.tr("➕ Ajouter"))
         self.add_contact_btn.clicked.connect(self.add_contact); btn_layout.addWidget(self.add_contact_btn)
-        self.edit_contact_btn = QPushButton(self.tr("Modifier")); self.edit_contact_btn.setIcon(QIcon(":/icons/pencil.svg"))
+        self.edit_contact_btn = QPushButton(self.tr("✏️ Modifier"))
         self.edit_contact_btn.clicked.connect(self.edit_contact); btn_layout.addWidget(self.edit_contact_btn)
-        self.remove_contact_btn = QPushButton(self.tr("Supprimer")); self.remove_contact_btn.setIcon(QIcon(":/icons/trash.svg"))
+        self.remove_contact_btn = QPushButton(self.tr("🗑️ Supprimer"))
         self.remove_contact_btn.setObjectName("dangerButton"); self.remove_contact_btn.clicked.connect(self.remove_contact); btn_layout.addWidget(self.remove_contact_btn)
         layout.addLayout(btn_layout)
 

@@ -233,21 +233,21 @@ class ClientMainWidget(QWidget):
             self.action_buttons_layout.addStretch(1)
 
             self.create_docs_btn = QPushButton(self.tr("Envoyer Mail"))
-            self.create_docs_btn.setIcon(QIcon(":/icons/bell.svg")) # Using bell as a placeholder for mail
+            self.create_docs_btn.setText("📧") # Using bell as a placeholder for mail
             self.create_docs_btn.setObjectName("actionButton")
             self.create_docs_btn.setToolTip(self.tr("Envoyer un email au client"))
             self.create_docs_btn.clicked.connect(self.open_send_email_dialog)
             self.action_buttons_layout.addWidget(self.create_docs_btn)
 
             self.edit_save_client_btn = QPushButton(self.tr("Modifier Client"))
-            self.edit_save_client_btn.setIcon(QIcon(":/icons/edit-2.svg"))
+            self.edit_save_client_btn.setText("✏️")
             self.edit_save_client_btn.setObjectName("primaryButton")
             self.edit_save_client_btn.setToolTip(self.tr("Modifier les informations du client"))
             self.edit_save_client_btn.clicked.connect(self.toggle_client_edit_mode)
             self.action_buttons_layout.addWidget(self.edit_save_client_btn)
 
             self.archive_client_btn = QPushButton(self.tr("Archiver Client"))
-            self.archive_client_btn.setIcon(QIcon(":/icons/trash.svg")) # Using trash as a placeholder for archive
+            self.archive_client_btn.setText("🗄️") # Using trash as a placeholder for archive
             self.archive_client_btn.setObjectName("dangerButton")
 
             self.archive_client_btn.setToolTip(self.tr("Archiver ce client (soft delete)"))
@@ -405,7 +405,7 @@ class ClientMainWidget(QWidget):
             contacts_pagination_layout.setSpacing(8)
 
             self.prev_contact_button = QPushButton(self.tr("Précédent"))
-            self.prev_contact_button.setIcon(QIcon(":/icons/arrow-left-circle.svg")) # Using available icon
+            self.prev_contact_button.setText("⬅️") # Using available icon
 
             self.prev_contact_button.setObjectName("paginationButton")
             self.prev_contact_button.setStyleSheet("padding: 5px 10px;")
@@ -416,7 +416,7 @@ class ClientMainWidget(QWidget):
             self.contact_page_info_label.setStyleSheet("font-size: 9pt; color: #4a5568;")
 
             self.next_contact_button = QPushButton(self.tr("Suivant"))
-            self.next_contact_button.setIcon(QIcon(":/icons/chevron-right.svg")) # Using chevron
+            self.next_contact_button.setText("➡️") # Using chevron
             self.next_contact_button.setLayoutDirection(Qt.RightToLeft)
 
             self.next_contact_button.setObjectName("paginationButton")
@@ -635,7 +635,7 @@ class ClientMainWidget(QWidget):
             send_email_tab_widget = QWidget()
             send_email_tab_layout = QVBoxLayout(send_email_tab_widget)
             self.open_email_dialog_btn = QPushButton(self.tr("Composer un Email..."))
-            self.open_email_dialog_btn.setIcon(QIcon.fromTheme("mail-send", QIcon(":/icons/bell.svg")))
+            self.open_email_dialog_btn.setText("📧")
             self.open_email_dialog_btn.clicked.connect(self.open_send_email_dialog)
             send_email_tab_layout.addWidget(self.open_email_dialog_btn)
             send_email_tab_layout.addStretch()
@@ -644,7 +644,7 @@ class ClientMainWidget(QWidget):
             send_whatsapp_tab_widget = QWidget()
             send_whatsapp_tab_layout = QVBoxLayout(send_whatsapp_tab_widget)
             self.open_whatsapp_dialog_btn = QPushButton(self.tr("Envoyer message WhatsApp..."))
-            self.open_whatsapp_dialog_btn.setIcon(QIcon.fromTheme("contact-new", QIcon(":/icons/user.svg")))
+            self.open_whatsapp_dialog_btn.setText("💬")
             self.open_whatsapp_dialog_btn.clicked.connect(self.open_send_whatsapp_dialog)
             send_whatsapp_tab_layout.addWidget(self.open_whatsapp_dialog_btn)
             send_whatsapp_tab_layout.addStretch()
@@ -2362,7 +2362,7 @@ class ClientMainWidget(QWidget):
         self.is_editing_client = not self.is_editing_client
         if self.is_editing_client:
             self.edit_save_client_btn.setText(self.tr("Sauvegarder Client"))
-            self.edit_save_client_btn.setIcon(QIcon.fromTheme("document-save", QIcon(":/icons/save.svg")))
+            self.edit_save_client_btn.setText("💾")
             # Future: Enable editing of specific fields
             logging.info(f"ClientMainWidget: Entered edit mode for client {self.client_info.get('client_id')}.")
             # Example: self.client_name_edit.setReadOnly(False)
@@ -2373,7 +2373,7 @@ class ClientMainWidget(QWidget):
             # For now, just revert button and log
             if self.save_client_changes_from_edit_view(): # Nouvelle méthode pour sauvegarder
                 self.edit_save_client_btn.setText(self.tr("Modifier Client"))
-                self.edit_save_client_btn.setIcon(QIcon.fromTheme("document-edit", QIcon(":/icons/pencil.svg")))
+                self.edit_save_client_btn.setText("✏️")
                 logging.info(f"ClientMainWidget: Exited edit mode for client {self.client_info.get('client_id')}. Changes saved.")
                 # La vue est rafraîchie dans save_client_changes_from_edit_view
             else:
@@ -2391,7 +2391,7 @@ class ClientMainWidget(QWidget):
             QMessageBox.warning(self, self.tr("Erreur"), self.tr("Aucune information client à modifier."))
             self.is_editing_client = False # Revert state
             self.edit_save_client_btn.setText(self.tr("Modifier Client"))
-            self.edit_save_client_btn.setIcon(QIcon.fromTheme("document-edit", QIcon(":/icons/pencil.svg")))
+            self.edit_save_client_btn.setText("✏️")
             return
 
         logging.info(f"ClientMainWidget: Switching to edit view for client {self.client_info.get('client_id')}")

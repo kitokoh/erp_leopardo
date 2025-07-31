@@ -55,7 +55,7 @@ class PerformPasswordResetDialog(QDialog):
         # Buttons
         self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         self.button_box.button(QDialogButtonBox.Ok).setText(self.tr("Réinitialiser"))
-        self.button_box.button(QDialogButtonBox.Ok).setIcon(QIcon(":/icons/save.svg")) # Assuming save icon
+        # self.button_box.button(QDialogButtonBox.Ok).setIcon(QIcon(":/icons/save.svg")) # Assuming save icon
         self.button_box.button(QDialogButtonBox.Cancel).setText(self.tr("Annuler"))
 
         self.button_box.accepted.connect(self._handle_submit)
