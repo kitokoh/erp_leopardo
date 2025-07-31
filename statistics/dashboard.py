@@ -27,6 +27,7 @@ import json
 import folium
 from branca.colormap import StepColormap
 import csv
+from PyQt5.QtWidgets import QLineEdit
 
 from .map_utils import generate_folium_map_html
 
