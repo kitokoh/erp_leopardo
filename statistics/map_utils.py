@@ -271,6 +271,30 @@ def generate_folium_map_html(
                 }}
             }};
 
+            function initializeMapInteraction(map) {{
+                console.log("Map object found, initializing interaction.");
+                map.on('moveend', function() {{
+                    try {{
+                        var center = map.getCenter();
+                        var zoom = map.getZoom();
+                        if (window.{map_interaction_handler_name} && typeof window.{map_interaction_handler_name}.onMapViewChanged === 'function') {{
+                            window.{map_interaction_handler_name}.onMapViewChanged(center.lat, center.lng, zoom);
+                        }}
+                    }} catch (e) {{
+                        console.error('Error in moveend event handler:', e);
+                    }}
+                }});
+            }}
+
+            function waitForMapAndInitialize() {{
+                if (typeof {map_variable_name} !== 'undefined') {{
+                    const map = {map_variable_name};
+                    initializeMapInteraction(map);
+                }} else {{
+                    setTimeout(waitForMapAndInitialize, 100);
+                }}
+            }}
+
             document.addEventListener("DOMContentLoaded", function() {{
                 try {{
                     if (typeof QWebChannel !== 'undefined') {{
@@ -280,45 +304,17 @@ def generate_folium_map_html(
                                 console.error("{map_interaction_handler_name} object not found. Available:", Object.keys(channel.objects));
                             }} else {{
                                 console.log("{map_interaction_handler_name} initialized successfully via WebChannel.");
-
-                                map.on('moveend', function() {{
-                                    try {{
-                                        var center = map.getCenter();
-                                        var zoom = map.getZoom();
-                                        if (window.{map_interaction_handler_name} && typeof window.{map_interaction_handler_name}.onMapViewChanged === 'function') {{
-                                            window.{map_interaction_handler_name}.onMapViewChanged(center.lat, center.lng, zoom);
-                                        }} else {{
-                                            console.error('{map_interaction_handler_name} or onMapViewChanged is not available.');
-                                        }}
-                                    }} catch (e) {{
-                                        console.error('Error in moveend event handler:', e);
-                                    }}
-                                }});
                             }}
                         }});
                     }} else {{
                         console.error("QWebChannel JavaScript library not loaded.");
                     }}
                 }} catch (e) {{
-                    console.error('Error during DOMContentLoaded event listener:', e);
-
+                    console.error('Error during QWebChannel setup:', e);
                 }}
-            }}
 
-            // We need to wait for the map variable to be defined.
-            // A simple way is to check for it periodically.
-            function waitForMapAndInitialize() {{
-                if (typeof {map_variable_name} !== 'undefined') {{
-                    // The map variable is now defined, we can call it 'map' for simplicity inside our functions
-                    const map = {map_variable_name};
-                    initializeMapInteraction(map);
-                }} else {{
-                    console.log("Waiting for map object '{map_variable_name}' to be defined...");
-                    setTimeout(waitForMapAndInitialize, 100);
-                }}
-            }}
-
-            document.addEventListener("DOMContentLoaded", waitForMapAndInitialize);
+                waitForMapAndInitialize();
+            }});
         </script>
         """
 
@@ -335,10 +331,6 @@ def generate_folium_map_html(
             map_html_content += webchannel_setup_js
 
         logging.info("map_utils: WebChannel JavaScript added to HTML content.")
-
-        # For debugging, save the HTML to a file
-        with open("map.html", "w", encoding="utf-8") as f:
-            f.write(map_html_content)
 
         return map_html_content
 

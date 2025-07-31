@@ -3,6 +3,7 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QApplication
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import matplotlib.pyplot as plt
+from PyQt5.QtCore import Qt
 
 class StatusChart(QWidget):
     def __init__(self, parent=None):
@@ -29,7 +30,7 @@ class StatusChart(QWidget):
             labels = [item.get('status_name', 'N/A') for item in filtered_status_data]
             sizes = [item.get('client_count', 0) for item in filtered_status_data]
 
-            plt.style.use('seaborn-v0_8-pastel')
+            plt.style.use('seaborn-v0_8-colorblind')
             fig = Figure(figsize=(5.5, 4.5), dpi=90)
             fig.patch.set_alpha(0)
             ax = fig.add_subplot(111)
