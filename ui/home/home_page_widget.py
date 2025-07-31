@@ -113,7 +113,7 @@ class HomePageWidget(QWidget):
         bottom_layout = self._setup_bottom_layout()
 
         main_v_layout.addLayout(top_layout, 1)
-        main_v_layout.addLayout(bottom_layout, 2)
+        main_v_layout.addLayout(bottom_layout)
 
         self.setLayout(main_v_layout)
         self._load_all_module_card_stats()

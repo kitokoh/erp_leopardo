@@ -2806,7 +2806,6 @@ class DocumentManager(QMainWindow):
 
     def refresh_client_widgets_and_filters(self):
         logging.info("Refreshing client-related UI components after status changes.")
-        self.load_statuses_into_filter_combo()
 
         for i in range(self.client_tabs_widget.count()):
             tab_widget = self.client_tabs_widget.widget(i)
