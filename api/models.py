@@ -59,28 +59,9 @@ class User(Base):
         return f"<User(user_id='{self.user_id}', username='{self.username}', role_id={self.role_id})>"
 
 
-class Client(Base):
-    __tablename__ = "clients"
-    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
-    name = Column(String, nullable=False)
-    # Relationships
-    proforma_invoices = relationship("ProformaInvoice", order_by="ProformaInvoice.id", back_populates="client")
-    # client_documents = relationship("ClientDocument", back_populates="client") # If ClientDocument links back to Client
-
-class Project(Base):
-    __tablename__ = "projects"
-    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
-    name = Column(String, nullable=False)
-    client_id = Column(String, ForeignKey("clients.id"))
-    # Relationships
-    proforma_invoices = relationship("ProformaInvoice", order_by="ProformaInvoice.id", back_populates="project")
-
-class Company(Base): # Represents the user's company (seller)
-    __tablename__ = "companies"
-    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
-    name = Column(String, nullable=False)
-    # Relationships
-    proforma_invoices = relationship("ProformaInvoice", order_by="ProformaInvoice.id", back_populates="company")
+# The Client, Project, and Company SQLAlchemy models are removed from this file
+# to avoid conflicts with the more complete models defined in their respective
+# db/models/ modules. This resolves the "Multiple classes found for path" error.
 
 class Product(Base):
     __tablename__ = "products"
@@ -110,68 +91,9 @@ class ClientDocument(Base): # For storing generated PDFs like Proformas or Invoi
     client_id = Column(String, ForeignKey("clients.id"), nullable=True) # Optional: link document to client
     # client = relationship("Client", back_populates="client_documents") # If ClientDocument links back to Client
 
-# Enum for ProformaInvoice status
-class ProformaInvoiceStatusEnum(enum.Enum):
-    DRAFT = "draft"
-    SENT = "sent"
-    ACCEPTED = "accepted"
-    REJECTED = "rejected"
-    INVOICED = "invoiced"
-    CANCELLED = "cancelled"
-
-# ProformaInvoice Model
-class ProformaInvoice(Base):
-    __tablename__ = "proforma_invoices"
-
-    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
-    proforma_invoice_number = Column(String, unique=True, index=True, nullable=False)
-    client_id = Column(String, ForeignKey("clients.id"), nullable=False, index=True)
-    project_id = Column(String, ForeignKey("projects.id"), nullable=True, index=True)
-    company_id = Column(String, ForeignKey("companies.id"), nullable=False, index=True) # The seller
-
-    created_date = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    sent_date = Column(DateTime(timezone=True), nullable=True)
-    status = Column(SQLAlchemyEnum(ProformaInvoiceStatusEnum), nullable=False, default=ProformaInvoiceStatusEnum.DRAFT, index=True)
-
-    currency = Column(String(3), nullable=False, default="USD")
-    subtotal_amount = Column(Float, nullable=False, default=0.0)
-    discount_amount = Column(Float, nullable=True, default=0.0)
-    vat_amount = Column(Float, nullable=False, default=0.0)
-    grand_total_amount = Column(Float, nullable=False, default=0.0)
-
-    payment_terms = Column(String, nullable=True)
-    delivery_terms = Column(String, nullable=True)
-    incoterms = Column(String, nullable=True)
-    named_place_of_delivery = Column(String, nullable=True)
-    notes = Column(Text, nullable=True)
-
-    linked_document_id = Column(String, ForeignKey("client_documents.id"), nullable=True)
-    generated_invoice_id = Column(String, ForeignKey("client_documents.id"), nullable=True)
-
-    # Relationships
-    client = relationship("Client", back_populates="proforma_invoices")
-    project = relationship("Project", back_populates="proforma_invoices")
-    company = relationship("Company", back_populates="proforma_invoices")
-
-    items = relationship("ProformaInvoiceItem", back_populates="proforma_invoice", cascade="all, delete-orphan")
-    linked_document = relationship("ClientDocument", foreign_keys=[linked_document_id])
-    generated_invoice_document = relationship("ClientDocument", foreign_keys=[generated_invoice_id])
-
-# ProformaInvoiceItem Model
-class ProformaInvoiceItem(Base):
-    __tablename__ = "proforma_invoice_items"
-
-    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
-    proforma_invoice_id = Column(String, ForeignKey("proforma_invoices.id"), nullable=False, index=True)
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=True) # Nullable if custom item
-    description = Column(Text, nullable=False)
-    quantity = Column(Float, nullable=False)
-    unit_price = Column(Float, nullable=False)
-    total_price = Column(Float, nullable=False) # quantity * unit_price
-
-    # Relationships
-    proforma_invoice = relationship("ProformaInvoice", back_populates="items")
-    product = relationship("Product") # No back_populates needed on Product for this item
+# The ProformaInvoice and ProformaInvoiceItem models are removed to resolve
+# relationship errors after their dependent models (Client, Project, Company)
+# were removed.
 
 
 class Contact(Base):
