@@ -1347,8 +1347,9 @@ class DocumentManager(QMainWindow):
         
         # Buttons in a single row
         client_actions_layout = QHBoxLayout()
-        self.add_new_client_button = QPushButton(self.tr("➕ Ajouter Nouveau Client")); self.add_new_client_button.setObjectName("primaryButton"); self.add_new_client_button.clicked.connect(self.open_add_new_client_dialog)
-        client_actions_layout.addWidget(self.add_new_client_button)
+        # self.add_new_client_button is now moved to the main menu as an action
+        # self.add_new_client_button = QPushButton(self.tr("➕ Ajouter Nouveau Client")); self.add_new_client_button.setObjectName("primaryButton"); self.add_new_client_button.clicked.connect(self.open_add_new_client_dialog)
+        # client_actions_layout.addWidget(self.add_new_client_button)
 
         self.add_client_by_voice_button = QPushButton(self.tr("🎤 Ajouter par Voix")); self.add_client_by_voice_button.setObjectName("primaryButton")
         self.add_client_by_voice_button.clicked.connect(self.handle_add_client_by_voice_clicked)
@@ -1541,6 +1542,11 @@ class DocumentManager(QMainWindow):
         self.home_action = QAction("🏠 " + self.tr("Accueil"), self)
         self.home_action.triggered.connect(self.show_home_view)
 
+        # Action for adding a new client (moved from button)
+        self.add_client_action = QAction("➕ " + self.tr("Ajouter Nouveau Client"), self)
+        self.add_client_action.triggered.connect(self.open_add_new_client_dialog)
+
+
         self.settings_action = QAction("⚙️ " + self.tr("Paramètres"), self); self.settings_action.triggered.connect(self.show_settings_page) # Changed to show_settings_page
         # self.template_action removed
         self.status_action = QAction("📊 " + self.tr("Gérer les Statuts"), self); self.status_action.triggered.connect(self.open_status_management_dialog_slot)
@@ -1591,6 +1597,7 @@ class DocumentManager(QMainWindow):
 
         # Populate searchable_actions_map
         self.searchable_actions_map[self.tr("Accueil")] = self.home_action
+        self.searchable_actions_map[self.tr("Ajouter Nouveau Client")] = self.add_client_action
         self.searchable_actions_map[self.tr("Calculatrices")] = self.calculator_module_action # Added Calculator action
         self.searchable_actions_map[self.tr("Paramètres")] = self.settings_action
         # self.searchable_actions_map[self.tr("Gérer les Modèles")] removed
@@ -1742,6 +1749,10 @@ class DocumentManager(QMainWindow):
 
         menu_definitions = [
             (self.tr("Accueil"), None, self.home_action), # Direct action, not a dropdown
+            (self.tr("Clients"), None, [
+                (self.tr("Ajouter Nouveau Client"), self.add_client_action),
+                (self.tr("Gestion Documents"), self.documents_view_action)
+            ]),
             (self.tr("Modules"), None, [
                 (self.tr("Synchronisation"), self.synchronization_action),
                 (self.tr("Statistiques"), self.statistics_action),
