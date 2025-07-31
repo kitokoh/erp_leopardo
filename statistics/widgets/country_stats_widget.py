@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QGroupBox, QFormLayout, QHBoxLayout
 from PyQt5.QtGui import QIcon, QFont
 from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import Qt
 
 class CountryStatsDisplayWidget(QWidget):
     back_to_global_requested = pyqtSignal()
