@@ -2839,13 +2839,13 @@ class ClientWidget(QWidget):
         self.billing_tab = QWidget()
         self.billing_tab_layout = QVBoxLayout(self.billing_tab)
 
-        self.generate_invoice_button = QPushButton(QIcon(":/icons/file-plus.svg"), self.tr("Generate Final Invoice"))
+        self.generate_invoice_button = QPushButton("📄 " + self.tr("Generate Final Invoice"))
         self.generate_invoice_button.setToolTip(self.tr("Open dialog to prepare and generate a final invoice for this client."))
         self.generate_invoice_button.clicked.connect(self.handle_generate_final_invoice)
         self.billing_tab_layout.addWidget(self.generate_invoice_button)
         self.billing_tab_layout.addStretch()
 
-        self.tab_widget.addTab(self.billing_tab, QIcon(":/icons/credit-card.svg"), self.tr("Billing"))
+        self.tab_widget.addTab(self.billing_tab, "💳 " + self.tr("Billing"))
         # Connect new accordion handlers
         self.client_info_group_box.toggled.connect(self._handle_client_info_section_toggled)
         self.notes_group_box.toggled.connect(self._handle_notes_section_toggled)
@@ -3694,12 +3694,12 @@ class ClientWidget(QWidget):
                 can_manage_doc_notes = has_permission(role_name, P_MANAGE_CLIENT_DOCUMENTS)
 
                 if can_manage_doc_notes:
-                    edit_button = QPushButton(QIcon(":/icons/pencil.svg"), "")
+                    edit_button = QPushButton("✏️")
                     edit_button.setToolTip(self.tr("Modifier cette note"))
                     edit_button.clicked.connect(lambda checked, n_id=note_id: self.on_edit_document_note_clicked(n_id))
                     actions_layout.addWidget(edit_button)
 
-                    delete_button = QPushButton(QIcon(":/icons/trash.svg"), "")
+                    delete_button = QPushButton("🗑️")
                     delete_button.setToolTip(self.tr("Supprimer cette note"))
                     delete_button.setObjectName("dangerButton")
                     delete_button.clicked.connect(lambda checked, n_id=note_id: self.on_delete_document_note_clicked(n_id))

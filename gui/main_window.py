@@ -294,7 +294,7 @@ class ClientListItemWidget(QWidget):
 
         self.edit_action_button = QToolButton(self)
         self.edit_action_button.setObjectName("listItemActionButton")
-        self.edit_action_button.setIcon(QIcon(":/icons/pencil.svg"))
+        self.edit_action_button.setText("✏️")
         self.edit_action_button.setToolTip(self.tr("Modifier ce client"))
         self.edit_action_button.setCursor(Qt.PointingHandCursor)
         self.edit_action_button.clicked.connect(self._on_edit_action_clicked)
@@ -302,7 +302,7 @@ class ClientListItemWidget(QWidget):
 
         self.folder_action_button = QToolButton(self)
         self.folder_action_button.setObjectName("listItemActionButton")
-        self.folder_action_button.setIcon(QIcon(":/icons/folder.svg"))
+        self.folder_action_button.setText("📁")
         self.folder_action_button.setToolTip(self.tr("Ouvrir le dossier de ce client"))
         self.folder_action_button.setCursor(Qt.PointingHandCursor)
         self.folder_action_button.clicked.connect(self._on_folder_action_clicked)

@@ -77,8 +77,9 @@ class UserMenuButton(QPushButton):
                     border: 1px solid #d1d5db;
                     border-radius: 16px;
                     background-color: #f3f4f6;
-                    font-size: 20px; /* Increased font size for emoji */
+                    font-size: 24px; /* Increased font size for emoji */
                     color: #1f2937; /* Darker color for better contrast */
+                    min-width: 32px; /* Ensure enough space for the emoji */
                 }
                 QPushButton:hover {
                     background-color: #e5e7eb;
