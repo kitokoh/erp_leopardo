@@ -108,23 +108,24 @@ def add_country(data: dict, conn: sqlite3.Connection = None) -> int | None:
         return None
 
 @_manage_conn
-def get_all_countries(conn: Session = None) -> list[dict]:
+def get_all_countries(conn: sqlite3.Connection = None) -> list[dict]:
     """
-    Retrieves all countries.
+    Retrieves all countries using a raw sqlite3 connection.
     """
+    logger_crud = logging.getLogger(__name__)
     try:
-        countries = conn.query(Country).order_by(Country.country_name).all()
-        return [
-            {
-                "country_id": c.country_id,
-                "country_name": c.country_name,
-                "created_at": c.created_at.isoformat() if c.created_at else None,
-                "updated_at": c.updated_at.isoformat() if c.updated_at else None,
-            }
-            for c in countries
-        ]
-    except Exception as e:
-        logging.error(f"Database error in get_all_countries: {e}")
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        logger_crud.info("locations_crud.get_all_countries: Querying for all countries.")
+        cursor.execute("SELECT * FROM Countries ORDER BY country_name")
+        rows = cursor.fetchall()
+        countries = [{key: row[key] for key in row.keys()} for row in rows]
+        logger_crud.info(f"locations_crud.get_all_countries: Found {len(countries)} countries.")
+        return countries
+    except sqlite3.Error as e:
+        logger_crud.error(f"Database error in get_all_countries: {e}")
+        # In case of an error, it's safer to return an empty list
+        # as the caller expects a list.
         return []
 
 # --- Cities CRUD ---
