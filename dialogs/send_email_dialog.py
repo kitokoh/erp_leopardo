@@ -58,8 +58,7 @@ class SendEmailDialog(QDialog):
         to_layout.addWidget(self.to_edit)
 
         if self.client_id:
-            self.select_contacts_btn = QPushButton(self.tr("Sélectionner Contacts"))
-            self.select_contacts_btn.setIcon(QIcon.fromTheme("address-book-new", QIcon(":/icons/user-plus.svg")))
+            self.select_contacts_btn = QPushButton("👥 " + self.tr("Sélectionner Contacts"))
             self.select_contacts_btn.clicked.connect(self.open_select_contacts_dialog)
             to_layout.addWidget(self.select_contacts_btn)
         form_layout.addRow(self.tr("À:"), to_layout)
@@ -101,24 +100,20 @@ class SendEmailDialog(QDialog):
             self.load_email_templates(self.language_combo.currentText())
 
         attachment_buttons_layout = QHBoxLayout()
-        self.add_attachment_btn = QPushButton(self.tr("Ajouter Pièce Jointe (Fichier)"))
-        self.add_attachment_btn.setIcon(QIcon.fromTheme("document-open", QIcon(":/icons/plus.svg")))
+        self.add_attachment_btn = QPushButton("📎 " + self.tr("Ajouter Pièce Jointe (Fichier)"))
         self.add_attachment_btn.clicked.connect(self.add_attachment_from_file_system)
         attachment_buttons_layout.addWidget(self.add_attachment_btn)
 
         if self.client_info:
-            self.add_client_document_btn = QPushButton(self.tr("Ajouter Document Client"))
-            self.add_client_document_btn.setIcon(QIcon.fromTheme("folder-open", QIcon(":/icons/folder.svg")))
+            self.add_client_document_btn = QPushButton("📄 " + self.tr("Ajouter Document Client"))
             self.add_client_document_btn.clicked.connect(self.add_attachment_from_client_docs)
             attachment_buttons_layout.addWidget(self.add_client_document_btn)
 
-        self.add_utility_document_btn = QPushButton(self.tr("Ajouter Document Utilitaire"))
-        self.add_utility_document_btn.setIcon(QIcon.fromTheme("document-properties", QIcon(":/icons/document.svg")))
+        self.add_utility_document_btn = QPushButton("📑 " + self.tr("Ajouter Document Utilitaire"))
         self.add_utility_document_btn.clicked.connect(self.add_attachment_from_utility_docs)
         attachment_buttons_layout.addWidget(self.add_utility_document_btn)
 
-        self.remove_attachment_btn = QPushButton(self.tr("Supprimer Pièce Jointe"))
-        self.remove_attachment_btn.setIcon(QIcon.fromTheme("edit-delete", QIcon(":/icons/trash.svg")))
+        self.remove_attachment_btn = QPushButton("🗑️ " + self.tr("Supprimer Pièce Jointe"))
         self.remove_attachment_btn.clicked.connect(self.remove_attachment)
         attachment_buttons_layout.addWidget(self.remove_attachment_btn)
         layout.addLayout(attachment_buttons_layout)
@@ -129,8 +124,8 @@ class SendEmailDialog(QDialog):
         layout.addWidget(self.attachments_list_widget)
 
         button_box = QDialogButtonBox()
-        send_button = button_box.addButton(self.tr("Envoyer"), QDialogButtonBox.AcceptRole)
-        send_button.setIcon(QIcon.fromTheme("mail-send", QIcon(":/icons/bell.svg")))
+        send_button = button_box.addButton("Envoyer", QDialogButtonBox.AcceptRole)
+        send_button.setText("✉️ " + self.tr("Envoyer"))
         send_button.setObjectName("primaryButton")
         button_box.addButton(QDialogButtonBox.Cancel)
         button_box.accepted.connect(self.send_email_action)

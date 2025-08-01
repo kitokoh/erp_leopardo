@@ -492,11 +492,7 @@ class DocumentsTab(QWidget):
                             actions_layout.addWidget(generate_final_btn)
 
                         # Bouton Ouvrir/Visualiser
-                        view_icon_path = ":/icons/eye.svg"
-                        if doc_type == "PDF" or doc_type.endswith("_PDF"): # Plus générique pour les PDF générés
-                            view_icon_path = ":/icons/file-text.svg"
-
-                        view_btn = QPushButton(QIcon(view_icon_path), "")
+                        view_btn = QPushButton("👁️")
                         view_btn.setToolTip(self.tr("Ouvrir Document"))
                         view_btn.setProperty("class", "tableActionButton")
                         view_btn.clicked.connect(lambda checked, p=full_file_path, d_id=doc_id: self._handle_view_document_action(p, d_id))
