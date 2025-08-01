@@ -1714,6 +1714,12 @@ class DocumentManager(QMainWindow):
 
         top_bar_layout.addWidget(self.app_title_label)
 
+        # Add the "Quick Add Client" button as requested
+        self.quick_add_client_button = QPushButton("➕ " + self.tr("Ajouter Client"))
+        self.quick_add_client_button.setObjectName("topMenuButton") # Use existing style for consistency
+        self.quick_add_client_button.setToolTip(self.tr("Ajouter un nouveau client rapidement"))
+        self.quick_add_client_button.clicked.connect(self.open_add_new_client_dialog)
+        top_bar_layout.addWidget(self.quick_add_client_button)
 
         # --- Define Menu Structure ---
         self.top_menu_buttons = {} # To store references
