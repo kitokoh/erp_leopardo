@@ -108,57 +108,54 @@ class ClientsCRUD(GenericCRUD):
         }
 
         try:
+            self.logger.info(f"Executing INSERT for new client '{params_dict.get('client_name')}' with ID {new_id}.")
             if _is_sqlalchemy_obj(conn):
                 conn.execute(sql_query, params_dict)
             else:
-                # Raw sqlite3 connection, expects string query.
-                # sqlite3 can handle named parameters if query string uses them.
                 conn.execute(str(sql_query), params_dict)
+            self.logger.info(f"Successfully inserted client record for ID {new_id}.")
 
-            # _manage_conn handles commit
             client_name_for_defaults = data.get('client_name', 'N/A')
             user_id_for_defaults = data.get('created_by_user_id', None)
 
-            # --- Create Default Order and Project using status_service ---
+            self.logger.info(f"Attempting to create default order and project for client {new_id}.")
             default_order_status_id = None
             default_project_status_id = None
 
             if status_service and status_models:
-                # 1. Fetch default status for 'Commande'
-                default_commande_status_obj = status_service.get_default_status_for_commande_creation() # Prefers 'Brouillon'
+                self.logger.debug("status_service is available. Fetching default statuses.")
+                default_commande_status_obj = status_service.get_default_status_for_commande_creation()
                 if default_commande_status_obj:
                     default_order_status_id = default_commande_status_obj.status_id
+                    self.logger.debug(f"Default order status ID found: {default_order_status_id}")
                 else:
-                    self.logger.warning(f"Could not determine a default status_id for Commande via status_service for client {new_id}.")
+                    self.logger.warning(f"Could not determine a default status_id for Commande for client {new_id}.")
 
-                # 2. Fetch default status for 'Project'
                 default_project_status_obj = status_service.get_default_status_for_type(status_models.StatusType.PROJECT, preferred_name="Planning")
                 if default_project_status_obj:
                     default_project_status_id = default_project_status_obj.status_id
+                    self.logger.debug(f"Default project status ID found: {default_project_status_id}")
                 else:
-                    self.logger.warning(f"Could not determine a default status_id for Project via status_service for client {new_id}.")
+                    self.logger.warning(f"Could not determine a default status_id for Project for client {new_id}.")
             else:
-                self.logger.error("status_service not available. Cannot determine default statuses for order/project.")
-
+                self.logger.error("status_service not available. Cannot determine default statuses.")
 
             if default_order_status_id:
+                self.logger.info("Proceeding with default order creation.")
                 default_order_data = {
-                    'client_id': new_id,
-                    'commande_reference': f"DEF-ORD-{new_id[:8]}",
-                    'status_commande_id': default_order_status_id,
-                    'created_by_user_id': user_id_for_defaults,
+                    'client_id': new_id, 'commande_reference': f"DEF-ORD-{new_id[:8]}",
+                    'status_commande_id': default_order_status_id, 'created_by_user_id': user_id_for_defaults,
                     'notes': f"Default order automatically created for {client_name_for_defaults}.",
-                    'is_default': True,
-                    'description_commande': "Default Order"
+                    'is_default': True, 'description_commande': "Default Order"
                 }
                 default_commande_id = commandes_crud.add_commande(default_order_data, conn=conn)
 
                 if default_commande_id:
                     self.logger.info(f"Successfully created default order {default_commande_id} for client {new_id}.")
-                    if default_project_status_id: # Only proceed if we have a project status
+                    if default_project_status_id:
+                        self.logger.info("Proceeding with default project creation.")
                         default_project_data = {
-                            'client_id': new_id,
-                            'project_name': f"Default Project for {client_name_for_defaults}",
+                            'client_id': new_id, 'project_name': f"Default Project for {client_name_for_defaults}",
                             'status_id': default_project_status_id,
                             'description': f"Default project automatically created for order {default_order_data['commande_reference']}.",
                             'manager_team_member_id': user_id_for_defaults
@@ -166,26 +163,26 @@ class ClientsCRUD(GenericCRUD):
                         default_project_id = projects_crud.add_project(default_project_data, conn=conn)
 
                         if default_project_id:
-                            self.logger.info(f"Successfully created default project {default_project_id} for client {new_id}.")
+                            self.logger.info(f"Successfully created default project {default_project_id}.")
                             update_payload = {'project_id': default_project_id}
                             if commandes_crud.update_commande(default_commande_id, update_payload, conn=conn):
-                                self.logger.info(f"Successfully linked default project {default_project_id} to default order {default_commande_id}.")
+                                self.logger.info(f"Successfully linked project {default_project_id} to order {default_commande_id}.")
                             else:
-                                self.logger.error(f"Failed to link default project {default_project_id} to default order {default_commande_id} for client {new_id}.")
+                                self.logger.error(f"Failed to link project {default_project_id} to order {default_commande_id}.")
                         else:
-                            self.logger.error(f"Failed to create default project for client {new_id} after creating default order {default_commande_id}.")
+                            self.logger.error(f"Failed to create default project for client {new_id}.")
                     else:
-                        self.logger.warning(f"Skipping default project creation for client {new_id} as no default project status ID was found via status_service.")
+                        self.logger.warning(f"Skipping default project creation for client {new_id} due to missing default project status ID.")
                 else:
                     self.logger.error(f"Failed to create default order for client {new_id}.")
             else:
-                 self.logger.warning(f"Skipping default order and project creation for client {new_id} as no default order status ID was found via status_service.")
-            # --- End Default Order and Project ---
+                self.logger.warning(f"Skipping default order and project creation for client {new_id} due to missing default order status ID.")
 
+            self.logger.info(f"Client creation process for {new_id} completed successfully.")
             return {'success': True, 'client_id': new_id}
-        except Exception as e: # Changed to general Exception
-            self.logger.error(f"Failed to add client '{data.get('client_name')}': {e}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+        except Exception as e:
+            self.logger.error(f"Transaction failed during client creation for '{data.get('client_name')}': {e}", exc_info=True)
+            return {'success': False, 'error': f"Database transaction failed: {e}"}
 
     @_manage_conn
     def create_client_folder(self, client_id: str, client_name: str, conn=None) -> str | None:
@@ -193,12 +190,14 @@ class ClientsCRUD(GenericCRUD):
         Creates a folder for the client if it doesn't exist.
         """
         try:
+            import os
             from app_setup import APP_ROOT_DIR
             sane_client_name = "".join(c if c.isalnum() else "_" for c in client_name)
             folder_name = f"{sane_client_name}_{client_id[:8]}"
-            folder_path = os.path.join(APP_ROOT_DIR, "clients", folder_name)
-            os.makedirs(folder_path, exist_ok=True)
-            return folder_path
+            relative_folder_path = os.path.join("clients", folder_name)
+            absolute_folder_path = os.path.join(APP_ROOT_DIR, relative_folder_path)
+            os.makedirs(absolute_folder_path, exist_ok=True)
+            return relative_folder_path
         except Exception as e:
             self.logger.error(f"Failed to create folder for client {client_id}: {e}", exc_info=True)
             return None

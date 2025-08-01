@@ -59,8 +59,8 @@ from PyQt5.QtWidgets import (
     QTextEdit, QSplitter, QApplication, QToolButton # Added QToolButton for inline actions
 
 )
-from PyQt5.QtGui import QIcon, QDesktopServices, QFont
-from PyQt5.QtCore import Qt, QUrl, QTimer, pyqtSlot, QByteArray, QDate, QEvent # Added QDate and QEvent
+from PyQt5.QtGui import QIcon, QDesktopServices, QFont, QMouseEvent
+from PyQt5.QtCore import Qt, QUrl, QTimer, pyqtSlot, QByteArray, QDate, QEvent, QPoint
 # QWebEngineView might still be used by ClientWidget or other parts, so keep for now unless confirmed unused.
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 # from PyQt5.QtWebChannel import QWebChannel # QWebChannel removed as DocumentManager no longer uses its own map.
@@ -429,13 +429,14 @@ class DocumentManager(QMainWindow):
 
 
         self._gradient_pos = 0.0
+        self.is_dragging = False
 
         # Window Controls
-        self.minimize_button = QPushButton("—")
+        self.minimize_button = QPushButton("−") # Using a proper minus sign
         self.minimize_button.setToolTip(self.tr("Minimiser"))
-        self.maximize_button = QPushButton("[]")
-        self.maximize_button.setToolTip(self.tr("Agrandir"))
-        self.close_button = QPushButton("X")
+        self.maximize_button = QPushButton("🗖") # A better maximize symbol
+        self.maximize_button.setToolTip(self.tr("Agrandir / Restaurer"))
+        self.close_button = QPushButton("✕") # A better close symbol
         self.close_button.setToolTip(self.tr("Fermer"))
 
         self.minimize_button.clicked.connect(self.showMinimized)
@@ -1694,6 +1695,20 @@ class DocumentManager(QMainWindow):
                 background: #e5e7eb;
                 margin: 5px 0px;
             }
+            QPushButton#windowControlButton {
+                background-color: transparent;
+                border: none;
+                padding: 4px;
+                border-radius: 4px;
+                color: #4b5563;
+            }
+            QPushButton#windowControlButton:hover {
+                background-color: #e5e7eb;
+            }
+            QPushButton#windowCloseButton:hover {
+                background-color: #ef4444;
+                color: white;
+            }
         """)
 
         top_bar_layout = QHBoxLayout(self.top_menu_bar_widget)
@@ -1714,43 +1729,32 @@ class DocumentManager(QMainWindow):
 
         top_bar_layout.addWidget(self.app_title_label)
 
-
         # --- Define Menu Structure ---
         self.top_menu_buttons = {} # To store references
 
         # Helper to create module actions for the new "Modules" menu
-        # These actions will call handle_sidebar_module_selection (which will be renamed or its logic adapted)
         module_menu_actions = []
-        # Order can be defined here or taken from CONFIGURABLE_MODULES if its order is preferred.
-        # Using CONFIGURABLE_MODULES to ensure all are covered and use their defined names/icons.
         for module_info in CONFIGURABLE_MODULES:
             action_attr_name = module_info['action_attr']
             q_action = getattr(self, action_attr_name, None)
             if q_action:
-                # We need to ensure the action, when triggered from the top menu,
-                # calls the correct view switching logic.
-                # The QAction itself is already connected to a show_..._view method.
                 module_menu_actions.append((q_action.text(), q_action))
             else:
                 logging.warning(f"QAction instance for module {module_info['name']} (attr: {action_attr_name}) not found.")
 
-        # Add core navigation items like "Accueil" and "Gestion Documents" if not in CONFIGURABLE_MODULES
-        # or if they need special placement. For now, assuming they are QActions like others.
-        # self.home_action and self.documents_view_action are already created.
-
         menu_definitions = [
-            (self.tr("Accueil"), None, self.home_action), # Direct action, not a dropdown
-            (self.tr("Modules"), None, [
+            (self.tr("Accueil 🏠"), None, self.home_action),
+            (self.tr("Modules 🧩"), None, [
                 (self.tr("Synchronisation"), self.synchronization_action),
                 (self.tr("Statistiques"), self.statistics_action),
                 (self.tr("Addons"), self.addons_action)
-            ] + module_menu_actions), # Dropdown for all other modules
-            (self.tr("Outils"), None, [
+            ] + module_menu_actions),
+            (self.tr("Outils 🛠️"), None, [
                 (self.tr("Paramètres"), self.settings_action),
                 (self.tr("Gérer les Statuts"), self.status_action),
                 (self.tr("À propos"), self.about_action)
             ]),
-            (self.tr("Administration"), None, [
+            (self.tr("Administration 🛡️"), None, [
                 (self.tr("Gérer les Utilisateurs"), self.manage_users_action),
                 (self.tr("Gérer les Rôles"), self.manage_roles_action)
             ]),
@@ -1759,11 +1763,11 @@ class DocumentManager(QMainWindow):
         for menu_title, menu_icon_path, actions_or_action_defs in menu_definitions:
             menu_button = QPushButton(menu_title)
             menu_button.setObjectName("topMenuButton")
-            if menu_icon_path: # Not currently used for these main items
+            if menu_icon_path:
                 menu_button.setIcon(QIcon(menu_icon_path))
 
-            if isinstance(actions_or_action_defs, list): # It's a list of (text, QAction) for a dropdown
-                if actions_or_action_defs: # If there are actions, create a dropdown menu
+            if isinstance(actions_or_action_defs, list):
+                if actions_or_action_defs:
                     dropdown_menu = QMenu(self)
                     for action_text, q_action_obj in actions_or_action_defs:
                         if q_action_obj:
@@ -1771,14 +1775,20 @@ class DocumentManager(QMainWindow):
                         else:
                             logging.warning(f"QAction for '{action_text}' in menu '{menu_title}' not found.")
                     menu_button.setMenu(dropdown_menu)
-            elif isinstance(actions_or_action_defs, QAction): # It's a single direct QAction
+            elif isinstance(actions_or_action_defs, QAction):
                 menu_button.clicked.connect(actions_or_action_defs.trigger)
 
             top_bar_layout.addWidget(menu_button)
             self.top_menu_buttons[menu_title] = menu_button
 
+        # Add the "Quick Add Client" button here, after the main menu items
+        self.quick_add_client_button = QPushButton("➕ " + self.tr("Ajouter Client"))
+        self.quick_add_client_button.setObjectName("topMenuButton")
+        self.quick_add_client_button.setToolTip(self.tr("Ajouter un nouveau client rapidement"))
+        self.quick_add_client_button.clicked.connect(self.open_add_new_client_dialog)
+        top_bar_layout.addWidget(self.quick_add_client_button)
 
-        top_bar_layout.addStretch(1) # Pushes menu items to left, following items to right
+        top_bar_layout.addStretch(1)
 
         # Search bar (re-add with its completer)
         self.search_bar_line_edit = QLineEdit(self) # Already initialized in create_actions_main
@@ -2717,10 +2727,12 @@ class DocumentManager(QMainWindow):
         delete_action = menu.addAction("🗑️ " + self.tr("Supprimer Client")); delete_action.triggered.connect(lambda: self.delete_client_permanently_slot(client_id_val))
         menu.exec_(self.client_list_widget.mapToGlobal(pos))
         
-    def open_client_folder_fs(self, client_id_val): 
+    def open_client_folder_fs(self, client_id_val):
         client_info = self.clients_data_map.get(client_id_val)
         if client_info and client_info.get("base_folder_path"):
-            QDesktopServices.openUrl(QUrl.fromLocalFile(client_info["base_folder_path"]))
+            relative_path = client_info["base_folder_path"]
+            absolute_path = os.path.join(self.app_root_dir, relative_path)
+            QDesktopServices.openUrl(QUrl.fromLocalFile(absolute_path))
         else:
             QMessageBox.warning(self, self.tr("Erreur"), self.tr("Chemin du dossier non trouvé pour ce client."))
             self.notify(title=self.tr("Accès Dossier Échoué"),
@@ -3516,3 +3528,36 @@ class DocumentManager(QMainWindow):
         # elif item_type == "Project":
             # This would require a way to show a project's details
             # pass
+
+    def mousePressEvent(self, event: QMouseEvent):
+        # This event handler is for the window dragging and for custom title bar button clicks.
+
+        # First, check if the click is on one of the control buttons.
+        # We check this first to ensure button clicks are not misinterpreted as drag events.
+        if self.minimize_button.geometry().contains(event.pos()):
+            self.showMinimized()
+            return # Stop further processing
+
+        if self.maximize_button.geometry().contains(event.pos()):
+            self.toggleMaximized()
+            return # Stop further processing
+
+        if self.close_button.geometry().contains(event.pos()):
+            self.close()
+            return # Stop further processing
+
+        # If the click was not on a button, then it might be a drag event.
+        # This part is for window dragging, which is a common feature for custom title bars.
+        if event.button() == Qt.LeftButton and self.top_menu_bar_widget.geometry().contains(event.pos()):
+            self.old_pos = event.globalPos()
+            self.is_dragging = True
+
+    def mouseMoveEvent(self, event: QMouseEvent):
+        if hasattr(self, 'is_dragging') and self.is_dragging:
+            delta = QPoint(event.globalPos() - self.old_pos)
+            self.move(self.x() + delta.x(), self.y() + delta.y())
+            self.old_pos = event.globalPos()
+
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        if hasattr(self, 'is_dragging'):
+            self.is_dragging = False
