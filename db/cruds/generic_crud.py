@@ -49,6 +49,26 @@ def _manage_conn(func):
                 conn_to_use.close()
     return wrapper
 
+# New decorator specifically for SQLAlchemy sessions
+def _manage_sqla_session(func):
+    def wrapper(*args, **kwargs):
+        from ..connection import SessionLocal
+        if SessionLocal is None:
+            raise RuntimeError("SQLAlchemy SessionLocal not initialized. Cannot use ORM features.")
+
+        session = SessionLocal()
+        try:
+            kwargs_for_func = {**kwargs, 'conn': session}
+            result = func(*args, **kwargs_for_func)
+            session.commit()
+            return result
+        except Exception as e:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+    return wrapper
+
 
 # Generic CRUD Base Class
 class GenericCRUD:

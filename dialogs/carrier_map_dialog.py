@@ -3,7 +3,9 @@ from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
     QPushButton, QTextBrowser, QApplication, QSizePolicy
 )
-from PyQt5.QtCore import Qt, QSize # Added QSize
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtWebChannel import QWebChannel
+from PyQt5.QtCore import Qt, QSize, pyqtSlot, QObject
 import sys
 import os
 
@@ -14,27 +16,35 @@ if project_root not in sys.path:
 
 try:
     from db.cruds import transporters_crud
-except ImportError:
-    # Fallback for direct execution if db module structure is not immediately found
-    # This might happen if the script is run directly without the project root in PYTHONPATH
-    print("Attempting fallback import for transporters_crud due to ImportError")
+    from statistics.map_utils import generate_folium_map_html
+    from statistics.dashboard import MapInteractionHandler # Re-using this handler
+except ImportError as e:
+    print(f"Error importing modules in carrier_map_dialog.py: {e}")
+    # Fallback for direct execution
     from db.cruds import transporters_crud
-
+    # In a real scenario, you'd want to ensure these paths are resolvable
+    # For this fix, we assume the project structure allows these imports.
+    generate_folium_map_html = None
+    MapInteractionHandler = QObject # Basic fallback
 
 class CarrierMapDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Carrier Map and Information"))
-        self.setMinimumSize(800, 600)
-        self.transporters = []  # Initialize transporters list
+        self.setMinimumSize(1024, 768) # Increased size for better map view
+        self.transporters = []
+        self.map_interaction_handler = None
+        self.web_channel = None
         self.setup_ui()
         self.load_carrier_data()
 
     def setup_ui(self):
-        main_layout = QHBoxLayout() # Do not pass self
+        main_layout = QHBoxLayout(self)
 
         # --- Left Pane (Carrier List & Details) ---
-        left_pane_layout = QVBoxLayout()
+        left_pane_widget = QWidget()
+        left_pane_layout = QVBoxLayout(left_pane_widget)
+        left_pane_widget.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
 
         self.carrier_list_widget = QListWidget()
         self.carrier_list_widget.setObjectName("carrierListWidget")
@@ -46,30 +56,32 @@ class CarrierMapDialog(QDialog):
 
         self.carrier_details_browser = QTextBrowser()
         self.carrier_details_browser.setObjectName("carrierDetailsBrowser")
-        self.carrier_details_browser.setMinimumHeight(200) # Ensure it has some height
+        self.carrier_details_browser.setMinimumHeight(200)
         left_pane_layout.addWidget(self.carrier_details_browser)
 
-        left_pane_widget = QLabel() # Using QLabel as a container for the layout
-        left_pane_widget.setLayout(left_pane_layout)
-        left_pane_widget.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
 
-
-        # --- Right Pane (Map Placeholder) ---
-        right_pane_layout = QVBoxLayout()
-        self.map_placeholder_label = QLabel(self.tr("Map Placeholder - Integration Pending"))
-        self.map_placeholder_label.setObjectName("mapPlaceholderLabel")
-        self.map_placeholder_label.setAlignment(Qt.AlignCenter)
-        self.map_placeholder_label.setStyleSheet("background-color: lightgrey; border: 1px solid grey;")
-        self.map_placeholder_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding) # Make it expand
-        right_pane_layout.addWidget(self.map_placeholder_label)
-
-        right_pane_widget = QLabel() # Using QLabel as a container
-        right_pane_widget.setLayout(right_pane_layout)
+        # --- Right Pane (Map View) ---
+        right_pane_widget = QWidget()
+        right_pane_layout = QVBoxLayout(right_pane_widget)
         right_pane_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
+        self.map_view = QWebEngineView()
+        self.map_view.setObjectName("carrierMapView")
+        self.map_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        right_pane_layout.addWidget(self.map_view)
 
-        main_layout.addWidget(left_pane_widget, 1) # Give left pane a stretch factor of 1
-        main_layout.addWidget(right_pane_widget, 2) # Give right pane a stretch factor of 2 (larger)
+        # Setup WebChannel for JS-Python communication
+        if MapInteractionHandler is not QObject: # Check if import was successful
+            self.map_interaction_handler = MapInteractionHandler(self)
+            # Connect signals if needed, e.g., for clicking on a carrier on the map
+            # self.map_interaction_handler.carrier_clicked_signal.connect(self.on_map_carrier_clicked)
+            self.web_channel = QWebChannel(self.map_view.page())
+            self.map_view.page().setWebChannel(self.web_channel)
+            self.web_channel.registerObject("pyMapConnector", self.map_interaction_handler)
+
+
+        main_layout.addWidget(left_pane_widget, 1)
+        main_layout.addWidget(right_pane_widget, 3) # Give map more space
 
 
         # --- Bottom Pane for Close Button ---
@@ -109,6 +121,8 @@ class CarrierMapDialog(QDialog):
             if self.carrier_list_widget.count() > 0:
                 self.carrier_list_widget.setCurrentRow(0) # Select the first item
 
+            self.refresh_map() # Initial map load
+
         except Exception as e:
             print(f"Error loading carrier data: {e}")
             item = QListWidgetItem(self.tr("Error loading carriers."))
@@ -142,6 +156,48 @@ class CarrierMapDialog(QDialog):
             <p><b>{self.tr('Current Cargo:')}</b> {transporter_data.get('current_cargo') if transporter_data.get('current_cargo') else 'N/A'}</p>
         """
         self.carrier_details_browser.setHtml(details_html)
+        self.refresh_map(focused_transporter=transporter_data)
+
+    def _generate_carrier_map_html(self, focused_transporter=None):
+        import folium
+
+        # Default view if no carriers or focus
+        initial_location = [46.2276, 2.2137] # France
+        initial_zoom = 5
+
+        if focused_transporter and focused_transporter.get('latitude') and focused_transporter.get('longitude'):
+            initial_location = [focused_transporter['latitude'], focused_transporter['longitude']]
+            initial_zoom = 13
+        elif self.transporters:
+            # Center on the average location of all transporters if no focus
+            lats = [t['latitude'] for t in self.transporters if t.get('latitude')]
+            lons = [t['longitude'] for t in self.transporters if t.get('longitude')]
+            if lats and lons:
+                initial_location = [sum(lats) / len(lats), sum(lons) / len(lons)]
+                initial_zoom = 6
+
+        m = folium.Map(location=initial_location, zoom_start=initial_zoom, tiles="CartoDB positron")
+
+        # Add all transporters as markers
+        for t in self.transporters:
+            if t.get('latitude') and t.get('longitude'):
+                is_focused = focused_transporter and t.get('id') == focused_transporter.get('id')
+                folium.Marker(
+                    location=[t['latitude'], t['longitude']],
+                    popup=f"<b>{t.get('name', 'N/A')}</b><br>Contact: {t.get('contact_person', 'N/A')}",
+                    tooltip=t.get('name', 'N/A'),
+                    icon=folium.Icon(color='red', icon='info-sign') if is_focused else folium.Icon(color='blue')
+                ).add_to(m)
+
+        # The web channel script is not added here as it's complex and might not be needed
+        # for a simple display map. For interaction (clicking markers to select in list),
+        # it would be required. This implementation focuses on display first.
+        return m._repr_html_()
+
+    def refresh_map(self, focused_transporter=None):
+        if hasattr(self, 'map_view'):
+            map_html = self._generate_carrier_map_html(focused_transporter)
+            self.map_view.setHtml(map_html)
 
     # Optional: Override sizeHint for better default sizing if needed
     # def sizeHint(self):

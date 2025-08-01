@@ -107,13 +107,16 @@ def add_country(data: dict, conn: sqlite3.Connection = None) -> int | None:
         logging.error(f"Database error in add_country for '{country_name}': {e}")
         return None
 
-@_manage_conn
+from .generic_crud import _manage_sqla_session
+
+@_manage_sqla_session
 def get_all_countries(conn: Session = None) -> list[dict]:
     """
-    Retrieves all countries.
+    Retrieves all countries using a SQLAlchemy session.
     """
     try:
         countries = conn.query(Country).order_by(Country.country_name).all()
+        # Convert ORM objects to dictionaries, which is the format expected by the UI.
         return [
             {
                 "country_id": c.country_id,
