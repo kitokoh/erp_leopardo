@@ -23,11 +23,11 @@ class EditUserDialog(QDialog):
 
         if self.add_mode:
             self.setWindowTitle(self.tr("Ajouter Utilisateur"))
-            self.setWindowIcon(QIcon(":/icons/user-plus.svg"))
+            self.setWindowIcon(QIcon(":/icons/user-plus.svg")) # Keep icon for adding
             self.user_data_to_edit = {'is_active': True} # Default for new user
         else:
             self.setWindowTitle(self.tr("Modifier Utilisateur"))
-            self.setWindowIcon(QIcon(":/icons/user.svg"))
+            self.setWindowIcon(QIcon(":/icons/user.svg")) # Keep icon for editing
             self._load_user_data_for_edit() # Load data only if editing
 
         if not self.add_mode and not self.user_data_to_edit:
@@ -87,10 +87,8 @@ class EditUserDialog(QDialog):
         main_layout.addLayout(self.form_layout)
 
         self.button_box = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
-        save_button_text = self.tr("Créer") if self.add_mode else self.tr("Sauvegarder")
-        self.button_box.button(QDialogButtonBox.Save).setText(save_button_text)
-        save_button_icon = QIcon(":/icons/user-plus.svg") if self.add_mode else QIcon(":/icons/save.svg")
-        # self.button_box.button(QDialogButtonBox.Save).setIcon(save_button_icon)
+        save_button_text = "Créer" if self.add_mode else "Sauvegarder"
+        self.button_box.button(QDialogButtonBox.Save).setText(f"💾 {self.tr(save_button_text)}")
         self.button_box.button(QDialogButtonBox.Cancel).setText(self.tr("Annuler"))
 
         self.button_box.accepted.connect(self._save_changes)

@@ -224,7 +224,7 @@ class ClientMainWidget(QWidget):
             # self.action_buttons_layout.addWidget(self.manage_referent_btn) # Removed, functionality moved to checkbox
 
 
-            self.generate_referents_report_btn = QPushButton(QIcon(":/icons/file-text.svg"), self.tr("Rapport Référents"))
+            self.generate_referents_report_btn = QPushButton("📄 " + self.tr("Rapport Référents"))
             self.generate_referents_report_btn.setObjectName("secondaryButton")
             self.generate_referents_report_btn.setToolTip(self.tr("Générer un rapport PDF des référents locaux et globaux pour ce client"))
             self.generate_referents_report_btn.clicked.connect(self.handle_generate_referents_report)
@@ -433,19 +433,19 @@ class ClientMainWidget(QWidget):
             # Boutons d'action sous le tableau
             contacts_btn_layout = QHBoxLayout()
             contacts_btn_layout.setSpacing(10)
-            self.add_contact_btn = QPushButton(QIcon(":/icons/plus-circle.svg"), self.tr("Ajouter Contact"))
+            self.add_contact_btn = QPushButton("➕ " + self.tr("Ajouter Contact"))
             self.add_contact_btn.setObjectName("primaryButton") # For QSS styling
             self.add_contact_btn.setToolTip(self.tr("Ajouter un nouveau contact pour ce client"))
             self.add_contact_btn.clicked.connect(self.add_contact)
             contacts_btn_layout.addWidget(self.add_contact_btn)
 
-            self.edit_contact_btn = QPushButton(QIcon(":/icons/edit-2.svg"), self.tr("Modifier Contact"))
+            self.edit_contact_btn = QPushButton("✏️ " + self.tr("Modifier Contact"))
             self.edit_contact_btn.setObjectName("secondaryButton") # For QSS styling
             self.edit_contact_btn.setToolTip(self.tr("Modifier le contact sélectionné"))
             self.edit_contact_btn.clicked.connect(self.edit_contact) # Connects to the same slot as double-click
             contacts_btn_layout.addWidget(self.edit_contact_btn)
 
-            self.remove_contact_btn = QPushButton(QIcon(":/icons/trash-2.svg"), self.tr("Supprimer Contact"))
+            self.remove_contact_btn = QPushButton("🗑️ " + self.tr("Supprimer Contact"))
             self.remove_contact_btn.setObjectName("dangerButton") # For QSS styling
             self.remove_contact_btn.setToolTip(self.tr("Supprimer le lien vers le contact sélectionné pour ce client"))
             self.remove_contact_btn.clicked.connect(self.remove_contact)
@@ -453,7 +453,7 @@ class ClientMainWidget(QWidget):
             contacts_btn_layout.addStretch() # Pushes buttons to the left
             contacts_tab_layout.addLayout(contacts_btn_layout)
 
-            self.internal_client_info_tabs.addTab(contacts_tab_widget, QIcon(":/icons/users.svg"), self.tr("Contacts"))
+            self.internal_client_info_tabs.addTab(contacts_tab_widget, "👥 " + self.tr("Contacts"))
 
             self.assignments_internal_tab = QWidget()
             assignments_internal_tab_layout = QVBoxLayout(self.assignments_internal_tab)
@@ -486,17 +486,17 @@ class ClientMainWidget(QWidget):
             self.assigned_vendors_table.setSortingEnabled(True)
             assigned_vendors_layout.addWidget(self.assigned_vendors_table)
             vendor_buttons_layout = QHBoxLayout()
-            self.add_assigned_vendor_btn = QPushButton(QIcon(":/icons/user-plus.svg"), self.tr("Ajouter Personnel"))
+            self.add_assigned_vendor_btn = QPushButton("👤+ " + self.tr("Ajouter Personnel"))
             self.add_assigned_vendor_btn.setObjectName("primaryButton")
             self.add_assigned_vendor_btn.clicked.connect(self.handle_add_assigned_vendor)
-            self.remove_assigned_vendor_btn = QPushButton(QIcon(":/icons/user-minus.svg"), self.tr("Retirer Personnel"))
+            self.remove_assigned_vendor_btn = QPushButton("👤- " + self.tr("Retirer Personnel"))
             self.remove_assigned_vendor_btn.setObjectName("dangerButton")
             self.remove_assigned_vendor_btn.clicked.connect(self.handle_remove_assigned_vendor)
             vendor_buttons_layout.addStretch()
             vendor_buttons_layout.addWidget(self.add_assigned_vendor_btn)
             vendor_buttons_layout.addWidget(self.remove_assigned_vendor_btn)
             assigned_vendors_layout.addLayout(vendor_buttons_layout)
-            self.assignments_sub_tabs.addTab(assigned_vendors_widget, QIcon(":/icons/users.svg"), self.tr("Personnel"))
+            self.assignments_sub_tabs.addTab(assigned_vendors_widget, "👥 " + self.tr("Personnel"))
 
             # --- Techniciens ---
             assigned_technicians_widget = QWidget()
@@ -514,17 +514,17 @@ class ClientMainWidget(QWidget):
             self.assigned_technicians_table.setSortingEnabled(True)
             assigned_technicians_layout.addWidget(self.assigned_technicians_table)
             technician_buttons_layout = QHBoxLayout()
-            self.add_assigned_technician_btn = QPushButton(QIcon(":/icons/tool.svg"), self.tr("Ajouter Technicien")) # More specific icon
+            self.add_assigned_technician_btn = QPushButton("🛠️ " + self.tr("Ajouter Technicien")) # More specific icon
             self.add_assigned_technician_btn.setObjectName("primaryButton")
             self.add_assigned_technician_btn.clicked.connect(self.handle_add_assigned_technician)
-            self.remove_assigned_technician_btn = QPushButton(QIcon(":/icons/user-minus.svg"), self.tr("Retirer Technicien"))
+            self.remove_assigned_technician_btn = QPushButton("👤- " + self.tr("Retirer Technicien"))
             self.remove_assigned_technician_btn.setObjectName("dangerButton")
             self.remove_assigned_technician_btn.clicked.connect(self.handle_remove_assigned_technician)
             technician_buttons_layout.addStretch()
             technician_buttons_layout.addWidget(self.add_assigned_technician_btn)
             technician_buttons_layout.addWidget(self.remove_assigned_technician_btn)
             assigned_technicians_layout.addLayout(technician_buttons_layout)
-            self.assignments_sub_tabs.addTab(assigned_technicians_widget, QIcon(":/icons/settings.svg"), self.tr("Techniciens"))
+            self.assignments_sub_tabs.addTab(assigned_technicians_widget, "⚙️ " + self.tr("Techniciens"))
 
             # --- Transporteurs ---
             assigned_transporters_widget = QWidget()
@@ -543,17 +543,17 @@ class ClientMainWidget(QWidget):
             self.assigned_transporters_table.setSortingEnabled(True)
             assigned_transporters_layout.addWidget(self.assigned_transporters_table)
             transporter_buttons_layout = QHBoxLayout()
-            self.add_assigned_transporter_btn = QPushButton(QIcon(":/icons/plus-circle.svg"), self.tr("Ajouter Transporteur"))
+            self.add_assigned_transporter_btn = QPushButton("➕ " + self.tr("Ajouter Transporteur"))
             self.add_assigned_transporter_btn.setObjectName("primaryButton")
             self.add_assigned_transporter_btn.clicked.connect(self.handle_add_assigned_transporter)
-            self.remove_assigned_transporter_btn = QPushButton(QIcon(":/icons/trash-2.svg"), self.tr("Retirer Transporteur"))
+            self.remove_assigned_transporter_btn = QPushButton("🗑️ " + self.tr("Retirer Transporteur"))
             self.remove_assigned_transporter_btn.setObjectName("dangerButton")
             self.remove_assigned_transporter_btn.clicked.connect(self.handle_remove_assigned_transporter)
             transporter_buttons_layout.addStretch()
             transporter_buttons_layout.addWidget(self.add_assigned_transporter_btn)
             transporter_buttons_layout.addWidget(self.remove_assigned_transporter_btn)
             assigned_transporters_layout.addLayout(transporter_buttons_layout)
-            self.assignments_sub_tabs.addTab(assigned_transporters_widget, QIcon(":/icons/truck.svg"), self.tr("Transporteurs"))
+            self.assignments_sub_tabs.addTab(assigned_transporters_widget, "🚚 " + self.tr("Transporteurs"))
 
             # --- Transitaires ---
             assigned_forwarders_widget = QWidget()
@@ -572,17 +572,17 @@ class ClientMainWidget(QWidget):
             self.assigned_forwarders_table.setSortingEnabled(True)
             assigned_forwarders_layout.addWidget(self.assigned_forwarders_table)
             forwarder_buttons_layout = QHBoxLayout()
-            self.add_assigned_forwarder_btn = QPushButton(QIcon(":/icons/plus-circle.svg"), self.tr("Ajouter Transitaire"))
+            self.add_assigned_forwarder_btn = QPushButton("➕ " + self.tr("Ajouter Transitaire"))
             self.add_assigned_forwarder_btn.setObjectName("primaryButton")
             self.add_assigned_forwarder_btn.clicked.connect(self.handle_add_assigned_forwarder)
-            self.remove_assigned_forwarder_btn = QPushButton(QIcon(":/icons/trash-2.svg"), self.tr("Retirer Transitaire"))
+            self.remove_assigned_forwarder_btn = QPushButton("🗑️ " + self.tr("Retirer Transitaire"))
             self.remove_assigned_forwarder_btn.setObjectName("dangerButton")
             self.remove_assigned_forwarder_btn.clicked.connect(self.handle_remove_assigned_forwarder)
             forwarder_buttons_layout.addStretch()
             forwarder_buttons_layout.addWidget(self.add_assigned_forwarder_btn)
             forwarder_buttons_layout.addWidget(self.remove_assigned_forwarder_btn)
             assigned_forwarders_layout.addLayout(forwarder_buttons_layout)
-            self.assignments_sub_tabs.addTab(assigned_forwarders_widget, QIcon(":/icons/globe.svg"), self.tr("Transitaires"))
+            self.assignments_sub_tabs.addTab(assigned_forwarders_widget, "🌍 " + self.tr("Transitaires"))
 
             mta_widget = QWidget()
             mta_layout = QVBoxLayout(mta_widget)
@@ -609,19 +609,19 @@ class ClientMainWidget(QWidget):
             mta_layout.addWidget(self.assigned_mta_table)
 
             mta_buttons_layout = QHBoxLayout()
-            self.add_assigned_mta_btn = QPushButton(QIcon(":/icons/plus-circle.svg"), self.tr("Assigner Agent"))
+            self.add_assigned_mta_btn = QPushButton("➕ " + self.tr("Assigner Agent"))
             self.add_assigned_mta_btn.setObjectName("primaryButton")
             self.add_assigned_mta_btn.clicked.connect(self.handle_add_assigned_mta)
-            self.remove_assigned_mta_btn = QPushButton(QIcon(":/icons/trash-2.svg"), self.tr("Retirer Agent"))
+            self.remove_assigned_mta_btn = QPushButton("🗑️ " + self.tr("Retirer Agent"))
             self.remove_assigned_mta_btn.setObjectName("dangerButton")
             self.remove_assigned_mta_btn.clicked.connect(self.handle_remove_assigned_mta)
             mta_buttons_layout.addStretch()
             mta_buttons_layout.addWidget(self.add_assigned_mta_btn)
             mta_buttons_layout.addWidget(self.remove_assigned_mta_btn)
             mta_layout.addLayout(mta_buttons_layout)
-            self.assignments_sub_tabs.addTab(mta_widget, QIcon(":/icons/credit-card.svg"), self.tr("Agents de Transfert d'Argent"))
+            self.assignments_sub_tabs.addTab(mta_widget, "💳 " + self.tr("Agents de Transfert d'Argent"))
 
-            self.internal_client_info_tabs.addTab(self.assignments_internal_tab, QIcon(":/icons/briefcase.svg"), self.tr("Affectations"))
+            self.internal_client_info_tabs.addTab(self.assignments_internal_tab, "📁 " + self.tr("Affectations"))
             self.assigned_vendors_table.itemSelectionChanged.connect(self.update_assigned_vendors_buttons_state)
             self.assigned_technicians_table.itemSelectionChanged.connect(self.update_assigned_technicians_buttons_state)
             self.assigned_transporters_table.itemSelectionChanged.connect(self.update_assigned_transporters_buttons_state)
@@ -796,13 +796,13 @@ class ClientMainWidget(QWidget):
                     actions_layout.setContentsMargins(5, 0, 5, 0)
                     actions_layout.setSpacing(5)
 
-                    edit_button = QPushButton(QIcon(":/icons/edit-2.svg"), "")
+                    edit_button = QPushButton("✏️")
                     edit_button.setToolTip(self.tr("Modifier ce contact"))
                     edit_button.setProperty("class", "tableActionButton")
                     edit_button.clicked.connect(lambda checked, r=row: self.handle_edit_contact_action(r))
                     actions_layout.addWidget(edit_button)
 
-                    remove_button = QPushButton(QIcon(":/icons/trash-2.svg"), "")
+                    remove_button = QPushButton("🗑️")
                     remove_button.setToolTip(self.tr("Supprimer le lien vers ce contact"))
                     remove_button.setProperty("class", "dangerButtonTable")
                     remove_button.clicked.connect(lambda checked, r=row: self.handle_remove_contact_action(r))
@@ -1478,7 +1478,7 @@ class ClientMainWidget(QWidget):
                 config=self.config,
                 parent_widget=self
             )
-            self.tab_widget.addTab(self.billing_tab_widget_ref, QIcon(":/icons/credit-card.svg"), self.tr("Billing"))
+            self.tab_widget.addTab(self.billing_tab_widget_ref, "💳 " + self.tr("Billing"))
 
             # Le bloc "Add Commandes Tab" était dupliqué. La première instance (plus haut dans la méthode)
             # est conservée, celle-ci est supprimée.
@@ -2106,11 +2106,11 @@ class ClientMainWidget(QWidget):
                 role_name = self.current_user_info.get('role_name') if self.current_user_info else None
                 can_manage_doc_notes = has_permission(role_name, P_MANAGE_CLIENT_DOCUMENTS)
                 if can_manage_doc_notes:
-                    edit_button = QPushButton(QIcon(":/icons/pencil.svg"), "")
+                    edit_button = QPushButton("✏️")
                     edit_button.setToolTip(self.tr("Modifier cette note"))
                     edit_button.clicked.connect(lambda checked, n_id=note_id: self.on_edit_document_note_clicked(n_id))
                     actions_layout.addWidget(edit_button)
-                    delete_button = QPushButton(QIcon(":/icons/trash.svg"), "")
+                    delete_button = QPushButton("🗑️")
                     delete_button.setToolTip(self.tr("Supprimer cette note"))
                     delete_button.setObjectName("dangerButton")
                     delete_button.clicked.connect(lambda checked, n_id=note_id: self.on_delete_document_note_clicked(n_id))

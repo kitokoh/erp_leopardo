@@ -1,5 +1,6 @@
 # user_management/user_menu_button.py
 import logging
+import os
 from PyQt5.QtWidgets import QPushButton, QMenu, QAction, QLabel, QWidgetAction, QApplication, QMessageBox
 from PyQt5.QtGui import QIcon, QPixmap, QPainter, QBrush, QColor
 from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QSize # Import QPoint
@@ -46,26 +47,44 @@ class UserMenuButton(QPushButton):
         avatar_path = self.current_user_info.get('avatar_path') if self.current_user_info else None
 
         if avatar_path and os.path.exists(avatar_path):
+            # Avatar exists, use the circular pixmap logic
+            self.setText("") # Clear any fallback text
             pixmap = QPixmap(avatar_path)
+            size = 28
+            circular_pixmap = QPixmap(size, size)
+            circular_pixmap.fill(Qt.transparent)
+
+            painter = QPainter(circular_pixmap)
+            painter.setRenderHint(QPainter.Antialiasing)
+
+            brush = QBrush(pixmap.scaled(size, size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
+            painter.setBrush(brush)
+            painter.setPen(Qt.NoPen)
+            painter.drawEllipse(0, 0, size, size)
+            painter.end()
+
+            self.setIcon(QIcon(circular_pixmap))
+            self.setIconSize(QSize(size, size))
+            # Reset stylesheet to basic transparent button for the icon
+            self.setStyleSheet("QPushButton { border: none; border-radius: 16px; background-color: transparent; }")
         else:
-            pixmap = QPixmap()
-
-        # Create a circular pixmap
-        size = 28
-        circular_pixmap = QPixmap(size, size)
-        circular_pixmap.fill(Qt.transparent)
-
-        painter = QPainter(circular_pixmap)
-        painter.setRenderHint(QPainter.Antialiasing)
-
-        brush = QBrush(pixmap.scaled(size, size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
-        painter.setBrush(brush)
-        painter.setPen(Qt.NoPen)
-        painter.drawEllipse(0, 0, size, size)
-        painter.end()
-
-        self.setIcon(QIcon(circular_pixmap))
-        self.setIconSize(QSize(size, size))
+            # No avatar, use emoji fallback
+            self.setIcon(QIcon()) # Clear any previous icon
+            self.setText("👤")
+            # Apply a style that makes the emoji visible and the button look good
+            self.setStyleSheet("""
+                QPushButton {
+                    border: 1px solid #d1d5db;
+                    border-radius: 16px;
+                    background-color: #f3f4f6;
+                    font-size: 24px; /* Increased font size for emoji */
+                    color: #1f2937; /* Darker color for better contrast */
+                    min-width: 32px; /* Ensure enough space for the emoji */
+                }
+                QPushButton:hover {
+                    background-color: #e5e7eb;
+                }
+            """)
 
     def _build_menu(self):
         self.user_menu.clear()

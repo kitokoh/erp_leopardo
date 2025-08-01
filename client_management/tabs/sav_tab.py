@@ -103,7 +103,7 @@ class SAVTab(QWidget):
 
         purchase_group_layout.addWidget(self.purchase_history_table)
 
-        self.refresh_purchase_history_btn = QPushButton(QIcon(":/icons/refresh-cw.svg"), self.tr("Actualiser Historique"))
+        self.refresh_purchase_history_btn = QPushButton("🔄 " + self.tr("Actualiser Historique"))
         self.refresh_purchase_history_btn.setObjectName("secondaryButton")
         self.refresh_purchase_history_btn.clicked.connect(self.load_purchase_history_table)
         purchase_group_layout.addWidget(self.refresh_purchase_history_btn, 0, Qt.AlignRight)
@@ -138,7 +138,7 @@ class SAVTab(QWidget):
         tickets_group_layout.addWidget(self.sav_tickets_table)
 
         sav_tickets_buttons_layout = QHBoxLayout()
-        self.add_sav_ticket_btn = QPushButton(QIcon(":/icons/plus-circle.svg"), self.tr("Nouveau Ticket SAV (Général)"))
+        self.add_sav_ticket_btn = QPushButton("➕ " + self.tr("Nouveau Ticket SAV (Général)"))
         self.add_sav_ticket_btn.setObjectName("primaryButton")
         self.add_sav_ticket_btn.setToolTip(self.tr("Ouvrir un nouveau ticket SAV non lié à un achat spécifique de l'historique"))
         self.add_sav_ticket_btn.clicked.connect(lambda: self.open_new_sav_ticket_dialog(client_project_product_id=None)) # General ticket
@@ -243,7 +243,7 @@ class SAVTab(QWidget):
                     actions_layout.setContentsMargins(0,0,0,0)
                     actions_layout.setSpacing(5)
 
-                    open_ticket_btn = QPushButton(QIcon(":/icons/file-plus.svg"), "") # Using file-plus for "new ticket"
+                    open_ticket_btn = QPushButton("📄") # Using file-plus for "new ticket"
                     open_ticket_btn.setToolTip(self.tr("Ouvrir un ticket SAV pour ce produit/achat"))
                     open_ticket_btn.setProperty("class", "tableActionButton")
                     open_ticket_btn.clicked.connect(lambda checked, c=cpp_id: self.open_new_sav_ticket_dialog(client_project_product_id=c))
@@ -342,7 +342,7 @@ class SAVTab(QWidget):
                 actions_layout = QHBoxLayout(actions_widget)
                 actions_layout.setContentsMargins(0,0,0,0); actions_layout.setSpacing(5)
 
-                view_edit_button = QPushButton(QIcon(":/icons/edit-2.svg"), "") # Or eye.svg
+                view_edit_button = QPushButton("✏️") # Or eye.svg
                 view_edit_button.setToolTip(self.tr("Voir/Modifier Ticket SAV"))
                 view_edit_button.setProperty("class", "tableActionButton")
                 view_edit_button.clicked.connect(lambda checked, t_id=ticket_id: self.view_edit_sav_ticket_dialog(t_id))

@@ -22,7 +22,6 @@ class LoginDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Connexion - Gestionnaire de Documents"))
-        self.setWindowIcon(QIcon(":/icons/logo.svg")) # Assuming logo.svg is in resources
         self.setMinimumSize(350, 250)
         self.user_data = None # To store user data upon successful login
         self._raw_login_output = None # To store all 4 return values from authentication.login
@@ -35,17 +34,12 @@ class LoginDialog(QDialog):
 
         # Optional: Add a logo or header image
         logo_label = QLabel(self)
-        pixmap = QPixmap(":/icons/leopard_logo.svg") # Or your app logo
-        if not pixmap.isNull():
-             logo_label.setPixmap(pixmap.scaled(100, 100, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-             logo_label.setAlignment(Qt.AlignCenter)
-             main_layout.addWidget(logo_label)
-        else:
-            # Fallback if logo not found or for simplicity
-            header_label = QLabel(self.tr("Authentification Requise"))
-            header_label.setObjectName("dialogHeaderLabel") # Assuming this style exists
-            header_label.setAlignment(Qt.AlignCenter)
-            main_layout.addWidget(header_label)
+        logo_label.setText("🐆")
+        logo_label.setAlignment(Qt.AlignCenter)
+        font = logo_label.font()
+        font.setPointSize(48)
+        logo_label.setFont(font)
+        main_layout.addWidget(logo_label)
 
 
         form_layout = QFormLayout()

@@ -48,7 +48,7 @@ class BillingTab(QWidget):
         actions_group = QGroupBox(self.tr("Actions de Facturation"))
         actions_group_layout = QVBoxLayout(actions_group)
 
-        self.generate_invoice_button = QPushButton(QIcon(":/icons/file-plus.svg"), self.tr("Préparer et Générer une Facture Finale"))
+        self.generate_invoice_button = QPushButton("📄 " + self.tr("Préparer et Générer une Facture Finale"))
         self.generate_invoice_button.setObjectName("primaryButton")
         self.generate_invoice_button.setToolTip(self.tr("Ouvre un dialogue pour saisir les informations finales et générer la facture PDF pour ce client."))
         self.generate_invoice_button.clicked.connect(self.handle_generate_final_invoice)
@@ -97,7 +97,7 @@ class BillingTab(QWidget):
         self.invoices_table.hide()
 
 
-        self.refresh_invoices_btn = QPushButton(QIcon(":/icons/refresh-cw.svg"), self.tr("Actualiser Factures"))
+        self.refresh_invoices_btn = QPushButton("🔄 " + self.tr("Actualiser Factures"))
         self.refresh_invoices_btn.setObjectName("secondaryButton")
         self.refresh_invoices_btn.clicked.connect(self.load_invoices_table)
         invoices_group_layout.addWidget(self.refresh_invoices_btn, 0, Qt.AlignRight)
@@ -169,13 +169,13 @@ class BillingTab(QWidget):
                     actions_layout.setContentsMargins(2, 2, 2, 2)
                     actions_layout.setSpacing(5)
 
-                    view_pdf_btn = QPushButton(QIcon(":/icons/file-text.svg"), "") # No text, icon only
+                    view_pdf_btn = QPushButton("📄") # No text, icon only
                     view_pdf_btn.setToolTip(self.tr("Ouvrir le fichier PDF de la facture"))
                     view_pdf_btn.setObjectName("iconButton")
                     view_pdf_btn.clicked.connect(lambda ch, inv_id=invoice_id, doc_id=invoice_data_dict.get("document_id"): self.handle_view_invoice_pdf(inv_id, doc_id))
                     actions_layout.addWidget(view_pdf_btn)
 
-                    record_payment_btn = QPushButton(QIcon(":/icons/dollar-sign.svg"), "") # No text, icon only
+                    record_payment_btn = QPushButton("💵") # No text, icon only
                     record_payment_btn.setToolTip(self.tr("Enregistrer ou mettre à jour le statut du paiement pour cette facture"))
                     record_payment_btn.setObjectName("iconButton")
                     record_payment_btn.clicked.connect(lambda ch, inv_id=invoice_id: self.handle_record_payment(inv_id))

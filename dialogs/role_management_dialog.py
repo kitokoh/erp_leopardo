@@ -21,7 +21,6 @@ class RoleManagementDialog(QDialog):
         self.current_user_info = current_user_info # Needed for logging and potentially permissions
         self.parent_window = parent
         self.setWindowTitle(self.tr("Gestion des Rôles et Permissions"))
-        self.setWindowIcon(QIcon(":/icons/settings.svg")) # Replaced shield.svg with settings.svg
         self.setMinimumSize(800, 600) # Increased size for permissions panel
 
         self._setup_ui()
@@ -58,15 +57,15 @@ class RoleManagementDialog(QDialog):
         roles_layout.addWidget(self.roles_table)
 
         role_buttons_layout = QHBoxLayout()
-        self.add_role_button = QPushButton(QIcon(":/icons/plus-circle.svg"), self.tr("Ajouter Rôle"))
+        self.add_role_button = QPushButton("➕ " + self.tr("Ajouter Rôle"))
         self.add_role_button.clicked.connect(self._handle_add_role) # Connect action
         role_buttons_layout.addWidget(self.add_role_button)
 
-        self.edit_role_button = QPushButton(QIcon(":/icons/pencil.svg"), self.tr("Modifier Rôle"))
+        self.edit_role_button = QPushButton("✏️ " + self.tr("Modifier Rôle"))
         self.edit_role_button.clicked.connect(self._handle_edit_role) # Connect action
         role_buttons_layout.addWidget(self.edit_role_button)
 
-        self.delete_role_button = QPushButton(QIcon(":/icons/trash.svg"), self.tr("Supprimer Rôle"))
+        self.delete_role_button = QPushButton("🗑️ " + self.tr("Supprimer Rôle"))
         self.delete_role_button.clicked.connect(self._handle_delete_role) # Connect action
         role_buttons_layout.addWidget(self.delete_role_button)
         roles_layout.addLayout(role_buttons_layout)
@@ -82,7 +81,7 @@ class RoleManagementDialog(QDialog):
         # Items will be checkable
         permissions_layout.addWidget(self.permissions_list_widget)
 
-        self.save_permissions_button = QPushButton(QIcon(":/icons/save.svg"), self.tr("Sauvegarder Permissions"))
+        self.save_permissions_button = QPushButton("💾 " + self.tr("Sauvegarder Permissions"))
         self.save_permissions_button.clicked.connect(self._handle_save_permissions)
         self.save_permissions_button.setEnabled(False) # Enabled when a role is selected
         permissions_layout.addWidget(self.save_permissions_button)
@@ -95,7 +94,7 @@ class RoleManagementDialog(QDialog):
         # Overall Dialog Buttons (Refresh, Close)
         dialog_buttons_layout = QHBoxLayout()
         dialog_buttons_layout.addStretch()
-        self.refresh_button = QPushButton(QIcon(":/icons/refresh-cw.svg"), self.tr("Actualiser Tout"))
+        self.refresh_button = QPushButton("🔄 " + self.tr("Actualiser Tout"))
         self.refresh_button.clicked.connect(self.load_roles_and_permissions) # Refresh both roles and current permissions view
         dialog_buttons_layout.addWidget(self.refresh_button)
 
