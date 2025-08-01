@@ -68,17 +68,17 @@ class UserMenuButton(QPushButton):
             # Reset stylesheet to basic transparent button for the icon
             self.setStyleSheet("QPushButton { border: none; border-radius: 16px; background-color: transparent; }")
         else:
-            # No avatar, use emoji fallback
-            self.setIcon(QIcon()) # Clear any previous icon
-            self.setText("👤")
-            # Apply a style that makes the emoji visible and the button look good
+            # No avatar, use a default icon from resources
+            self.setText("") # Ensure no text is displayed
+            self.setIcon(QIcon(":/icons/user.svg")) # Set the default user icon
+            self.setIconSize(QSize(24, 24)) # A good size for a 32x32 button
+            # Apply a simple style for the button background
             self.setStyleSheet("""
                 QPushButton {
                     border: 1px solid #d1d5db;
                     border-radius: 16px;
                     background-color: #f3f4f6;
-                    font-size: 18px;
-                    color: #4b5563;
+                    padding: 4px;
                 }
                 QPushButton:hover {
                     background-color: #e5e7eb;
