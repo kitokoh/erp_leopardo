@@ -3530,25 +3530,16 @@ class DocumentManager(QMainWindow):
             # pass
 
     def mousePressEvent(self, event: QMouseEvent):
-        # This event handler is for the window dragging and for custom title bar button clicks.
-
-        # First, check if the click is on one of the control buttons.
-        # We check this first to ensure button clicks are not misinterpreted as drag events.
-        if self.minimize_button.geometry().contains(event.pos()):
-            self.showMinimized()
-            return # Stop further processing
-
-        if self.maximize_button.geometry().contains(event.pos()):
-            self.toggleMaximized()
-            return # Stop further processing
-
-        if self.close_button.geometry().contains(event.pos()):
-            self.close()
-            return # Stop further processing
-
-        # If the click was not on a button, then it might be a drag event.
-        # This part is for window dragging, which is a common feature for custom title bars.
+        # This event handler is for window dragging. Button clicks are handled by their 'clicked' signals.
         if event.button() == Qt.LeftButton and self.top_menu_bar_widget.geometry().contains(event.pos()):
+            # Do not start a drag if the click is on one of the control buttons.
+            # Let the button handle its own click event.
+            if (self.minimize_button.geometry().contains(event.pos()) or
+                    self.maximize_button.geometry().contains(event.pos()) or
+                    self.close_button.geometry().contains(event.pos())):
+                return
+
+            # If not on a button, it's a drag event.
             self.old_pos = event.globalPos()
             self.is_dragging = True
 
