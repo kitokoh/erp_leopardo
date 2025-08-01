@@ -547,20 +547,18 @@ class DocumentManager(QMainWindow):
         if self.module_states.get('statistics', True):
             self.statistics_summary_widget_instance = StatisticsSummaryWidget(parent=self)
             # No need to add to stack, it's part of HomePageWidget's layout
-            self.home_page_map_widget_instance = HomePageMapWidget(app_translator_func=self.tr, parent=self)
+            self.home_page_map_widget_instance = None # It's now managed by HomePageWidget
             # No need to add to stack, it's part of HomePageWidget's layout
 
             if self.home_page_widget_instance:
                 if hasattr(self.home_page_widget_instance, 'set_right_sidebar_widget'):
                     self.home_page_widget_instance.set_right_sidebar_widget(self.statistics_summary_widget_instance)
-                if hasattr(self.home_page_widget_instance, 'set_bottom_widget'):
-                    self.home_page_widget_instance.set_bottom_widget(self.home_page_map_widget_instance)
+                # The call to set_bottom_widget is no longer needed as HomePageWidget handles its own map.
         else: # statistics module disabled
             if self.home_page_widget_instance:
                 if hasattr(self.home_page_widget_instance, 'set_right_sidebar_widget'):
                     self.home_page_widget_instance.set_right_sidebar_widget(None)
-                if hasattr(self.home_page_widget_instance, 'set_bottom_widget'):
-                    self.home_page_widget_instance.set_bottom_widget(None)
+                # The call to set_bottom_widget is no longer needed.
 
         self.searchable_actions_map = {} # Initialize for create_actions_main
 
