@@ -128,11 +128,11 @@ class SidebarNavigationWidget(QWidget):
 
         if self.is_expanded:
             self.setFixedWidth(220) # Largeur typique déployée (ajuster si nécessaire)
-            self.toggle_button.setIcon(QIcon(":/icons/arrow-left-circle.svg")) # Using available icon
+            self.toggle_button.setText("⬅️")
             self.toggle_button.setToolTip(self.tr("Rétracter la barre latérale"))
         else:
             self.setFixedWidth(60)  # Largeur typique rétractée (ajuster si nécessaire)
-            self.toggle_button.setIcon(QIcon(":/icons/chevron-right.svg"))
+            self.toggle_button.setText("➡️")
             self.toggle_button.setToolTip(self.tr("Déployer la barre latérale"))
 
         self._update_button_styles() # Mettre à jour le style des boutons de module

@@ -128,13 +128,13 @@ class CreateDocumentDialog(QDialog):
 
         # Buttons
         button_layout = QHBoxLayout()
-        self.view_folder_button = QPushButton(QIcon(":/icons/folder.svg"), self.tr("Voir Dossier Client"))
+        self.view_folder_button = QPushButton("📁 " + self.tr("Voir Dossier Client"))
         self.view_folder_button.clicked.connect(self._handle_view_client_folder)
         button_layout.addWidget(self.view_folder_button)
         button_layout.addStretch(1)
 
         # Renommer le bouton pour refléter qu'il initie une action, pas seulement la génération
-        self.action_button = QPushButton(QIcon(":/icons/file-plus.svg"), self.tr("Valider Sélection"))
+        self.action_button = QPushButton("✅ " + self.tr("Valider Sélection"))
         self.action_button.setObjectName("primaryButton")
         self.action_button.clicked.connect(self._handle_template_selection_action) # Nouvelle méthode de handler
         button_layout.addWidget(self.action_button)
