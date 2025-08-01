@@ -18,8 +18,7 @@ from db.cruds import product_media_links_crud
 from media_manager import operations as media_ops # For mocking add_image
 from config import MEDIA_FILES_BASE_PATH # For _browse_technical_image path logic
 
-# Ensure a QApplication instance exists.
-app = QApplication.instance() if QApplication.instance() else QApplication(sys.argv)
+# app = QApplication.instance() if QApplication.instance() else QApplication(sys.argv)
 
 class TestProductEditDialog(unittest.TestCase):
 

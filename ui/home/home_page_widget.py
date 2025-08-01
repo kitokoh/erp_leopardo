@@ -109,6 +109,11 @@ class HomePageWidget(QWidget):
         self.map_widget_container = QFrame() # Conteneur pour la carte
         self.map_widget_container.setObjectName("homePageMapContainer")
 
+        # Instantiate and set the map widget directly.
+        # The translator function `self.tr` is available from QWidget.
+        self.home_map_widget = HomePageMapWidget(app_translator_func=self.tr, parent=self)
+        self.set_map_widget(self.home_map_widget)
+
         top_layout = self._setup_top_layout()
         bottom_layout = self._setup_bottom_layout()
 
@@ -474,10 +479,6 @@ class HomePageWidget(QWidget):
                 self.map_widget_container.setVisible(True)
             else:
                 self.map_widget_container.setVisible(False)
-
-    def set_bottom_widget(self, widget_to_display):
-        # Cette méthode est maintenant utilisée pour placer la carte.
-        self.set_map_widget(widget_to_display)
 
     def set_right_sidebar_widget(self, widget_to_display):
         # Clear existing widgets from the right sidebar layout
