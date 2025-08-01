@@ -2,6 +2,7 @@
 # import os # No longer needed for sys.path manipulation here
 
 # Assuming main.py or the entry script handles adding project root to sys.path
+from .cruds.locations_crud import get_all_countries, add_country, get_or_add_country, get_all_cities, add_city, get_or_add_city, get_country_by_id, get_city_by_id, get_country_by_name, get_city_by_name_and_country_id
 from config import DATABASE_PATH # This should work if project root is in sys.path
 
 DATABASE_NAME = DATABASE_PATH
