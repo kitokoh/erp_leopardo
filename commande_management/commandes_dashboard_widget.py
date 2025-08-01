@@ -242,19 +242,19 @@ class CommandesDashboardWidget(QWidget):
                 actions_layout = QHBoxLayout(actions_widget)
                 actions_layout.setContentsMargins(0,0,0,0); actions_layout.setSpacing(3)
 
-                view_btn = QPushButton(QIcon.fromTheme("document-edit-symbolic", QIcon(":/icons/pencil.svg")), "")
+                view_btn = QPushButton("✏️")
                 view_btn.setToolTip(self.tr("Voir/Modifier Commande"))
                 view_btn.clicked.connect(lambda ch, cid=cmd_data.get("commande_id"): self._handle_view_edit_commande(cid))
                 actions_layout.addWidget(view_btn)
 
                 client_id_for_action = cmd_data.get("client_id")
-                client_btn = QPushButton(QIcon.fromTheme("user-home", QIcon(":/icons/team.svg")), "") # Fallback icon
+                client_btn = QPushButton("👤") # Fallback icon
                 client_btn.setToolTip(self.tr("Aller à la Fiche Client"))
                 client_btn.clicked.connect(lambda ch, cid=client_id_for_action: self._handle_go_to_client(cid))
                 actions_layout.addWidget(client_btn)
 
                 project_id_for_action = cmd_data.get("project_id")
-                project_btn = QPushButton(QIcon.fromTheme("folder-activities", QIcon(":/icons/briefcase.svg")), "") # Fallback icon
+                project_btn = QPushButton("📁") # Fallback icon
                 project_btn.setToolTip(self.tr("Aller au Projet Associé"))
                 if project_id_for_action:
                     project_btn.clicked.connect(lambda ch, pid=project_id_for_action: self._handle_go_to_project(pid))

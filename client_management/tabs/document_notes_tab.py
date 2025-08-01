@@ -67,12 +67,12 @@ class DocumentNotesTab(QWidget):
 
         top_bar_layout.addStretch(1)
 
-        self.add_doc_note_button = QPushButton(QIcon(":/icons/plus-circle.svg"), self.tr("Ajouter Note"))
+        self.add_doc_note_button = QPushButton("➕ " + self.tr("Ajouter Note"))
         self.add_doc_note_button.setObjectName("primaryButton")
         self.add_doc_note_button.setToolTip(self.tr("Ajouter une nouvelle note de document pour ce client"))
         top_bar_layout.addWidget(self.add_doc_note_button)
 
-        self.refresh_doc_notes_button = QPushButton(QIcon(":/icons/refresh-cw.svg"), self.tr("Actualiser"))
+        self.refresh_doc_notes_button = QPushButton("🔄 " + self.tr("Actualiser"))
         self.refresh_doc_notes_button.setObjectName("secondaryButton")
         self.refresh_doc_notes_button.setToolTip(self.tr("Actualiser la liste des notes de document"))
         top_bar_layout.addWidget(self.refresh_doc_notes_button)
@@ -188,13 +188,13 @@ class DocumentNotesTab(QWidget):
                 can_manage = has_permission(role_name, P_MANAGE_CLIENT_DOCUMENTS) # Or a more specific permission
 
                 if can_manage:
-                    edit_btn = QPushButton(QIcon(":/icons/edit-2.svg"), "")
+                    edit_btn = QPushButton("✏️")
                     edit_btn.setToolTip(self.tr("Modifier cette note"))
                     edit_btn.setProperty("class", "tableActionButton")
                     edit_btn.clicked.connect(lambda ch, nid=note_id: self.on_edit_document_note_clicked(nid))
                     actions_layout.addWidget(edit_btn)
 
-                    delete_btn = QPushButton(QIcon(":/icons/trash-2.svg"), "")
+                    delete_btn = QPushButton("🗑️")
                     delete_btn.setToolTip(self.tr("Supprimer cette note"))
                     delete_btn.setProperty("class", "dangerButtonTable")
                     delete_btn.clicked.connect(lambda ch, nid=note_id: self.on_delete_document_note_clicked(nid))

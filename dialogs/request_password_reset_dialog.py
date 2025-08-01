@@ -18,7 +18,6 @@ class RequestPasswordResetDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Réinitialisation du mot de passe"))
-        self.setWindowIcon(QIcon(":/icons/lock.svg")) # Assuming a lock icon exists
         self.setMinimumWidth(350)
         self.setModal(True)
 
@@ -46,8 +45,7 @@ class RequestPasswordResetDialog(QDialog):
 
         # Buttons
         button_layout = QHBoxLayout()
-        self.submit_button = QPushButton(self.tr("Envoyer la demande"))
-        self.submit_button.setIcon(QIcon(":/icons/send.svg")) # Assuming send icon
+        self.submit_button = QPushButton("✉️ " + self.tr("Envoyer la demande"))
         self.submit_button.clicked.connect(self._handle_submit)
 
         self.cancel_button = QPushButton(self.tr("Annuler"))

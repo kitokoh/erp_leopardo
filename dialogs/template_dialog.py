@@ -70,16 +70,16 @@ class TemplateDialog(QDialog):
         self.template_list.setAlternatingRowColors(True); font = self.template_list.font(); font.setPointSize(font.pointSize() + 1); self.template_list.setFont(font)
         left_vbox_layout.addWidget(self.template_list)
         btn_layout = QHBoxLayout(); btn_layout.setSpacing(8)
-        self.add_btn = QPushButton(self.tr("Ajouter Fichier")); self.add_btn.setIcon(QIcon(":/icons/plus.svg")); self.add_btn.setToolTip(self.tr("Ajouter un nouveau modèle à partir d'un fichier existant (.docx, .xlsx, .html)")); self.add_btn.setObjectName("primaryButton"); self.add_btn.clicked.connect(self.add_template_from_file); btn_layout.addWidget(self.add_btn)
+        self.add_btn = QPushButton("➕ " + self.tr("Ajouter Fichier")); self.add_btn.setToolTip(self.tr("Ajouter un nouveau modèle à partir d'un fichier existant (.docx, .xlsx, .html)")); self.add_btn.setObjectName("primaryButton"); self.add_btn.clicked.connect(self.add_template_from_file); btn_layout.addWidget(self.add_btn)
 
-        self.create_html_btn = QPushButton(self.tr("Créer Modèle HTML")); self.create_html_btn.setIcon(QIcon(":/icons/file-plus.svg")); # Assuming you have a file-plus.svg or similar
+        self.create_html_btn = QPushButton("📄 " + self.tr("Créer Modèle HTML")); # Assuming you have a file-plus.svg or similar
         self.create_html_btn.setToolTip(self.tr("Créer un nouveau modèle HTML à partir de zéro avec l'éditeur intégré")); self.create_html_btn.clicked.connect(self.create_html_template_dialog); btn_layout.addWidget(self.create_html_btn)
 
         btn_layout.addStretch(1) # Add some space before other buttons
 
-        self.edit_btn = QPushButton(self.tr("Modifier")); self.edit_btn.setIcon(QIcon(":/icons/pencil.svg")); self.edit_btn.setToolTip(self.tr("Modifier le modèle sélectionné (ouvre le fichier externe ou l'éditeur HTML)")); self.edit_btn.clicked.connect(self.edit_template); self.edit_btn.setEnabled(False); btn_layout.addWidget(self.edit_btn)
-        self.delete_btn = QPushButton(self.tr("Supprimer")); self.delete_btn.setIcon(QIcon(":/icons/trash.svg")); self.delete_btn.setToolTip(self.tr("Supprimer le modèle sélectionné")); self.delete_btn.setObjectName("dangerButton"); self.delete_btn.clicked.connect(self.delete_template); self.delete_btn.setEnabled(False); btn_layout.addWidget(self.delete_btn)
-        self.default_btn = QPushButton(self.tr("Par Défaut")); self.default_btn.setIcon(QIcon.fromTheme("emblem-default", QIcon(":/icons/check-square.svg"))); # Fallback icon
+        self.edit_btn = QPushButton("✏️ " + self.tr("Modifier")); self.edit_btn.setToolTip(self.tr("Modifier le modèle sélectionné (ouvre le fichier externe ou l'éditeur HTML)")); self.edit_btn.clicked.connect(self.edit_template); self.edit_btn.setEnabled(False); btn_layout.addWidget(self.edit_btn)
+        self.delete_btn = QPushButton("🗑️ " + self.tr("Supprimer")); self.delete_btn.setToolTip(self.tr("Supprimer le modèle sélectionné")); self.delete_btn.setObjectName("dangerButton"); self.delete_btn.clicked.connect(self.delete_template); self.delete_btn.setEnabled(False); btn_layout.addWidget(self.delete_btn)
+        self.default_btn = QPushButton("⭐ " + self.tr("Par Défaut")); # Fallback icon
         self.default_btn.setToolTip(self.tr("Définir le modèle sélectionné comme modèle par défaut pour sa catégorie et langue")); self.default_btn.clicked.connect(self.set_default_template); self.default_btn.setEnabled(False); btn_layout.addWidget(self.default_btn)
 
         left_vbox_layout.addLayout(btn_layout); main_hbox_layout.addLayout(left_vbox_layout, 1)

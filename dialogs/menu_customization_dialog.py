@@ -81,12 +81,12 @@ class MenuCustomizationDialog(QDialog):
         # Action Buttons Section (between the two lists)
         actions_layout = QVBoxLayout()
         actions_layout.addStretch()
-        self.move_to_hidden_button = QPushButton(QIcon(":/icons/arrow-right.svg"), self.tr("")) # Move to Hidden
+        self.move_to_hidden_button = QPushButton("➡️") # Move to Hidden
         self.move_to_hidden_button.setToolTip(self.tr("Cacher le module sélectionné"))
         self.move_to_hidden_button.clicked.connect(self._move_selected_to_hidden)
         actions_layout.addWidget(self.move_to_hidden_button)
 
-        self.move_to_visible_button = QPushButton(QIcon(":/icons/arrow-left.svg"), self.tr("")) # Move to Visible
+        self.move_to_visible_button = QPushButton("⬅️") # Move to Visible
         self.move_to_visible_button.setToolTip(self.tr("Afficher le module sélectionné"))
         self.move_to_visible_button.clicked.connect(self._move_selected_to_visible)
         actions_layout.addWidget(self.move_to_visible_button)

@@ -55,13 +55,13 @@ class CommandeWidget(QWidget):
 
         top_bar_layout.addStretch(1)
 
-        self.add_commande_btn = QPushButton(QIcon(":/icons/plus-circle.svg"), self.tr("Nouvelle Commande"))
+        self.add_commande_btn = QPushButton("➕ " + self.tr("Nouvelle Commande"))
         self.add_commande_btn.setObjectName("primaryButton")
         self.add_commande_btn.setToolTip(self.tr("Créer une nouvelle commande pour ce client"))
         self.add_commande_btn.clicked.connect(self.add_new_commande)
         top_bar_layout.addWidget(self.add_commande_btn)
 
-        self.refresh_btn = QPushButton(QIcon(":/icons/refresh-cw.svg"), self.tr("Actualiser"))
+        self.refresh_btn = QPushButton("🔄 " + self.tr("Actualiser"))
         self.refresh_btn.setObjectName("secondaryButton")
         self.refresh_btn.setToolTip(self.tr("Actualiser la liste des commandes"))
         self.refresh_btn.clicked.connect(self.load_commandes)
@@ -181,25 +181,25 @@ class CommandeWidget(QWidget):
                 actions_layout.setContentsMargins(0,0,0,0)
                 actions_layout.setSpacing(5)
 
-                view_btn = QPushButton(QIcon(":/icons/eye.svg"), "")
+                view_btn = QPushButton("👁️")
                 view_btn.setToolTip("Voir/Modifier Commande")
                 view_btn.setProperty("class", "tableActionButton")
                 view_btn.clicked.connect(lambda ch, cmd_id=commande_data.get("commande_id"): self.view_edit_commande(cmd_id=cmd_id))
                 actions_layout.addWidget(view_btn)
 
-                proforma_btn = QPushButton(QIcon(":/icons/file-text.svg"), "")
+                proforma_btn = QPushButton("📄")
                 proforma_btn.setToolTip("Générer Facture Proforma")
                 proforma_btn.setProperty("class", "tableActionButton")
                 proforma_btn.clicked.connect(lambda ch, cmd_id=commande_data.get("commande_id"): self.handle_generate_proforma_for_commande(cmd_id))
                 actions_layout.addWidget(proforma_btn)
 
-                compile_docs_btn = QPushButton(QIcon.fromTheme("document-export"), "") # ou une autre icône pertinente
+                compile_docs_btn = QPushButton("📦") # ou une autre icône pertinente
                 compile_docs_btn.setToolTip(self.tr("Compiler les Documents PDF de la Commande"))
                 compile_docs_btn.setProperty("class", "tableActionButton")
                 compile_docs_btn.clicked.connect(lambda ch, cmd_id=commande_data.get("commande_id"): self.handle_compile_order_documents(cmd_id))
                 actions_layout.addWidget(compile_docs_btn)
 
-                delete_btn = QPushButton(QIcon(":/icons/trash-2.svg"), "")
+                delete_btn = QPushButton("🗑️")
                 delete_btn.setToolTip("Supprimer Commande")
                 delete_btn.setProperty("class", "dangerButtonTable")
                 delete_btn.clicked.connect(lambda ch, cmd_id=commande_data.get("commande_id"): self.delete_selected_commande(cmd_id))
