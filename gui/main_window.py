@@ -59,8 +59,8 @@ from PyQt5.QtWidgets import (
     QTextEdit, QSplitter, QApplication, QToolButton # Added QToolButton for inline actions
 
 )
-from PyQt5.QtGui import QIcon, QDesktopServices, QFont
-from PyQt5.QtCore import Qt, QUrl, QTimer, pyqtSlot, QByteArray, QDate, QEvent # Added QDate and QEvent
+from PyQt5.QtGui import QIcon, QDesktopServices, QFont, QMouseEvent
+from PyQt5.QtCore import Qt, QUrl, QTimer, pyqtSlot, QByteArray, QDate, QEvent, QPoint
 # QWebEngineView might still be used by ClientWidget or other parts, so keep for now unless confirmed unused.
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 # from PyQt5.QtWebChannel import QWebChannel # QWebChannel removed as DocumentManager no longer uses its own map.
@@ -429,13 +429,14 @@ class DocumentManager(QMainWindow):
 
 
         self._gradient_pos = 0.0
+        self.is_dragging = False
 
         # Window Controls
-        self.minimize_button = QPushButton("—")
+        self.minimize_button = QPushButton("−") # Using a proper minus sign
         self.minimize_button.setToolTip(self.tr("Minimiser"))
-        self.maximize_button = QPushButton("[]")
-        self.maximize_button.setToolTip(self.tr("Agrandir"))
-        self.close_button = QPushButton("X")
+        self.maximize_button = QPushButton("🗖") # A better maximize symbol
+        self.maximize_button.setToolTip(self.tr("Agrandir / Restaurer"))
+        self.close_button = QPushButton("✕") # A better close symbol
         self.close_button.setToolTip(self.tr("Fermer"))
 
         self.minimize_button.clicked.connect(self.showMinimized)
@@ -1742,18 +1743,18 @@ class DocumentManager(QMainWindow):
                 logging.warning(f"QAction instance for module {module_info['name']} (attr: {action_attr_name}) not found.")
 
         menu_definitions = [
-            (self.tr("Accueil"), ":/icons/home.svg", self.home_action),
-            (self.tr("Modules"), ":/icons/layout.svg", [
+            (self.tr("Accueil 🏠"), None, self.home_action),
+            (self.tr("Modules 🧩"), None, [
                 (self.tr("Synchronisation"), self.synchronization_action),
                 (self.tr("Statistiques"), self.statistics_action),
                 (self.tr("Addons"), self.addons_action)
             ] + module_menu_actions),
-            (self.tr("Outils"), ":/icons/settings.svg", [
+            (self.tr("Outils 🛠️"), None, [
                 (self.tr("Paramètres"), self.settings_action),
                 (self.tr("Gérer les Statuts"), self.status_action),
                 (self.tr("À propos"), self.about_action)
             ]),
-            (self.tr("Administration"), ":/icons/users.svg", [
+            (self.tr("Administration 🛡️"), None, [
                 (self.tr("Gérer les Utilisateurs"), self.manage_users_action),
                 (self.tr("Gérer les Rôles"), self.manage_roles_action)
             ]),
@@ -3527,3 +3528,36 @@ class DocumentManager(QMainWindow):
         # elif item_type == "Project":
             # This would require a way to show a project's details
             # pass
+
+    def mousePressEvent(self, event: QMouseEvent):
+        # This event handler is for the window dragging and for custom title bar button clicks.
+
+        # First, check if the click is on one of the control buttons.
+        # We check this first to ensure button clicks are not misinterpreted as drag events.
+        if self.minimize_button.geometry().contains(event.pos()):
+            self.showMinimized()
+            return # Stop further processing
+
+        if self.maximize_button.geometry().contains(event.pos()):
+            self.toggleMaximized()
+            return # Stop further processing
+
+        if self.close_button.geometry().contains(event.pos()):
+            self.close()
+            return # Stop further processing
+
+        # If the click was not on a button, then it might be a drag event.
+        # This part is for window dragging, which is a common feature for custom title bars.
+        if event.button() == Qt.LeftButton and self.top_menu_bar_widget.geometry().contains(event.pos()):
+            self.old_pos = event.globalPos()
+            self.is_dragging = True
+
+    def mouseMoveEvent(self, event: QMouseEvent):
+        if hasattr(self, 'is_dragging') and self.is_dragging:
+            delta = QPoint(event.globalPos() - self.old_pos)
+            self.move(self.x() + delta.x(), self.y() + delta.y())
+            self.old_pos = event.globalPos()
+
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        if hasattr(self, 'is_dragging'):
+            self.is_dragging = False
