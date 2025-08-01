@@ -1,5 +1,6 @@
 # user_management/user_menu_button.py
 import logging
+import os
 from PyQt5.QtWidgets import QPushButton, QMenu, QAction, QLabel, QWidgetAction, QApplication, QMessageBox
 from PyQt5.QtGui import QIcon, QPixmap, QPainter, QBrush, QColor
 from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QSize # Import QPoint
@@ -46,26 +47,43 @@ class UserMenuButton(QPushButton):
         avatar_path = self.current_user_info.get('avatar_path') if self.current_user_info else None
 
         if avatar_path and os.path.exists(avatar_path):
+            # Avatar exists, use the circular pixmap logic
+            self.setText("") # Clear any fallback text
             pixmap = QPixmap(avatar_path)
+            size = 28
+            circular_pixmap = QPixmap(size, size)
+            circular_pixmap.fill(Qt.transparent)
+
+            painter = QPainter(circular_pixmap)
+            painter.setRenderHint(QPainter.Antialiasing)
+
+            brush = QBrush(pixmap.scaled(size, size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
+            painter.setBrush(brush)
+            painter.setPen(Qt.NoPen)
+            painter.drawEllipse(0, 0, size, size)
+            painter.end()
+
+            self.setIcon(QIcon(circular_pixmap))
+            self.setIconSize(QSize(size, size))
+            # Reset stylesheet to basic transparent button for the icon
+            self.setStyleSheet("QPushButton { border: none; border-radius: 16px; background-color: transparent; }")
         else:
-            pixmap = QPixmap()
-
-        # Create a circular pixmap
-        size = 28
-        circular_pixmap = QPixmap(size, size)
-        circular_pixmap.fill(Qt.transparent)
-
-        painter = QPainter(circular_pixmap)
-        painter.setRenderHint(QPainter.Antialiasing)
-
-        brush = QBrush(pixmap.scaled(size, size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
-        painter.setBrush(brush)
-        painter.setPen(Qt.NoPen)
-        painter.drawEllipse(0, 0, size, size)
-        painter.end()
-
-        self.setIcon(QIcon(circular_pixmap))
-        self.setIconSize(QSize(size, size))
+            # No avatar, use a default icon from resources
+            self.setText("") # Ensure no text is displayed
+            self.setIcon(QIcon(":/icons/user.svg")) # Set the default user icon
+            self.setIconSize(QSize(24, 24)) # A good size for a 32x32 button
+            # Apply a simple style for the button background
+            self.setStyleSheet("""
+                QPushButton {
+                    border: 1px solid #d1d5db;
+                    border-radius: 16px;
+                    background-color: #f3f4f6;
+                    padding: 4px;
+                }
+                QPushButton:hover {
+                    background-color: #e5e7eb;
+                }
+            """)
 
     def _build_menu(self):
         self.user_menu.clear()

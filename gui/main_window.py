@@ -1696,6 +1696,20 @@ class DocumentManager(QMainWindow):
                 background: #e5e7eb;
                 margin: 5px 0px;
             }
+            QPushButton#windowControlButton {
+                background-color: transparent;
+                border: none;
+                padding: 4px;
+                border-radius: 4px;
+                color: #4b5563;
+            }
+            QPushButton#windowControlButton:hover {
+                background-color: #e5e7eb;
+            }
+            QPushButton#windowCloseButton:hover {
+                background-color: #ef4444;
+                color: white;
+            }
         """)
 
         top_bar_layout = QHBoxLayout(self.top_menu_bar_widget)
@@ -1716,43 +1730,32 @@ class DocumentManager(QMainWindow):
 
         top_bar_layout.addWidget(self.app_title_label)
 
-
         # --- Define Menu Structure ---
         self.top_menu_buttons = {} # To store references
 
         # Helper to create module actions for the new "Modules" menu
-        # These actions will call handle_sidebar_module_selection (which will be renamed or its logic adapted)
         module_menu_actions = []
-        # Order can be defined here or taken from CONFIGURABLE_MODULES if its order is preferred.
-        # Using CONFIGURABLE_MODULES to ensure all are covered and use their defined names/icons.
         for module_info in CONFIGURABLE_MODULES:
             action_attr_name = module_info['action_attr']
             q_action = getattr(self, action_attr_name, None)
             if q_action:
-                # We need to ensure the action, when triggered from the top menu,
-                # calls the correct view switching logic.
-                # The QAction itself is already connected to a show_..._view method.
                 module_menu_actions.append((q_action.text(), q_action))
             else:
                 logging.warning(f"QAction instance for module {module_info['name']} (attr: {action_attr_name}) not found.")
 
-        # Add core navigation items like "Accueil" and "Gestion Documents" if not in CONFIGURABLE_MODULES
-        # or if they need special placement. For now, assuming they are QActions like others.
-        # self.home_action and self.documents_view_action are already created.
-
         menu_definitions = [
-            (self.tr("Accueil"), None, self.home_action), # Direct action, not a dropdown
-            (self.tr("Modules"), None, [
+            (self.tr("Accueil"), ":/icons/home.svg", self.home_action),
+            (self.tr("Modules"), ":/icons/layout.svg", [
                 (self.tr("Synchronisation"), self.synchronization_action),
                 (self.tr("Statistiques"), self.statistics_action),
                 (self.tr("Addons"), self.addons_action)
-            ] + module_menu_actions), # Dropdown for all other modules
-            (self.tr("Outils"), None, [
+            ] + module_menu_actions),
+            (self.tr("Outils"), ":/icons/settings.svg", [
                 (self.tr("Paramètres"), self.settings_action),
                 (self.tr("Gérer les Statuts"), self.status_action),
                 (self.tr("À propos"), self.about_action)
             ]),
-            (self.tr("Administration"), None, [
+            (self.tr("Administration"), ":/icons/users.svg", [
                 (self.tr("Gérer les Utilisateurs"), self.manage_users_action),
                 (self.tr("Gérer les Rôles"), self.manage_roles_action)
             ]),
@@ -1761,11 +1764,11 @@ class DocumentManager(QMainWindow):
         for menu_title, menu_icon_path, actions_or_action_defs in menu_definitions:
             menu_button = QPushButton(menu_title)
             menu_button.setObjectName("topMenuButton")
-            if menu_icon_path: # Not currently used for these main items
+            if menu_icon_path:
                 menu_button.setIcon(QIcon(menu_icon_path))
 
-            if isinstance(actions_or_action_defs, list): # It's a list of (text, QAction) for a dropdown
-                if actions_or_action_defs: # If there are actions, create a dropdown menu
+            if isinstance(actions_or_action_defs, list):
+                if actions_or_action_defs:
                     dropdown_menu = QMenu(self)
                     for action_text, q_action_obj in actions_or_action_defs:
                         if q_action_obj:
@@ -1773,14 +1776,20 @@ class DocumentManager(QMainWindow):
                         else:
                             logging.warning(f"QAction for '{action_text}' in menu '{menu_title}' not found.")
                     menu_button.setMenu(dropdown_menu)
-            elif isinstance(actions_or_action_defs, QAction): # It's a single direct QAction
+            elif isinstance(actions_or_action_defs, QAction):
                 menu_button.clicked.connect(actions_or_action_defs.trigger)
 
             top_bar_layout.addWidget(menu_button)
             self.top_menu_buttons[menu_title] = menu_button
 
+        # Add the "Quick Add Client" button here, after the main menu items
+        self.quick_add_client_button = QPushButton("➕ " + self.tr("Ajouter Client"))
+        self.quick_add_client_button.setObjectName("topMenuButton")
+        self.quick_add_client_button.setToolTip(self.tr("Ajouter un nouveau client rapidement"))
+        self.quick_add_client_button.clicked.connect(self.open_add_new_client_dialog)
+        top_bar_layout.addWidget(self.quick_add_client_button)
 
-        top_bar_layout.addStretch(1) # Pushes menu items to left, following items to right
+        top_bar_layout.addStretch(1)
 
         # Search bar (re-add with its completer)
         self.search_bar_line_edit = QLineEdit(self) # Already initialized in create_actions_main
