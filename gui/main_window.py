@@ -2723,10 +2723,12 @@ class DocumentManager(QMainWindow):
         delete_action = menu.addAction("🗑️ " + self.tr("Supprimer Client")); delete_action.triggered.connect(lambda: self.delete_client_permanently_slot(client_id_val))
         menu.exec_(self.client_list_widget.mapToGlobal(pos))
         
-    def open_client_folder_fs(self, client_id_val): 
+    def open_client_folder_fs(self, client_id_val):
         client_info = self.clients_data_map.get(client_id_val)
         if client_info and client_info.get("base_folder_path"):
-            QDesktopServices.openUrl(QUrl.fromLocalFile(client_info["base_folder_path"]))
+            relative_path = client_info["base_folder_path"]
+            absolute_path = os.path.join(self.app_root_dir, relative_path)
+            QDesktopServices.openUrl(QUrl.fromLocalFile(absolute_path))
         else:
             QMessageBox.warning(self, self.tr("Erreur"), self.tr("Chemin du dossier non trouvé pour ce client."))
             self.notify(title=self.tr("Accès Dossier Échoué"),
