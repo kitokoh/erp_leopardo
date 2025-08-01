@@ -459,21 +459,18 @@ class SettingsPage(QWidget):
         buttons_layout = QHBoxLayout()
         buttons_layout.setSpacing(10) # Standard spacing between buttons
 
-        self.reload_settings_button = QPushButton(self.tr("Reload Current Settings"))
+        self.reload_settings_button = QPushButton(self.tr("🔄 Reload Current Settings"))
         self.reload_settings_button.setObjectName("secondaryButton") # For styling
-        self.reload_settings_button.setIcon(QIcon(":/icons/refresh-cw.svg")) # Suggest using an icon
         self.reload_settings_button.setToolTip(self.tr("Reloads all settings from the configuration, discarding any unsaved changes."))
         self.reload_settings_button.clicked.connect(self._load_all_settings_from_config)
 
-        self.restore_defaults_button = QPushButton(self.tr("Restore Default Settings"))
+        self.restore_defaults_button = QPushButton(self.tr("⚙️ Restore Default Settings"))
         self.restore_defaults_button.setObjectName("secondaryButton") # For styling
-        self.restore_defaults_button.setIcon(QIcon(":/icons/settings.svg")) # Suggest using an icon (placeholder, find better)
         self.restore_defaults_button.setToolTip(self.tr("Resets all settings to their original default values. This action requires confirmation and an application restart."))
         self.restore_defaults_button.clicked.connect(self._confirm_restore_defaults)
 
-        self.save_settings_button = QPushButton(self.tr("Save All Settings"))
+        self.save_settings_button = QPushButton(self.tr("💾 Save All Settings"))
         self.save_settings_button.setObjectName("primaryButton") # For styling
-        self.save_settings_button.setIcon(QIcon(":/icons/save.svg")) # Suggest using an icon
         self.save_settings_button.setToolTip(self.tr("Saves all current settings. Some changes may require an application restart."))
         self.save_settings_button.clicked.connect(self._save_all_settings)
 
@@ -617,21 +614,18 @@ class SettingsPage(QWidget):
         global_smtp_group_layout.addWidget(self.smtp_configs_table)
 
         smtp_buttons_layout = QHBoxLayout()
-        self.add_smtp_config_btn = QPushButton(self.tr("Ajouter"))
-        self.add_smtp_config_btn.setIcon(QIcon(":/icons/plus-circle.svg"))
+        self.add_smtp_config_btn = QPushButton(self.tr("➕ Ajouter"))
         self.add_smtp_config_btn.setToolTip(self.tr("Ajouter une nouvelle configuration SMTP globale."))
         self.add_smtp_config_btn.clicked.connect(self._handle_add_smtp_config)
         smtp_buttons_layout.addWidget(self.add_smtp_config_btn)
 
-        self.edit_smtp_config_btn = QPushButton(self.tr("Modifier"))
-        self.edit_smtp_config_btn.setIcon(QIcon(":/icons/edit-2.svg"))
+        self.edit_smtp_config_btn = QPushButton(self.tr("✏️ Modifier"))
         self.edit_smtp_config_btn.setToolTip(self.tr("Modifier la configuration SMTP sélectionnée."))
         self.edit_smtp_config_btn.setEnabled(False)
         self.edit_smtp_config_btn.clicked.connect(self._handle_edit_smtp_config)
         smtp_buttons_layout.addWidget(self.edit_smtp_config_btn)
 
-        self.delete_smtp_config_btn = QPushButton(self.tr("Supprimer"))
-        self.delete_smtp_config_btn.setIcon(QIcon(":/icons/trash.svg"))
+        self.delete_smtp_config_btn = QPushButton(self.tr("🗑️ Supprimer"))
         self.delete_smtp_config_btn.setObjectName("dangerButton")
         self.delete_smtp_config_btn.setToolTip(self.tr("Supprimer la configuration SMTP sélectionnée."))
         self.delete_smtp_config_btn.setEnabled(False)
@@ -640,8 +634,7 @@ class SettingsPage(QWidget):
 
         smtp_buttons_layout.addStretch(1)
 
-        self.set_global_default_smtp_btn = QPushButton(self.tr("Définir par Défaut (Global)"))
-        self.set_global_default_smtp_btn.setIcon(QIcon(":/icons/check-square.svg"))
+        self.set_global_default_smtp_btn = QPushButton(self.tr("⭐ Définir par Défaut (Global)"))
         self.set_global_default_smtp_btn.setToolTip(self.tr("Définir la configuration SMTP sélectionnée comme défaut global pour l'application."))
         self.set_global_default_smtp_btn.setEnabled(False)
         self.set_global_default_smtp_btn.clicked.connect(self._handle_set_global_default_smtp)
@@ -695,8 +688,7 @@ class SettingsPage(QWidget):
         self.assign_global_smtp_combo.setToolTip(self.tr("Choisir une configuration SMTP globale à assigner à l'utilisateur sélectionné."))
         self.assign_global_smtp_combo.currentIndexChanged.connect(self._update_user_assignment_buttons_state)
         assign_new_layout.addWidget(self.assign_global_smtp_combo)
-        self.assign_smtp_to_user_btn = QPushButton(self.tr("Assigner à l'Utilisateur"))
-        self.assign_smtp_to_user_btn.setIcon(QIcon(":/icons/plus.svg"))
+        self.assign_smtp_to_user_btn = QPushButton(self.tr("➕ Assigner à l'Utilisateur"))
         self.assign_smtp_to_user_btn.setToolTip(self.tr("Assigner la configuration SMTP globale sélectionnée à l'utilisateur."))
         self.assign_smtp_to_user_btn.setEnabled(False)
         self.assign_smtp_to_user_btn.clicked.connect(self._handle_assign_smtp_to_user)
@@ -705,15 +697,13 @@ class SettingsPage(QWidget):
         assignment_main_layout.addLayout(assign_new_layout)
 
         user_assignment_buttons_layout = QHBoxLayout()
-        self.set_user_default_smtp_btn = QPushButton(self.tr("Définir par Défaut (Utilisateur)"))
-        self.set_user_default_smtp_btn.setIcon(QIcon(":/icons/check.svg"))
+        self.set_user_default_smtp_btn = QPushButton(self.tr("⭐ Définir par Défaut (Utilisateur)"))
         self.set_user_default_smtp_btn.setToolTip(self.tr("Définir la configuration SMTP assignée sélectionnée comme défaut pour cet utilisateur."))
         self.set_user_default_smtp_btn.setEnabled(False)
         self.set_user_default_smtp_btn.clicked.connect(self._handle_set_user_default_smtp)
         user_assignment_buttons_layout.addWidget(self.set_user_default_smtp_btn)
 
-        self.unassign_smtp_from_user_btn = QPushButton(self.tr("Désassigner de l'Utilisateur"))
-        self.unassign_smtp_from_user_btn.setIcon(QIcon(":/icons/trash.svg"))
+        self.unassign_smtp_from_user_btn = QPushButton(self.tr("🗑️ Désassigner de l'Utilisateur"))
         self.unassign_smtp_from_user_btn.setObjectName("dangerButton")
         self.unassign_smtp_from_user_btn.setToolTip(self.tr("Désassigner la configuration SMTP de cet utilisateur."))
         self.unassign_smtp_from_user_btn.setEnabled(False)
@@ -779,8 +769,7 @@ class SettingsPage(QWidget):
         self.db_path_input = QLineEdit()
         self.db_path_input.setPlaceholderText(self.tr("Path to your SQLite database file"))
         self.db_path_input.setToolTip(self.tr("Select the application's database file. Changing this requires a restart."))
-        db_path_browse_btn = QPushButton(self.tr("Browse..."))
-        db_path_browse_btn.setIcon(QIcon(":/icons/folder.svg")) # Suggest icon
+        db_path_browse_btn = QPushButton(self.tr("📁 Browse..."))
         db_path_browse_btn.clicked.connect(lambda: self._browse_db_file(self.db_path_input))
         db_path_layout = QHBoxLayout()
         db_path_layout.addWidget(self.db_path_input)
@@ -875,14 +864,12 @@ class SettingsPage(QWidget):
         data_ops_layout = QVBoxLayout(data_ops_group) # QVBoxLayout for buttons
         data_ops_layout.setSpacing(10)
 
-        self.import_products_btn = QPushButton(self.tr("Import Products from CSV"))
-        self.import_products_btn.setIcon(QIcon(":/icons/file-plus.svg")) # Replaced missing icon
+        self.import_products_btn = QPushButton(self.tr("⬆️ Import Products from CSV"))
         self.import_products_btn.setToolTip(self.tr("Import product data from a CSV file."))
         self.import_products_btn.clicked.connect(self._handle_import_products)
         data_ops_layout.addWidget(self.import_products_btn)
 
-        self.export_products_btn = QPushButton(self.tr("Export Products to CSV"))
-        self.export_products_btn.setIcon(QIcon(":/icons/download.svg")) # Suggest icon
+        self.export_products_btn = QPushButton(self.tr("⬇️ Export Products to CSV"))
         self.export_products_btn.setToolTip(self.tr("Export current product data to a CSV file."))
         self.export_products_btn.clicked.connect(self._handle_export_products)
         data_ops_layout.addWidget(self.export_products_btn)
@@ -899,8 +886,7 @@ class SettingsPage(QWidget):
 
         self.download_monitor_path_input = QLineEdit()
         self.download_monitor_path_input.setPlaceholderText(self.tr("Path to the folder to monitor"))
-        browse_download_path_btn = QPushButton(self.tr("Browse..."))
-        browse_download_path_btn.setIcon(QIcon(":/icons/folder.svg")) # Suggest icon
+        browse_download_path_btn = QPushButton(self.tr("📁 Browse..."))
         browse_download_path_btn.clicked.connect(self._browse_download_monitor_path)
         download_path_layout = QHBoxLayout()
         download_path_layout.addWidget(self.download_monitor_path_input)
@@ -930,9 +916,8 @@ class SettingsPage(QWidget):
         self.backup_password_input.setPlaceholderText(self.tr("Password for backup server"))
         backup_form_layout.addRow(self.tr("Password:"), self.backup_password_input)
 
-        self.run_backup_button = QPushButton(self.tr("Run Manual Backup Now"))
+        self.run_backup_button = QPushButton(self.tr("☁️ Run Manual Backup Now"))
         self.run_backup_button.setObjectName("primaryButton")
-        self.run_backup_button.setIcon(QIcon(":/icons/save.svg")) # Replaced missing icon
         self.run_backup_button.setToolTip(self.tr("Initiates a manual backup to the configured remote server."))
         self.run_backup_button.clicked.connect(self._handle_run_backup)
         backup_form_layout.addRow(self.run_backup_button) # Add button to the form for alignment
@@ -967,15 +952,12 @@ class SettingsPage(QWidget):
         transporters_group_layout.addWidget(self.transporters_table)
 
         transporter_btns_layout = QHBoxLayout()
-        self.add_transporter_btn = QPushButton(self.tr("Add Transporter"))
-        self.add_transporter_btn.setIcon(QIcon(":/icons/plus-circle.svg"))
+        self.add_transporter_btn = QPushButton(self.tr("➕ Add Transporter"))
         self.add_transporter_btn.clicked.connect(self._handle_add_transporter)
-        self.edit_transporter_btn = QPushButton(self.tr("Edit Selected"))
-        self.edit_transporter_btn.setIcon(QIcon(":/icons/edit-2.svg"))
+        self.edit_transporter_btn = QPushButton(self.tr("✏️ Edit Selected"))
         self.edit_transporter_btn.setEnabled(False)
         self.edit_transporter_btn.clicked.connect(self._handle_edit_transporter)
-        self.delete_transporter_btn = QPushButton(self.tr("Delete Selected"))
-        self.delete_transporter_btn.setIcon(QIcon(":/icons/trash.svg"))
+        self.delete_transporter_btn = QPushButton(self.tr("🗑️ Delete Selected"))
         self.delete_transporter_btn.setObjectName("dangerButton")
         self.delete_transporter_btn.setEnabled(False)
         self.delete_transporter_btn.clicked.connect(self._handle_delete_transporter)
@@ -1005,15 +987,12 @@ class SettingsPage(QWidget):
         forwarders_group_layout.addWidget(self.forwarders_table)
 
         forwarder_btns_layout = QHBoxLayout()
-        self.add_forwarder_btn = QPushButton(self.tr("Add Freight Forwarder"))
-        self.add_forwarder_btn.setIcon(QIcon(":/icons/plus-circle.svg"))
+        self.add_forwarder_btn = QPushButton(self.tr("➕ Add Freight Forwarder"))
         self.add_forwarder_btn.clicked.connect(self._handle_add_forwarder)
-        self.edit_forwarder_btn = QPushButton(self.tr("Edit Selected"))
-        self.edit_forwarder_btn.setIcon(QIcon(":/icons/edit-2.svg"))
+        self.edit_forwarder_btn = QPushButton(self.tr("✏️ Edit Selected"))
         self.edit_forwarder_btn.setEnabled(False)
         self.edit_forwarder_btn.clicked.connect(self._handle_edit_forwarder)
-        self.delete_forwarder_btn = QPushButton(self.tr("Delete Selected"))
-        self.delete_forwarder_btn.setIcon(QIcon(":/icons/trash.svg"))
+        self.delete_forwarder_btn = QPushButton(self.tr("🗑️ Delete Selected"))
         self.delete_forwarder_btn.setObjectName("dangerButton")
         self.delete_forwarder_btn.setEnabled(False)
         self.delete_forwarder_btn.clicked.connect(self._handle_delete_forwarder)
@@ -1040,8 +1019,7 @@ class SettingsPage(QWidget):
 
         self.templates_dir_input = QLineEdit()
         self.templates_dir_input.setPlaceholderText(self.tr("Path to your global templates directory"))
-        templates_browse_btn = QPushButton(self.tr("Browse..."))
-        templates_browse_btn.setIcon(QIcon(":/icons/folder.svg"))
+        templates_browse_btn = QPushButton(self.tr("📁 Browse..."))
         templates_browse_btn.clicked.connect(lambda: self._browse_directory(self.templates_dir_input, self.tr("Select Global Templates Directory")))
         templates_dir_layout = QHBoxLayout()
         templates_dir_layout.addWidget(self.templates_dir_input)
@@ -1050,8 +1028,7 @@ class SettingsPage(QWidget):
 
         self.clients_dir_input = QLineEdit() # Assuming this is for client-specific template overrides or client data
         self.clients_dir_input.setPlaceholderText(self.tr("Path to directory for client-specific data/templates"))
-        clients_browse_btn = QPushButton(self.tr("Browse..."))
-        clients_browse_btn.setIcon(QIcon(":/icons/folder-documents.svg")) # Different icon for distinction
+        clients_browse_btn = QPushButton(self.tr("📁 Browse..."))
         clients_browse_btn.clicked.connect(lambda: self._browse_directory(self.clients_dir_input, self.tr("Select Client Data Directory")))
         clients_dir_layout = QHBoxLayout()
         clients_dir_layout.addWidget(self.clients_dir_input)
@@ -1064,8 +1041,7 @@ class SettingsPage(QWidget):
         template_mgmt_layout = QVBoxLayout(template_mgmt_group)
         template_mgmt_layout.setSpacing(10)
 
-        manage_templates_btn = QPushButton(self.tr("Open Global Template Manager"))
-        manage_templates_btn.setIcon(QIcon(":/icons/settings.svg")) # Consider a more specific icon
+        manage_templates_btn = QPushButton(self.tr("🛠️ Open Global Template Manager"))
         manage_templates_btn.setToolTip(self.tr("Manage categories, languages, and extensions for all templates."))
         manage_templates_btn.clicked.connect(self._open_template_manager_dialog)
         template_mgmt_layout.addWidget(manage_templates_btn)
@@ -1094,13 +1070,11 @@ class SettingsPage(QWidget):
         template_visibility_layout.addWidget(self.template_visibility_table)
 
         visibility_btns_layout = QHBoxLayout()
-        self.refresh_template_visibility_btn = QPushButton(self.tr("Refresh List"))
-        self.refresh_template_visibility_btn.setIcon(QIcon(":/icons/refresh-cw.svg"))
+        self.refresh_template_visibility_btn = QPushButton(self.tr("🔄 Refresh List"))
         self.refresh_template_visibility_btn.clicked.connect(self._load_template_visibility_data)
         visibility_btns_layout.addWidget(self.refresh_template_visibility_btn)
         visibility_btns_layout.addStretch()
-        self.save_template_visibility_btn = QPushButton(self.tr("Save Visibility Changes"))
-        self.save_template_visibility_btn.setIcon(QIcon(":/icons/save.svg"))
+        self.save_template_visibility_btn = QPushButton(self.tr("💾 Save Visibility Changes"))
         self.save_template_visibility_btn.clicked.connect(self._save_template_visibility_data)
         visibility_btns_layout.addWidget(self.save_template_visibility_btn)
         template_visibility_layout.addLayout(visibility_btns_layout)
@@ -1169,20 +1143,17 @@ class SettingsPage(QWidget):
 
         # Buttons for reordering (alternative or in addition to drag-drop)
         buttons_hbox = QHBoxLayout()
-        self.move_module_up_btn = QPushButton(self.tr("Move Up"))
-        self.move_module_up_btn.setIcon(QIcon(":/icons/chevron-up.svg"))
+        self.move_module_up_btn = QPushButton(self.tr("🔼 Move Up"))
         self.move_module_up_btn.clicked.connect(self._move_menu_module_up)
         buttons_hbox.addWidget(self.move_module_up_btn)
 
-        self.move_module_down_btn = QPushButton(self.tr("Move Down"))
-        self.move_module_down_btn.setIcon(QIcon(":/icons/chevron-down.svg"))
+        self.move_module_down_btn = QPushButton(self.tr("🔽 Move Down"))
         self.move_module_down_btn.clicked.connect(self._move_menu_module_down)
         buttons_hbox.addWidget(self.move_module_down_btn)
 
         buttons_hbox.addStretch()
 
-        self.reset_menu_config_btn = QPushButton(self.tr("Reset Menu to Default"))
-        self.reset_menu_config_btn.setIcon(QIcon(":/icons/refresh-cw.svg"))
+        self.reset_menu_config_btn = QPushButton(self.tr("🔄 Reset Menu to Default"))
         self.reset_menu_config_btn.clicked.connect(self._reset_menu_config_to_default)
         buttons_hbox.addWidget(self.reset_menu_config_btn)
         group_layout.addLayout(buttons_hbox)
@@ -1364,11 +1335,11 @@ class SettingsPage(QWidget):
         forwarders_layout.addWidget(self.forwarders_table)
 
         btns_layout = QHBoxLayout()
-        self.add_forwarder_btn = QPushButton(self.tr("Add Freight Forwarder")); self.add_forwarder_btn.setIcon(QIcon(":/icons/plus.svg"))
+        self.add_forwarder_btn = QPushButton(self.tr("➕ Add Freight Forwarder"))
         self.add_forwarder_btn.clicked.connect(self._handle_add_forwarder)
-        self.edit_forwarder_btn = QPushButton(self.tr("Edit Freight Forwarder")); self.edit_forwarder_btn.setIcon(QIcon(":/icons/pencil.svg")); self.edit_forwarder_btn.setEnabled(False)
+        self.edit_forwarder_btn = QPushButton(self.tr("✏️ Edit Freight Forwarder")); self.edit_forwarder_btn.setEnabled(False)
         self.edit_forwarder_btn.clicked.connect(self._handle_edit_forwarder)
-        self.delete_forwarder_btn = QPushButton(self.tr("Delete Freight Forwarder")); self.delete_forwarder_btn.setIcon(QIcon(":/icons/trash.svg")); self.delete_forwarder_btn.setObjectName("dangerButton"); self.delete_forwarder_btn.setEnabled(False)
+        self.delete_forwarder_btn = QPushButton(self.tr("🗑️ Delete Freight Forwarder")); self.delete_forwarder_btn.setObjectName("dangerButton"); self.delete_forwarder_btn.setEnabled(False)
         self.delete_forwarder_btn.clicked.connect(self._handle_delete_forwarder)
         btns_layout.addWidget(self.add_forwarder_btn); btns_layout.addWidget(self.edit_forwarder_btn); btns_layout.addWidget(self.delete_forwarder_btn)
         forwarders_layout.addLayout(btns_layout)
@@ -2204,9 +2175,8 @@ class SettingsPage(QWidget):
         description_label.setWordWrap(True)
         tab_layout.addWidget(description_label)
 
-        manage_templates_btn = QPushButton(self.tr("Open Template Manager"))
+        manage_templates_btn = QPushButton(self.tr("🛠️ Open Template Manager"))
         manage_templates_btn.setObjectName("manageTemplatesButton") # For styling
-        manage_templates_btn.setIcon(QIcon(":/icons/settings-gear.svg"))  # Assuming a gear or similar icon
         manage_templates_btn.clicked.connect(self._open_template_manager_dialog)
 
         button_hbox = QHBoxLayout()
@@ -2245,15 +2215,13 @@ class SettingsPage(QWidget):
 
         # Buttons layout
         buttons_layout = QHBoxLayout()
-        self.refresh_template_visibility_btn = QPushButton(self.tr("Refresh List"))
-        self.refresh_template_visibility_btn.setIcon(QIcon(":/icons/refresh.svg")) # Assuming icon exists
+        self.refresh_template_visibility_btn = QPushButton(self.tr("🔄 Refresh List"))
         self.refresh_template_visibility_btn.clicked.connect(self._load_template_visibility_data)
         buttons_layout.addWidget(self.refresh_template_visibility_btn)
 
         buttons_layout.addStretch(1)
 
-        self.save_template_visibility_btn = QPushButton(self.tr("Save Visibility Settings"))
-        self.save_template_visibility_btn.setIcon(QIcon(":/icons/save.svg")) # Assuming icon exists
+        self.save_template_visibility_btn = QPushButton(self.tr("💾 Save Visibility Settings"))
         self.save_template_visibility_btn.clicked.connect(self._save_template_visibility_data)
         buttons_layout.addWidget(self.save_template_visibility_btn)
 

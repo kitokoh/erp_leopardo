@@ -87,19 +87,19 @@ class ProductsTab(QWidget):
 
         top_bar_layout.addStretch(1)
 
-        self.add_product_btn = QPushButton(QIcon(":/icons/plus-circle.svg"), self.tr("Lier Produit Existant")) # Changed icon
+        self.add_product_btn = QPushButton("➕ " + self.tr("Lier Produit Existant")) # Changed icon
         self.add_product_btn.setObjectName("primaryButton")
         self.add_product_btn.setToolTip(self.tr("Lier un produit existant du catalogue à ce client/commande"))
         self.add_product_btn.clicked.connect(self.add_product) # This should open ProductDialog to select existing
         top_bar_layout.addWidget(self.add_product_btn)
 
-        self.add_new_global_product_btn = QPushButton(QIcon(":/icons/plus-square.svg"), self.tr("Créer Produit Global")) # Changed icon
+        self.add_new_global_product_btn = QPushButton("➕ " + self.tr("Créer Produit Global")) # Changed icon
         self.add_new_global_product_btn.setObjectName("secondaryButton")
         self.add_new_global_product_btn.setToolTip(self.tr("Créer un nouveau produit dans le catalogue global et le lier"))
         self.add_new_global_product_btn.clicked.connect(self.handle_add_new_global_product)
         top_bar_layout.addWidget(self.add_new_global_product_btn)
 
-        self.manage_global_catalog_btn = QPushButton(QIcon(":/icons/book-open.svg"), self.tr("Gérer Catalogue Global"))
+        self.manage_global_catalog_btn = QPushButton("📖 " + self.tr("Gérer Catalogue Global"))
         self.manage_global_catalog_btn.setObjectName("secondaryButton")
         self.manage_global_catalog_btn.setToolTip(self.tr("Ouvrir le dialogue de gestion du catalogue global des produits (ajouter, modifier, supprimer des produits maîtres)."))
         self.manage_global_catalog_btn.clicked.connect(self.handle_manage_global_catalog)
@@ -155,13 +155,13 @@ class ProductsTab(QWidget):
         bottom_actions_layout = QHBoxLayout()
         bottom_actions_layout.setSpacing(10)
 
-        self.edit_product_btn = QPushButton(QIcon(":/icons/edit-2.svg"), self.tr("Modifier Ligne"))
+        self.edit_product_btn = QPushButton("✏️ " + self.tr("Modifier Ligne"))
         self.edit_product_btn.setObjectName("actionButton") # Generic style for non-primary/danger
         self.edit_product_btn.setToolTip(self.tr("Modifier les détails de la ligne produit sélectionnée (quantité, prix spécifique, etc.)"))
         self.edit_product_btn.clicked.connect(self.edit_product)
         bottom_actions_layout.addWidget(self.edit_product_btn)
 
-        self.remove_product_btn = QPushButton(QIcon(":/icons/trash-2.svg"), self.tr("Supprimer Ligne"))
+        self.remove_product_btn = QPushButton("🗑️ " + self.tr("Supprimer Ligne"))
         self.remove_product_btn.setObjectName("dangerButton")
         self.remove_product_btn.setToolTip(self.tr("Supprimer la ligne produit sélectionnée de ce client/commande"))
         self.remove_product_btn.clicked.connect(self.remove_product)
@@ -170,7 +170,7 @@ class ProductsTab(QWidget):
 
         bottom_actions_layout.addStretch(1) # Push proforma button to the right
 
-        self.generate_proforma_btn = QPushButton(QIcon(":/icons/file-text.svg"), self.tr("Générer Proforma"))
+        self.generate_proforma_btn = QPushButton("📄 " + self.tr("Générer Proforma"))
         self.generate_proforma_btn.setObjectName("secondaryButton")
         self.generate_proforma_btn.setToolTip(self.tr("Générer une facture proforma pour les produits actuellement affichés."))
         self.generate_proforma_btn.clicked.connect(self.handle_generate_proforma)

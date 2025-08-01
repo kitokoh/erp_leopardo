@@ -15,7 +15,6 @@ class PerformPasswordResetDialog(QDialog):
     def __init__(self, initial_token: str | None = None, parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Réinitialiser le mot de passe"))
-        self.setWindowIcon(QIcon(":/icons/lock.svg"))
         self.setMinimumWidth(400)
         self.setModal(True)
 
