@@ -62,74 +62,13 @@ from db.connection import Base, initialize_engine_and_session, get_db_connection
 
 # Explicitly import all modules containing SQLAlchemy models that use the central Base
 # This is crucial for Alembic's autogenerate feature to detect all tables and changes.
-print("Alembic env.py: Importing application models...")
+print("Alembic env.py: Importing consolidated application models...")
 try:
-    from db.common_models import * # For Products, Role, etc.
-    print("  Successfully imported db.common_models")
+    from db.models import *
+    print("  Successfully imported all models from db.models")
 except ImportError as e:
-    print(f"  Warning: Could not import db.common_models: {e}")
+    print(f"  CRITICAL: Could not import from db.models: {e}")
 
-try:
-    from accounting.models import *
-    print("  Successfully imported accounting.models")
-except ImportError as e:
-    print(f"  Warning: Could not import accounting.models: {e}")
-
-try:
-    from api.models import * # This should bring in User, Client, Product, ProformaInvoice etc.
-    print("  Successfully imported api.models")
-except ImportError as e:
-    print(f"  Warning: Could not import api.models: {e}")
-
-try:
-    from botpress_integration.models import *
-    print("  Successfully imported botpress_integration.models")
-except ImportError as e:
-    print(f"  Warning: Could not import botpress_integration.models: {e}")
-
-try:
-    from calculator.models import *
-    print("  Successfully imported calculator.models")
-except ImportError as e:
-    print(f"  Warning: Could not import calculator.models: {e}")
-
-try:
-    from conference_manager.models import * # Assuming it uses the central Base
-    print("  Successfully imported conference_manager.models")
-except ImportError as e:
-    print(f"  Warning: Could not import conference_manager.models: {e}")
-except Exception as e: # Broad exception to catch other issues like missing dependencies for a module
-    print(f"  Error importing conference_manager.models: {e}")
-
-
-try:
-    from status_manager.status_models import * # Assuming it uses the central Base
-    print("  Successfully imported status_manager.status_models")
-except ImportError as e:
-    print(f"  Warning: Could not import status_manager.status_models: {e}")
-except Exception as e:
-    print(f"  Error importing status_manager.status_models: {e}")
-
-
-try:
-    from user_profile_management.models import * # Assuming it uses the central Base
-    print("  Successfully imported user_profile_management.models")
-except ImportError as e:
-    print(f"  Warning: Could not import user_profile_management.models: {e}")
-except Exception as e:
-    print(f"  Error importing user_profile_management.models: {e}")
-
-try:
-    from db.models.client_documents import *
-    print("  Successfully imported db.models.client_documents")
-except ImportError as e:
-    print(f"  Warning: Could not import db.models.client_documents: {e}")
-
-# Any other modules with SQLAlchemy models should be imported here as well.
-# For example:
-# from invoicing.models import * (if it has SQLAlchemy models)
-# from project_management.models import * (if it has SQLAlchemy models)
-# from recruitment.models import * (if it has SQLAlchemy models)
 
 print("Alembic env.py: Finished importing application models.")
 

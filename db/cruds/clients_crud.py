@@ -23,165 +23,79 @@ class ClientsCRUD(GenericCRUD):
         self.logger = logging.getLogger(__name__) # Add logger instance
 
     @_manage_conn
-    def add_client(self, data: dict, conn = None) -> dict: # conn is Session
+    def add_client(self, data: dict, conn: Session = None) -> dict:
         """
-        Adds a new client to the database.
-        After successfully adding the client, it automatically creates a default order
-        and a default project linked to that order for the new client.
-
-        Performs input validation for required fields ('client_name', 'created_by_user_id')
-        and data types (e.g., 'price'). Sets 'is_deleted' to 0 by default.
-
-        Args:
-            data (dict): A dictionary containing client data. Expected keys include:
-                         'client_name', 'created_by_user_id', 'company_name' (optional),
-                         'primary_need_description' (optional), 'project_identifier' (optional, default 'N/A'),
-                         'country_id' (optional), 'city_id' (optional), 'default_base_folder_path' (optional),
-                         'status_id' (optional), 'selected_languages' (optional),
-                         'price' (optional, default 0), 'notes' (optional), 'category' (optional).
-            conn (sqlite3.Connection, optional): Database connection. Managed by decorator if None.
-
-        Returns:
-            dict: A dictionary with {'success': True, 'client_id': new_id} on success,
-                  or {'success': False, 'error': 'error message'} on failure.
+        Adds a new client to the database using the ORM.
         """
-        from . import commandes_crud # Local import to avoid circular dependency at module level
-        from . import projects_crud # Local import
-        # from . import status_settings_crud # No longer directly needed here for status fetching
-        # Import the new status_manager service
-        try:
-            from status_manager import status_service, status_models # Attempt direct import
-        except ImportError:
-            self.logger.error("Failed to import status_manager.status_service in clients_crud. Default status logic will be impaired.")
-            status_service = None # Fallback if import fails
-            status_models = None
+        from db.models import Client, Commande, Project
+        from status_manager import status_service, status_models
 
+        self.logger.info(f"Attempting to add client with data: {data}")
 
-        self.logger.info(f"Attempting to add client with data: {data}") # Log incoming data
-
-        # Input Validation
         required_fields = ['client_name', 'created_by_user_id']
         for field in required_fields:
             if not data.get(field):
-                self.logger.error(f"Missing required field: {field} in add_client data: {data}")
+                self.logger.error(f"Missing required field: {field}")
                 return {'success': False, 'error': f"Missing required field: {field}"}
 
-        if 'price' in data and data['price'] is not None and not isinstance(data['price'], (int, float)):
-            self.logger.error(f"Invalid data type for price in add_client data: {data}")
-            return {'success': False, 'error': "Invalid data type for price. Must be a number."}
-
         new_id = str(uuid.uuid4())
-        now_utc_iso = datetime.utcnow().isoformat() + "Z"
-
-        # Add is_deleted and deleted_at with default values
-        is_deleted_val = data.get('is_deleted', 0) # Default to not deleted
-        deleted_at_val = data.get('deleted_at', None)
-
-        # Create client folder
         folder_path = self.create_client_folder(new_id, data.get('client_name'), conn=conn)
-        if not folder_path:
-            # Even if folder creation fails, we can still proceed with adding the client
-            self.logger.error(f"Could not create folder for new client {data.get('client_name')}. The client will be created without a default folder path.")
 
-        sql_query = text("""INSERT INTO Clients
-                 (client_id, client_name, company_name, primary_need_description, project_identifier,
-                  country_id, city_id, default_base_folder_path, status_id, selected_languages,
-                  price, notes, category, lead_source, created_at, updated_at, created_by_user_id,
-                  is_deleted, deleted_at, default_template_id)
-                 VALUES (:client_id, :client_name, :company_name, :primary_need_description, :project_identifier,
-                         :country_id, :city_id, :default_base_folder_path, :status_id, :selected_languages,
-                         :price, :notes, :category, :lead_source, :created_at, :updated_at, :created_by_user_id,
-                         :is_deleted, :deleted_at, :default_template_id)""")
+        new_client = Client(
+            client_id=new_id,
+            client_name=data.get('client_name'),
+            company_name=data.get('company_name'),
+            primary_need_description=data.get('primary_need_description'),
+            project_identifier=data.get('project_identifier', 'N/A'),
+            country_id=data.get('country_id'),
+            city_id=data.get('city_id'),
+            default_base_folder_path=folder_path,
+            status_id=data.get('status_id'),
+            selected_languages=data.get('selected_languages'),
+            price=data.get('price', 0),
+            notes=data.get('notes'),
+            category=data.get('category'),
+            lead_source=data.get('lead_source'),
+            created_by_user_id=data.get('created_by_user_id'),
+            default_template_id=data.get('default_template_id')
+        )
+        conn.add(new_client)
 
-        params_dict = {
-            "client_id": new_id, "client_name": data.get('client_name'), "company_name": data.get('company_name'),
-            "primary_need_description": data.get('primary_need_description'),
-            "project_identifier": data.get('project_identifier', 'N/A'),
-            "country_id": data.get('country_id'), "city_id": data.get('city_id'),
-            "default_base_folder_path": folder_path, # Use the created folder path
-            "status_id": data.get('status_id'), "selected_languages": data.get('selected_languages'),
-            "price": data.get('price', 0), "notes": data.get('notes'), "category": data.get('category'),
-            "lead_source": data.get('lead_source'), "created_at": now_utc_iso, "updated_at": now_utc_iso,
-            "created_by_user_id": data.get('created_by_user_id'),
-            "is_deleted": is_deleted_val, "deleted_at": deleted_at_val,
-            "default_template_id": data.get('default_template_id')
-        }
+        # Create default order and project
+        default_order_status_id = status_service.get_default_status_for_commande_creation().status_id
+        default_project_status_id = status_service.get_default_status_for_type(status_models.StatusType.PROJECT, preferred_name="Planning").status_id
+
+        if default_order_status_id and default_project_status_id:
+            new_commande = Commande(
+                commande_id=str(uuid.uuid4()),
+                client_id=new_id,
+                commande_reference=f"DEF-ORD-{new_id[:8]}",
+                status_commande_id=default_order_status_id,
+                created_by_user_id=data.get('created_by_user_id'),
+                notes=f"Default order automatically created for {data.get('client_name')}.",
+                is_default=True,
+                description_commande="Default Order"
+            )
+            conn.add(new_commande)
+
+            new_project = Project(
+                project_id=str(uuid.uuid4()),
+                client_id=new_id,
+                project_name=f"Default Project for {data.get('client_name')}",
+                status_id=default_project_status_id,
+                description=f"Default project automatically created for order {new_commande.commande_reference}.",
+                manager_team_member_id=data.get('created_by_user_id')
+            )
+            conn.add(new_project)
+            new_commande.project_id = new_project.project_id
 
         try:
-            self.logger.info(f"Executing INSERT for new client '{params_dict.get('client_name')}' with ID {new_id}.")
-            if _is_sqlalchemy_obj(conn):
-                conn.execute(sql_query, params_dict)
-            else:
-                conn.execute(str(sql_query), params_dict)
-            self.logger.info(f"Successfully inserted client record for ID {new_id}.")
-
-            client_name_for_defaults = data.get('client_name', 'N/A')
-            user_id_for_defaults = data.get('created_by_user_id', None)
-
-            self.logger.info(f"Attempting to create default order and project for client {new_id}.")
-            default_order_status_id = None
-            default_project_status_id = None
-
-            if status_service and status_models:
-                self.logger.debug("status_service is available. Fetching default statuses.")
-                default_commande_status_obj = status_service.get_default_status_for_commande_creation()
-                if default_commande_status_obj:
-                    default_order_status_id = default_commande_status_obj.status_id
-                    self.logger.debug(f"Default order status ID found: {default_order_status_id}")
-                else:
-                    self.logger.warning(f"Could not determine a default status_id for Commande for client {new_id}.")
-
-                default_project_status_obj = status_service.get_default_status_for_type(status_models.StatusType.PROJECT, preferred_name="Planning")
-                if default_project_status_obj:
-                    default_project_status_id = default_project_status_obj.status_id
-                    self.logger.debug(f"Default project status ID found: {default_project_status_id}")
-                else:
-                    self.logger.warning(f"Could not determine a default status_id for Project for client {new_id}.")
-            else:
-                self.logger.error("status_service not available. Cannot determine default statuses.")
-
-            if default_order_status_id:
-                self.logger.info("Proceeding with default order creation.")
-                default_order_data = {
-                    'client_id': new_id, 'commande_reference': f"DEF-ORD-{new_id[:8]}",
-                    'status_commande_id': default_order_status_id, 'created_by_user_id': user_id_for_defaults,
-                    'notes': f"Default order automatically created for {client_name_for_defaults}.",
-                    'is_default': True, 'description_commande': "Default Order"
-                }
-                default_commande_id = commandes_crud.add_commande(default_order_data, conn=conn)
-
-                if default_commande_id:
-                    self.logger.info(f"Successfully created default order {default_commande_id} for client {new_id}.")
-                    if default_project_status_id:
-                        self.logger.info("Proceeding with default project creation.")
-                        default_project_data = {
-                            'client_id': new_id, 'project_name': f"Default Project for {client_name_for_defaults}",
-                            'status_id': default_project_status_id,
-                            'description': f"Default project automatically created for order {default_order_data['commande_reference']}.",
-                            'manager_team_member_id': user_id_for_defaults
-                        }
-                        default_project_id = projects_crud.add_project(default_project_data, conn=conn)
-
-                        if default_project_id:
-                            self.logger.info(f"Successfully created default project {default_project_id}.")
-                            update_payload = {'project_id': default_project_id}
-                            if commandes_crud.update_commande(default_commande_id, update_payload, conn=conn):
-                                self.logger.info(f"Successfully linked project {default_project_id} to order {default_commande_id}.")
-                            else:
-                                self.logger.error(f"Failed to link project {default_project_id} to order {default_commande_id}.")
-                        else:
-                            self.logger.error(f"Failed to create default project for client {new_id}.")
-                    else:
-                        self.logger.warning(f"Skipping default project creation for client {new_id} due to missing default project status ID.")
-                else:
-                    self.logger.error(f"Failed to create default order for client {new_id}.")
-            else:
-                self.logger.warning(f"Skipping default order and project creation for client {new_id} due to missing default order status ID.")
-
-            self.logger.info(f"Client creation process for {new_id} completed successfully.")
+            conn.commit()
+            self.logger.info(f"Successfully added client {new_id}")
             return {'success': True, 'client_id': new_id}
         except Exception as e:
-            self.logger.error(f"Transaction failed during client creation for '{data.get('client_name')}': {e}", exc_info=True)
+            self.logger.error(f"Transaction failed during client creation: {e}", exc_info=True)
+            conn.rollback()
             return {'success': False, 'error': f"Database transaction failed: {e}"}
 
     @_manage_conn
@@ -203,42 +117,30 @@ class ClientsCRUD(GenericCRUD):
             return None
 
     @_manage_conn
-    def get_client_by_id(self, client_id: str, conn = None, include_deleted: bool = False) -> dict | None: # conn is Session
+    def get_client_by_id(self, client_id: str, conn: Session = None, include_deleted: bool = False) -> dict | None:
         """
-        Fetches a single client by their client_id.
+        Fetches a single client by their client_id using the ORM.
 
         Args:
             client_id (str): The UUID of the client to fetch.
-            conn (sqlite3.Connection, optional): Database connection.
+            conn (Session, optional): SQLAlchemy Session.
             include_deleted (bool, optional): If True, includes soft-deleted clients.
                                               Defaults to False.
 
         Returns:
-            dict | None: A dictionary representing the client if found and not excluded by
-                         soft delete policy, otherwise None.
+            dict | None: A dictionary representing the client if found, otherwise None.
         """
-        sql_base = f"SELECT * FROM {self.table_name} WHERE {self.id_column} = :client_id"
-        params_dict = {"client_id": client_id}
-
-        if not include_deleted:
-            sql_base += " AND (is_deleted IS NULL OR is_deleted = 0)"
-
-        sql_query = text(sql_base)
+        from db.models import Client  # Import the model
         try:
-            if _is_sqlalchemy_obj(conn):
-                result = conn.execute(sql_query, params_dict)
-            else:
-                # Raw sqlite3 connection
-                result = conn.execute(str(sql_query), params_dict)
-            row = result.fetchone()
-            # For SQLAlchemy, row might be a RowProxy, for sqlite3 a Row.
-            # dict(row._mapping) works for RowProxy. For sqlite3.Row, dict(row) works.
-            # The _object_to_dict method in GenericCRUD can handle this.
-            # However, since we are in ClientsCRUD, we might not have direct access to it
-            # unless we call super()._object_to_dict or ClientsCRUD implements its own.
-            # For now, assuming direct conversion works or _mapping is available.
-            if row:
-                return dict(row._mapping) if hasattr(row, '_mapping') else dict(row)
+            query = conn.query(Client).filter(Client.client_id == client_id)
+            if not include_deleted:
+                query = query.filter(Client.is_deleted == 0)
+
+            client = query.first()
+
+            if client:
+                # Convert the SQLAlchemy object to a dictionary
+                return {c.name: getattr(client, c.name) for c in client.__table__.columns}
             return None
         except Exception as e:
             self.logger.error(f"Error getting client by ID {client_id}: {e}", exc_info=True)
@@ -305,70 +207,30 @@ class ClientsCRUD(GenericCRUD):
             return []
 
     @_manage_conn
-    def update_client(self, client_id: str, client_data: dict, conn = None) -> dict: # conn is Session
+    def update_client(self, client_id: str, client_data: dict, conn: Session = None) -> dict:
         """
-        Updates an existing client's information.
-
-        Validates that `client_id` is provided and that `client_data` is not empty.
-        Performs data type validation for fields like 'price'.
-        Allows updating of soft delete fields `is_deleted` and `deleted_at`.
-
-        Args:
-            client_id (str): The UUID of the client to update.
-            client_data (dict): A dictionary containing the client data to update.
-                                Keys should correspond to valid column names.
-            conn (sqlite3.Connection, optional): Database connection.
-
-        Returns:
-            dict: {'success': True, 'updated_count': count} if rows were updated,
-                  {'success': False, 'error': 'message'} or
-                  {'success': True, 'updated_count': 0} if no rows matched or no valid data.
+        Updates an existing client's information using the ORM.
         """
+        from db.models import Client
         if not client_id:
             return {'success': False, 'error': "Client ID is required for update."}
         if not client_data:
             return {'success': False, 'error': "No data provided for update."}
 
-        now_utc_iso = datetime.utcnow().isoformat() + "Z"
-
-        # Prepare data for update, ensuring 'updated_at' is set
-        data_for_update = client_data.copy() # Avoid modifying the input dict
-        data_for_update['updated_at'] = now_utc_iso
-
-        valid_cols = ['client_name', 'company_name', 'primary_need_description', 'project_identifier',
-                      'country_id', 'city_id', 'default_base_folder_path', 'status_id',
-                      'selected_languages', 'price', 'notes', 'category', 'lead_source', 'updated_at',
-                      'created_by_user_id', 'is_deleted', 'deleted_at', 'default_template_id']
-
-        params_dict = {}
-        set_clauses = []
-
-        for k, v in data_for_update.items():
-            if k in valid_cols:
-                if k == 'price' and not isinstance(v, (int, float)) and v is not None:
-                    self.logger.error(f"Invalid data type for price in update_client for client {client_id}")
-                    return {'success': False, 'error': "Invalid data type for price. Must be a number."}
-                set_clauses.append(f"{k} = :{k}")
-                params_dict[k] = v
-
-        if not set_clauses:
-            return {'success': False, 'error': "No valid fields to update."}
-
-        params_dict[self.id_column] = client_id # For the WHERE clause
-
-        sql_query_str = f"UPDATE {self.table_name} SET {', '.join(set_clauses)} WHERE {self.id_column} = :{self.id_column}"
-        sql_query = text(sql_query_str)
-
         try:
-            if _is_sqlalchemy_obj(conn):
-                result = conn.execute(sql_query, params_dict)
-            else:
-                result = conn.execute(str(sql_query), params_dict)
-            # _manage_conn handles commit
-            return {'success': result.rowcount > 0, 'updated_count': result.rowcount}
-        except Exception as e: # Changed to general Exception
-            self.logger.error(f"clients_crud.update_client: Failed to update client {client_id} with data {params_dict}. Error: {type(e).__name__} - {e}", exc_info=True)
-            # _manage_conn handles rollback
+            client = conn.query(Client).filter(Client.client_id == client_id).first()
+            if not client:
+                return {'success': True, 'updated_count': 0}
+
+            for key, value in client_data.items():
+                if hasattr(client, key):
+                    setattr(client, key, value)
+
+            conn.commit()
+            return {'success': True, 'updated_count': 1}
+        except Exception as e:
+            self.logger.error(f"Failed to update client {client_id}: {e}", exc_info=True)
+            conn.rollback()
             return {'success': False, 'error': str(e)}
 
     @_manage_conn
