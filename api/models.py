@@ -365,7 +365,132 @@ class PerformanceReviewResponse(PerformanceReviewBase):
         from_attributes = True
 
 
+class Client(BaseModel):
+    client_id: str
+    client_name: str
+    company_name: Optional[str] = None
+    primary_need_description: Optional[str] = None
+    project_identifier: Optional[str] = None
+    country_id: Optional[int] = None
+    city_id: Optional[int] = None
+    default_base_folder_path: Optional[str] = None
+    status_id: Optional[int] = None
+    selected_languages: Optional[str] = None
+    price: Optional[float] = None
+    notes: Optional[str] = None
+    category: Optional[str] = None
+    lead_source: Optional[str] = None
+    created_by_user_id: str
+    default_template_id: Optional[int] = None
+    is_deleted: bool = False
+    deleted_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class Project(BaseModel):
+    project_id: str
+    client_id: str
+    project_name: str
+    description: Optional[str] = None
+    start_date: Optional[date] = None
+    deadline_date: Optional[date] = None
+    budget: Optional[float] = None
+    status_id: int
+    manager_team_member_id: Optional[str] = None
+    priority: Optional[int] = None
+    progress_percentage: Optional[int] = None
+    is_deleted: bool = False
+    deleted_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class Company(BaseModel):
+    company_id: str
+    company_name: str
+    address: Optional[str] = None
+    is_default: bool = False
+    logo_path: Optional[str] = None
+    payment_info: Optional[str] = None
+    other_info: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class Product(BaseModel):
+    product_id: int
+    product_name: str
+    product_code: str
+    description: Optional[str] = None
+    category: Optional[str] = None
+    language_code: Optional[str] = None
+    base_unit_price: Optional[float] = None
+    unit_of_measure: Optional[str] = None
+    weight: Optional[float] = None
+    dimensions: Optional[str] = None
+    is_active: bool = True
+    is_deleted: bool = False
+    deleted_at: Optional[datetime] = None
+    created_by_user_id: Optional[str] = None
+    updated_by_user_id: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class ClientDocument(BaseModel):
+    document_id: str
+    client_id: str
+    document_type: str
+    file_path_relative: str
+    file_name_on_disk: str
+    created_by_user_id: str
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
 # Pydantic Models for Leave Management
+
+class ProformaInvoiceStatusEnum(str, enum.Enum):
+    DRAFT = "draft"
+    SENT = "sent"
+    PAID = "paid"
+    CANCELLED = "cancelled"
+
+class ProformaInvoiceItem(BaseModel):
+    id: Optional[str] = None
+    proforma_invoice_id: Optional[str] = None
+    product_id: Optional[str] = None
+    description: str
+    quantity: float
+    unit_price: float
+    total_price: float
+
+    class Config:
+        from_attributes = True
+
+class ProformaInvoiceBase(BaseModel):
+    id: Optional[str] = None
+    proforma_invoice_number: str
+    client_id: str
+    company_id: str
+    project_id: Optional[str] = None
+    currency: str
+    subtotal_amount: float
+    vat_amount: float
+    grand_total_amount: float
+    status: ProformaInvoiceStatusEnum
+    notes: Optional[str] = None
+    linked_document_id: Optional[str] = None
+    generated_invoice_document_id: Optional[str] = None
+    created_date: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    items: List[ProformaInvoiceItem] = []
+
+    class Config:
+        from_attributes = True
 
 class LeaveRequestStatusEnum(str, enum.Enum):
     PENDING = "pending"

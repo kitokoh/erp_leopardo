@@ -28,15 +28,15 @@ from db.cruds.generic_crud import GenericCRUD
 # Import CRUD instances for refactored modules
 # from db.cruds.users_crud import users_crud_instance # Replaced with direct module import
 from db.cruds import users_crud # Import the module itself
-from db.cruds.clients_crud import clients_crud_instance
-from db.cruds.products_crud import products_crud_instance
+from db.cruds.clients.clients_crud import clients_crud_instance
+from db.cruds.products.products_crud import products_crud
 
 # Imports for non-refactored or utility functions used in seeding
-from db.cruds.template_categories_crud import add_template_category, get_template_category_by_name
-from db.cruds.cover_page_templates_crud import get_cover_page_template_by_name, add_cover_page_template
+from db.cruds.misc.template_categories_crud import add_template_category, get_template_category_by_name
+from db.cruds.misc.cover_page_templates_crud import get_cover_page_template_by_name, add_cover_page_template
 # get_user_by_username will be called via users_crud_instance if needed for seeding logic outside Users table itself
-from db.cruds.locations_crud import get_or_add_country, get_or_add_city, get_country_by_name, get_city_by_name_and_country_id
-from db.cruds.status_settings_crud import get_status_setting_by_name
+from db.cruds.misc.locations_crud import get_or_add_country, get_or_add_city, get_country_by_name, get_city_by_name_and_country_id
+from db.cruds.misc.status_settings_crud import get_status_setting_by_name
 from db.cruds import partners_crud
 # Assuming company and company personnel functions will be imported if they were used via db_main_manager
 # For now, let's assume they are not, or will be handled if errors arise.
@@ -51,10 +51,10 @@ LOGO_SUBDIR_CONTEXT = "company_logos" # This should match the setup
 
 # Ensure add_default_template_if_not_exists is imported if used by seed_initial_data directly
 # (It is used, so ensure it's available from db.cruds.templates_crud)
-from db.cruds.templates_crud import add_template, get_filtered_templates, add_default_template_if_not_exists
+from db.cruds.misc.templates_crud import add_template, get_filtered_templates, add_default_template_if_not_exists
 # Ensure set_setting is imported if used by seed_initial_data directly
 # (It is used, so ensure it's available from db.cruds.application_settings_crud)
-from db.cruds.application_settings_crud import get_setting, set_setting
+from db.cruds.misc.application_settings_crud import get_setting, set_setting
 # from db.connection import engine as main_sqlalchemy_engine # Import the main engine - will get it dynamically
 
 # Import the connection module itself to access the engine dynamically
