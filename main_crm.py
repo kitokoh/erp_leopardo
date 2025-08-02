@@ -637,6 +637,7 @@ class CRMModule(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     crm_module = CRMModule()
+    crm_module.showMaximized()
     sys.exit(app.exec_())
 
 def get_notification_manager():
