@@ -13,6 +13,7 @@ class StatusSetting(Base):
     is_archival_status = Column(Boolean, default=False)
     is_completion_status = Column(Boolean, default=False)
     sort_order = Column(Integer, default=0)
+    __table_args__ = {'extend_existing': True}
 
     def __repr__(self):
         return f"<StatusSetting(status_id={self.status_id}, status_name='{self.status_name}')>"

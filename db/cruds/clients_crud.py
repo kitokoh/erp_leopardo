@@ -23,165 +23,79 @@ class ClientsCRUD(GenericCRUD):
         self.logger = logging.getLogger(__name__) # Add logger instance
 
     @_manage_conn
-    def add_client(self, data: dict, conn = None) -> dict: # conn is Session
+    def add_client(self, data: dict, conn: Session = None) -> dict:
         """
-        Adds a new client to the database.
-        After successfully adding the client, it automatically creates a default order
-        and a default project linked to that order for the new client.
-
-        Performs input validation for required fields ('client_name', 'created_by_user_id')
-        and data types (e.g., 'price'). Sets 'is_deleted' to 0 by default.
-
-        Args:
-            data (dict): A dictionary containing client data. Expected keys include:
-                         'client_name', 'created_by_user_id', 'company_name' (optional),
-                         'primary_need_description' (optional), 'project_identifier' (optional, default 'N/A'),
-                         'country_id' (optional), 'city_id' (optional), 'default_base_folder_path' (optional),
-                         'status_id' (optional), 'selected_languages' (optional),
-                         'price' (optional, default 0), 'notes' (optional), 'category' (optional).
-            conn (sqlite3.Connection, optional): Database connection. Managed by decorator if None.
-
-        Returns:
-            dict: A dictionary with {'success': True, 'client_id': new_id} on success,
-                  or {'success': False, 'error': 'error message'} on failure.
+        Adds a new client to the database using the ORM.
         """
-        from . import commandes_crud # Local import to avoid circular dependency at module level
-        from . import projects_crud # Local import
-        # from . import status_settings_crud # No longer directly needed here for status fetching
-        # Import the new status_manager service
-        try:
-            from status_manager import status_service, status_models # Attempt direct import
-        except ImportError:
-            self.logger.error("Failed to import status_manager.status_service in clients_crud. Default status logic will be impaired.")
-            status_service = None # Fallback if import fails
-            status_models = None
+        from db.models import Client, Commande, Project
+        from status_manager import status_service, status_models
 
+        self.logger.info(f"Attempting to add client with data: {data}")
 
-        self.logger.info(f"Attempting to add client with data: {data}") # Log incoming data
-
-        # Input Validation
         required_fields = ['client_name', 'created_by_user_id']
         for field in required_fields:
             if not data.get(field):
-                self.logger.error(f"Missing required field: {field} in add_client data: {data}")
+                self.logger.error(f"Missing required field: {field}")
                 return {'success': False, 'error': f"Missing required field: {field}"}
 
-        if 'price' in data and data['price'] is not None and not isinstance(data['price'], (int, float)):
-            self.logger.error(f"Invalid data type for price in add_client data: {data}")
-            return {'success': False, 'error': "Invalid data type for price. Must be a number."}
-
         new_id = str(uuid.uuid4())
-        now_utc_iso = datetime.utcnow().isoformat() + "Z"
-
-        # Add is_deleted and deleted_at with default values
-        is_deleted_val = data.get('is_deleted', 0) # Default to not deleted
-        deleted_at_val = data.get('deleted_at', None)
-
-        # Create client folder
         folder_path = self.create_client_folder(new_id, data.get('client_name'), conn=conn)
-        if not folder_path:
-            # Even if folder creation fails, we can still proceed with adding the client
-            self.logger.error(f"Could not create folder for new client {data.get('client_name')}. The client will be created without a default folder path.")
 
-        sql_query = text("""INSERT INTO Clients
-                 (client_id, client_name, company_name, primary_need_description, project_identifier,
-                  country_id, city_id, default_base_folder_path, status_id, selected_languages,
-                  price, notes, category, lead_source, created_at, updated_at, created_by_user_id,
-                  is_deleted, deleted_at, default_template_id)
-                 VALUES (:client_id, :client_name, :company_name, :primary_need_description, :project_identifier,
-                         :country_id, :city_id, :default_base_folder_path, :status_id, :selected_languages,
-                         :price, :notes, :category, :lead_source, :created_at, :updated_at, :created_by_user_id,
-                         :is_deleted, :deleted_at, :default_template_id)""")
+        new_client = Client(
+            client_id=new_id,
+            client_name=data.get('client_name'),
+            company_name=data.get('company_name'),
+            primary_need_description=data.get('primary_need_description'),
+            project_identifier=data.get('project_identifier', 'N/A'),
+            country_id=data.get('country_id'),
+            city_id=data.get('city_id'),
+            default_base_folder_path=folder_path,
+            status_id=data.get('status_id'),
+            selected_languages=data.get('selected_languages'),
+            price=data.get('price', 0),
+            notes=data.get('notes'),
+            category=data.get('category'),
+            lead_source=data.get('lead_source'),
+            created_by_user_id=data.get('created_by_user_id'),
+            default_template_id=data.get('default_template_id')
+        )
+        conn.add(new_client)
 
-        params_dict = {
-            "client_id": new_id, "client_name": data.get('client_name'), "company_name": data.get('company_name'),
-            "primary_need_description": data.get('primary_need_description'),
-            "project_identifier": data.get('project_identifier', 'N/A'),
-            "country_id": data.get('country_id'), "city_id": data.get('city_id'),
-            "default_base_folder_path": folder_path, # Use the created folder path
-            "status_id": data.get('status_id'), "selected_languages": data.get('selected_languages'),
-            "price": data.get('price', 0), "notes": data.get('notes'), "category": data.get('category'),
-            "lead_source": data.get('lead_source'), "created_at": now_utc_iso, "updated_at": now_utc_iso,
-            "created_by_user_id": data.get('created_by_user_id'),
-            "is_deleted": is_deleted_val, "deleted_at": deleted_at_val,
-            "default_template_id": data.get('default_template_id')
-        }
+        # Create default order and project
+        default_order_status_id = status_service.get_default_status_for_commande_creation().status_id
+        default_project_status_id = status_service.get_default_status_for_type(status_models.StatusType.PROJECT, preferred_name="Planning").status_id
+
+        if default_order_status_id and default_project_status_id:
+            new_commande = Commande(
+                commande_id=str(uuid.uuid4()),
+                client_id=new_id,
+                commande_reference=f"DEF-ORD-{new_id[:8]}",
+                status_commande_id=default_order_status_id,
+                created_by_user_id=data.get('created_by_user_id'),
+                notes=f"Default order automatically created for {data.get('client_name')}.",
+                is_default=True,
+                description_commande="Default Order"
+            )
+            conn.add(new_commande)
+
+            new_project = Project(
+                project_id=str(uuid.uuid4()),
+                client_id=new_id,
+                project_name=f"Default Project for {data.get('client_name')}",
+                status_id=default_project_status_id,
+                description=f"Default project automatically created for order {new_commande.commande_reference}.",
+                manager_team_member_id=data.get('created_by_user_id')
+            )
+            conn.add(new_project)
+            new_commande.project_id = new_project.project_id
 
         try:
-            self.logger.info(f"Executing INSERT for new client '{params_dict.get('client_name')}' with ID {new_id}.")
-            if _is_sqlalchemy_obj(conn):
-                conn.execute(sql_query, params_dict)
-            else:
-                conn.execute(str(sql_query), params_dict)
-            self.logger.info(f"Successfully inserted client record for ID {new_id}.")
-
-            client_name_for_defaults = data.get('client_name', 'N/A')
-            user_id_for_defaults = data.get('created_by_user_id', None)
-
-            self.logger.info(f"Attempting to create default order and project for client {new_id}.")
-            default_order_status_id = None
-            default_project_status_id = None
-
-            if status_service and status_models:
-                self.logger.debug("status_service is available. Fetching default statuses.")
-                default_commande_status_obj = status_service.get_default_status_for_commande_creation()
-                if default_commande_status_obj:
-                    default_order_status_id = default_commande_status_obj.status_id
-                    self.logger.debug(f"Default order status ID found: {default_order_status_id}")
-                else:
-                    self.logger.warning(f"Could not determine a default status_id for Commande for client {new_id}.")
-
-                default_project_status_obj = status_service.get_default_status_for_type(status_models.StatusType.PROJECT, preferred_name="Planning")
-                if default_project_status_obj:
-                    default_project_status_id = default_project_status_obj.status_id
-                    self.logger.debug(f"Default project status ID found: {default_project_status_id}")
-                else:
-                    self.logger.warning(f"Could not determine a default status_id for Project for client {new_id}.")
-            else:
-                self.logger.error("status_service not available. Cannot determine default statuses.")
-
-            if default_order_status_id:
-                self.logger.info("Proceeding with default order creation.")
-                default_order_data = {
-                    'client_id': new_id, 'commande_reference': f"DEF-ORD-{new_id[:8]}",
-                    'status_commande_id': default_order_status_id, 'created_by_user_id': user_id_for_defaults,
-                    'notes': f"Default order automatically created for {client_name_for_defaults}.",
-                    'is_default': True, 'description_commande': "Default Order"
-                }
-                default_commande_id = commandes_crud.add_commande(default_order_data, conn=conn)
-
-                if default_commande_id:
-                    self.logger.info(f"Successfully created default order {default_commande_id} for client {new_id}.")
-                    if default_project_status_id:
-                        self.logger.info("Proceeding with default project creation.")
-                        default_project_data = {
-                            'client_id': new_id, 'project_name': f"Default Project for {client_name_for_defaults}",
-                            'status_id': default_project_status_id,
-                            'description': f"Default project automatically created for order {default_order_data['commande_reference']}.",
-                            'manager_team_member_id': user_id_for_defaults
-                        }
-                        default_project_id = projects_crud.add_project(default_project_data, conn=conn)
-
-                        if default_project_id:
-                            self.logger.info(f"Successfully created default project {default_project_id}.")
-                            update_payload = {'project_id': default_project_id}
-                            if commandes_crud.update_commande(default_commande_id, update_payload, conn=conn):
-                                self.logger.info(f"Successfully linked project {default_project_id} to order {default_commande_id}.")
-                            else:
-                                self.logger.error(f"Failed to link project {default_project_id} to order {default_commande_id}.")
-                        else:
-                            self.logger.error(f"Failed to create default project for client {new_id}.")
-                    else:
-                        self.logger.warning(f"Skipping default project creation for client {new_id} due to missing default project status ID.")
-                else:
-                    self.logger.error(f"Failed to create default order for client {new_id}.")
-            else:
-                self.logger.warning(f"Skipping default order and project creation for client {new_id} due to missing default order status ID.")
-
-            self.logger.info(f"Client creation process for {new_id} completed successfully.")
+            conn.commit()
+            self.logger.info(f"Successfully added client {new_id}")
             return {'success': True, 'client_id': new_id}
         except Exception as e:
-            self.logger.error(f"Transaction failed during client creation for '{data.get('client_name')}': {e}", exc_info=True)
+            self.logger.error(f"Transaction failed during client creation: {e}", exc_info=True)
+            conn.rollback()
             return {'success': False, 'error': f"Database transaction failed: {e}"}
 
     @_manage_conn

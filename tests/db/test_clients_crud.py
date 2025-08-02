@@ -61,7 +61,12 @@ class TestClientsCRUD(unittest.TestCase):
         self.session.close()
         Base.metadata.drop_all(self.engine)
 
-    def test_add_client_success(self):
+    @patch('db.cruds.clients_crud.status_service')
+    def test_add_client_success(self, mock_status_service):
+        # Mock the status service to return dummy IDs
+        mock_status_service.get_default_status_for_commande_creation.return_value.status_id = 1
+        mock_status_service.get_default_status_for_type.return_value.status_id = 1
+
         result = self.clients_crud.add_client(self.client_data1, conn=self.session)
         self.assertTrue(result['success'])
         self.assertIsNotNone(result.get('client_id'))
@@ -72,6 +77,13 @@ class TestClientsCRUD(unittest.TestCase):
         self.assertIsNotNone(db_client)
         self.assertEqual(db_client.client_name, self.client_data1['client_name'])
         self.assertEqual(db_client.is_deleted, 0)
+        # Verify that a default order and project were created
+        from db.models import Commande, Project
+        default_order = self.session.query(Commande).filter_by(client_id=client_id, is_default=True).first()
+        self.assertIsNotNone(default_order)
+        default_project = self.session.query(Project).filter_by(client_id=client_id).first()
+        self.assertIsNotNone(default_project)
+        self.assertEqual(default_order.project_id, default_project.project_id)
 
     def test_add_client_missing_required_field(self):
         invalid_data = self.client_data1.copy()

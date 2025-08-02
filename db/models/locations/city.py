@@ -14,6 +14,7 @@ class City(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     country = relationship("Country")
+    __table_args__ = {'extend_existing': True}
 
     def __repr__(self):
         return f"<City(city_id={self.city_id}, city_name='{self.city_name}')>"

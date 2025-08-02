@@ -33,6 +33,7 @@ class Client(Base):
     city = relationship("City")
     status = relationship("StatusSetting")
     # default_template = relationship("Template")
+    __table_args__ = {'extend_existing': True}
 
     def __repr__(self):
         return f"<Client(client_id='{self.client_id}', client_name='{self.client_name}')>"
