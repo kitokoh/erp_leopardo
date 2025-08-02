@@ -67,50 +67,32 @@ def _fetch_all_as_dict_list(conn_or_cursor, sql_query_sa, sql_query_sqlite, para
         return []
 
 @_manage_conn
-def add_user(username: str, password: str, role_id: int, full_name: str = None, email: str = None, conn=None, logger_passed: logging.Logger | None = None) -> str | None:
+def add_user(username: str, password: str, role_id: int, full_name: str = None, email: str = None, conn: Session = None, logger_passed: logging.Logger | None = None) -> str | None:
     current_logger = logger_passed if logger_passed else module_logger
     if not username or not password or role_id is None:
         current_logger.error("Username, password, and role_id are required.")
         return None
 
-    # util_hash_password from utils.auth returns a single string (hash includes salt)
     final_hashed_password = util_hash_password(password, logger_passed=current_logger)
     user_id_generated = str(uuid.uuid4())
-    now_iso = datetime.utcnow().isoformat() + "Z"
 
-    # 'salt' column is removed as passlib handles it within the hash
-    sql_common_cols = """(user_id, username, hashed_password, full_name, email, role_id, is_active, created_at, updated_at, last_login_at, is_fingerprint_auth_enabled, fingerprint_template_id, is_face_auth_enabled, face_template_id, is_voice_auth_enabled, voice_profile_id)"""
-    sql_sqlite_placeholders = "(?, ?, ?, ?, ?, ?, 1, ?, ?, NULL, 0, NULL, 0, NULL, 0, NULL)"
-    sql_sa_placeholders = "(:user_id, :username, :hashed_password, :full_name, :email, :role_id, 1, :created_at, :updated_at, NULL, 0, NULL, 0, NULL, 0, NULL)"
-
-    sql_sqlite = f"INSERT INTO Users {sql_common_cols} VALUES {sql_sqlite_placeholders}"
-    sql_sa = text(f"INSERT INTO Users {sql_common_cols} VALUES {sql_sa_placeholders}")
-
-    params_sa = {
-        "user_id": user_id_generated, "username": username,
-        "hashed_password": final_hashed_password, # Only the combined hash
-        "full_name": full_name, "email": email, "role_id": role_id,
-        "created_at": now_iso, "updated_at": now_iso
-    }
-    # Ensure params_sqlite order matches sql_common_cols and sql_sqlite_placeholders
-    params_sqlite = (user_id_generated, username, final_hashed_password, full_name, email, role_id, now_iso, now_iso)
-
-    db_obj, dialect = _get_cursor_and_dialect(conn)
-    if not db_obj or not dialect:
-        current_logger.error(f"Unsupported connection type: {type(conn)}")
-        return None
-
+    new_user = User(
+        user_id=user_id_generated,
+        username=username,
+        hashed_password=final_hashed_password,
+        full_name=full_name,
+        email=email,
+        role_id=role_id,
+        is_active=True,
+    )
+    conn.add(new_user)
     try:
-        _execute_query(db_obj, sql_sa if dialect == "sqlalchemy" else sql_sqlite, params_sa if dialect == "sqlalchemy" else params_sqlite, dialect)
-        # Commit is handled by _manage_conn (assumed for both dialects or needs adjustment in _manage_conn)
+        conn.commit()
         current_logger.info(f"User '{username}' added successfully with ID {user_id_generated}.")
         return user_id_generated
-    except (sqlite3.IntegrityError, SQLAlchemyError) as e: # SQLAlchemyError might wrap IntegrityError
-        current_logger.error(f"Error adding user '{username}'. Username or email might already exist: {e}", exc_info=True)
-        # Rollback assumed handled by _manage_conn for errors
-        return None
-    except (sqlite3.Error, SQLAlchemyError) as e:
-        current_logger.error(f"Database error adding user '{username}': {e}", exc_info=True)
+    except Exception as e:
+        current_logger.error(f"Error adding user '{username}': {e}", exc_info=True)
+        conn.rollback()
         return None
 
 from db.models import User, Role

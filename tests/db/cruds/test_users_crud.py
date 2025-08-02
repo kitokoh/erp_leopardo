@@ -35,18 +35,13 @@ class TestUsersCrud(unittest.TestCase):
         """Helper to add a user for testing."""
         username = f"user_{username_suffix}_{uuid.uuid4().hex[:6]}"
         email = f"{username}@example.com"
-        user = User(
-            user_id=str(uuid.uuid4()),
-            username=username,
-            email=email,
-            hashed_password=hash_password("password123"),
-            full_name=f"User {username_suffix.capitalize()}",
-            role_id=self.test_role_id,
-            is_active=True,
+        user_id = users_crud.add_user(
+            username, "password123", self.test_role_id,
+            full_name=f"User {username_suffix.capitalize()}", email=email,
+            conn=self.session
         )
-        self.session.add(user)
-        self.session.commit()
-        return user.user_id, username
+        self.assertIsNotNone(user_id)
+        return user_id, username
 
     def test_01_add_user_initializes_biometric_fields(self):
         """Test that new users have biometric fields initialized to False/Null."""

@@ -1,24 +1,21 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Float, REAL, Date
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, REAL
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from db.connection import Base
 
-class ProformaInvoiceItems(Base):
+class ProformaInvoiceItem(Base):
     __tablename__ = 'proforma_invoice_items'
-    # = Column(String, primary_key=True)
-    # = Column(String, nullable=False)
-    # = Column(String)
-    # = Column(String, nullable=False)
-    # = Column(String, nullable=False)
-    # = Column(String, nullable=False)
-    # = Column(String, nullable=False)
-    # = Column(String, ForeignKey('proforma_invoices.id'))
-    # = Column(String, ForeignKey('products.product_id'))
 
-    proforma_invoice_rel = relationship('ProformaInvoices')
-    product_rel = relationship('Products')
+    id = Column(String, primary_key=True)
+    proforma_invoice_id = Column(String, ForeignKey('proforma_invoices.id'))
+    product_id = Column(Integer, ForeignKey('products.id'))
+    description = Column(Text)
+    quantity = Column(REAL)
+    unit_price = Column(REAL)
+    total_price = Column(REAL)
+
+    proforma_invoice = relationship("ProformaInvoice", back_populates="items")
+    product = relationship("Product")
 
     def __repr__(self):
-        return f'<ProformaInvoiceItems #={self.#}>'
-    proforma_invoice_rel = relationship('ProformaInvoices')
-    product_rel = relationship('Products')
+        return f"<ProformaInvoiceItem(id='{self.id}')>"

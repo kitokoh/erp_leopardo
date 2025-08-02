@@ -1,23 +1,21 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Float, REAL, Date
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from db.connection import Base
 
-class Savtickets(Base):
+class SavTicket(Base):
     __tablename__ = 'sav_tickets'
-    ticket_id = Column(Text, primary_key=True, nullable=False)
-    client_project_product_id = Column(Integer, nullable=False, ForeignKey('clientprojectproducts.client_project_product_id'))
 
-    status_id = Column(Integer, nullable=False, ForeignKey('statussettings.status_id'))
-
+    ticket_id = Column(String, primary_key=True)
+    client_id = Column(String, ForeignKey('clients.client_id'))
+    client_project_product_id = Column(Integer, ForeignKey('client_project_products.client_project_product_id'), nullable=False)
+    issue_description = Column(Text)
+    status_id = Column(Integer, ForeignKey('status_settings.status_id'))
+    assigned_technician_id = Column(Integer, ForeignKey('team_members.team_member_id'))
     resolution_details = Column(Text)
+    opened_at = Column(DateTime)
     closed_at = Column(DateTime)
-
+    created_by_user_id = Column(String, ForeignKey('users.user_id'))
 
     def __repr__(self):
-        return f'<Savtickets ticket_id={self.ticket_id}>'
-    client_rel = relationship('Clients')
-    clientprojectproduct_rel = relationship('Clientprojectproducts')
-    statussetting_rel = relationship('Statussettings')
-    teammember_rel = relationship('Teammembers')
-    user_rel = relationship('Users')
+        return f"<SavTicket(ticket_id='{self.ticket_id}')>"
