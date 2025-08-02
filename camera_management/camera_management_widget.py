@@ -9,6 +9,7 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QUrl
 # from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 # from PyQt5.QtMultimediaWidgets import QVideoWidget
+from PyQt5.QtMultimediaWidgets import QVideoWidget
 
 # Assuming db_manager and company_assets_crud are accessible.
 # These imports might need adjustment based on the final project structure
