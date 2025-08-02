@@ -3,7 +3,7 @@ import logging
 import os
 from PyQt5.QtWidgets import QWidget, QVBoxLayout
 from PyQt5.QtWebEngineWidgets import QWebEngineView
-from PyQt5.QtCore import pyqtSlot, QObject, pyqtSignal, QTimer
+from PyQt5.QtCore import pyqtSlot, QObject, pyqtSignal, QTimer, QUrl
 from PyQt5.QtWebChannel import QWebChannel
 
 from app_setup import APP_ROOT_DIR
@@ -105,8 +105,9 @@ class HomePageMapWidget(QWidget):
             )
 
             if map_html:
-                self.map_view.setHtml(map_html)
-                logging.info(f"HomePageMapWidget: Map HTML content set. Length: {len(map_html)}")
+                base_url = QUrl.fromLocalFile(APP_ROOT_DIR + os.path.sep)
+                self.map_view.setHtml(map_html, baseUrl=base_url)
+                logging.info(f"HomePageMapWidget: Map HTML content set with base URL {base_url.toString()}. Length: {len(map_html)}")
             else:
                 self._display_error_html("Erreur de génération de la carte pour la page d'accueil.")
                 logging.error("HomePageMapWidget: Failed to generate map HTML.")

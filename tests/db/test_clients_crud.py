@@ -77,7 +77,6 @@ class TestClientsCRUD(unittest.TestCase):
         self.assertIsNotNone(db_client)
         self.assertEqual(db_client.client_name, self.client_data1['client_name'])
         self.assertEqual(db_client.is_deleted, 0)
-
         # Verify that a default order and project were created
         from db.models import Commande, Project
         default_order = self.session.query(Commande).filter_by(client_id=client_id, is_default=True).first()
