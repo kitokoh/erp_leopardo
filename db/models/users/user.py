@@ -26,7 +26,7 @@ class User(Base):
     is_voice_auth_enabled = Column(Boolean, server_default='0', nullable=True)
     voice_profile_id = Column(Text, nullable=True)
 
-    role = relationship("Role")
+    role = relationship("Role", back_populates="users")
     __table_args__ = {'extend_existing': True}
 
     def __repr__(self):

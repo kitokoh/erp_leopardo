@@ -2,6 +2,8 @@ from sqlalchemy import Column, Integer, String, Text, DateTime
 from sqlalchemy.sql import func
 from db.connection import Base
 
+from sqlalchemy.orm import relationship
+
 class Role(Base):
     __tablename__ = 'roles'
 
