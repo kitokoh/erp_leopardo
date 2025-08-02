@@ -1,0 +1,23 @@
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, UniqueConstraint
+from sqlalchemy.orm import relationship
+from db.connection import Base
+
+class LeaveBalance(Base):
+    __tablename__ = 'leave_balances'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    employee_id = Column(String, ForeignKey('employees.id'), nullable=False, index=True)
+    leave_type_id = Column(Integer, ForeignKey('leave_types.id'), nullable=False, index=True)
+    year = Column(Integer, nullable=False, index=True)
+    entitled_days = Column(Float, nullable=False)
+    used_days = Column(Float, nullable=False, default=0.0)
+
+    employee = relationship("Employee")
+    leave_type = relationship("LeaveType")
+
+    __table_args__ = (
+        UniqueConstraint('employee_id', 'leave_type_id', 'year', name='uq_employee_leave_year'),
+    )
+
+    def __repr__(self):
+        return f"<LeaveBalance(id={self.id}, employee_id='{self.employee_id}', leave_type_id={self.leave_type_id}, year={self.year})>"

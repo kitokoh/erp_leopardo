@@ -4,7 +4,7 @@ from datetime import datetime
 import json
 import logging
 from .generic_crud import _manage_conn # get_db_connection is not used directly
-from .products_crud import get_product_by_id # Important dependency
+from .products_crud import products_crud
 
 logger = logging.getLogger(__name__)
 

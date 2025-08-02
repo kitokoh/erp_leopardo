@@ -7,11 +7,12 @@ from datetime import date, datetime
 # Assuming your project structure allows these imports
 # Adjust if your models are located elsewhere
 from api.models import (
-    Goal, GoalCreate, GoalUpdate, GoalStatusEnum,
+    GoalBase as Goal, GoalCreate, GoalUpdate,
     ReviewCycle, ReviewCycleCreate, ReviewCycleUpdate,
-    PerformanceReview, PerformanceReviewCreate, PerformanceReviewUpdate, PerformanceReviewStatusEnum,
-    Employee, User # Needed for relationships and context
+    PerformanceReview, PerformanceReviewCreate, PerformanceReviewUpdate,
+    EmployeeBase as Employee, UserInDB as User # Needed for relationships and context
 )
+from db.models.performance import GoalStatusEnum, PerformanceReviewStatusEnum
 
 # --- Goal CRUD ---
 

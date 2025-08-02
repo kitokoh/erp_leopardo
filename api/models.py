@@ -367,6 +367,12 @@ class PerformanceReviewResponse(PerformanceReviewBase):
 
 # Pydantic Models for Leave Management
 
+class LeaveRequestStatusEnum(str, enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    CANCELLED = "cancelled"
+
 # LeaveType
 class LeaveTypeBase(BaseModel):
     name: str

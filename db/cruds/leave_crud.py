@@ -7,8 +7,8 @@ from datetime import date, datetime, timedelta
 # Assuming your project structure allows these imports
 # Adjust if your models are located elsewhere
 from api.models import (
-    LeaveType, LeaveBalance, LeaveRequest,
-    Employee, User, # Needed for relationships
+    LeaveTypeBase, LeaveBalanceBase, LeaveRequestBase,
+    EmployeeBase, UserInDB, # Needed for relationships
     LeaveTypeCreate, LeaveBalanceCreate, LeaveBalanceUpdate, LeaveRequestCreate,
     LeaveRequestStatusEnum # The Enum itself
 )
@@ -34,6 +34,8 @@ def calculate_leave_duration(start_date: date, end_date: date, exclude_weekends:
             num_days += 1.0
         current_date += timedelta(days=1)
     return num_days
+
+from db.models.leave.leave_type import LeaveType
 
 # --- LeaveType CRUD ---
 
@@ -75,6 +77,8 @@ def delete_leave_type(db: Session, leave_type_id: int) -> Optional[LeaveType]:
         db.commit()
     return db_leave_type
 
+from db.models.leave.leave_balance import LeaveBalance
+
 # --- LeaveBalance CRUD ---
 
 def create_leave_balance(db: Session, leave_balance_data: LeaveBalanceCreate) -> LeaveBalance:
@@ -114,6 +118,8 @@ def update_leave_balance(db: Session, leave_balance_id: int, balance_update_data
             db.rollback()
             raise
     return db_leave_balance
+
+from db.models.leave.leave_request import LeaveRequest
 
 # --- LeaveRequest CRUD & Logic ---
 
