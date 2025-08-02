@@ -113,29 +113,24 @@ def add_user(username: str, password: str, role_id: int, full_name: str = None, 
         current_logger.error(f"Database error adding user '{username}': {e}", exc_info=True)
         return None
 
+from db.models import User, Role
+
 @_manage_conn
-def get_user_by_username(username: str, conn=None, logger_passed: logging.Logger | None = None) -> dict | None:
+def get_user_by_username(username: str, conn: Session = None, logger_passed: logging.Logger | None = None) -> dict | None:
     current_logger = logger_passed if logger_passed else module_logger
-    sql_select_part = "SELECT u.*, r.role_name FROM Users u JOIN Roles r ON u.role_id = r.role_id"
-
-    sql_sqlite = f"{sql_select_part} WHERE u.username = ? AND u.is_active = 1 AND (u.is_deleted = 0 OR u.is_deleted IS NULL)"
-    sql_sa = text(f"{sql_select_part} WHERE u.username = :username AND u.is_active = 1 AND (u.is_deleted = 0 OR u.is_deleted IS NULL)")
-
-    params_sa = {"username": username}
-    params_sqlite = (username,)
-
-    db_obj, dialect = _get_cursor_and_dialect(conn)
-    if not db_obj or not dialect:
-        current_logger.error(f"Unsupported connection type: {type(conn)}")
+    try:
+        user = conn.query(User).join(Role).filter(User.username == username, User.is_active == True, User.is_deleted == 0).first()
+        if user:
+            user_data = {c.name: getattr(user, c.name) for c in user.__table__.columns}
+            user_data['role_name'] = user.role.role_name
+            current_logger.debug(f"User '{username}' found. Hash: {user_data.get('hashed_password')}")
+            return user_data
+        else:
+            current_logger.debug(f"User '{username}' not found.")
+            return None
+    except Exception as e:
+        current_logger.error(f"Error getting user by username {username}: {e}", exc_info=True)
         return None
-
-    user_data = _fetch_one_as_dict(db_obj, sql_sa, sql_sqlite, params_sa, params_sqlite, dialect, current_logger)
-
-    if user_data:
-        current_logger.debug(f"User '{username}' found. Hash: {user_data.get('hashed_password')}")
-    else:
-        current_logger.debug(f"User '{username}' not found.")
-    return user_data
 
 @_manage_conn
 def get_any_user_by_username(username: str, conn=None, logger_passed: logging.Logger | None = None) -> dict | None:
