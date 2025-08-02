@@ -203,42 +203,30 @@ class ClientsCRUD(GenericCRUD):
             return None
 
     @_manage_conn
-    def get_client_by_id(self, client_id: str, conn = None, include_deleted: bool = False) -> dict | None: # conn is Session
+    def get_client_by_id(self, client_id: str, conn: Session = None, include_deleted: bool = False) -> dict | None:
         """
-        Fetches a single client by their client_id.
+        Fetches a single client by their client_id using the ORM.
 
         Args:
             client_id (str): The UUID of the client to fetch.
-            conn (sqlite3.Connection, optional): Database connection.
+            conn (Session, optional): SQLAlchemy Session.
             include_deleted (bool, optional): If True, includes soft-deleted clients.
                                               Defaults to False.
 
         Returns:
-            dict | None: A dictionary representing the client if found and not excluded by
-                         soft delete policy, otherwise None.
+            dict | None: A dictionary representing the client if found, otherwise None.
         """
-        sql_base = f"SELECT * FROM {self.table_name} WHERE {self.id_column} = :client_id"
-        params_dict = {"client_id": client_id}
-
-        if not include_deleted:
-            sql_base += " AND (is_deleted IS NULL OR is_deleted = 0)"
-
-        sql_query = text(sql_base)
+        from db.models import Client  # Import the model
         try:
-            if _is_sqlalchemy_obj(conn):
-                result = conn.execute(sql_query, params_dict)
-            else:
-                # Raw sqlite3 connection
-                result = conn.execute(str(sql_query), params_dict)
-            row = result.fetchone()
-            # For SQLAlchemy, row might be a RowProxy, for sqlite3 a Row.
-            # dict(row._mapping) works for RowProxy. For sqlite3.Row, dict(row) works.
-            # The _object_to_dict method in GenericCRUD can handle this.
-            # However, since we are in ClientsCRUD, we might not have direct access to it
-            # unless we call super()._object_to_dict or ClientsCRUD implements its own.
-            # For now, assuming direct conversion works or _mapping is available.
-            if row:
-                return dict(row._mapping) if hasattr(row, '_mapping') else dict(row)
+            query = conn.query(Client).filter(Client.client_id == client_id)
+            if not include_deleted:
+                query = query.filter(Client.is_deleted == 0)
+
+            client = query.first()
+
+            if client:
+                # Convert the SQLAlchemy object to a dictionary
+                return {c.name: getattr(client, c.name) for c in client.__table__.columns}
             return None
         except Exception as e:
             self.logger.error(f"Error getting client by ID {client_id}: {e}", exc_info=True)
