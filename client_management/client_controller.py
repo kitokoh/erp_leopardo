@@ -529,14 +529,14 @@ import db as db_manager # Assuming db_manager is the existing module for DB inte
 from db.cruds.clients import clients_crud_instance as clients_crud
 from db.cruds.products import products_crud
 from db.cruds.clients import client_project_products_crud
-from db.cruds import regions_crud, referents_crud # Added for Referents
+from db.cruds.misc import regions_crud, referents_crud
 import logging
 
 # Setup basic logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 from db.cruds.misc.activity_logs_crud import add_activity_log
-from db.cruds import companies_crud # Ajouté
+from db.cruds.misc import companies_crud
 from document_generator import html_generator # Ajouté
 import os # Ajouté
 import tempfile # Ajouté pour un chemin de sortie temporaire

@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 from cryptography.hazmat.backends import default_backend
 from cryptography.exceptions import InvalidSignature
 
-from db.cruds import licenses_crud
+from db.cruds.misc import licenses_crud
 import sqlite3
 
 # Assuming APP_ROOT_DIR is available or can be imported for robust path construction

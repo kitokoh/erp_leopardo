@@ -197,3 +197,9 @@ def get_activity_log_by_id(log_id: int, conn=None) -> dict | None:
     except (sqlite3.Error, SQLAlchemyError) as e: # Should be caught by helper
         logger.error(f"Failed to get activity log by ID {log_id}: {e}", exc_info=True)
         return None
+
+__all__ = [
+    "add_activity_log",
+    "get_activity_logs",
+    "get_activity_log_by_id",
+]

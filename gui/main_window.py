@@ -66,8 +66,8 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView
 # from PyQt5.QtWebChannel import QWebChannel # QWebChannel removed as DocumentManager no longer uses its own map.
 
 import db as db_manager
-from db.cruds.clients_crud import clients_crud_instance
-from db.cruds.products_crud import products_crud_instance
+from db.cruds.clients.clients_crud import clients_crud_instance
+from db.cruds.products.products_crud import products_crud_instance
 
 import icons_rc
 # import folium # No longer used directly by DocumentManager for its own map
@@ -176,9 +176,9 @@ from ui.home.home_page_widget import HomePageWidget # Updated import path
 from gui.widgets.experience_module_widget import ExperienceModuleWidget # Added
 from services.download_monitor_service import DownloadMonitorService
 from dialogs.assign_document_dialog import AssignDocumentToClientDialog
-from db.cruds.client_documents_crud import add_client_document # For assign dialog
+from db.cruds.clients.client_documents_crud import add_client_document # For assign dialog
 import os # For path checks in download monitor init
-from db.cruds import user_saved_filters_crud # Import for saved filters
+from db.cruds.misc import user_saved_filters_crud # Import for saved filters
 
 from calendar_module.calendar_widget import CalendarWidget # Import CalendarWidget
 from user_management.page import UserManagementPage # Import UserManagementPage

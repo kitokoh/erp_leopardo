@@ -27,7 +27,7 @@ from db.cruds.generic_crud import GenericCRUD
 
 # Import CRUD instances for refactored modules
 # from db.cruds.users_crud import users_crud_instance # Replaced with direct module import
-from db.cruds import users_crud # Import the module itself
+from db.cruds.users import users_crud
 from db.cruds.clients.clients_crud import clients_crud_instance
 from db.cruds.products.products_crud import products_crud
 
@@ -37,10 +37,10 @@ from db.cruds.misc.cover_page_templates_crud import get_cover_page_template_by_n
 # get_user_by_username will be called via users_crud_instance if needed for seeding logic outside Users table itself
 from db.cruds.misc.locations_crud import get_or_add_country, get_or_add_city, get_country_by_name, get_city_by_name_and_country_id
 from db.cruds.misc.status_settings_crud import get_status_setting_by_name
-from db.cruds import partners_crud
+from db.cruds.misc import partners_crud
 # Assuming company and company personnel functions will be imported if they were used via db_main_manager
 # For now, let's assume they are not, or will be handled if errors arise.
-from db.cruds import regions_crud, referents_crud # Added for Referents seeding
+from db.cruds.misc import regions_crud, referents_crud
 
 LOGO_SUBDIR_CONTEXT = "company_logos" # This should match the setup
 
