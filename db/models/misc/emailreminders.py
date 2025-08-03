@@ -1,19 +1,17 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Float, REAL, Date
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from db.connection import Base
 
-class Emailreminders(Base):
+class EmailReminder(Base):
     __tablename__ = 'email_reminders'
-    reminder_id = Column(Integer, primary_key=True, autoincrement=True)
-    scheduled_email_id = Column(Integer, nullable=False, ForeignKey('scheduledemails.scheduled_email_id'))
 
-    reminder_type = Column(Text, nullable=False)
-    reminder_send_at = Column(DateTime, nullable=False)
-    status = Column(Text, nullable=False)
+    reminder_id = Column(Integer, primary_key=True, autoincrement=True)
+    scheduled_email_id = Column(Integer, ForeignKey('scheduled_emails.scheduled_email_id'), nullable=False)
+    reminder_type = Column(String)
+    reminder_send_at = Column(DateTime)
+    status = Column(String)
     created_at = Column(DateTime)
 
-
     def __repr__(self):
-        return f'<Emailreminders reminder_id={self.reminder_id}>'
-    scheduledemail_rel = relationship('Scheduledemails')
+        return f"<EmailReminder(reminder_id='{self.reminder_id}')>"
