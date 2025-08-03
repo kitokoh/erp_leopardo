@@ -9,7 +9,7 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
 import logging # Added logging
 
-from db.cruds.products_crud import products_crud_instance
+from db.cruds.products.products_crud import products_crud
 # Import GlobalProductEditDialog and SUPPORTED_LANGUAGES later, inside the method,
 # to avoid potential circular import issues at module load time.
 # from product_management.global_product_edit_dialog import GlobalProductEditDialog

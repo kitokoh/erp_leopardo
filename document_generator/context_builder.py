@@ -6,23 +6,15 @@ from decimal import Decimal, ROUND_HALF_UP
 
 # Assuming db.cruds and other necessary modules exist in the parent directory or are accessible.
 # Adjust these imports based on the actual project structure.
-from db.cruds import (
-    get_company_by_id,
-    get_client_by_id,
-    # Make sure referents_crud is imported if not available through the main __init__
-    referents_crud, # Added for referents report
-    get_product_by_id,
-    get_products_for_client_or_project,
-    get_contacts_for_client,
-    get_country_by_id,
-    get_city_by_id,
-    get_project_by_id,
-    get_client_document_notes,
-    get_equivalent_products,
-    get_media_links_for_product,
-    get_personnel_for_company,
-    application_settings_crud, # Added for default footer notes
-)
+from db.cruds.misc import get_company_by_id, referents_crud, get_personnel_for_company, application_settings_crud
+from db.cruds.clients import clients_crud_instance as clients_crud
+from db.cruds.products import products_crud
+from db.cruds.projects import get_project_by_id
+from db.cruds.misc import get_country_by_id, get_city_by_id
+from db.cruds.clients import get_products_for_client_or_project, get_client_document_notes
+from db.cruds.misc import get_contacts_for_client
+from db.cruds.products import products_crud
+from db.cruds.products import product_media_links_crud
 from db.connection import get_db_connection # Changed from db.utils
 # Assuming these config variables are correctly defined in your project.
 # from db_config import APP_ROOT_DIR_CONTEXT, LOGO_SUBDIR_CONTEXT # Removed

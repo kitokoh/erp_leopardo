@@ -217,19 +217,19 @@ def test_download_document_api_success(auth_headers):
             # Given the complexity, this test will be basic for now, checking if it attempts a FileResponse.
             # A more robust test would involve setting up the exact directory structure.
 
-            # If we mock `api.documents.FileResponse` directly:
-            with patch('api.documents.FileResponse') as MockFileResponse:
-                MockFileResponse.return_value = "Mocked FileResponse content" # Or a mock object
-                response = client.get(f"/api/documents/{doc_id_to_download}/download", headers=auth_headers)
-                assert response.status_code == 200
-                # Check that FileResponse was called with expected path and filename
-                # This requires knowing the exact path it would construct.
-                # For now, just check it was called.
-                MockFileResponse.assert_called_once()
-                args, kwargs = MockFileResponse.call_args
-                assert kwargs.get('filename') == mock_doc_meta.get('file_name_on_disk')
-                assert kwargs.get('media_type') == 'application/pdf'
-                # Path assertion is tricky due to its construction.
+    # If we mock `api.documents.FileResponse` directly:
+    with patch('api.documents.FileResponse') as MockFileResponse:
+        MockFileResponse.return_value = "Mocked FileResponse content" # Or a mock object
+        response = client.get(f"/api/documents/{doc_id_to_download}/download", headers=auth_headers)
+        assert response.status_code == 200
+        # Check that FileResponse was called with expected path and filename
+        # This requires knowing the exact path it would construct.
+        # For now, just check it was called.
+        MockFileResponse.assert_called_once()
+        args, kwargs = MockFileResponse.call_args
+        assert kwargs.get('filename') == mock_doc_meta.get('file_name_on_disk')
+        assert kwargs.get('media_type') == 'application/pdf'
+        # Path assertion is tricky due to its construction.
 
     # Cleanup dummy file
     if os.path.exists(temp_file_path):
