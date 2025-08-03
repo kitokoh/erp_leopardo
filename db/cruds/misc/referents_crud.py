@@ -2,7 +2,7 @@ import sqlite3
 import uuid
 from datetime import datetime
 import logging
-from .generic_crud import GenericCRUD, _manage_conn
+from ..generic_crud import GenericCRUD, _manage_conn
 
 logger = logging.getLogger(__name__)
 

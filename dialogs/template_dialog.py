@@ -15,8 +15,8 @@ from PyQt5.QtGui import QIcon, QDesktopServices, QFont
 from PyQt5.QtCore import Qt, QUrl
 
 import db as db_manager
-from db.cruds.template_categories_crud import get_all_template_categories
-from db.cruds.templates_crud import get_distinct_template_languages, get_distinct_template_types, get_filtered_templates, get_distinct_template_extensions # Added import
+from db.cruds.misc.template_categories_crud import get_all_template_categories
+from db.cruds.misc.templates_crud import get_distinct_template_languages, get_distinct_template_types, get_filtered_templates, get_distinct_template_extensions # Added import
 # templates_crud_instance is not used directly by TemplateDialog
 import icons_rc # Import for Qt resource file
 

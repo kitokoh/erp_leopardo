@@ -15,7 +15,7 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
 
 import db as db_manager # db_manager will provide access to new CRUDs
-from db.cruds.clients_crud import clients_crud_instance
+from db.cruds.clients.clients_crud import clients_crud_instance
 # from db.cruds import templates_crud # templates_crud is not directly used, db_manager.get_template_details_by_id is used
 
 # Import EmailSenderService

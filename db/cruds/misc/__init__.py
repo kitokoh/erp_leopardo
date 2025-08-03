@@ -27,3 +27,5 @@ from .tags_crud import *
 from .template_categories_crud import *
 from .templates_crud import *
 from .transporters_crud import *
+from .regions_crud import *
+from .referents_crud import *
