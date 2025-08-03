@@ -6,12 +6,8 @@ from db.connection import Base
 from ..employees.employee import Employee
 from .leave_type import LeaveType
 from ..users.user import User
+from api.models import LeaveRequestStatusEnum
 
-class LeaveRequestStatusEnum(enum.Enum):
-    PENDING = "pending"
-    APPROVED = "approved"
-    REJECTED = "rejected"
-    CANCELLED = "cancelled"
 
 class LeaveRequest(Base):
     __tablename__ = 'leave_requests'

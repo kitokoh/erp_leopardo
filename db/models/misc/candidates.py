@@ -1,30 +1,24 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Float, REAL, Date
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from db.connection import Base
 
-class Candidates(Base):
+class Candidate(Base):
     __tablename__ = 'candidates'
-    candidate_id = Column(Text, primary_key=True)
-    job_opening_id = Column(Text, nullable=False, ForeignKey('jobopenings.job_opening_id'))
 
-    first_name = Column(Text, nullable=False)
-    last_name = Column(Text, nullable=False)
-    email = Column(Text, nullable=False, unique=True)
-    phone = Column(Text)
-    resume_path = Column(Text)
-    cover_letter_path = Column(Text)
-    application_source = Column(Text)
-    current_status_id = Column(Integer, ForeignKey('statussettings.status_id'))
-
+    candidate_id = Column(String, primary_key=True)
+    job_opening_id = Column(Text, ForeignKey('job_openings.job_opening_id'), nullable=False)
+    first_name = Column(String)
+    last_name = Column(String)
+    email = Column(String)
+    phone = Column(String)
+    resume_path = Column(String)
+    cover_letter_path = Column(String)
+    application_source = Column(String)
+    current_status_id = Column(Integer, ForeignKey('status_settings.status_id'))
     application_date = Column(DateTime)
-    notes = Column(Text)
+    notes = Column(String)
     linked_contact_id = Column(Integer, ForeignKey('contacts.contact_id'))
 
-
-
     def __repr__(self):
-        return f'<Candidates candidate_id={self.candidate_id}>'
-    jobopening_rel = relationship('Jobopenings')
-    statussetting_rel = relationship('Statussettings')
-    contact_rel = relationship('Contacts')
+        return f"<Candidate(candidate_id='{self.candidate_id}')>"

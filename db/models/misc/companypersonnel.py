@@ -1,20 +1,18 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Float, REAL, Date
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from db.connection import Base
 
-class Companypersonnel(Base):
+class CompanyPersonnel(Base):
     __tablename__ = 'company_personnel'
-    personnel_id = Column(Integer, primary_key=True, autoincrement=True)
-    company_id = Column(Text, nullable=False, ForeignKey('companies.company_id'))
 
-    name = Column(Text, nullable=False)
-    role = Column(Text, nullable=False)
-    phone = Column(Text)
-    email = Column(Text)
+    personnel_id = Column(Integer, primary_key=True, autoincrement=True)
+    company_id = Column(Text, ForeignKey('companies.company_id'), nullable=False)
+    name = Column(String)
+    role = Column(String)
+    phone = Column(String)
+    email = Column(String)
     created_at = Column(DateTime)
 
-
     def __repr__(self):
-        return f'<Companypersonnel personnel_id={self.personnel_id}>'
-    companie_rel = relationship('Companies')
+        return f"<CompanyPersonnel(personnel_id='{self.personnel_id}')>"

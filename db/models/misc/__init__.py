@@ -57,4 +57,4 @@ from .teammembers import TeamMember
 from .templates import Template
 from .transporters import Transporter
 from .usecases import UseCase
-from .usersessiontokens import UserSessionToken
+from .user_session_tokens import UserSessionToken
