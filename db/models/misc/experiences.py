@@ -1,19 +1,19 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Float, REAL, Date
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Date
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from db.connection import Base
 
-class Experiences(Base):
+class Experience(Base):
     __tablename__ = 'experiences'
-    experience_id = Column(Text, primary_key=True)
-    title = Column(Text, nullable=False)
+
+    experience_id = Column(String, primary_key=True)
+    title = Column(String)
     description = Column(Text)
     experience_date = Column(Date)
-    type = Column(Text)
+    type = Column(String)
     created_at = Column(DateTime)
     updated_at = Column(DateTime)
-    user_id = Column(Text)
-
+    user_id = Column(String, ForeignKey('users.user_id'))
 
     def __repr__(self):
-        return f'<Experiences experience_id={self.experience_id}>'
+        return f"<Experience(experience_id='{self.experience_id}')>"
