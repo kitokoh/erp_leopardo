@@ -1,15 +1,20 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Float, REAL, Date
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, REAL
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from db.connection import Base
 
-class Kpis(Base):
+class Kpi(Base):
     __tablename__ = 'kp_is'
-    kpi_id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
-    value = Column(REAL, nullable=False)
-    created_at = Column(DateTime)
 
+    kpi_id = Column(Integer, primary_key=True, autoincrement=True)
+    project_id = Column(String, ForeignKey('projects.project_id'))
+    name = Column(String)
+    value = Column(REAL)
+    target = Column(REAL)
+    trend = Column(String)
+    unit = Column(String)
+    created_at = Column(DateTime)
+    updated_at = Column(DateTime)
 
     def __repr__(self):
-        return f'<Kpis kpi_id={self.kpi_id}>'
-    project_rel = relationship('Projects')
+        return f"<Kpi(kpi_id='{self.kpi_id}')>"
