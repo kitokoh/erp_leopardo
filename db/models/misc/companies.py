@@ -1,20 +1,20 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Float, REAL, Date
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from db.connection import Base
 
-class Companies(Base):
+class Company(Base):
     __tablename__ = 'companies'
-    # = Column(String, primary_key=True)
-    # = Column(String, nullable=False)
-    # = Column(String)
-    # = Column(String)
-    # = Column(String)
-    # = Column(String)
-    # = Column(String)
-    # = Column(String)
-    # = Column(Date)
 
+    company_id = Column(String, primary_key=True)
+    company_name = Column(String)
+    address = Column(Text)
+    payment_info = Column(Text)
+    logo_path = Column(String)
+    other_info = Column(Text)
+    is_default = Column(Boolean)
+    created_at = Column(DateTime)
+    updated_at = Column(DateTime)
 
     def __repr__(self):
-        return f'<Companies #={self.#}>'
+        return f"<Company(company_id='{self.company_id}')>"
