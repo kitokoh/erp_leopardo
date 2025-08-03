@@ -1123,7 +1123,7 @@ class MainBusinessApp(QMainWindow):
         layout.addStretch()
         
         from datetime import datetime
-        time_label = CrystallineTextWidget(datetime.now().strftime(self.tr("🕒 %H:%M")))
+        time_label = CrystallineTextWidget(datetime.now().strftime(self.tr(" %H:%M")))
         time_label.setStyleSheet("""
             font-family: "Roboto", sans-serif;
             font-size: 8px;
