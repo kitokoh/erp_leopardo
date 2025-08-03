@@ -1,18 +1,22 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Float, REAL, Date
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from db.connection import Base
 
-class Coverpagetemplates(Base):
+class CoverPageTemplate(Base):
     __tablename__ = 'cover_page_templates'
-    template_id = Column(Text, primary_key=True, nullable=False, unique=True)
-    default_title = Column(Text)
-    style_config_json = Column(Text, nullable=False)
+
+    template_id = Column(String, primary_key=True)
+    template_name = Column(String)
+    description = Column(Text)
+    default_title = Column(String)
+    default_subtitle = Column(String)
+    default_author = Column(String)
+    style_config_json = Column(Text)
+    is_default_template = Column(Integer)
     created_at = Column(DateTime)
-    created_by_user_id = Column(Text, ForeignKey('users.user_id'))
-
-
+    updated_at = Column(DateTime)
+    created_by_user_id = Column(String, ForeignKey('users.user_id'))
 
     def __repr__(self):
-        return f'<Coverpagetemplates template_id={self.template_id}>'
-    user_rel = relationship('Users')
+        return f"<CoverPageTemplate(template_id='{self.template_id}')>"
