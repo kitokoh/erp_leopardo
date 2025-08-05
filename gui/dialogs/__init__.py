@@ -1,5 +1,5 @@
-from client_management.add_new_client_dialog import AddNewClientDialog
-from client_management.edit_client_dialog import EditClientDialog
+from .add_new_client_dialog import AddNewClientDialog
+from .edit_client_dialog import EditClientDialog
 from .template_dialog import TemplateDialog # Added back
 from .contact_dialog import ContactDialog
 from .product_dialog import ProductDialog
