@@ -9,7 +9,7 @@ from .html_to_pdf_util import render_html_template, convert_html_to_pdf, WeasyPr
 
 from app_setup import get_app_config
 CONFIG = get_app_config()
-from db.cruds import clients_crud # Though not directly used in this func as per spec
+from db.cruds.clients import clients_crud
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 

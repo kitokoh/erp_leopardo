@@ -7,12 +7,8 @@ from PyQt5.QtCore import QDate, Qt
 from PyQt5.QtGui import QPixmap
 
 # Assuming db.py is discoverable
-from db import (
-    get_all_file_based_templates,
-    get_cover_page_template_by_id,
-    add_cover_page,
-    update_cover_page
-)
+from db.cruds.templates_crud import get_all_file_based_templates
+from db.cruds.misc.cover_pages_crud import get_cover_page_by_id, add_cover_page, update_cover_page
 
 class CoverPageEditorDialog(QDialog):
     def __init__(self, mode, client_id=None, user_id=None, cover_page_data=None, parent=None):

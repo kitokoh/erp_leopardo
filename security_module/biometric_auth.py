@@ -1,7 +1,7 @@
 # This module will contain the logic for biometric authentication.
 import platform
 import logging
-from db.cruds import users_crud # For setting/getting biometric status
+from db.cruds.users import users_crud
 
 # security_module/biometric_auth.py
 """
@@ -13,7 +13,7 @@ through a common interface, abstracting away the OS-level details.
 """
 import platform
 import logging
-from db.cruds import users_crud # For setting/getting biometric status
+from db.cruds.users import users_crud
 
 # Dynamically import handlers based on OS
 logger = logging.getLogger(__name__)

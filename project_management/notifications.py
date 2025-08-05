@@ -5,7 +5,9 @@ import logging # Added for consistent logging
 
 from datetime import datetime, timedelta
 
-from db import get_all_status_settings, get_all_projects, get_tasks_by_project_id
+from db.cruds.misc.status_settings_crud import get_all_status_settings
+from db.cruds.projects.projects_crud import get_all_projects
+from db.cruds.projects.tasks_crud import get_tasks_by_project_id
 
 
 class CustomNotificationBanner(QFrame):

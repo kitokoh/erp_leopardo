@@ -3,13 +3,9 @@ from PyQt5.QtWidgets import (QDialog, QFormLayout, QLineEdit, QTextEdit, QComboB
 from PyQt5.QtCore import QTimer, QDate, Qt # Qt might not be directly used, but QDate is.
 from datetime import datetime
 
-from db import (
-    get_task_by_id,
-    get_all_status_settings,
-    get_status_setting_by_id,
-    get_all_team_members,
-    update_task
-)
+from db.cruds.projects.tasks_crud import get_task_by_id, update_task
+from db.cruds.misc.status_settings_crud import get_all_status_settings, get_status_setting_by_id
+from db.cruds.users.team_members_crud import get_all_team_members
 
 class EditProductionStepDialog(QDialog):
     def __init__(self, task_id, parent_dialog): # parent_dialog is EditProductionOrderDialog

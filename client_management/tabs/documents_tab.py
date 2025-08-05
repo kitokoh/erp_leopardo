@@ -16,7 +16,8 @@ from PyQt5.QtCore import Qt, QUrl, QStandardPaths
 
 from gui.widgets.pdf_viewer_widget import PdfViewerWidget # Ajout de l'importation
 import db as db_manager
-from db.cruds import client_documents_crud, projects_crud
+from db.cruds.clients import client_documents_crud
+from db.cruds.projects import projects_crud
 
 from excel_editor import ExcelEditor
 from gui.widgets.html_editor import HtmlEditor

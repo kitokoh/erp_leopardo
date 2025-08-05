@@ -22,7 +22,7 @@ except ImportError:
 
 from .generic_crud import _manage_conn # get_db_connection is not used directly
 from .template_categories_crud import add_template_category, get_template_category_by_name
-from .application_settings_crud import get_setting # Added for visibility check
+from .misc.application_settings_crud import get_setting
 
 # --- Templates CRUD ---
 @_manage_conn

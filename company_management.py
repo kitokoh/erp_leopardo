@@ -26,7 +26,7 @@ if current_dir not in sys.path: # for running directly if db.py is alongside
 
 
 # Import company CRUD functions directly
-from db.cruds.companies_crud import (
+from db.cruds.misc.companies_crud import (
     get_all_companies,
     add_company,
     update_company,
@@ -35,7 +35,7 @@ from db.cruds.companies_crud import (
     get_company_by_id # Add if needed elsewhere
 )
 # Import personnel and contact link CRUD functions directly
-from db.cruds.company_personnel_crud import (
+from db.cruds.misc.company_personnel_crud import (
     get_contacts_for_personnel,
     add_company_personnel,
     get_personnel_for_company,
@@ -53,10 +53,6 @@ try:
         # Company functions handled by companies_crud_instance:
         # add_company, get_company_by_id, get_all_companies,
         # update_company, delete_company, set_default_company, get_default_company
-        add_company_personnel,
-        get_personnel_for_company,
-        update_company_personnel,
-        delete_company_personnel,
         initialize_database
 
     )

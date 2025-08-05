@@ -1,27 +1,26 @@
 import logging
 from cachetools import cached
 from .cache import cache
-from db import (
+from db.cruds.clients.clients_crud import (
     get_total_clients_count,
     get_active_clients_count,
-    get_country_by_name,
-    get_total_projects_count,
-    get_active_projects_count,
-    get_total_products_count,
-    get_client_segmentation_by_city,
+    get_client_counts_by_country,
     get_client_segmentation_by_status,
     get_client_segmentation_by_category,
-    get_client_counts_by_country,
-    get_country_by_id,
-    get_city_by_id,
-    get_status_setting_by_id,
-    get_status_setting_by_name
+    get_client_segmentation_by_city,
 )
-from db.cruds.clients_crud import clients_crud_instance
+from db.cruds.projects.projects_crud import (
+    get_total_projects_count,
+    get_active_projects_count,
+)
+from db.cruds.products.products_crud import products_crud
+from db.cruds.misc.locations_crud import get_country_by_name, get_country_by_id, get_city_by_id
+from db.cruds.misc.status_settings_crud import get_status_setting_by_id, get_status_setting_by_name
+from db.cruds.clients.clients_crud import clients_crud_instance
 from db.connection import get_db_connection
-from db.cruds.client_project_products_crud import get_product_usage_counts
-from db.cruds.proforma_invoices_crud import get_total_sales_amount_for_period, get_total_proforma_sales_for_country_id
-from db.cruds.projects_crud import get_active_project_count_by_country_id
+from db.cruds.clients.client_project_products_crud import get_product_usage_counts
+from db.cruds.invoices.proforma_invoices_crud import get_total_sales_amount_for_period, get_total_proforma_sales_for_country_id
+from db.cruds.projects.projects_crud import get_active_project_count_by_country_id
 
 @cached(cache)
 def fetch_global_stats(start_date, end_date):

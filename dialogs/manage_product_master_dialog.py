@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt # For Qt.AlignRight, Qt.AlignVCenter, etc.
 
-from db.cruds.products_crud import products_crud_instance
+from db.cruds.products.products_crud import products_crud
 # Anticipated import, will be resolved when ProductDimensionUIDialog is moved
 from .product_dimension_ui_dialog import ProductDimensionUIDialog
 
