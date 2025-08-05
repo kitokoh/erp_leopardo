@@ -18,9 +18,8 @@ from PyQt5.QtWidgets import QDialog
 import db
 from db.cruds.invoices import commandes_crud
 from config import CONFIG
+from .commande_dialog import CommandeDialog
 
-# Placeholder for CommandeDialog - will be in commande_dialog.py
-# from .commande_dialog import CommandeDialog
 
 class CommandeWidget(QWidget):
     def __init__(self, client_info, current_user_info, parent=None):
@@ -217,7 +216,6 @@ class CommandeWidget(QWidget):
     def add_new_commande(self):
         self.logger.info(f"Add new commande initiated for client: {self.client_id}")
         try:
-            from .commande_dialog import CommandeDialog # Import here
             dialog = CommandeDialog(client_id=self.client_id, current_user_id=self.current_user_info.get('user_id'), parent=self)
             if dialog.exec_() == QDialog.Accepted:
                 self.load_commandes()
@@ -257,7 +255,6 @@ class CommandeWidget(QWidget):
 
         self.logger.info(f"View/Edit commande initiated for commande_id: {cmd_id}")
         try:
-            from .commande_dialog import CommandeDialog # Import here
             dialog = CommandeDialog(client_id=self.client_id, commande_id_to_edit=cmd_id, current_user_id=self.current_user_info.get('user_id'), parent=self)
             if dialog.exec_() == QDialog.Accepted:
                 self.load_commandes()
