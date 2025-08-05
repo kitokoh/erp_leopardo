@@ -21,13 +21,13 @@ from PyQt5.QtWidgets import QListWidgetItem
 from PyQt5.QtGui import QPixmap
 
 import db as db_manager
-from db.cruds import users_crud
-from db.cruds.clients_crud import clients_crud_instance
+from db.cruds.users import users_crud
+from db.cruds.clients.clients_crud import clients_crud_instance
 from dialogs import ClientProductDimensionDialog, AssignPersonnelDialog, AssignTransporterDialog, AssignFreightForwarderDialog, AssignMoneyTransferAgentDialog
 from whatsapp.whatsapp_dialog import SendWhatsAppDialog
-import db.cruds.money_transfer_agents_crud as mta_crud
-import db.cruds.client_order_money_transfer_agents_crud as coma_crud
-import db.cruds.projects_crud as projects_crud
+from db.cruds.misc import money_transfer_agents_crud as mta_crud
+from db.cruds.clients import client_order_money_transfer_agents_crud as coma_crud
+from db.cruds.projects import projects_crud
 from PyQt5.QtWidgets import QCheckBox
 
 MAIN_MODULE_CONTACT_DIALOG = None

@@ -9,8 +9,8 @@ from datetime import datetime
 
 # Assuming APP_ROOT_DIR setup is done in the main application for db access
 # For now, assume db.cruds are importable.
-from db.cruds import invoices_crud
-from db.cruds import clients_crud # For fetching client name
+from db.cruds.invoices import invoices_crud
+from db.cruds.clients import clients_crud
 
 class RecordPaymentDialog(QDialog):
     def __init__(self, invoice_id, parent=None):

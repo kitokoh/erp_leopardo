@@ -17,7 +17,7 @@ from .clients.client_contacts_crud import (
 from .clients.client_documents_crud import add_client_document, get_document_by_id, get_documents_for_client, get_client_document_notes, add_client_document_note, update_client_document_note, delete_client_document_note, get_client_document_note_by_id, delete_client_document
 from .clients.client_freight_forwarders_crud import assign_forwarder_to_client, get_assigned_forwarders_for_client, unassign_forwarder_from_client
 from .clients.client_project_products_crud import get_products_for_client_or_project, add_product_to_client_or_project, update_client_project_product, remove_product_from_client_or_project, get_client_project_product_by_id, get_distinct_purchase_confirmed_at_for_client, get_product_usage_counts
-from .clients.money_transfer_agents_crud import assign_agent_to_client_order, get_assigned_agents_for_client_order, get_assigned_agents_for_client, unassign_agent_from_client_order, update_assignment_details as update_mta_assignment_details
+from .clients.client_order_money_transfer_agents_crud import assign_agent_to_client_order, get_assigned_agents_for_client_order, get_assigned_agents_for_client, unassign_agent_from_client_order, update_assignment_details as update_mta_assignment_details
 from .clients.client_transporters_crud import assign_transporter_to_client, get_assigned_transporters_for_client, unassign_transporter_from_client, update_client_transporter_email_status
 from .clients.clients_crud import get_all_clients, get_client_by_id, get_active_clients_count, get_client_counts_by_country, get_client_segmentation_by_city, get_client_segmentation_by_status, get_client_segmentation_by_category, get_total_clients_count, update_client, add_client, delete_client as soft_delete_client, get_all_clients_with_details, get_clients_by_archival_status, get_active_clients_per_country, add_client_note as add_client_note_to_client, get_client_notes as get_client_notes_for_client, get_clients_count_created_between, get_total_clients_count_up_to_date, get_active_clients_count_up_to_date
 from .misc.companies_crud import add_company, get_company_by_id, get_all_companies, update_company, delete_company, set_default_company, get_default_company
@@ -70,7 +70,9 @@ from .users.team_members_crud import get_all_team_members, get_team_member_by_id
 from .template_categories_crud import get_all_template_categories, add_template_category, update_template_category, delete_template_category, get_template_category_by_id, get_template_category_by_name
 from .templates_crud import get_all_templates, get_template_by_id, add_template, update_template, delete_template, get_all_file_based_templates, get_distinct_template_languages, get_distinct_template_types, get_filtered_templates, get_distinct_languages_for_template_type, add_utility_document_template, get_utility_documents, get_distinct_template_extensions
 from .misc.transporters_crud import transporters_crud
-from .misc.money_transfer_agents_crud import get_all_money_transfer_agents, add_money_transfer_agent, get_money_transfer_agent_by_id, update_money_transfer_agent, delete_money_transfer_agent
+from .misc.money_transfer_agents_crud import money_transfer_agents_crud
+from .clients import client_order_money_transfer_agents_crud
+
 from .users.users_crud import get_user_by_id, list_users, update_user_password, add_user as add_user_crud, verify_user_password, update_user_role, set_user_active_status, record_login_time, get_user_by_username
 from .misc.company_expenses_crud import add_company_expense, get_company_expense_by_id, get_all_company_expenses, update_company_expense, soft_delete_company_expense as delete_company_expense, add_company_facture, get_company_facture_by_id, update_company_facture, soft_delete_company_facture as delete_company_facture, get_all_company_factures, link_facture_to_expense, unlink_facture_from_expense
 
@@ -90,7 +92,6 @@ except ImportError:
     def link_media_item_to_entity(*args, **kwargs): logging.error("media_items_crud not available"); return None
     def unlink_media_item_from_entity(*args, **kwargs): logging.error("media_items_crud not available"); return None
     logging.warning("db.cruds.media_items_crud module not found. Media item functionality will be limited.")
-
 
 
 
@@ -276,9 +277,12 @@ __all__ = [
     'templates_crud',
     'transporters_crud',
     'money_transfer_agents_crud',
+    'client_order_money_transfer_agents_crud',
+    'client_order_money_transfer_agents_crud',
+    'client_order_money_transfer_agents_crud',
+
     'users_crud',
 ]
-
 # Remove media_items_crud functions from __all__ if the module couldn't be imported
 if media_items_crud is None:
     media_functions_to_remove = [

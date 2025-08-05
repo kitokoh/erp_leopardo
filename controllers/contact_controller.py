@@ -1,5 +1,5 @@
 # controllers/contact_controller.py
-from db.cruds import contacts_crud # Assuming this is where the CRUD functions are
+from db.cruds.misc import contacts_crud
 import logging
 
 class ContactController:

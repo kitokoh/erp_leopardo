@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import QDialog
 
 
 import db
-from db.cruds import commandes_crud # Assuming this will be created with necessary functions
+from db.cruds.invoices import commandes_crud
 from config import CONFIG
 
 # Placeholder for CommandeDialog - will be in commande_dialog.py

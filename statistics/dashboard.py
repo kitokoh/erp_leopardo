@@ -44,7 +44,7 @@ from .data_loader import (
     get_total_sales_amount_for_period,
     get_active_clients_count
 )
-from db.cruds.clients_crud import clients_crud_instance
+from db.cruds.clients.clients_crud import clients_crud_instance
 from db.connection import get_db_connection
 
 from client_management.add_new_client_dialog import AddNewClientDialog

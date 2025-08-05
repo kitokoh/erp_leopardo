@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton, QTableWi
                              QLineEdit, QHBoxLayout, QTableWidgetItem, QHeaderView,
                              QAbstractItemView, QMessageBox, QApplication, QComboBox, QDialog)
 from PyQt5.QtCore import Qt
-from db import get_all_partner_categories, get_all_partners, get_partners_in_category, get_categories_for_partner, get_partner_by_id
+from db.cruds.misc.partners_crud import get_all_partner_categories, get_all_partners, get_partners_in_category, get_categories_for_partner, get_partner_by_id
 from .partner_dialog import PartnerDialog
 from .partner_category_dialog import PartnerCategoryDialog
 from contact_manager.sync_service import handle_contact_change_from_platform # For Google Sync

@@ -9,7 +9,7 @@ from PyQt5.QtWebChannel import QWebChannel
 from app_setup import APP_ROOT_DIR
 from .map_utils import generate_folium_map_html
 # For fetching data for the map - consider if this widget should do it, or receive data
-from db import get_client_counts_by_country # Example, might need more data
+from db.cruds.clients.clients_crud import get_client_counts_by_country
 
 # A simplified MapInteractionHandler for the home page map, if needed.
 # Or, the home page map might be non-interactive beyond Folium's defaults.

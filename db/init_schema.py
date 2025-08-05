@@ -50,13 +50,13 @@ from sqlalchemy import Table, Column, Text # Added for reflecting Users table mo
 from auth.roles import SUPER_ADMIN
 
 # Import CRUD functions (taken from db/schema.py, paths adjusted for db/init_schema.py)
-from .cruds.users_crud import get_user_by_username
-from .cruds.locations_crud import get_country_by_name, get_city_by_name_and_country_id
-from .cruds.status_settings_crud import get_status_setting_by_name
-from .cruds.application_settings_crud import set_setting
+from .cruds.users.users_crud import get_user_by_username
+from .cruds.misc.locations_crud import get_country_by_name, get_city_by_name_and_country_id
+from .cruds.misc.status_settings_crud import get_status_setting_by_name
+from .cruds.misc.application_settings_crud import set_setting
 # add_default_template_if_not_exists is not directly used by initialize_database, but good to keep if other parts of schema setup might use it.
 # from .cruds.templates_crud import add_default_template_if_not_exists
-from .cruds.cover_page_templates_crud import add_cover_page_template, get_cover_page_template_by_name
+from .cruds.misc.cover_page_templates_crud import add_cover_page_template, get_cover_page_template_by_name
 from .cruds.template_categories_crud import add_template_category # Used by _get_or_create_category_id if category doesn't exist.
 
 # Helper function from db/schema.py (also present in db/ca.py, schema.py version is more complete)

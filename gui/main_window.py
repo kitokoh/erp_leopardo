@@ -67,7 +67,7 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView
 
 import db as db_manager
 from db.cruds.clients.clients_crud import clients_crud_instance
-from db.cruds.products.products_crud import products_crud_instance
+from db.cruds.products.products_crud import products_crud
 
 import icons_rc
 # import folium # No longer used directly by DocumentManager for its own map
@@ -77,7 +77,7 @@ from app_setup import APP_ROOT_DIR, CONFIG
 from gui.ui_components import StatusDelegate # Still used for QListWidget
 from gui.dialogs.map_client_dialog import MapClientDialog # Added for new client from map
 # The get_country_by_name, get_or_add_country, etc. specific imports for handle_add_client_from_stats_map might become obsolete.
-from db import get_country_by_name, get_or_add_country, get_city_by_name_and_country_id, get_or_add_city
+from db.cruds.misc.locations_crud import get_country_by_name, get_or_add_country, get_city_by_name_and_country_id, get_or_add_city
 
 from dialogs.statistics_add_client_dialog import StatisticsAddClientDialog # Import the new dialog
 

@@ -6,14 +6,11 @@ from PyQt5.QtGui import QColor
 
 # Assuming db.py is in the parent directory of project_management
 # and the application is run from a context where 'db' is discoverable.
-from db import (
-    get_project_by_id,
-    get_all_clients, # Used to get client name
-    get_status_setting_by_id,
-    get_team_member_by_id,
-    get_tasks_by_project_id_ordered_by_sequence, # Assumed to exist in db.py
-    get_task_by_id # Not directly in original ProductionOrderDetailDialog, but related to tasks
-)
+from db.cruds.projects.projects_crud import get_project_by_id
+from db.cruds.clients.clients_crud import get_all_clients
+from db.cruds.misc.status_settings_crud import get_status_setting_by_id
+from db.cruds.users.team_members_crud import get_team_member_by_id
+from db.cruds.projects.tasks_crud import get_tasks_by_project_id_ordered_by_sequence, get_task_by_id
 
 class ProductionOrderDetailDialog(QDialog):
     def __init__(self, project_id, parent=None):

@@ -10,7 +10,7 @@ from PyQt5.QtGui import QIcon, QDesktopServices
 from PyQt5.QtCore import Qt, QUrl, QLocale, QDate # Added QLocale, QDate
 
 import db as db_manager # This should give access to db.cruds.invoices_crud
-from db.cruds import invoices_crud # Direct import for clarity
+from db.cruds.invoices import invoices_crud
 # from invoicing.final_invoice_data_dialog import FinalInvoiceDataDialog # Already present
 from invoicing.record_payment_dialog import RecordPaymentDialog # To be created/imported
 from utils.document_manager_logic import create_final_invoice_and_update_db

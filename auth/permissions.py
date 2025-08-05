@@ -148,7 +148,7 @@ PERMISSION_MAP = {
 # --- End of PERMISSION_MAP obsolescence notice ---
 
 # Import necessary CRUDs for the new has_permission logic
-from db.cruds import roles_crud, role_permissions_crud
+from db.cruds.users import roles_crud, permissions_crud
 
 def has_permission(user_role_name: str, required_permission_key: str) -> bool:
     """

@@ -14,7 +14,7 @@ from PyQt5.QtGui import QPixmap, QIcon
 from db.cruds import products_crud
 from db.cruds import product_media_links_crud
 from media_manager import operations as media_ops
-from db.cruds.users_crud import get_user_by_username # To get a placeholder uploader_id
+from db.cruds.users.users_crud import get_user_by_username
 import asyncio # For running async functions
 from config import MEDIA_FILES_BASE_PATH # For resolving image paths
 import os

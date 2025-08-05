@@ -6,11 +6,9 @@ from PyQt5.QtCore import QDate, Qt # Qt might not be used directly
 from PyQt5.QtGui import QIcon # If icons are used with buttons
 
 # Assuming db.py is discoverable
-from db import (
-    get_all_status_settings,
-    get_all_team_members,
-    get_all_clients
-)
+from db.cruds.misc.status_settings_crud import get_all_status_settings
+from db.cruds.users.team_members_crud import get_all_team_members
+from db.cruds.clients.clients_crud import get_all_clients
 
 class AddProductionOrderDialog(QDialog):
     def __init__(self, parent=None, template_manager=None): # template_manager not used currently
