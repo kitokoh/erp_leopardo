@@ -72,6 +72,7 @@ from .templates_crud import get_all_templates, get_template_by_id, add_template,
 from .misc.transporters_crud import transporters_crud
 from .misc.money_transfer_agents_crud import money_transfer_agents_crud
 from .clients import client_order_money_transfer_agents_crud
+
 from .users.users_crud import get_user_by_id, list_users, update_user_password, add_user as add_user_crud, verify_user_password, update_user_role, set_user_active_status, record_login_time, get_user_by_username
 from .misc.company_expenses_crud import add_company_expense, get_company_expense_by_id, get_all_company_expenses, update_company_expense, soft_delete_company_expense as delete_company_expense, add_company_facture, get_company_facture_by_id, update_company_facture, soft_delete_company_facture as delete_company_facture, get_all_company_factures, link_facture_to_expense, unlink_facture_from_expense
 
@@ -91,8 +92,6 @@ except ImportError:
     def link_media_item_to_entity(*args, **kwargs): logging.error("media_items_crud not available"); return None
     def unlink_media_item_from_entity(*args, **kwargs): logging.error("media_items_crud not available"); return None
     logging.warning("db.cruds.media_items_crud module not found. Media item functionality will be limited.")
-
-
 
 
 
@@ -281,6 +280,7 @@ __all__ = [
     'client_order_money_transfer_agents_crud',
     'client_order_money_transfer_agents_crud',
     'client_order_money_transfer_agents_crud',
+
     'users_crud',
 ]
 # Remove media_items_crud functions from __all__ if the module couldn't be imported

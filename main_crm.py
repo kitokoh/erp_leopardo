@@ -629,6 +629,7 @@ class CRMModule(QMainWindow):
             notification_manager = NotificationManager(parent_window=self)
             QApplication.instance().notification_manager = notification_manager
             splash.finish_splash(self)
+            self.showMaximized()
         else:
             splash.hide()
             sys.exit(1)
