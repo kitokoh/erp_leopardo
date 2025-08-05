@@ -1,5 +1,5 @@
-from client_management.add_new_client_dialog import AddNewClientDialog
-from client_management.edit_client_dialog import EditClientDialog
+from .add_new_client_dialog import AddNewClientDialog
+from .edit_client_dialog import EditClientDialog
 from .template_dialog import TemplateDialog # Added back
 from .contact_dialog import ContactDialog
 from .product_dialog import ProductDialog
@@ -18,8 +18,8 @@ from .client_product_dimension_dialog import ClientProductDimensionDialog
 from .transporter_dialog import TransporterDialog
 from .freight_forwarder_dialog import FreightForwarderDialog
 from .assign_personnel_dialog import AssignPersonnelDialog
-from .assign_transporter_dialog import AssignTransporterDialog
-from .assign_freight_forwarder_dialog import AssignFreightForwarderDialog
+from .add_new_client_dialog import AddNewClientDialog
+from .edit_client_dialog import EditClientDialog
 from .assign_money_transfer_agent_dialog import AssignMoneyTransferAgentDialog
 from .add_edit_milestone_dialog import AddEditMilestoneDialog
 from .statistics_add_client_dialog import StatisticsAddClientDialog

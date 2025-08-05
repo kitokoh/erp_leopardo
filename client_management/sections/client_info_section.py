@@ -21,9 +21,10 @@ from db.cruds import users_crud # For fetching user names
 
 # These will be moved into their own files later
 # from .client_details_tab import ClientDetailsTab
-# from .client_contacts_internal_tab import ClientContactsInternalTab
-# from .client_assignments_internal_tab import ClientAssignmentsInternalTab
-# from .client_email_internal_tab import ClientEmailInternalTab
+from .client_contacts_internal_tab import ClientContactsInternalTab
+from .client_assignments_internal_tab import ClientAssignmentsInternalTab
+from .client_email_internal_tab import ClientEmailInternalTab
+from .client_whatsapp_internal_tab import ClientWhatsAppInternalTab
 # from .client_whatsapp_internal_tab import ClientWhatsAppInternalTab
 
 
@@ -184,100 +185,35 @@ class ClientInfoSection(QWidget):
 
 
     def _setup_contacts_internal_tab(self):
-        # This will be the content of the "Contacts" tab within internal_tabs
-        # Eventually, this will instantiate ClientContactsInternalTab
-        self.contacts_internal_tab_content = QWidget() # Placeholder
-        contacts_tab_layout = QVBoxLayout(self.contacts_internal_tab_content)
-
-        self.contacts_table = QTableWidget()
-        self.contacts_table.setColumnCount(5)
-        self.contacts_table.setHorizontalHeaderLabels([
-            self.tr("Nom"), self.tr("Email"), self.tr("Téléphone"),
-            self.tr("Position"), self.tr("Principal")
-        ])
-        self.contacts_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.contacts_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.contacts_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.contacts_table.setAlternatingRowColors(True)
-        self.contacts_table.cellDoubleClicked.connect(self.edit_contact) # Method to be moved here
-
-        self.contacts_empty_label = QLabel(self.tr("Aucun contact ajouté pour ce client.\nCliquez sur '➕ Ajouter' pour commencer."))
-        self.contacts_empty_label.setAlignment(Qt.AlignCenter)
-        font_contacts_empty = self.contacts_empty_label.font(); font_contacts_empty.setPointSize(10)
-        self.contacts_empty_label.setFont(font_contacts_empty)
-        contacts_tab_layout.addWidget(self.contacts_empty_label)
-        contacts_tab_layout.addWidget(self.contacts_table)
-
-        contacts_pagination_layout = QHBoxLayout()
-        self.prev_contact_button = QPushButton("<< Précédent")
-        self.prev_contact_button.setObjectName("paginationButton")
-        self.prev_contact_button.clicked.connect(self.prev_contact_page) # Method to be moved
-        self.contact_page_info_label = QLabel("Page 1 / 1")
-        self.contact_page_info_label.setObjectName("paginationLabel")
-        self.next_contact_button = QPushButton("Suivant >>")
-        self.next_contact_button.setObjectName("paginationButton")
-        self.next_contact_button.clicked.connect(self.next_contact_page) # Method to be moved
-        contacts_pagination_layout.addStretch()
-        contacts_pagination_layout.addWidget(self.prev_contact_button)
-        contacts_pagination_layout.addWidget(self.contact_page_info_label)
-        contacts_pagination_layout.addWidget(self.next_contact_button)
-        contacts_pagination_layout.addStretch()
-        contacts_tab_layout.addLayout(contacts_pagination_layout)
-
-        contacts_btn_layout = QHBoxLayout()
-        self.add_contact_btn = QPushButton(self.tr("➕ Ajouter"))
-        self.add_contact_btn.setToolTip(self.tr("Ajouter un nouveau contact pour ce client")); self.add_contact_btn.clicked.connect(self.add_contact); contacts_btn_layout.addWidget(self.add_contact_btn) # Method to be moved
-        self.edit_contact_btn = QPushButton(self.tr("✏️ Modifier"))
-        self.edit_contact_btn.setToolTip(self.tr("Modifier le contact sélectionné")); self.edit_contact_btn.clicked.connect(self.edit_contact); contacts_btn_layout.addWidget(self.edit_contact_btn) # Method to be moved
-        self.remove_contact_btn = QPushButton(self.tr("🗑️ Supprimer"))
-        self.remove_contact_btn.setToolTip(self.tr("Supprimer le lien vers le contact sélectionné pour ce client")); self.remove_contact_btn.setObjectName("dangerButton"); self.remove_contact_btn.clicked.connect(self.remove_contact); contacts_btn_layout.addWidget(self.remove_contact_btn) # Method to be moved
-        contacts_tab_layout.addLayout(contacts_btn_layout)
-
+        self.contacts_internal_tab_content = ClientContactsInternalTab(
+            client_info=self.client_info,
+            section_widget=self,
+            parent=self
+        )
         self.internal_tabs.addTab(self.contacts_internal_tab_content, self.tr("Contacts"))
 
     def _setup_assignments_internal_tab(self):
-        # This will be the content of the "Assignments" tab within internal_tabs
-        # Eventually, this will instantiate ClientAssignmentsInternalTab
-        self.assignments_internal_tab_content = QWidget() # Placeholder
-        assignments_layout = QVBoxLayout(self.assignments_internal_tab_content)
-
-        self.assignments_sub_tabs = QTabWidget()
-        assignments_layout.addWidget(self.assignments_sub_tabs)
-
-        # Sub-Tab: Assigned Vendors/Sellers
-        # ... (Code for vendors sub-tab UI and logic - to be moved from ClientMainWidget)
-        # Sub-Tab: Assigned Technicians
-        # ... (Code for technicians sub-tab UI and logic)
-        # Sub-Tab: Assigned Transporters
-        # ... (Code for transporters sub-tab UI and logic)
-        # Sub-Tab: Assigned Freight Forwarders
-        # ... (Code for forwarders sub-tab UI and logic)
-        # Sub-Tab: Money Transfer Agents
-        # ... (Code for MTA sub-tab UI and logic)
-
+        self.assignments_internal_tab_content = ClientAssignmentsInternalTab(
+            client_info=self.client_info,
+            section_widget=self,
+            parent=self
+        )
         self.internal_tabs.addTab(self.assignments_internal_tab_content, self.tr("Affectations"))
 
     def _setup_email_internal_tab(self):
-        # This will be the content of the "Envoyer Mail" tab within internal_tabs
-        self.email_internal_tab_content = QWidget() # Placeholder
-        email_layout = QVBoxLayout(self.email_internal_tab_content)
-        self.open_email_dialog_btn_internal = QPushButton(self.tr("Composer un Email..."))
-        self.open_email_dialog_btn_internal.setText("📧")
-        self.open_email_dialog_btn_internal.clicked.connect(self.open_send_email_dialog) # Method to be potentially moved or adapted
-        email_layout.addWidget(self.open_email_dialog_btn_internal)
-        email_layout.addStretch()
+        self.email_internal_tab_content = ClientEmailInternalTab(
+            client_info=self.client_info,
+            section_widget=self,
+            parent=self
+        )
         self.internal_tabs.addTab(self.email_internal_tab_content, self.tr("Envoyer Mail"))
 
     def _setup_whatsapp_internal_tab(self):
-        # This will be the content of the "Send WhatsApp" tab within internal_tabs
-        self.whatsapp_internal_tab_content = QWidget() # Placeholder
-        whatsapp_layout = QVBoxLayout(self.whatsapp_internal_tab_content)
-        self.open_whatsapp_dialog_btn_internal = QPushButton(self.tr("Envoyer message WhatsApp..."))
-        # self.open_whatsapp_dialog_btn_internal.setIcon(QIcon.fromTheme("contact-new", QIcon(":/icons/user.svg"))) # Assuming user.svg is a placeholder
-        self.open_whatsapp_dialog_btn_internal.setText("💬") # Example different icon
-        self.open_whatsapp_dialog_btn_internal.clicked.connect(self.open_send_whatsapp_dialog) # Method to be potentially moved or adapted
-        whatsapp_layout.addWidget(self.open_whatsapp_dialog_btn_internal)
-        whatsapp_layout.addStretch()
+        self.whatsapp_internal_tab_content = ClientWhatsAppInternalTab(
+            client_info=self.client_info,
+            section_widget=self,
+            parent=self
+        )
         self.internal_tabs.addTab(self.whatsapp_internal_tab_content, self.tr("Send WhatsApp"))
 
     # --- Methods to be moved from ClientMainWidget (or their logic adapted) ---
@@ -400,28 +336,10 @@ class ClientInfoSection(QWidget):
             self.distributor_info_value_label.setText(self.client_info.get('distributor_specific_info', ''))
 
     # Placeholder for methods to be moved from ClientMainWidget related to internal tabs
-    def load_contacts(self): pass # Will be in ClientContactsInternalTab
-    def add_contact(self): pass
-    def edit_contact(self, r=None, c=None): pass
-    def remove_contact(self): pass
-    def prev_contact_page(self): pass
-    def next_contact_page(self): pass
-    def update_contact_pagination_controls(self): pass
+    def load_contacts(self):
+        if hasattr(self, 'contacts_internal_tab_content') and hasattr(self.contacts_internal_tab_content, 'load_contacts'):
+            self.contacts_internal_tab_content.load_contacts()
 
-    def open_send_email_dialog(self): # For the internal email tab
-        # Simplified, actual logic will be in ClientEmailInternalTab or here
-        if self.SendEmailDialog:
-            # Logic to get primary email of client
-            primary_email = "" # Fetch appropriately
-            dialog = self.SendEmailDialog(client_email=primary_email, config=self.config, client_id=self.client_info.get('client_id'), parent=self)
-            dialog.exec_()
-
-    def open_send_whatsapp_dialog(self): # For the internal WhatsApp tab
-        if self.SendWhatsAppDialog:
-            # Logic to get primary phone of client
-            primary_phone = "" # Fetch appropriately
-            dialog = self.SendWhatsAppDialog(phone_number=primary_phone, client_name=self.client_info.get('client_name',""), parent=self)
-            dialog.exec_()
 
     def refresh_section_display(self, new_client_info):
         """Refreshes the display of this section with new client_info."""

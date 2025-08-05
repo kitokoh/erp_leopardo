@@ -40,10 +40,12 @@ else:
 # If they are defined in main.py and not moved yet, this will cause an issue.
 # For this step, we assume they are accessible.
 from dialogs import (
-    ContactDialog, ProductDialog, CreateDocumentDialog, EditClientDialog
+    ContactDialog, ProductDialog, CreateDocumentDialog
 )
+from gui.dialogs.edit_client_dialog import EditClientDialog
 # If ClientWidget is used by any logic here (e.g. for refreshing tabs), it would also need to be importable.
 # from client_widget import ClientWidget # Not directly used in the functions being moved, but DocumentManager uses it.
+from gui.dialogs.edit_client_dialog import EditClientDialog
 from .app_utils import sanitize_foldername # Import the new utility
 
 import logging # For logging errors or info

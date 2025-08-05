@@ -79,7 +79,7 @@ from gui.dialogs.map_client_dialog import MapClientDialog # Added for new client
 # The get_country_by_name, get_or_add_country, etc. specific imports for handle_add_client_from_stats_map might become obsolete.
 from db.cruds.misc.locations_crud import get_country_by_name, get_or_add_country, get_city_by_name_and_country_id, get_or_add_city
 
-from dialogs.statistics_add_client_dialog import StatisticsAddClientDialog # Import the new dialog
+from gui.dialogs.statistics_add_client_dialog import StatisticsAddClientDialog # Import the new dialog
 
 from utils.document_manager_logic import (
     handle_create_client_execution,
@@ -91,8 +91,9 @@ from utils.document_manager_logic import (
     permanently_delete_client
 )
 from dialogs import (
-    TemplateDialog, AddNewClientDialog, ManageProductMasterDialog
+    TemplateDialog, ManageProductMasterDialog
 )
+from .dialogs.add_new_client_dialog import AddNewClientDialog
 # Removed: SettingsDialog as OriginalSettingsDialog, TransporterDialog, FreightForwarderDialog
 # from product_management.list_dialog import ProductListDialog # Removed
 
@@ -178,7 +179,7 @@ from services.download_monitor_service import DownloadMonitorService
 from dialogs.assign_document_dialog import AssignDocumentToClientDialog
 from db.cruds.clients.client_documents_crud import add_client_document # For assign dialog
 import os # For path checks in download monitor init
-from db.cruds.misc import user_saved_filters_crud # Import for saved filters
+from db.cruds import user_saved_filters_crud # Import for saved filters
 
 from calendar_module.calendar_widget import CalendarWidget # Import CalendarWidget
 from user_management.page import UserManagementPage # Import UserManagementPage
