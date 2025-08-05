@@ -47,7 +47,7 @@ from db.db_seed import run_seed, seed_only_hidroguc_products
 from db.cruds.misc.companies_crud import get_all_companies, add_company
 from db.cruds.users import users_crud
 # from auth.login_window import LoginWindow # Replaced by LoginDialog
-from dialogs.login_dialog import LoginDialog # New LoginDialog
+from gui.dialogs.login_dialog import LoginDialog # New LoginDialog
 from auth import authentication as auth_service # Import the auth service
 from user_profile_management.database_setup import create_tables as create_user_profile_tables
 from user_profile_management.database_setup import seed_data as seed_user_profile_data
