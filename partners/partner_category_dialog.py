@@ -3,10 +3,9 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QListWidget, QPushButton,
                              QHBoxLayout, QMessageBox, QDialogButtonBox,
                              QInputDialog, QListWidgetItem)
 from PyQt5.QtCore import Qt
-import db as db_manager
-
-from db import ( get_all_partner_categories,get_partner_category_by_name,add_partner_category,  delete_partner_category, 
-    get_all_partner_categories, update_partner_category, get_partner_category_by_id
+from db.cruds.misc.partners_crud import (
+    get_all_partner_categories, get_partner_category_by_name, add_partner_category,
+    delete_partner_category, update_partner_category, get_partner_category_by_id
 )
 class PartnerCategoryDialog(QDialog):
     def __init__(self, parent=None):
