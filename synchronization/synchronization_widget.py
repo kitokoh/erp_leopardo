@@ -3,7 +3,7 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QGroupBox, QFormLayout, QLineEdit, QLabel, QProgressBar, QComboBox, QSplitter
 from PyQt5.QtCore import Qt
 from .next_erp_client import NextERPClient
-from db.cruds.products_crud import products_crud_instance
+from db.cruds.products.products_crud import products_crud
 import db as db_manager
 import json
 
@@ -123,7 +123,7 @@ class SynchronizationWidget(QWidget):
 
     def sync_app_to_next_erp(self, client):
         self.log_message("--- Synchronisation de l'application vers Next-ERP ---")
-        products_to_sync = products_crud_instance.get_all_products()
+        products_to_sync = products_crud.get_all_products()
 
         if not products_to_sync:
             self.log_message("Aucun produit à synchroniser depuis l'application.")
