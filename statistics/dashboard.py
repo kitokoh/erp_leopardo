@@ -47,7 +47,7 @@ from .data_loader import (
 from db.cruds.clients.clients_crud import clients_crud_instance
 from db.connection import get_db_connection
 
-from client_management.add_new_client_dialog import AddNewClientDialog
+from gui.dialogs.add_new_client_dialog import AddNewClientDialog
 from client_management.client_controller import ClientController
 from PyQt5.QtWidgets import QComboBox
 
