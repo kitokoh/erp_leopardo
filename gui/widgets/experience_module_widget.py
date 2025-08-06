@@ -9,9 +9,13 @@ from PyQt5.QtCore import QDate, Qt, QStringListModel
 import uuid
 import logging
 
-from db.cruds import experience_crud, tags_crud
-from db.cruds import clients_crud, projects_crud, products_crud, partners_crud, company_assets_crud
-from db.cruds import media_items_crud
+from db.cruds.misc import experience_crud, tags_crud
+from db.cruds.clients import clients_crud
+from db.cruds.projects import projects_crud
+from db.cruds.products import products_crud
+from db.cruds.misc import partners_crud
+from db.cruds.misc import company_assets_crud
+from db.cruds.misc import media_items_crud
 
 
 

@@ -400,7 +400,7 @@ if __name__ == '__main__':
 
         # Import ProductEquivalencyDialog here to avoid circular dependencies at module level if any
         try:
-            from dialogs.product_equivalency_dialog import ProductEquivalencyDialog
+            from gui.dialogs.product_equivalency_dialog import ProductEquivalencyDialog
             # Passer source_product_id_to_pass au constructeur
             eq_dialog = ProductEquivalencyDialog(source_product_id=source_product_id_to_pass, parent=self)
             eq_dialog.exec_() # Show as a modal dialog

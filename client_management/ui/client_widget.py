@@ -28,7 +28,7 @@ from db.cruds import client_documents_crud, users_crud, activity_logs_crud # Add
 from db.cruds.clients_crud import clients_crud_instance
 from excel_editor import ExcelEditor
 from html_editor import HtmlEditor
-from dialogs import ClientProductDimensionDialog, AssignPersonnelDialog, AssignTransporterDialog, AssignFreightForwarderDialog, AssignMoneyTransferAgentDialog # Added import
+from gui.dialogs import ClientProductDimensionDialog, AssignPersonnelDialog, AssignTransporterDialog, AssignFreightForwarderDialog, AssignMoneyTransferAgentDialog # Added import
 from whatsapp.whatsapp_dialog import SendWhatsAppDialog # Added import
 # Removed: from main import get_notification_manager
 # CRUD imports for Money Transfer Agents
@@ -38,7 +38,7 @@ import db.cruds.projects_crud as projects_crud
 
 from invoicing.final_invoice_data_dialog import FinalInvoiceDataDialog
 from document_manager_logic import create_final_invoice_and_update_db
-from dialogs.client_visit_dialog import ClientVisitDialog # Added for Client Visits
+from gui.dialogs.client_visit_dialog import ClientVisitDialog # Added for Client Visits
 
 
 # Globals imported from main (temporary, to be refactored)
@@ -65,7 +65,7 @@ def _import_main_elements():
 
     if MAIN_MODULE_CONFIG is None: # Check one, load all if not loaded
         # import main as main_module # No longer needed
-        from dialogs import (SendEmailDialog, ContactDialog, ProductDialog, EditProductLineDialog,
+        from gui.dialogs import (SendEmailDialog, ContactDialog, ProductDialog, EditProductLineDialog,
                              CreateDocumentDialog, CompilePdfDialog, ClientDocumentNoteDialog)
         from whatsapp.whatsapp_dialog import SendWhatsAppDialog as WhatsAppDialogModule
         from utils import generate_pdf_for_document as utils_generate_pdf_for_document
