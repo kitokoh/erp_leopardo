@@ -119,4 +119,4 @@ class ProductsCRUD:
         return db.query(Product).filter(Product.product_id.in_(equivalent_ids), Product.is_deleted == False).all()
 
 
-products_crud = ProductsCRUD()
+products_crud_instance = ProductsCRUD()
