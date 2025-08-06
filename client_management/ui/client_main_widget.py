@@ -6,7 +6,7 @@ from datetime import datetime
 import math
 
 from gui.dialogs.carrier_email_dialog import CarrierEmailDialog
-from client_management.dialogs.referent_details_dialog import ReferentDetailsDialog
+from gui.dialogs.referent_details_dialog import ReferentDetailsDialog
 
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QTextEdit, QListWidget, QLineEdit,
@@ -23,7 +23,7 @@ from PyQt5.QtGui import QPixmap
 import db as db_manager
 from db.cruds.users import users_crud
 from db.cruds.clients.clients_crud import clients_crud_instance
-from dialogs import ClientProductDimensionDialog, AssignPersonnelDialog, AssignTransporterDialog, AssignFreightForwarderDialog, AssignMoneyTransferAgentDialog
+from gui.dialogs import ClientProductDimensionDialog, AssignPersonnelDialog, TransporterDialog as AssignTransporterDialog, AssignFreightForwarderDialog, AssignMoneyTransferAgentDialog
 from whatsapp.whatsapp_dialog import SendWhatsAppDialog
 from db.cruds.misc import money_transfer_agents_crud as mta_crud
 from db.cruds.clients import client_order_money_transfer_agents_crud as coma_crud
@@ -93,6 +93,7 @@ from client_management.tabs.document_notes_tab import DocumentNotesTab
 from client_management.tabs.product_dimensions_tab import ProductDimensionsTab
 from client_management.tabs.sav_tab import SAVTab
 from client_management.tabs.billing_tab import BillingTab
+from client_management.signals import client_management_signals
 
 
 class ClientMainWidget(QWidget):
@@ -105,7 +106,9 @@ class ClientMainWidget(QWidget):
 
         logging.info(f"ClientMainWidget.__init__: INSTANTIATION STARTED for client_id={client_info.get('client_id')}, user: {self.current_user_info.get('username')}")
         self.client_info = client_info
-        self.notification_manager = notification_manager
+        self.notification_manager = notification_manager # Kept for now for tabs that are not yet refactored
+
+        client_management_signals.client_updated.connect(self.refresh_display)
 
         _import_main_elements()
         self.config = MAIN_MODULE_CONFIG # Expected to be app_setup.CONFIG
@@ -169,7 +172,6 @@ class ClientMainWidget(QWidget):
             self.referent_status_label.setVisible(False)
 
         if hasattr(self, 'edit_save_client_btn'): self.edit_save_client_btn.setEnabled(False)
-        if hasattr(self, 'create_docs_btn'): self.create_docs_btn.setEnabled(False)
         if hasattr(self, 'send_whatsapp_btn'): self.send_whatsapp_btn.setEnabled(False)
         if hasattr(self, 'archive_client_btn'): self.archive_client_btn.setEnabled(False)
         if hasattr(self, 'manage_referent_btn'): self.manage_referent_btn.setEnabled(False)
@@ -195,470 +197,8 @@ class ClientMainWidget(QWidget):
         layout.setContentsMargins(15, 15, 15, 15)
         layout.setSpacing(15)
 
-        try:
-            logging.info("ClientMainWidget.setup_ui: Starting setup for Collapsible Client Info Section...")
-            self.client_info_group_box = QGroupBox(self.client_info.get('client_name', self.tr("Client Information")))
-            self.client_info_group_box.setCheckable(True)
-            client_info_group_layout = QVBoxLayout(self.client_info_group_box)
-
-            self.info_container_widget = QWidget()
-            info_container_layout = QVBoxLayout(self.info_container_widget)
-            info_container_layout.setContentsMargins(0, 5, 0, 0)
-            info_container_layout.setSpacing(10)
-
-            # Elements that will be moved into the first tab
-            self.header_label = QLabel(f"<h2>{self.client_info.get('client_name', self.tr('Client Inconnu'))}</h2>")
-            self.header_label.setObjectName("clientHeaderLabel")
-            # info_container_layout.addWidget(self.header_label) # Moved
-
-            self.referent_status_label = QLabel("")
-            self.referent_status_label.setObjectName("referentStatusLabel")
-            self.referent_status_label.setVisible(False)
-            # info_container_layout.addWidget(self.referent_status_label) # Moved
-
-            self.action_buttons_layout = QHBoxLayout() # Renamed for clarity
-
-            # self.manage_referent_btn = QPushButton(QIcon.fromTheme("star", QIcon(":/icons/emblem-favorite.svg")), self.tr("Gérer Référent"))
-            # self.manage_referent_btn.setToolTip(self.tr("Gérer le statut de référent pour ce client"))
-            # self.manage_referent_btn.clicked.connect(self.manage_referent_status_for_selected_client)
-            # self.action_buttons_layout.addWidget(self.manage_referent_btn) # Removed, functionality moved to checkbox
-
-
-            self.generate_referents_report_btn = QPushButton("📄 " + self.tr("Rapport Référents"))
-            self.generate_referents_report_btn.setObjectName("secondaryButton")
-            self.generate_referents_report_btn.setToolTip(self.tr("Générer un rapport PDF des référents locaux et globaux pour ce client"))
-            self.generate_referents_report_btn.clicked.connect(self.handle_generate_referents_report)
-            self.action_buttons_layout.addWidget(self.generate_referents_report_btn)
-
-            self.action_buttons_layout.addStretch(1)
-
-            self.create_docs_btn = QPushButton(self.tr("Envoyer Mail"))
-            self.create_docs_btn.setText("📧") # Using bell as a placeholder for mail
-            self.create_docs_btn.setObjectName("actionButton")
-            self.create_docs_btn.setToolTip(self.tr("Envoyer un email au client"))
-            self.create_docs_btn.clicked.connect(self.open_send_email_dialog)
-            self.action_buttons_layout.addWidget(self.create_docs_btn)
-
-            self.edit_save_client_btn = QPushButton(self.tr("Modifier Client"))
-            self.edit_save_client_btn.setText("✏️")
-            self.edit_save_client_btn.setObjectName("primaryButton")
-            self.edit_save_client_btn.setToolTip(self.tr("Modifier les informations du client"))
-            self.edit_save_client_btn.clicked.connect(self.toggle_client_edit_mode)
-            self.action_buttons_layout.addWidget(self.edit_save_client_btn)
-
-            self.archive_client_btn = QPushButton(self.tr("Archiver Client"))
-            self.archive_client_btn.setText("🗄️") # Using trash as a placeholder for archive
-            self.archive_client_btn.setObjectName("dangerButton")
-
-            self.archive_client_btn.setToolTip(self.tr("Archiver ce client (soft delete)"))
-            self.archive_client_btn.clicked.connect(self.handle_archive_client)
-            self.action_buttons_layout.addWidget(self.archive_client_btn)
-
-            # self.mark_distributor_btn was here in the original autrewidget.py's action_layout
-            # It's removed as its functionality is now with the checkbox.
-            # No need to add a line here if it's not being created and added.
-
-
-            self.internal_client_info_tabs = QTabWidget()
-            info_container_layout.addWidget(self.internal_client_info_tabs) # This remains in info_container_layout
-
-            # Setup the first tab (Client Details Tab)
-            self.client_details_tab = QWidget()
-            details_tab_layout = QVBoxLayout(self.client_details_tab) # This is the layout for the first tab's content
-
-            # Add the moved elements to the details_tab_layout (top of the first tab)
-            # details_tab_layout.addWidget(self.header_label) # Removed
-            # self.referent_status_label is also hidden by _setup_client_statuses_section
-            # details_tab_layout.addWidget(self.referent_status_label)
-            details_tab_layout.addLayout(self.action_buttons_layout) # This should be the first visible thing
-
-            # Existing QFormLayout for other details
-            self.status_combo = QComboBox()
-            self.details_layout = QFormLayout()
-
-            self.details_layout.setLabelAlignment(Qt.AlignLeft)
-            self.details_layout.setSpacing(10)
-
-            self.project_id_label = QLabel(self.tr("ID Projet:"))
-            self.project_id_value_label = QLabel(self.tr("N/A"))
-            self.details_layout.addRow(self.project_id_label, self.project_id_value_label)
-            self.country_city_label = QLabel(self.tr("Localisation:"))
-            self.country_city_widget = QWidget()
-            country_city_h_layout = QHBoxLayout(self.country_city_widget)
-            country_city_h_layout.setContentsMargins(0,0,0,0)
-            self.country_label_static = QLabel(self.tr("Pays:"))
-            self.country_value_label = QLabel(self.tr("N/A"))
-            self.city_label_static = QLabel(self.tr("Ville:"))
-            self.city_value_label = QLabel(self.tr("N/A"))
-            country_city_h_layout.addWidget(self.country_label_static)
-            country_city_h_layout.addWidget(self.country_value_label)
-            country_city_h_layout.addSpacing(20)
-            country_city_h_layout.addWidget(self.city_label_static)
-            country_city_h_layout.addWidget(self.city_value_label)
-            country_city_h_layout.addStretch()
-            self.details_layout.addRow(self.country_city_label, self.country_city_widget)
-            self.price_date_label = QLabel(self.tr("Finances & Date:"))
-            self.price_date_widget = QWidget()
-            price_date_h_layout = QHBoxLayout(self.price_date_widget)
-            price_date_h_layout.setContentsMargins(0,0,0,0)
-            self.price_label_static = QLabel(self.tr("Prix Final:"))
-            self.price_value_label = QLabel(self.tr("0 €"))
-            self.date_label_static = QLabel(self.tr("Date Création:"))
-            self.date_value_label = QLabel(self.tr("N/A"))
-            price_date_h_layout.addWidget(self.price_label_static)
-            price_date_h_layout.addWidget(self.price_value_label)
-            price_date_h_layout.addSpacing(20)
-            price_date_h_layout.addWidget(self.date_label_static)
-            price_date_h_layout.addWidget(self.date_value_label)
-            price_date_h_layout.addStretch()
-            self.details_layout.addRow(self.price_date_label, self.price_date_widget)
-            self.status_category_label = QLabel(self.tr("Classification:"))
-            self.status_category_widget = QWidget()
-            status_category_h_layout = QHBoxLayout(self.status_category_widget)
-            status_category_h_layout.setContentsMargins(0,0,0,0)
-            self.status_label_static = QLabel(self.tr("Statut:"))
-            self.status_combo = QComboBox()
-            self.category_label_static = QLabel(self.tr("Catégorie:"))
-            self.category_value_label = QLabel(self.tr("N/A"))
-            status_category_h_layout.addWidget(self.status_label_static)
-            status_category_h_layout.addWidget(self.status_combo)
-            status_category_h_layout.addSpacing(20)
-            status_category_h_layout.addWidget(self.category_label_static)
-            status_category_h_layout.addWidget(self.category_value_label)
-            status_category_h_layout.addStretch()
-            self.details_layout.addRow(self.status_category_label, self.status_category_widget)
-            self.distributor_info_label_static = QLabel(self.tr("Info Distributeur:"))
-            self.distributor_info_value_label = QLabel(self.tr("N/A"))
-            self.distributor_info_value_label.setWordWrap(True)
-            self.distributor_info_value_label.setObjectName("distributorInfoValueLabel")
-            self.distributor_info_label_static.setObjectName("distributorInfoLabel")
-            self.details_layout.addRow(self.distributor_info_label_static, self.distributor_info_value_label)
-            self.need_label_static = QLabel(self.tr("Besoin Principal:"))
-            self.need_value_label = QLabel(self.tr("N/A"))
-            self.details_layout.addRow(self.need_label_static, self.need_value_label)
-            self.folder_label_static = QLabel(self.tr("Chemin Dossier:"))
-            self.folder_value_label = QLabel(self.tr("N/A"))
-            self.folder_value_label.setOpenExternalLinks(True)
-            self.folder_value_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
-            self.details_layout.addRow(self.folder_label_static, self.folder_value_label)
-            self.created_by_label_static = QLabel(self.tr("Créé par:"))
-            self.created_by_value_label = QLabel(self.tr("N/A"))
-            self.details_layout.addRow(self.created_by_label_static, self.created_by_value_label)
-
-            # Placeholder for client statuses - to be populated by _setup_client_statuses_section
-            self.client_statuses_widget = QWidget()
-            self.client_statuses_layout = QHBoxLayout(self.client_statuses_widget)
-            self.client_statuses_layout.setContentsMargins(0,0,0,0)
-            self.details_layout.addRow(self.tr("Statuts Client:"), self.client_statuses_widget)
-
-            details_tab_layout.addLayout(self.details_layout)
-            self.internal_client_info_tabs.addTab(self.client_details_tab, self.client_info.get('client_name', self.tr("Détails Client")))
-
-        # Call populate_details_layout which will also call _setup_client_statuses_section
-            self.populate_details_layout()
-
-
-            contacts_tab_widget = QWidget()
-            contacts_tab_layout = QVBoxLayout(contacts_tab_widget)
-            contacts_tab_layout.setSpacing(10)
-
-            # Table des contacts
-            self.contacts_table = QTableWidget()
-            self.contacts_table.setObjectName("contactsClientTable")
-            self.contacts_table.setColumnCount(6)
-            self.contacts_table.setHorizontalHeaderLabels([
-                self.tr("Nom"), self.tr("Email"), self.tr("Téléphone"),
-                self.tr("Position"), self.tr("Principal"), self.tr("Actions")
-            ])
-            self.contacts_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-            self.contacts_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            self.contacts_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch) # Default, can be overridden per column
-            self.contacts_table.horizontalHeader().setSectionsClickable(True)
-            self.contacts_table.horizontalHeader().setSortIndicatorShown(True)
-            self.contacts_table.setSortingEnabled(True)
-            self.contacts_table.setAlternatingRowColors(True)
-            self.contacts_table.cellDoubleClicked.connect(self.edit_contact) # Already present
-            # Style de l'en-tête
-            header_style = """
-                QHeaderView::section {
-                    background-color: #4a5568; /* Gris foncé Tailwind */
-                    color: white;
-                    padding: 4px;
-                    border: 1px solid #ddd;
-                    font-weight: bold;
-                }
-            """
-            self.contacts_table.horizontalHeader().setStyleSheet(header_style)
-            self.contacts_table.verticalHeader().setVisible(False) # Masquer l'en-tête vertical
-
-            self.contacts_empty_label = QLabel(self.tr("Aucun contact ajouté pour ce client.\nCliquez sur '➕ Ajouter' pour commencer."))
-            self.contacts_empty_label.setAlignment(Qt.AlignCenter)
-            font_contacts_empty = self.contacts_empty_label.font(); font_contacts_empty.setPointSize(10)
-            self.contacts_empty_label.setFont(font_contacts_empty)
-            self.contacts_empty_label.setStyleSheet("color: #718096;") # Gris moyen Tailwind
-
-            contacts_tab_layout.addWidget(self.contacts_empty_label)
-            contacts_tab_layout.addWidget(self.contacts_table)
-
-            # Pagination des contacts
-            contacts_pagination_layout = QHBoxLayout()
-            contacts_pagination_layout.setSpacing(8)
-
-            self.prev_contact_button = QPushButton(self.tr("Précédent"))
-            self.prev_contact_button.setText("⬅️") # Using available icon
-
-            self.prev_contact_button.setObjectName("paginationButton")
-            self.prev_contact_button.setStyleSheet("padding: 5px 10px;")
-            self.prev_contact_button.clicked.connect(self.prev_contact_page)
-
-            self.contact_page_info_label = QLabel("Page 1 / 1") # Default text, updated in update_contact_pagination_controls
-            self.contact_page_info_label.setObjectName("paginationLabel")
-            self.contact_page_info_label.setStyleSheet("font-size: 9pt; color: #4a5568;")
-
-            self.next_contact_button = QPushButton(self.tr("Suivant"))
-            self.next_contact_button.setText("➡️") # Using chevron
-            self.next_contact_button.setLayoutDirection(Qt.RightToLeft)
-
-            self.next_contact_button.setObjectName("paginationButton")
-            self.next_contact_button.setStyleSheet("padding: 5px 10px;")
-            self.next_contact_button.clicked.connect(self.next_contact_page)
-
-            contacts_pagination_layout.addStretch()
-            contacts_pagination_layout.addWidget(self.prev_contact_button)
-            contacts_pagination_layout.addWidget(self.contact_page_info_label)
-            contacts_pagination_layout.addWidget(self.next_contact_button)
-            contacts_pagination_layout.addStretch()
-            contacts_tab_layout.addLayout(contacts_pagination_layout)
-
-            # Boutons d'action sous le tableau
-            contacts_btn_layout = QHBoxLayout()
-            contacts_btn_layout.setSpacing(10)
-            self.add_contact_btn = QPushButton("➕ " + self.tr("Ajouter Contact"))
-            self.add_contact_btn.setObjectName("primaryButton") # For QSS styling
-            self.add_contact_btn.setToolTip(self.tr("Ajouter un nouveau contact pour ce client"))
-            self.add_contact_btn.clicked.connect(self.add_contact)
-            contacts_btn_layout.addWidget(self.add_contact_btn)
-
-            self.edit_contact_btn = QPushButton("✏️ " + self.tr("Modifier Contact"))
-            self.edit_contact_btn.setObjectName("secondaryButton") # For QSS styling
-            self.edit_contact_btn.setToolTip(self.tr("Modifier le contact sélectionné"))
-            self.edit_contact_btn.clicked.connect(self.edit_contact) # Connects to the same slot as double-click
-            contacts_btn_layout.addWidget(self.edit_contact_btn)
-
-            self.remove_contact_btn = QPushButton("🗑️ " + self.tr("Supprimer Contact"))
-            self.remove_contact_btn.setObjectName("dangerButton") # For QSS styling
-            self.remove_contact_btn.setToolTip(self.tr("Supprimer le lien vers le contact sélectionné pour ce client"))
-            self.remove_contact_btn.clicked.connect(self.remove_contact)
-            contacts_btn_layout.addWidget(self.remove_contact_btn)
-            contacts_btn_layout.addStretch() # Pushes buttons to the left
-            contacts_tab_layout.addLayout(contacts_btn_layout)
-
-            self.internal_client_info_tabs.addTab(contacts_tab_widget, "👥 " + self.tr("Contacts"))
-
-            self.assignments_internal_tab = QWidget()
-            assignments_internal_tab_layout = QVBoxLayout(self.assignments_internal_tab)
-            self.assignments_sub_tabs = QTabWidget()
-            assignments_internal_tab_layout.addWidget(self.assignments_sub_tabs)
-
-            header_style = """
-                QHeaderView::section {
-                    background-color: #4a5568;
-                    color: white;
-                    padding: 4px;
-                    border: 1px solid #ddd;
-                    font-weight: bold;
-                }
-            """ # Common header style for assignment tables
-
-            # --- Vendeurs & Personnel ---
-            assigned_vendors_widget = QWidget()
-            assigned_vendors_layout = QVBoxLayout(assigned_vendors_widget)
-            self.assigned_vendors_table = QTableWidget()
-            self.assigned_vendors_table.setObjectName("assignedVendorsTable")
-            self.assigned_vendors_table.setColumnCount(4)
-            self.assigned_vendors_table.setHorizontalHeaderLabels([self.tr("Nom"), self.tr("Rôle Projet"), self.tr("Email"), self.tr("Téléphone")])
-            self.assigned_vendors_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-            self.assigned_vendors_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            self.assigned_vendors_table.horizontalHeader().setStretchLastSection(True) # Keep for this one
-            self.assigned_vendors_table.horizontalHeader().setStyleSheet(header_style)
-            self.assigned_vendors_table.verticalHeader().setVisible(False)
-            self.assigned_vendors_table.setAlternatingRowColors(True)
-            self.assigned_vendors_table.setSortingEnabled(True)
-            assigned_vendors_layout.addWidget(self.assigned_vendors_table)
-            vendor_buttons_layout = QHBoxLayout()
-            self.add_assigned_vendor_btn = QPushButton("👤+ " + self.tr("Ajouter Personnel"))
-            self.add_assigned_vendor_btn.setObjectName("primaryButton")
-            self.add_assigned_vendor_btn.clicked.connect(self.handle_add_assigned_vendor)
-            self.remove_assigned_vendor_btn = QPushButton("👤- " + self.tr("Retirer Personnel"))
-            self.remove_assigned_vendor_btn.setObjectName("dangerButton")
-            self.remove_assigned_vendor_btn.clicked.connect(self.handle_remove_assigned_vendor)
-            vendor_buttons_layout.addStretch()
-            vendor_buttons_layout.addWidget(self.add_assigned_vendor_btn)
-            vendor_buttons_layout.addWidget(self.remove_assigned_vendor_btn)
-            assigned_vendors_layout.addLayout(vendor_buttons_layout)
-            self.assignments_sub_tabs.addTab(assigned_vendors_widget, "👥 " + self.tr("Personnel"))
-
-            # --- Techniciens ---
-            assigned_technicians_widget = QWidget()
-            assigned_technicians_layout = QVBoxLayout(assigned_technicians_widget)
-            self.assigned_technicians_table = QTableWidget()
-            self.assigned_technicians_table.setObjectName("assignedTechniciansTable")
-            self.assigned_technicians_table.setColumnCount(4)
-            self.assigned_technicians_table.setHorizontalHeaderLabels([self.tr("Nom"), self.tr("Rôle Projet"), self.tr("Email"), self.tr("Téléphone")])
-            self.assigned_technicians_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-            self.assigned_technicians_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            self.assigned_technicians_table.horizontalHeader().setStretchLastSection(True)
-            self.assigned_technicians_table.horizontalHeader().setStyleSheet(header_style)
-            self.assigned_technicians_table.verticalHeader().setVisible(False)
-            self.assigned_technicians_table.setAlternatingRowColors(True)
-            self.assigned_technicians_table.setSortingEnabled(True)
-            assigned_technicians_layout.addWidget(self.assigned_technicians_table)
-            technician_buttons_layout = QHBoxLayout()
-            self.add_assigned_technician_btn = QPushButton("🛠️ " + self.tr("Ajouter Technicien")) # More specific icon
-            self.add_assigned_technician_btn.setObjectName("primaryButton")
-            self.add_assigned_technician_btn.clicked.connect(self.handle_add_assigned_technician)
-            self.remove_assigned_technician_btn = QPushButton("👤- " + self.tr("Retirer Technicien"))
-            self.remove_assigned_technician_btn.setObjectName("dangerButton")
-            self.remove_assigned_technician_btn.clicked.connect(self.handle_remove_assigned_technician)
-            technician_buttons_layout.addStretch()
-            technician_buttons_layout.addWidget(self.add_assigned_technician_btn)
-            technician_buttons_layout.addWidget(self.remove_assigned_technician_btn)
-            assigned_technicians_layout.addLayout(technician_buttons_layout)
-            self.assignments_sub_tabs.addTab(assigned_technicians_widget, "⚙️ " + self.tr("Techniciens"))
-
-            # --- Transporteurs ---
-            assigned_transporters_widget = QWidget()
-            assigned_transporters_layout = QVBoxLayout(assigned_transporters_widget)
-            self.assigned_transporters_table = QTableWidget()
-            self.assigned_transporters_table.setObjectName("assignedTransportersTable")
-            self.assigned_transporters_table.setColumnCount(6)
-            self.assigned_transporters_table.setHorizontalHeaderLabels([self.tr("Nom Transporteur"), self.tr("Contact"), self.tr("Téléphone"), self.tr("Détails Transport"), self.tr("Coût Estimé"), self.tr("Actions")])
-            self.assigned_transporters_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-            self.assigned_transporters_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            self.assigned_transporters_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents) # Resize to contents
-            self.assigned_transporters_table.horizontalHeader().setStretchLastSection(True) # Stretch last section (Actions)
-            self.assigned_transporters_table.horizontalHeader().setStyleSheet(header_style)
-            self.assigned_transporters_table.verticalHeader().setVisible(False)
-            self.assigned_transporters_table.setAlternatingRowColors(True)
-            self.assigned_transporters_table.setSortingEnabled(True)
-            assigned_transporters_layout.addWidget(self.assigned_transporters_table)
-            transporter_buttons_layout = QHBoxLayout()
-            self.add_assigned_transporter_btn = QPushButton("➕ " + self.tr("Ajouter Transporteur"))
-            self.add_assigned_transporter_btn.setObjectName("primaryButton")
-            self.add_assigned_transporter_btn.clicked.connect(self.handle_add_assigned_transporter)
-            self.remove_assigned_transporter_btn = QPushButton("🗑️ " + self.tr("Retirer Transporteur"))
-            self.remove_assigned_transporter_btn.setObjectName("dangerButton")
-            self.remove_assigned_transporter_btn.clicked.connect(self.handle_remove_assigned_transporter)
-            transporter_buttons_layout.addStretch()
-            transporter_buttons_layout.addWidget(self.add_assigned_transporter_btn)
-            transporter_buttons_layout.addWidget(self.remove_assigned_transporter_btn)
-            assigned_transporters_layout.addLayout(transporter_buttons_layout)
-            self.assignments_sub_tabs.addTab(assigned_transporters_widget, "🚚 " + self.tr("Transporteurs"))
-
-            # --- Transitaires ---
-            assigned_forwarders_widget = QWidget()
-            assigned_forwarders_layout = QVBoxLayout(assigned_forwarders_widget)
-            self.assigned_forwarders_table = QTableWidget()
-            self.assigned_forwarders_table.setObjectName("assignedForwardersTable")
-            self.assigned_forwarders_table.setColumnCount(5)
-            self.assigned_forwarders_table.setHorizontalHeaderLabels([self.tr("Nom Transitaire"), self.tr("Contact"), self.tr("Téléphone"), self.tr("Description Tâche"), self.tr("Coût Estimé")])
-            self.assigned_forwarders_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-            self.assigned_forwarders_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            self.assigned_forwarders_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-            self.assigned_forwarders_table.horizontalHeader().setStretchLastSection(False) # Don't stretch last if 5 columns
-            self.assigned_forwarders_table.horizontalHeader().setStyleSheet(header_style)
-            self.assigned_forwarders_table.verticalHeader().setVisible(False)
-            self.assigned_forwarders_table.setAlternatingRowColors(True)
-            self.assigned_forwarders_table.setSortingEnabled(True)
-            assigned_forwarders_layout.addWidget(self.assigned_forwarders_table)
-            forwarder_buttons_layout = QHBoxLayout()
-            self.add_assigned_forwarder_btn = QPushButton("➕ " + self.tr("Ajouter Transitaire"))
-            self.add_assigned_forwarder_btn.setObjectName("primaryButton")
-            self.add_assigned_forwarder_btn.clicked.connect(self.handle_add_assigned_forwarder)
-            self.remove_assigned_forwarder_btn = QPushButton("🗑️ " + self.tr("Retirer Transitaire"))
-            self.remove_assigned_forwarder_btn.setObjectName("dangerButton")
-            self.remove_assigned_forwarder_btn.clicked.connect(self.handle_remove_assigned_forwarder)
-            forwarder_buttons_layout.addStretch()
-            forwarder_buttons_layout.addWidget(self.add_assigned_forwarder_btn)
-            forwarder_buttons_layout.addWidget(self.remove_assigned_forwarder_btn)
-            assigned_forwarders_layout.addLayout(forwarder_buttons_layout)
-            self.assignments_sub_tabs.addTab(assigned_forwarders_widget, "🌍 " + self.tr("Transitaires"))
-
-            mta_widget = QWidget()
-            mta_layout = QVBoxLayout(mta_widget)
-            mta_project_selector_layout = QHBoxLayout()
-            mta_project_selector_layout.addWidget(QLabel(self.tr("Sélectionner Commande/Projet:")))
-            self.mta_project_selector_combo = QComboBox()
-            mta_project_selector_layout.addWidget(self.mta_project_selector_combo)
-            mta_layout.addLayout(mta_project_selector_layout)
-            self.assigned_mta_table = QTableWidget()
-            self.assigned_mta_table.setObjectName("assignedMtaTable")
-            self.assigned_mta_table.setColumnCount(8)
-            self.assigned_mta_table.setHorizontalHeaderLabels([
-                self.tr("Nom Agent"), self.tr("Type"), self.tr("Email"), self.tr("Téléphone"),
-                self.tr("Détails Affectation"), self.tr("Frais Estimés"), self.tr("Statut Email"), self.tr("Actions")])
-            self.assigned_mta_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-            self.assigned_mta_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            self.assigned_mta_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-            self.assigned_mta_table.horizontalHeader().setStretchLastSection(True) # Stretch Actions column
-            self.assigned_mta_table.horizontalHeader().setStyleSheet(header_style)
-            self.assigned_mta_table.verticalHeader().setVisible(False)
-            self.assigned_mta_table.setAlternatingRowColors(True)
-            self.assigned_mta_table.setSortingEnabled(True)
-            self.assigned_mta_table.setMinimumHeight(150) # Keep minimum height
-            mta_layout.addWidget(self.assigned_mta_table)
-
-            mta_buttons_layout = QHBoxLayout()
-            self.add_assigned_mta_btn = QPushButton("➕ " + self.tr("Assigner Agent"))
-            self.add_assigned_mta_btn.setObjectName("primaryButton")
-            self.add_assigned_mta_btn.clicked.connect(self.handle_add_assigned_mta)
-            self.remove_assigned_mta_btn = QPushButton("🗑️ " + self.tr("Retirer Agent"))
-            self.remove_assigned_mta_btn.setObjectName("dangerButton")
-            self.remove_assigned_mta_btn.clicked.connect(self.handle_remove_assigned_mta)
-            mta_buttons_layout.addStretch()
-            mta_buttons_layout.addWidget(self.add_assigned_mta_btn)
-            mta_buttons_layout.addWidget(self.remove_assigned_mta_btn)
-            mta_layout.addLayout(mta_buttons_layout)
-            self.assignments_sub_tabs.addTab(mta_widget, "💳 " + self.tr("Agents de Transfert d'Argent"))
-
-            self.internal_client_info_tabs.addTab(self.assignments_internal_tab, "📁 " + self.tr("Affectations"))
-            self.assigned_vendors_table.itemSelectionChanged.connect(self.update_assigned_vendors_buttons_state)
-            self.assigned_technicians_table.itemSelectionChanged.connect(self.update_assigned_technicians_buttons_state)
-            self.assigned_transporters_table.itemSelectionChanged.connect(self.update_assigned_transporters_buttons_state)
-            self.assigned_forwarders_table.itemSelectionChanged.connect(self.update_assigned_forwarders_buttons_state)
-            self.mta_project_selector_combo.currentIndexChanged.connect(self.handle_mta_project_selection_changed)
-            self.assigned_mta_table.itemSelectionChanged.connect(self.update_mta_buttons_state)
-            self.load_projects_for_mta_combo()
-            self.add_assigned_mta_btn.setEnabled(False)
-            self.remove_assigned_mta_btn.setEnabled(False)
-
-            send_email_tab_widget = QWidget()
-            send_email_tab_layout = QVBoxLayout(send_email_tab_widget)
-            self.open_email_dialog_btn = QPushButton(self.tr("Composer un Email..."))
-            self.open_email_dialog_btn.setText("📧")
-            self.open_email_dialog_btn.clicked.connect(self.open_send_email_dialog)
-            send_email_tab_layout.addWidget(self.open_email_dialog_btn)
-            send_email_tab_layout.addStretch()
-            self.internal_client_info_tabs.addTab(send_email_tab_widget, self.tr("Envoyer Mail"))
-
-            send_whatsapp_tab_widget = QWidget()
-            send_whatsapp_tab_layout = QVBoxLayout(send_whatsapp_tab_widget)
-            self.open_whatsapp_dialog_btn = QPushButton(self.tr("Envoyer message WhatsApp..."))
-            self.open_whatsapp_dialog_btn.setText("💬")
-            self.open_whatsapp_dialog_btn.clicked.connect(self.open_send_whatsapp_dialog)
-            send_whatsapp_tab_layout.addWidget(self.open_whatsapp_dialog_btn)
-            send_whatsapp_tab_layout.addStretch()
-            self.internal_client_info_tabs.addTab(send_whatsapp_tab_widget, self.tr("Send WhatsApp"))
-
-            client_info_group_layout.addWidget(self.info_container_widget)
-            self.client_info_group_box.setChecked(True)
-            layout.addWidget(self.client_info_group_box)
-        except Exception as e:
-            logging.error(f"Error in _setup_client_info_section: {e}", exc_info=True)
-            QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation section infos client:\n{0}").format(str(e)))
-
-        # self._setup_notes_section(layout) # Notes section is now a tab
-        self._setup_main_tabs_section(layout) # This now includes Commandes tab setup
+        # The rest of the setup is handled by the section and tab widgets
+        self._setup_main_tabs_section(layout)
 
         logging.info("ClientMainWidget.setup_ui: Starting initial data loading for tabs...")
         try:
@@ -667,17 +207,10 @@ class ClientMainWidget(QWidget):
         except Exception as e:
             logging.error(f"ClientMainWidget.setup_ui: Error during self.load_contacts(): {e}", exc_info=True)
 
-        # Other initial loads (products, documents, etc.) happen within _setup_main_tabs_section or their respective tab setups
-        # For example, if CommandeWidget has its own load method, it's called during its instantiation or setup.
-
         logging.info("ClientMainWidget.setup_ui: Finished initial data loading for main tabs.")
-
 
         if hasattr(self, 'client_info_group_box'):
              self.client_info_group_box.toggled.connect(self._handle_client_info_section_toggled)
-        # self.notes_group_box is no longer a top-level collapsible section in main_layout
-        # if hasattr(self, 'notes_group_box'):
-        #      self.notes_group_box.toggled.connect(self._handle_notes_section_toggled)
         if hasattr(self, 'tabs_group_box'): # This is now "Commandes" group box
              self.tabs_group_box.toggled.connect(self._handle_tabs_section_toggled)
 
@@ -685,7 +218,7 @@ class ClientMainWidget(QWidget):
             self.notes_edit.installEventFilter(self)
         logging.info(f"ClientMainWidget.setup_ui: FULL UI SETUP COMPLETED for client_id={self.client_info.get('client_id')}")
 
-        self._show_client_details_state() # Ensure initial state is correct if client_info is valid
+        self._show_client_details_state()
 
     def open_send_email_dialog(self):
         if not self.client_info or not self.client_info.get("client_id"):
@@ -875,7 +408,7 @@ class ClientMainWidget(QWidget):
                     )
 
                     if link_success:
-                        self.notification_manager.show(self.tr("Succès"), self.tr("Contact ajouté et lié au client avec succès."), type='SUCCESS')
+                        client_management_signals.show_notification.emit(self.tr("Succès"), self.tr("Contact ajouté et lié au client avec succès."), 'SUCCESS')
                         self.load_contacts()
                     else:
                         QMessageBox.critical(self, self.tr("Erreur DB"), self.tr("Impossible de lier le contact au client."))
@@ -994,7 +527,7 @@ class ClientMainWidget(QWidget):
                     #    QMessageBox.warning(self, self.tr("Erreur"), self.tr("Échec de la mise à jour des détails de liaison du contact."))
 
 
-                self.notification_manager.show(self.tr("Succès"), self.tr("Contact mis à jour avec succès."), type='SUCCESS')
+                client_management_signals.show_notification.emit(self.tr("Succès"), self.tr("Contact mis à jour avec succès."), 'SUCCESS')
                 self.load_contacts()
         except Exception as e:
             logging.error(f"Error editing contact (ID: {contact_id}): {e}", exc_info=True)
@@ -1146,7 +679,7 @@ class ClientMainWidget(QWidget):
                     QMessageBox.warning(self, self.tr("Erreur"), self.tr("Lien contact-client non trouvé."))
 
                 if success:
-                    self.notification_manager.show(self.tr("Succès"), self.tr("Lien vers le contact supprimé avec succès."), type='SUCCESS')
+                    client_management_signals.show_notification.emit(self.tr("Succès"), self.tr("Lien vers le contact supprimé avec succès."), 'SUCCESS')
                     self.load_contacts()
                 else:
                     QMessageBox.warning(self, self.tr("Échec"), self.tr("Impossible de supprimer le lien vers le contact."))
@@ -1226,8 +759,6 @@ class ClientMainWidget(QWidget):
         # Define is_client_selected early for broad use in this method
         is_client_selected = self.client_info is not None and self.client_info.get('client_id') is not None
 
-        if hasattr(self, 'create_docs_btn'):
-            self.create_docs_btn.setEnabled(can_manage_documents)
         if hasattr(self, 'compile_pdf_btn'):
              self.compile_pdf_btn.setEnabled(can_manage_documents)
         if hasattr(self, 'edit_save_client_btn'):
@@ -1243,7 +774,6 @@ class ClientMainWidget(QWidget):
         if hasattr(self, 'generate_referents_report_btn'):
             # Assuming P_REFERENTS_MANAGE also covers viewing/generating reports, or use a new permission
             self.generate_referents_report_btn.setEnabled(can_manage_referents and is_client_selected)
-
 
         if hasattr(self, 'status_combo'):
             self.status_combo.setEnabled(can_edit_full or can_edit_basic)
@@ -1305,7 +835,7 @@ class ClientMainWidget(QWidget):
 
         role_name = self.current_user_info.get('role_name') if self.current_user_info else None
         if not has_permission(role_name, P_REFERENTS_MANAGE):
-            self.notification_manager.show(self.tr("Accès Refusé"), self.tr("Vous n'avez pas la permission de gérer les référents."), type='ERROR')
+            client_management_signals.show_notification.emit(self.tr("Accès Refusé"), self.tr("Vous n'avez pas la permission de gérer les référents."), 'ERROR')
             return
 
         client_id = self.client_info.get('client_id')
@@ -1330,7 +860,7 @@ class ClientMainWidget(QWidget):
         if dialog.exec_() == QDialog.Accepted:
             self.current_referent_details = self.client_controller.get_referent_profile_by_client_id(client_id, include_inactive=True)
             self._update_referent_status_display()
-            self.notification_manager.show(self.tr("Statut Référent"), self.tr("Le statut de référent a été mis à jour."), type='SUCCESS')
+            client_management_signals.show_notification.emit(self.tr("Statut Référent"), self.tr("Le statut de référent a été mis à jour."), 'SUCCESS')
             if hasattr(self.parent(), 'load_clients_data'):
                 try:
                     # This assumes ClientMainWidget is part of a larger dashboard (ClientDashboardWidget)
@@ -1350,70 +880,32 @@ class ClientMainWidget(QWidget):
             logging.info(f"Manage referent status dialog cancelled for client {client_id}.")
 
 
-    def _setup_notes_section(self, main_layout):
-        try:
-            logging.info("ClientMainWidget.setup_ui: Starting setup for Notes Section...")
-            self.notes_edit = QTextEdit(self.client_info.get("notes", ""))
-            self.notes_edit.setPlaceholderText(self.tr("Ajoutez des notes sur ce client..."))
-            self.notes_group_box = QGroupBox(self.tr("Notes"))
-            self.notes_group_box.setCheckable(True)
-            notes_group_layout = QVBoxLayout(self.notes_group_box)
-            self.notes_container_widget = QWidget()
-            notes_container_layout = QVBoxLayout(self.notes_container_widget)
-            notes_container_layout.setContentsMargins(0, 5, 0, 0)
-            notes_container_layout.addWidget(self.notes_edit)
-            notes_group_layout.addWidget(self.notes_container_widget)
-            self.notes_group_box.setChecked(False)
-            # main_layout.addWidget(self.notes_group_box) # No longer adding to main_layout
-            # Add notes_edit as a new tab in self.internal_client_info_tabs
-            if hasattr(self, 'internal_client_info_tabs') and self.internal_client_info_tabs is not None:
-                self.internal_client_info_tabs.addTab(self.notes_edit, self.tr("Notes"))
-            else:
-                logging.error("ClientMainWidget._setup_notes_section: internal_client_info_tabs not found, cannot add Notes tab.")
-                # Fallback: add the original group box to the main layout if internal_tabs is missing
-                main_layout.addWidget(self.notes_group_box)
-
-        except Exception as e:
-            logging.error(f"Error in _setup_notes_section: {e}", exc_info=True)
-            QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation section notes:\n{0}").format(str(e)))
 
     def _setup_main_tabs_section(self, main_layout):
-        global LAST_SELECTED_MAIN_TAB_INDEX # Déclaration pour pouvoir modifier la variable globale
+        global LAST_SELECTED_MAIN_TAB_INDEX
         try:
             logging.info("ClientMainWidget.setup_ui: Starting setup for Main Tabs Section...")
-            # Le QGroupBox "Dossier Client" (anciennement "Commandes") contiendra le QTabWidget principal
             self.tabs_group_box = QGroupBox(self.tr("Dossier Client"))
             self.tabs_group_box.setCheckable(True)
             tabs_group_layout = QVBoxLayout(self.tabs_group_box)
-            self.tab_widget = QTabWidget() # Ce QTabWidget affichera "Aperçu", "Commandes", "Documents", etc.
+            self.tab_widget = QTabWidget()
             tabs_group_layout.addWidget(self.tab_widget)
             self.tabs_group_box.setChecked(True)
             main_layout.addWidget(self.tabs_group_box)
 
-            # --- Initialisation de tous les widgets d'onglet ---
-            # 1. Onglet Aperçu
             self.apercu_tab_widget = QWidget()
             apercu_layout = QVBoxLayout(self.apercu_tab_widget)
             apercu_label = QLabel(self.tr("Contenu de l'aperçu global du client et de ses commandes.\n(Détails à implémenter)"))
             apercu_label.setAlignment(Qt.AlignCenter)
             apercu_layout.addWidget(apercu_label)
 
-            # 2. Onglet Commandes
-            try:
-                self.commandes_content_widget = CommandeWidget(
-                    client_info=self.client_info,
-                    current_user_info=self.current_user_info,
-                    parent=self
-                )
-                self.tab_widget.addTab(self.commandes_content_widget, self.tr("Commandes"))
-                logging.info("ClientMainWidget._setup_main_tabs_section: Commandes tab added to self.tab_widget.")
-            except Exception as e_cmd:
-                logging.error(f"Error creating or adding Commandes tab: {e_cmd}", exc_info=True)
-                error_placeholder_commandes = QLabel(self.tr("Erreur chargement onglet Commandes."))
-                error_placeholder_commandes.setAlignment(Qt.AlignCenter)
-                self.tab_widget.addTab(error_placeholder_commandes, self.tr("Commandes (Erreur)"))
+            self.commandes_content_widget = CommandeWidget(
+                client_info=self.client_info,
+                current_user_info=self.current_user_info,
+                parent=self
+            )
+            self.tab_widget.addTab(self.commandes_content_widget, self.tr("Commandes"))
 
-            # 3. Onglet Documents
             self.documents_tab_widget_ref = DocumentsTab(
                 client_info=self.client_info,
                 config=self.config,
@@ -1453,15 +945,7 @@ class ClientMainWidget(QWidget):
                 main_module_client_product_dimension_dialog=ClientProductDimensionDialog,
                 parent_widget=self
             )
-            notes_tab_idx = -1
-            for i in range(self.tab_widget.count()):
-                if self.tab_widget.widget(i) == self.document_notes_tab_widget_ref:
-                    notes_tab_idx = i
-                    break
-            if notes_tab_idx != -1:
-                 self.tab_widget.insertTab(notes_tab_idx + 1, self.product_dimensions_tab_widget_ref, self.tr("Dimensions Produit (Global)"))
-            else:
-                 self.tab_widget.addTab(self.product_dimensions_tab_widget_ref, self.tr("Dimensions Produit (Global)"))
+            self.tab_widget.addTab(self.product_dimensions_tab_widget_ref, self.tr("Dimensions Produit (Global)"))
 
             self.sav_tab_widget_ref = SAVTab(
                 client_info=self.client_info,
@@ -1480,13 +964,7 @@ class ClientMainWidget(QWidget):
             )
             self.tab_widget.addTab(self.billing_tab_widget_ref, "💳 " + self.tr("Billing"))
 
-            # Le bloc "Add Commandes Tab" était dupliqué. La première instance (plus haut dans la méthode)
-            # est conservée, celle-ci est supprimée.
-
-            # Définir l'onglet "Commandes" comme onglet par défaut
-            # Cette logique doit s'appliquer à la première instance de commandes_content_widget
             if hasattr(self, 'commandes_content_widget') and self.commandes_content_widget is not None:
-                # Store the index of the Commandes tab if we want it as a default
                 commandes_tab_index = -1
                 for i in range(self.tab_widget.count()):
                     if self.tab_widget.widget(i) == self.commandes_content_widget:
@@ -1498,11 +976,11 @@ class ClientMainWidget(QWidget):
                 elif commandes_tab_index != -1:
                     self.tab_widget.setCurrentIndex(commandes_tab_index)
                     LAST_SELECTED_MAIN_TAB_INDEX = commandes_tab_index
-                elif self.tab_widget.count() > 0: # Fallback to first tab
+                elif self.tab_widget.count() > 0:
                     self.tab_widget.setCurrentIndex(0)
                     LAST_SELECTED_MAIN_TAB_INDEX = 0
 
-            else: # Fallback if Commandes tab doesn't exist
+            else:
                 if LAST_SELECTED_MAIN_TAB_INDEX is not None and 0 <= LAST_SELECTED_MAIN_TAB_INDEX < self.tab_widget.count():
                     self.tab_widget.setCurrentIndex(LAST_SELECTED_MAIN_TAB_INDEX)
                 elif self.tab_widget.count() > 0:
@@ -1514,16 +992,6 @@ class ClientMainWidget(QWidget):
         except Exception as e:
             logging.error(f"Error in _setup_main_tabs_section: {e}", exc_info=True)
             QMessageBox.warning(self, self.tr("Erreur UI"), self.tr("Erreur initialisation conteneur onglets principaux:\n{0}").format(str(e)))
-
-    def _setup_contacts_tab(self):
-        pass
-
-    # def _setup_assignments_tab(self): # Method removed as assignments are now an internal tab within Client Info section
-    #     pass
-
-
-    # def _setup_commandes_tab(self): # Method removed as it's integrated into _setup_main_tabs_section
-    #     pass
 
     def _on_main_tab_changed(self, index):
         """Slot to capture the current main tab index when changed by the user."""
@@ -1557,10 +1025,10 @@ class ClientMainWidget(QWidget):
         )
         if dialog.exec_() == QDialog.Accepted:
             self.populate_doc_table()
-            self.notification_manager.show(
+            client_management_signals.show_notification.emit(
                 self.tr("Nouvelle Version Créée"),
                 self.tr("Une nouvelle version du document a été créée avec succès."),
-                type='SUCCESS'
+                'SUCCESS'
             )
 
     def delete_client_document_entry(self, document_id, file_path):
@@ -1580,18 +1048,18 @@ class ClientMainWidget(QWidget):
                         try:
                             os.remove(file_path)
                             logging.info(f"File {file_path} deleted from disk.")
-                            self.notification_manager.show(self.tr("Succès"), self.tr("Document et fichier supprimés avec succès."), type='SUCCESS')
+                            client_management_signals.show_notification.emit(self.tr("Succès"), self.tr("Document et fichier supprimés avec succès."), 'SUCCESS')
                         except OSError as e_file:
                             logging.error(f"Error deleting file {file_path}: {e_file}", exc_info=True)
-                            self.notification_manager.show(self.tr("Erreur Fichier"), self.tr("Document supprimé de la base de données, mais échec de la suppression du fichier:\n{0}").format(str(e_file)), type='ERROR')
+                            client_management_signals.show_notification.emit(self.tr("Erreur Fichier"), self.tr("Document supprimé de la base de données, mais échec de la suppression du fichier:\n{0}").format(str(e_file)), 'ERROR')
                     else:
                         logging.warning(f"File path not provided or file does not exist for document ID {document_id}: {file_path}. DB entry deleted.")
-                        self.notification_manager.show(self.tr("Succès (Partiel)"), self.tr("Entrée de document supprimée de la base de données. Fichier non trouvé ou chemin non spécifié."), type='WARNING')
+                        client_management_signals.show_notification.emit(self.tr("Succès (Partiel)"), self.tr("Entrée de document supprimée de la base de données. Fichier non trouvé ou chemin non spécifié."), 'WARNING')
                 else:
-                    self.notification_manager.show(self.tr("Erreur DB"), self.tr("Impossible de supprimer l'entrée du document de la base de données (ID: {0}). Vérifiez les logs.").format(document_id), type='ERROR')
+                    client_management_signals.show_notification.emit(self.tr("Erreur DB"), self.tr("Impossible de supprimer l'entrée du document de la base de données (ID: {0}). Vérifiez les logs.").format(document_id), 'ERROR')
             except Exception as e:
                 logging.error(f"Error in delete_client_document_entry for doc ID {document_id}: {e}", exc_info=True)
-                self.notification_manager.show(self.tr("Erreur Suppression"), self.tr("Une erreur inattendue est survenue:\n{0}").format(str(e)), type='CRITICAL')
+                client_management_signals.show_notification.emit(self.tr("Erreur Suppression"), self.tr("Une erreur inattendue est survenue:\n{0}").format(str(e)), 'CRITICAL')
             finally:
                 self.populate_doc_table()
 
@@ -2553,7 +2021,7 @@ class ClientMainWidget(QWidget):
 
             success = clients_crud_instance.update_client(self.client_info['client_id'], data_to_save)
             if success:
-                self.notification_manager.show(self.tr("Succès"), self.tr("Modifications client sauvegardées."), type='SUCCESS')
+                client_management_signals.show_notification.emit(self.tr("Succès"), self.tr("Modifications client sauvegardées."), 'SUCCESS')
                 # Update self.client_info with the saved data
                 for key, value in data_to_save.items():
                     self.client_info[key] = value
@@ -2791,7 +2259,7 @@ class ClientMainWidget(QWidget):
             self.is_referent_checkbox.blockSignals(False)
 
 
-            self.notification_manager.show(self.tr("Statut Référent"), self.tr("Statut référent mis à jour."), type='SUCCESS')
+            client_management_signals.show_notification.emit(self.tr("Statut Référent"), self.tr("Statut référent mis à jour."), 'SUCCESS')
 
         except Exception as e:
             logging.error(f"Error toggling referent status for client {client_id}: {e}", exc_info=True)
@@ -2831,7 +2299,7 @@ class ClientMainWidget(QWidget):
                 if 'distributor_specific_info' in update_payload:
                      self.client_info['distributor_specific_info'] = update_payload['distributor_specific_info']
 
-                self.notification_manager.show(self.tr("Statut Distributeur"), self.tr("Catégorie client mise à jour."), type='SUCCESS')
+                client_management_signals.show_notification.emit(self.tr("Statut Distributeur"), self.tr("Catégorie client mise à jour."), 'SUCCESS')
                 self.populate_details_layout() # Refresh to show/hide info field if structure changes
             else:
                 QMessageBox.warning(self, self.tr("Erreur"), self.tr("Impossible de mettre à jour la catégorie du client."))
@@ -3222,8 +2690,7 @@ class ClientMainWidget(QWidget):
         if dialog.exec_() == QDialog.Accepted:
             # AssignPersonnelDialog should handle the actual DB assignment via db_manager.assign_personnel_to_client
             self.load_assigned_vendors_personnel() # Refresh the table
-            if self.notification_manager:
-                self.notification_manager.show(self.tr("Succès"), self.tr("Personnel assigné avec succès."), type='SUCCESS')
+            client_management_signals.show_notification.emit(self.tr("Succès"), self.tr("Personnel assigné avec succès."), 'SUCCESS')
 
     def handle_remove_assigned_vendor(self):
         selected_items = self.assigned_vendors_table.selectedItems()
@@ -3247,8 +2714,7 @@ class ClientMainWidget(QWidget):
                 success = db_manager.unassign_personnel_from_client(assignment_id)
                 if success:
                     self.load_assigned_vendors_personnel()
-                    if self.notification_manager:
-                        self.notification_manager.show(self.tr("Succès"), self.tr("Personnel retiré avec succès."), type='SUCCESS')
+                    client_management_signals.show_notification.emit(self.tr("Succès"), self.tr("Personnel retiré avec succès."), 'SUCCESS')
                 else:
                     QMessageBox.warning(self, self.tr("Erreur DB"), self.tr("Impossible de retirer le membre du personnel."))
             except Exception as e:
@@ -3272,8 +2738,7 @@ class ClientMainWidget(QWidget):
         )
         if dialog.exec_() == QDialog.Accepted:
             self.load_assigned_technicians()
-            if self.notification_manager:
-                self.notification_manager.show(self.tr("Succès"), self.tr("Technicien assigné avec succès."), type='SUCCESS')
+            client_management_signals.show_notification.emit(self.tr("Succès"), self.tr("Technicien assigné avec succès."), 'SUCCESS')
 
     def handle_remove_assigned_technician(self):
         selected_items = self.assigned_technicians_table.selectedItems()
@@ -3296,8 +2761,7 @@ class ClientMainWidget(QWidget):
                 success = db_manager.unassign_personnel_from_client(assignment_id) # Same function as for vendors
                 if success:
                     self.load_assigned_technicians()
-                    if self.notification_manager:
-                        self.notification_manager.show(self.tr("Succès"), self.tr("Technicien retiré avec succès."), type='SUCCESS')
+                    client_management_signals.show_notification.emit(self.tr("Succès"), self.tr("Technicien retiré avec succès."), 'SUCCESS')
                 else:
                     QMessageBox.warning(self, self.tr("Erreur DB"), self.tr("Impossible de retirer le technicien."))
             except Exception as e:
@@ -3312,8 +2776,7 @@ class ClientMainWidget(QWidget):
         if dialog.exec_() == QDialog.Accepted:
             # AssignTransporterDialog should handle the DB interaction via db_manager.assign_transporter_to_client
             self.load_assigned_transporters()
-            if self.notification_manager:
-                self.notification_manager.show(self.tr("Succès"), self.tr("Transporteur assigné avec succès."), type='SUCCESS')
+            client_management_signals.show_notification.emit(self.tr("Succès"), self.tr("Transporteur assigné avec succès."), 'SUCCESS')
 
     def handle_remove_assigned_transporter(self):
         selected_items = self.assigned_transporters_table.selectedItems()
@@ -3337,8 +2800,7 @@ class ClientMainWidget(QWidget):
                 success = db_manager.unassign_transporter_from_client(client_transporter_id)
                 if success:
                     self.load_assigned_transporters()
-                    if self.notification_manager:
-                        self.notification_manager.show(self.tr("Succès"), self.tr("Transporteur retiré avec succès."), type='SUCCESS')
+                    client_management_signals.show_notification.emit(self.tr("Succès"), self.tr("Transporteur retiré avec succès."), 'SUCCESS')
                 else:
                     QMessageBox.warning(self, self.tr("Erreur DB"), self.tr("Impossible de retirer le transporteur."))
             except Exception as e:
@@ -3405,8 +2867,7 @@ class ClientMainWidget(QWidget):
         if dialog.exec_() == QDialog.Accepted:
             # AssignFreightForwarderDialog should handle the DB interaction via db_manager.assign_freight_forwarder_to_client
             self.load_assigned_freight_forwarders()
-            if self.notification_manager:
-                self.notification_manager.show(self.tr("Succès"), self.tr("Transitaire assigné avec succès."), type='SUCCESS')
+            client_management_signals.show_notification.emit(self.tr("Succès"), self.tr("Transitaire assigné avec succès."), 'SUCCESS')
 
     def handle_remove_assigned_forwarder(self):
         selected_items = self.assigned_forwarders_table.selectedItems()
@@ -3430,8 +2891,7 @@ class ClientMainWidget(QWidget):
                 success = db_manager.unassign_freight_forwarder_from_client(client_forwarder_id)
                 if success:
                     self.load_assigned_freight_forwarders()
-                    if self.notification_manager:
-                        self.notification_manager.show(self.tr("Succès"), self.tr("Transitaire retiré avec succès."), type='SUCCESS')
+                    client_management_signals.show_notification.emit(self.tr("Succès"), self.tr("Transitaire retiré avec succès."), 'SUCCESS')
                 else:
                     QMessageBox.warning(self, self.tr("Erreur DB"), self.tr("Impossible de retirer le transitaire."))
             except Exception as e:
@@ -3452,8 +2912,7 @@ class ClientMainWidget(QWidget):
         if dialog.exec_() == QDialog.Accepted:
             # AssignMoneyTransferAgentDialog should handle DB interaction via coma_crud.assign_agent_to_order
             self.load_assigned_money_transfer_agents(selected_order_id) # Refresh the table for the current order
-            if self.notification_manager:
-                self.notification_manager.show(self.tr("Succès"), self.tr("Agent de transfert d'argent assigné avec succès."), type='SUCCESS')
+            client_management_signals.show_notification.emit(self.tr("Succès"), self.tr("Agent de transfert d'argent assigné avec succès."), 'SUCCESS')
 
     def handle_remove_assigned_mta(self):
         selected_items = self.assigned_mta_table.selectedItems()
@@ -3483,8 +2942,7 @@ class ClientMainWidget(QWidget):
                     else: # Clear table if no order selected (should not happen if button was enabled)
                         self.assigned_mta_table.setRowCount(0)
 
-                    if self.notification_manager:
-                        self.notification_manager.show(self.tr("Succès"), self.tr("Agent de transfert d'argent retiré avec succès."), type='SUCCESS')
+                    client_management_signals.show_notification.emit(self.tr("Succès"), self.tr("Agent de transfert d'argent retiré avec succès."), 'SUCCESS')
                 else:
                     QMessageBox.warning(self, self.tr("Erreur DB"), self.tr("Impossible de retirer l'agent de transfert d'argent."))
             except Exception as e:

@@ -26,7 +26,7 @@ from PyQt5.QtCore import Qt, QModelIndex, QRectF
 
 # CRUD imports
 try:
-    from db.cruds.item_locations_crud import (
+    from db.cruds.products.item_locations_crud import (
         add_item_location, get_item_location_by_id,
         get_item_locations_by_parent_id, get_all_item_locations,
         update_item_location, delete_item_location,
@@ -34,13 +34,13 @@ try:
         update_item_in_location, get_item_in_specific_location,
         get_full_location_path_str # Added
     )
-    from db.cruds.products_crud import get_products_by_name_pattern # Assuming this exists
+    from db.cruds.products.products_crud import get_products_by_name_pattern # Assuming this exists
 except ImportError:
     import os
     project_root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     if project_root_path not in sys.path:
         sys.path.insert(0, project_root_path)
-    from db.cruds.item_locations_crud import (
+    from db.cruds.products.item_locations_crud import (
         add_item_location, get_item_location_by_id,
         get_item_locations_by_parent_id, get_all_item_locations,
         update_item_location, delete_item_location,

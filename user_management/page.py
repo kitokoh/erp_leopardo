@@ -9,9 +9,10 @@ from PyQt5.QtWidgets import QAbstractItemView, QComboBox # Added QComboBox (alre
 
 # Assuming users_crud and roles_crud are accessible for fetching data
 # and auth.permissions for permission checking if actions were added here.
-from db.cruds import users_crud, activity_logs_crud # For list_users and logging
+from db.cruds.users import users_crud
+from db.cruds.misc import activity_logs_crud
 from auth.permissions import has_permission, P_MANAGE_USERS
-from db.cruds import roles_crud # For populating roles in edit dialog
+from db.cruds.users import roles_crud # For populating roles in edit dialog
 
 # Placeholder for EditUserDialog, will be created later
 # from dialogs.edit_user_dialog import EditUserDialog

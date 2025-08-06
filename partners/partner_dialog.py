@@ -8,15 +8,12 @@ import logging
 from PyQt5.QtCore import Qt, QUrl, QDate
 from PyQt5.QtGui import QDesktopServices
 
-from db import (
+from db.cruds.misc.partners_crud import (
     get_partner_by_id, get_documents_for_partner, add_partner_document,
     delete_partner_document, get_contacts_for_partner, get_all_partner_categories,
     get_categories_for_partner, update_partner, add_partner,
-    # CRUDs for contacts will be called by EditPartnerContactDialog
-    # Make sure these are the updated CRUDs from previous steps
     add_partner_contact, update_partner_contact, delete_partner_contact,
     link_partner_to_category, unlink_partner_from_category,
-    # PartnerInteractions CRUD
     add_partner_interaction, get_interactions_for_partner,
     update_partner_interaction, delete_partner_interaction
 )

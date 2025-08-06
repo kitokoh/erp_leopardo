@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session # For type hinting Session
 from ..generic_crud import GenericCRUD, _manage_conn, _is_sqlalchemy_obj
 
 from db.models import Client, Commande, Project, StatusSetting, Template, Country, City
-from status_manager import status_service, status_models
 
 # --- Clients CRUD ---
 class ClientsCRUD(GenericCRUD):
@@ -29,7 +28,7 @@ class ClientsCRUD(GenericCRUD):
         """
         Adds a new client to the database using the ORM.
         """
-        from db.models import Client, Commande, Project
+        # Circular import guard
         from status_manager import status_service, status_models
 
         self.logger.info(f"Attempting to add client with data: {data}")
@@ -41,7 +40,7 @@ class ClientsCRUD(GenericCRUD):
                 return {'success': False, 'error': f"Missing required field: {field}"}
 
         new_id = str(uuid.uuid4())
-        folder_path = self.create_client_folder(new_id, data.get('client_name'), conn=conn)
+        folder_path = self.create_client_folder(new_id, data.get('client_name'))
 
         new_client = Client(
             client_id=new_id,
@@ -61,43 +60,47 @@ class ClientsCRUD(GenericCRUD):
             created_by_user_id=data.get('created_by_user_id'),
             default_template_id=data.get('default_template_id')
         )
-        conn.add(new_client)
+        db.add(new_client)
 
         # Create default order and project
-        default_order_status_id = status_service.get_default_status_for_commande_creation().status_id
-        default_project_status_id = status_service.get_default_status_for_type(status_models.StatusType.PROJECT, preferred_name="Planning").status_id
+        default_order_status = status_service.get_default_status_for_commande_creation(db)
+        default_project_status = status_service.get_default_status_for_type(db, status_models.StatusType.PROJECT, preferred_name="Planning")
 
-        if default_order_status_id and default_project_status_id:
+        if default_order_status and default_project_status:
             new_commande = Commande(
                 commande_id=str(uuid.uuid4()),
                 client_id=new_id,
                 commande_reference=f"DEF-ORD-{new_id[:8]}",
-                status_commande_id=default_order_status_id,
+                status_commande_id=default_order_status.status_id,
                 created_by_user_id=data.get('created_by_user_id'),
                 notes=f"Default order automatically created for {data.get('client_name')}.",
                 is_default=True,
                 description_commande="Default Order"
             )
-            conn.add(new_commande)
+            db.add(new_commande)
 
             new_project = Project(
                 project_id=str(uuid.uuid4()),
                 client_id=new_id,
                 project_name=f"Default Project for {data.get('client_name')}",
-                status_id=default_project_status_id,
+                status_id=default_project_status.status_id,
                 description=f"Default project automatically created for order {new_commande.commande_reference}.",
                 manager_team_member_id=data.get('created_by_user_id')
             )
-            conn.add(new_project)
+            db.add(new_project)
+            # The relationship should handle this, but explicit assignment is safe
             new_commande.project_id = new_project.project_id
+        else:
+            self.logger.warning("Could not find default statuses for Order or Project. Client will be created without them.")
 
         try:
-            conn.commit()
-            self.logger.info(f"Successfully added client {new_id}")
-            return {'success': True, 'client_id': new_id}
+            db.commit()
+            db.refresh(new_client)
+            self.logger.info(f"Successfully added client {new_client.client_id}")
+            return {'success': True, 'client_id': new_client.client_id}
         except Exception as e:
             self.logger.error(f"Transaction failed during client creation: {e}", exc_info=True)
-            conn.rollback()
+            db.rollback()
             return {'success': False, 'error': f"Database transaction failed: {e}"}
 
     def create_client_folder(self, client_id: str, client_name: str) -> str | None:
@@ -117,31 +120,27 @@ class ClientsCRUD(GenericCRUD):
             self.logger.error(f"Failed to create folder for client {client_id}: {e}", exc_info=True)
             return None
 
-    def get_client_by_id(self, db: Session, client_id: str, include_deleted: bool = False) -> dict | None:
+    def get_client_by_id(self, db: Session, client_id: str, include_deleted: bool = False) -> Client | None:
         """
         Fetches a single client by their client_id using the ORM.
 
         Args:
+            db (Session): SQLAlchemy Session.
             client_id (str): The UUID of the client to fetch.
-            conn (Session, optional): SQLAlchemy Session.
             include_deleted (bool, optional): If True, includes soft-deleted clients.
                                               Defaults to False.
 
         Returns:
-            dict | None: A dictionary representing the client if found, otherwise None.
+            Client | None: The SQLAlchemy Client object if found, otherwise None.
         """
-        from db.models import Client  # Import the model
         try:
-            query = conn.query(Client).filter(Client.client_id == client_id)
+            query = db.query(Client).filter(Client.client_id == client_id)
             if not include_deleted:
-                query = query.filter(Client.is_deleted == 0)
+                # Assuming is_deleted is a boolean or 0/1
+                query = query.filter(Client.is_deleted == False)
 
             client = query.first()
-
-            if client:
-                # Convert the SQLAlchemy object to a dictionary
-                return {c.name: getattr(client, c.name) for c in client.__table__.columns}
-            return None
+            return client
         except Exception as e:
             self.logger.error(f"Error getting client by ID {client_id}: {e}", exc_info=True)
             return None
@@ -233,72 +232,50 @@ class ClientsCRUD(GenericCRUD):
 
     def delete_client(self, db: Session, client_id: str) -> dict:
         """
-        Soft deletes a client by setting `is_deleted = 1`, `deleted_at` to the current UTC timestamp,
-        and updating the client's status to 'Archivé'.
+        Soft deletes a client by setting `is_deleted = True`, `deleted_at` to the current UTC timestamp,
+        and updating the client's status to 'Archivé'. Uses the ORM.
 
         Args:
+            db (Session): SQLAlchemy Session.
             client_id (str): The UUID of the client to soft delete.
-            conn (sqlite3.Connection, optional): Database connection.
 
         Returns:
-            dict: {'success': True, 'message': 'Client soft deleted and status updated.'} on success,
-                  {'success': False, 'error': 'Reason for failure.'} on failure.
+            dict: {'success': True, 'message': '...'} on success,
+                  {'success': False, 'error': '...'} on failure.
         """
-        # from . import status_settings_crud # No longer directly needed here
-        # Import the new status_manager service
-        try:
-            from status_manager import status_service
-        except ImportError:
-            self.logger.error("Failed to import status_manager.status_service in clients_crud (delete_client). Status update during delete will fail.")
-            status_service = None
+        # Circular import guard
+        from status_manager import status_service
 
         if not client_id:
             self.logger.warning("delete_client called with no client_id.")
             return {'success': False, 'error': "Client ID is required for deletion."}
 
-        now_utc_iso = datetime.utcnow().isoformat() + "Z"
-        params_dict = {
-            "is_deleted": 1,
-            "deleted_at": now_utc_iso,
-            "client_id_where": client_id # Renamed for clarity in WHERE clause
-        }
-        set_parts = ["is_deleted = :is_deleted", "deleted_at = :deleted_at"]
-
-        archived_status_id = None
-        if status_service:
-            archived_status_obj = status_service.get_archived_status_for_client()
-            if archived_status_obj:
-                archived_status_id = archived_status_obj.status_id
-                params_dict["status_id"] = archived_status_id
-                set_parts.append("status_id = :status_id")
-            else:
-                self.logger.error(f"Could not find 'Archivé' status for Client type via status_service. Client {client_id} status will not be updated to 'Archivé' during soft delete.")
-        else:
-            self.logger.error("status_service not available in delete_client. Cannot set client status to 'Archivé'.")
-
-        sql_query_str = f"UPDATE {self.table_name} SET {', '.join(set_parts)} WHERE {self.id_column} = :client_id_where"
-        sql_query = text(sql_query_str)
-
         try:
-            if _is_sqlalchemy_obj(conn):
-                result = conn.execute(sql_query, params_dict)
+            client_to_delete = db.query(Client).filter(Client.client_id == client_id, Client.is_deleted == False).first()
+
+            if not client_to_delete:
+                self.logger.warning(f"Client {client_id} not found or already deleted.")
+                return {'success': False, 'error': f"Client {client_id} not found or already deleted."}
+
+            client_to_delete.is_deleted = True
+            client_to_delete.deleted_at = datetime.utcnow()
+
+            message = f"Client {client_id} soft deleted."
+            archived_status = status_service.get_archived_status_for_client(db)
+
+            if archived_status:
+                client_to_delete.status_id = archived_status.status_id
+                message += " Status updated to 'Archivé'."
             else:
-                result = conn.execute(str(sql_query), params_dict)
-            # _manage_conn handles commit
-            if result.rowcount > 0:
-                message = f"Client {client_id} soft deleted."
-                if archived_status_id:
-                    message += " Status updated to 'Archivé'."
-                else:
-                    message += " Status NOT updated to 'Archivé' due to missing status configuration."
-                self.logger.info(message)
-                return {'success': True, 'message': message}
-            else:
-                self.logger.warning(f"Client {client_id} not found or no changes made during soft delete.")
-                return {'success': False, 'error': f"Client {client_id} not found or no changes made."}
-        except Exception as e: # Changed to general Exception
+                self.logger.error(f"Could not find 'Archivé' status for Client type. Status will not be updated during soft delete.")
+                message += " Status NOT updated to 'Archivé' due to missing status configuration."
+
+            db.commit()
+            self.logger.info(message)
+            return {'success': True, 'message': message}
+        except Exception as e:
+            db.rollback()
             self.logger.error(f"Failed to soft delete client {client_id}: {e}", exc_info=True)
-            # _manage_conn handles rollback
             return {'success': False, 'error': str(e)}
 
     def get_all_clients_with_details(self, db: Session, filters: dict = None, limit: int = None, offset: int = 0, include_deleted: bool = False) -> list[dict]:
