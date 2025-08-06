@@ -90,11 +90,9 @@ from utils.document_manager_logic import (
     archive_client_status,
     permanently_delete_client
 )
-<<<<<<< HEAD
-from gui.dialogs import (
-=======
+
+
 from .dialogs import (
->>>>>>> cf65954074bdfef7840ecc7db7d4d58778c4010f
     TemplateDialog, ManageProductMasterDialog
 )
 from .dialogs.add_new_client_dialog import AddNewClientDialog
