@@ -145,7 +145,7 @@ from product_management.page import ProductManagementPage # Added
 from PyQt5.QtWidgets import QSizePolicy
 
 from .dialogs.status_management_dialog import StatusManagementDialog # Added for status management
-from dialogs.manage_saved_filters_dialog import ManageSavedFiltersDialog # Import for managing saved filters
+from .dialogs.manage_saved_filters_dialog import ManageSavedFiltersDialog # Import for managing saved filters
 
 from PyQt5.QtWidgets import QDateEdit
 
