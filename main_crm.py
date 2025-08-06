@@ -40,14 +40,14 @@ from auth.roles import SUPER_ADMIN
 from settings.initial_setup_dialog import InitialSetupDialog, PromptCompanyInfoDialog
 from PyQt5.QtWidgets import QDialog # Required for QDialog.Accepted check
 # Import specific db functions needed
-import db # Added import for db module
+import db
+from db.init_schema import initialize_database as initialize_database_from_schema
+from db.cruds.misc.application_settings_crud import get_setting, set_setting
 from db.db_seed import run_seed, seed_only_hidroguc_products
 from db.cruds.misc.companies_crud import get_all_companies, add_company
 from db.cruds.users import users_crud
-# from db.cruds.application_settings_crud import get_setting # Removed direct import
-# from db.init_schema import initialize_database # This will be db.initialize_database after this change
 # from auth.login_window import LoginWindow # Replaced by LoginDialog
-from dialogs.login_dialog import LoginDialog # New LoginDialog
+from gui.dialogs.login_dialog import LoginDialog # New LoginDialog
 from auth import authentication as auth_service # Import the auth service
 from user_profile_management.database_setup import create_tables as create_user_profile_tables
 from user_profile_management.database_setup import seed_data as seed_user_profile_data
@@ -251,7 +251,7 @@ def initialize_database():
 
     if not db_exists:
         logging.info("Database does not exist. Initializing a new one.")
-        db.initialize_database(CONFIG)
+        initialize_database_from_schema(CONFIG)
 
     try:
         from alembic.config import Config as AlembicConfig
@@ -403,7 +403,7 @@ class CRMModule(QMainWindow):
         # Determine current language for splash screen - NOW SAFE TO CALL db.get_setting
         current_app_lang = QLocale.system().name().split('_')[0] # Default
         try:
-            language_code_from_db_for_splash = db.get_setting('user_selected_language')
+            language_code_from_db_for_splash = get_setting('user_selected_language')
             if language_code_from_db_for_splash and isinstance(language_code_from_db_for_splash, str) and language_code_from_db_for_splash.strip():
                 current_app_lang = language_code_from_db_for_splash.strip()
                 logging.info(f"Splash screen language '{current_app_lang}' loaded from database setting.")
@@ -432,7 +432,7 @@ class CRMModule(QMainWindow):
 
         # 7. Load Global Stylesheet
         # load_stylesheet_global is imported from app_setup
-        theme = db.get_setting('theme', default='Light')
+        theme = get_setting('theme', default='Light')
         if theme == 'Dark':
             dark_theme_path = os.path.join(APP_ROOT_DIR, "resources", "styles", "dark_theme.qss")
             if os.path.exists(dark_theme_path):
@@ -444,7 +444,7 @@ class CRMModule(QMainWindow):
             load_stylesheet_global(app)
 
         # 8. Setup Translations
-        language_code_from_db = db.get_setting('user_selected_language') # Use db.get_setting
+        language_code_from_db = get_setting('user_selected_language') # Use db.get_setting
 
         if language_code_from_db and isinstance(language_code_from_db, str) and language_code_from_db.strip():
             language_code = language_code_from_db.strip()
@@ -509,7 +509,7 @@ class CRMModule(QMainWindow):
         # --- Startup Dialog Logic ---
         show_setup_prompt_config_value = CONFIG.get("show_initial_setup_on_startup", False)
         first_launch_detected = is_first_launch(APP_ROOT_DIR, CONFIG.get('templates_dir'), CONFIG.get('clients_dir'))
-        companies_exist = bool(db.get_all_companies())
+        companies_exist = bool(get_all_companies())
 
         should_reset_config_flag_after_dialog = False
 

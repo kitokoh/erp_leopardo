@@ -4,7 +4,7 @@ from datetime import datetime
 import json
 import logging
 from ..generic_crud import _manage_conn
-from ..products.products_crud import products_crud
+from ..products.products_crud import products_crud_instance
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ def add_product_to_client_or_project(link_data: dict, conn: sqlite3.Connection =
         logger.error("product_id and client_id are required to link a product.")
         return None
 
-    prod_info = get_product_by_id(product_id, conn=conn) # Pass connection
+    prod_info = products_crud_instance.get_product_by_id(product_id, conn=conn) # Pass connection
     if not prod_info:
         logger.error(f"Product with ID {product_id} not found.")
         return None

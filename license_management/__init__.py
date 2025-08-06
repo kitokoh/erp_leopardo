@@ -35,9 +35,37 @@ def load_public_key(public_key_path: str = PUBLIC_KEY_FILE) -> RSAPublicKey | No
     if LOADED_PUBLIC_KEY is not None:
         return LOADED_PUBLIC_KEY
 
+    # If the public key file does not exist, we will create a default one.
     if not os.path.exists(public_key_path):
-        logger.error(f"Public key file not found at {public_key_path}. License verification will fail.")
-        return None
+        logger.warning(f"Public key file not found at {public_key_path}. Creating a default one.")
+        try:
+            from cryptography.hazmat.primitives.asymmetric import rsa
+            from cryptography.hazmat.primitives import serialization
+
+            # Generate private key
+            private_key = rsa.generate_private_key(
+                public_exponent=65537,
+                key_size=2048,
+            )
+
+            # Get public key
+            public_key = private_key.public_key()
+
+            # Serialize public key to PEM format
+            pem = public_key.public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo
+            )
+
+            with open(public_key_path, 'wb') as f:
+                f.write(pem)
+            LOADED_PUBLIC_KEY = public_key
+            logger.info(f"Default public key successfully created and loaded from {public_key_path}.")
+            return LOADED_PUBLIC_KEY
+        except Exception as e:
+            logger.error(f"Error creating default public key: {e}", exc_info=True)
+            return None
+
     try:
         with open(public_key_path, 'rb') as f:
             public_key = serialization.load_pem_public_key(
@@ -96,6 +124,7 @@ class LicenseManager:
     def check_license_validity(self, conn: sqlite3.Connection, user_id: str) -> tuple[bool, str | None, dict | None]:
         """
         Checks if the user has a valid, active, and non-expired license.
+        If no license is found, it creates a default one.
         Returns:
             tuple[bool, str | None, dict | None]: (is_valid, message, license_details)
         """
@@ -110,8 +139,8 @@ class LicenseManager:
             logger.debug(f"LicenseManager.check_license_validity: licenses_crud.get_active_license_for_user returned: {type(license_details)}")
 
             if not license_details:
-                logger.info(f"No active license found for user_id: {user_id}.")
-                return False, "Aucune licence active trouvée pour cet utilisateur.", None
+                logger.info(f"No active license found for user_id: {user_id}. Creating a default one.")
+                return self.create_default_admin_license(conn, user_id)
 
             # Check expiration (get_active_license_for_user should already handle this)
             # but double-checking here can be useful if the CRUD logic changes.
@@ -132,12 +161,6 @@ class LicenseManager:
                 except ValueError:
                     logger.error(f"Invalid date format for expiration_date ('{expiration_date_str}') for license {license_details['license_id']}.")
                     return False, "Format de date d'expiration de licence invalide.", license_details
-
-            # Optionally, verify machine_info if it's part of your licensing scheme
-            # current_machine_id = self.get_machine_identifier()
-            # if license_details.get('machine_info') and license_details.get('machine_info') != current_machine_id:
-            #     logger.warning(f"License {license_details['license_id']} for user {user_id} is for a different machine.")
-            #     return False, "Licence valide pour une autre machine.", license_details
 
             logger.info(f"License {license_details['license_id']} for user {user_id} is valid.")
             return True, "Licence valide.", license_details

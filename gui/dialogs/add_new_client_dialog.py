@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 # import db as db_manager # Removed
-from .client_controller import ClientController # Added
+from client_management.client_controller import ClientController
 # from db.cruds.templates_crud import get_all_templates # Removed
 from auth.authentication import get_current_user_id # Added import
 from db.connection import get_db_connection
