@@ -39,7 +39,7 @@ else:
 # Assuming these dialogs are in a 'dialogs.py' or similar accessible location.
 # If they are defined in main.py and not moved yet, this will cause an issue.
 # For this step, we assume they are accessible.
-from dialogs import (
+from gui.dialogs import (
     ContactDialog, ProductDialog, CreateDocumentDialog
 )
 from gui.dialogs.edit_client_dialog import EditClientDialog
