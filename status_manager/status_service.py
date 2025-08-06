@@ -3,10 +3,10 @@ from typing import List, Optional
 
 # Attempt to import CRUD functions from the existing db module
 try:
-    from db.cruds import status_settings_crud
+    from db.cruds.misc import status_settings_crud
     # We also need to check usage in Clients and Commandes
-    from db.cruds import clients_crud  # For checking client status usage
-    from db.cruds import commandes_crud # For checking commande status usage
+    from db.cruds.clients import clients_crud
+    from db.cruds.invoices import commandes_crud
 except ImportError as e:
     logging.error(f"StatusManager Service: Could not import DB CRUD modules: {e}. Ensure PYTHONPATH is set correctly.")
     # To allow the rest of the file to be parsed, provide dummy fallbacks if needed,
