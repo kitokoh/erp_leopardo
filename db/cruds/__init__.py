@@ -54,7 +54,7 @@ from .projects.milestones_crud import get_milestones_for_project, add_milestone,
 from .performance.performance_crud import create_goal as create_goal_sqla, get_goal as get_goal_sqla, get_goals_for_employee as get_goals_for_employee_sqla, update_goal as update_goal_sqla, delete_goal as delete_goal_sqla, create_review_cycle as create_review_cycle_sqla, get_review_cycle as get_review_cycle_sqla, get_review_cycles as get_review_cycles_sqla, update_review_cycle as update_review_cycle_sqla, delete_review_cycle as delete_review_cycle_sqla, create_performance_review as create_performance_review_sqla, get_performance_review as get_performance_review_sqla, get_performance_reviews_for_employee as get_performance_reviews_for_employee_sqla, get_performance_reviews_by_reviewer as get_performance_reviews_by_reviewer_sqla, update_performance_review as update_performance_review_sqla, delete_performance_review as delete_performance_review_sqla
 from .misc.partners_crud import get_all_partner_categories, get_all_partners, get_partners_in_category, get_categories_for_partner, get_partner_by_id as get_partner_details_by_id, get_documents_for_partner, add_partner_document, update_partner_document, delete_partner_document, get_partner_document_by_id, get_contacts_for_partner, add_partner_contact, update_partner_contact, delete_partner_contact, add_partner, update_partner, delete_partner, link_partner_to_category, unlink_partner_from_category, get_or_add_partner_category, get_partner_category_by_name, add_partner_category, delete_partner_category, update_partner_category, get_partner_category_by_id, add_partner_interaction, get_interactions_for_partner, update_partner_interaction, delete_partner_interaction
 from .products.product_media_links_crud import product_media_links_crud
-from .products.products_crud import products_crud
+from .products.products_crud import products_crud_instance
 from .projects.projects_crud import get_all_projects, get_project_by_id, add_project, update_project, delete_project, get_total_projects_count as get_total_project_count_stat, get_active_projects_count as get_active_project_count_stat, get_projects_by_client_id
 from .misc.status_settings_crud import get_status_setting_by_id, get_all_status_settings, get_status_setting_by_name, add_status_setting, update_status_setting, delete_status_setting
 from .misc.tags_crud import (
@@ -262,7 +262,7 @@ __all__ = [
     'partners_crud',
     'performance_crud', # Module access for SQLAlchemy functions
     'product_media_links_crud',
-    'products_crud',
+    'products_crud_instance',
     'projects_crud',
     'recruitment_candidate_progress_crud', # Module access for SQLAlchemy functions
     'recruitment_candidates_crud', # Module access for SQLAlchemy functions
