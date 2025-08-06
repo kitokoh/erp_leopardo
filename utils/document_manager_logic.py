@@ -23,7 +23,7 @@ from db.cruds.clients.clients_crud import clients_crud_instance
 from db.cruds.projects.projects_crud import add_project, get_project_by_id, delete_project
 from db.cruds.projects.tasks_crud import add_task
 from db.cruds.misc.contacts_crud import get_contact_by_email, add_contact, update_contact, link_contact_to_client, get_contacts_for_client, update_client_contact_link
-from db.cruds.products.products_crud import products_crud
+from db.cruds.products.products_crud import products_crud_instance
 
 from db.cruds.clients.client_project_products_crud import add_product_to_client_or_project, get_products_for_client_or_project
 

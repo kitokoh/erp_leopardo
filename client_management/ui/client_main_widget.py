@@ -23,7 +23,7 @@ from PyQt5.QtGui import QPixmap
 import db as db_manager
 from db.cruds.users import users_crud
 from db.cruds.clients.clients_crud import clients_crud_instance
-from gui.dialogs import ClientProductDimensionDialog, AssignPersonnelDialog, AssignTransporterDialog, AssignFreightForwarderDialog, AssignMoneyTransferAgentDialog
+from gui.dialogs import ClientProductDimensionDialog, AssignPersonnelDialog, TransporterDialog as AssignTransporterDialog, AssignFreightForwarderDialog, AssignMoneyTransferAgentDialog
 from whatsapp.whatsapp_dialog import SendWhatsAppDialog
 from db.cruds.misc import money_transfer_agents_crud as mta_crud
 from db.cruds.clients import client_order_money_transfer_agents_crud as coma_crud
