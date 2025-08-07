@@ -12,9 +12,12 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QDate
 
 import db # Assuming db.__init__ exposes necessary cruds
-from db.cruds import commandes_crud, products_crud, projects_crud, status_settings_crud
-from db.cruds import client_project_products_crud # Added for linking products to client
-from dialogs.product_dialog import ProductDialog # Import ProductDialog
+from db.cruds.invoices import commandes_crud
+from db.cruds.products import products_crud
+from db.cruds.projects import projects_crud
+from db.cruds.misc import status_settings_crud
+from db.cruds.clients import client_project_products_crud # Added for linking products to client
+from gui.dialogs.product_dialog import ProductDialog
 
 
 

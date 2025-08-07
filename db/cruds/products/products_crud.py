@@ -118,5 +118,12 @@ class ProductsCRUD:
 
         return db.query(Product).filter(Product.product_id.in_(equivalent_ids), Product.is_deleted == False).all()
 
+    def get_total_products_count(self, db: Session, include_deleted: bool = False) -> int:
+        """Returns the total number of products."""
+        query = db.query(func.count(Product.product_id))
+        if not include_deleted:
+            query = query.filter(Product.is_deleted == False)
+        return query.scalar()
+
 
 products_crud_instance = ProductsCRUD()

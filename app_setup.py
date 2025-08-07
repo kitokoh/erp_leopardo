@@ -384,10 +384,10 @@ def initialize_default_templates(config, app_root_dir):
             font-size: 10pt;
         }
         .page {
-            width: 210mm;
-            min-height: 297mm;
-            padding: 20mm;
-            margin: 10mm auto;
+            width: 210;
+            min-height: 297;
+            padding: 20;
+            margin: 10 auto;
             background-color: #fff;
             box-shadow: 0 0 15px rgba(0,0,0,0.1);
             page-break-after: always;

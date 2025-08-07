@@ -13,7 +13,7 @@ from db.cruds.projects.projects_crud import (
     get_total_projects_count,
     get_active_projects_count,
 )
-from db.cruds.products.products_crud import products_crud
+from db.cruds.products.products_crud import products_crud_instance as products_crud
 from db.cruds.misc.locations_crud import get_country_by_name, get_country_by_id, get_city_by_id
 from db.cruds.misc.status_settings_crud import get_status_setting_by_id, get_status_setting_by_name
 from db.cruds.clients.clients_crud import clients_crud_instance

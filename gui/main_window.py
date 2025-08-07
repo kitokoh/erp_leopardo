@@ -67,7 +67,7 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView
 
 import db as db_manager
 from db.cruds.clients.clients_crud import clients_crud_instance
-from db.cruds.products.products_crud import products_crud
+from db.cruds.products.products_crud import products_crud_instance
 
 import icons_rc
 # import folium # No longer used directly by DocumentManager for its own map
@@ -90,9 +90,9 @@ from utils.document_manager_logic import (
     archive_client_status,
     permanently_delete_client
 )
-from .dialogs import (
-    TemplateDialog, ManageProductMasterDialog
-)
+from .dialogs.template_dialog import TemplateDialog
+from .dialogs.manage_product_master_dialog import ManageProductMasterDialog
+from .dialogs.assign_freight_forwarder_dialog import AssignFreightForwarderDialog
 from .dialogs.add_new_client_dialog import AddNewClientDialog
 # Removed: SettingsDialog as OriginalSettingsDialog, TransporterDialog, FreightForwarderDialog
 # from product_management.list_dialog import ProductListDialog # Removed
@@ -162,7 +162,7 @@ from utils import save_config
 from company_management import CompanyTabWidget
 from settings.settings_page import SettingsPage # Import the new SettingsPage
 from botpress_integration.ui_components import BotpressIntegrationUI # Import Botpress UI
-from dialogs.carrier_map_dialog import CarrierMapDialog # Import CarrierMapDialog
+from gui.dialogs.carrier_map_dialog import CarrierMapDialog
 from voice_input_service import VoiceInputService # Added import
 
 from partners.partner_main_widget import PartnerMainWidget # Partner Management

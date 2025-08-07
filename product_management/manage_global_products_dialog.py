@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QLocale # Added QLocale
 
-from db.cruds import products_crud
+from db.cruds.products.products_crud import products_crud_instance as products_crud
 from .global_product_edit_dialog import GlobalProductEditDialog # Use the new dedicated dialog
 from auth.permissions import has_permission, P_MANAGE_GLOBAL_PRODUCTS, P_VIEW_GLOBAL_PRODUCTS
 
@@ -359,30 +359,6 @@ class ManageGlobalProductsDialog(QDialog):
                 QMessageBox.critical(self, self.tr("Erreur de Suppression"), self.tr("Impossible de supprimer le produit: {0}").format(result.get('error')))
 
     def handle_manage_equivalencies(self):
-        logging.warning("Placeholder for handle_manage_equivalencies called.")
-        QMessageBox.information(self, self.tr("Fonctionnalité en cours de développement"),
-                                self.tr("La gestion des équivalences de produits sera bientôt disponible."))
-
-if __name__ == '__main__':
-    app = QApplication([])
-
-    mock_user_info = {'user_id': 'test_user', 'role_name': 'Administrator'}
-    mock_config = type('MockConfig', (), {})() # Simplified mock config
-    mock_notifications = type('MockNotifications', (), {
-        'show_notification': staticmethod(lambda title, msg, type: print(f"NOTIF ({type}): {title} - {msg}"))
-    })()
-
-    # For testing, ensure P_MANAGE_GLOBAL_PRODUCTS is handled by has_permission
-    # This might require mocking has_permission or ensuring 'Administrator' role has it in a test DB setup.
-    # from auth.permissions import P_MANAGE_GLOBAL_PRODUCTS as P_MGP # Ensure it's importable
-    # For this snippet, we assume it's correctly checked.
-
-    dialog = ManageGlobalProductsDialog(mock_user_info, mock_config, mock_notifications, parent=None)
-    dialog.exec_()
-
-    # app.exec_() # Not needed if dialog.exec_() is blocking
-
-    def handle_manage_equivalencies(self):
         source_product_id_to_pass = None
         selected_rows = self.products_table.selectionModel().selectedRows()
         if selected_rows:
@@ -411,3 +387,22 @@ if __name__ == '__main__':
         except Exception as e:
             logging.error(f"Error opening ProductEquivalencyDialog: {e}", exc_info=True)
             QMessageBox.critical(self, self.tr("Erreur Inattendue"), str(e))
+
+if __name__ == '__main__':
+    app = QApplication([])
+
+    mock_user_info = {'user_id': 'test_user', 'role_name': 'Administrator'}
+    mock_config = type('MockConfig', (), {})() # Simplified mock config
+    mock_notifications = type('MockNotifications', (), {
+        'show_notification': staticmethod(lambda title, msg, type: print(f"NOTIF ({type}): {title} - {msg}"))
+    })()
+
+    # For testing, ensure P_MANAGE_GLOBAL_PRODUCTS is handled by has_permission
+    # This might require mocking has_permission or ensuring 'Administrator' role has it in a test DB setup.
+    # from auth.permissions import P_MANAGE_GLOBAL_PRODUCTS as P_MGP # Ensure it's importable
+    # For this snippet, we assume it's correctly checked.
+
+    dialog = ManageGlobalProductsDialog(mock_user_info, mock_config, mock_notifications, parent=None)
+    dialog.exec_()
+
+    # app.exec_() # Not needed if dialog.exec_() is blocking

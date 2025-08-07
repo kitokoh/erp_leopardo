@@ -12,7 +12,7 @@ import os # For path operations
 import uuid # For unique filenames
 
 import db as db_manager
-from db.cruds import products_crud
+from db.cruds.products.products_crud import products_crud_instance as products_crud
 from db.cruds.invoices import commandes_crud
 from db.cruds.invoices import proforma_invoices_crud
 from utils.proforma_invoice_utils import get_proforma_invoice_context_data # For context

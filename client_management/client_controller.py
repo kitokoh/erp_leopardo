@@ -1,7 +1,7 @@
 # controllers/client_controller.py
 import db as db_manager # Assuming db_manager is the existing module for DB interactions
 from db.cruds.clients import clients_crud_instance as clients_crud, client_project_products_crud
-from db.cruds.products import products_crud
+from db.cruds.products.products_crud import products_crud_instance as products_crud
 from db.cruds.misc import regions_crud, referents_crud
 import logging
 

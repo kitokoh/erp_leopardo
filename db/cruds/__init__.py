@@ -280,6 +280,7 @@ __all__ = [
     'client_order_money_transfer_agents_crud',
     'client_order_money_transfer_agents_crud',
     'client_order_money_transfer_agents_crud',
+    'commandes_crud',
 
     'users_crud',
 ]

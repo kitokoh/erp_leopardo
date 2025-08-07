@@ -16,7 +16,7 @@ from PyQt5.QtGui import QIcon, QDesktopServices
 from PyQt5.QtCore import QUrl, QDir
 
 from PyPDF2 import PdfMerger
-from pagedegrde import generate_cover_page_logic, APP_CONFIG as PAGEDEGRDE_APP_CONFIG
+# from pagedegrde import generate_cover_page_logic, APP_CONFIG as PAGEDEGRDE_APP_CONFIG
 import db as db_manager
 # clients_crud_instance is not used by CompilePdfDialog
 import icons_rc # Import for Qt resource file
@@ -121,33 +121,33 @@ class CompilePdfDialog(QDialog):
             self.accept()
         except Exception as e: QMessageBox.critical(self, self.tr("Erreur"), self.tr("Erreur lors de la compilation du PDF:\n{0}").format(str(e)))
 
-    def create_cover_page(self):
-        config_dict = {'title': self.tr("Compilation de Documents - Projet: {0}").format(self.client_info.get('project_identifier', self.tr('N/A'))),
-                       'subtitle': self.tr("Client: {0}").format(self.client_info.get('client_name', self.tr('N/A'))),
-                       'author': self.client_info.get('company_name', PAGEDEGRDE_APP_CONFIG.get('default_institution', self.tr('Votre Entreprise'))),
-                       'institution': "", 'department': "", 'doc_type': self.tr("Compilation de Documents"),
-                       'date': datetime.now().strftime('%d/%m/%Y %H:%M'), 'version': "1.0",
-                       'font_name': PAGEDEGRDE_APP_CONFIG.get('default_font', 'Helvetica'), 'font_size_title': 20, 'font_size_subtitle': 16, 'font_size_author': 10,
-                       'text_color': PAGEDEGRDE_APP_CONFIG.get('default_text_color', '#000000'), 'template_style': 'Moderne', 'show_horizontal_line': True, 'line_y_position_mm': 140,
-                       'logo_data': None, 'logo_width_mm': 40, 'logo_height_mm': 40, 'logo_x_mm': 25, 'logo_y_mm': 297 - 25 - 40, # A4 height based
-                       'margin_top': 25, 'margin_bottom': 25, 'margin_left': 20, 'margin_right': 20,
-                       'footer_text': self.tr("Document compilé le {0}").format(datetime.now().strftime('%d/%m/%Y'))}
+    # def create_cover_page(self):
+    #     config_dict = {'title': self.tr("Compilation de Documents - Projet: {0}").format(self.client_info.get('project_identifier', self.tr('N/A'))),
+    #                    'subtitle': self.tr("Client: {0}").format(self.client_info.get('client_name', self.tr('N/A'))),
+    #                    'author': self.client_info.get('company_name', PAGEDEGRDE_APP_CONFIG.get('default_institution', self.tr('Votre Entreprise'))),
+    #                    'institution': "", 'department': "", 'doc_type': self.tr("Compilation de Documents"),
+    #                    'date': datetime.now().strftime('%d/%m/%Y %H:%M'), 'version': "1.0",
+    #                    'font_name': PAGEDEGRDE_APP_CONFIG.get('default_font', 'Helvetica'), 'font_size_title': 20, 'font_size_subtitle': 16, 'font_size_author': 10,
+    #                    'text_color': PAGEDEGRDE_APP_CONFIG.get('default_text_color', '#000000'), 'template_style': 'Moderne', 'show_horizontal_line': True, 'line_y_position_mm': 140,
+    #                    'logo_data': None, 'logo_width_mm': 40, 'logo_height_mm': 40, 'logo_x_mm': 25, 'logo_y_mm': 297 - 25 - 40, # A4 height based
+    #                    'margin_top': 25, 'margin_bottom': 25, 'margin_left': 20, 'margin_right': 20,
+    #                    'footer_text': self.tr("Document compilé le {0}").format(datetime.now().strftime('%d/%m/%Y'))}
 
-        logo_path = os.path.join(self.app_root_dir, "logo.png")
-        if os.path.exists(logo_path):
-            try:
-                with open(logo_path, "rb") as f_logo: config_dict['logo_data'] = f_logo.read()
-            except Exception as e_logo: print(self.tr("Erreur chargement logo.png: {0}").format(e_logo)) # Keep print or use logging
+    #     logo_path = os.path.join(self.app_root_dir, "logo.png")
+    #     if os.path.exists(logo_path):
+    #         try:
+    #             with open(logo_path, "rb") as f_logo: config_dict['logo_data'] = f_logo.read()
+    #         except Exception as e_logo: print(self.tr("Erreur chargement logo.png: {0}").format(e_logo)) # Keep print or use logging
 
-        try:
-            pdf_bytes = generate_cover_page_logic(config_dict)
-            base_temp_dir = self.client_info.get("base_folder_path", QDir.tempPath()); temp_cover_filename = f"cover_page_generated_{datetime.now().strftime('%Y%m%d%H%M%S%f')}.pdf"
-            temp_cover_path = os.path.join(base_temp_dir, temp_cover_filename)
-            with open(temp_cover_path, "wb") as f: f.write(pdf_bytes)
-            return temp_cover_path
-        except Exception as e:
-            print(self.tr("Erreur lors de la génération de la page de garde via pagedegrde: {0}").format(e)) # Keep print or use logging
-            QMessageBox.warning(self, self.tr("Erreur Page de Garde"), self.tr("Impossible de générer la page de garde personnalisée: {0}").format(e)); return None
+    #     try:
+    #         pdf_bytes = generate_cover_page_logic(config_dict)
+    #         base_temp_dir = self.client_info.get("base_folder_path", QDir.tempPath()); temp_cover_filename = f"cover_page_generated_{datetime.now().strftime('%Y%m%d%H%M%S%f')}.pdf"
+    #         temp_cover_path = os.path.join(base_temp_dir, temp_cover_filename)
+    #         with open(temp_cover_path, "wb") as f: f.write(pdf_bytes)
+    #         return temp_cover_path
+    #     except Exception as e:
+    #         print(self.tr("Erreur lors de la génération de la page de garde via pagedegrde: {0}").format(e)) # Keep print or use logging
+    #         QMessageBox.warning(self, self.tr("Erreur Page de Garde"), self.tr("Impossible de générer la page de garde personnalisée: {0}").format(e)); return None
 
     def offer_download_or_email(self, pdf_path):
         msg_box = QMessageBox(self); msg_box.setWindowTitle(self.tr("Compilation réussie")); msg_box.setText(self.tr("Le PDF compilé a été sauvegardé dans:\n{0}").format(pdf_path))
