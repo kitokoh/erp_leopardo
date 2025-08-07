@@ -1000,7 +1000,7 @@ if __name__ == '__main__':
     # Ensure DB is initialized (adjust path as needed)
     try:
         sys.path.append(os.path.join(os.path.dirname(__file__), '..')) # To find db package
-        from db import initialize_database
+        from db.init_schema import initialize_database
         initialize_database()
         # You might want to add a mock client here for testing
         # db.add_client({'client_id': mock_client_id, 'client_name': 'Test Client Dialog', 'created_by_user_id': mock_user_id, 'project_identifier': 'P-DIALOG'})

@@ -295,7 +295,7 @@ except ImportError:
     db_manager = None # Will be replaced by mock in __main__ if None
 
 try:
-    from db.cruds.products_crud import products_crud_instance
+    from db.cruds.products.products_crud import products_crud_instance
 except ImportError:
     print("ERROR: Failed to import 'products_crud_instance' from 'db.cruds.products_crud'. Export functionality will be affected.")
     products_crud_instance = None # Ensure it exists, even if None

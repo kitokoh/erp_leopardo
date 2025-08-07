@@ -9,29 +9,24 @@ from typing import Optional, List, Dict, Any, Union
 
 # Attempt to import ProformaInvoice model for type hinting
 try:
-    from api.models import ProformaInvoice
+    from db.models.misc.proforma_invoices import ProformaInvoice
 except ImportError:
-    logging.warning("Could not import ProformaInvoice from api.models. Type hinting will use Any.")
+    logging.warning("Could not import ProformaInvoice from db.models.misc. Type hinting will use Any.")
     ProformaInvoice = Any # Fallback type
 
 # Attempt to import from db module
 try:
     from db.connection import get_db_connection
-    from db.cruds.companies_crud import get_company_by_id as db_get_company_by_id
-    from db.cruds.company_personnel_crud import get_personnel_for_company as db_get_personnel_for_company # Corrected path
-    from db.cruds.clients_crud import get_client_by_id as db_get_client_by_id
-    from db.cruds.locations_crud import get_country_by_id as db_get_country_by_id, get_city_by_id as db_get_city_by_id # Corrected path
-    from db.cruds.contacts_crud import get_contacts_for_client as db_get_contacts_for_client
-    from db.cruds.projects_crud import get_project_by_id as db_get_project_by_id
-    from db.cruds.products_crud import get_product_by_id as db_get_product_by_id # Corrected path
-    # Assuming get_products_for_client_or_project and get_client_document_notes might be in client_project_products_crud or similar
-    # For now, let's assume they might be in a general db utility or directly in db if not found in specific cruds
-    from db import get_products_for_client_or_project as db_get_products_for_client_or_project # Placeholder if not in a specific crud
-    # from db import get_client_document_notes as db_get_client_document_notes # Placeholder - This is now in notes_crud
-    from db.cruds.notes_crud import get_effective_document_note as db_get_effective_document_note
-
-
-    from db.cruds.application_settings_crud import get_next_invoice_number
+    from db.cruds.misc.companies_crud import get_company_by_id as db_get_company_by_id
+    from db.cruds.misc.company_personnel_crud import get_personnel_for_company as db_get_personnel_for_company
+    from db.cruds.clients.clients_crud import get_client_by_id as db_get_client_by_id
+    from db.cruds.misc.locations_crud import get_country_by_id as db_get_country_by_id, get_city_by_id as db_get_city_by_id
+    from db.cruds.misc.contacts_crud import get_contacts_for_client as db_get_contacts_for_client
+    from db.cruds.projects.projects_crud import get_project_by_id as db_get_project_by_id
+    from db.cruds.products.products_crud import get_product_by_id as db_get_product_by_id
+    from db.cruds.clients.client_project_products_crud import get_products_for_client_or_project as db_get_products_for_client_or_project
+    from db.cruds.misc.notes_crud import get_effective_document_note as db_get_effective_document_note
+    from db.cruds.misc.application_settings_crud import get_next_invoice_number
 except ImportError as e:
     logging.warning(f"Could not import all dependencies from db or cruds: {e}. Using placeholder functions. Full functionality requires db modules to be correctly structured and accessible.")
     # Define placeholder functions if db.py or its functions are not found
@@ -53,7 +48,6 @@ except ImportError as e:
     # Adjusted signature for db_get_product_by_id
     def db_get_product_by_id(conn, product_id): return MockProduct(id=product_id, name=f"Mock Product {product_id}", desc="Mock Desc", lang="en", price=10.0, unit="pcs", code=f"CODE-{product_id}")
     def db_get_products_for_client_or_project(conn, client_id, project_id=None): return [] # Adjusted signature
-    # def db_get_client_document_notes(conn, client_id, document_type, language_code): return "N/A" # Adjusted signature
     def db_get_effective_document_note(conn, client_id, document_type, language_code): return "N/A" # Adjusted signature for new function
 
 
@@ -632,7 +626,7 @@ def get_proforma_invoice_context_data(
         # --- Client Specific Notes (remains same) ---
         doc_notes_type = additional_context.get("client_document_notes_type", "Proforma")
         if client_id:
-            notes_text = db_get_client_document_notes(db_conn, client_id, doc_notes_type, target_language_code)
+            notes_text = db_get_effective_document_note(db_conn, client_id, doc_notes_type, target_language_code)
             doc_ctx["client_specific_footer_notes"] = notes_text.replace('\n', '<br>') if notes_text and isinstance(notes_text, str) else ""
         else:
             doc_ctx["client_specific_footer_notes"] = ""
@@ -810,12 +804,12 @@ def get_final_invoice_context_data(
 
         # --- Invoice Number ---
         # Pass db_conn to get_next_invoice_number
-        doc_ctx["invoice_number"] = additional_context.get("invoice_number") or get_next_invoice_number(conn=db_conn)
+        doc_ctx["invoice_number"] = additional_context.get("invoice_number") or get_next_invoice_number(db_conn)
 
 
         # --- Seller Data (largely reused from proforma) ---
         seller_ctx = context["seller"]
-        seller_company_data = get_company_by_id(db_conn, company_id) if company_id else None # Use db_conn
+        seller_company_data = db_get_company_by_id(db_conn, company_id) if company_id else None # Use db_conn
         if seller_company_data:
             seller_ctx["id"] = seller_company_data.id
             seller_ctx["company_name"] = seller_company_data.name or "N/A"
@@ -859,7 +853,7 @@ def get_final_invoice_context_data(
 
         # --- Client Data (largely reused) ---
         client_ctx = context["client"]
-        client_data = get_client_by_id(db_conn, client_id) if client_id else None # Use db_conn
+        client_data = db_get_client_by_id(db_conn, client_id) if client_id else None # Use db_conn
         if client_data:
             client_ctx["id"] = client_data.id
             client_ctx["company_name"] = client_data.company_name or "N/A"
@@ -868,20 +862,20 @@ def get_final_invoice_context_data(
             client_dist_info_json = _parse_json_field(client_data.distributor_specific_info)
             client_ctx["vat_id"] = client_dist_info_json.get("vat_id", additional_context.get("client_vat_id", "N/A"))
 
-            primary_contacts = get_contacts_for_client(db_conn, client_id, is_primary=True) # Use db_conn
+            primary_contacts = db_get_contacts_for_client(db_conn, client_id, is_primary=True) # Use db_conn
             primary_contact = primary_contacts[0] if primary_contacts else None
 
             if primary_contact:
                 client_ctx["representative_name"] = f"{primary_contact.first_name or ''} {primary_contact.last_name or ''}".strip() or client_ctx["representative_name"]
                 client_ctx["address_line1"] = primary_contact.address_streetAddress or "N/A"
-                client_ctx["city"] = primary_contact.address_city or (get_city_by_id(db_conn, client_data.city_id).name if client_data.city_id else "N/A") # Use db_conn
+                client_ctx["city"] = primary_contact.address_city or (db_get_city_by_id(db_conn, client_data.city_id).name if client_data.city_id else "N/A") # Use db_conn
                 client_ctx["postal_code"] = primary_contact.address_postalCode or "N/A"
-                client_ctx["country"] = primary_contact.address_country or (get_country_by_id(db_conn, client_data.country_id).name if client_data.country_id else "N/A") # Use db_conn
+                client_ctx["country"] = primary_contact.address_country or (db_get_country_by_id(db_conn, client_data.country_id).name if client_data.country_id else "N/A") # Use db_conn
             else:
                 client_ctx["address_line1"] = additional_context.get("client_address_line1", "N/A")
-                client_ctx["city"] = (get_city_by_id(db_conn, client_data.city_id).name if client_data.city_id else None) or additional_context.get("client_city", "N/A") # Use db_conn
+                client_ctx["city"] = (db_get_city_by_id(db_conn, client_data.city_id).name if client_data.city_id else None) or additional_context.get("client_city", "N/A") # Use db_conn
                 client_ctx["postal_code"] = additional_context.get("client_postal_code", "N/A")
-                client_ctx["country"] = (get_country_by_id(db_conn, client_data.country_id).name if client_data.country_id else None) or additional_context.get("client_country", "N/A") # Use db_conn
+                client_ctx["country"] = (db_get_country_by_id(db_conn, client_data.country_id).name if client_data.country_id else None) or additional_context.get("client_country", "N/A") # Use db_conn
 
             client_ctx["address"] = _format_address_parts(client_ctx["address_line1"], client_ctx["city"], client_ctx["postal_code"], client_ctx["country"])
             client_ctx["city_zip_country"] = _format_address_parts(None, client_ctx["city"], client_ctx["postal_code"], client_ctx["country"])
@@ -892,7 +886,7 @@ def get_final_invoice_context_data(
         # --- Project Data (largely reused) ---
         project_ctx = context["project"]
         if project_id:
-            project_data = get_project_by_id(db_conn, project_id) # Use db_conn
+            project_data = db_get_project_by_id(db_conn, project_id) # Use db_conn
             if project_data:
                 project_ctx["id"] = project_data.id
                 project_ctx["name"] = project_data.name or "N/A"
