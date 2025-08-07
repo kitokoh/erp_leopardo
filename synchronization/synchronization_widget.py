@@ -3,7 +3,7 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QGroupBox, QFormLayout, QLineEdit, QLabel, QProgressBar, QComboBox, QSplitter
 from PyQt5.QtCore import Qt
 from .next_erp_client import NextERPClient
-from db.cruds.products.products_crud import products_crud
+from db.cruds.products.products_crud import products_crud_instance
 import db as db_manager
 import json
 

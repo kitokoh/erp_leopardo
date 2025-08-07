@@ -8,34 +8,34 @@ from .context_builder import get_document_context
 
 # Assuming pagedegrde.py is in the parent directory of document_generator package
 # Adjust import path if pagedegrde.py is located elsewhere.
-try:
-    from ..pagedegrde import generate_cover_page_logic, APP_CONFIG as PAGEDEGARDE_APP_CONFIG, _register_fonts
-    # If _register_fonts needs APP_ROOT_DIR and it's defined in pagedegrde:
-    # from ..pagedegrde import APP_ROOT_DIR as PAGEDEGARDE_APP_ROOT_DIR
-    PAGEDEGARDE_APP_ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..')) # Define if not from pagedegrde
-except ImportError:
-    logging.warning(
-        "Failed to import 'pagedegrde' module from parent directory. "
-        "Cover page generation will likely fail. "
-        "Attempting direct import for standalone testing or alternative structures."
-    )
-    try:
-        # Fallback for direct execution or if pagedegrde is in PYTHONPATH
-        import pagedegrde
-        generate_cover_page_logic = pagedegrde.generate_cover_page_logic
-        PAGEDEGARDE_APP_CONFIG = pagedegrde.APP_CONFIG
-        _register_fonts = pagedegrde._register_fonts
-        # PAGEDEGARDE_APP_ROOT_DIR = pagedegrde.APP_ROOT_DIR
-        PAGEDEGARDE_APP_ROOT_DIR = os.getcwd() # Define if not from pagedegrde
-    except ImportError as e:
-        logging.error(f"Failed to import 'pagedegrde' directly: {e}. Cover page functionality is unavailable.")
-        # Define dummy functions/vars if import fails, to allow module to load
-        def generate_cover_page_logic(config_dict):
-            raise NotImplementedError("pagedegrde.generate_cover_page_logic not imported")
-        PAGEDEGARDE_APP_CONFIG = {}
-        def _register_fonts(app_root_dir=None):
-            logging.info("pagedegrde._register_fonts not imported - skipping font registration.")
-        PAGEDEGARDE_APP_ROOT_DIR = os.getcwd()
+# try:
+#     from ..pagedegrde import generate_cover_page_logic, APP_CONFIG as PAGEDEGARDE_APP_CONFIG, _register_fonts
+#     # If _register_fonts needs APP_ROOT_DIR and it's defined in pagedegrde:
+#     # from ..pagedegrde import APP_ROOT_DIR as PAGEDEGARDE_APP_ROOT_DIR
+#     PAGEDEGARDE_APP_ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..')) # Define if not from pagedegrde
+# except ImportError:
+#     logging.warning(
+#         "Failed to import 'pagedegrde' module from parent directory. "
+#         "Cover page generation will likely fail. "
+#         "Attempting direct import for standalone testing or alternative structures."
+#     )
+#     try:
+#         # Fallback for direct execution or if pagedegrde is in PYTHONPATH
+#         import pagedegrde
+#         generate_cover_page_logic = pagedegrde.generate_cover_page_logic
+#         PAGEDEGARDE_APP_CONFIG = pagedegrde.APP_CONFIG
+#         _register_fonts = pagedegrde._register_fonts
+#         # PAGEDEGARDE_APP_ROOT_DIR = pagedegrde.APP_ROOT_DIR
+#         PAGEDEGARDE_APP_ROOT_DIR = os.getcwd() # Define if not from pagedegrde
+#     except ImportError as e:
+#         logging.error(f"Failed to import 'pagedegrde' directly: {e}. Cover page functionality is unavailable.")
+#         # Define dummy functions/vars if import fails, to allow module to load
+#         def generate_cover_page_logic(config_dict):
+#             raise NotImplementedError("pagedegrde.generate_cover_page_logic not imported")
+#         PAGEDEGARDE_APP_CONFIG = {}
+#         def _register_fonts(app_root_dir=None):
+#             logging.info("pagedegrde._register_fonts not imported - skipping font registration.")
+#         PAGEDEGARDE_APP_ROOT_DIR = os.getcwd()
 
 
 # Setup logging
@@ -54,177 +54,177 @@ except Exception as e:
     logger.error(f"Error during initial font registration for pagedegrde: {e}", exc_info=True)
 
 
-def generate_cover_page_pdf(
-    client_id: int,
-    company_id: int, # Seller company ID
-    language_code: str,
-    output_pdf_path: str,
-    project_id: int = None,
-    document_type_for_context: str = None, # e.g., "Proforma Invoice", "Technical Proposal"
-    additional_context_overrides: dict = None, # For overriding specific config_dict fields
-    db_conn=None
-) -> bool:
-    """
-    Generates a PDF cover page using ReportLab logic via pagedegrde module.
+# def generate_cover_page_pdf(
+#     client_id: int,
+#     company_id: int, # Seller company ID
+#     language_code: str,
+#     output_pdf_path: str,
+#     project_id: int = None,
+#     document_type_for_context: str = None, # e.g., "Proforma Invoice", "Technical Proposal"
+#     additional_context_overrides: dict = None, # For overriding specific config_dict fields
+#     db_conn=None
+# ) -> bool:
+#     """
+#     Generates a PDF cover page using ReportLab logic via pagedegrde module.
 
-    Args:
-        client_id: ID of the client.
-        company_id: ID of the seller company.
-        language_code: Language code.
-        output_pdf_path: Path to save the generated PDF.
-        project_id: Optional ID of the project.
-        document_type_for_context: Optional type of document for context fetching.
-        additional_context_overrides: Optional dict to override/add to pagedegrde config.
-        db_conn: Optional existing database connection.
+#     Args:
+#         client_id: ID of the client.
+#         company_id: ID of the seller company.
+#         language_code: Language code.
+#         output_pdf_path: Path to save the generated PDF.
+#         project_id: Optional ID of the project.
+#         document_type_for_context: Optional type of document for context fetching.
+#         additional_context_overrides: Optional dict to override/add to pagedegrde config.
+#         db_conn: Optional existing database connection.
 
-    Returns:
-        True on success, False on failure.
-    """
-    if additional_context_overrides is None:
-        additional_context_overrides = {}
+#     Returns:
+#         True on success, False on failure.
+#     """
+#     if additional_context_overrides is None:
+#         additional_context_overrides = {}
 
-    logger.info(f"Generating PDF cover page: client_id={client_id}, company_id={company_id}, "
-                f"output='{os.path.basename(output_pdf_path)}', lang='{language_code}'")
+#     logger.info(f"Generating PDF cover page: client_id={client_id}, company_id={company_id}, "
+#                 f"output='{os.path.basename(output_pdf_path)}', lang='{language_code}'")
 
-    try:
-        # 1. Fetch document context
-        # Pass document_type for context if provided, otherwise it's None
-        context = get_document_context(
-            client_id=client_id,
-            company_id=company_id,
-            language_code=language_code,
-            project_id=project_id,
-            document_type=document_type_for_context,
-            additional_data=additional_context_overrides.get("context_builder_data", {}), # For data to context_builder
-            db_conn=db_conn
-        )
-        if not context:
-            logger.error("Failed to retrieve document context for cover page.")
-            return False
+#     try:
+#         # 1. Fetch document context
+#         # Pass document_type for context if provided, otherwise it's None
+#         context = get_document_context(
+#             client_id=client_id,
+#             company_id=company_id,
+#             language_code=language_code,
+#             project_id=project_id,
+#             document_type=document_type_for_context,
+#             additional_data=additional_context_overrides.get("context_builder_data", {}), # For data to context_builder
+#             db_conn=db_conn
+#         )
+#         if not context:
+#             logger.error("Failed to retrieve document context for cover page.")
+#             return False
 
-        # 2. Construct config_dict for pagedegrde.generate_cover_page_logic
-        # Start with defaults from pagedegrde.APP_CONFIG or define local defaults
-        config_dict = {
-            'output_path': output_pdf_path, # pagedegrde might use this or return bytes
-            'title': "Document Title",
-            'subtitle': "", # e.g., Project Name
-            'author': "",   # e.g., Client Company Name or Seller Name
-            'institution': "", # e.g., Seller Company Name
-            'department': "", # Could be derived or fixed
-            'version': "1.0",
-            'date': datetime.date.today().strftime("%d/%m/%Y"),
-            'logo_data': None, # Bytes of the logo
-            'logo_width': None, # Optional: Inches, e.g., 1.5*inch
-            'logo_height': None, # Optional: Inches
-            'template_style': 'Moderne', # Default style from pagedegrde
-            'language': language_code,
-            # Add any other fields expected by pagedegrde.generate_cover_page_logic
-        }
+#         # 2. Construct config_dict for pagedegrde.generate_cover_page_logic
+#         # Start with defaults from pagedegrde.APP_CONFIG or define local defaults
+#         config_dict = {
+#             'output_path': output_pdf_path, # pagedegrde might use this or return bytes
+#             'title': "Document Title",
+#             'subtitle': "", # e.g., Project Name
+#             'author': "",   # e.g., Client Company Name or Seller Name
+#             'institution': "", # e.g., Seller Company Name
+#             'department': "", # Could be derived or fixed
+#             'version': "1.0",
+#             'date': datetime.date.today().strftime("%d/%m/%Y"),
+#             'logo_data': None, # Bytes of the logo
+#             'logo_width': None, # Optional: Inches, e.g., 1.5*inch
+#             'logo_height': None, # Optional: Inches
+#             'template_style': 'Moderne', # Default style from pagedegrde
+#             'language': language_code,
+#             # Add any other fields expected by pagedegrde.generate_cover_page_logic
+#         }
 
-        # Merge defaults from pagedegrde.APP_CONFIG if they exist for cover pages
-        if PAGEDEGARDE_APP_CONFIG and 'cover_page_defaults' in PAGEDEGARDE_APP_CONFIG:
-            config_dict.update(PAGEDEGARDE_APP_CONFIG['cover_page_defaults'])
+#         # Merge defaults from pagedegrde.APP_CONFIG if they exist for cover pages
+#         if PAGEDEGARDE_APP_CONFIG and 'cover_page_defaults' in PAGEDEGARDE_APP_CONFIG:
+#             config_dict.update(PAGEDEGARDE_APP_CONFIG['cover_page_defaults'])
 
-        # Map from context to config_dict
-        # Title:
-        if context.get("project") and context["project"].get("name"):
-            default_title = f"Report for Project: {context['project']['name']}"
-        elif document_type_for_context:
-            default_title = str(document_type_for_context)
-        else:
-            default_title = "Project Document"
-        config_dict['title'] = context.get("doc", {}).get("document_title", default_title) # If you add 'document_title' to context
+#         # Map from context to config_dict
+#         # Title:
+#         if context.get("project") and context["project"].get("name"):
+#             default_title = f"Report for Project: {context['project']['name']}"
+#         elif document_type_for_context:
+#             default_title = str(document_type_for_context)
+#         else:
+#             default_title = "Project Document"
+#         config_dict['title'] = context.get("doc", {}).get("document_title", default_title) # If you add 'document_title' to context
 
-        # Subtitle:
-        if context.get("project") and context["project"].get("identifier"):
-             config_dict['subtitle'] = f"Ref: {context['project']['identifier']}"
-        elif context.get("client") and context["client"].get("company_name"):
-            config_dict['subtitle'] = context["client"]["company_name"]
+#         # Subtitle:
+#         if context.get("project") and context["project"].get("identifier"):
+#              config_dict['subtitle'] = f"Ref: {context['project']['identifier']}"
+#         elif context.get("client") and context["client"].get("company_name"):
+#             config_dict['subtitle'] = context["client"]["company_name"]
 
-        # Author:
-        if context.get("client") and context["client"].get("company_name"):
-            config_dict['author'] = context["client"]["company_name"]
-        elif context.get("client") and context["client"].get("name"):
-            config_dict['author'] = context["client"]["name"]
+#         # Author:
+#         if context.get("client") and context["client"].get("company_name"):
+#             config_dict['author'] = context["client"]["company_name"]
+#         elif context.get("client") and context["client"].get("name"):
+#             config_dict['author'] = context["client"]["name"]
 
-        # Institution (typically the seller/provider):
-        if context.get("seller") and context["seller"].get("name"):
-            config_dict['institution'] = context["seller"]["name"]
+#         # Institution (typically the seller/provider):
+#         if context.get("seller") and context["seller"].get("name"):
+#             config_dict['institution'] = context["seller"]["name"]
 
-        # Date:
-        config_dict['date'] = context.get("doc", {}).get("current_date_formatted", config_dict['date']) # if specific format needed
+#         # Date:
+#         config_dict['date'] = context.get("doc", {}).get("current_date_formatted", config_dict['date']) # if specific format needed
 
-        # Logo data:
-        logo_data_bytes = None
-        seller_logo_path = context.get("seller", {}).get("logo_path") # This should be file:///path from context_builder
+#         # Logo data:
+#         logo_data_bytes = None
+#         seller_logo_path = context.get("seller", {}).get("logo_path") # This should be file:///path from context_builder
 
-        if seller_logo_path and seller_logo_path.startswith("file:///"):
-            actual_logo_path = seller_logo_path[len("file:///"):]
-            if os.path.exists(actual_logo_path):
-                try:
-                    with open(actual_logo_path, 'rb') as f:
-                        logo_data_bytes = f.read()
-                    logger.info(f"Loaded logo from seller context: {actual_logo_path}")
-                except Exception as e:
-                    logger.error(f"Error reading logo file {actual_logo_path}: {e}")
-            else:
-                logger.warning(f"Logo path from seller context does not exist: {actual_logo_path}")
+#         if seller_logo_path and seller_logo_path.startswith("file:///"):
+#             actual_logo_path = seller_logo_path[len("file:///"):]
+#             if os.path.exists(actual_logo_path):
+#                 try:
+#                     with open(actual_logo_path, 'rb') as f:
+#                         logo_data_bytes = f.read()
+#                     logger.info(f"Loaded logo from seller context: {actual_logo_path}")
+#                 except Exception as e:
+#                     logger.error(f"Error reading logo file {actual_logo_path}: {e}")
+#             else:
+#                 logger.warning(f"Logo path from seller context does not exist: {actual_logo_path}")
 
-        config_dict['logo_data'] = logo_data_bytes
+#         config_dict['logo_data'] = logo_data_bytes
 
-        # Apply overrides from additional_context_overrides last
-        # These are direct overrides for the pagedegrde config_dict
-        if additional_context_overrides:
-            # Ensure 'context_builder_data' (if used) is not directly merged into config_dict
-            pagedegrde_overrides = {k: v for k, v in additional_context_overrides.items() if k != "context_builder_data"}
-            config_dict.update(pagedegrde_overrides)
+#         # Apply overrides from additional_context_overrides last
+#         # These are direct overrides for the pagedegrde config_dict
+#         if additional_context_overrides:
+#             # Ensure 'context_builder_data' (if used) is not directly merged into config_dict
+#             pagedegrde_overrides = {k: v for k, v in additional_context_overrides.items() if k != "context_builder_data"}
+#             config_dict.update(pagedegrde_overrides)
 
-        # Ensure output_pdf_path is in the config_dict for pagedegrde if it saves the file directly
-        config_dict['output_path'] = output_pdf_path # pagedegrde might use this or return bytes
+#         # Ensure output_pdf_path is in the config_dict for pagedegrde if it saves the file directly
+#         config_dict['output_path'] = output_pdf_path # pagedegrde might use this or return bytes
 
-        # 3. Call pagedegrde.generate_cover_page_logic
-        # This function is expected to generate the PDF and either save it to
-        # config_dict['output_path'] or return the PDF bytes.
-        # For this example, let's assume it saves the file if output_path is given,
-        # or returns bytes if output_path is None/not present.
+#         # 3. Call pagedegrde.generate_cover_page_logic
+#         # This function is expected to generate the PDF and either save it to
+#         # config_dict['output_path'] or return the PDF bytes.
+#         # For this example, let's assume it saves the file if output_path is given,
+#         # or returns bytes if output_path is None/not present.
 
-        logger.debug(f"Calling generate_cover_page_logic with config: {config_dict}")
-        pdf_output = generate_cover_page_logic(config_dict) # This might return bytes or status
+#         logger.debug(f"Calling generate_cover_page_logic with config: {config_dict}")
+#         pdf_output = generate_cover_page_logic(config_dict) # This might return bytes or status
 
-        # 4. Save PDF (if generate_cover_page_logic returns bytes)
-        # If generate_cover_page_logic saves the file itself based on 'output_path' in config_dict,
-        # then this step might not be needed or pdf_output might be a success boolean.
+#         # 4. Save PDF (if generate_cover_page_logic returns bytes)
+#         # If generate_cover_page_logic saves the file itself based on 'output_path' in config_dict,
+#         # then this step might not be needed or pdf_output might be a success boolean.
 
-        saved_successfully = False
-        if isinstance(pdf_output, bytes):
-            output_dir = os.path.dirname(output_pdf_path)
-            if output_dir and not os.path.exists(output_dir):
-                os.makedirs(output_dir, exist_ok=True)
-            with open(output_pdf_path, 'wb') as f:
-                f.write(pdf_output)
-            logger.info(f"PDF cover page generated and saved to: {output_pdf_path}")
-            saved_successfully = True
-        elif isinstance(pdf_output, bool) and pdf_output: # Assuming it returns True if saved internally
-            logger.info(f"PDF cover page generated and saved by pagedegrde to: {output_pdf_path}")
-            saved_successfully = True
-        elif os.path.exists(output_pdf_path): # Check if pagedegrde saved it
-             logger.info(f"PDF cover page seems to be generated by pagedegrde at: {output_pdf_path}")
-             saved_successfully = True
-        else:
-            logger.error("generate_cover_page_logic did not return PDF bytes nor indicate success.")
-            return False
+#         saved_successfully = False
+#         if isinstance(pdf_output, bytes):
+#             output_dir = os.path.dirname(output_pdf_path)
+#             if output_dir and not os.path.exists(output_dir):
+#                 os.makedirs(output_dir, exist_ok=True)
+#             with open(output_pdf_path, 'wb') as f:
+#                 f.write(pdf_output)
+#             logger.info(f"PDF cover page generated and saved to: {output_pdf_path}")
+#             saved_successfully = True
+#         elif isinstance(pdf_output, bool) and pdf_output: # Assuming it returns True if saved internally
+#             logger.info(f"PDF cover page generated and saved by pagedegrde to: {output_pdf_path}")
+#             saved_successfully = True
+#         elif os.path.exists(output_pdf_path): # Check if pagedegrde saved it
+#              logger.info(f"PDF cover page seems to be generated by pagedegrde at: {output_pdf_path}")
+#              saved_successfully = True
+#         else:
+#             logger.error("generate_cover_page_logic did not return PDF bytes nor indicate success.")
+#             return False
 
-        return saved_successfully
+#         return saved_successfully
 
-    except FileNotFoundError as e: # e.g. if logo file specified in overrides is not found
-        logger.error(f"File not found during cover page generation: {e}", exc_info=True)
-        return False
-    except NotImplementedError: # If pagedegrde itself is not implemented
-        logger.error("Cover page generation failed: pagedegrde functionality is not available.", exc_info=True)
-        return False
-    except Exception as e:
-        logger.error(f"Error generating PDF cover page: {e}", exc_info=True)
-        return False
+#     except FileNotFoundError as e: # e.g. if logo file specified in overrides is not found
+#         logger.error(f"File not found during cover page generation: {e}", exc_info=True)
+#         return False
+#     except NotImplementedError: # If pagedegrde itself is not implemented
+#         logger.error("Cover page generation failed: pagedegrde functionality is not available.", exc_info=True)
+#         return False
+#     except Exception as e:
+#         logger.error(f"Error generating PDF cover page: {e}", exc_info=True)
+#         return False
 
 
 if __name__ == '__main__':

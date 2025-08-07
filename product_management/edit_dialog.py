@@ -11,7 +11,7 @@ from PyQt5.QtGui import QPixmap, QIcon
 # Assuming db.cruds is accessible. Adjust import path if necessary.
 # Example: from ..db.cruds import products_crud, product_media_links_crud
 # For this subtask, direct import if files are in expected locations.
-from db.cruds import products_crud
+from db.cruds.products.products_crud import products_crud_instance as products_crud
 from db.cruds import product_media_links_crud
 from media_manager import operations as media_ops
 from db.cruds.users.users_crud import get_user_by_username

@@ -88,17 +88,9 @@ from .dialogs import (
 
 # The following imports need to be checked for correct relative paths
 # Assuming 'dialogs' at the root level is a sibling to 'project_management'
-try:
-    from ..dialogs import ManageProductMasterDialog, ProductEquivalencyDialog
-    # AddEditMilestoneDialog is used in _handle_add_milestone, etc.
-    # Assuming it's also in the root 'dialogs' directory.
-    from ..dialogs import AddEditMilestoneDialog
-except ImportError:
-    # Fallback for standalone execution if dashboard.py is run directly for testing
-    # This assumes 'dialogs' and 'dashboard_extensions' are in the same directory as dashboard.py
-    # This part might be removed if standalone testing is handled differently
-    print("Attempting fallback imports for ..dialogs and ..dashboard_extensions")
-    from dialogs import ManageProductMasterDialog, ProductEquivalencyDialog, AddEditMilestoneDialog
+from gui.dialogs.manage_product_master_dialog import ManageProductMasterDialog
+from gui.dialogs.product_equivalency_dialog import ProductEquivalencyDialog
+from gui.dialogs.add_edit_milestone_dialog import AddEditMilestoneDialog
 
 
 try:

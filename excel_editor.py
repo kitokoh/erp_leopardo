@@ -22,19 +22,19 @@ from openpyxl.utils.exceptions import InvalidFileException, ReadOnlyWorkbookExce
 import zipfile
 from openpyxl.worksheet.page import PageMargins
 
-# PDF export
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib import colors
+# # PDF export
+# from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+# from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+# from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape, letter
 from reportlab.lib.units import cm, inch, mm
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
+# from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
+# from reportlab.pdfbase import pdfmetrics
+# from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
-from reportlab.platypus.flowables import Flowable
-import io # Added for BytesIO
-from reportlab.lib.utils import ImageReader # Added for header/footer images
+# from reportlab.platypus.flowables import Flowable
+# import io # Added for BytesIO
+# from reportlab.lib.utils import ImageReader # Added for header/footer images
 
 # Qt GUI
 from PyQt5.QtWidgets import (
@@ -68,9 +68,9 @@ DEFAULT_FONT_NAME = "Arial" # This is for Excel cell style, not PDF
 MAX_ROWS_PREVIEW = 5000
 MAX_COLS_PREVIEW = 100
 PDF_DPI = 300
-PDF_PAGE_MARGINS = 15 * mm
-PDF_HEADER_HEIGHT = 15 * mm
-PDF_FOOTER_HEIGHT = 10 * mm
+PDF_PAGE_MARGINS = 15
+PDF_HEADER_HEIGHT = 15
+PDF_FOOTER_HEIGHT = 10
 
 @dataclass
 class ExcelCellStyle:
@@ -482,270 +482,270 @@ class ExcelTableWidget(QTableWidget):
         for c_idx in sc: self.removeColumn(c_idx)
 # --- End of ExcelTableWidget ---
 
-class PDFGenerator:
-    """Handles high-quality PDF export with modern styling"""
+# class PDFGenerator:
+#     """Handles high-quality PDF export with modern styling"""
     
-    def __init__(self, table: ExcelTableWidget, client_data: ClientData, settings: PDFExportSettings,
-                 current_sheet_title: str, sheet_images_data: Dict[str, List],
-                 sheet_headers_footers_data: Dict[str, Dict[str, Dict[str, Dict[str, Optional[str]]]]]):
-        self.table = table
-        self.client_data = client_data
-        self.settings = settings
-        self.current_sheet_title = current_sheet_title
-        self.sheet_images_data = sheet_images_data
-        self.sheet_hf_data = sheet_headers_footers_data
-        self.styles = getSampleStyleSheet()
+#     def __init__(self, table: ExcelTableWidget, client_data: ClientData, settings: PDFExportSettings,
+#                  current_sheet_title: str, sheet_images_data: Dict[str, List],
+#                  sheet_headers_footers_data: Dict[str, Dict[str, Dict[str, Dict[str, Optional[str]]]]]):
+#         self.table = table
+#         self.client_data = client_data
+#         self.settings = settings
+#         self.current_sheet_title = current_sheet_title
+#         self.sheet_images_data = sheet_images_data
+#         self.sheet_hf_data = sheet_headers_footers_data
+#         self.styles = getSampleStyleSheet()
         
-        self.register_fonts()
-        self.create_styles()
+#         self.register_fonts()
+#         self.create_styles()
     
-    def register_fonts(self):
-        try:
-            pdfmetrics.registerFont(TTFont('Arial', 'arial.ttf'))
-            pdfmetrics.registerFont(TTFont('Arial-Bold', 'arialbd.ttf'))
-            pdfmetrics.registerFont(TTFont('Arial-Italic', 'ariali.ttf'))
-            pdfmetrics.registerFont(TTFont('Arial-BoldItalic', 'arialbi.ttf'))
-        except: pass
+#     def register_fonts(self):
+#         try:
+#             pdfmetrics.registerFont(TTFont('Arial', 'arial.ttf'))
+#             pdfmetrics.registerFont(TTFont('Arial-Bold', 'arialbd.ttf'))
+#             pdfmetrics.registerFont(TTFont('Arial-Italic', 'ariali.ttf'))
+#             pdfmetrics.registerFont(TTFont('Arial-BoldItalic', 'arialbi.ttf'))
+#         except: pass
     
-    def create_styles(self):
-        self.title_style = ParagraphStyle('Title', parent=self.styles['Heading1'], fontName='Helvetica-Bold', fontSize=16, leading=18, spaceAfter=12, alignment=TA_CENTER, textColor=colors.HexColor('#2c3e50'))
-        self.client_style = ParagraphStyle('Client', parent=self.styles['BodyText'], fontName='Helvetica', fontSize=10, leading=12, spaceAfter=6, textColor=colors.HexColor('#34495e'))
-        self.table_header_style = ParagraphStyle('TableHeader', parent=self.styles['BodyText'], fontName='Helvetica-Bold', fontSize=9, leading=10, alignment=TA_CENTER, textColor=colors.white, backColor=colors.HexColor('#3498db'))
-        self.table_cell_style = ParagraphStyle('TableCell', parent=self.styles['BodyText'], fontName='Helvetica', fontSize=8, leading=9, textColor=colors.black)
-        self.footer_style = ParagraphStyle('Footer', parent=self.styles['BodyText'], fontName='Helvetica', fontSize=8, leading=9, alignment=TA_CENTER, textColor=colors.HexColor('#7f8c8d'))
+#     def create_styles(self):
+#         self.title_style = ParagraphStyle('Title', parent=self.styles['Heading1'], fontName='Helvetica-Bold', fontSize=16, leading=18, spaceAfter=12, alignment=TA_CENTER, textColor=colors.HexColor('#2c3e50'))
+#         self.client_style = ParagraphStyle('Client', parent=self.styles['BodyText'], fontName='Helvetica', fontSize=10, leading=12, spaceAfter=6, textColor=colors.HexColor('#34495e'))
+#         self.table_header_style = ParagraphStyle('TableHeader', parent=self.styles['BodyText'], fontName='Helvetica-Bold', fontSize=9, leading=10, alignment=TA_CENTER, textColor=colors.white, backColor=colors.HexColor('#3498db'))
+#         self.table_cell_style = ParagraphStyle('TableCell', parent=self.styles['BodyText'], fontName='Helvetica', fontSize=8, leading=9, textColor=colors.black)
+#         self.footer_style = ParagraphStyle('Footer', parent=self.styles['BodyText'], fontName='Helvetica', fontSize=8, leading=9, alignment=TA_CENTER, textColor=colors.HexColor('#7f8c8d'))
     
-    def generate(self, file_path: str) -> Tuple[bool, str]:
-        try:
-            doc = SimpleDocTemplate(file_path, pagesize=self.settings.page_size, leftMargin=self.settings.margins[0], rightMargin=self.settings.margins[1], topMargin=self.settings.margins[2], bottomMargin=self.settings.margins[3])
-            elements = []
-            has_excel_header, has_excel_footer = False, False
-            if self.current_sheet_title and self.current_sheet_title in self.sheet_hf_data:
-                sheet_hf = self.sheet_hf_data[self.current_sheet_title]
-                if any(k in sheet_hf for k in ['odd_header', 'even_header', 'first_header']): has_excel_header = True
-                if any(k in sheet_hf for k in ['odd_footer', 'even_footer', 'first_footer']): has_excel_footer = True
+#     def generate(self, file_path: str) -> Tuple[bool, str]:
+#         try:
+#             doc = SimpleDocTemplate(file_path, pagesize=self.settings.page_size, leftMargin=self.settings.margins[0], rightMargin=self.settings.margins[1], topMargin=self.settings.margins[2], bottomMargin=self.settings.margins[3])
+#             elements = []
+#             has_excel_header, has_excel_footer = False, False
+#             if self.current_sheet_title and self.current_sheet_title in self.sheet_hf_data:
+#                 sheet_hf = self.sheet_hf_data[self.current_sheet_title]
+#                 if any(k in sheet_hf for k in ['odd_header', 'even_header', 'first_header']): has_excel_header = True
+#                 if any(k in sheet_hf for k in ['odd_footer', 'even_footer', 'first_footer']): has_excel_footer = True
             
-            if self.settings.header and not has_excel_header: elements.extend(self.create_header())
-            elements.append(Paragraph(f"<u>Devis {self.client_data.project_id}</u>" if self.client_data.project_id else "<u>Devis</u>", self.title_style))
-            elements.append(Spacer(1, 12))
-            elements.extend(self.create_client_info())
-            elements.append(Spacer(1, 15))
+#             if self.settings.header and not has_excel_header: elements.extend(self.create_header())
+#             elements.append(Paragraph(f"<u>Devis {self.client_data.project_id}</u>" if self.client_data.project_id else "<u>Devis</u>", self.title_style))
+#             elements.append(Spacer(1, 12))
+#             elements.extend(self.create_client_info())
+#             elements.append(Spacer(1, 15))
 
-            if self.current_sheet_title and self.current_sheet_title in self.sheet_images_data:
-                images_on_sheet = self.sheet_images_data[self.current_sheet_title]
-                if images_on_sheet:
-                    heading_style_name = 'Heading3' if 'Heading3' in self.styles else 'h3'
-                    elements.append(Paragraph("<u>Sheet Images:</u>", self.styles[heading_style_name]))
-                    elements.append(Spacer(1, 0.1*inch))
-                    for i, img_obj in enumerate(images_on_sheet):
-                        try:
-                            img_data = img_obj._data() # Corrected from .data()
-                            img_flowable = Image(io.BytesIO(img_data))
-                            img_flowable.drawWidth = 2 * inch
-                            img_flowable.drawHeight = (img_flowable.imageHeight / img_flowable.imageWidth) * (2 * inch) if img_flowable.imageWidth else 1 * inch
-                            img_flowable.preserveAspectRatio = True
-                            elements.append(img_flowable)
-                            elements.append(Spacer(1, 0.1*inch))
-                            logger.info(f"Added image {i+1} (Type: {type(img_obj)}) from sheet '{self.current_sheet_title}' to PDF.")
-                        except Exception as e: logger.error(f"Could not process image from sheet '{self.current_sheet_title}': {e}")
-                    elements.append(Spacer(1, 0.2*inch))
+#             if self.current_sheet_title and self.current_sheet_title in self.sheet_images_data:
+#                 images_on_sheet = self.sheet_images_data[self.current_sheet_title]
+#                 if images_on_sheet:
+#                     heading_style_name = 'Heading3' if 'Heading3' in self.styles else 'h3'
+#                     elements.append(Paragraph("<u>Sheet Images:</u>", self.styles[heading_style_name]))
+#                     elements.append(Spacer(1, 0.1*inch))
+#                     for i, img_obj in enumerate(images_on_sheet):
+#                         try:
+#                             img_data = img_obj._data() # Corrected from .data()
+#                             img_flowable = Image(io.BytesIO(img_data))
+#                             img_flowable.drawWidth = 2 * inch
+#                             img_flowable.drawHeight = (img_flowable.imageHeight / img_flowable.imageWidth) * (2 * inch) if img_flowable.imageWidth else 1 * inch
+#                             img_flowable.preserveAspectRatio = True
+#                             elements.append(img_flowable)
+#                             elements.append(Spacer(1, 0.1*inch))
+#                             logger.info(f"Added image {i+1} (Type: {type(img_obj)}) from sheet '{self.current_sheet_title}' to PDF.")
+#                         except Exception as e: logger.error(f"Could not process image from sheet '{self.current_sheet_title}': {e}")
+#                     elements.append(Spacer(1, 0.2*inch))
             
-            table_data, col_widths = self.prepare_table_data()
-            if table_data:
-                main_table = Table(table_data, colWidths=col_widths, repeatRows=1 if self.settings.repeat_headers else 0)
-                main_table.setStyle(self.create_table_style(len(table_data), len(table_data[0])))
-                elements.append(main_table)
-            else:
-                logger.warning(f"No table data for sheet '{self.current_sheet_title}'.")
-                if not elements: return False, f"No content for sheet '{self.current_sheet_title}'"
+#             table_data, col_widths = self.prepare_table_data()
+#             if table_data:
+#                 main_table = Table(table_data, colWidths=col_widths, repeatRows=1 if self.settings.repeat_headers else 0)
+#                 main_table.setStyle(self.create_table_style(len(table_data), len(table_data[0])))
+#                 elements.append(main_table)
+#             else:
+#                 logger.warning(f"No table data for sheet '{self.current_sheet_title}'.")
+#                 if not elements: return False, f"No content for sheet '{self.current_sheet_title}'"
             
-            if self.settings.footer and not has_excel_footer:
-                elements.append(Spacer(1, 10))
-                elements.extend(self.create_footer())
+#             if self.settings.footer and not has_excel_footer:
+#                 elements.append(Spacer(1, 10))
+#                 elements.extend(self.create_footer())
             
-            doc.build(elements, onFirstPage=self.add_page_decorations, onLaterPages=self.add_page_decorations)
-            return True, "PDF generated successfully"
-        except Exception as e:
-            logger.error(f"PDF generation failed: {str(e)}", exc_info=True)
-            return False, str(e)
+#             doc.build(elements, onFirstPage=self.add_page_decorations, onLaterPages=self.add_page_decorations)
+#             return True, "PDF generated successfully"
+#         except Exception as e:
+#             logger.error(f"PDF generation failed: {str(e)}", exc_info=True)
+#             return False, str(e)
     
-    def create_header(self) -> List[Flowable]:
-        header_elements = []
-        header_table = Table([[self.create_company_info(),self.create_document_info()]], colWidths=['70%', '30%'])
-        header_table.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'TOP'), ('BOTTOMPADDING', (0,0), (-1,-1), 10), ('LEFTPADDING', (0,0), (0,0), 0), ('RIGHTPADDING', (1,0), (1,0), 0)]))
-        header_elements.append(header_table)
-        header_elements.append(Spacer(1, 10))
-        return header_elements
+#     def create_header(self) -> List[Flowable]:
+#         header_elements = []
+#         header_table = Table([[self.create_company_info(),self.create_document_info()]], colWidths=['70%', '30%'])
+#         header_table.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'TOP'), ('BOTTOMPADDING', (0,0), (-1,-1), 10), ('LEFTPADDING', (0,0), (0,0), 0), ('RIGHTPADDING', (1,0), (1,0), 0)]))
+#         header_elements.append(header_table)
+#         header_elements.append(Spacer(1, 10))
+#         return header_elements
     
-    def create_company_info(self) -> Paragraph:
-        company_info = [f"<b>{self.client_data.company or 'Société'}</b>", self.client_data.address or "Adresse", f"Tél: {self.client_data.phone or 'N/A'}", f"Email: {self.client_data.email or 'N/A'}"]
-        return Paragraph("<br/>".join(company_info), self.client_style)
+#     def create_company_info(self) -> Paragraph:
+#         company_info = [f"<b>{self.client_data.company or 'Société'}</b>", self.client_data.address or "Adresse", f"Tél: {self.client_data.phone or 'N/A'}", f"Email: {self.client_data.email or 'N/A'}"]
+#         return Paragraph("<br/>".join(company_info), self.client_style)
     
-    def create_document_info(self) -> Paragraph:
-        doc_info = [f"<b>Devis N° {self.client_data.project_id or 'XXXX'}</b>", f"Date: {datetime.now().strftime('%d/%m/%Y')}", f"Client: {self.client_data.name or 'N/A'}"]
-        return Paragraph("<br/>".join(doc_info), self.client_style)
+#     def create_document_info(self) -> Paragraph:
+#         doc_info = [f"<b>Devis N° {self.client_data.project_id or 'XXXX'}</b>", f"Date: {datetime.now().strftime('%d/%m/%Y')}", f"Client: {self.client_data.name or 'N/A'}"]
+#         return Paragraph("<br/>".join(doc_info), self.client_style)
     
-    def create_client_info(self) -> List[Flowable]:
-        client_elements = []
-        client_table = Table([["Client:", self.client_data.name or "N/A"],["Société:", self.client_data.company or "N/A"],["Projet:", self.client_data.project or "N/A"],["Date:", datetime.now().strftime("%d/%m/%Y")],["Prix Total:", f"{self.client_data.price:,.2f} {self.client_data.currency}"]], colWidths=[3*cm, 10*cm])
-        client_table.setStyle(TableStyle([('BACKGROUND', (0,0), (0,-1), colors.HexColor("#f8f9fa")),('TEXTCOLOR', (0,0), (-1,-1), colors.black),('ALIGN', (0,0), (0,-1), 'RIGHT'),('ALIGN', (1,0), (1,-1), 'LEFT'),('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'), ('FONTSIZE', (0,0),(-1,-1), 9),('GRID', (0,0),(-1,-1), 0.5, colors.HexColor("#e0e0e0")),('VALIGN', (0,0),(-1,-1), 'MIDDLE'),('BOTTOMPADDING', (0,0),(-1,-1), 6), ('LEFTPADDING', (0,0),(-1,-1), 4), ('RIGHTPADDING', (0,0),(-1,-1), 4)]))
-        client_elements.append(client_table)
-        return client_elements
+#     def create_client_info(self) -> List[Flowable]:
+#         client_elements = []
+#         client_table = Table([["Client:", self.client_data.name or "N/A"],["Société:", self.client_data.company or "N/A"],["Projet:", self.client_data.project or "N/A"],["Date:", datetime.now().strftime("%d/%m/%Y")],["Prix Total:", f"{self.client_data.price:,.2f} {self.client_data.currency}"]], colWidths=[3*cm, 10*cm])
+#         client_table.setStyle(TableStyle([('BACKGROUND', (0,0), (0,-1), colors.HexColor("#f8f9fa")),('TEXTCOLOR', (0,0), (-1,-1), colors.black),('ALIGN', (0,0), (0,-1), 'RIGHT'),('ALIGN', (1,0), (1,-1), 'LEFT'),('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'), ('FONTSIZE', (0,0),(-1,-1), 9),('GRID', (0,0),(-1,-1), 0.5, colors.HexColor("#e0e0e0")),('VALIGN', (0,0),(-1,-1), 'MIDDLE'),('BOTTOMPADDING', (0,0),(-1,-1), 6), ('LEFTPADDING', (0,0),(-1,-1), 4), ('RIGHTPADDING', (0,0),(-1,-1), 4)]))
+#         client_elements.append(client_table)
+#         return client_elements
     
-    def prepare_table_data(self) -> Tuple[List[List[Union[str, Paragraph]]], List[float]]:
-        if not self.table: return [],[]
-        rows = min(self.table.rowCount(), MAX_ROWS_PREVIEW)
-        cols = min(self.table.columnCount(), MAX_COLS_PREVIEW)
-        if rows == 0 or cols == 0: return [], []
+#     def prepare_table_data(self) -> Tuple[List[List[Union[str, Paragraph]]], List[float]]:
+#         if not self.table: return [],[]
+#         rows = min(self.table.rowCount(), MAX_ROWS_PREVIEW)
+#         cols = min(self.table.columnCount(), MAX_COLS_PREVIEW)
+#         if rows == 0 or cols == 0: return [], []
 
-        data = []
-        col_widths = []
-        headers = []
-        for col in range(cols):
-            header = self.table.horizontalHeaderItem(col)
-            header_text = header.text() if header else f"Col {col+1}"
-            headers.append(Paragraph(header_text, self.table_header_style))
-            col_widths.append(self.table.columnWidth(col) / 10.0 if self.table.columnWidth(col) > 0 else 1.5*inch)
-        data.append(headers)
+#         data = []
+#         col_widths = []
+#         headers = []
+#         for col in range(cols):
+#             header = self.table.horizontalHeaderItem(col)
+#             header_text = header.text() if header else f"Col {col+1}"
+#             headers.append(Paragraph(header_text, self.table_header_style))
+#             col_widths.append(self.table.columnWidth(col) / 10.0 if self.table.columnWidth(col) > 0 else 1.5*inch)
+#         data.append(headers)
         
-        for row in range(rows):
-            row_data = []
-            for col in range(cols):
-                item = self.table.item(row, col)
-                if item:
-                    cell_style = self.table_cell_style.clone('TableCell_Specific')
-                    text_color = item.foreground().color().name()
-                    if text_color != "#000000": cell_style.textColor = colors.HexColor(text_color)
-                    align = item.textAlignment()
-                    if align & Qt.AlignLeft: cell_style.alignment = TA_LEFT
-                    elif align & Qt.AlignRight: cell_style.alignment = TA_RIGHT
-                    elif align & Qt.AlignHCenter: cell_style.alignment = TA_CENTER
-                    elif align & Qt.AlignJustify: cell_style.alignment = TA_JUSTIFY
-                    row_data.append(Paragraph(item.text(), cell_style))
-                else: row_data.append("")
-            data.append(row_data)
-        return data, col_widths
+#         for row in range(rows):
+#             row_data = []
+#             for col in range(cols):
+#                 item = self.table.item(row, col)
+#                 if item:
+#                     cell_style = self.table_cell_style.clone('TableCell_Specific')
+#                     text_color = item.foreground().color().name()
+#                     if text_color != "#000000": cell_style.textColor = colors.HexColor(text_color)
+#                     align = item.textAlignment()
+#                     if align & Qt.AlignLeft: cell_style.alignment = TA_LEFT
+#                     elif align & Qt.AlignRight: cell_style.alignment = TA_RIGHT
+#                     elif align & Qt.AlignHCenter: cell_style.alignment = TA_CENTER
+#                     elif align & Qt.AlignJustify: cell_style.alignment = TA_JUSTIFY
+#                     row_data.append(Paragraph(item.text(), cell_style))
+#                 else: row_data.append("")
+#             data.append(row_data)
+#         return data, col_widths
     
-    def create_table_style(self, num_rows: int, num_cols: int) -> TableStyle:
-        if num_rows == 0 or num_cols == 0: return TableStyle([])
-        style = TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#3498db")), ('TEXTCOLOR',(0,0),(-1,0),colors.white),
-            ('ALIGN', (0,0), (-1,0), 'CENTER'), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0,0), (-1,0), 9), ('BOTTOMPADDING', (0,0), (-1,0), 6),
-            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#e0e0e0")),
-            ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor("#f8f9fa")]),
-            ('LEFTPADDING', (0,0), (-1,-1), 4), ('RIGHTPADDING', (0,0), (-1,-1), 4), ('VALIGN', (0,0), (-1,-1), 'MIDDLE')
-        ])
-        if self.table:
-            for r in range(1, num_rows):
-                 for c in range(num_cols):
-                    if r >= self.table.rowCount() or c >= self.table.columnCount(): continue
-                    item = self.table.item(r-1, c)
-                    if item:
-                        bg_color_name = item.background().color().name()
-                        if bg_color_name != "#ffffff":
-                            style.add('BACKGROUND', (c,r), (c,r), colors.HexColor(bg_color_name))
-                        row_span = self.table.rowSpan(r-1, c)
-                        col_span = self.table.columnSpan(r-1, c)
-                        if row_span > 1 or col_span > 1:
-                            style.add('SPAN', (c,r), (c+col_span-1, r+row_span-1))
-        return style
+#     def create_table_style(self, num_rows: int, num_cols: int) -> TableStyle:
+#         if num_rows == 0 or num_cols == 0: return TableStyle([])
+#         style = TableStyle([
+#             ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#3498db")), ('TEXTCOLOR',(0,0),(-1,0),colors.white),
+#             ('ALIGN', (0,0), (-1,0), 'CENTER'), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+#             ('FONTSIZE', (0,0), (-1,0), 9), ('BOTTOMPADDING', (0,0), (-1,0), 6),
+#             ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#e0e0e0")),
+#             ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor("#f8f9fa")]),
+#             ('LEFTPADDING', (0,0), (-1,-1), 4), ('RIGHTPADDING', (0,0), (-1,-1), 4), ('VALIGN', (0,0), (-1,-1), 'MIDDLE')
+#         ])
+#         if self.table:
+#             for r in range(1, num_rows):
+#                  for c in range(num_cols):
+#                     if r >= self.table.rowCount() or c >= self.table.columnCount(): continue
+#                     item = self.table.item(r-1, c)
+#                     if item:
+#                         bg_color_name = item.background().color().name()
+#                         if bg_color_name != "#ffffff":
+#                             style.add('BACKGROUND', (c,r), (c,r), colors.HexColor(bg_color_name))
+#                         row_span = self.table.rowSpan(r-1, c)
+#                         col_span = self.table.columnSpan(r-1, c)
+#                         if row_span > 1 or col_span > 1:
+#                             style.add('SPAN', (c,r), (c+col_span-1, r+row_span-1))
+#         return style
     
-    def create_footer(self) -> List[Flowable]:
-        footer_elements = []
-        if self.client_data.notes:
-            notes = Paragraph(f"<b>Notes:</b><br/>{self.client_data.notes}", ParagraphStyle('Notes',parent=self.styles['BodyText'],fontName='Helvetica',fontSize=8,leading=9,textColor=colors.HexColor("#7f8c8d")))
-            footer_elements.append(notes)
-            footer_elements.append(Spacer(1, 10))
-        footer_text = Paragraph(f"Document généré le {datetime.now().strftime('%d/%m/%Y à %H:%M')} | {self.client_data.company or 'Société'}", self.footer_style)
-        footer_elements.append(footer_text)
-        return footer_elements
+#     def create_footer(self) -> List[Flowable]:
+#         footer_elements = []
+#         if self.client_data.notes:
+#             notes = Paragraph(f"<b>Notes:</b><br/>{self.client_data.notes}", ParagraphStyle('Notes',parent=self.styles['BodyText'],fontName='Helvetica',fontSize=8,leading=9,textColor=colors.HexColor("#7f8c8d")))
+#             footer_elements.append(notes)
+#             footer_elements.append(Spacer(1, 10))
+#         footer_text = Paragraph(f"Document généré le {datetime.now().strftime('%d/%m/%Y à %H:%M')} | {self.client_data.company or 'Société'}", self.footer_style)
+#         footer_elements.append(footer_text)
+#         return footer_elements
 
-    def _draw_hf_section(self, canvas: canvas.Canvas, doc, section_content: Dict, is_header: bool, default_hf_height: float, font_name: str, font_size: int):
-        canvas.setFont(font_name, font_size)
-        y_position = 0
-        font_ascent_approx = font_size * 0.8
-        if is_header:
-            y_position = doc.height + doc.topMargin - default_hf_height + font_ascent_approx * 0.5
-        else:
-            y_position = doc.bottomMargin + font_ascent_approx * 0.5
+#     def _draw_hf_section(self, canvas: canvas.Canvas, doc, section_content: Dict, is_header: bool, default_hf_height: float, font_name: str, font_size: int):
+#         canvas.setFont(font_name, font_size)
+#         y_position = 0
+#         font_ascent_approx = font_size * 0.8
+#         if is_header:
+#             y_position = doc.height + doc.topMargin - default_hf_height + font_ascent_approx * 0.5
+#         else:
+#             y_position = doc.bottomMargin + font_ascent_approx * 0.5
 
-        positions = {
-            "left": doc.leftMargin + 0.1*inch,
-            "center": doc.width / 2 + doc.leftMargin,
-            "right": doc.width + doc.leftMargin - 0.1*inch
-        }
+#         positions = {
+#             "left": doc.leftMargin + 0.1*inch,
+#             "center": doc.width / 2 + doc.leftMargin,
+#             "right": doc.width + doc.leftMargin - 0.1*inch
+#         }
 
-        for part_key in ["left", "center", "right"]:
-            part_data = section_content.get(part_key)
-            if not part_data: continue
-            text_content = part_data.get("text")
-            if text_content:
-                text_to_draw = text_content
-                if "&G" in text_to_draw:
-                    logger.info(f"Header/Footer image reference mark (&G) found in {part_key} of {'header' if is_header else 'footer'}: '{text_to_draw}'. Actual display requires rID/&G parsing and image data resolution.")
+#         for part_key in ["left", "center", "right"]:
+#             part_data = section_content.get(part_key)
+#             if not part_data: continue
+#             text_content = part_data.get("text")
+#             if text_content:
+#                 text_to_draw = text_content
+#                 if "&G" in text_to_draw:
+#                     logger.info(f"Header/Footer image reference mark (&G) found in {part_key} of {'header' if is_header else 'footer'}: '{text_to_draw}'. Actual display requires rID/&G parsing and image data resolution.")
 
-                page_number_str = str(canvas.getPageNumber())
-                total_pages_str = str(getattr(doc, '_pageNumber', canvas.getPageNumber()))
-                text_to_draw = text_to_draw.replace("&[Page]", page_number_str).replace("&P", page_number_str)
-                text_to_draw = text_to_draw.replace("&[Pages]", total_pages_str).replace("&N", total_pages_str)
-                text_to_draw = text_to_draw.replace("&[Date]", datetime.now().strftime("%Y-%m-%d")).replace("&D", datetime.now().strftime("%Y-%m-%d"))
-                text_to_draw = text_to_draw.replace("&[Time]", datetime.now().strftime("%H:%M:%S")).replace("&T", datetime.now().strftime("%H:%M:%S"))
-                text_to_draw = text_to_draw.replace("&[File]", Path(doc.filename).name if doc.filename else "Document").replace("&F", Path(doc.filename).name if doc.filename else "Document")
-                text_to_draw = text_to_draw.replace("&[Tab]", self.current_sheet_title or "Sheet").replace("&A", self.current_sheet_title or "Sheet")
-                text_to_draw = text_to_draw.replace("&B", "").replace("&I", "")
-                text_to_draw = text_to_draw.replace("&G", "").strip()
+#                 page_number_str = str(canvas.getPageNumber())
+#                 total_pages_str = str(getattr(doc, '_pageNumber', canvas.getPageNumber()))
+#                 text_to_draw = text_to_draw.replace("&[Page]", page_number_str).replace("&P", page_number_str)
+#                 text_to_draw = text_to_draw.replace("&[Pages]", total_pages_str).replace("&N", total_pages_str)
+#                 text_to_draw = text_to_draw.replace("&[Date]", datetime.now().strftime("%Y-%m-%d")).replace("&D", datetime.now().strftime("%Y-%m-%d"))
+#                 text_to_draw = text_to_draw.replace("&[Time]", datetime.now().strftime("%H:%M:%S")).replace("&T", datetime.now().strftime("%H:%M:%S"))
+#                 text_to_draw = text_to_draw.replace("&[File]", Path(doc.filename).name if doc.filename else "Document").replace("&F", Path(doc.filename).name if doc.filename else "Document")
+#                 text_to_draw = text_to_draw.replace("&[Tab]", self.current_sheet_title or "Sheet").replace("&A", self.current_sheet_title or "Sheet")
+#                 text_to_draw = text_to_draw.replace("&B", "").replace("&I", "")
+#                 text_to_draw = text_to_draw.replace("&G", "").strip()
 
-                canvas.setFillColor(colors.black)
-                if part_key == "left": canvas.drawString(positions[part_key], y_position, text_to_draw)
-                elif part_key == "center": canvas.drawCentredString(positions[part_key], y_position, text_to_draw)
-                elif part_key == "right": canvas.drawRightString(positions[part_key], y_position, text_to_draw)
+#                 canvas.setFillColor(colors.black)
+#                 if part_key == "left": canvas.drawString(positions[part_key], y_position, text_to_draw)
+#                 elif part_key == "center": canvas.drawCentredString(positions[part_key], y_position, text_to_draw)
+#                 elif part_key == "right": canvas.drawRightString(positions[part_key], y_position, text_to_draw)
     
-    def add_page_decorations(self, canvas: canvas.Canvas, doc):
-        canvas.saveState()
-        if self.settings.watermark:
-            canvas.setFont('Helvetica', 60) # Changed from Arial
-            canvas.setFillColor(colors.HexColor("#f0f0f0"))
-            canvas.rotate(45)
-            page_width, page_height = doc.pagesize
-            canvas.drawString(page_width * 0.25, page_height * 0.25, self.settings.watermark)
-            canvas.rotate(-45)
+#     def add_page_decorations(self, canvas: canvas.Canvas, doc):
+#         canvas.saveState()
+#         if self.settings.watermark:
+#             canvas.setFont('Helvetica', 60) # Changed from Arial
+#             canvas.setFillColor(colors.HexColor("#f0f0f0"))
+#             canvas.rotate(45)
+#             page_width, page_height = doc.pagesize
+#             canvas.drawString(page_width * 0.25, page_height * 0.25, self.settings.watermark)
+#             canvas.rotate(-45)
 
-        default_page_num_text = f"Page {canvas.getPageNumber()}"
-        excel_hf_applied_for_page = False
-        hf_font_name = "Helvetica"
-        hf_font_size = 8
+#         default_page_num_text = f"Page {canvas.getPageNumber()}"
+#         excel_hf_applied_for_page = False
+#         hf_font_name = "Helvetica"
+#         hf_font_size = 8
 
-        if self.current_sheet_title and self.current_sheet_title in self.sheet_hf_data:
-            sheet_hf_content = self.sheet_hf_data[self.current_sheet_title]
-            page_num = canvas.getPageNumber()
-            header_type_to_use, footer_type_to_use = None, None
+#         if self.current_sheet_title and self.current_sheet_title in self.sheet_hf_data:
+#             sheet_hf_content = self.sheet_hf_data[self.current_sheet_title]
+#             page_num = canvas.getPageNumber()
+#             header_type_to_use, footer_type_to_use = None, None
 
-            if page_num == 1 and sheet_hf_content.get("first_header"): header_type_to_use = "first_header"
-            elif page_num % 2 == 0 and sheet_hf_content.get("even_header"): header_type_to_use = "even_header"
-            elif sheet_hf_content.get("odd_header"): header_type_to_use = "odd_header"
+#             if page_num == 1 and sheet_hf_content.get("first_header"): header_type_to_use = "first_header"
+#             elif page_num % 2 == 0 and sheet_hf_content.get("even_header"): header_type_to_use = "even_header"
+#             elif sheet_hf_content.get("odd_header"): header_type_to_use = "odd_header"
 
-            if page_num == 1 and sheet_hf_content.get("first_footer"): footer_type_to_use = "first_footer"
-            elif page_num % 2 == 0 and sheet_hf_content.get("even_footer"): footer_type_to_use = "even_footer"
-            elif sheet_hf_content.get("odd_footer"): footer_type_to_use = "odd_footer"
+#             if page_num == 1 and sheet_hf_content.get("first_footer"): footer_type_to_use = "first_footer"
+#             elif page_num % 2 == 0 and sheet_hf_content.get("even_footer"): footer_type_to_use = "even_footer"
+#             elif sheet_hf_content.get("odd_footer"): footer_type_to_use = "odd_footer"
 
-            if header_type_to_use and header_type_to_use in sheet_hf_content:
-                header_data = sheet_hf_content[header_type_to_use]
-                self._draw_hf_section(canvas, doc, header_data, True, PDF_HEADER_HEIGHT, hf_font_name, hf_font_size)
-                if any(header_data.get(part, {}).get('text') for part in ["left", "center", "right"]):
-                    excel_hf_applied_for_page = True
+#             if header_type_to_use and header_type_to_use in sheet_hf_content:
+#                 header_data = sheet_hf_content[header_type_to_use]
+#                 self._draw_hf_section(canvas, doc, header_data, True, PDF_HEADER_HEIGHT, hf_font_name, hf_font_size)
+#                 if any(header_data.get(part, {}).get('text') for part in ["left", "center", "right"]):
+#                     excel_hf_applied_for_page = True
 
-            if footer_type_to_use and footer_type_to_use in sheet_hf_content:
-                footer_data = sheet_hf_content[footer_type_to_use]
-                self._draw_hf_section(canvas, doc, footer_data, False, PDF_FOOTER_HEIGHT, hf_font_name, hf_font_size)
-                if any(footer_data.get(part, {}).get('text') for part in ["left", "center", "right"]):
-                    excel_hf_applied_for_page = True
+#             if footer_type_to_use and footer_type_to_use in sheet_hf_content:
+#                 footer_data = sheet_hf_content[footer_type_to_use]
+#                 self._draw_hf_section(canvas, doc, footer_data, False, PDF_FOOTER_HEIGHT, hf_font_name, hf_font_size)
+#                 if any(footer_data.get(part, {}).get('text') for part in ["left", "center", "right"]):
+#                     excel_hf_applied_for_page = True
 
-        if self.settings.footer and not excel_hf_applied_for_page:
-            canvas.setFont(hf_font_name, hf_font_size)
-            canvas.setFillColor(colors.HexColor("#7f8c8d"))
-            page_num_y_pos = doc.bottomMargin + (PDF_FOOTER_HEIGHT - hf_font_size * 0.8) / 2
-            canvas.drawRightString(doc.width + doc.leftMargin - 0.1*inch, page_num_y_pos, default_page_num_text)
-        canvas.restoreState()
+#         if self.settings.footer and not excel_hf_applied_for_page:
+#             canvas.setFont(hf_font_name, hf_font_size)
+#             canvas.setFillColor(colors.HexColor("#7f8c8d"))
+#             page_num_y_pos = doc.bottomMargin + (PDF_FOOTER_HEIGHT - hf_font_size * 0.8) / 2
+#             canvas.drawRightString(doc.width + doc.leftMargin - 0.1*inch, page_num_y_pos, default_page_num_text)
+#         canvas.restoreState()
 
 # --- Start of ExcelEditor ---
 class ExcelEditor(QDialog):
@@ -841,7 +841,8 @@ class ExcelEditor(QDialog):
         # PDF export
         pdf_action = QAction(QIcon.fromTheme("document-export"), "Export PDF", self)
         pdf_action.setShortcut("Ctrl+E")
-        pdf_action.triggered.connect(self.export_pdf)
+        # pdf_action.triggered.connect(self.export_pdf)
+        pdf_action.setEnabled(False)
         toolbar.addAction(pdf_action)
         
         # Settings
@@ -1135,35 +1136,35 @@ class ExcelEditor(QDialog):
             QMessageBox.critical(self, "Error", f"Error loading sheet:\n{str(e)}")
             self.set_progress(False)
     
-    def export_pdf(self):
-        if not self.file_path:
-            QMessageBox.warning(self, "Warning", "No file loaded to export")
-            return
-        self.update_client_data()
-        default_name = f"{Path(self.file_path).stem}.pdf"
-        save_path, _ = QFileDialog.getSaveFileName(self, "Export PDF", default_name, "PDF Files (*.pdf);;All Files (*)")
-        if not save_path: return
+    # def export_pdf(self):
+    #     if not self.file_path:
+    #         QMessageBox.warning(self, "Warning", "No file loaded to export")
+    #         return
+    #     self.update_client_data()
+    #     default_name = f"{Path(self.file_path).stem}.pdf"
+    #     save_path, _ = QFileDialog.getSaveFileName(self, "Export PDF", default_name, "PDF Files (*.pdf);;All Files (*)")
+    #     if not save_path: return
             
-        try:
-            self.set_progress(True, "Exporting to PDF...")
-            current_sheet_title = self.excel_model.current_sheet.title if self.excel_model.current_sheet else ""
-            pdf_gen = PDFGenerator(
-                self.table, self.excel_model.client_data, self.pdf_settings,
-                current_sheet_title, self.excel_model.sheet_images,
-                self.excel_model.sheet_headers_footers
-            )
-            success, message = pdf_gen.generate(save_path)
-            self.set_progress(False)
-            if success:
-                self.update_status("PDF exported successfully")
-                if QMessageBox.question(self, "Export Complete", f"PDF created successfully:\n{save_path}\n\nOpen now?", QMessageBox.Yes | QMessageBox.No) == QMessageBox.Yes:
-                    self.open_file(save_path)
-            else:
-                QMessageBox.critical(self, "Export Error", f"Error exporting PDF:\n{message}")
-        except Exception as e:
-            logger.error(f"Error exporting PDF: {str(e)}", exc_info=True)
-            QMessageBox.critical(self, "Error", f"Error exporting PDF:\n{str(e)}")
-            self.set_progress(False)
+    #     try:
+    #         self.set_progress(True, "Exporting to PDF...")
+    #         current_sheet_title = self.excel_model.current_sheet.title if self.excel_model.current_sheet else ""
+    #         pdf_gen = PDFGenerator(
+    #             self.table, self.excel_model.client_data, self.pdf_settings,
+    #             current_sheet_title, self.excel_model.sheet_images,
+    #             self.excel_model.sheet_headers_footers
+    #         )
+    #         success, message = pdf_gen.generate(save_path)
+    #         self.set_progress(False)
+    #         if success:
+    #             self.update_status("PDF exported successfully")
+    #             if QMessageBox.question(self, "Export Complete", f"PDF created successfully:\n{save_path}\n\nOpen now?", QMessageBox.Yes | QMessageBox.No) == QMessageBox.Yes:
+    #                 self.open_file(save_path)
+    #         else:
+    #             QMessageBox.critical(self, "Export Error", f"Error exporting PDF:\n{message}")
+    #     except Exception as e:
+    #         logger.error(f"Error exporting PDF: {str(e)}", exc_info=True)
+    #         QMessageBox.critical(self, "Error", f"Error exporting PDF:\n{str(e)}")
+    #         self.set_progress(False)
     
     def select_logo(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Select Logo Image", "", "Image Files (*.png *.jpg *.jpeg *.bmp);;All Files (*)")

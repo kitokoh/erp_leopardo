@@ -29,7 +29,7 @@ from db.cruds.generic_crud import GenericCRUD
 # from db.cruds.users_crud import users_crud_instance # Replaced with direct module import
 from db.cruds.users import users_crud
 from db.cruds.clients.clients_crud import clients_crud_instance
-from db.cruds.products.products_crud import products_crud
+from db.cruds.products.products_crud import products_crud_instance as products_crud
 
 # Imports for non-refactored or utility functions used in seeding
 from db.cruds.misc.template_categories_crud import add_template_category, get_template_category_by_name

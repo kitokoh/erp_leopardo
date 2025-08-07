@@ -41,6 +41,8 @@ for module_name in modules_to_test:
         successful_imports += 1
     except ImportError as e:
         print(f"[FAILURE] Failed to import '{module_name}': {e}")
+        import traceback
+        traceback.print_exc()
         failed_imports += 1
     except Exception as e: # Catch other potential errors during import (like syntax errors)
         print(f"[ERROR] An unexpected error occurred while importing '{module_name}': {e}")
