@@ -12,12 +12,12 @@ import uuid
 # from google.auth.transport.requests import Request
 # import requests # For direct HTTP calls
 
-from db import (
+from db.cruds import (
     get_user_google_account_by_google_account_id,
     update_user_google_account,
     add_user_google_account,
     get_user_google_account_by_user_id,
-    get_user_google_account_by_id,
+    get_google_account_by_id,
     delete_user_google_account
 )
 
@@ -263,7 +263,7 @@ def revoke_google_tokens(user_google_account_id: str) -> bool:
     # Removed db_manager check.
     if not user_google_account_id: return False
 
-    account_info = get_user_google_account_by_id(user_google_account_id)
+    account_info = get_google_account_by_id(user_google_account_id)
     if not account_info:
         print(f"No Google account found with ID {user_google_account_id} to revoke.")
         return False

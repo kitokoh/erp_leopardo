@@ -1,5 +1,6 @@
 # auth/authentication.py
 import logging
+import sqlite3
 from datetime import datetime, timedelta, timezone # Added timedelta and timezone
 
 # auth/authentication.py

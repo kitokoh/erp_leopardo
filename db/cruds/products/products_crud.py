@@ -1,3 +1,4 @@
+import sqlite3
 from sqlalchemy.orm import Session, joinedload, subqueryload
 from sqlalchemy import select, update, delete, func, or_, and_
 from ...models import (
@@ -125,5 +126,30 @@ class ProductsCRUD:
             query = query.filter(Product.is_deleted == False)
         return query.scalar()
 
+def get_product_by_id(product_id: int, conn: sqlite3.Connection = None) -> Optional[Dict[str, Any]]:
+    """
+    Fetches a single product by its ID using a direct sqlite3 connection.
+    This is a standalone function to accommodate legacy code that does not use SQLAlchemy sessions.
+    """
+    if conn is None:
+        conn = get_db_connection()
+        close_conn = True
+    else:
+        close_conn = False
+
+    try:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM Products WHERE product_id = ? AND is_deleted = 0", (product_id,))
+        row = cursor.fetchone()
+        if row:
+            return dict(row)
+        return None
+    except sqlite3.Error as e:
+        logging.error(f"Error fetching product by ID {product_id}: {e}")
+        return None
+    finally:
+        if close_conn:
+            conn.close()
 
 products_crud_instance = ProductsCRUD()

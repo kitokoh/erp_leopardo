@@ -9,7 +9,7 @@ from PyQt5.QtGui import QIcon
 try:
     from ..cruds import restaurant_commande_crud, restaurant_ligne_commande_crud, restaurant_paiement_crud
     from ..models import RestaurantCommande, RestaurantLigneCommande # For type hinting
-    from db.cruds.products_crud import products_crud_instance # To fetch product names
+    from db.cruds.products.products_crud import products_crud_instance # To fetch product names
 except ImportError:
     logging.error("ges_restaurant.ui.order_management_dialog: Failed to import CRUDS or Models.")
     restaurant_commande_crud = None

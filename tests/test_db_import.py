@@ -1,5 +1,5 @@
 try:
-    from db import (
+    from db.cruds import (
         get_status_setting_by_id, get_all_status_settings, get_status_setting_by_name,
         get_all_projects, get_project_by_id, add_project, update_project, delete_project,
         get_tasks_by_project_id, add_task, update_task, delete_task, get_task_by_id,

@@ -34,7 +34,6 @@ try:
         update_item_in_location, get_item_in_specific_location,
         get_full_location_path_str # Added
     )
-    from db.cruds.products.products_crud import get_products_by_name_pattern # Assuming this exists
 except ImportError:
     import os
     project_root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -49,12 +48,11 @@ except ImportError:
         get_full_location_path_str # Added
     )
     # Attempt to import products_crud similarly if needed for standalone testing
-    try:
-        from db.cruds.products_crud import get_products_by_name_pattern
-    except ImportError:
-        print("Warning: products_crud.get_products_by_name_pattern not found. Product search will not work.")
-        def get_products_by_name_pattern(*args, **kwargs): # Dummy function
-            return {'success': False, 'error': 'products_crud not available'}
+    # The import was removed as the function does not exist.
+    # The try/except block is no longer necessary for this specific import.
+    print("Warning: products_crud.get_products_by_name_pattern not found. Product search will not work.")
+    def get_products_by_name_pattern(*args, **kwargs): # Dummy function
+        return {'success': False, 'error': 'products_crud not available'}
 
 
 class LocationEditDialog(QDialog):

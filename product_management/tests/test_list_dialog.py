@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import QApplication, QDialog
 from PyQt5.QtGui import QIcon # For new column tests if icons were used
 from product_management.list_dialog import ProductListDialog
 from product_management.edit_dialog import ProductEditDialog # For mocking add/edit calls
-from db.cruds.products_crud import products_crud_instance # Direct import
+from db.cruds.products.products_crud import products_crud_instance # Direct import
 import html_to_pdf_util # Assuming this is still a top-level or correctly pathed import
 
 # Ensure a QApplication instance exists for widget testing, but only one.

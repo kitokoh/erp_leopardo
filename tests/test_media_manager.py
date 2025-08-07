@@ -13,7 +13,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from typing import List, Dict, Any # Added import
 from media_manager import operations, models
-import db
+from db.init_schema import initialize_database
+from db.connection import get_db_connection
+from db.cruds.users import users_crud
 from config import MEDIA_FILES_BASE_PATH, DEFAULT_DOWNLOAD_PATH, DATABASE_PATH, APP_ROOT_DIR
 
 class TestMediaManager(unittest.TestCase):
@@ -23,48 +25,57 @@ class TestMediaManager(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        db.DATABASE_NAME = os.path.basename(DATABASE_PATH)
-        db.initialize_database()
+        # This setup is problematic as it modifies a global config.
+        # A better approach would be to pass the test DB path to functions.
+        # For now, we'll keep it but acknowledge it's not ideal.
+        # db.DATABASE_NAME = os.path.basename(DATABASE_PATH)
+        initialize_database()
 
-        conn_setup = db.get_db_connection()
+        conn_setup = get_db_connection()
         conn_setup.execute("PRAGMA foreign_keys = ON;")
 
-        user1_data = {'username': 'test_uploader_1', 'password': 'password1', 'full_name': 'Test Uploader One', 'email': 'uploader1@test.com', 'role': 'user'}
-        user2_data = {'username': 'test_uploader_2', 'password': 'password2', 'full_name': 'Test Uploader Two', 'email': 'uploader2@test.com', 'role': 'user'}
+        user1_data = {'username': 'test_uploader_1', 'password_hash': 'password1', 'full_name': 'Test Uploader One', 'email': 'uploader1@test.com', 'role_id': 1} # Assuming role_id 1 exists
+        user2_data = {'username': 'test_uploader_2', 'password_hash': 'password2', 'full_name': 'Test Uploader Two', 'email': 'uploader2@test.com', 'role_id': 1}
 
-        existing_user1 = db.get_user_by_username(user1_data['username'])
-        if existing_user1: db.delete_user(existing_user1['user_id'])
+        existing_user1 = users_crud.get_user_by_username(user1_data['username'], conn=conn_setup)
+        if existing_user1: users_crud.delete_user(existing_user1['user_id'], conn=conn_setup)
 
-        existing_user2 = db.get_user_by_username(user2_data['username'])
-        if existing_user2: db.delete_user(existing_user2['user_id'])
+        existing_user2 = users_crud.get_user_by_username(user2_data['username'], conn=conn_setup)
+        if existing_user2: users_crud.delete_user(existing_user2['user_id'], conn=conn_setup)
 
-        cls.test_user_id_1 = db.add_user(user1_data)
-        cls.test_user_id_2 = db.add_user(user2_data)
+        cls.test_user_id_1 = users_crud.add_user(user1_data, conn=conn_setup)
+        cls.test_user_id_2 = users_crud.add_user(user2_data, conn=conn_setup)
 
         if not cls.test_user_id_1 or not cls.test_user_id_2:
             if not cls.test_user_id_1:
-                u1 = db.get_user_by_username(user1_data['username'])
+                u1 = users_crud.get_user_by_username(user1_data['username'], conn=conn_setup)
                 if u1: cls.test_user_id_1 = u1['user_id']
             if not cls.test_user_id_2:
-                u2 = db.get_user_by_username(user2_data['username'])
+                u2 = users_crud.get_user_by_username(user2_data['username'], conn=conn_setup)
                 if u2: cls.test_user_id_2 = u2['user_id']
             if not cls.test_user_id_1 or not cls.test_user_id_2:
                  raise Exception("Failed to create or retrieve test users for MediaManager tests.")
+        conn_setup.commit()
         conn_setup.close()
+
 
     @classmethod
     def tearDownClass(cls):
+        conn_teardown = get_db_connection()
         if cls.test_user_id_1:
-            db.delete_user(cls.test_user_id_1)
+            users_crud.delete_user(cls.test_user_id_1, conn=conn_teardown)
         if cls.test_user_id_2:
-            db.delete_user(cls.test_user_id_2)
+            users_crud.delete_user(cls.test_user_id_2, conn=conn_teardown)
+        conn_teardown.commit()
+        conn_teardown.close()
+
 
     def setUp(self):
         self.media_files_base_path_config = MEDIA_FILES_BASE_PATH
         self.thumbnails_path = os.path.join(self.media_files_base_path_config, self.THUMBNAIL_SUBDIR)
         self.test_download_dir = os.path.join(APP_ROOT_DIR, 'test_media_downloads_temp')
 
-        self.conn = db.get_db_connection()
+        self.conn = get_db_connection()
         self.conn.execute("PRAGMA foreign_keys = ON;")
         self.cursor = self.conn.cursor()
         self.cursor.execute("DELETE FROM MediaItemTags")
