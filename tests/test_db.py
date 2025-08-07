@@ -5,6 +5,7 @@ import sys
 
 # Adjust path to import db_manager from parent directory
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from db.init_schema import initialize_database
 import db as db_manager
 
 class TestDBContactsPagination(unittest.TestCase):
@@ -19,7 +20,7 @@ class TestDBContactsPagination(unittest.TestCase):
         if os.path.exists(cls.test_db_name):
             os.remove(cls.test_db_name)
 
-        db_manager.initialize_database()
+        initialize_database()
 
     @classmethod
     def tearDownClass(cls):
@@ -119,7 +120,7 @@ class TestCarrierEmailDB(unittest.TestCase):
 
         if os.path.exists(cls.test_db_name):
             os.remove(cls.test_db_name)
-        db_manager.initialize_database() # This will create Client_Transporters with email_status
+        initialize_database() # This will create Client_Transporters with email_status
 
     @classmethod
     def tearDownClass(cls):

@@ -9,7 +9,7 @@ from PyQt5.QtGui import QIcon # Added for indicators
 from PyQt5.QtWidgets import QDialog # Already imported but good to ensure QDialog is recognized if separated
 from .edit_dialog import ProductEditDialog # Added import
 # import db as db_manager # No longer needed for product functions
-from db.cruds.products_crud import products_crud_instance
+from db.cruds.products.products_crud import products_crud_instance
 import html_to_pdf_util # Import the PDF utility
 
 class ProductListDialog(QDialog):

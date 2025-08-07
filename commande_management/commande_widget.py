@@ -1065,7 +1065,7 @@ if __name__ == '__main__':
     try:
         # Assuming db directory is a sibling of commande_management
         sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-        from db import initialize_database
+        from db.init_schema import initialize_database
         initialize_database() # Make sure this creates 'Commande' statuses
     except Exception as e:
         print(f"Could not initialize database for CommandeWidget test: {e}")

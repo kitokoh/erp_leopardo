@@ -11,7 +11,7 @@ try:
     from . import google_auth
     from . import google_people_api
     # Use specific imports from the db facade
-    from db import (
+    from db.cruds import (
         get_user_google_account_by_user_id,
         update_user_google_account,
         add_contact_sync_log,
@@ -35,7 +35,7 @@ except (ImportError, ValueError) as e:
         from contact_manager import google_auth
         from contact_manager import google_people_api
         # Use specific imports from the db facade
-        from db import (
+        from db.cruds import (
             get_user_google_account_by_user_id,
             update_user_google_account,
             add_contact_sync_log,

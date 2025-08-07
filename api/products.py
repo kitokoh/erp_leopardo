@@ -5,7 +5,7 @@ import os # For URL construction if base URL comes from env
 # Assuming db is structured to allow from db import cruds or similar
 # Or from ..db import cruds if api is a subdir of a main app package
 # For this subtask, let's assume db.cruds gives access to modules
-import db.cruds.products_crud as products_crud
+from db.cruds.products import products_crud
 import db.cruds.product_media_links_crud as product_media_links_crud
 from ..models import ( # Relative import from parent models.py
     ProductResponse, ProductCreate, ProductUpdate, ProductBase,
