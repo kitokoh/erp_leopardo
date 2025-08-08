@@ -13,7 +13,7 @@ from PyQt5.QtWebChannel import QWebChannel
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtCore import QUrl, QStandardPaths, Qt, QCoreApplication, pyqtSlot, QObject, pyqtSignal, QFileInfo, QTimer
 import db as db_manager # Assuming db_manager provides necutils.
-from db.utils import get_document_context_data
+from db.db_utils import get_document_context_data
 # from db.cruds.companies_crud import get_default_company # Moved into __init__
 from utils.html_to_pdf_util import render_html_template, convert_html_to_pdf
 
