@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from db.connection import Base
 
-class Usergoogleaccounts(Base):
+class UserGoogleAccounts(Base):
     __tablename__ = 'user_google_accounts'
     user_google_account_id = Column(Text, primary_key=True, nullable=False)
     google_account_id = Column(Text, nullable=False, unique=True)
