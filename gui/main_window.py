@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
+import sqlite3
 
 # --- sys.path MODIFICATION REMOVED ---
 # Relying on main.py to set up sys.path correctly.

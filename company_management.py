@@ -49,13 +49,7 @@ from db.cruds.misc.company_personnel_crud import (
 # Keep other db imports for now, will be refactored incrementally
 try:
     # Company and personnel functions are now imported directly above.
-    from db import (
-        # Company functions handled by companies_crud_instance:
-        # add_company, get_company_by_id, get_all_companies,
-        # update_company, delete_company, set_default_company, get_default_company
-        initialize_database
-
-    )
+    from db.init_schema import initialize_database
     db_available = True # This flag is now mainly for initialize_database
     print("Core DB functions (initialize_database) imported successfully.")
 except ImportError as e:

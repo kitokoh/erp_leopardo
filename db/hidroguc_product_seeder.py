@@ -1,7 +1,7 @@
 import json
 import os
 import logging
-from db.cruds.products_crud import products_crud_instance
+from db.cruds.products.products_crud import products_crud_instance
 
 # Chemin vers le fichier JSON des produits
 # __file__ est le chemin de ce script (hidroguc_product_seeder.py)

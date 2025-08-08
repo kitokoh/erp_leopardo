@@ -36,8 +36,8 @@ try:
     # Import specific models that use MainBase and need table creation here
     from calculator.models import CalculationHistory
     # from other_module.models import OtherModelUsingMainBase # Example for future models
-    from db.common_models import Products # Import the Products SQLAlchemy model # RESTORED
-    logging.info("DEBUG_INIT_DB: Products model import from db.common_models RESTORED.")
+    from db.models.products.product import Product as Products # Import the Products SQLAlchemy model # RESTORED
+    logging.info("DEBUG_INIT_DB: Products model import from db.models.products.product RESTORED.")
     MAIN_SQLALCHEMY_COMPONENTS_LOADED = True
 except ImportError as e_main_sqlalchemy:
     logging.error(f"db.init_schema: Could not import MainBase or initialize_engine_and_session from db.connection: {e_main_sqlalchemy}. Tables using MainBase (e.g., CalculatorHistory) might not be created by this script.")
@@ -2753,7 +2753,7 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     if MAIN_SQLALCHEMY_COMPONENTS_LOADED and MainBase is not None:
         try:
             logging.info("DEBUG_INIT_DB: Importing SQLAlchemy model modules...")
-            import db.common_models # For Products, etc.
+            # import db.common_models # For Products, etc.
             import accounting.models
             import b2c.ges_restaurant.models
             import calculator.models

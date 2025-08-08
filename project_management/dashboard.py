@@ -1296,7 +1296,7 @@ if __name__ == "__main__":
         if project_root not in sys.path:
             sys.path.insert(0, project_root)
 
-        from db import initialize_database # Now this should work if db.py is at project_root
+        from db.init_schema import initialize_database # Now this should work if db.py is at project_root
         initialize_database()
     except ImportError as e:
         print(f"Error during __main__ db initialization: {e}. Ensure db.py is accessible.")
