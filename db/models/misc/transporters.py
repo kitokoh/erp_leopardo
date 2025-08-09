@@ -20,5 +20,7 @@ class Transporter(Base):
     created_at = Column(DateTime)
     updated_at = Column(DateTime)
 
+    client_associations = relationship("ClientTransporters", back_populates="transporter_rel")
+
     def __repr__(self):
         return f"<Transporter(transporter_id='{self.transporter_id}')>"

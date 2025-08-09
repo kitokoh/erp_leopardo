@@ -42,19 +42,16 @@ from .partners import Partner
 from .passwordresettokens import PasswordResetToken
 from .permissions import Permission
 from .proforma_invoice_items import ProformaInvoiceItem
-from .proforma_invoices import ProformaInvoice
+from .proforma_invoices import ProformaInvoice, ProformaInvoiceStatusEnum
 from .recruitmentsteps import RecruitmentStep
 from .referents import Referent
 from .regions import Region
 from .reportconfigfields import ReportConfigField
-from .reportconfigfilters import ReportConfigFilter
 from .reportconfigurations import ReportConfiguration
-from .savtickets import SavTicket
 from .scheduledemails import ScheduledEmail
 from .sectors import Sector
 from .smtpconfigs import SmtpConfig
 from .tags import Tag
-from .tasks import Task
 from .teammembers import TeamMember
 from .templatecategories import TemplateCategory
 from .templates import Template
