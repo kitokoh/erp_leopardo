@@ -14,19 +14,17 @@ from db.models import User, Role
 
 module_logger = logging.getLogger(__name__)
 
-def _get_cursor_and_dialect(conn):
-    if isinstance(conn, (Session, Engine, SQLAlchemyConnection)):
-        return conn, "sqlalchemy"
-    elif hasattr(conn, 'cursor'):
-        return conn.cursor(), "sqlite"
+def _get_cursor_and_dialect(db_session_or_conn):
+    if isinstance(db_session_or_conn, (Session, Engine, SQLAlchemyConnection)):
+        return db_session_or_conn, "sqlalchemy"
+    elif hasattr(db_session_or_conn, 'cursor'):
+        return db_session_or_conn.cursor(), "sqlite"
     return None, None
 
 def _execute_query(conn_or_cursor, sql_text, params, dialect):
     if dialect == "sqlalchemy":
-        # conn_or_cursor is SA Session/Engine/Connection
         return conn_or_cursor.execute(sql_text, params)
     elif dialect == "sqlite":
-        # conn_or_cursor is sqlite3 cursor
         return conn_or_cursor.execute(sql_text, params)
     return None
 
@@ -98,7 +96,7 @@ def add_user(db: Session, username: str, password: str, role_id: int, full_name:
 def get_user_by_username(db: Session, username: str, logger_passed: logging.Logger | None = None) -> dict | None:
     current_logger = logger_passed if logger_passed else module_logger
     try:
-        user = conn.query(User).join(Role).filter(User.username == username, User.is_active == True, User.is_deleted == 0).first()
+        user = db.query(User).join(Role).filter(User.username == username, User.is_active == True, User.is_deleted == 0).first()
         if user:
             user_data = {c.name: getattr(user, c.name) for c in user.__table__.columns}
             user_data['role_name'] = user.role.role_name
@@ -114,7 +112,6 @@ def get_user_by_username(db: Session, username: str, logger_passed: logging.Logg
 def get_any_user_by_username(db: Session, username: str, logger_passed: logging.Logger | None = None) -> dict | None:
     """Fetches a user by username, regardless of their is_active or is_deleted status."""
     current_logger = logger_passed if logger_passed else module_logger
-    # Similar to get_user_by_username but without status checks, and using LEFT JOIN for robustness
     sql_select_part = "SELECT u.*, r.role_name FROM Users u LEFT JOIN Roles r ON u.role_id = r.role_id"
 
 
@@ -124,9 +121,9 @@ def get_any_user_by_username(db: Session, username: str, logger_passed: logging.
     params_sa = {"username": username}
     params_sqlite = (username,)
 
-    db_obj, dialect = _get_cursor_and_dialect(conn)
+    db_obj, dialect = _get_cursor_and_dialect(db)
     if not db_obj or not dialect:
-        current_logger.error(f"Unsupported connection type: {type(conn)}")
+        current_logger.error(f"Unsupported connection type: {type(db)}")
         return None
 
     user_data = _fetch_one_as_dict(db_obj, sql_sa, sql_sqlite, params_sa, params_sqlite, dialect, current_logger)
@@ -147,9 +144,9 @@ def get_user_by_id(db: Session, user_id: str, logger_passed: logging.Logger | No
     params_sa = {"user_id": user_id}
     params_sqlite = (user_id,)
 
-    db_obj, dialect = _get_cursor_and_dialect(conn)
+    db_obj, dialect = _get_cursor_and_dialect(db)
     if not db_obj or not dialect:
-        current_logger.error(f"Unsupported connection type: {type(conn)}")
+        current_logger.error(f"Unsupported connection type: {type(db)}")
         return None
 
     return _fetch_one_as_dict(db_obj, sql_sa, sql_sqlite, params_sa, params_sqlite, dialect, current_logger)
@@ -164,7 +161,7 @@ def update_user_role(db: Session, user_id: str, new_role_id: int, logger_passed:
     params_sa = {"new_role_id": new_role_id, "updated_at": now_iso, "user_id": user_id}
     params_sqlite = (new_role_id, now_iso, user_id)
 
-    db_obj, dialect = _get_cursor_and_dialect(conn)
+    db_obj, dialect = _get_cursor_and_dialect(db)
     if not db_obj or not dialect: return False
 
     try:
@@ -189,7 +186,7 @@ def update_user_password(db: Session, user_id: str, new_password: str, logger_pa
     params_sa = {"hashed_password": hashed_pw, "updated_at": now_iso, "user_id": user_id}
     params_sqlite = (hashed_pw, now_iso, user_id)
 
-    db_obj, dialect = _get_cursor_and_dialect(conn)
+    db_obj, dialect = _get_cursor_and_dialect(db)
     if not db_obj or not dialect: return False
 
     try:
@@ -214,7 +211,7 @@ def set_user_active_status(db: Session, user_id: str, is_active: bool, logger_pa
     params_sa = {"is_active": status_int, "updated_at": now_iso, "user_id": user_id}
     params_sqlite = (status_int, now_iso, user_id)
 
-    db_obj, dialect = _get_cursor_and_dialect(conn)
+    db_obj, dialect = _get_cursor_and_dialect(db)
     if not db_obj or not dialect: return False
 
     try:
@@ -234,7 +231,7 @@ def record_login_time(db: Session, user_id: str, logger_passed: logging.Logger |
     params_sa = {"last_login_at": now_iso, "user_id": user_id}
     params_sqlite = (now_iso, user_id)
 
-    db_obj, dialect = _get_cursor_and_dialect(conn)
+    db_obj, dialect = _get_cursor_and_dialect(db)
     if not db_obj or not dialect: return False
 
     try:
@@ -276,7 +273,7 @@ def list_users(db: Session, role_id_filter: int = None, status_filter: str = Non
     final_sql_sqlite = f"{base_sql}{where_clause_sqlite} ORDER BY u.username"
     final_sql_sa = text(f"{base_sql}{where_clause_sa} ORDER BY u.username")
 
-    db_obj, dialect = _get_cursor_and_dialect(conn)
+    db_obj, dialect = _get_cursor_and_dialect(db)
     if not db_obj or not dialect: return []
 
     return _fetch_all_as_dict_list(db_obj, final_sql_sa, final_sql_sqlite, params_sa, params_sqlite, dialect, current_logger)
@@ -292,7 +289,7 @@ def _update_user_password_hash_only(db: Session, user_id: str, new_hashed_passwo
     params_sa = {"new_hashed_password": new_hashed_password, "updated_at": now_iso, "user_id": user_id}
     params_sqlite = (new_hashed_password, now_iso, user_id)
 
-    db_obj, dialect = _get_cursor_and_dialect(conn)
+    db_obj, dialect = _get_cursor_and_dialect(db)
     if not db_obj or not dialect: return False
 
     try:
@@ -312,8 +309,7 @@ def verify_user_password(db: Session, username: str, password: str, logger_passe
         current_logger.warning("Username and password are required for verification.")
         return None
 
-    # get_user_by_username is already refactored to handle conn type
-    user = get_user_by_username(username, conn=conn, logger_passed=current_logger)
+    user = get_user_by_username(username, db=db, logger_passed=current_logger)
 
     if user:
         if not user.get('is_active'):
@@ -327,12 +323,10 @@ def verify_user_password(db: Session, username: str, password: str, logger_passe
 
         if verified:
             current_logger.info(f"Password verification successful for user: {username}")
-            # record_login_time is refactored
-            record_login_time(user['user_id'], conn=conn, logger_passed=current_logger)
+            record_login_time(user['user_id'], db=db, logger_passed=current_logger)
             if new_hash:
                 current_logger.info(f"Password hash for user '{username}' needs upgrade.")
-                # _update_user_password_hash_only is refactored
-                if _update_user_password_hash_only(user['user_id'], new_hash, conn=conn, logger_passed=current_logger):
+                if _update_user_password_hash_only(user['user_id'], new_hash, db=db, logger_passed=current_logger):
                     current_logger.info(f"Upgraded password hash for user '{username}'.")
                 else:
                     current_logger.error(f"Failed to upgrade password hash for user '{username}'.")
@@ -359,7 +353,7 @@ def soft_delete_user(db: Session, user_id_to_delete: str, current_user_id: str, 
     params_sa = {"deleted_at": now_iso, "updated_at": now_iso, "user_id": user_id_to_delete}
     params_sqlite = (now_iso, now_iso, user_id_to_delete)
 
-    db_obj, dialect = _get_cursor_and_dialect(conn)
+    db_obj, dialect = _get_cursor_and_dialect(db)
     if not db_obj or not dialect: return False
 
     try:
@@ -400,7 +394,7 @@ def set_biometric_auth_status(db: Session, user_id: str, method: str, enabled: b
     }
     params_sqlite = (enabled_int, current_template_id, now_iso, user_id)
 
-    db_obj, dialect = _get_cursor_and_dialect(conn)
+    db_obj, dialect = _get_cursor_and_dialect(db)
     if not db_obj or not dialect: return False
 
     try:
@@ -428,7 +422,7 @@ def get_biometric_auth_status(db: Session, user_id: str, logger_passed: logging.
     params_sa = {"user_id": user_id}
     params_sqlite = (user_id,)
 
-    db_obj, dialect = _get_cursor_and_dialect(conn)
+    db_obj, dialect = _get_cursor_and_dialect(db)
     if not db_obj or not dialect: return None
 
     user_settings = _fetch_one_as_dict(db_obj, sql_sa, sql_sqlite, params_sa, params_sqlite, dialect, current_logger)
@@ -494,9 +488,9 @@ def activate_and_update_user_details(
     }
     params_sqlite = (role_id, hashed_new_password, full_name, email, now_iso, user_id)
 
-    db_obj, dialect = _get_cursor_and_dialect(conn)
+    db_obj, dialect = _get_cursor_and_dialect(db)
     if not db_obj or not dialect:
-        current_logger.error(f"Unsupported connection type for activate_and_update_user_details: {type(conn)}")
+        current_logger.error(f"Unsupported connection type for activate_and_update_user_details: {type(db)}")
         return False
 
     try:
@@ -522,7 +516,7 @@ def get_user_by_email(db: Session, email: str, logger_passed: logging.Logger | N
     params_sa = {"email": email}
     params_sqlite = (email,)
 
-    db_obj, dialect = _get_cursor_and_dialect(conn)
+    db_obj, dialect = _get_cursor_and_dialect(db)
     if not db_obj or not dialect: return None
 
     user_data = _fetch_one_as_dict(db_obj, sql_sa, sql_sqlite, params_sa, params_sqlite, dialect, current_logger)
@@ -541,9 +535,9 @@ def is_users_table_empty(db: Session, logger_passed: logging.Logger | None = Non
     sql_sqlite = "SELECT 1 FROM Users LIMIT 1"
     sql_sa = text(sql_sqlite)
 
-    db_obj, dialect = _get_cursor_and_dialect(conn)
+    db_obj, dialect = _get_cursor_and_dialect(db)
     if not db_obj or not dialect:
-        current_logger.error(f"Unsupported connection type: {type(conn)}")
+        current_logger.error(f"Unsupported connection type: {type(db)}")
         return True  # Assume empty on error to be safe
 
     try:

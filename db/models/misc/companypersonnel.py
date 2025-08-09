@@ -14,5 +14,7 @@ class CompanyPersonnel(Base):
     email = Column(String)
     created_at = Column(DateTime)
 
+    client_assignments = relationship("ClientAssignedpersonnel", back_populates="companypersonne_rel")
+
     def __repr__(self):
         return f"<CompanyPersonnel(personnel_id='{self.personnel_id}')>"

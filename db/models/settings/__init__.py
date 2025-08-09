@@ -1,1 +1,3 @@
+from .applicationsettings import Applicationsettings
+from .companycalendarsettings import Companycalendarsettings
 from .status_setting import StatusSetting
