@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, REAL, Text, Date
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+from sqlalchemy import Boolean
+from sqlalchemy.sql import func, false
 from db.connection import Base
 
 class Project(Base):
@@ -19,7 +20,7 @@ class Project(Base):
     priority = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    is_deleted = Column(Integer, default=0)
+    is_deleted = Column(Boolean, nullable=False, server_default=false())
     deleted_at = Column(DateTime(timezone=True), nullable=True)
 
     client = relationship("Client")

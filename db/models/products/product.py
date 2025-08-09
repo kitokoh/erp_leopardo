@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, false
 from db.connection import Base
 
 class Product(Base):
@@ -16,10 +16,12 @@ class Product(Base):
     weight = Column(Float, nullable=True)
     dimensions = Column(Text, nullable=True) # Using Text for dimensions
     is_active = Column(Boolean, default=True, nullable=False)
-    is_deleted = Column(Integer, default=0, nullable=False)
+    is_deleted = Column(Boolean, server_default=false(), nullable=False)
     deleted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    proforma_items = relationship("ProformaInvoiceItem", back_populates="product")
 
     def __repr__(self):
         return f"<Product(id='{self.product_id}', product_name='{self.product_name}')>"

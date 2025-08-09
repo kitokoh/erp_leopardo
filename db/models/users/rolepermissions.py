@@ -10,6 +10,6 @@ class RolePermissions(Base):
     def __repr__(self):
         return f'<RolePermissions(role_id={self.role_id}, permission_key={self.permission_key})>'
 
-    # Assuming 'Role' is the class name in role.py and 'Permission' in permissions.py
-    role = relationship('Role')
-    permission = relationship('Permission')
+    # Bidirectional relationship with back_populates
+    role = relationship('Role', back_populates='permissions')
+    permission = relationship('Permission', back_populates='roles')

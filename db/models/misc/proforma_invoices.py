@@ -23,7 +23,7 @@ class ProformaInvoice(Base):
     proforma_invoice_number = Column(String, unique=True, nullable=False)
     client_id = Column(String, ForeignKey('clients.client_id'), nullable=False)
     project_id = Column(String, ForeignKey('projects.project_id'))
-    company_id = Column(String, ForeignKey('companies.id'), nullable=False)
+    company_id = Column(String, ForeignKey('companies.company_id'), nullable=False)
     created_date = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     sent_date = Column(DateTime(timezone=True))
     status = Column(SQLAlchemyEnum(ProformaInvoiceStatusEnum), nullable=False, default=ProformaInvoiceStatusEnum.DRAFT)
@@ -42,7 +42,7 @@ class ProformaInvoice(Base):
 
     client = relationship("Client")
     project = relationship("Project")
-    company = relationship("Company")
+    company = relationship("Company", back_populates="proforma_invoices")
     linked_document = relationship("ClientDocument", foreign_keys=[linked_document_id])
     generated_invoice_document = relationship("ClientDocument", foreign_keys=[generated_invoice_id])
     items = relationship("ProformaInvoiceItem", back_populates="proforma_invoice")

@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, REAL, Date
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, false
 from db.connection import Base
 
 class CompanyAsset(Base):
@@ -17,7 +17,7 @@ class CompanyAsset(Base):
     notes = Column(Text)
     created_at = Column(DateTime)
     updated_at = Column(DateTime)
-    is_deleted = Column(Integer)
+    is_deleted = Column(Boolean, nullable=False, server_default=false())
     deleted_at = Column(DateTime)
 
     def __repr__(self):

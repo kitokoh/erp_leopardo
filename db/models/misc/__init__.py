@@ -56,6 +56,7 @@ from .smtpconfigs import SmtpConfig
 from .tags import Tag
 from .tasks import Task
 from .teammembers import TeamMember
+from .templatecategories import TemplateCategory
 from .templates import Template
 from .transporters import Transporter
 from .usecases import UseCase

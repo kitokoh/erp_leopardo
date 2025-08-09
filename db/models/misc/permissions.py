@@ -9,5 +9,7 @@ class Permission(Base):
     permission_key = Column(String, primary_key=True)
     description = Column(Text)
 
+    roles = relationship('RolePermissions', back_populates='permission', cascade="all, delete-orphan")
+
     def __repr__(self):
         return f"<Permission(permission_key='{self.permission_key}')>"
