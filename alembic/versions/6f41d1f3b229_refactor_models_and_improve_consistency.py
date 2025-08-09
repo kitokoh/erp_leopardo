@@ -9,7 +9,14 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.engine import reflection
 
+
+def table_exists(table_name: str) -> bool:
+    """Check if a table exists in the current database."""
+    bind = op.get_bind()
+    inspector = reflection.Inspector.from_engine(bind)
+    return table_name in inspector.get_table_names()
 
 # revision identifiers, used by Alembic.
 revision: str = '6f41d1f3b229'
