@@ -250,8 +250,11 @@ def initialize_database():
     db_exists = os.path.exists(db_path) if db_path else False
 
     if not db_exists:
-        logging.info("Database does not exist. Initializing a new one.")
-        initialize_database_from_schema(CONFIG)
+        logging.info("Database does not exist. It will be created by Alembic.")
+        # The following call is the source of the "table already exists" conflict.
+        # It uses raw SQL to create tables, which then conflicts with Alembic's first migration.
+        # Alembic should be the single source of truth for schema creation.
+        # initialize_database_from_schema(CONFIG)
 
     try:
         from alembic.config import Config as AlembicConfig
