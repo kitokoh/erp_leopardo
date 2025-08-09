@@ -12,5 +12,6 @@ class ClientFreightforwarders(Base):
 
     def __repr__(self):
         return f'<ClientFreightforwarders client_forwarder_id={self.client_forwarder_id}>'
+
     client_rel = relationship('Client', back_populates='freight_forwarders')
     freightforwarder_rel = relationship('FreightForwarder', back_populates='client_associations')

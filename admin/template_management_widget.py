@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
 
-from db.cruds import templates_crud
+from db.cruds.misc import templates_crud
 from .template_edit_dialog import TemplateEditDialog # Ajout de l'import
 # Supposer que APP_ROOT_DIR et config (pour templates_dir) sont accessibles
 # via le parent ou une configuration globale.

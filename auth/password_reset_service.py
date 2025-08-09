@@ -1,27 +1,23 @@
 # auth/password_reset_service.py
 import logging
 from datetime import datetime, timedelta, timezone
-import os # For path construction for email templates
+import os
 
-from db.cruds import users_crud, password_reset_tokens_crud, user_session_tokens_crud, activity_logs_crud # Added activity_logs_crud
+from db.cruds.users import users_crud, password_reset_tokens_crud
+from db.cruds import user_session_tokens_crud
+from db.cruds.misc import activity_logs_crud
 from utils.security_helpers import generate_secure_token, hash_token_for_storage
 from services.email_service import EmailSenderService
 from db.connection import get_db_connection
-from app_setup import CONFIG, APP_ROOT_DIR # Added APP_ROOT_DIR
+from app_setup import CONFIG, APP_ROOT_DIR
 
 logger = logging.getLogger(__name__)
 
 TOKEN_VALIDITY_HOURS = 1
 APP_NAME = CONFIG.get("app_display_name", "ClientDocManager")
-# BASE_URL for reset links, e.g., "https://myapp.com/reset-password" - for web apps.
-# For desktop, the link might be conceptual or a custom scheme, or user just copies token.
-# For now, we'll assume the user will copy the token from the email.
-# If a web component is available:
-# APP_BASE_URL = CONFIG.get("app_base_url", "http://localhost:8000")
 
 class PasswordResetService:
     def __init__(self):
-        # Email service can be initialized per request or kept if lightweight
         pass
 
     def request_password_reset(self, email: str) -> tuple[bool, str]:
@@ -32,26 +28,25 @@ class PasswordResetService:
         conn = None
         try:
             conn = get_db_connection()
-            user = users_crud.get_user_by_email(email, conn=conn)
+            user = users_crud.get_user_by_email(email, db=conn)
 
             if not user:
                 logger.warning(f"Password reset request for non-existent email: {email}")
                 activity_logs_crud.add_activity_log(
-                    conn=conn,
+                    db=conn,
                     data={
-                        "user_id": None, # User is unknown
+                        "user_id": None,
                         "action_type": "PASSWORD_RESET_REQUEST_UNKNOWN_EMAIL",
                         "details": f"Password reset requested for non-existent or non-disclosed email: {email}.",
                     }
                 )
-                # Return a generic message to avoid disclosing whether an email exists
                 return True, "Si un compte est associé à cet e-mail, un lien de réinitialisation a été envoyé."
 
-            user_id = user['user_id'] # Get user_id early for logging
+            user_id = user['user_id']
             if not user.get('is_active'):
                 logger.warning(f"Password reset request for inactive user: {email} (User ID: {user_id})")
                 activity_logs_crud.add_activity_log(
-                    conn=conn,
+                    db=conn,
                     data={
                         "user_id": user_id,
                         "action_type": "PASSWORD_RESET_REQUEST_INACTIVE_USER",
@@ -62,14 +57,14 @@ class PasswordResetService:
                 )
                 return False, "Ce compte utilisateur est désactivé. Réinitialisation de mot de passe non permise."
 
-            original_token = generate_secure_token(32) # 32 bytes = 43 URL-safe chars
+            original_token = generate_secure_token(32)
             token_hash = hash_token_for_storage(original_token)
             expires_at = datetime.now(timezone.utc) + timedelta(hours=TOKEN_VALIDITY_HOURS)
 
             if not password_reset_tokens_crud.create_reset_token(conn, user_id, token_hash, expires_at):
                 logger.error(f"Failed to create password reset token in DB for user {user_id}.")
                 activity_logs_crud.add_activity_log(
-                    conn=conn,
+                    db=conn,
                     data={
                         "user_id": user_id,
                         "action_type": "PASSWORD_RESET_TOKEN_CREATION_FAILED",
@@ -81,7 +76,7 @@ class PasswordResetService:
                 return False, "Erreur interne lors de la création de la demande de réinitialisation."
 
             activity_logs_crud.add_activity_log(
-                conn=conn,
+                db=conn,
                 data={
                     "user_id": user_id,
                     "action_type": "PASSWORD_RESET_TOKEN_CREATED",
@@ -91,31 +86,19 @@ class PasswordResetService:
                 }
             )
 
-            # Send email
-            # Construct reset link (conceptual for desktop, user might copy token)
-            # reset_link = f"{APP_BASE_URL}/reset-password?token={original_token}"
-            # For desktop, we'll emphasize copying the token.
-            reset_link_placeholder = f"app://reset-password?token={original_token}" # Example custom scheme
+            reset_link_placeholder = f"app://reset-password?token={original_token}"
 
             email_context = {
                 "user_full_name": user.get("full_name", user.get("username", "Utilisateur")),
-                "reset_link": reset_link_placeholder, # User will likely copy the token itself
+                "reset_link": reset_link_placeholder,
                 "reset_token": original_token,
                 "token_validity_hours": TOKEN_VALIDITY_HOURS,
                 "app_name": APP_NAME,
             }
 
-            # Determine email language - for now, assume French or use a setting
-            # This could be enhanced by storing user's preferred language
-            lang_code = "fr" # Default or from user profile/app settings
-
-            # Load the HTML content from file
-            # This path needs to be relative to where EmailSenderService expects it or absolute
-            # For now, assuming EmailSenderService can find it or path is adjusted.
-            # Let's assume app_setup.APP_ROOT_DIR is available for constructing path.
-            from app_setup import APP_ROOT_DIR
+            lang_code = "fr"
             template_filename = f"password_reset_email_{lang_code}.html"
-            template_path = os.path.join(APP_ROOT_DIR, "email_template_designs", template_filename)
+            template_path = os.path.join(APP_ROOT_DIR, "resources", "email_template_designs", template_filename)
 
             html_body_content = ""
             try:
@@ -123,18 +106,12 @@ class PasswordResetService:
                     html_body_content = f.read()
             except FileNotFoundError:
                 logger.error(f"Password reset email template not found: {template_path}")
-                # Fallback to a very basic text email if template is missing
                 html_body_content = f"Veuillez utiliser ce jeton pour réinitialiser votre mot de passe : {original_token}"
-                # Consider not sending if template is critical and missing.
-                # return False, "Erreur interne: Modèle d'e-mail manquant."
-
 
             email_subject = f"Réinitialisation de votre mot de passe pour {APP_NAME}"
             if lang_code == "en":
                 email_subject = f"Password Reset Request for {APP_NAME}"
 
-
-            # Initialize EmailSenderService - it will use default SMTP config
             email_service = EmailSenderService()
             if not email_service.smtp_config:
                  logger.error("SMTP configuration not available for password reset email.")
@@ -142,17 +119,16 @@ class PasswordResetService:
 
             email_sent, email_msg = email_service.send_email(
                 recipient_email=user['email'],
-                subject_template=email_subject, # Subject is already personalized or fixed
-                body_html_content_or_filename=html_body_content, # Pass direct HTML content
-                context_data=email_context, # Context for placeholder replacement
-                # template_obj=None, # Not using DB template object for this system email
+                subject_template=email_subject,
+                body_html_content_or_filename=html_body_content,
+                context_data=email_context,
                 attachments=[]
             )
 
             if email_sent:
                 logger.info(f"Password reset email sent to {user['email']} for user {user_id}.")
                 activity_logs_crud.add_activity_log(
-                    conn=conn,
+                    db=conn,
                     data={
                         "user_id": user_id,
                         "action_type": "PASSWORD_RESET_EMAIL_SENT",
@@ -165,7 +141,7 @@ class PasswordResetService:
             else:
                 logger.error(f"Failed to send password reset email to {user['email']}: {email_msg}")
                 activity_logs_crud.add_activity_log(
-                    conn=conn,
+                    db=conn,
                     data={
                         "user_id": user_id,
                         "action_type": "PASSWORD_RESET_EMAIL_FAILED",
@@ -174,18 +150,13 @@ class PasswordResetService:
                         "related_entity_id": user_id
                     }
                 )
-                # Don't expose detailed email sending failure to user for security.
-                # But we need to rollback or mark the token as unusable if email failed.
-                # For simplicity now, the token remains but won't be usable if user can't get it.
-                # A more robust system might retry or log for admin attention.
                 return False, "Impossible d'envoyer l'e-mail de réinitialisation pour le moment. Veuillez réessayer plus tard."
 
         except Exception as e:
             logger.error(f"Unexpected error in request_password_reset for {email}: {e}", exc_info=True)
-            # Log generic failure if specific user_id isn't available yet
             user_id_for_log = user.get('user_id') if 'user' in locals() and user else None
             activity_logs_crud.add_activity_log(
-                conn=conn, # conn might be None if get_db_connection failed
+                db=conn,
                 data={
                     "user_id": user_id_for_log,
                     "action_type": "PASSWORD_RESET_REQUEST_EXCEPTION",
@@ -235,9 +206,9 @@ class PasswordResetService:
 
             if not token_data:
                 activity_logs_crud.add_activity_log(
-                    conn=conn,
+                    db=conn,
                     data={
-                        "user_id": None, # User ID unknown if token is invalid
+                        "user_id": None,
                         "action_type": "PASSWORD_RESET_INVALID_TOKEN",
                         "details": f"Attempt to reset password with invalid/expired/used token hash {token_hash[:10]}...",
                         "related_entity_id": token_hash
@@ -247,11 +218,10 @@ class PasswordResetService:
 
             user_id = token_data['user_id']
 
-            # Update user's password
-            if not users_crud.update_user_password(user_id, new_password, conn=conn):
+            if not users_crud.update_user_password(user_id, new_password, db=conn):
                 logger.error(f"Failed to update password in DB for user {user_id} during reset.")
                 activity_logs_crud.add_activity_log(
-                    conn=conn,
+                    db=conn,
                     data={
                         "user_id": user_id,
                         "action_type": "PASSWORD_RESET_DB_UPDATE_FAILED",
@@ -262,11 +232,10 @@ class PasswordResetService:
                 )
                 return False, "Erreur lors de la mise à jour du mot de passe."
 
-            # Mark reset token as used
             if not password_reset_tokens_crud.mark_token_as_used(conn, token_hash):
                 logger.warning(f"Failed to mark reset token {token_hash[:10]}... as used for user {user_id}. This might allow reuse if not handled.")
                 activity_logs_crud.add_activity_log(
-                    conn=conn,
+                    db=conn,
                     data={
                         "user_id": user_id,
                         "action_type": "PASSWORD_RESET_TOKEN_MARK_USED_FAILED",
@@ -275,13 +244,11 @@ class PasswordResetService:
                         "related_entity_id": token_hash
                     }
                 )
-                # This is a potential issue but password has been reset. Continue with success for user.
 
-            # Invalidate all active "Remember Me" session tokens for this user
             deleted_session_tokens = user_session_tokens_crud.delete_all_user_session_tokens(conn, user_id)
             logger.info(f"Invalidated {deleted_session_tokens} active session token(s) for user {user_id} after password reset.")
             activity_logs_crud.add_activity_log(
-                conn=conn,
+                db=conn,
                 data={
                     "user_id": user_id,
                     "action_type": "SESSION_TOKENS_INVALIDATED_POST_PASSWORD_RESET",
@@ -291,12 +258,9 @@ class PasswordResetService:
                 }
             )
 
-            # Optionally, send password change confirmation email here
-            # ...
-
             logger.info(f"Password successfully reset for user {user_id}.")
             activity_logs_crud.add_activity_log(
-                conn=conn,
+                db=conn,
                 data={
                     "user_id": user_id,
                     "action_type": "PASSWORD_RESET_SUCCESS",
@@ -311,7 +275,7 @@ class PasswordResetService:
             logger.error(f"Error during password reset with token: {e}", exc_info=True)
             user_id_for_log = token_data.get('user_id') if 'token_data' in locals() and token_data else None
             activity_logs_crud.add_activity_log(
-                conn=conn, # conn might be None if get_db_connection failed earlier
+                db=conn,
                 data={
                     "user_id": user_id_for_log,
                     "action_type": "PASSWORD_RESET_WITH_TOKEN_EXCEPTION",
@@ -319,13 +283,7 @@ class PasswordResetService:
                     "related_entity_id": token_hash[:10] if token_hash else "N/A"
                 }
             )
-            # Rollback might be needed if conn was used for multiple ops, but users_crud and password_reset_tokens_crud manage their own commits.
             return False, "Une erreur interne est survenue lors de la réinitialisation du mot de passe."
         finally:
             if conn:
                 conn.close()
-
-# Instantiate if you want to use it as `auth_service.password_reset_service.request_password_reset()`
-# Or keep as a class and instantiate where needed.
-# For now, let's assume it will be instantiated on demand or be part of a larger auth service object.
-# password_reset_service_instance = PasswordResetService()

@@ -35,6 +35,7 @@ class Client(Base):
     assigned_personnel = relationship("ClientAssignedpersonnel", back_populates="client_rel")
     documents = relationship("ClientDocument", back_populates="client")
     freight_forwarders = relationship("ClientFreightforwarders", back_populates="client_rel")
+    transporters = relationship("ClientTransporters", back_populates="client_rel")
 
     # default_template = relationship("Template")
     __table_args__ = {'extend_existing': True}
