@@ -189,9 +189,9 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
 
     # Import here to avoid circular dependencies if roles_crud uses get_db_connection
     # Alias imports to avoid conflict with the 'logger' variable in this function's scope.
-    from db.cruds.roles_crud import add_role as crud_add_role, get_role_by_name as crud_get_role_by_name
+    from db.cruds.users.roles_crud import add_role as crud_add_role, get_role_by_name as crud_get_role_by_name
     # users_crud functions now accept logger_passed
-    from db.cruds import users_crud # Keep direct import for users_crud
+    from db.cruds.users import users_crud
     from auth.permissions import ADMINISTRATOR, TEAM_LEAD, OPERATOR, ALL_PERMISSIONS, PERMISSION_MAP # Role names and permission map
     # Permissions and PERMISSION_MAP will be imported by the function that uses them (_seed_permissions_and_role_permissions)
 
@@ -765,8 +765,10 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
                 try:
                     # Changed to absolute import based on PROJECT_ROOT being in sys.path
                     from db.hidroguc_product_seeder import seed_hidroguc_products
+                    from sqlalchemy.orm import Session
                     logger.info("Attempting to seed HİDROGÜÇ PRES products...")
-                    seed_hidroguc_products(conn, cursor, logger_passed=logger)
+                    with Session(db_connection_module.engine) as session:
+                        seed_hidroguc_products(session, logger_passed=logger)
                     logger.info("HİDROGÜÇ PRES products seeding attempt finished.")
                 except ImportError as e_import_hp:
                     logger.error(f"Could not import seed_hidroguc_products. Error: {e_import_hp}. Skipping HİDROGÜÇ PRES products seeding.", exc_info=True)
@@ -1525,24 +1527,15 @@ def seed_only_hidroguc_products():
     logger = logging.getLogger(__name__)
     logger.info("Starting HİDROGÜÇ PRES products specific seeding.")
 
-    raw_conn = None
+    from sqlalchemy.orm import Session
     try:
-        raw_conn = db_connection_module.get_raw_sqlite_connection()
-        cursor = raw_conn.cursor()
-
-        from db.hidroguc_product_seeder import seed_hidroguc_products
-        seed_hidroguc_products(raw_conn, cursor, logger_passed=logger)
-
-        raw_conn.commit()
+        with Session(db_connection_module.engine) as session:
+            from db.hidroguc_product_seeder import seed_hidroguc_products
+            seed_hidroguc_products(session, logger_passed=logger)
+            session.commit()
         logger.info("HİDROGÜÇ PRES products specific seeding committed successfully.")
     except Exception as e:
         logger.error(f"Error during HİDROGÜÇ PRES products specific seeding: {e}", exc_info=True)
-        if raw_conn:
-            raw_conn.rollback()
-    finally:
-        if raw_conn:
-            raw_conn.close()
-            logger.info("Raw SQLite connection for HİDROGÜÇ PRES products seeding closed.")
 
 
 if __name__ == '__main__':
