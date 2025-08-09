@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Float, REAL, Date
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from db.connection import Base
@@ -9,7 +9,6 @@ class UserMotivationalMessages(Base):
     message = Column(Text, nullable=False)
     language_code = Column(Text)
     is_active = Column(Boolean)
-    -- = Column(String)
     created_at = Column(DateTime)
     updated_at = Column(DateTime)
 
