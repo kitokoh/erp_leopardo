@@ -43,7 +43,7 @@ from PyQt5.QtWidgets import QDialog # Required for QDialog.Accepted check
 import db
 from db.init_schema import initialize_database as initialize_database_from_schema
 from db.cruds.misc.application_settings_crud import get_setting, set_setting
-from db.db_seed import run_seed, seed_only_hidroguc_products
+from db.seeders import seed_all
 from db.cruds.misc.companies_crud import get_all_companies, add_company
 from db.cruds.users import users_crud
 # from auth.login_window import LoginWindow # Replaced by LoginDialog
@@ -348,7 +348,9 @@ class CRMModule(QMainWindow):
             logging.error("main.py: Could not find db.connection.set_db_config. DB calls might fail.")
         # Initialize the database. This function now encapsulates all DB setup.
         initialize_database()
-        seed_only_hidroguc_products()
+        from db.connection import Session
+        with Session() as session:
+            seed_all(session)
 
         # Set the configuration for document_generator.context_builder
         try:
@@ -368,7 +370,8 @@ class CRMModule(QMainWindow):
         try:
             conn_cleanup = get_db_connection() # Get a connection for cleanup tasks
             if conn_cleanup:
-                from db.cruds import user_session_tokens_crud, password_reset_tokens_crud
+                from db.cruds import user_session_tokens_crud
+                from db.cruds.users import password_reset_tokens_crud
 
                 cleaned_session_tokens = user_session_tokens_crud.cleanup_expired_tokens(conn_cleanup)
                 logging.info(f"Cleaned up {cleaned_session_tokens} expired 'Remember Me' session tokens on startup.")
@@ -502,12 +505,14 @@ class CRMModule(QMainWindow):
         # --- Coordinated Data Seeding ---
         try:
             logging.info("Attempting to run data seeding if necessary...")
-            if users_crud.is_users_table_empty():
+            db_session_for_check = db.connection.get_db_connection()
+            if users_crud.is_users_table_empty(db=db_session_for_check):
                 logging.info("Users table is empty, running data seeding...")
                 run_seed()
                 logging.info("Data seeding process via run_seed() completed.")
             else:
                 logging.info("Users table is not empty, skipping data seeding.")
+            db_session_for_check.close()
         except Exception as e_seed_run:
             logging.error(f"An unexpected error occurred when calling run_seed(): {e_seed_run}", exc_info=True)
         # --- End Coordinated Data Seeding ---
