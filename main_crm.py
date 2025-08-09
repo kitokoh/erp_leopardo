@@ -250,8 +250,11 @@ def initialize_database():
     db_exists = os.path.exists(db_path) if db_path else False
 
     if not db_exists:
-        logging.info("Database does not exist. Initializing a new one.")
-        initialize_database_from_schema(CONFIG)
+        logging.info("Database does not exist. It will be created by Alembic.")
+        # The following call is the source of the "table already exists" conflict.
+        # It uses raw SQL to create tables, which then conflicts with Alembic's first migration.
+        # Alembic should be the single source of truth for schema creation.
+        # initialize_database_from_schema(CONFIG)
 
     try:
         from alembic.config import Config as AlembicConfig
@@ -285,9 +288,12 @@ def initialize_database():
 
     from db.connection import Base as MainBase, engine as actual_main_engine
     if MainBase and actual_main_engine:
-        logging.info("Creating all tables from MainBase metadata...")
-        MainBase.metadata.create_all(bind=actual_main_engine)
-        logging.info("All tables created successfully.")
+        # This call is problematic as Alembic is now the single source of truth for schema management.
+        # Running create_all can lead to conflicts where it tries to create tables that Alembic
+        # has already created or expects to manage.
+        # logging.info("Creating all tables from MainBase metadata...")
+        # MainBase.metadata.create_all(bind=actual_main_engine)
+        logging.info("Table creation is now handled by Alembic migrations. Skipping redundant create_all call.")
     else:
         logging.error("MainBase or actual_main_engine not available. Cannot create tables.")
 
