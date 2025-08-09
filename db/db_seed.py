@@ -310,7 +310,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         if DEFAULT_ADMIN_USERNAME and DEFAULT_ADMIN_USERNAME != target_admin_username: # target_admin_username is 'admin'
             logger.info(f"Checking for original default admin user '{DEFAULT_ADMIN_USERNAME}' for compatibility (current admin_user_id refers to '{target_admin_username}').")
             # We use get_any_user_by_username here to find it even if inactive, for logging purposes.
-            original_default_admin_details = users_crud.get_any_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn, logger_passed=logger)
+            original_default_admin_details = users_crud.get_any_user_by_username(conn, DEFAULT_ADMIN_USERNAME, logger_passed=logger)
             if original_default_admin_details:
                 logger.info(f"Found user record for '{DEFAULT_ADMIN_USERNAME}' with ID {original_default_admin_details['user_id']}. This is separate from the primary '{target_admin_username}'.")
             else:
@@ -323,15 +323,19 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
     # Seed Default Operational User (depends on 'Operator' role_id from current_role_ids)
     DEFAULT_OPERATIONAL_USERNAME = "default_operational_user"
     logger.info(f"Checking for default operational user '{DEFAULT_OPERATIONAL_USERNAME}'...")
-    existing_operational_user = users_crud.get_user_by_username(DEFAULT_OPERATIONAL_USERNAME, conn=conn, logger_passed=logger) # Checks for active user
+    existing_operational_user = users_crud.get_user_by_username(conn, DEFAULT_OPERATIONAL_USERNAME, logger_passed=logger) # Checks for active user
     if not existing_operational_user:
         operator_role_id_for_op_user = current_role_ids.get(OPERATOR)
         if operator_role_id_for_op_user:
             logger.info(f"Creating default operational user '{DEFAULT_OPERATIONAL_USERNAME}' with role '{OPERATOR}'.")
             op_user_id = users_crud.add_user(
-                username=DEFAULT_OPERATIONAL_USERNAME, password=uuid.uuid4().hex, role_id=operator_role_id_for_op_user,
-                full_name="Default Operational User", email=f"{DEFAULT_OPERATIONAL_USERNAME}@example.local",
-                conn=conn, logger_passed=logger
+                db=conn,
+                username=DEFAULT_OPERATIONAL_USERNAME,
+                password=uuid.uuid4().hex,
+                role_id=operator_role_id_for_op_user,
+                full_name="Default Operational User",
+                email=f"{DEFAULT_OPERATIONAL_USERNAME}@example.local",
+                logger_passed=logger
             )
             if op_user_id: logger.info(f"Created default operational user ID: {op_user_id}.")
             else: logger.error(f"Failed to create default operational user: {DEFAULT_OPERATIONAL_USERNAME}")
@@ -370,7 +374,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
         if admin_user_id: # This 'admin_user_id' is now from super_admin_user_id (raw seeded 'admin')
             logger.info(f"Attempting to seed TeamMember for admin_user_id: {admin_user_id}")
             # Fetch the admin user's details using the admin_user_id
-            admin_details_for_tm_seed = users_crud.get_user_by_id(admin_user_id, conn=conn, logger_passed=logger)
+            admin_details_for_tm_seed = users_crud.get_user_by_id(conn, admin_user_id, logger_passed=logger)
 
             if admin_details_for_tm_seed:
                 logger.info(f"Details for TeamMember seeding (admin): ID={admin_user_id}, Name='{admin_details_for_tm_seed.get('full_name')}', Email='{admin_details_for_tm_seed.get('email')}', Role='{admin_details_for_tm_seed.get('role_name')}'")
@@ -541,7 +545,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
             # Fallback for original DEFAULT_ADMIN_USERNAME if that's different and was used elsewhere
             if DEFAULT_ADMIN_USERNAME != "admin":
                 logger.info(f"Checking for original default admin user '{DEFAULT_ADMIN_USERNAME}' for compatibility in other seeding parts if needed.")
-                original_admin_user_dict = users_crud.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn, logger_passed=logger)
+                original_admin_user_dict = users_crud.get_user_by_username(conn, DEFAULT_ADMIN_USERNAME, logger_passed=logger)
                 if original_admin_user_dict:
                     # This original_admin_user_id might be used by other parts of seed script if they haven't been updated
                     # to use the new 'admin_user_id' which refers to the "admin" with "super_admin" role.
@@ -1163,7 +1167,7 @@ def _seed_sample_referents(cursor: sqlite3.Cursor, conn: sqlite3.Connection, log
     from db.cruds import commandes_crud # For checking if client has orders
 
     # Get a default user ID (e.g., admin) for created_by_user_id
-    admin_user = users_crud.get_user_by_username(DEFAULT_ADMIN_USERNAME, conn=conn)
+    admin_user = users_crud.get_user_by_username(conn, DEFAULT_ADMIN_USERNAME)
     if not admin_user or 'user_id' not in admin_user:
         logger.error(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' not found. Cannot seed referents.")
         return
