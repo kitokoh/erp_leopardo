@@ -189,7 +189,7 @@ def _original_seed_initial_data_func_placeholder(cursor: sqlite3.Cursor, conn: s
 
     # Import here to avoid circular dependencies if roles_crud uses get_db_connection
     # Alias imports to avoid conflict with the 'logger' variable in this function's scope.
-    from db.cruds.roles_crud import add_role as crud_add_role, get_role_by_name as crud_get_role_by_name
+    from db.cruds.users.roles_crud import add_role as crud_add_role, get_role_by_name as crud_get_role_by_name
     # users_crud functions now accept logger_passed
     from db.cruds import users_crud # Keep direct import for users_crud
     from auth.permissions import ADMINISTRATOR, TEAM_LEAD, OPERATOR, ALL_PERMISSIONS, PERMISSION_MAP # Role names and permission map

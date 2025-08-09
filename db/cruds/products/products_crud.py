@@ -39,6 +39,15 @@ class ProductsCRUD:
 
         return query.first()
 
+    def get_product_by_name(self, product_name: str, db: Session, include_deleted: bool = False) -> Optional[Product]:
+        """Fetches a single product by its name."""
+        query = db.query(Product).filter(Product.product_name == product_name)
+
+        if not include_deleted:
+            query = query.filter(Product.is_deleted == False)
+
+        return query.first()
+
     def get_all_products(self, db: Session, skip: int = 0, limit: int = 100, include_deleted: bool = False) -> List[Product]:
         """Retrieves all products with pagination."""
         query = db.query(Product)
