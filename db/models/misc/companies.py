@@ -16,5 +16,7 @@ class Company(Base):
     created_at = Column(DateTime)
     updated_at = Column(DateTime)
 
+    proforma_invoices = relationship("ProformaInvoice", back_populates="company")
+
     def __repr__(self):
         return f"<Company(company_id='{self.company_id}')>"

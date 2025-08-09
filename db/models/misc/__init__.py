@@ -31,6 +31,7 @@ from .invoices import Invoice
 from .jobopenings import JobOpening
 from .kpis import Kpi
 from .licenses import License
+from .media_items import MediaItem
 from .menuconfiguration import MenuConfiguration
 from .moneytransferagents import MoneyTransferAgent
 from .motivational_messages import MotivationalMessage
@@ -52,9 +53,10 @@ from .savtickets import SavTicket
 from .scheduledemails import ScheduledEmail
 from .sectors import Sector
 from .smtpconfigs import SmtpConfig
+from .tags import Tag
 from .tasks import Task
 from .teammembers import TeamMember
+from .templatecategories import TemplateCategory
 from .templates import Template
 from .transporters import Transporter
 from .usecases import UseCase
-from .user_session_tokens import UserSessionToken

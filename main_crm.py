@@ -285,9 +285,12 @@ def initialize_database():
 
     from db.connection import Base as MainBase, engine as actual_main_engine
     if MainBase and actual_main_engine:
-        logging.info("Creating all tables from MainBase metadata...")
-        MainBase.metadata.create_all(bind=actual_main_engine)
-        logging.info("All tables created successfully.")
+        # This call is problematic as Alembic is now the single source of truth for schema management.
+        # Running create_all can lead to conflicts where it tries to create tables that Alembic
+        # has already created or expects to manage.
+        # logging.info("Creating all tables from MainBase metadata...")
+        # MainBase.metadata.create_all(bind=actual_main_engine)
+        logging.info("Table creation is now handled by Alembic migrations. Skipping redundant create_all call.")
     else:
         logging.error("MainBase or actual_main_engine not available. Cannot create tables.")
 

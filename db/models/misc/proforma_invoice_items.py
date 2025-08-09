@@ -8,14 +8,14 @@ class ProformaInvoiceItem(Base):
 
     id = Column(String, primary_key=True)
     proforma_invoice_id = Column(String, ForeignKey('proforma_invoices.id'))
-    product_id = Column(Integer, ForeignKey('products.id'))
+    product_id = Column(Integer, ForeignKey('products.product_id'))
     description = Column(Text)
     quantity = Column(REAL)
     unit_price = Column(REAL)
     total_price = Column(REAL)
 
     proforma_invoice = relationship("ProformaInvoice", back_populates="items")
-    product = relationship("Product")
+    product = relationship("Product", back_populates="proforma_items")
 
     def __repr__(self):
         return f"<ProformaInvoiceItem(id='{self.id}')>"

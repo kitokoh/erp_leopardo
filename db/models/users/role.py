@@ -12,6 +12,9 @@ class Role(Base):
     description = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    users = relationship("User", back_populates="role")
+    permissions = relationship('RolePermissions', back_populates='role', cascade="all, delete-orphan")
     __table_args__ = {'extend_existing': True}
 
     def __repr__(self):

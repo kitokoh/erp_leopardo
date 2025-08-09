@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Float, REAL, Date
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, false
 from db.connection import Base
 
 class CompanyExpense(Base):
@@ -16,7 +16,7 @@ class CompanyExpense(Base):
     created_by_user_id = Column(String, ForeignKey('users.user_id'))
     created_at = Column(DateTime)
     updated_at = Column(DateTime)
-    is_deleted = Column(Integer)
+    is_deleted = Column(Boolean, nullable=False, server_default=false())
     deleted_at = Column(DateTime)
 
     def __repr__(self):

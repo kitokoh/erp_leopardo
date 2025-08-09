@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from db.connection import Base
 
-class Itemstoragelocations(Base):
+class ItemStorageLocation(Base):
     __tablename__ = 'item_storage_locations'
     item_storage_location_id = Column(Text, primary_key=True)
     item_id = Column(Text)

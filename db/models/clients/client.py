@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Float
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, false
 from db.connection import Base
 
 class Client(Base):
@@ -24,7 +24,7 @@ class Client(Base):
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
     created_by_user_id = Column(String, ForeignKey('users.user_id'))
-    is_deleted = Column(Integer, server_default='0', nullable=False)
+    is_deleted = Column(Boolean, server_default=false(), nullable=False)
     deleted_at = Column(DateTime)
     lead_source = Column(String)
 

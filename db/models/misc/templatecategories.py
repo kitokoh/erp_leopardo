@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from db.connection import Base
 
-class Templatecategories(Base):
+class TemplateCategory(Base):
     __tablename__ = 'template_categories'
     category_id = Column(Integer, primary_key=True, autoincrement=True)
     category_name = Column(Text, nullable=False, unique=True)
