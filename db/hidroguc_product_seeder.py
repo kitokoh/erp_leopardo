@@ -9,8 +9,6 @@ JSON_FILE_PATH = os.path.join(os.path.dirname(__file__), 'seed_data', 'hidroguc_
 
 def _add_product_if_not_exists(product_data, db: Session, logger):
     """Ajoute un produit s'il n'existe pas déjà basé sur product_name."""
-    # The original code used product_code, but the model doesn't have it.
-    # We'll use product_name as the unique identifier for seeding purposes.
     existing_product = products_crud_instance.get_product_by_name(product_data['product_name'], db=db)
     if existing_product:
         logger.info(f"Le produit avec le nom '{product_data['product_name']}' existe déjà (ID: {existing_product.product_id}). Utilisation de l'existant.")
@@ -23,7 +21,6 @@ def _add_product_if_not_exists(product_data, db: Session, logger):
                 logger.error(f"Impossible de convertir base_unit_price '{product_data['base_unit_price']}' en float pour le produit {product_data.get('product_name')}.")
                 return None
 
-        # The add_product method returns a Product object, not a dict
         new_product = products_crud_instance.add_product(product_data, db=db)
         if new_product and new_product.product_id:
             logger.info(f"Produit '{new_product.product_name}' ajouté avec ID: {new_product.product_id}.")
