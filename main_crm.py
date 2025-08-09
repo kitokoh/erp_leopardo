@@ -43,7 +43,7 @@ from PyQt5.QtWidgets import QDialog # Required for QDialog.Accepted check
 import db
 from db.init_schema import initialize_database as initialize_database_from_schema
 from db.cruds.misc.application_settings_crud import get_setting, set_setting
-from db.db_seed import run_seed, seed_only_hidroguc_products
+from db.seeders import seed_all
 from db.cruds.misc.companies_crud import get_all_companies, add_company
 from db.cruds.users import users_crud
 # from auth.login_window import LoginWindow # Replaced by LoginDialog
@@ -348,7 +348,9 @@ class CRMModule(QMainWindow):
             logging.error("main.py: Could not find db.connection.set_db_config. DB calls might fail.")
         # Initialize the database. This function now encapsulates all DB setup.
         initialize_database()
-        seed_only_hidroguc_products()
+        from db.connection import Session
+        with Session() as session:
+            seed_all(session)
 
         # Set the configuration for document_generator.context_builder
         try:

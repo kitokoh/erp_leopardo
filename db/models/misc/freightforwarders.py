@@ -17,5 +17,7 @@ class FreightForwarder(Base):
     created_at = Column(DateTime)
     updated_at = Column(DateTime)
 
+    client_associations = relationship("ClientFreightforwarders", back_populates="freightforwarder_rel")
+
     def __repr__(self):
         return f"<FreightForwarder(forwarder_id='{self.forwarder_id}')>"

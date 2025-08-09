@@ -12,5 +12,6 @@ class ClientAssignedpersonnel(Base):
 
     def __repr__(self):
         return f'<ClientAssignedpersonnel assignment_id={self.assignment_id}>'
+
     client_rel = relationship('Client', back_populates='assigned_personnel')
     companypersonne_rel = relationship('CompanyPersonnel', back_populates='client_assignments')
