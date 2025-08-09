@@ -73,41 +73,62 @@ def add_user(db: Session, username: str, password: str, role_id: int, full_name:
 
     final_hashed_password = util_hash_password(password, logger_passed=current_logger)
     user_id_generated = str(uuid.uuid4())
+    now_iso = datetime.utcnow().isoformat() + "Z"
 
-    new_user = User(
-        user_id=user_id_generated,
-        username=username,
-        hashed_password=final_hashed_password,
-        full_name=full_name,
-        email=email,
-        role_id=role_id,
-        is_active=True,
-    )
-    db.add(new_user)
+    db_obj, dialect = _get_cursor_and_dialect(db)
+    if not db_obj or not dialect:
+        current_logger.error(f"Unsupported connection type: {type(db)}")
+        return None
+
     try:
-        db.commit()
+        if dialect == "sqlalchemy":
+            new_user = User(
+                user_id=user_id_generated, username=username, hashed_password=final_hashed_password,
+                full_name=full_name, email=email, role_id=role_id, is_active=True,
+                created_at=datetime.utcnow(), updated_at=datetime.utcnow()
+            )
+            db_obj.add(new_user)
+            db_obj.commit()
+        else: # sqlite dialect
+            sql_sqlite = """
+                INSERT INTO Users (user_id, username, hashed_password, full_name, email, role_id, is_active, created_at, updated_at, is_deleted)
+                VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, 0)
+            """
+            params_sqlite = (user_id_generated, username, final_hashed_password, full_name, email, role_id, now_iso, now_iso)
+            db_obj.execute(sql_sqlite, params_sqlite)
+            # The raw connection is expected to be committed by the caller in the seeder.
+
         current_logger.info(f"User '{username}' added successfully with ID {user_id_generated}.")
         return user_id_generated
-    except Exception as e:
+    except (sqlite3.Error, SQLAlchemyError) as e:
         current_logger.error(f"Error adding user '{username}': {e}", exc_info=True)
-        db.rollback()
+        if isinstance(db, Session):
+            db.rollback()
         return None
 
 def get_user_by_username(db: Session, username: str, logger_passed: logging.Logger | None = None) -> dict | None:
     current_logger = logger_passed if logger_passed else module_logger
-    try:
-        user = db.query(User).join(Role).filter(User.username == username, User.is_active == True, User.is_deleted == 0).first()
-        if user:
-            user_data = {c.name: getattr(user, c.name) for c in user.__table__.columns}
-            user_data['role_name'] = user.role.role_name
-            current_logger.debug(f"User '{username}' found. Hash: {user_data.get('hashed_password')}")
-            return user_data
-        else:
-            current_logger.debug(f"User '{username}' not found.")
-            return None
-    except Exception as e:
-        current_logger.error(f"Error getting user by username {username}: {e}", exc_info=True)
+    sql_select_part = "SELECT u.*, r.role_name FROM Users u JOIN Roles r ON u.role_id = r.role_id"
+
+    # This query specifically finds active, non-deleted users.
+    sql_sqlite = f"{sql_select_part} WHERE u.username = ? AND u.is_active = 1 AND (u.is_deleted = 0 OR u.is_deleted IS NULL)"
+    sql_sa = text(f"{sql_select_part} WHERE u.username = :username AND u.is_active = 1 AND (u.is_deleted = 0 OR u.is_deleted IS NULL)")
+
+    params_sa = {"username": username}
+    params_sqlite = (username,)
+
+    db_obj, dialect = _get_cursor_and_dialect(db)
+    if not db_obj or not dialect:
+        current_logger.error(f"Unsupported connection type: {type(db)}")
         return None
+
+    user_data = _fetch_one_as_dict(db_obj, sql_sa, sql_sqlite, params_sa, params_sqlite, dialect, current_logger)
+
+    if user_data:
+        current_logger.debug(f"User '{username}' found. Hash: {user_data.get('hashed_password')}")
+    else:
+        current_logger.debug(f"User '{username}' not found.")
+    return user_data
 
 def get_any_user_by_username(db: Session, username: str, logger_passed: logging.Logger | None = None) -> dict | None:
     """Fetches a user by username, regardless of their is_active or is_deleted status."""
