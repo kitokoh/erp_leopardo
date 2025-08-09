@@ -13,10 +13,16 @@ from sqlalchemy.engine import reflection
 
 
 def table_exists(table_name: str) -> bool:
-    """Check if a table exists in the current database."""
+    """Check if a table exists using a direct SQL query for SQLite to avoid inspector caching."""
     bind = op.get_bind()
-    inspector = reflection.Inspector.from_engine(bind)
-    return table_name in inspector.get_table_names()
+    if bind.dialect.name == 'sqlite':
+        sql_query = sa.text(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'")
+        result = bind.execute(sql_query).scalar_one_or_none()
+        return result is not None
+    else:
+        # Fallback to inspector for other databases
+        inspector = reflection.Inspector.from_engine(bind)
+        return table_name in inspector.get_table_names()
 
 # revision identifiers, used by Alembic.
 revision: str = '6f41d1f3b229'
