@@ -21,5 +21,5 @@ class Commandeitems(Base):
 
     def __repr__(self):
         return f'<Commandeitems item_id={self.item_id}>'
-    commande_rel = relationship('Commandes')
+    commande_rel = relationship('Commande')
     product_rel = relationship('Product')
