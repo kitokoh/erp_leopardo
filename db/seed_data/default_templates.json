@@ -1,0 +1,107 @@
+{
+  "email_templates": [
+    {
+      "template_name": "SAV Ticket Ouvert (FR)", "template_type": "email_sav_ticket_opened", "language_code": "fr",
+      "base_file_name": "sav_ticket_opened_fr.html", "category_name": "Modèles Email SAV",
+      "category_purpose": "email",
+      "email_subject_template": "Ticket SAV #{{ticket.id}} Ouvert - {{project.name | default: \"Référence Client\"}}",
+      "is_default_for_type_lang": true
+    },
+    {
+      "template_name": "SAV Ticket Résolu (FR)", "template_type": "email_sav_ticket_resolved", "language_code": "fr",
+      "base_file_name": "sav_ticket_resolved_fr.html", "category_name": "Modèles Email SAV",
+      "category_purpose": "email",
+      "email_subject_template": "Ticket SAV #{{ticket.id}} Résolu - {{project.name | default: \"Référence Client\"}}",
+      "is_default_for_type_lang": true
+    },
+    {
+      "template_name": "Suivi Prospect Proforma (FR)", "template_type": "email_follow_up_prospect",
+      "language_code": "fr", "base_file_name": "follow_up_prospect_fr.html",
+      "category_name": "Modèles Email Marketing/Suivi", "category_purpose": "email",
+      "email_subject_template": "Suite à votre demande de proforma : {{project.name | default: client.primary_need}}",
+      "is_default_for_type_lang": true
+    },
+    {
+      "template_name": "Vœux Noël (FR)", "template_type": "email_greeting_christmas", "language_code": "fr",
+      "base_file_name": "greeting_holiday_christmas_fr.html", "category_name": "Modèles Email Vœux",
+      "category_purpose": "email", "email_subject_template": "Joyeux Noël de la part de {{seller.company_name}}!",
+      "is_default_for_type_lang": true
+    },
+    {
+      "template_name": "Vœux Nouvelle Année (FR)", "template_type": "email_greeting_newyear", "language_code": "fr",
+      "base_file_name": "greeting_holiday_newyear_fr.html", "category_name": "Modèles Email Vœux",
+      "category_purpose": "email", "email_subject_template": "Bonne Année {{doc.current_year}} ! - {{seller.company_name}}",
+      "is_default_for_type_lang": true
+    },
+    {
+      "template_name": "Message Générique (FR)", "template_type": "email_generic_message", "language_code": "fr",
+      "base_file_name": "generic_message_fr.html", "category_name": "Modèles Email Généraux",
+      "category_purpose": "email", "email_subject_template": "Un message de {{seller.company_name}}",
+      "is_default_for_type_lang": true
+    }
+  ],
+  "utility_templates": [
+    {
+      "template_name": "Contact Page EN", "base_file_name": "contact_page_template.html", "language_code": "en",
+      "description": "Standard contact page template in English."
+    },
+    {
+      "template_name": "Contact Page FR", "base_file_name": "contact_page_template.html", "language_code": "fr",
+      "description": "Modèle de page de contact standard en français."
+    },
+    {
+      "template_name": "Cover Page EN", "base_file_name": "cover_page_template.html", "language_code": "en",
+      "description": "Standard cover page template in English."
+    },
+    {
+      "template_name": "Cover Page FR", "base_file_name": "cover_page_template.html", "language_code": "fr",
+      "description": "Modèle de page de garde standard en français."
+    },
+    {
+      "template_name": "Technical Specifications EN", "base_file_name": "technical_specifications_template.html",
+      "language_code": "en", "description": "Template for technical specifications in English."
+    },
+    {
+      "template_name": "Technical Specifications FR", "base_file_name": "technical_specifications_template.html",
+      "language_code": "fr", "description": "Modèle de spécifications techniques en français."
+    },
+    {
+      "template_name": "Warranty Document EN", "base_file_name": "warranty_document_template.html",
+      "language_code": "en", "description": "Standard warranty document in English."
+    },
+    {
+      "template_name": "Affichage Images Produit FR", "base_file_name": "product_images_template.html",
+      "language_code": "fr", "description": "Affiche les images des produits, leur nom et leur code."
+    }
+  ],
+  "main_document_templates": [
+    {
+      "template_name": "Spécification Technique (Excel)", "base_file_name": "specification_technique_template.xlsx",
+      "template_type": "EXCEL_TECHNICAL_SPECIFICATIONS", "description": "Modèle Excel pour les spécifications techniques."
+    },
+    {
+      "template_name": "Facture Proforma (Excel)", "base_file_name": "proforma_template.xlsx",
+      "template_type": "EXCEL_PROFORMA_INVOICE", "description": "Modèle Excel pour les factures proforma."
+    },
+    {
+      "template_name": "Contrat de Vente (Excel)", "base_file_name": "contrat_vente_template.xlsx",
+      "template_type": "EXCEL_SALES_CONTRACT", "description": "Modèle Excel pour les contrats de vente."
+    },
+    {
+      "template_name": "Liste de Colisage (Excel)", "base_file_name": "packing_liste_template.xlsx",
+      "template_type": "EXCEL_PACKING_LIST", "description": "Modèle Excel pour les listes de colisage."
+    },
+    {
+      "template_name": "Facture Proforma (HTML)", "base_file_name": "proforma_invoice_template.html",
+      "template_type": "HTML_PROFORMA", "description": "Modèle HTML pour les factures proforma."
+    },
+    {
+      "template_name": "Liste de Colisage (HTML)", "base_file_name": "packing_list_template.html",
+      "template_type": "PACKING_LIST_HTML", "description": "Modèle HTML pour les listes de colisage."
+    },
+    {
+      "template_name": "Contrat de Vente (HTML)", "base_file_name": "sales_contract_template.html",
+      "template_type": "SALES_CONTRACT_HTML", "description": "Modèle HTML pour les contrats de vente."
+    }
+  ]
+}

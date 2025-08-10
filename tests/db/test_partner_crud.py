@@ -13,18 +13,9 @@ if APP_ROOT_DIR not in sys.path:
     sys.path.insert(0, APP_ROOT_DIR)
 
 # Now import application modules
-try:
-    from db import crud as db_manager, schema as db_schema, db_config
-except ImportError as e:
-    print(f"Failed to import db modules: {e}")
-    print(f"Current sys.path: {sys.path}")
-    # Fallback for cases where path adjustment might not be perfect in all execution contexts
-    # This is a simplified attempt, real projects might need more robust test setup for imports
-    if os.path.basename(APP_ROOT_DIR) == 'src' or os.path.basename(APP_ROOT_DIR) == 'app': # common project structures
-         PARENT_OF_APP_ROOT = os.path.dirname(APP_ROOT_DIR)
-         if PARENT_OF_APP_ROOT not in sys.path:
-            sys.path.insert(0, PARENT_OF_APP_ROOT)
-         from db import crud as db_manager, schema as db_schema, db_config
+from db.cruds.misc import partners_crud as db_manager
+from db import init_schema as db_schema
+import config as db_config
 
 
 class TestPartnerCRUD(unittest.TestCase):
