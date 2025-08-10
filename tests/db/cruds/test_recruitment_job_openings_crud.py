@@ -50,4 +50,3 @@ class TestMinimalRecruitmentJobOpeningsCRUD(unittest.TestCase):
         self.assertTrue(isinstance(new_id, str))
 
 # No if __name__ == '__main__' block
-```

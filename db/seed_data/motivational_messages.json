@@ -1,0 +1,29 @@
+{
+  "default_messages": [
+    { "language_code": "fr", "message": "Chaque effort compte, continuez d'avancer !", "day_of_year": null },
+    { "language_code": "fr", "message": "Votre potentiel est illimité, explorez-le.", "day_of_year": null },
+    { "language_code": "fr", "message": "Les défis sont des opportunités déguisées.", "day_of_year": null },
+    { "language_code": "fr", "message": "Bonne année ! Que cette nouvelle année vous apporte succès et bonheur.", "day_of_year": 1 },
+    { "language_code": "fr", "message": "Joyeux Noël ! Paix et joie à vous et vos proches.", "day_of_year": 359 },
+    { "language_code": "fr", "message": "C'est le printemps, un temps de renouveau et de croissance !", "day_of_year": 80 },
+    { "language_code": "en", "message": "Every effort counts, keep moving forward!", "day_of_year": null },
+    { "language_code": "en", "message": "Your potential is limitless, explore it.", "day_of_year": null },
+    { "language_code": "en", "message": "Challenges are disguised opportunities.", "day_of_year": null },
+    { "language_code": "en", "message": "Happy New Year! May this year bring you success and happiness.", "day_of_year": 1 },
+    { "language_code": "en", "message": "Merry Christmas! Peace and joy to you and yours.", "day_of_year": 359 },
+    { "language_code": "en", "message": "It's springtime, a time for renewal and growth!", "day_of_year": 80 },
+    { "language_code": "ar", "message": "كل مجهود مهم، استمر في التقدم!", "day_of_year": null },
+    { "language_code": "ar", "message": "إمكانياتك لا حدود لها، استكشفها.", "day_of_year": null },
+    { "language_code": "ar", "message": "سنة جديدة سعيدة! أتمنى لك التوفيق والسعادة.", "day_of_year": 1 },
+    { "language_code": "fr", "message": "Chaque jour est une nouvelle opportunité.", "day_of_year": null },
+    { "language_code": "fr", "message": "Croyez en vous et tout deviendra possible.", "day_of_year": null },
+    { "language_code": "en", "message": "Every day is a new opportunity.", "day_of_year": null },
+    { "language_code": "en", "message": "Believe in yourself and anything is possible.", "day_of_year": null },
+    { "language_code": "ar", "message": "كل يوم هو فرصة جديدة.", "day_of_year": null }
+  ],
+  "user_messages": [
+    { "message": "Keep pushing your limits!", "language_code": "en" },
+    { "message": "Aujourd'hui est un cadeau.", "language_code": "fr" },
+    { "message": "Make today amazing.", "language_code": null }
+  ]
+}
