@@ -268,57 +268,9 @@ def initialize_database(app_config):
     # """)
     # print("DEBUG_INIT_DB: Table Companies (raw SQL) creation SKIPPED - Handled by Alembic.")
 
-    # Create CompanyPersonnel table (base from ca.py)
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS CompanyPersonnel (
-        personnel_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        company_id TEXT NOT NULL,
-        name TEXT NOT NULL,
-        role TEXT NOT NULL, -- e.g., "seller", "technical_manager"
-        phone TEXT,
-        email TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (company_id) REFERENCES Companies (company_id) ON DELETE CASCADE
-    )
-    """)
-
-    # Create CompanyPersonnelContacts table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS CompanyPersonnelContacts (
-        company_personnel_contact_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        personnel_id INTEGER NOT NULL,
-        contact_id INTEGER NOT NULL,
-        is_primary BOOLEAN DEFAULT FALSE,
-        can_receive_documents BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (personnel_id) REFERENCES CompanyPersonnel(personnel_id) ON DELETE CASCADE,
-        FOREIGN KEY (contact_id) REFERENCES Contacts(contact_id) ON DELETE CASCADE,
-        UNIQUE (personnel_id, contact_id)
-    )
-    """)
-
-    # Create TeamMembers table (base from ca.py)
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS TeamMembers (
-        team_member_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id TEXT UNIQUE,
-        full_name TEXT NOT NULL,
-        email TEXT NOT NULL UNIQUE,
-        role_or_title TEXT,
-        department TEXT,
-        phone_number TEXT,
-        profile_picture_url TEXT,
-        is_active BOOLEAN DEFAULT TRUE,
-        notes TEXT,
-        hire_date TEXT,
-        performance INTEGER DEFAULT 0,
-        skills TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES Users (user_id) ON DELETE SET NULL
-    )
-    """)
+    # Create CompanyPersonnel table (base from ca.py) - REMOVED, handled by Alembic
+    # Create CompanyPersonnelContacts table - REMOVED, handled by Alembic
+    # Create TeamMembers table (base from ca.py) - REMOVED, handled by Alembic
 
     # Create Countries table (base from ca.py)
     cursor.execute("""
