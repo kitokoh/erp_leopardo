@@ -348,7 +348,6 @@ class CRMModule(QMainWindow):
             logging.error("main.py: Could not find db.connection.set_db_config. DB calls might fail.")
         # Initialize the database. This function now encapsulates all DB setup.
         initialize_database()
-        seed_only_hidroguc_products()
 
         # Set the configuration for document_generator.context_builder
         try:
@@ -501,18 +500,10 @@ class CRMModule(QMainWindow):
         logging.info("Call to app_setup.initialize_default_templates completed (ensures template files on disk).")
 
         # --- Coordinated Data Seeding ---
-        try:
-            logging.info("Attempting to run data seeding if necessary...")
-            db_session_for_check = db.connection.get_db_connection()
-            if users_crud.is_users_table_empty(db=db_session_for_check):
-                logging.info("Users table is empty, running data seeding...")
-                run_seed()
-                logging.info("Data seeding process via run_seed() completed.")
-            else:
-                logging.info("Users table is not empty, skipping data seeding.")
-            db_session_for_check.close()
-        except Exception as e_seed_run:
-            logging.error(f"An unexpected error occurred when calling run_seed(): {e_seed_run}", exc_info=True)
+        # This block is now redundant because initialize_database() handles the seeding
+        # on initial creation. If the database exists but is empty for some reason,
+        # manual intervention or a separate utility script would be a better approach.
+        # Keeping this might cause unintended re-seeding.
         # --- End Coordinated Data Seeding ---
 
         # --- Startup Dialog Logic ---
