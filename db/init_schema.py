@@ -162,25 +162,8 @@ def initialize_database(app_config):
 
 
     # --- Permissions and RolePermissions Tables (New for dynamic permissions) ---
-    # These are still created with raw SQL as they are not (yet) SQLAlchemy models.
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS Permissions (
-        permission_key TEXT PRIMARY KEY,
-        description TEXT
-    )
-    """)
-    print("DEBUG_INIT_DB: Table Permissions created or exists.")
-
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS RolePermissions (
-        role_id INTEGER NOT NULL,
-        permission_key TEXT NOT NULL,
-        PRIMARY KEY (role_id, permission_key),
-        FOREIGN KEY (role_id) REFERENCES Roles (role_id) ON DELETE CASCADE,
-        FOREIGN KEY (permission_key) REFERENCES Permissions (permission_key) ON DELETE CASCADE
-    )
-    """)
-    print("DEBUG_INIT_DB: Table RolePermissions created or exists.")
+    # These tables are now created by Alembic. The raw SQL is removed to avoid conflicts.
+    print("DEBUG_INIT_DB: Table Permissions and RolePermissions creation SKIPPED - Handled by Alembic.")
     # --- End Permissions and RolePermissions Tables ---
 
     # Populate Roles table (ensure default roles exist) - REMOVED
