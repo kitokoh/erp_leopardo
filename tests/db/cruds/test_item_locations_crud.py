@@ -575,4 +575,3 @@ def test_get_item_in_specific_location(db_conn): # Renamed
     non_existent_link = item_locations_crud.get_item_in_specific_location(TEST_ITEM_ID, str(uuid.uuid4()), conn=db_conn) # Random location
     assert non_existent_link['success']
     assert non_existent_link['data'] is None
-```
