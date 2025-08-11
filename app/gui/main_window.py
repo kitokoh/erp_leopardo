@@ -420,7 +420,7 @@ class ClientListItemWidget(QWidget):
 
 
 class DocumentManager(QMainWindow):
-    def __init__(self, app_root_dir, current_user_info: dict, current_license_info: dict | None):
+    def __init__(self, app_root_dir, current_user_info: dict, current_license_info: dict | None, session_manager=None):
         super().__init__()
         self.setWindowFlags(Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
@@ -452,6 +452,7 @@ class DocumentManager(QMainWindow):
         self.close_button.setObjectName("windowCloseButton")
 
         self.app_root_dir = app_root_dir
+        self.session_manager = session_manager
         self.current_user_info = current_user_info # Store the full user info dictionary
         self.current_license_info = current_license_info # Store license information
         self.current_user_id = self.current_user_info.get('user_id') # Extract user_id for existing usage
