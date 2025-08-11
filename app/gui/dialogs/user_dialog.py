@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QLineEdit, QComboBox,
     QCheckBox, QDialogButtonBox, QMessageBox, QLabel
 )
-from auth.roles import ALL_ROLES # To populate roles combobox
+from app.auth.roles import ALL_ROLES # To populate roles combobox
 
 class UserDialog(QDialog):
     def __init__(self, user_data=None, parent=None, is_editing=False):

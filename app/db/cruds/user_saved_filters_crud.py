@@ -1,7 +1,7 @@
 # db/cruds/user_saved_filters_crud.py
 import json
 import logging
-from db.connection import get_db_connection
+from app.db.connection import get_db_connection
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import text

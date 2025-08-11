@@ -6,14 +6,14 @@ from typing import Generator, List
 from datetime import date, datetime, timedelta
 
 # Adjust imports based on your project structure
-from api.models import (
+from app.api.models import (
     Base, Employee, User,
     LeaveType, LeaveTypeCreate, LeaveTypeBase, # LeaveTypeBase for update
     LeaveBalance, LeaveBalanceCreate, LeaveBalanceUpdate,
     LeaveRequest, LeaveRequestCreate, LeaveRequestStatusEnum,
     GoalStatusEnum # Not used here, but good to have models available
 )
-from db.cruds import leave_crud, employees_crud, users_crud # Assuming users_crud for creating users
+from app.db.cruds import leave_crud, employees_crud, users_crud # Assuming users_crud for creating users
 from pydantic import ValidationError
 
 # Use an in-memory SQLite database for testing

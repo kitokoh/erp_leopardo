@@ -1,7 +1,7 @@
 import sqlite3
 import uuid
 from datetime import datetime
-from db.connection import get_db_connection
+from app.db.connection import get_db_connection
 
 # TODO: Add StatusSettings related functions for status_id validation.
 # TODO: Consider validation for candidate_id, job_opening_id, recruitment_step_id, interviewer_team_member_id.

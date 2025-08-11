@@ -7,8 +7,8 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QIcon
 
-from db.cruds.users import roles_crud, users_crud, permissions_crud
-from db.cruds import role_permissions_crud
+from app.db.cruds.users import roles_crud, users_crud, permissions_crud
+from app.db.cruds import role_permissions_crud
 # from auth.permissions import has_permission, P_MANAGE_ROLES # For later, if dialog itself checks perms
 from PyQt5.QtWidgets import QWidget
 import logging

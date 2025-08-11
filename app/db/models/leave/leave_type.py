@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String
-from db.connection import Base
+from app.db.connection import Base
 
 class LeaveType(Base):
     __tablename__ = 'leave_types'

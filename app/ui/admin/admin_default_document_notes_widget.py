@@ -8,8 +8,8 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
 
 # Assuming db module is accessible from project root
-import db
-from db.cruds import notes_crud
+import app.db
+from app.db.cruds import notes_crud
 
 from .admin_add_edit_default_note_dialog import AddEditDefaultNoteDialog
 

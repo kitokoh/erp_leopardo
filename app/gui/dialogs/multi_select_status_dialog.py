@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QHBoxLayout
 from PyQt5.QtWidgets import QMessageBox
-import db as db_manager # For fetching statuses
+import app.db as db_manager # For fetching statuses
 
 class MultiSelectStatusDialog(QDialog):
     def __init__(self, pre_selected_status_ids: list = None, parent=None):

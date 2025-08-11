@@ -7,7 +7,7 @@ import time # For slight delay in timestamp checks
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
-from db.cruds.users_crud import UsersCRUD
+from app.db.cruds.users_crud import UsersCRUD
 
 class TestUsersCRUD(unittest.TestCase):
     def setUp(self):

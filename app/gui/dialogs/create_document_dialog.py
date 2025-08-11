@@ -12,11 +12,11 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIcon, QColor, QDesktopServices
 from PyQt5.QtCore import Qt, QUrl, QSettings # Ajout de QSettings
 
-import db as db_manager
-from db.cruds.template_categories_crud import get_all_template_categories
-from gui.widgets.html_editor import HtmlEditor
-from utils import populate_docx_template
-import icons_rc
+import app.db as db_manager
+from app.db.cruds.template_categories_crud import get_all_template_categories
+from app.gui.widgets.html_editor import HtmlEditor
+from app.utils import populate_docx_template
+import app.icons_rc
 from PyQt5.QtWidgets import QFormLayout
 
 # Importer la nouvelle boîte de dialogue de choix et les constantes d'action

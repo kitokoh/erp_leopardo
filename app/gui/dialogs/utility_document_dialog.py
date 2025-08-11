@@ -10,7 +10,7 @@ from PyQt5.QtGui import QFont
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 
 # Assuming db.py and app_config.py are in the same directory or accessible in PYTHONPATH
-import db
+import app.db
 from app_config import CONFIG # For CONFIG.get("templates_dir")
 
 # Placeholder for current_user_id. In a real app, this would come from an auth system.
@@ -19,7 +19,7 @@ CURRENT_USER_ID = None # For now, preview won't use user-specific context
 # It's good practice to import specific functions if the module 'db' is large.
 # However, the existing code uses `db.some_function`, so we'll stick to that pattern
 # for existing calls, and use specific imports for new ones where appropriate.
-from db.utils import get_document_context_data # For potential future context-aware previews
+from app.db.utils import get_document_context_data # For potential future context-aware previews
 
 
 class AddEditUtilityDocDialog(QDialog):

@@ -9,9 +9,9 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from db import db_config
-from db.init_schema import initialize_database
-from db.cruds import projects_crud, tasks_crud, status_settings_crud, team_members_crud, clients_crud
+from app.db import db_config
+from app.db.init_schema import initialize_database
+from app.db.cruds import projects_crud, tasks_crud, status_settings_crud, team_members_crud, clients_crud
 
 class TestProductionModuleCRUDS(unittest.TestCase):
     @classmethod

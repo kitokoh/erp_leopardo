@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Path, Request
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
-import db.cruds.company_expenses_crud as expenses_crud
+import app.db.cruds.company_expenses_crud as expenses_crud
 from .models import (
     CompanyExpenseCreatePydantic, CompanyExpenseReadPydantic, CompanyExpenseUpdatePydantic,
     CompanyFactureReadPydantic, LinkFactureToExpenseRequestPydantic, #Pydantic suffix added in models

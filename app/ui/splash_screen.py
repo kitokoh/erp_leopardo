@@ -11,8 +11,8 @@ from PyQt5.QtCore import Qt, QSize, QTimer, QLocale, QPropertyAnimation, QEasing
 # This might require adjusting imports based on your project structure
 # For example, if db.cruds.generic_crud is the path:
 
-from db.connection import get_db_connection # Corrected import
-from db.cruds.generic_crud import GenericCRUD
+from app.db.connection import get_db_connection # Corrected import
+from app.db.cruds.generic_crud import GenericCRUD
 
 
 class SplashWindow(QWidget):

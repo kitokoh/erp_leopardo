@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
     QCheckBox, QDialogButtonBox, QMessageBox, QLabel, QPushButton, QHBoxLayout
 )
 from PyQt5.QtCore import Qt
-import db # Assuming db.__init__ exports the necessary smtp_configs_crud functions
+import app.db # Assuming db.__init__ exports the necessary smtp_configs_crud functions
 import smtplib
 from email.mime.text import MIMEText
 

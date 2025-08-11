@@ -11,9 +11,9 @@ import sys
 APP_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(APP_ROOT)
 
-from db.cruds import invoices_crud
-from db import init_schema # To initialize the database schema
-from db import db_config # To override DATABASE_PATH for tests
+from app.db.cruds import invoices_crud
+from app.db import init_schema # To initialize the database schema
+from app.db import db_config # To override DATABASE_PATH for tests
 
 # Hold the original DATABASE_PATH
 ORIGINAL_DB_PATH = None

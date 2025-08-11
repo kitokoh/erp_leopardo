@@ -1,5 +1,5 @@
 import sqlite3
-from db.connection import get_db_connection # Assuming this utility exists for DB connection
+from app.db.connection import get_db_connection # Assuming this utility exists for DB connection
 import logging
 
 # Placeholder for media items CRUD operations.

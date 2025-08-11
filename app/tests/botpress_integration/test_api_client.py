@@ -5,7 +5,7 @@ import requests # For requests.exceptions
 # Assuming your project structure allows this import:
 # Adjust if your project root is not directly discoverable by Python path
 # e.g. by setting PYTHONPATH environment variable or using sys.path.append
-from botpress_integration.api_client import BotpressClient, BotpressAPIError
+from app.botpress_integration.api_client import BotpressClient, BotpressAPIError
 
 class TestBotpressClient(unittest.TestCase):
 

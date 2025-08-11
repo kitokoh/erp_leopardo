@@ -41,9 +41,9 @@ def mock_config_for_db_path():
 
 
 # Now import db modules after patching is set up for autouse session fixture
-from db.init_schema import initialize_database
-from db.cruds import item_locations_crud
-from db.cruds import internal_stock_items_crud # Changed from products_crud
+from app.db.init_schema import initialize_database
+from app.db.cruds import item_locations_crud
+from app.db.cruds import internal_stock_items_crud # Changed from products_crud
 
 # Global test item_id for linking
 TEST_ITEM_ID = None

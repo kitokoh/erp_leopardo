@@ -8,12 +8,12 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from db.cruds.transporters_crud import (
+from app.db.cruds.transporters_crud import (
     add_transporter, get_transporter_by_id, get_all_transporters,
     update_transporter, delete_transporter
 )
-from db.utils import get_db_connection # Used by CRUDs, not directly in test usually
-from db.init_schema import initialize_database
+from app.db.utils import get_db_connection # Used by CRUDs, not directly in test usually
+from app.db.init_schema import initialize_database
 
 # Mock config for testing if config is imported by db.init_schema or db.utils
 # This is to ensure DATABASE_PATH is controlled during tests.

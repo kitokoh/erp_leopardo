@@ -4,8 +4,8 @@ from sqlalchemy.orm import sessionmaker, Session as SQLAlchemySession # Use alia
 import logging
 
 # Adjust import path as necessary
-from botpress_integration.models import Base, UserBotpressSettings, UserPrompt, Conversation, Message, create_db_and_tables as main_create_db_and_tables
-from botpress_integration import crud
+from app.botpress_integration.models import Base, UserBotpressSettings, UserPrompt, Conversation, Message, create_db_and_tables as main_create_db_and_tables
+from app.botpress_integration import crud
 from datetime import datetime
 
 # Configure logging for tests (optional, but can be helpful)

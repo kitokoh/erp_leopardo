@@ -4,10 +4,10 @@ from sqlalchemy.sql import func, extract, case
 from datetime import date, datetime, timedelta
 
 # Assuming models are directly under api.models as per prompt
-from db.models.employees.employee import Employee
-from db.models.leave.leave_request import LeaveRequest, LeaveRequestStatusEnum
-from db.models.leave.leave_type import LeaveType
-from api.models import (
+from app.db.models.employees.employee import Employee
+from app.db.models.leave.leave_request import LeaveRequest, LeaveRequestStatusEnum
+from app.db.models.leave.leave_type import LeaveType
+from app.api.models import (
     HeadcountReportItem, # For type hinting return structure, not direct instantiation here
     AnniversaryReportItem,
     LeaveSummaryReportItem

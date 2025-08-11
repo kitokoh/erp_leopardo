@@ -5,8 +5,8 @@ import os # For URL construction if base URL comes from env
 # Assuming db is structured to allow from db import cruds or similar
 # Or from ..db import cruds if api is a subdir of a main app package
 # For this subtask, let's assume db.cruds gives access to modules
-from db.cruds.products import products_crud
-import db.cruds.product_media_links_crud as product_media_links_crud
+from app.db.cruds.products import products_crud
+import app.db.cruds.product_media_links_crud as product_media_links_crud
 from ..models import ( # Relative import from parent models.py
     ProductResponse, ProductCreate, ProductUpdate, ProductBase,
     LinkMediaToProductRequest, ProductImageLinkResponse, ProductImageLinkUpdateRequest,
@@ -118,6 +118,7 @@ async def get_product_by_code_api(
 @router.get("", response_model=List[ProductResponse])
 async def get_all_products_api(
     request: Request,
+    *,
     category: Optional[str] = Query(None),
     language_code: Optional[str] = Query(None),
     is_active: Optional[bool] = Query(None),

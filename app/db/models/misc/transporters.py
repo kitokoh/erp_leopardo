@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, REAL
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from db.connection import Base
+from app.db.connection import Base
 
 class Transporter(Base):
     __tablename__ = 'transporters'

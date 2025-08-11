@@ -2,8 +2,8 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 # Updated imports for refactored structure
-from client_management.ui.client_main_widget import ClientMainWidget
-from client_management.tabs.documents_tab import DocumentsTab # DocumentsTab will be tested
+from app.client_management.ui.client_main_widget import ClientMainWidget
+from app.client_management.tabs.documents_tab import DocumentsTab # DocumentsTab will be tested
 from PyQt5.QtWidgets import QApplication, QWidget
 
 # Required for QApplication instance

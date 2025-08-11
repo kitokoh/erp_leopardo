@@ -14,11 +14,11 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIcon, QDesktopServices, QFont
 from PyQt5.QtCore import Qt, QUrl
 
-import db as db_manager
-from db.cruds.misc.template_categories_crud import get_all_template_categories
-from db.cruds.misc.templates_crud import get_distinct_template_languages, get_distinct_template_types, get_filtered_templates, get_distinct_template_extensions # Added import
+import app.db as db_manager
+from app.db.cruds.misc.template_categories_crud import get_all_template_categories
+from app.db.cruds.misc.templates_crud import get_distinct_template_languages, get_distinct_template_types, get_filtered_templates, get_distinct_template_extensions # Added import
 # templates_crud_instance is not used directly by TemplateDialog
-import icons_rc # Import for Qt resource file
+import app.icons_rc # Import for Qt resource file
 
 # Local import for get_notification_manager will be kept inside methods as per plan.
 from .html_template_creator_dialog import HtmlTemplateCreatorDialog # Import the new dialog

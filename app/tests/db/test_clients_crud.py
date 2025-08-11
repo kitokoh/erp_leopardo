@@ -11,9 +11,9 @@ from unittest.mock import patch
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
 # Import the new models
-from db.models import Base, Client, StatusSetting, User
+from app.db.models import Base, Client, StatusSetting, User
 # Import the instance for testing
-from db.cruds.clients_crud import clients_crud_instance
+from app.db.cruds.clients_crud import clients_crud_instance
 
 # Helper for date formatting consistent with the app
 def format_datetime_for_db(dt_obj):

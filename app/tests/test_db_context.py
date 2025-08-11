@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, PropertyMock
 import datetime # Import datetime
-from db import get_document_context_data, _parse_json_field, _parse_key_value_string, _format_address_parts
+from app.db import get_document_context_data, _parse_json_field, _parse_key_value_string, _format_address_parts
 
 # --- Mocks for SQLAlchemy models ---
 # These need to be classes to allow attribute assignment in tests.

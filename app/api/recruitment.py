@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, date
 
 # CRUD function imports
-from db.cruds import (
+from app.db.cruds import (
     recruitment_job_openings_crud,
     recruitment_candidates_crud,
     recruitment_interviews_crud,

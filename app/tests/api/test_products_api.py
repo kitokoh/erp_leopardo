@@ -8,9 +8,9 @@ import sys
 # Add project root to sys.path to allow importing project modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
-from api.products import router as products_router
-from api.auth import get_current_active_user # Import the dependency
-from db.cruds import products_crud # To interact with DB directly for setup/assertions
+from app.api.products import router as products_router
+from app.api.auth import get_current_active_user # Import the dependency
+from app.db.cruds import products_crud # To interact with DB directly for setup/assertions
 from models import ProductCreate, ProductResponse, ProductUpdate, UserInDB # Pydantic models
 
 # Global variable for the database connection

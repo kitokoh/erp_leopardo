@@ -14,17 +14,17 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
 
-import db as db_manager # db_manager will provide access to new CRUDs
-from db.cruds.clients.clients_crud import clients_crud_instance
+import app.db as db_manager # db_manager will provide access to new CRUDs
+from app.db.cruds.clients.clients_crud import clients_crud_instance
 # from db.cruds import templates_crud # templates_crud is not directly used, db_manager.get_template_details_by_id is used
 
 # Import EmailSenderService
-from services.email_service import EmailSenderService
+from app.services.email_service import EmailSenderService
 
 from .select_contacts_dialog import SelectContactsDialog
 from .select_client_attachment_dialog import SelectClientAttachmentDialog
 from .select_utility_attachment_dialog import SelectUtilityAttachmentDialog
-import icons_rc
+import app.icons_rc
 
 logger = logging.getLogger(__name__)
 

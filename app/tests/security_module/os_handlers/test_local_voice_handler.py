@@ -11,7 +11,7 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from security_module.os_handlers.local_voice_handler import LocalVoiceHandler, \
+from app.security_module.os_handlers.local_voice_handler import LocalVoiceHandler, \
     SAMPLE_RATE, N_MFCC, DURATION_PER_SAMPLE, N_SAMPLES_ENROLL, VOICE_PROFILES_DIR, N_COMPONENTS_GMM
 
 # Mock joblib avant qu'il ne soit importé par le module testé si nécessaire

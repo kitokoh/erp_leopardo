@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 
-from auth.password_reset_service import PasswordResetService
+from app.auth.password_reset_service import PasswordResetService
 
 logger = logging.getLogger(__name__)
 

@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QCoreApplication # Added QCoreApplication for fallback tr
-from db.cruds import user_saved_filters_crud
+from app.db.cruds import user_saved_filters_crud
 
 # It's good practice to define tr at the module level or ensure it's available
 # For now, we'll use a helper in the class or rely on parent's tr.

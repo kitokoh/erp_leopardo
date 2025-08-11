@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QColor # QIcon not directly used
 from PyQt5.QtCore import Qt
 
-import db as db_manager
+import app.db as db_manager
 
 class SelectUtilityAttachmentDialog(QDialog):
     def __init__(self, config, parent=None):

@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt
 # import db # For database operations - No longer needed for user registration
-from db.cruds.users_crud import users_crud_instance # Import the UsersCRUD instance
+from app.db.cruds.users_crud import users_crud_instance # Import the UsersCRUD instance
 import random # For promo text, though might share LoginWindow's list
 from .login_window import LoginWindow # To access PROMOTIONAL_TEXTS
 

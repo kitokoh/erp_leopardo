@@ -1,6 +1,6 @@
 import sqlite3
 import uuid
-from db.connection import get_db_connection
+from app.db.connection import get_db_connection
 
 # --- Experiences Table CRUD Functions ---
 

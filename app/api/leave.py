@@ -5,11 +5,11 @@ from sqlalchemy.exc import IntegrityError
 from datetime import date, datetime # Ensure date is imported
 
 # Project-specific imports
-from api.dependencies import get_db
+from app.api.dependencies import get_db
 # Assuming UserInDB is the model for the current user, adjust if different
 # If get_current_active_user is in a different location, adjust this import path
-from api.auth import get_current_active_user
-from api.models import (
+from app.api.auth import get_current_active_user
+from app.api.models import (
     UserInDB, # User model for dependency injection
     Employee, # To check if employee exists
     LeaveType, LeaveTypeCreate, LeaveTypeResponse, LeaveTypeBase,
@@ -17,7 +17,7 @@ from api.models import (
     LeaveRequest, LeaveRequestCreate, LeaveRequestResponse, LeaveRequestUpdate,
     LeaveRequestStatusEnum # Enum for status
 )
-from db.cruds import leave_crud, employees_crud # CRUD modules
+from app.db.cruds import leave_crud, employees_crud # CRUD modules
 
 router = APIRouter(
     prefix="/leave",

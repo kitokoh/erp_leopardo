@@ -86,6 +86,8 @@ flask = ">=2.0.0"
 requests = ">=2.20.0"
 reportlab = ">=3.6.12"
 cachetools = ">=5.3.0"
+pytesseract = ">=0.3.10"
+sounddevice = ">=0.4.6"
 
 
 [build-system]

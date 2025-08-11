@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, REAL, Date
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func, false
-from db.connection import Base
+from app.db.connection import Base
 
 class CompanyAsset(Base):
     __tablename__ = 'company_assets'

@@ -3,11 +3,11 @@ import uuid
 from datetime import datetime, timezone
 import logging
 from sqlalchemy.orm import Session
-from db.models.projects.project import Project
-from db.models.settings.status_setting import StatusSetting
+from app.db.models.projects.project import Project
+from app.db.models.settings.status_setting import StatusSetting
 from ..generic_crud import _manage_conn
 
-from db.models import Client
+from app.db.models import Client
 
 logger = logging.getLogger(__name__)
 

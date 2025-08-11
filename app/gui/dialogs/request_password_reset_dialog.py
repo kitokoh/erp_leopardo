@@ -9,7 +9,7 @@ from PyQt5.QtGui import QIcon
 
 # Assuming password_reset_service will be accessible, e.g., via an auth_service module
 # from auth import auth_service # Or directly: from auth.password_reset_service import PasswordResetService
-from auth.password_reset_service import PasswordResetService
+from app.auth.password_reset_service import PasswordResetService
 
 
 logger = logging.getLogger(__name__)

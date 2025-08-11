@@ -8,9 +8,9 @@ from PyQt5.QtGui import QIcon
 # No specific QtGui or QtCore imports noted as directly used by this class methods
 # other than those implicitly handled by QtWidgets.
 
-from db.cruds.misc import freight_forwarders_crud
-from db.cruds.misc import contacts_crud
-from db.cruds.misc import entity_contacts_crud
+from app.db.cruds.misc import freight_forwarders_crud
+from app.db.cruds.misc import contacts_crud
+from app.db.cruds.misc import entity_contacts_crud
 from .contact_dialog import ContactDialog
 
 class FreightForwarderDialog(QDialog):

@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QFont, QColor, QIcon
 from PyQt5.QtCore import Qt, QRect
-import db as db_manager # Used by both classes
+import app.db as db_manager # Used by both classes
 
 # --- UI Components ---
 

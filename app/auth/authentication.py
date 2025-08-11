@@ -8,13 +8,13 @@ import logging
 import traceback # Import for detailed traceback
 from datetime import datetime, timedelta, timezone # Added timedelta and timezone
 
-from db.cruds.users import users_crud
-from db.cruds.misc import activity_logs_crud, licenses_crud, application_settings_crud
+from app.db.cruds.users import users_crud
+from app.db.cruds.misc import activity_logs_crud, licenses_crud, application_settings_crud
 
-from db.cruds import user_session_tokens_crud
-from utils.security_helpers import generate_secure_token, hash_token_for_storage # New helpers
-from license_management import manager as license_manager # Already imported below, moved up for clarity
-from db.connection import get_db_connection # Already imported below, moved up
+from app.db.cruds import user_session_tokens_crud
+from app.utils.security_helpers import generate_secure_token, hash_token_for_storage # New helpers
+from app.license_management import manager as license_manager # Already imported below, moved up for clarity
+from app.db.connection import get_db_connection # Already imported below, moved up
 
 logger = logging.getLogger(__name__)
 

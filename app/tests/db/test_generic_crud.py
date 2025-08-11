@@ -12,7 +12,7 @@ import os
 # Or, if the tool runs from the repo root:
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
-from db.cruds.generic_crud import GenericCRUD
+from app.db.cruds.generic_crud import GenericCRUD
 
 class TestGenericCRUD(unittest.TestCase):
     def setUp(self):

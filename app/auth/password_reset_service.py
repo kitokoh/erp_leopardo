@@ -3,10 +3,10 @@ import logging
 from datetime import datetime, timedelta, timezone
 import os # For path construction for email templates
 
-from db.cruds import users_crud, password_reset_tokens_crud, user_session_tokens_crud, activity_logs_crud # Added activity_logs_crud
-from utils.security_helpers import generate_secure_token, hash_token_for_storage
-from services.email_service import EmailSenderService
-from db.connection import get_db_connection
+from app.db.cruds import users_crud, password_reset_tokens_crud, user_session_tokens_crud, activity_logs_crud # Added activity_logs_crud
+from app.utils.security_helpers import generate_secure_token, hash_token_for_storage
+from app.services.email_service import EmailSenderService
+from app.db.connection import get_db_connection
 from app_setup import CONFIG, APP_ROOT_DIR # Added APP_ROOT_DIR
 
 logger = logging.getLogger(__name__)

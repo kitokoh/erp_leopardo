@@ -7,19 +7,19 @@ import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 
-from db.init_schema import initialize_database
-from db.cruds.client_order_money_transfer_agents_crud import (
+from app.db.init_schema import initialize_database
+from app.db.cruds.client_order_money_transfer_agents_crud import (
     assign_agent_to_client_order,
     get_assigned_agents_for_client_order,
     get_assigned_agents_for_client,
     update_assignment_details,
     unassign_agent_from_client_order
 )
-from db.cruds.money_transfer_agents_crud import add_money_transfer_agent
-from db.cruds.clients_crud import add_client
-from db.cruds.projects_crud import add_project
-from db.cruds.users_crud import add_user_direct # Assuming a simple user add for created_by
-from db.cruds.locations_crud import add_country, add_city # For agent prerequisites
+from app.db.cruds.money_transfer_agents_crud import add_money_transfer_agent
+from app.db.cruds.clients_crud import add_client
+from app.db.cruds.projects_crud import add_project
+from app.db.cruds.users_crud import add_user_direct # Assuming a simple user add for created_by
+from app.db.cruds.locations_crud import add_country, add_city # For agent prerequisites
 
 ORIGINAL_DB_PATH_COMA = None
 TEST_DB_PATH_COMA = ":memory:"

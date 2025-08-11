@@ -3,15 +3,15 @@ import sqlite3
 import uuid
 from datetime import datetime
 
-from db.cruds.users import users_crud
-from db.cruds.clients.clients_crud import clients_crud_instance
-from db.cruds.products.products_crud import products_crud_instance as products_crud
-from db.cruds.misc.status_settings_crud import get_status_setting_by_name
-from db.cruds.misc.locations_crud import get_country_by_name, get_city_by_name_and_country_id
-from db.cruds.misc import partners_crud, referents_crud
-from db.cruds.misc.application_settings_crud import set_setting
-from db.cruds import commandes_crud
-from auth.roles import SUPER_ADMIN
+from app.db.cruds.users import users_crud
+from app.db.cruds.clients.clients_crud import clients_crud_instance
+from app.db.cruds.products.products_crud import products_crud_instance as products_crud
+from app.db.cruds.misc.status_settings_crud import get_status_setting_by_name
+from app.db.cruds.misc.locations_crud import get_country_by_name, get_city_by_name_and_country_id
+from app.db.cruds.misc import partners_crud, referents_crud
+from app.db.cruds.misc.application_settings_crud import set_setting
+from app.db.cruds import commandes_crud
+from app.auth.roles import SUPER_ADMIN
 
 def seed_initial_setup(conn: sqlite3.Connection, logger: logging.Logger):
     """

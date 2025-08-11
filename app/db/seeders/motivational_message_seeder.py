@@ -3,7 +3,7 @@ import os
 import logging
 import sqlite3
 
-from db.cruds.generic_crud import GenericCRUD
+from app.db.cruds.generic_crud import GenericCRUD
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

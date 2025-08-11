@@ -6,8 +6,8 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 
-import db # Assuming db module is accessible
-from db.cruds import notes_crud
+import app.db # Assuming db module is accessible
+from app.db.cruds import notes_crud
 
 class AddEditDefaultNoteDialog(QDialog):
     def __init__(self, note_data=None, parent=None):

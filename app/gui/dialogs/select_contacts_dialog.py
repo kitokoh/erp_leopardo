@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (
     QDialogButtonBox, QLabel, QAbstractItemView
 )
 from PyQt5.QtCore import Qt
-import db as db_manager
+import app.db as db_manager
 
 class SelectContactsDialog(QDialog):
     def __init__(self, client_id, parent=None):

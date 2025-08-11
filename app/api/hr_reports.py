@@ -4,16 +4,16 @@ from sqlalchemy.orm import Session
 from datetime import datetime, date # Ensure both are imported
 
 # Project-specific imports
-from api.dependencies import get_db
-from api.auth import get_current_active_user # Assuming UserInDB is returned
-from api.models import (
+from app.api.dependencies import get_db
+from app.api.auth import get_current_active_user # Assuming UserInDB is returned
+from app.api.models import (
     UserInDB, # User model for dependency injection
     HeadcountReportResponse,
     AnniversaryReportResponse,
     LeaveSummaryReportResponse,
     LeaveRequestStatusEnum # The Enum itself for query param
 )
-from db.cruds import hr_reports_crud # The new CRUD module
+from app.db.cruds import hr_reports_crud # The new CRUD module
 
 router = APIRouter(
     prefix="/hr-reports",

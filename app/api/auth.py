@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone # Ensure timezone is imported
 from typing import Optional
 import os # Added import
 
-import db as db_manager # To access user verification
+import app.db as db_manager # To access user verification
 from .models import TokenData, UserInDB, Token # Import UserInDB and Token from local models
 
 # Configuration (replace with your actual secret key and algorithm)

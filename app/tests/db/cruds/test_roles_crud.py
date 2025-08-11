@@ -1,8 +1,8 @@
 import pytest
 import sqlite3
-from db.cruds import roles_crud
-from db.connection import get_db_connection # Pourrait être mocké ou utilisé pour setup
-from db.init_schema import initialize_database # Pour s'assurer que la table Roles existe
+from app.db.cruds import roles_crud
+from app.db.connection import get_db_connection # Pourrait être mocké ou utilisé pour setup
+from app.db.init_schema import initialize_database # Pour s'assurer que la table Roles existe
 
 # Fixture pour initialiser une base de données en mémoire pour chaque test
 @pytest.fixture

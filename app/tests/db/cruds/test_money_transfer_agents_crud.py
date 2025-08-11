@@ -8,17 +8,17 @@ import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 
-from db.init_schema import initialize_database
-from db.cruds.money_transfer_agents_crud import (
+from app.db.init_schema import initialize_database
+from app.db.cruds.money_transfer_agents_crud import (
     add_money_transfer_agent,
     get_money_transfer_agent_by_id,
     get_all_money_transfer_agents,
     update_money_transfer_agent,
     delete_money_transfer_agent
 )
-from db.cruds.clients_crud import add_client
-from db.cruds.projects_crud import add_project
-from db.cruds.locations_crud import add_country, add_city
+from app.db.cruds.clients_crud import add_client
+from app.db.cruds.projects_crud import add_project
+from app.db.cruds.locations_crud import add_country, add_city
 
 # Store the original DATABASE_PATH and override it for tests
 ORIGINAL_DB_PATH = None

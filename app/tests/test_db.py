@@ -5,8 +5,8 @@ import sys
 
 # Adjust path to import db_manager from parent directory
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from db.init_schema import initialize_database
-import db as db_manager
+from app.db.init_schema import initialize_database
+import app.db as db_manager
 
 class TestDBContactsPagination(unittest.TestCase):
 

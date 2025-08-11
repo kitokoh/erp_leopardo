@@ -3,9 +3,9 @@ import os
 import logging
 import sqlite3
 
-from db.cruds.misc.template_categories_crud import add_template_category, get_template_category_by_name
-from db.cruds.misc.templates_crud import add_default_template_if_not_exists
-from db.cruds.misc.application_settings_crud import get_setting, set_setting
+from app.db.cruds.misc.template_categories_crud import add_template_category, get_template_category_by_name
+from app.db.cruds.misc.templates_crud import add_default_template_if_not_exists
+from app.db.cruds.misc.application_settings_crud import get_setting, set_setting
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

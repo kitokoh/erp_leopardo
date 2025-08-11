@@ -7,18 +7,18 @@ from typing import Generator, Optional, Any, Dict, Callable, List as PyList
 from datetime import date, datetime
 
 # Adjust these imports based on your project structure
-from api.models import (
+from app.api.models import (
     Base, UserInDB, Employee,
     Goal, GoalCreate, GoalResponse, GoalUpdate, GoalStatusEnum,
     ReviewCycle, ReviewCycleCreate, ReviewCycleResponse, ReviewCycleUpdate,
     PerformanceReview, PerformanceReviewCreate, PerformanceReviewResponse, PerformanceReviewUpdate, PerformanceReviewStatusEnum,
     performance_review_goals_link
 )
-from api.performance import router as performance_router
-from api.dependencies import get_db
-from api.auth import get_current_active_user
+from app.api.performance import router as performance_router
+from app.api.dependencies import get_db
+from app.api.auth import get_current_active_user
 
-from db.cruds import employees_crud, performance_crud, users_crud # Added users_crud
+from app.db.cruds import employees_crud, performance_crud, users_crud # Added users_crud
 
 # --- Test Database Setup ---
 DATABASE_URL = "sqlite:///:memory:"

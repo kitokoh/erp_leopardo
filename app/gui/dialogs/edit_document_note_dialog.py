@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (
     QMessageBox, QLabel
 )
 from PyQt5.QtCore import Qt
-import db # Assuming db.__init__ exposes notes_crud
+import app.db # Assuming db.__init__ exposes notes_crud
 
 class EditDocumentNoteDialog(QDialog):
     def __init__(self, document_id, document_type, language_code, parent=None):

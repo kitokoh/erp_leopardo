@@ -2,7 +2,7 @@ import sqlite3
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
-from db.connection import get_db_connection
+from app.db.connection import get_db_connection
 
 # --- Company Facture CRUD Operations ---
 

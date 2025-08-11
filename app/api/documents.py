@@ -5,11 +5,11 @@ import uuid
 import os
 import datetime
 
-import db as db_manager
+import app.db as db_manager
 import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from utils.html_to_pdf_util import render_html_template, convert_html_to_pdf, WeasyPrintError
+from app.utils.html_to_pdf_util import render_html_template, convert_html_to_pdf, WeasyPrintError
 from .models import DocumentGenerationRequest, DocumentGenerationResponse, UserInDB # UserInDB for type hint
 from .auth import get_current_active_user
 from .dependencies import PermissionRequired

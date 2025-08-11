@@ -4,9 +4,9 @@ from sqlalchemy.exc import IntegrityError
 from datetime import datetime
 
 # Assuming your project structure allows these imports
-from db.models import DocumentCategory
-from db.models import DocumentCategory, EmployeeDocument
-from api.models import (
+from app.db.models import DocumentCategory
+from app.db.models import DocumentCategory, EmployeeDocument
+from app.api.models import (
     DocumentCategoryCreate, DocumentCategoryBase, # DocumentCategoryBase for update
     EmployeeDocumentCreate, EmployeeDocumentUpdate
 )

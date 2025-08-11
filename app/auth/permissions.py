@@ -148,7 +148,9 @@ PERMISSION_MAP = {
 # --- End of PERMISSION_MAP obsolescence notice ---
 
 # Import necessary CRUDs for the new has_permission logic
-from db.cruds.users import roles_crud, permissions_crud
+from app.db.cruds.users import roles_crud, permissions_crud
+from app.db.cruds import role_permissions_crud
+from app.auth.roles import SUPER_ADMIN as SUPER_ADMIN_ROLE_CONSTANT
 
 def has_permission(user_role_name: str, required_permission_key: str) -> bool:
     """
@@ -168,7 +170,6 @@ def has_permission(user_role_name: str, required_permission_key: str) -> bool:
     # SUPER_ADMIN role bypasses individual permission checks and always has all permissions.
     # Ensure SUPER_ADMIN is imported or defined in this scope.
     # Using .roles constants directly might be cleaner if they are simple strings.
-    from .roles import SUPER_ADMIN as SUPER_ADMIN_ROLE_CONSTANT # Assuming SUPER_ADMIN is "super_admin"
     if user_role_name == SUPER_ADMIN_ROLE_CONSTANT: # Check against the constant
         logger.debug(f"Permission check for role '{user_role_name}' (SUPER_ADMIN) for key '{required_permission_key}': GRANTED (superuser).")
         return True

@@ -4,19 +4,14 @@ import sys
 import os
 from datetime import datetime
 
-# Add project root to sys.path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
 from PyQt5.QtWidgets import QApplication, QDialog, QMessageBox, QInputDialog, QFileDialog
 from PyQt5.QtCore import Qt
 
-from product_management.edit_dialog import ProductEditDialog, SUPPORTED_LANGUAGES
-from db.cruds.products.products_crud import products_crud_instance as products_crud
-from db.cruds import product_media_links_crud
-from media_manager import operations as media_ops # For mocking add_image
-from config import MEDIA_FILES_BASE_PATH # For _browse_technical_image path logic
+from app.product_management.edit_dialog import ProductEditDialog, SUPPORTED_LANGUAGES
+from app.db.cruds.products.products_crud import products_crud_instance as products_crud
+from app.db.cruds import product_media_links_crud
+from app.media_manager import operations as media_ops # For mocking add_image
+from app.config import MEDIA_FILES_BASE_PATH # For _browse_technical_image path logic
 
 # app = QApplication.instance() if QApplication.instance() else QApplication(sys.argv)
 

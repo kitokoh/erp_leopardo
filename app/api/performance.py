@@ -5,16 +5,16 @@ from sqlalchemy.exc import IntegrityError
 from datetime import date, datetime
 
 # Project-specific imports
-from api.dependencies import get_db
-from api.auth import get_current_active_user # Assuming UserInDB is returned with at least user_id and role
-from api.models import (
+from app.api.dependencies import get_db
+from app.api.auth import get_current_active_user # Assuming UserInDB is returned with at least user_id and role
+from app.api.models import (
     UserInDB, Employee, # Core models
     Goal, GoalCreate, GoalResponse, GoalUpdate, GoalStatusEnum,
     ReviewCycle, ReviewCycleCreate, ReviewCycleResponse, ReviewCycleUpdate,
     PerformanceReview, PerformanceReviewCreate, PerformanceReviewResponse, PerformanceReviewUpdate, PerformanceReviewStatusEnum,
     EmployeeResponse # For potential nested responses, though not explicitly used in all signatures here
 )
-from db.cruds import performance_crud, employees_crud
+from app.db.cruds import performance_crud, employees_crud
 
 
 router = APIRouter(

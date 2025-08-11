@@ -12,11 +12,11 @@ import cv2
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from typing import List, Dict, Any # Added import
-from media_manager import operations, models
-from db.init_schema import initialize_database
-from db.connection import get_db_connection
-from db.cruds.users import users_crud
-from config import MEDIA_FILES_BASE_PATH, DEFAULT_DOWNLOAD_PATH, DATABASE_PATH, APP_ROOT_DIR
+from app.media_manager import operations, models
+from app.db.init_schema import initialize_database
+from app.db.connection import get_db_connection
+from app.db.cruds.users import users_crud
+from app.config import MEDIA_FILES_BASE_PATH, DEFAULT_DOWNLOAD_PATH, DATABASE_PATH, APP_ROOT_DIR
 
 class TestMediaManager(unittest.TestCase):
     test_user_id_1 = None
