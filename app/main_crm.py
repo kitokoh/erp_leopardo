@@ -28,47 +28,46 @@ from PyQt5.QtGui import QFont, QPixmap, QMovie
 from PyQt5.QtCore import QStringListModel
 
 # Imports from project structure
-from app_setup import (
+from app.app_setup import (
     APP_ROOT_DIR, CONFIG,
     setup_logging, load_stylesheet_global, initialize_default_templates
 )
-from utils import save_config # Changed import from app_config to utils
-from utils import is_first_launch, mark_initial_setup_complete
-from auth.roles import SUPER_ADMIN
+from app.utils import save_config # Changed import from app_config to utils
+from app.utils import is_first_launch, mark_initial_setup_complete
+from app.auth.roles import SUPER_ADMIN
 # Import InitialSetupDialog and PromptCompanyInfoDialog
-from settings.initial_setup_dialog import InitialSetupDialog, PromptCompanyInfoDialog
+from app.settings.initial_setup_dialog import InitialSetupDialog, PromptCompanyInfoDialog
 from PyQt5.QtWidgets import QDialog # Required for QDialog.Accepted check
 # Import specific db functions needed
-import db
-from db.init_schema import initialize_database as initialize_database_from_schema
-from db.cruds.misc.application_settings_crud import get_setting, set_setting
-from db.db_seed import run_seed, seed_only_hidroguc_products
-from db.cruds.misc.companies_crud import get_all_companies, add_company
-from db.cruds.users import users_crud
+import app.db as db
+# from db.init_schema import initialize_database as initialize_database_from_schema # This is now handled by the core initializer
+# from db.cruds.misc.application_settings_crud import get_setting, set_setting
+# from db.db_seed import run_seed, seed_only_hidroguc_products
+# from db.cruds.misc.companies_crud import get_all_companies, add_company
+# from db.cruds.users import users_crud
 # from auth.login_window import LoginWindow # Replaced by LoginDialog
-from gui.dialogs.login_dialog import LoginDialog # New LoginDialog
-from auth import authentication as auth_service # Import the auth service
-from user_profile_management.database_setup import create_tables as create_user_profile_tables
-from user_profile_management.database_setup import seed_data as seed_user_profile_data
+# from gui.dialogs.login_dialog import LoginDialog # New LoginDialog
+# from auth import authentication as auth_service # Import the auth service
+# from user_profile_management.database_setup import create_tables as create_user_profile_tables
+# from user_profile_management.database_setup import seed_data as seed_user_profile_data
 
-from PyQt5.QtWidgets import QDialog # Required for QDialog.Accepted check (already present, but good to note)
+from PyQt5.QtWidgets import QDialog, QMessageBox, QSplashScreen, QMainWindow
 # from initial_setup_dialog import InitialSetupDialog # Redundant import, already imported above
 # import db as db_manager # For db initialization - already imported above, now using 'import db'
-from notifications import NotificationManager # Added for notifications
+from app.notifications import NotificationManager # Added for notifications
 # from db.cruds.users_crud import users_crud_instance # users_crud is used directly by auth_service
-from PyQt5.QtWidgets import QMessageBox # Added for error dialog
-from PyQt5.QtWidgets import QSplashScreen
+# from PyQt5.QtWidgets import QMessageBox # Added for error dialog
+# from PyQt5.QtWidgets import QSplashScreen
 
-from gui.main_window import DocumentManager
+from app.gui.main_window import DocumentManager
 from PyQt5.QtCore import QSettings # Added for Remember Me
-from PyQt5.QtWidgets import QMainWindow
 from PyQt5.QtCore import Qt
 
 # Imports pour la gestion de licence
-from db.connection import get_db_connection
-from license_management import manager as license_manager
-from license_management.ui import LicenseDialog # Décommenté
-from auth.session_manager import SessionManager
+# from db.connection import get_db_connection # Moved into functions
+from app.license_management import manager as license_manager
+from app.license_management.ui import LicenseDialog # Décommenté
+from app.auth.session_manager import SessionManager
 from app.core.initializer import initialize_database, setup_qt_application, setup_translations
 from app.auth.auth_flow_manager import AuthFlowManager
 from app.core.api_server_manager import APIServerManager
@@ -110,6 +109,15 @@ class CRMModule(QMainWindow):
             logging.error("main.py: Could not find db.connection.set_db_config. DB calls might fail.")
         # Initialize the database. This function now encapsulates all DB setup.
         initialize_database(CONFIG, PROJECT_ROOT)
+
+        # --- Import DB-dependent modules AFTER initialization ---
+        from db.db_seed import run_seed, seed_only_hidroguc_products
+        from db.connection import get_db_connection
+        from db.cruds.misc.application_settings_crud import get_setting
+        from db.cruds.users import users_crud
+        from db.cruds.misc.companies_crud import get_all_companies, add_company
+        # --- End DB-dependent imports ---
+
         seed_only_hidroguc_products()
 
         # Set the configuration for document_generator.context_builder

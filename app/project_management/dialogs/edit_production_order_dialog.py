@@ -7,11 +7,11 @@ from PyQt5.QtCore import Qt, QTimer, QDate
 from PyQt5.QtGui import QIcon
 
 # Assuming db.py is discoverable
-from db.cruds.projects.projects_crud import get_project_by_id, update_project
-from db.cruds.misc.status_settings_crud import get_all_status_settings, get_status_setting_by_id, get_status_setting_by_name
-from db.cruds.users.team_members_crud import get_all_team_members, get_team_member_by_id
-from db.cruds.clients.clients_crud import get_all_clients
-from db.cruds.projects.tasks_crud import get_tasks_by_project_id_ordered_by_sequence, add_task, update_task, delete_task
+from app.db.cruds.projects.projects_crud import get_project_by_id, update_project
+from app.db.cruds.misc.status_settings_crud import get_all_status_settings, get_status_setting_by_id, get_status_setting_by_name
+from app.db.cruds.users.team_members_crud import get_all_team_members, get_team_member_by_id
+from app.db.cruds.clients.clients_crud import get_all_clients
+from app.db.cruds.projects.tasks_crud import get_tasks_by_project_id_ordered_by_sequence, add_task, update_task, delete_task
 
 # Relative import for EditProductionStepDialog
 from .edit_production_step_dialog import EditProductionStepDialog

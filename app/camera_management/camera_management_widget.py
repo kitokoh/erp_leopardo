@@ -15,7 +15,7 @@ from PyQt5.QtMultimediaWidgets import QVideoWidget
 # These imports might need adjustment based on the final project structure
 # and how global instances or accessors are defined.
 # from .. import db as db_manager # Example if db is one level up
-from db.cruds.misc.company_assets_crud import company_assets_crud
+from app.db.cruds.misc.company_assets_crud import company_assets_crud
 # from db.cruds.users_crud import users_crud # If needed for created_by_user_id
 
 logger = logging.getLogger(__name__)

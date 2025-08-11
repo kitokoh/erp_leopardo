@@ -9,19 +9,14 @@ from PyQt5.QtCore import Qt, QSize, pyqtSlot, QObject
 import sys
 import os
 
-# Adjust path to import from root
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
 try:
-    from db.cruds import transporters_crud
-    from statistics.map_utils import generate_folium_map_html
-    from statistics.dashboard import MapInteractionHandler # Re-using this handler
+    from app.db.cruds.misc import transporters_crud
+    from app.statistics.map_utils import generate_folium_map_html
+    from app.statistics.dashboard import MapInteractionHandler # Re-using this handler
 except ImportError as e:
     print(f"Error importing modules in carrier_map_dialog.py: {e}")
     # Fallback for direct execution
-    from db.cruds import transporters_crud
+    from app.db.cruds.misc import transporters_crud
     # In a real scenario, you'd want to ensure these paths are resolvable
     # For this fix, we assume the project structure allows these imports.
     generate_folium_map_html = None

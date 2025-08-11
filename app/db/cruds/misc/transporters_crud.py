@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from ...models import Transporter
+from ...models.misc.transporters import Transporter
 import logging
 from typing import List, Optional, Dict, Any
 from uuid import uuid4

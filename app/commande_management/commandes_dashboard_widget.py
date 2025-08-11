@@ -9,8 +9,8 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QDate
 from datetime import datetime
 # Placeholder for DB imports, will be added as needed
-from db.cruds.invoices import commandes_crud
-from db.cruds.misc import status_settings_crud
+from app.db.cruds.invoices import commandes_crud
+from app.db.cruds.misc.status_settings_crud import get_all_status_settings
 from PyQt5.QtGui import QColor # For status color
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtWidgets import QFormLayout
@@ -143,8 +143,7 @@ class CommandesDashboardWidget(QWidget):
         self.status_filter_combo.clear()
         self.status_filter_combo.addItem(self.tr("Tous les Statuts"), None)
         try:
-            from db.cruds import status_settings_crud # Corrected import
-            statuses = status_settings_crud.get_all_status_settings(type_filter='Commande')
+            statuses = get_all_status_settings(type_filter='Commande')
             if statuses:
                 for status in sorted(statuses, key=lambda x: x.get('sort_order', 0)):
                     # Assuming icons are available in the theme
@@ -190,7 +189,7 @@ class CommandesDashboardWidget(QWidget):
         current_filters = self._get_current_filters()
 
         try:
-            from db.cruds import commandes_crud # Corrected import
+            from app.db.cruds.invoices import commandes_crud # Corrected import
             total_commandes = commandes_crud.get_all_commandes_count(filters=current_filters)
 
             commandes_list = commandes_crud.get_all_commandes_with_details(
@@ -289,7 +288,7 @@ class CommandesDashboardWidget(QWidget):
     def _next_page(self):
         # Re-fetch total count based on current filters to ensure next button is correctly enabled/disabled
         current_filters = self._get_current_filters()
-        from db.cruds import commandes_crud # Corrected import
+        from app.db.cruds.invoices import commandes_crud # Corrected import
         total_items = commandes_crud.get_all_commandes_count(filters=current_filters)
 
         if (self.current_offset + self.limit_per_page) < total_items:
@@ -303,7 +302,7 @@ class CommandesDashboardWidget(QWidget):
         if not commande_id: return
         self.logger.info(f"Request to view/edit commande ID: {commande_id}")
         try:
-            from .commande_dialog import CommandeDialog
+            from app.commande_management.commande_dialog import CommandeDialog
 
             # Determine app_root_dir. This is crucial if ProductDialog is called from CommandeDialog.
             app_root_dir_val = None
@@ -318,7 +317,7 @@ class CommandesDashboardWidget(QWidget):
                 else: break
 
             if not app_root_dir_val: # Fallback if not found in parent chain
-                 from app_setup import APP_ROOT_DIR as GLOBAL_APP_ROOT_DIR
+                 from app.app_setup import APP_ROOT_DIR as GLOBAL_APP_ROOT_DIR
                  app_root_dir_val = GLOBAL_APP_ROOT_DIR
                  self.logger.warning(f"app_root_dir not found in parent hierarchy for CommandesDashboard, using global APP_ROOT_DIR: {app_root_dir_val}")
 

@@ -6,7 +6,11 @@ from app.db.connection import Base
 from ..clients.client import Client
 from ..projects.project import Project
 from ..misc.companies import Company
-from ..documents.client_documents import ClientDocument
+from typing import TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from ..documents.client_documents import ClientDocument
 
 class ProformaInvoiceStatusEnum(enum.Enum):
     DRAFT = "draft"

@@ -6,16 +6,19 @@ from decimal import Decimal, ROUND_HALF_UP
 
 # Assuming db.cruds and other necessary modules exist in the parent directory or are accessible.
 # Adjust these imports based on the actual project structure.
-from db.cruds.misc import get_company_by_id, referents_crud, get_personnel_for_company, application_settings_crud
-from db.cruds.clients import clients_crud_instance as clients_crud
-from db.cruds.products.products_crud import products_crud_instance as products_crud
-from db.cruds.projects import get_project_by_id
-from db.cruds.misc import get_country_by_id, get_city_by_id
-from db.cruds.clients import get_products_for_client_or_project, get_client_document_notes
-from db.cruds.misc import get_contacts_for_client
-from db.cruds.products.products_crud import products_crud_instance as products_crud
-from db.cruds.products import product_media_links_crud
-from db.connection import get_db_connection # Changed from db.utils
+from app.db.cruds.misc.companies_crud import get_company_by_id
+from app.db.cruds.misc.referents_crud import get_all_referents, get_referent_by_client_id
+from app.db.cruds.misc.company_personnel_crud import get_personnel_for_company
+from app.db.cruds.misc.application_settings_crud import get_setting
+from app.db.cruds.clients import clients_crud_instance as clients_crud
+from app.db.cruds.products.products_crud import products_crud_instance as products_crud
+from app.db.cruds.projects import get_project_by_id
+from app.db.cruds.misc.countries_crud import get_country_by_id
+from app.db.cruds.misc.cities_crud import get_city_by_id
+from app.db.cruds.clients import get_products_for_client_or_project, get_client_document_notes
+from app.db.cruds.misc.contacts_crud import get_contacts_for_client
+from app.db.cruds.products import product_media_links_crud
+from app.db.connection import get_db_connection # Changed from db.utils
 # Assuming these config variables are correctly defined in your project.
 # from db_config import APP_ROOT_DIR_CONTEXT, LOGO_SUBDIR_CONTEXT # Removed
 # from config import MEDIA_FILES_BASE_PATH # Removed
@@ -753,7 +756,7 @@ def get_document_context(
                 # if target_client_city_id: # This might be too restrictive, country level is often enough for "local"
                 #     local_filters['city_id'] = target_client_city_id
 
-                all_local_raw = referents_crud.get_all_referents(filters=local_filters, include_inactive=False)
+                all_local_raw = get_all_referents(filters=local_filters, include_inactive=False)
                 for ref_raw in all_local_raw:
                     if ref_raw.get('client_id') == client_id: # Exclude the target client itself
                         continue
@@ -769,7 +772,7 @@ def get_document_context(
 
             # Récupérer les référents globaux (tous les référents actifs)
             global_referents_list = []
-            all_global_raw = referents_crud.get_all_referents(include_inactive=False)
+            all_global_raw = get_all_referents(include_inactive=False)
             for ref_raw in all_global_raw:
                 if ref_raw.get('client_id') == client_id: # Exclude the target client itself
                     continue
@@ -799,7 +802,7 @@ def get_document_context(
         else:
             default_footer_key = f"default_document_footer_notes_{language_code}"
             # The get_setting CRUD is already decorated with _manage_conn, so it handles its own connection.
-            default_notes = application_settings_crud.get_setting(default_footer_key, default="")
+            default_notes = get_setting(default_footer_key, default="")
             if default_notes and default_notes.strip():
                 final_footer_notes = default_notes
                 logger.info(f"Using default footer notes for language '{language_code}': {default_notes[:50]}...")

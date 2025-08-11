@@ -8,7 +8,8 @@ from app.db.cruds.clients.clients_crud import clients_crud_instance
 from app.db.cruds.products.products_crud import products_crud_instance as products_crud
 from app.db.cruds.misc.status_settings_crud import get_status_setting_by_name
 from app.db.cruds.misc.locations_crud import get_country_by_name, get_city_by_name_and_country_id
-from app.db.cruds.misc import partners_crud, referents_crud
+from app.db.cruds.misc.partners_crud import get_partner_category_by_name, add_partner_category
+from app.db.cruds.misc.referents_crud import get_referent_by_client_id, add_referent
 from app.db.cruds.misc.application_settings_crud import set_setting
 from app.db.cruds import commandes_crud
 from app.auth.roles import SUPER_ADMIN
@@ -133,8 +134,8 @@ def _seed_partner_categories(conn: sqlite3.Connection, logger: logging.Logger):
         {'category_name': 'Distributor', 'description': 'Entities distributing products.'}
     ]
     for cat in categories:
-        if not partners_crud.get_partner_category_by_name(cat['category_name'], conn=conn):
-            partners_crud.add_partner_category(cat, conn=conn)
+        if not get_partner_category_by_name(cat['category_name'], conn=conn):
+            add_partner_category(cat, conn=conn)
     logger.info("Default partner categories seeding attempt finished.")
 
 def _seed_document_footers(conn: sqlite3.Connection, logger: logging.Logger):
@@ -148,7 +149,7 @@ def _seed_document_footers(conn: sqlite3.Connection, logger: logging.Logger):
     logger.info("Default document footer notes seeding complete.")
 
 def _seed_default_document_notes(conn: sqlite3.Connection, logger: logging.Logger):
-    from db.cruds.notes_crud import add_default_document_note, get_default_document_note
+    from app.db.cruds.misc.notes_crud import add_default_document_note, get_default_document_note
     doc_types = [
         "contact_page", "sales_contract_excel", "cover_page", "packing_list_html",
         "packing_list_excel", "product_images", "proforma_invoice_html", "proforma_invoice_excel",
@@ -179,12 +180,12 @@ def _seed_sample_referents(conn: sqlite3.Connection, logger: logging.Logger, adm
         client_id = client.get('client_id')
         if not client_id or not client.get('country_id'):
             continue
-        if referents_crud.get_referent_by_client_id(client_id, conn=conn, include_inactive=True):
+        if get_referent_by_client_id(client_id, conn=conn, include_inactive=True):
             continue
         if not commandes_crud.get_commandes_for_client(client_id, limit=1, conn=conn):
             continue
 
-        referents_crud.add_referent(
+        add_referent(
             client_id=client_id, country_id=client.get('country_id'), region_id=None,
             city_id=client.get('city_id'), notes=f"Exemplary referent from {client.get('country', 'N/A')}.",
             created_by_user_id=admin_user_id, conn=conn

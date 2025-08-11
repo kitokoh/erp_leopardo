@@ -10,7 +10,8 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.utils import hash_password as util_hash_password, verify_password as util_verify_password
 from ..generic_crud import _manage_conn
-from app.db.models import User, Role
+from app.db.models.users.user import User
+from app.db.models.users.role import Role
 
 module_logger = logging.getLogger(__name__)
 
