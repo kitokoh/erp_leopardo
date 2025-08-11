@@ -66,23 +66,23 @@ from PyQt5.QtCore import Qt, QUrl, QTimer, pyqtSlot, QByteArray, QDate, QEvent, 
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 # from PyQt5.QtWebChannel import QWebChannel # QWebChannel removed as DocumentManager no longer uses its own map.
 
-import db as db_manager
-from db.cruds.clients.clients_crud import clients_crud_instance
-from db.cruds.products.products_crud import products_crud_instance
+import app.db as db_manager
+from app.db.cruds.clients.clients_crud import clients_crud_instance
+from app.db.cruds.products.products_crud import products_crud_instance
 
-import icons_rc
+import app.icons_rc
 # import folium # No longer used directly by DocumentManager for its own map
 # from statistics_module import MapInteractionHandler # DocumentManager no longer has its own map handler instance
 from app_setup import APP_ROOT_DIR, CONFIG
 # from ui_components import StatisticsWidget # StatisticsWidget removed from main_layout
-from gui.ui_components import StatusDelegate # Still used for QListWidget
-from gui.dialogs.map_client_dialog import MapClientDialog # Added for new client from map
+from app.gui.ui_components import StatusDelegate # Still used for QListWidget
+from app.gui.dialogs.map_client_dialog import MapClientDialog # Added for new client from map
 # The get_country_by_name, get_or_add_country, etc. specific imports for handle_add_client_from_stats_map might become obsolete.
-from db.cruds.misc.locations_crud import get_country_by_name, get_or_add_country, get_city_by_name_and_country_id, get_or_add_city
+from app.db.cruds.misc.locations_crud import get_country_by_name, get_or_add_country, get_city_by_name_and_country_id, get_or_add_city
 
-from gui.dialogs.statistics_add_client_dialog import StatisticsAddClientDialog # Import the new dialog
+from app.gui.dialogs.statistics_add_client_dialog import StatisticsAddClientDialog # Import the new dialog
 
-from utils.document_manager_logic import (
+from app.utils.document_manager_logic import (
     handle_create_client_execution,
     load_and_display_clients,
     filter_and_display_clients,
@@ -142,7 +142,7 @@ except Exception as e_local_sys_path_mod:
 print(f"DEBUG: Current sys.path before product_management import: {sys.path}")
 print(f"DEBUG: Current working directory before product_management import: {os.getcwd()}")
 
-from product_management.page import ProductManagementPage # Added
+from app.product_management.page import ProductManagementPage # Added
 from PyQt5.QtWidgets import QSizePolicy
 
 from .dialogs.status_management_dialog import StatusManagementDialog # Added for status management
@@ -152,61 +152,61 @@ from PyQt5.QtWidgets import QDateEdit
 
 
 # Updated import for the refactored client widget
-from client_management.ui.client_main_widget import ClientMainWidget
-from client_management.client_controller import ClientController # Import ClientController
-from project_management import MainDashboard as ProjectManagementDashboard
-from statistics import StatisticsDashboard, StatisticsSummaryWidget # Updated import
-from statistics.map_widget import HomePageMapWidget # Import HomePageMapWidget
+from app.client_management.ui.client_main_widget import ClientMainWidget
+from app.client_management.client_controller import ClientController # Import ClientController
+from app.project_management import MainDashboard as ProjectManagementDashboard
+from app.statistics import StatisticsDashboard, StatisticsSummaryWidget # Updated import
+from app.statistics.map_widget import HomePageMapWidget # Import HomePageMapWidget
 # from statistics_panel import CollapsibleStatisticsWidget # Unused in main_window
 
-from utils import save_config
-from company_management import CompanyTabWidget
-from settings.settings_page import SettingsPage # Import the new SettingsPage
-from botpress_integration.ui_components import BotpressIntegrationUI # Import Botpress UI
-from gui.dialogs.carrier_map_dialog import CarrierMapDialog
+from app.utils import save_config
+from app.company_management import CompanyTabWidget
+from app.settings.settings_page import SettingsPage # Import the new SettingsPage
+from app.botpress_integration.ui_components import BotpressIntegrationUI # Import Botpress UI
+from app.gui.dialogs.carrier_map_dialog import CarrierMapDialog
 from voice_input_service import VoiceInputService # Added import
 
-from partners.partner_main_widget import PartnerMainWidget # Partner Management
-from gui.widgets.inventory_browser_widget import InventoryBrowserWidget # Inventory Management
-from camera_management.camera_management_widget import CameraManagementWidget # Camera Management
+from app.partners.partner_main_widget import PartnerMainWidget # Partner Management
+from app.gui.widgets.inventory_browser_widget import InventoryBrowserWidget # Inventory Management
+from app.camera_management.camera_management_widget import CameraManagementWidget # Camera Management
 
 from PyQt5.QtGui import QColor, QPalette # For ClientListItemWidget text color
 
-from recruitment.recruitment_dashboard import RecruitmentDashboard # Import RecruitmentDashboard
+from app.recruitment.recruitment_dashboard import RecruitmentDashboard # Import RecruitmentDashboard
 
-from ui.home.home_page_widget import HomePageWidget # Updated import path
-from gui.widgets.experience_module_widget import ExperienceModuleWidget # Added
-from services.download_monitor_service import DownloadMonitorService
+from app.ui.home.home_page_widget import HomePageWidget # Updated import path
+from app.gui.widgets.experience_module_widget import ExperienceModuleWidget # Added
+from app.services.download_monitor_service import DownloadMonitorService
 from dialogs.assign_document_dialog import AssignDocumentToClientDialog
-from db.cruds.clients.client_documents_crud import add_client_document # For assign dialog
+from app.db.cruds.clients.client_documents_crud import add_client_document # For assign dialog
 import os # For path checks in download monitor init
-from db.cruds import user_saved_filters_crud # Import for saved filters
+from app.db.cruds import user_saved_filters_crud # Import for saved filters
 
-from calendar_module.calendar_widget import CalendarWidget # Import CalendarWidget
-from user_management.page import UserManagementPage # Import UserManagementPage
+from app.calendar_module.calendar_widget import CalendarWidget # Import CalendarWidget
+from app.user_management.page import UserManagementPage # Import UserManagementPage
 
-from calculator.main_calculator_widget import MainCalculatorWidget # Import Calculator Widget
+from app.calculator.main_calculator_widget import MainCalculatorWidget # Import Calculator Widget
 # from db.connection import SessionLocal as AppSessionLocal_MW # Import SessionLocal for calculator
-from user_management.user_menu_button import UserMenuButton # Import UserMenuButton
+from app.user_management.user_menu_button import UserMenuButton # Import UserMenuButton
 from dialogs.edit_user_dialog import EditUserDialog # For handling edit/add user requests
 from dialogs.role_management_dialog import RoleManagementDialog # Added for Role Management
-from commande_management.commandes_dashboard_widget import CommandesDashboardWidget # Import CommandesDashboardWidget
-from utils.app_constants import CONFIGURABLE_MODULES # Import from new location
-from gui.widgets.sidebar_navigation_widget import SidebarNavigationWidget # Import de la Sidebar
-from gui.widgets.notification_panel import NotificationPanel
-from gui.widgets.categorized_completer import CategorizedCompleter, CategoryDelegate
+from app.commande_management.commandes_dashboard_widget import CommandesDashboardWidget # Import CommandesDashboardWidget
+from app.utils.app_constants import CONFIGURABLE_MODULES # Import from new location
+from app.gui.widgets.sidebar_navigation_widget import SidebarNavigationWidget # Import de la Sidebar
+from app.gui.widgets.notification_panel import NotificationPanel
+from app.gui.widgets.categorized_completer import CategorizedCompleter, CategoryDelegate
 
 
 # B2C Restaurant Module Import
-from b2c.ges_restaurant.ui.main_widget import RestaurantMainWidget
+from app.b2c.ges_restaurant.ui.main_widget import RestaurantMainWidget
 
-from addons.widgets import AddonsPage
-from synchronization.synchronization_widget import SynchronizationWidget
+from app.addons.widgets import AddonsPage
+from app.synchronization.synchronization_widget import SynchronizationWidget
 
 
 # License Management Imports for feature constants and manager
-from license_management import manager as license_manager # To call get_allowed_features
-from license_management import (
+from app.license_management import manager as license_manager # To call get_allowed_features
+from app.license_management import (
     FEATURE_BASIC_CLIENT_DOCS, FEATURE_PROJECT_MANAGEMENT, FEATURE_STATISTICS_MODULE,
     FEATURE_PRODUCT_MANAGEMENT, FEATURE_PARTNER_MANAGEMENT, FEATURE_INVENTORY_MANAGEMENT,
     FEATURE_RECRUITMENT_MODULE, FEATURE_BOTPRESS_INTEGRATION, FEATURE_CALENDAR_MODULE,
@@ -217,7 +217,7 @@ from license_management import (
 
 # Import for menu customization
 from dialogs.menu_customization_dialog import MenuCustomizationDialog
-from utils.app_constants import CONFIGURABLE_MODULES # For menu customization and default order
+from app.utils.app_constants import CONFIGURABLE_MODULES # For menu customization and default order
 import json # For handling menu config storage
 import random
 from PyQt5.QtCore import pyqtSignal, QTimer, QEasingCurve, pyqtProperty # Added QTimer, QEasingCurve

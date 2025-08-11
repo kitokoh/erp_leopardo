@@ -2,11 +2,11 @@ import enum
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Float, Enum as SQLAlchemyEnum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from db.connection import Base
+from app.db.connection import Base
 from ..employees.employee import Employee
 from .leave_type import LeaveType
 from ..users.user import User
-from api.models import LeaveRequestStatusEnum
+from app.api.models import LeaveRequestStatusEnum
 
 
 class LeaveRequest(Base):

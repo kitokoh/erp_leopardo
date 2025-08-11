@@ -5,11 +5,11 @@ from typing import Generator, List as PyList, Optional
 from datetime import date, datetime, timedelta
 
 # Adjust imports based on your project structure
-from api.models import (
+from app.api.models import (
     Base, Employee, LeaveType, LeaveRequest, LeaveRequestStatusEnum,
     HeadcountReportItem, AnniversaryReportItem, LeaveSummaryReportItem
 )
-from db.cruds import hr_reports_crud, employees_crud, leave_crud # For setting up data
+from app.db.cruds import hr_reports_crud, employees_crud, leave_crud # For setting up data
 
 # Use an in-memory SQLite database for testing
 DATABASE_URL = "sqlite:///:memory:"

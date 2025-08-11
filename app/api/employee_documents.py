@@ -13,15 +13,15 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 # Project-specific imports
-from api.dependencies import get_db
-from api.auth import get_current_active_user # Assuming UserInDB is returned
-from api.models import (
+from app.api.dependencies import get_db
+from app.api.auth import get_current_active_user # Assuming UserInDB is returned
+from app.api.models import (
     UserInDB,
     DocumentCategory, DocumentCategoryCreate, DocumentCategoryResponse, DocumentCategoryBase,
     EmployeeDocument, EmployeeDocumentCreate, EmployeeDocumentResponse, EmployeeDocumentUpdate,
     Employee # For checking employee existence
 )
-from db.cruds import employee_documents_crud, employees_crud
+from app.db.cruds import employee_documents_crud, employees_crud
 
 # --- Configuration for Local File Storage ---
 BASE_DIR = pathlib.Path(__file__).resolve().parent.parent # Assuming this file is in api/

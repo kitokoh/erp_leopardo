@@ -1,7 +1,7 @@
 import json
 import os
 import logging
-from db.cruds.products.products_crud import products_crud_instance
+from app.db.cruds.products.products_crud import products_crud_instance
 from sqlalchemy.orm import Session
 
 # Chemin vers le fichier JSON des produits

@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QLineEdit, QTextEdit,
     QComboBox, QPushButton, QMessageBox, QCheckBox, QHBoxLayout, QLabel
 )
-from client_management.client_controller import ClientController # Assumed path
+from app.client_management.client_controller import ClientController # Assumed path
 
 logger = logging.getLogger(__name__)
 

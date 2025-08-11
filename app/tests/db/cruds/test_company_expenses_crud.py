@@ -11,13 +11,13 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 # Now import after path adjustment
-from db.cruds.company_expenses_crud import (
+from app.db.cruds.company_expenses_crud import (
     add_company_facture, get_company_facture_by_id, update_company_facture, soft_delete_company_facture, get_all_company_factures,
     add_company_expense, get_company_expense_by_id, update_company_expense, soft_delete_company_expense, get_all_company_expenses,
     link_facture_to_expense, unlink_facture_from_expense
 )
-import db.init_schema  # To initialize schema in memory
-from db.connection import get_db_connection # To override for in-memory testing
+import app.db.init_schema  # To initialize schema in memory
+from app.db.connection import get_db_connection # To override for in-memory testing
 
 # Store the original get_db_connection function
 original_get_db_connection = db.connection.get_db_connection

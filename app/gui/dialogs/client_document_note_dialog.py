@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
 # No specific QtGui or QtCore imports noted as directly used by this class methods
 # other than those implicitly handled by QtWidgets.
 
-import db as db_manager
+import app.db as db_manager
 
 class ClientDocumentNoteDialog(QDialog):
     def __init__(self, client_id, note_data=None, parent=None):

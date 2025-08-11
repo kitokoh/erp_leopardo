@@ -74,7 +74,7 @@ mock_utils = MagicMock()
 sys.modules['utils'] = mock_utils
 
 
-from settings_page import SettingsPage # Now this should import
+from app.settings_page import SettingsPage # Now this should import
 
 class TestSettingsPageDataHandling(unittest.TestCase):
 

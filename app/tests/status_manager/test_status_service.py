@@ -2,8 +2,8 @@ import unittest
 from unittest.mock import patch, MagicMock
 
 # Assuming status_manager and db.cruds are in PYTHONPATH
-from status_manager.status_models import Status, StatusType
-from status_manager import status_service
+from app.status_manager.status_models import Status, StatusType
+from app.status_manager import status_service
 
 # Mock data for status_settings_crud responses
 MOCK_DB_STATUS_ROW_CLIENT_PROSPECT = {

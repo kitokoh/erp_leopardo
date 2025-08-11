@@ -1,5 +1,5 @@
 import os
-import db as db_manager
+import app.db as db_manager
 import datetime # Not directly used but good for context
 import json # Not directly used but good for context
 import shutil # For potential directory cleanup if needed, though os.remove is used for files

@@ -8,7 +8,7 @@ from PyQt5.QtGui import QIcon
 
 # Anticipated import, will be resolved when ProductDimensionUIDialog is moved
 from .product_dimension_ui_dialog import ProductDimensionUIDialog
-import db # For db_manager access
+import app.db # For db_manager access
 import logging # For error logging
 
 

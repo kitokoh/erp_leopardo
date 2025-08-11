@@ -13,9 +13,9 @@ if APP_ROOT_DIR not in sys.path:
     sys.path.insert(0, APP_ROOT_DIR)
 
 # Now import application modules
-from db.cruds.misc import partners_crud as db_manager
-from db import init_schema as db_schema
-import config as db_config
+from app.db.cruds.misc import partners_crud as db_manager
+from app.db import init_schema as db_schema
+import app.config as db_config
 
 
 class TestPartnerCRUD(unittest.TestCase):

@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtCore import Qt
 
-from db.cruds.products.products_crud import products_crud_instance
+from app.db.cruds.products.products_crud import products_crud_instance
 
 class ProductDimensionUIDialog(QDialog):
     def __init__(self, product_id, app_root_dir, parent=None, read_only=False): # Added app_root_dir and read_only

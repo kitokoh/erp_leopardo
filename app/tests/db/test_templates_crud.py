@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 # Assuming the path to your templates_crud module
 # Adjust if your project structure is different
-from db.cruds.templates_crud import get_all_templates
+from app.db.cruds.templates_crud import get_all_templates
 
 # Mock the _manage_conn decorator for testing CRUD functions in isolation
 # This avoids needing a real DB connection for these unit tests.

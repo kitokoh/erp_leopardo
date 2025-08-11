@@ -1,7 +1,7 @@
 import sqlite3
 import uuid
 from datetime import datetime
-from db.connection import get_db_connection
+from app.db.connection import get_db_connection
 
 # TODO: Validate candidate_id, recruitment_step_id, status_id.
 

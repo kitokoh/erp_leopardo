@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
-from api.main import app # Import the FastAPI app from api.main
-import db as db_manager # For mocking or setting up users
+from app.api.main import app # Import the FastAPI app from api.main
+import app.db as db_manager # For mocking or setting up users
 from unittest.mock import patch, MagicMock
 
 client = TestClient(app)

@@ -10,8 +10,8 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtCore import Qt
 
-import db as db_manager # This class uses db_manager directly
-import icons_rc # Import for Qt resource file
+import app.db as db_manager # This class uses db_manager directly
+import app.icons_rc # Import for Qt resource file
 from PyQt5.QtWidgets import QWidget
 
 class ClientProductDimensionDialog(QDialog):

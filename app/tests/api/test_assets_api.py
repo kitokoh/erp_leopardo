@@ -13,11 +13,11 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from api.main import app
-from api.auth import get_current_active_user
+from app.api.main import app
+from app.api.auth import get_current_active_user
 from models.user_models import User as UserModelFromApi # Renamed to avoid conflict with local User if any
-from db.init_schema import initialize_database
-import config # To override DATABASE_PATH for tests
+from app.db.init_schema import initialize_database
+import app.config # To override DATABASE_PATH for tests
 
 # Mock user for dependency override
 mock_user_data = {

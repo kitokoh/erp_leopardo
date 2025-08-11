@@ -2,13 +2,7 @@ import unittest
 import sys
 from pathlib import Path
 
-# Adjust path to import from src
-# Assuming test file is in invoice_ocr_project/tests/
-# and module to test is in invoice_ocr_project/src/
-project_root = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(project_root / "src"))
-
-from ocr_processor import parse_extracted_text
+from app.invoice_ocr_project.src.ocr_processor import parse_extracted_text
 
 class TestOcrProcessor(unittest.TestCase):
     """

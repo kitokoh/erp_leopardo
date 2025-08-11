@@ -6,11 +6,11 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 # import db as db_manager # Removed
-from client_management.client_controller import ClientController
+from app.client_management.client_controller import ClientController
 # from db.cruds.templates_crud import get_all_templates # Removed
-from auth.authentication import get_current_user_id # Added import
-from db.connection import get_db_connection
-from db.cruds.misc.application_settings_crud import get_setting
+from app.auth.authentication import get_current_user_id # Added import
+from app.db.connection import get_db_connection
+from app.db.cruds.misc.application_settings_crud import get_setting
 
 class AddNewClientDialog(QDialog):
     def __init__(self, parent=None, initial_country_name=None):

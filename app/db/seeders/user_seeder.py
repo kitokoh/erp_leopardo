@@ -2,9 +2,9 @@ import logging
 import sqlite3
 import uuid
 
-from db.cruds.users import users_crud
-from db.cruds.users.roles_crud import get_role_by_name
-from auth.roles import SUPER_ADMIN, OPERATOR
+from app.db.cruds.users import users_crud
+from app.db.cruds.users.roles_crud import get_role_by_name
+from app.auth.roles import SUPER_ADMIN, OPERATOR
 
 def seed_default_users(conn: sqlite3.Connection, logger: logging.Logger):
     """

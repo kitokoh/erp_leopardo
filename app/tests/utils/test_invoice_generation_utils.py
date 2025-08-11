@@ -10,9 +10,9 @@ APP_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 sys.path.append(APP_ROOT)
 
 # For get_next_invoice_number
-from db.cruds.application_settings_crud import get_next_invoice_number, set_setting, get_setting
-from db.init_schema import initialize_database
-import db.db_config as db_config
+from app.db.cruds.application_settings_crud import get_next_invoice_number, set_setting, get_setting
+from app.db.init_schema import initialize_database
+import app.db.db_config as db_config
 
 # For get_final_invoice_context_data
 from proforma_invoice_utils import get_final_invoice_context_data

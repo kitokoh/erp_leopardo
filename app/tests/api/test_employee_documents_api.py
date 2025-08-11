@@ -11,17 +11,17 @@ import pathlib
 import uuid
 
 # Module to be tested and its dependencies
-from api import employee_documents as employee_documents_api # To monkeypatch UPLOAD_DIRECTORY
-from api.employee_documents import router as employee_documents_router
-from api.dependencies import get_db
-from api.auth import get_current_active_user
+from app.api import employee_documents as employee_documents_api # To monkeypatch UPLOAD_DIRECTORY
+from app.api.employee_documents import router as employee_documents_router
+from app.api.dependencies import get_db
+from app.api.auth import get_current_active_user
 
-from api.models import (
+from app.api.models import (
     Base, UserInDB, Employee, DocumentCategory, EmployeeDocument,
     DocumentCategoryCreate, DocumentCategoryResponse, DocumentCategoryBase,
     EmployeeDocumentCreate, EmployeeDocumentResponse, EmployeeDocumentUpdate
 )
-from db.cruds import employees_crud, employee_documents_crud, users_crud # Assuming users_crud for DB users
+from app.db.cruds import employees_crud, employee_documents_crud, users_crud # Assuming users_crud for DB users
 
 # --- Test Database Setup ---
 DATABASE_URL = "sqlite:///:memory:"

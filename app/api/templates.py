@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List
-import db as db_manager  # Assuming db.py is accessible in the parent directory
+import app.db as db_manager  # Assuming db.py is accessible in the parent directory
 from .models import TemplateInfo, UserInDB, TemplateVisibilityInfo, UpdateTemplateVisibilityRequest # Added new models
 from .auth import get_current_active_user
 

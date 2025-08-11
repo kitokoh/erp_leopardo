@@ -1,5 +1,5 @@
 import unittest
-from status_manager.status_models import Status, StatusType # Assuming status_manager is in PYTHONPATH
+from app.status_manager.status_models import Status, StatusType # Assuming status_manager is in PYTHONPATH
 
 class TestStatusType(unittest.TestCase):
     def test_enum_values(self):

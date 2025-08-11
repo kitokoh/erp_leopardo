@@ -13,7 +13,7 @@ from . import hr_reports # Import for HR reports router
 from . import recruitment as recruitment_router_module # Import for the recruitment router
 from . import company_expenses_api # Import for the company expenses router
 from . import company_factures_api # Import for the company factures router
-from calendar_module import api as calendar_api_router # Import for the calendar router
+from app.calendar_module import api as calendar_api_router # Import for the calendar router
 
 
 app = FastAPI(

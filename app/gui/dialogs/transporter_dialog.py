@@ -8,9 +8,9 @@ from PyQt5.QtGui import QIcon
 # No specific QtGui or QtCore imports noted as directly used by this class methods
 # other than those implicitly handled by QtWidgets (e.g QPushButton via QDialogButtonBox).
 
-from db.cruds.misc import transporters_crud
-from db.cruds.misc import contacts_crud
-from db.cruds.misc import entity_contacts_crud
+from app.db.cruds.misc import transporters_crud
+from app.db.cruds.misc import contacts_crud
+from app.db.cruds.misc import entity_contacts_crud
 from .contact_dialog import ContactDialog # Assuming contact_dialog.py is in the same directory
 
 class TransporterDialog(QDialog):

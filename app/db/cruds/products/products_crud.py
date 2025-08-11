@@ -1,13 +1,11 @@
 import sqlite3
 from sqlalchemy.orm import Session, joinedload, subqueryload
 from sqlalchemy import select, update, delete, func, or_, and_
-from ...models import (
-    Product,
-    ProductDimension,
-    ProductEquivalency,
-    ProductMediaLink
-)
-from ...connection import get_db_connection
+from app.db.models.products.product import Product
+from app.db.models.products.productdimensions import ProductDimension
+from app.db.models.products.productequivalencies import ProductEquivalency
+from app.db.models.products.productmedialinks import ProductMediaLink
+from app.db.connection import get_db_connection
 import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime

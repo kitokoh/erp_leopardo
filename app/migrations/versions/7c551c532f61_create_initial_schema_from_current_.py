@@ -1,8 +1,8 @@
-"""Create initial schema from repaired models
+"""Create initial schema from current models
 
-Revision ID: 7dd932f29341
+Revision ID: 7c551c532f61
 Revises:
-Create Date: 2025-08-09 15:50:29.757169
+Create Date: 2025-08-11 02:13:17.851165
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '7dd932f29341'
+revision: str = '7c551c532f61'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -31,13 +31,6 @@ def upgrade() -> None:
     sa.Column('business_profile_id', sa.Integer(), nullable=False),
     sa.Column('document_type_id', sa.Integer(), nullable=False),
     sa.PrimaryKeyConstraint('id')
-    )
-    op.create_table('client_document_notes',
-    sa.Column('note_id', sa.Integer(), autoincrement=True, nullable=False),
-    sa.Column('document_type', sa.Text(), nullable=False),
-    sa.Column('note_content', sa.Text(), nullable=False),
-    sa.Column('created_at', sa.DateTime(), nullable=True),
-    sa.PrimaryKeyConstraint('note_id')
     )
     op.create_table('clients',
     sa.Column('client_id', sa.String(), nullable=False),
@@ -158,7 +151,9 @@ def upgrade() -> None:
     sa.Column('updated_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_employees_email'), 'employees', ['email'], unique=True)
+    with op.batch_alter_table('employees', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_employees_email'), ['email'], unique=True)
+
     op.create_table('freight_forwarders',
     sa.Column('forwarder_id', sa.String(), nullable=False),
     sa.Column('name', sa.String(), nullable=True),
@@ -393,17 +388,30 @@ def upgrade() -> None:
     )
     op.create_table('client__freight_forwarders',
     sa.Column('client_forwarder_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('client_id', sa.String(), nullable=False),
     sa.Column('forwarder_id', sa.Text(), nullable=False),
     sa.Column('assigned_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['client_id'], ['clients.client_id'], ),
     sa.ForeignKeyConstraint(['forwarder_id'], ['freight_forwarders.forwarder_id'], ),
     sa.PrimaryKeyConstraint('client_forwarder_id')
     )
     op.create_table('client__transporters',
     sa.Column('client_transporter_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('client_id', sa.String(), nullable=False),
     sa.Column('transporter_id', sa.Text(), nullable=False),
     sa.Column('assigned_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['client_id'], ['clients.client_id'], ),
     sa.ForeignKeyConstraint(['transporter_id'], ['transporters.transporter_id'], ),
     sa.PrimaryKeyConstraint('client_transporter_id')
+    )
+    op.create_table('client_document_notes',
+    sa.Column('note_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('client_id', sa.String(), nullable=False),
+    sa.Column('document_type', sa.Text(), nullable=False),
+    sa.Column('note_content', sa.Text(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['client_id'], ['clients.client_id'], ),
+    sa.PrimaryKeyConstraint('note_id')
     )
     op.create_table('company_personnel',
     sa.Column('personnel_id', sa.Integer(), autoincrement=True, nullable=False),
@@ -577,8 +585,10 @@ def upgrade() -> None:
     )
     op.create_table('client__assigned_personnel',
     sa.Column('assignment_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('client_id', sa.String(), nullable=False),
     sa.Column('personnel_id', sa.Integer(), nullable=False),
     sa.Column('assigned_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['client_id'], ['clients.client_id'], ),
     sa.ForeignKeyConstraint(['personnel_id'], ['company_personnel.personnel_id'], ),
     sa.PrimaryKeyConstraint('assignment_id')
     )
@@ -867,7 +877,9 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('user_google_account_id'),
     sa.UniqueConstraint('google_account_id')
     )
-    op.create_index(op.f('ix_user_google_accounts_user_id'), 'user_google_accounts', ['user_id'], unique=False)
+    with op.batch_alter_table('user_google_accounts', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_user_google_accounts_user_id'), ['user_id'], unique=False)
+
     op.create_table('user_saved_filters',
     sa.Column('id', sa.Text(), nullable=False),
     sa.Column('user_id', sa.Text(), nullable=False),
@@ -1382,7 +1394,9 @@ def downgrade() -> None:
     op.drop_table('business_use_cases')
     op.drop_table('user_session_tokens')
     op.drop_table('user_saved_filters')
-    op.drop_index(op.f('ix_user_google_accounts_user_id'), table_name='user_google_accounts')
+    with op.batch_alter_table('user_google_accounts', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_user_google_accounts_user_id'))
+
     op.drop_table('user_google_accounts')
     op.drop_table('user_calendar_events')
     op.drop_table('team_members')
@@ -1417,6 +1431,7 @@ def downgrade() -> None:
     op.drop_table('partners')
     op.drop_table('important_dates')
     op.drop_table('company_personnel')
+    op.drop_table('client_document_notes')
     op.drop_table('client__transporters')
     op.drop_table('client__freight_forwarders')
     op.drop_table('cities')
@@ -1441,7 +1456,9 @@ def downgrade() -> None:
     op.drop_table('item_locations')
     op.drop_table('internal_stock_items')
     op.drop_table('freight_forwarders')
-    op.drop_index(op.f('ix_employees_email'), table_name='employees')
+    with op.batch_alter_table('employees', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_employees_email'))
+
     op.drop_table('employees')
     op.drop_table('document_types')
     op.drop_table('document_categories')
@@ -1451,7 +1468,6 @@ def downgrade() -> None:
     op.drop_table('company_assets')
     op.drop_table('companies')
     op.drop_table('clients')
-    op.drop_table('client_document_notes')
     op.drop_table('business_selected_documents')
     op.drop_table('application_settings')
     # ### end Alembic commands ###

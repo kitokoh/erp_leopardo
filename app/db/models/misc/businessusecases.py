@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, ForeignKey
 from sqlalchemy.orm import relationship
-from db.connection import Base
+from app.db.connection import Base
 
 class BusinessUseCase(Base):
     __tablename__ = 'business_use_cases'

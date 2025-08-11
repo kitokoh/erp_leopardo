@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from db.connection import Base
+from app.db.connection import Base
 
 class UserSessionTokens(Base):
     __tablename__ = 'user_session_tokens'

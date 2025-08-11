@@ -11,9 +11,9 @@ from PyQt5.QtCore import Qt
 #     app = QApplication(sys.argv)
 
 # Adjust import paths as necessary
-from botpress_integration.ui_components import BotpressIntegrationUI
-from botpress_integration.api_client import BotpressClient # Needed for type checks / mock return values
-from botpress_integration.models import UserBotpressSettings, Conversation # For mock return values from CRUD
+from app.botpress_integration.ui_components import BotpressIntegrationUI
+from app.botpress_integration.api_client import BotpressClient # Needed for type checks / mock return values
+from app.botpress_integration.models import UserBotpressSettings, Conversation # For mock return values from CRUD
 
 class TestBotpressIntegrationUI(unittest.TestCase):
 

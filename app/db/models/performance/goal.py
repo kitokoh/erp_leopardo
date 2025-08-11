@@ -2,7 +2,7 @@ import enum
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Enum as SQLAlchemyEnum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from db.connection import Base
+from app.db.connection import Base
 
 class GoalStatusEnum(enum.Enum):
     OPEN = "open"

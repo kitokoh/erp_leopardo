@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func, false
-from db.connection import Base
+from app.db.connection import Base
 
 class MoneyTransferAgent(Base):
     __tablename__ = 'money_transfer_agents'

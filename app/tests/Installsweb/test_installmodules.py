@@ -1,4 +1,4 @@
-from addons.widgets import AddonsPage
+from app.addons.widgets import AddonsPage
 
 def test_installer_dialog_instantiation():
     """Test that InstallerDialog can be instantiated."""

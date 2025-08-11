@@ -9,14 +9,14 @@ from sqlalchemy import func # Added for func.now()
 
 # Assuming db managing and models are structured as previously discussed
 # Adjust paths if your project structure is different
-from db.cruds import proforma_invoices_crud
+from app.db.cruds import proforma_invoices_crud
 # For other db operations (like fetching client, company, or adding ClientDocument)
 # that use the main sqlite3-based 'db' facade:
-from db import get_client_by_id as get_client_by_id_sqlite
-from db import add_client_document as add_client_document_sqlite
-from db import get_company_by_id as get_company_by_id_sqlite
-from utils.proforma_invoice_utils import get_proforma_invoice_context_data # Assuming this is sqlite based
-from api.models import ProformaInvoiceStatusEnum, User # Assuming User model for auth
+from app.db import get_client_by_id as get_client_by_id_sqlite
+from app.db import add_client_document as add_client_document_sqlite
+from app.db import get_company_by_id as get_company_by_id_sqlite
+from app.utils.proforma_invoice_utils import get_proforma_invoice_context_data # Assuming this is sqlite based
+from app.api.models import ProformaInvoiceStatusEnum, User # Assuming User model for auth
 # from api import models as api_models # Not explicitly used, can be removed if ProformaInvoice Pydantic models are self-contained here
 # Assuming proforma_invoice_utils.py will exist or be created later
 # from proforma_invoice_utils import get_proforma_invoice_context_data # Replaced by direct import from db.utils

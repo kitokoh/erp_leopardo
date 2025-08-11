@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
-from db.cruds.products.products_crud import ProductsCRUD
+from app.db.cruds.products.products_crud import ProductsCRUD
 # Assuming product_media_links_crud is a module with functions.
 # We will mock its behavior within ProductsCRUD for these tests.
 

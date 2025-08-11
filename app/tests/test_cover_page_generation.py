@@ -1,5 +1,5 @@
 import os
-import db as db_manager
+import app.db as db_manager
 from datetime import datetime
 import shutil
 # Import app_setup to call initialize_default_templates if needed, and to access CONFIG

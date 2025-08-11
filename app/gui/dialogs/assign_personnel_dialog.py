@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt # Added for Qt.UserRole
 
-import db as db_manager
+import app.db as db_manager
 
 class AssignPersonnelDialog(QDialog):
     def __init__(self, client_id, role_filter, company_id, parent=None):

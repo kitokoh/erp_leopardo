@@ -10,9 +10,9 @@ from datetime import date, datetime
 # accounting.cruds
 # api.models (for the main Base)
 # Adjust imports based on your actual project structure
-from accounting import models
-from accounting import cruds as acc_cruds
-from api.models import Base as MainBase # The Base used by accounting models if it's shared
+from app.accounting import models as acc_models
+from app.accounting import cruds as acc_cruds
+from app.db.connection import Base as MainBase
 
 # Use an in-memory SQLite database for testing
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"

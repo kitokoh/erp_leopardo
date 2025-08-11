@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Text, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from db.connection import Base
+from app.db.connection import Base
 
 class UserGoogleAccounts(Base):
     __tablename__ = 'user_google_accounts'

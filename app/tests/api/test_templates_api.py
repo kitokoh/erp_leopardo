@@ -1,6 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
-from api.main import app
+from app.api.main import app
 from unittest.mock import patch, MagicMock
 from .test_auth_api import get_auth_token, TEST_USERNAME, TEST_PASSWORD # Import helper and test user credentials
 

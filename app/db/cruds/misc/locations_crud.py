@@ -2,7 +2,7 @@ import sqlite3
 import logging
 from datetime import datetime
 from sqlalchemy.orm import Session
-from db.models.locations import Country, City
+from app.db.models.locations import Country, City
 from ..generic_crud import _manage_conn
 
 # --- Countries CRUD ---

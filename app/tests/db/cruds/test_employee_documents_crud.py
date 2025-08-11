@@ -7,12 +7,12 @@ from datetime import date, datetime
 import uuid # For generating EmployeeDocument IDs if needed, though model has default
 
 # Adjust imports based on your project structure
-from api.models import (
+from app.api.models import (
     Base, Employee, User,
     DocumentCategory, DocumentCategoryCreate, DocumentCategoryBase,
     EmployeeDocument, EmployeeDocumentCreate, EmployeeDocumentUpdate
 )
-from db.cruds import employee_documents_crud, employees_crud # Assuming users_crud for creating users
+from app.db.cruds import employee_documents_crud, employees_crud # Assuming users_crud for creating users
 
 # Use an in-memory SQLite database for testing
 DATABASE_URL = "sqlite:///:memory:"

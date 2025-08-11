@@ -1,6 +1,6 @@
 import unittest
 import os
-from utils.text_extraction import extract_text_from_pdf, parse_invoice_text, find_dates, find_amounts, find_vendor_names
+from app.utils.text_extraction import extract_text_from_pdf, parse_invoice_text, find_dates, find_amounts, find_vendor_names
 
 # Mock PDF content for testing extract_text_from_pdf if PyPDF2 is complex to mock directly for content
 # For now, we'll focus on testing the parsing functions (find_dates, find_amounts, parse_invoice_text)

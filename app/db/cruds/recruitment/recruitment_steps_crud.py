@@ -1,7 +1,7 @@
 import sqlite3
 import uuid
 from datetime import datetime # Though not directly used in timestamps for this table
-from db.connection import get_db_connection
+from app.db.connection import get_db_connection
 
 # TODO: Validate job_opening_id - ensure it exists in JobOpenings table.
 

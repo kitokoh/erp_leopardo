@@ -6,8 +6,8 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt # For QCompleter flags and other Qt specific attributes
 
-import db as db_manager
-from db.cruds.misc.templates_crud import get_all_templates
+import app.db as db_manager
+from app.db.cruds.misc.templates_crud import get_all_templates
 
 class EditClientDialog(QDialog):
     def __init__(self, client_info, config, parent=None): # Config is passed

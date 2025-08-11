@@ -4,17 +4,12 @@ import os
 import sys
 import time # For unique naming
 
-# Add project root to sys.path to allow imports from main project
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')) # Adjusted path for new location
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
 from PyQt5.QtWidgets import QApplication, QDialog
-from PyQt5.QtGui import QIcon # For new column tests if icons were used
-from product_management.list_dialog import ProductListDialog
-from product_management.edit_dialog import ProductEditDialog # For mocking add/edit calls
-from db.cruds.products.products_crud import products_crud_instance # Direct import
-import html_to_pdf_util # Assuming this is still a top-level or correctly pathed import
+from PyQt5.QtGui import QIcon
+from app.product_management.list_dialog import ProductListDialog
+from app.product_management.edit_dialog import ProductEditDialog
+from app.db.cruds.products.products_crud import products_crud_instance
+from app.utils import html_to_pdf as html_to_pdf_util
 
 # Ensure a QApplication instance exists for widget testing, but only one.
 # It's often better to manage this per test class or even per test method if tests interfere.
@@ -109,9 +104,9 @@ class TestProductList(unittest.TestCase):
     # The new tests test_product_list_dialog_loads_data_with_new_columns and
     # test_pdf_export_with_new_columns are more focused on UI and mocked data.
 
-    @patch('product_management.list_dialog.products_crud_instance.get_product_dimension')
-    @patch('product_management.list_dialog.products_crud_instance.get_equivalent_products')
-    @patch('product_management.list_dialog.products_crud_instance.get_all_products')
+    @patch('app.product_management.list_dialog.products_crud_instance.get_product_dimension')
+    @patch('app.product_management.list_dialog.products_crud_instance.get_equivalent_products')
+    @patch('app.product_management.list_dialog.products_crud_instance.get_all_products')
     def test_product_list_dialog_loads_data_with_new_columns(self, mock_get_all_products, mock_get_equivalent_products, mock_get_product_dimension): # This is a new, enhanced test
         print("\nRunning test_product_list_dialog_loads_data_with_new_columns...")
 
@@ -181,10 +176,10 @@ class TestProductList(unittest.TestCase):
         print("test_product_list_dialog_loads_data_with_new_columns PASSED.")
 
 
-    @patch('product_management.list_dialog.QFileDialog.getSaveFileName')
-    @patch('product_management.list_dialog.html_to_pdf_util.convert_html_to_pdf')
+    @patch('app.product_management.list_dialog.QFileDialog.getSaveFileName')
+    @patch('app.product_management.list_dialog.html_to_pdf_util.convert_html_to_pdf')
     @patch('builtins.open', new_callable=unittest.mock.mock_open)
-    @patch('product_management.list_dialog.products_crud_instance') # Mock the instance
+    @patch('app.product_management.list_dialog.products_crud_instance') # Mock the instance
     def test_pdf_export_with_new_columns(self, mock_crud_instance, mock_file_open, mock_convert_to_pdf, mock_get_save_file_name):
         print("\nRunning test_pdf_export_with_new_columns...")
 
@@ -225,8 +220,8 @@ class TestProductList(unittest.TestCase):
         print("test_pdf_export_with_new_columns PASSED.")
 
 
-    @patch('product_management.list_dialog.ProductListDialog.apply_filters_and_reload')
-    @patch('product_management.list_dialog.ProductEditDialog') # Path to ProductEditDialog for mocking
+    @patch('app.product_management.list_dialog.ProductListDialog.apply_filters_and_reload')
+    @patch('app.product_management.list_dialog.ProductEditDialog') # Path to ProductEditDialog for mocking
     def test_add_product_button_opens_dialog(self, MockProductEditDialog, mock_apply_filters_and_reload):
         print("\nRunning test_add_product_button_opens_dialog...")
         dialog = ProductListDialog()
@@ -245,8 +240,8 @@ class TestProductList(unittest.TestCase):
         dialog.close()
         print("test_add_product_button_opens_dialog PASSED.")
 
-    @patch('product_list_dialog.ProductListDialog.apply_filters_and_reload')
-    @patch('product_list_dialog.ProductEditDialog')
+    @patch('app.product_management.list_dialog.ProductListDialog.apply_filters_and_reload')
+    @patch('app.product_management.list_dialog.ProductEditDialog')
     def test_edit_product_opens_dialog(self, MockProductEditDialog, mock_apply_filters_and_reload):
         print("\nRunning test_edit_product_opens_dialog...")
         # Add a product to be edited
@@ -306,9 +301,9 @@ class TestProductList(unittest.TestCase):
         dialog.close()
         print("test_edit_product_opens_dialog PASSED.")
 
-    @patch('product_list_dialog.ProductListDialog.apply_filters_and_reload')
-    @patch('product_list_dialog.products_crud_instance.delete_product')
-    @patch('product_list_dialog.QMessageBox.question')
+    @patch('app.product_management.list_dialog.ProductListDialog.apply_filters_and_reload')
+    @patch('app.product_management.list_dialog.products_crud_instance.delete_product')
+    @patch('app.product_management.list_dialog.QMessageBox.question')
     def test_delete_product_button(self, mock_qmessagebox_question, mock_crud_delete_product, mock_apply_filters_and_reload):
         print("\nRunning test_delete_product_button...")
         # Add a product to be deleted

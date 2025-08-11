@@ -4,7 +4,7 @@ import shutil
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Path, Request
 from typing import Optional
 
-import db.cruds.company_expenses_crud as factures_crud # Reusing the CRUD from expenses for factures
+import app.db.cruds.company_expenses_crud as factures_crud # Reusing the CRUD from expenses for factures
 from .models import (
     CompanyFactureReadPydantic,
     UserInDB
@@ -12,8 +12,8 @@ import json # For storing parsed data as JSON string
 
 )
 from .auth import get_current_active_user
-import config # To get COMPANY_FACTURES_DIR_PATH
-from utils.text_extraction import extract_text_from_pdf, parse_invoice_text # Import the new utility
+import app.config # To get COMPANY_FACTURES_DIR_PATH
+from app.utils.text_extraction import extract_text_from_pdf, parse_invoice_text # Import the new utility
 
 router = APIRouter(
     prefix="/api/company-factures", # Using kebab-case for URL prefix

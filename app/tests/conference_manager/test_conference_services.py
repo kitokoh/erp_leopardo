@@ -23,9 +23,9 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 import sqlite3 # Pour attraper les erreurs spécifiques si nécessaire, bien que les services devraient les encapsuler.
-from conference_manager import services
-from conference_manager.models import Client, Conference
-from conference_manager.database import DATABASE_NAME # Pourrait être utile si on veut tester avec un fichier spécifique
+from app.conference_manager import services
+from app.conference_manager.models import Client, Conference
+from app.conference_manager.database import DATABASE_NAME # Pourrait être utile si on veut tester avec un fichier spécifique
 
 
 class TestConferenceServicesWithDB(unittest.TestCase): # Renommer pour indiquer l'utilisation de la BD

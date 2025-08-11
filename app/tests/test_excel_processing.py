@@ -1,7 +1,7 @@
 import sys # For QApplication
 import logging
 from PyQt5.QtWidgets import QApplication # Required for QWidget instantiation
-from excel_editor import ExcelTableModel, PDFGenerator, PDFExportSettings, ClientData, ExcelTableWidget
+from app.excel_editor import ExcelTableModel, PDFGenerator, PDFExportSettings, ClientData, ExcelTableWidget
 
 # Setup basic logging to capture output from excel_editor's logger
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')

@@ -6,7 +6,7 @@ from sqlalchemy.sql import text
 from sqlalchemy.orm import Session # For type hinting Session
 from ..generic_crud import GenericCRUD, _manage_conn, _is_sqlalchemy_obj
 
-from db.models import Client, Commande, Project, StatusSetting, Template, Country, City
+from app.db.models import Client, Commande, Project, StatusSetting, Template, Country, City
 
 # --- Clients CRUD ---
 class ClientsCRUD(GenericCRUD):
@@ -29,7 +29,7 @@ class ClientsCRUD(GenericCRUD):
         Adds a new client to the database using the ORM.
         """
         # Circular import guard
-        from status_manager import status_service, status_models
+        from app.status_manager import status_service, status_models
 
         self.logger.info(f"Attempting to add client with data: {data}")
 
@@ -208,7 +208,7 @@ class ClientsCRUD(GenericCRUD):
         """
         Updates an existing client's information using the ORM.
         """
-        from db.models import Client
+        from app.db.models import Client
         if not client_id:
             return {'success': False, 'error': "Client ID is required for update."}
         if not client_data:

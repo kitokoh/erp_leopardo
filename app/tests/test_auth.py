@@ -7,8 +7,8 @@ import sqlite3 # For specific error checking if needed, though current db.py han
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, project_root)
 
-import db as db_manager # For add_user, get_user_by_id etc. from db/__init__
-from db import init_schema # For initialize_database
+import app.db as db_manager # For add_user, get_user_by_id etc. from db/__init__
+from app.db import init_schema # For initialize_database
 
 class TestAuth(unittest.TestCase):
 

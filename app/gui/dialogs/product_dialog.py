@@ -9,12 +9,12 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
 
-import db as db_manager # Keep for now, direct calls like db_manager.get_all_products_for_selection_filtered
-from db.cruds.clients.clients_crud import clients_crud_instance
+import app.db as db_manager # Keep for now, direct calls like db_manager.get_all_products_for_selection_filtered
+from app.db.cruds.clients.clients_crud import clients_crud_instance
 
 # Anticipated import, will be resolved when ProductDimensionUIDialog is moved
 from .product_dimension_ui_dialog import ProductDimensionUIDialog
-import icons_rc # Import for Qt resource file
+import app.icons_rc # Import for Qt resource file
 
 
 class ProductDialog(QDialog):

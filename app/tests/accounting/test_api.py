@@ -9,12 +9,12 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 # Adjust imports based on your project structure
-from api.main import app
-from api.dependencies import get_db_session
-from accounting import models as acc_pydantic_models
-from accounting import cruds as acc_cruds
-from accounting.models import Base as AccountingBase
-from api.models import Base as MainBase
+from app.api.main import app
+from app.api.dependencies import get_db_session
+from app.accounting import models as acc_pydantic_models
+from app.accounting import cruds as acc_cruds
+from app.accounting.models import Base as AccountingBase
+from app.api.models import Base as MainBase
 
 # Use the same in-memory SQLite setup as in test_cruds.py
 from .test_cruds import SQLALCHEMY_DATABASE_URL, TestingSessionLocal, engine

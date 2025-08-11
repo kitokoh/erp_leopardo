@@ -10,11 +10,11 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from db.init_schema import initialize_database
-from db.connection import get_db_connection
-from db.cruds import notes_crud
-from db.cruds import client_documents_crud # For setting up related data
-from db.cruds import commandes_crud # For setting up related data
+from app.db.init_schema import initialize_database
+from app.db.connection import get_db_connection
+from app.db.cruds import notes_crud
+from app.db.cruds import client_documents_crud # For setting up related data
+from app.db.cruds import commandes_crud # For setting up related data
 
 # Use an in-memory database for testing
 TEST_DB_PATH = ":memory:"

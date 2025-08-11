@@ -5,9 +5,9 @@ from sqlalchemy.exc import IntegrityError
 
 # Assuming 'api.dependencies' provides 'get_db'
 # Adjust the import path if your project structure is different.
-from api.dependencies import get_db
-from api.models import Employee, EmployeeCreate, EmployeeResponse, EmployeeUpdate
-from db.cruds import employees_crud
+from app.api.dependencies import get_db
+from app.api.models import Employee, EmployeeCreate, EmployeeResponse, EmployeeUpdate
+from app.db.cruds import employees_crud
 
 router = APIRouter(
     prefix="/employees",

@@ -10,8 +10,8 @@ from PyQt5.QtWidgets import QCheckBox
 
 # Assuming auth.authentication module is accessible
 # Adjust import path if necessary based on project structure
-from auth import authentication
-import icons_rc # For icons
+from app.auth import authentication
+import app.icons_rc # For icons
 
 logger = logging.getLogger(__name__)
 
