@@ -71,8 +71,7 @@ from app.db.cruds.misc.entity_contacts_crud import (
     update_entity_contact_link
 )
 from app.db.cruds.misc.status_settings_crud import get_status_setting_by_id, get_all_status_settings
-from app.db.cruds.misc.countries_crud import get_all_countries
-from app.db.cruds.misc.cities_crud import get_cities_by_country_id
+from app.db.cruds.misc.locations_crud import get_all_countries, get_all_cities as get_cities_by_country_id
 from app.db.cruds.misc import money_transfer_agents_crud as mta_crud
 
 # Products
@@ -82,7 +81,7 @@ from app.db.cruds.products.products_crud import get_product_by_id
 from app.db.cruds.projects import projects_crud
 
 # SAV
-from app.db.cruds.sav import sav_crud
+from app.db.cruds import sav_crud
 
 # Users
 from app.db.cruds.users import users_crud

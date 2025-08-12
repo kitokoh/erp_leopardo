@@ -10,13 +10,13 @@ import sys
 import os
 
 try:
-    from app.db.cruds.misc import transporters_crud
+    from app.db.cruds.misc.transporters_crud import get_all_transporters
     from app.statistics.map_utils import generate_folium_map_html
     from app.statistics.dashboard import MapInteractionHandler # Re-using this handler
 except ImportError as e:
     print(f"Error importing modules in carrier_map_dialog.py: {e}")
     # Fallback for direct execution
-    from app.db.cruds.misc import transporters_crud
+    from app.db.cruds.misc.transporters_crud import get_all_transporters
     # In a real scenario, you'd want to ensure these paths are resolvable
     # For this fix, we assume the project structure allows these imports.
     generate_folium_map_html = None
@@ -100,7 +100,7 @@ class CarrierMapDialog(QDialog):
     def load_carrier_data(self):
         self.carrier_list_widget.clear()
         try:
-            self.transporters = transporters_crud.get_all_transporters()
+            self.transporters = get_all_transporters()
             if not self.transporters:
                 item = QListWidgetItem(self.tr("No carriers found."))
                 item.setData(Qt.UserRole, None) # No data
