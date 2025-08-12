@@ -11,13 +11,13 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QDate
 
-import db # Assuming db.__init__ exposes necessary cruds
-from db.cruds.invoices import commandes_crud
-from db.cruds.products import products_crud
-from db.cruds.projects import projects_crud
-from db.cruds.misc import status_settings_crud
-from db.cruds.clients import client_project_products_crud # Added for linking products to client
-from gui.dialogs.product_dialog import ProductDialog
+from app import db # Assuming db.__init__ exposes necessary cruds
+from app.db.cruds.invoices import commandes_crud
+from app.db.cruds.products import products_crud
+from app.db.cruds.projects import projects_crud
+from app.db.cruds.misc.status_settings_crud import get_all_status_settings, get_status_setting_by_name
+from app.db.cruds.clients import client_project_products_crud # Added for linking products to client
+from app.gui.dialogs.product_dialog import ProductDialog
 
 
 
@@ -192,7 +192,7 @@ class CommandeDialog(QDialog):
         # Statuses
         self.status_commande_combo.clear()
         try:
-            statuses = status_settings_crud.get_all_status_settings(type_filter='Commande')
+            statuses = get_all_status_settings(type_filter='Commande')
             if statuses:
                 for status in sorted(statuses, key=lambda x: x.get('sort_order', 0)):
                     self.status_commande_combo.addItem(status.get('status_name'), status.get('status_id'))
@@ -564,7 +564,7 @@ class CommandeDialog(QDialog):
             project_name, ok = QInputDialog.getText(self, "Nouveau Projet", f"Nom du projet pour la commande {commande_ref}:")
             if ok and project_name.strip():
                 # Default status for new project (e.g., 'Planning')
-                planning_status = status_settings_crud.get_status_setting_by_name("Planning", "Project")
+                planning_status = get_status_setting_by_name("Planning", "Project")
                 if not planning_status:
                     QMessageBox.critical(self, "Erreur", "Statut 'Planning' par défaut introuvable pour les projets.")
                     return # Or handle differently

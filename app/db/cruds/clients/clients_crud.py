@@ -6,7 +6,13 @@ from sqlalchemy.sql import text
 from sqlalchemy.orm import Session # For type hinting Session
 from ..generic_crud import GenericCRUD, _manage_conn, _is_sqlalchemy_obj
 
-from app.db.models import Client, Commande, Project, StatusSetting, Template, Country, City
+from app.db.models.clients.client import Client
+from app.db.models.orders.commande import Commande
+from app.db.models.projects.project import Project
+from app.db.models.settings.status_setting import StatusSetting
+from app.db.models.misc.templates import Template
+from app.db.models.locations.country import Country
+from app.db.models.locations.city import City
 
 # --- Clients CRUD ---
 class ClientsCRUD(GenericCRUD):
@@ -208,7 +214,6 @@ class ClientsCRUD(GenericCRUD):
         """
         Updates an existing client's information using the ORM.
         """
-        from app.db.models import Client
         if not client_id:
             return {'success': False, 'error': "Client ID is required for update."}
         if not client_data:

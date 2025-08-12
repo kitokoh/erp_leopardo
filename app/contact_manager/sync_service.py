@@ -11,7 +11,7 @@ try:
     from . import google_auth
     from . import google_people_api
     # Use specific imports from the db facade
-    from db.cruds import (
+    from app.db.cruds.misc.google_sync_crud import (
         get_user_google_account_by_user_id,
         update_user_google_account,
         add_contact_sync_log,
@@ -21,7 +21,8 @@ try:
         delete_contact_sync_log
         # Add other specific db functions if used elsewhere in this file
     )
-    import config # Changed from db_config, corrected indent
+    from app.db.cruds.clients import contacts_crud
+    import app.config as config # Changed from db_config, corrected indent
 except (ImportError, ValueError) as e:
     # Fallback for potential execution context issues
     import sys
@@ -32,10 +33,10 @@ except (ImportError, ValueError) as e:
         sys.path.append(app_root_dir)
     try:
         # Corrected fallback imports to be absolute from app root
-        from contact_manager import google_auth
-        from contact_manager import google_people_api
+        from app.contact_manager import google_auth
+        from app.contact_manager import google_people_api
         # Use specific imports from the db facade
-        from db.cruds import (
+        from app.db.cruds.misc.google_sync_crud import (
             get_user_google_account_by_user_id,
             update_user_google_account,
             add_contact_sync_log,
@@ -45,7 +46,7 @@ except (ImportError, ValueError) as e:
             delete_contact_sync_log
             # Add other specific db functions if used elsewhere in this file
         )
-        import config # Changed from db_config, corrected indent
+        import app.config as config # Changed from db_config, corrected indent
     except ImportError as final_e:
         google_auth = None
         google_people_api = None
@@ -134,6 +135,7 @@ def _transform_platform_contact_to_google(platform_contact: dict, contact_type: 
     # Specific mappings (primarily for 'client_contact' type which comes from the main Contacts table)
     # For 'partner_contact' or 'company_personnel', the platform_contact data might be simpler
     # and some fields below might not be present.
+    local_id_val = platform_contact.get(local_id_key) if local_id_key else None
 
     # Organizations (company and position/title)
     org_name = platform_contact.get("company_name")

@@ -9,8 +9,8 @@ import traceback # Import for detailed traceback
 from datetime import datetime, timedelta, timezone # Added timedelta and timezone
 
 from app.db.cruds.users import users_crud
-from app.db.cruds.misc import activity_logs_crud, licenses_crud, application_settings_crud
-
+from app.db.cruds.misc.activity_logs_crud import add_activity_log
+from app.db.cruds.misc.application_settings_crud import get_setting
 from app.db.cruds import user_session_tokens_crud
 from app.utils.security_helpers import generate_secure_token, hash_token_for_storage # New helpers
 from app.license_management import manager as license_manager # Already imported below, moved up for clarity
@@ -169,7 +169,7 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
                 logger.debug(f"AUTH_LOGIN: conn object type after get_db_connection(): {type(conn)}") # <<< ADDED THIS LOG
 
                 # --- License Check Bypass Logic ---
-                should_check_license_str = application_settings_crud.get_setting('check_license_on_startup', default='True', conn=conn) # Pass conn
+                should_check_license_str = get_setting('check_license_on_startup', default='True', conn=conn) # Pass conn
                 should_check_license = should_check_license_str.lower() == 'true'
                 logger.info(f"AUTH_LOGIN: License check setting 'check_license_on_startup' is '{should_check_license_str}', parsed as: {should_check_license}")
 
@@ -192,7 +192,7 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
                         "allowed_features": "all" # Assuming bypass grants all features
                     }
                     # Log activity for bypass
-                    activity_logs_crud.add_activity_log(conn=conn, data={
+                    add_activity_log(conn=conn, data={
                         "user_id": _current_user_data['user_id'], "action_type": "LICENSE_CHECK_BYPASSED",
                         "details": "License check was bypassed due to application setting.",
                         "related_entity_type": "User", "related_entity_id": _current_user_data['user_id']
@@ -212,7 +212,7 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
                     if token_record_id:
                         save_remember_me_token_to_settings(new_token)
                         logger.info(f"New session token generated and stored for user {user['user_id']}.")
-                        activity_logs_crud.add_activity_log(conn=conn, data={"user_id": user['user_id'], "action_type": "REMEMBER_ME_TOKEN_GENERATED", "details": f"New 'Remember Me' session token generated. Expires: {expires_at.isoformat()}.", "related_entity_type": "UserSessionToken", "related_entity_id": token_record_id})
+                        add_activity_log(conn=conn, data={"user_id": user['user_id'], "action_type": "REMEMBER_ME_TOKEN_GENERATED", "details": f"New 'Remember Me' session token generated. Expires: {expires_at.isoformat()}.", "related_entity_type": "UserSessionToken", "related_entity_id": token_record_id})
                     else:
                         logger.error(f"Failed to store new session token in DB for user {user['user_id']}.")
                 else:
@@ -220,7 +220,7 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
                     deleted_count = user_session_tokens_crud.delete_all_user_session_tokens(conn, user['user_id'])
                     if deleted_count > 0:
                         logger.info(f"Cleared {deleted_count} 'Remember Me' token(s) for user {user['user_id']} as 'Remember Me' was not checked.")
-                        activity_logs_crud.add_activity_log(conn=conn, data={"user_id": user['user_id'], "action_type": "REMEMBER_ME_TOKENS_CLEARED_ON_LOGIN", "details": f"All 'Remember Me' tokens cleared for user as 'Remember Me' was not selected during login. Count: {deleted_count}."})
+                        add_activity_log(conn=conn, data={"user_id": user['user_id'], "action_type": "REMEMBER_ME_TOKENS_CLEARED_ON_LOGIN", "details": f"All 'Remember Me' tokens cleared for user as 'Remember Me' was not selected during login. Count: {deleted_count}."})
 
                 # --- Actual License Check (if not bypassed) ---
                 if should_check_license: # Only perform these if license check is not bypassed
@@ -321,7 +321,7 @@ def login_with_session_token(token_from_qsettings: str) -> tuple[bool, str | Non
             logger.warning("Session token not found in DB or expired. Clearing from QSettings.")
             clear_remember_me_token_from_settings()
             # Log failed token login attempt
-            activity_logs_crud.add_activity_log(
+            add_activity_log(
                 conn=conn,
                 data={
                     "user_id": None, # User is unknown at this point
@@ -339,7 +339,7 @@ def login_with_session_token(token_from_qsettings: str) -> tuple[bool, str | Non
             logger.warning(f"User for token (ID: {token_data['user_id']}) not found or inactive. Deleting token.")
             user_session_tokens_crud.delete_session_token(conn, token_hash) # Delete the compromised/invalid token
             clear_remember_me_token_from_settings()
-            activity_logs_crud.add_activity_log(
+            add_activity_log(
                  conn=conn,
                  data={
                     "user_id": token_data.get('user_id'),
@@ -363,7 +363,7 @@ def login_with_session_token(token_from_qsettings: str) -> tuple[bool, str | Non
         user_session_tokens_crud.update_token_last_used(conn, token_hash)
         users_crud.record_login_time(user['user_id'], conn=conn) # Record login time
         logger.info(f"Successfully logged in user {user['username']} with session token.")
-        activity_logs_crud.add_activity_log(
+        add_activity_log(
             conn=conn,
             data={
                 "user_id": user['user_id'],
@@ -375,7 +375,7 @@ def login_with_session_token(token_from_qsettings: str) -> tuple[bool, str | Non
         )
 
         # --- License Check Bypass Logic (for token login) ---
-        should_check_license_str = application_settings_crud.get_setting('check_license_on_startup', default='True', conn=conn)
+        should_check_license_str = get_setting('check_license_on_startup', default='True', conn=conn)
         should_check_license = should_check_license_str.lower() == 'true'
         logger.info(f"AUTH_TOKEN_LOGIN: License check setting 'check_license_on_startup' is '{should_check_license_str}', parsed as: {should_check_license}")
 
@@ -397,7 +397,7 @@ def login_with_session_token(token_from_qsettings: str) -> tuple[bool, str | Non
                 "machine_info": "N/A_BYPASS_TOKEN",
                 "allowed_features": "all"
             }
-            activity_logs_crud.add_activity_log(conn=conn, data={
+            add_activity_log(conn=conn, data={
                 "user_id": _current_user_data['user_id'], "action_type": "LICENSE_CHECK_BYPASSED_TOKEN",
                 "details": "License check (token login) was bypassed due to application setting.",
                 "related_entity_type": "User", "related_entity_id": _current_user_data['user_id']
@@ -455,7 +455,7 @@ def logout():
             token_deleted_from_db = user_session_tokens_crud.delete_session_token(conn, token_hash)
             if token_deleted_from_db:
                 logger.info("Session token deleted from database during logout.")
-                activity_logs_crud.add_activity_log(
+                add_activity_log(
                     conn=conn,
                     data={
                         # _current_user_data might be None if logout is called without an active session,

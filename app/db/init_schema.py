@@ -32,11 +32,11 @@ import sys # Ensure sys is imported for path manipulation
 # Note: main_engine will be None here and needs to be initialized by main.py calling db.connection.initialize_engine_and_session
 try:
     # Import Base and initialize_engine_and_session. We will get 'engine' later, after it's initialized.
-    from db.connection import Base as MainBase, initialize_engine_and_session
+    from app.db.connection import Base as MainBase, initialize_engine_and_session
     # Import specific models that use MainBase and need table creation here
-    from calculator.models import CalculationHistory
+    from app.calculator.models import CalculationHistory
     # from other_module.models import OtherModelUsingMainBase # Example for future models
-    from db.models.products.product import Product as Products # Import the Products SQLAlchemy model # RESTORED
+    from app.db.models.products.product import Product as Products # Import the Products SQLAlchemy model # RESTORED
     logging.info("DEBUG_INIT_DB: Products model import from db.models.products.product RESTORED.")
     MAIN_SQLALCHEMY_COMPONENTS_LOADED = True
 except ImportError as e_main_sqlalchemy:
@@ -47,17 +47,17 @@ except ImportError as e_main_sqlalchemy:
 
 from sqlalchemy import Table, Column, Text # Added for reflecting Users table more explicitly
 
-from auth.roles import SUPER_ADMIN
+from app.auth.roles import SUPER_ADMIN
 
 # Import CRUD functions (taken from db/schema.py, paths adjusted for db/init_schema.py)
-from .cruds.users.users_crud import get_user_by_username
-from .cruds.misc.locations_crud import get_country_by_name, get_city_by_name_and_country_id
-from .cruds.misc.status_settings_crud import get_status_setting_by_name
-from .cruds.misc.application_settings_crud import set_setting
+from app.db.cruds.users.users_crud import get_user_by_username
+from app.db.cruds.misc.locations_crud import get_country_by_name, get_city_by_name_and_country_id
+from app.db.cruds.misc.status_settings_crud import get_status_setting_by_name
+from app.db.cruds.misc.application_settings_crud import set_setting
 # add_default_template_if_not_exists is not directly used by initialize_database, but good to keep if other parts of schema setup might use it.
 # from .cruds.templates_crud import add_default_template_if_not_exists
-from .cruds.misc.cover_page_templates_crud import add_cover_page_template, get_cover_page_template_by_name
-from .cruds.template_categories_crud import add_template_category # Used by _get_or_create_category_id if category doesn't exist.
+from app.db.cruds.misc.cover_page_templates_crud import add_cover_page_template, get_cover_page_template_by_name
+from app.db.cruds.template_categories_crud import add_template_category # Used by _get_or_create_category_id if category doesn't exist.
 
 # Helper function from db/schema.py (also present in db/ca.py, schema.py version is more complete)
 def _get_or_create_category_id(cursor: sqlite3.Cursor, category_name: str, default_category_id: int | None) -> int | None:

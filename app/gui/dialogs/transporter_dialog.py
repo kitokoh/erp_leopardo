@@ -9,8 +9,8 @@ from PyQt5.QtGui import QIcon
 # other than those implicitly handled by QtWidgets (e.g QPushButton via QDialogButtonBox).
 
 from app.db.cruds.misc import transporters_crud
-from app.db.cruds.misc import contacts_crud
-from app.db.cruds.misc import entity_contacts_crud
+from app.db.cruds.misc.contacts_crud import add_contact, update_contact, get_contact_by_email
+from app.db.cruds.misc.entity_contacts_crud import get_contacts_for_entity, link_contact_to_entity, update_entity_contact_link, unlink_contact_from_entity
 from .contact_dialog import ContactDialog # Assuming contact_dialog.py is in the same directory
 
 class TransporterDialog(QDialog):
@@ -139,7 +139,7 @@ class TransporterDialog(QDialog):
         if not self.transporter_id:
             return
 
-        contacts = entity_contacts_crud.get_contacts_for_entity(self.transporter_id, 'Transporter')
+        contacts = get_contacts_for_entity(self.transporter_id, 'Transporter')
         for contact_data in contacts:
             row_position = self.contacts_table.rowCount()
             self.contacts_table.insertRow(row_position)
@@ -174,10 +174,10 @@ class TransporterDialog(QDialog):
 
             # Add to central Contacts table
             # TODO: Consider if user_id should be passed to add_contact
-            new_contact_id = contacts_crud.add_contact(contact_details)
+            new_contact_id = add_contact(contact_details)
             if new_contact_id:
                 # Link to this transporter
-                entity_contacts_crud.link_contact_to_entity(
+                link_contact_to_entity(
                     entity_id=self.transporter_id,
                     entity_type='Transporter',
                     contact_id=new_contact_id,
@@ -224,10 +224,10 @@ class TransporterDialog(QDialog):
             updated_link_details = contact_dialog.get_link_data()
 
             # Update central contact
-            contacts_crud.update_contact(full_contact_link_data['contact_id'], updated_contact_details)
+            update_contact(full_contact_link_data['contact_id'], updated_contact_details)
 
             # Update link
-            entity_contacts_crud.update_entity_contact_link(full_contact_link_data['entity_contact_id'], updated_link_details)
+            update_entity_contact_link(full_contact_link_data['entity_contact_id'], updated_link_details)
 
             self.load_associated_contacts() # Refresh table
 
@@ -252,7 +252,7 @@ class TransporterDialog(QDialog):
                                      self.tr(f"Êtes-vous sûr de vouloir supprimer le lien avec {contact_name}?\nLe contact central ne sera pas supprimé."),
                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply == QMessageBox.Yes:
-            if entity_contacts_crud.unlink_contact_from_entity(entity_contact_id):
+            if unlink_contact_from_entity(entity_contact_id):
                 self.load_associated_contacts() # Refresh table
             else:
                 QMessageBox.warning(self, self.tr("Erreur"), self.tr("Impossible de supprimer le lien."))
@@ -372,7 +372,7 @@ class TransporterDialog(QDialog):
 
 
         # Check if a primary contact already exists via EntityContacts
-        existing_contacts = entity_contacts_crud.get_contacts_for_entity(self.transporter_id, 'Transporter')
+        existing_contacts = get_contacts_for_entity(self.transporter_id, 'Transporter')
         primary_entity_contact = next((c for c in existing_contacts if c.get('is_primary')), None)
 
         if primary_entity_contact:
@@ -396,7 +396,7 @@ class TransporterDialog(QDialog):
         contact_to_link_id = None
         # Try to find an existing contact by email to avoid duplicates
         if direct_email:
-            existing_central_contact = contacts_crud.get_contact_by_email(direct_email)
+            existing_central_contact = get_contact_by_email(direct_email)
             if existing_central_contact:
                 contact_to_link_id = existing_central_contact['contact_id']
                 update_payload = {}
@@ -407,7 +407,7 @@ class TransporterDialog(QDialog):
                 if direct_phone and existing_central_contact.get('phone') != direct_phone:
                     update_payload['phone'] = direct_phone
                 if update_payload:
-                    contacts_crud.update_contact(contact_to_link_id, update_payload)
+                    update_contact(contact_to_link_id, update_payload)
 
         if not contact_to_link_id:
             # Create a new contact only if a name is present
@@ -422,7 +422,7 @@ class TransporterDialog(QDialog):
                 'employee_status': 'external'
 
             }
-            contact_to_link_id = contacts_crud.add_contact(contact_details)
+            contact_to_link_id = add_contact(contact_details)
 
         if contact_to_link_id:
 
@@ -434,7 +434,7 @@ class TransporterDialog(QDialog):
             # Check if this contact is already linked (even if not primary)
             already_linked = any(c['contact_id'] == contact_to_link_id for c in existing_contacts)
             if not already_linked:
-                 entity_contacts_crud.link_contact_to_entity(
+                 link_contact_to_entity(
                     entity_id=self.transporter_id,
                     entity_type='Transporter',
                     contact_id=contact_to_link_id,
@@ -443,6 +443,6 @@ class TransporterDialog(QDialog):
             else: # If already linked, find its entity_contact_id and update it to be primary
                 existing_link_for_this_contact = next((c for c in existing_contacts if c['contact_id'] == contact_to_link_id), None)
                 if existing_link_for_this_contact and not existing_link_for_this_contact.get('is_primary'):
-                    entity_contacts_crud.update_entity_contact_link(existing_link_for_this_contact['entity_contact_id'], link_details)
+                    update_entity_contact_link(existing_link_for_this_contact['entity_contact_id'], link_details)
 
             self.load_associated_contacts() # Refresh the contacts table in the UI

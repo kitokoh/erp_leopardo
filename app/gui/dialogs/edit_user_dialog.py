@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt # Added for Qt.TextSelectableByMouse
 from PyQt5.QtGui import QIcon
 from app.db.cruds.users import users_crud, roles_crud
-from app.db.cruds.misc import activity_logs_crud
+from app.db.cruds.misc.activity_logs_crud import add_activity_log
 from app.auth.permissions import P_MANAGE_USERS, has_permission
 from app.utils.auth import hash_password # Import the hashing function
 
@@ -205,7 +205,7 @@ class EditUserDialog(QDialog):
                         "related_entity_type": "User",
                         "related_entity_id": new_user_id
                     }
-                    activity_logs_crud.add_activity_log(log_data)
+                    add_activity_log(log_data)
                     logger.info(f"Activity logged for USER_CREATED: {new_user_id} by {self.current_admin_user_info.get('user_id')}")
                 except Exception as e_log:
                     logger.error(f"Failed to log USER_CREATED activity for new user {new_user_id}: {e_log}", exc_info=True)
@@ -292,7 +292,7 @@ class EditUserDialog(QDialog):
                             "related_entity_type": "User",
                             "related_entity_id": self.user_id_to_edit
                         }
-                        activity_logs_crud.add_activity_log(log_data)
+                        add_activity_log(log_data)
                         logger.info(f"Activity logged for USER_UPDATED: {self.user_id_to_edit} by {self.current_admin_user_info.get('user_id')}")
                     except Exception as e_log:
                         logger.error(f"Failed to log USER_UPDATED activity for user {self.user_id_to_edit}: {e_log}", exc_info=True)

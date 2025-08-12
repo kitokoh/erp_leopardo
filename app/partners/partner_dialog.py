@@ -8,7 +8,7 @@ import logging
 from PyQt5.QtCore import Qt, QUrl, QDate
 from PyQt5.QtGui import QDesktopServices
 
-from db.cruds.misc.partners_crud import (
+from app.db.cruds.misc.partners_crud import (
     get_partner_by_id, get_documents_for_partner, add_partner_document,
     delete_partner_document, get_contacts_for_partner, get_all_partner_categories,
     get_categories_for_partner, update_partner, add_partner,
@@ -24,7 +24,7 @@ from datetime import datetime
 
 # Try to import db_config for PARTNERS_DOCUMENTS_DIR, use fallback if not found
 try:
-    import db_config
+    from app import db_config
     PARTNERS_DOCUMENTS_BASE_DIR = db_config.PARTNERS_DOCUMENTS_DIR
 except ImportError:
     PARTNERS_DOCUMENTS_BASE_DIR = 'partners_documents/' # Fallback directory

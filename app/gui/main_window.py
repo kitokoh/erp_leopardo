@@ -3,45 +3,8 @@ import sys
 import os
 import sqlite3
 
-# --- sys.path MODIFICATION REMOVED ---
-# Relying on main.py to set up sys.path correctly.
-# _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# if _PROJECT_ROOT not in sys.path:
-#    sys.path.insert(0, _PROJECT_ROOT)
-# ---
-
 from PyQt5.QtCore import QDate
 import logging
-
-# --- BEGIN WORKAROUND for ModuleNotFoundError ---
-# This workaround is removed as sys.path is now primarily managed by main.py
-# and this file (gui/main_window.py) is no longer at the project root.
-# Ensure the project root is in sys.path when main_window.py is loaded.
-# This is a targeted fix for environments where main.py's sys.path modification
-# might not be effective for all imports within main_window.py.
-# _PROJECT_ROOT_MW = None
-# try:
-#     _current_file_path_mw = os.path.abspath(__file__)
-#     _main_window_dir_mw = os.path.dirname(_current_file_path_mw)
-#     # Assuming main_window.py is in the project root.
-#     # If main_window.py is in a subdirectory, this logic needs to be adjusted
-#     # to find the actual project root (e.g., os.path.dirname(_main_window_dir_mw) for one level up).
-#     _PROJECT_ROOT_MW = _main_window_dir_mw
-#
-#     if _PROJECT_ROOT_MW not in sys.path:
-#         sys.path.insert(0, _PROJECT_ROOT_MW)
-#         # print(f"[MW_WORKAROUND] Added {_PROJECT_ROOT_MW} to sys.path[0]")
-#     elif sys.path[0] != _PROJECT_ROOT_MW:
-#         sys.path.remove(_PROJECT_ROOT_MW)
-#         sys.path.insert(0, _PROJECT_ROOT_MW)
-#         # print(f"[MW_WORKAROUND] Moved {_PROJECT_ROOT_MW} to sys.path[0]")
-#     # else:
-#         # print(f"[MW_WORKAROUND] {_PROJECT_ROOT_MW} already at sys.path[0]")
-#
-# except Exception as e_mw_path_setup:
-#     # Use basic print here as logging might not be configured yet or could fail.
-#     print(f"Error in main_window.py sys.path WORKAROUND: {e_mw_path_setup}. Project root may not be set correctly: {_PROJECT_ROOT_MW}")
-# --- END WORKAROUND ---
 
 # import logging # logging is already imported
 import logging
@@ -73,7 +36,7 @@ from app.db.cruds.products.products_crud import products_crud_instance
 import app.icons_rc
 # import folium # No longer used directly by DocumentManager for its own map
 # from statistics_module import MapInteractionHandler # DocumentManager no longer has its own map handler instance
-from app_setup import APP_ROOT_DIR, CONFIG
+from app.app_setup import APP_ROOT_DIR, CONFIG
 # from ui_components import StatisticsWidget # StatisticsWidget removed from main_layout
 from app.gui.ui_components import StatusDelegate # Still used for QListWidget
 from app.gui.dialogs.map_client_dialog import MapClientDialog # Added for new client from map
@@ -91,62 +54,18 @@ from app.utils.document_manager_logic import (
     archive_client_status,
     permanently_delete_client
 )
-from .dialogs.template_dialog import TemplateDialog
-from .dialogs.manage_product_master_dialog import ManageProductMasterDialog
-from .dialogs.assign_freight_forwarder_dialog import AssignFreightForwarderDialog
-from .dialogs.add_new_client_dialog import AddNewClientDialog
+from app.gui.dialogs.template_dialog import TemplateDialog
+from app.gui.dialogs.manage_product_master_dialog import ManageProductMasterDialog
+from app.gui.dialogs.assign_freight_forwarder_dialog import AssignFreightForwarderDialog
+from app.gui.dialogs.add_new_client_dialog import AddNewClientDialog
 # Removed: SettingsDialog as OriginalSettingsDialog, TransporterDialog, FreightForwarderDialog
 # from product_management.list_dialog import ProductListDialog # Removed
-
-# --- BEGIN TARGETED sys.path FIX for product_management import ---
-# This workaround is removed as sys.path is now primarily managed by main.py
-# import sys # Ensure sys is imported if not already (it is at the top)
-# import os  # Ensure os is imported if not already (it is at the top)
-# try:
-#     _mw_file_path = os.path.abspath(__file__)
-#     _project_root_for_pm = os.path.dirname(_mw_file_path) # Assuming main_window.py is in project root
-#
-#     if _project_root_for_pm not in sys.path:
-#         sys.path.insert(0, _project_root_for_pm)
-#     elif sys.path[0] != _project_root_for_pm:
-#         sys.path.remove(_project_root_for_pm)
-#         sys.path.insert(0, _project_root_for_pm)
-# except Exception:
-#     # Silently pass on error during this specific fix, relying on global error handling
-#     # or allowing the ModuleNotFoundError to naturally occur if this fails.
-#     pass
-# --- END TARGETED sys.path FIX ---
-
-# --- BEGIN Local sys.path adjustment in gui/main_window.py ---
-# This is a targeted fix to ensure product_management can be imported from here.
-# os and sys modules are imported at the top of this file.
-try:
-    _gui_main_window_file_path = os.path.abspath(__file__)
-    _gui_dir = os.path.dirname(_gui_main_window_file_path)
-    _project_root_local_calc = os.path.dirname(_gui_dir) # Project root is parent of 'gui'
-
-    if _project_root_local_calc not in sys.path:
-        sys.path.insert(0, _project_root_local_calc)
-        print(f"DEBUG gui/main_window.py (LOCAL SYS.PATH MOD): Inserted project root {_project_root_local_calc}. New sys.path: {sys.path}")
-    elif sys.path[0] != _project_root_local_calc:
-        if _project_root_local_calc in sys.path: # Check before removing
-             sys.path.remove(_project_root_local_calc)
-        sys.path.insert(0, _project_root_local_calc)
-        print(f"DEBUG gui/main_window.py (LOCAL SYS.PATH MOD): Moved project root {_project_root_local_calc} to start. New sys.path: {sys.path}")
-    # else:
-        # print(f"DEBUG gui/main_window.py (LOCAL SYS.PATH MOD): Project root {_project_root_local_calc} already at sys.path[0].")
-except Exception as e_local_sys_path_mod:
-    print(f"ERROR in gui/main_window.py local sys.path modification: {e_local_sys_path_mod}")
-# --- END Local sys.path adjustment ---
-
-print(f"DEBUG: Current sys.path before product_management import: {sys.path}")
-print(f"DEBUG: Current working directory before product_management import: {os.getcwd()}")
 
 from app.product_management.page import ProductManagementPage # Added
 from PyQt5.QtWidgets import QSizePolicy
 
-from .dialogs.status_management_dialog import StatusManagementDialog # Added for status management
-from .dialogs.manage_saved_filters_dialog import ManageSavedFiltersDialog # Import for managing saved filters
+from app.gui.dialogs.status_management_dialog import StatusManagementDialog # Added for status management
+from app.gui.dialogs.manage_saved_filters_dialog import ManageSavedFiltersDialog # Import for managing saved filters
 
 from PyQt5.QtWidgets import QDateEdit
 
@@ -164,7 +83,7 @@ from app.company_management import CompanyTabWidget
 from app.settings.settings_page import SettingsPage # Import the new SettingsPage
 from app.botpress_integration.ui_components import BotpressIntegrationUI # Import Botpress UI
 from app.gui.dialogs.carrier_map_dialog import CarrierMapDialog
-from voice_input_service import VoiceInputService # Added import
+from app.voice_input_service import VoiceInputService # Added import
 
 from app.partners.partner_main_widget import PartnerMainWidget # Partner Management
 from app.gui.widgets.inventory_browser_widget import InventoryBrowserWidget # Inventory Management
@@ -177,7 +96,7 @@ from app.recruitment.recruitment_dashboard import RecruitmentDashboard # Import 
 from app.ui.home.home_page_widget import HomePageWidget # Updated import path
 from app.gui.widgets.experience_module_widget import ExperienceModuleWidget # Added
 from app.services.download_monitor_service import DownloadMonitorService
-from dialogs.assign_document_dialog import AssignDocumentToClientDialog
+from app.gui.dialogs.assign_document_dialog import AssignDocumentToClientDialog
 from app.db.cruds.clients.client_documents_crud import add_client_document # For assign dialog
 import os # For path checks in download monitor init
 from app.db.cruds import user_saved_filters_crud # Import for saved filters
@@ -188,8 +107,8 @@ from app.user_management.page import UserManagementPage # Import UserManagementP
 from app.calculator.main_calculator_widget import MainCalculatorWidget # Import Calculator Widget
 # from db.connection import SessionLocal as AppSessionLocal_MW # Import SessionLocal for calculator
 from app.user_management.user_menu_button import UserMenuButton # Import UserMenuButton
-from dialogs.edit_user_dialog import EditUserDialog # For handling edit/add user requests
-from dialogs.role_management_dialog import RoleManagementDialog # Added for Role Management
+from app.gui.dialogs.edit_user_dialog import EditUserDialog # For handling edit/add user requests
+from app.gui.dialogs.role_management_dialog import RoleManagementDialog # Added for Role Management
 from app.commande_management.commandes_dashboard_widget import CommandesDashboardWidget # Import CommandesDashboardWidget
 from app.utils.app_constants import CONFIGURABLE_MODULES # Import from new location
 from app.gui.widgets.sidebar_navigation_widget import SidebarNavigationWidget # Import de la Sidebar
@@ -216,7 +135,7 @@ from app.license_management import (
 )
 
 # Import for menu customization
-from dialogs.menu_customization_dialog import MenuCustomizationDialog
+from app.gui.dialogs.menu_customization_dialog import MenuCustomizationDialog
 from app.utils.app_constants import CONFIGURABLE_MODULES # For menu customization and default order
 import json # For handling menu config storage
 import random

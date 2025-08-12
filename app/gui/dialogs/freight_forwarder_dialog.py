@@ -9,8 +9,8 @@ from PyQt5.QtGui import QIcon
 # other than those implicitly handled by QtWidgets.
 
 from app.db.cruds.misc import freight_forwarders_crud
-from app.db.cruds.misc import contacts_crud
-from app.db.cruds.misc import entity_contacts_crud
+from app.db.cruds.misc.contacts_crud import add_contact, update_contact, get_contact_by_email
+from app.db.cruds.misc.entity_contacts_crud import get_contacts_for_entity, link_contact_to_entity, update_entity_contact_link, unlink_contact_from_entity
 from .contact_dialog import ContactDialog
 
 class FreightForwarderDialog(QDialog):
@@ -125,7 +125,7 @@ class FreightForwarderDialog(QDialog):
         if not self.forwarder_id:
             return
 
-        contacts = entity_contacts_crud.get_contacts_for_entity(self.forwarder_id, 'FreightForwarder')
+        contacts = get_contacts_for_entity(self.forwarder_id, 'FreightForwarder')
         for contact_data in contacts:
             row_position = self.contacts_table.rowCount()
             self.contacts_table.insertRow(row_position)
@@ -156,9 +156,9 @@ class FreightForwarderDialog(QDialog):
             contact_details = contact_dialog.get_contact_data()
             link_details = contact_dialog.get_link_data()
 
-            new_contact_id = contacts_crud.add_contact(contact_details)
+            new_contact_id = add_contact(contact_details)
             if new_contact_id:
-                entity_contacts_crud.link_contact_to_entity(
+                link_contact_to_entity(
                     entity_id=self.forwarder_id,
                     entity_type='FreightForwarder',
                     contact_id=new_contact_id,
@@ -199,8 +199,8 @@ class FreightForwarderDialog(QDialog):
             updated_contact_details = contact_dialog.get_contact_data()
             updated_link_details = contact_dialog.get_link_data()
 
-            contacts_crud.update_contact(full_contact_link_data['contact_id'], updated_contact_details)
-            entity_contacts_crud.update_entity_contact_link(full_contact_link_data['entity_contact_id'], updated_link_details)
+            update_contact(full_contact_link_data['contact_id'], updated_contact_details)
+            update_entity_contact_link(full_contact_link_data['entity_contact_id'], updated_link_details)
             self.load_associated_contacts()
 
     def handle_delete_contact_link(self):
@@ -224,7 +224,7 @@ class FreightForwarderDialog(QDialog):
                                      self.tr(f"Êtes-vous sûr de vouloir supprimer le lien avec {contact_name}?\nLe contact central ne sera pas supprimé."),
                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply == QMessageBox.Yes:
-            if entity_contacts_crud.unlink_contact_from_entity(entity_contact_id):
+            if unlink_contact_from_entity(entity_contact_id):
                 self.load_associated_contacts()
             else:
                 QMessageBox.warning(self, self.tr("Erreur"), self.tr("Impossible de supprimer le lien."))
@@ -292,7 +292,7 @@ class FreightForwarderDialog(QDialog):
         if not direct_contact_name and not direct_email and not direct_phone:
             return
 
-        existing_contacts = entity_contacts_crud.get_contacts_for_entity(self.forwarder_id, 'FreightForwarder')
+        existing_contacts = get_contacts_for_entity(self.forwarder_id, 'FreightForwarder')
         primary_entity_contact = next((c for c in existing_contacts if c.get('is_primary')), None)
 
         if primary_entity_contact:
@@ -300,7 +300,7 @@ class FreightForwarderDialog(QDialog):
 
         contact_to_link_id = None
         if direct_email:
-            existing_central_contact = contacts_crud.get_contact_by_email(direct_email)
+            existing_central_contact = get_contact_by_email(direct_email)
             if existing_central_contact:
                 contact_to_link_id = existing_central_contact['contact_id']
                 update_payload = {}
@@ -309,7 +309,7 @@ class FreightForwarderDialog(QDialog):
                 if direct_phone and existing_central_contact.get('phone') != direct_phone:
                     update_payload['phone'] = direct_phone
                 if update_payload:
-                    contacts_crud.update_contact(contact_to_link_id, update_payload)
+                    update_contact(contact_to_link_id, update_payload)
 
         if not contact_to_link_id:
             contact_details = {
@@ -319,7 +319,7 @@ class FreightForwarderDialog(QDialog):
                 'phone': direct_phone,
                 'employee_status': 'external'
             }
-            contact_to_link_id = contacts_crud.add_contact(contact_details)
+            contact_to_link_id = add_contact(contact_details)
 
         if contact_to_link_id:
             link_details = {
@@ -329,7 +329,7 @@ class FreightForwarderDialog(QDialog):
             }
             already_linked = any(c['contact_id'] == contact_to_link_id for c in existing_contacts)
             if not already_linked:
-                entity_contacts_crud.link_contact_to_entity(
+                link_contact_to_entity(
                     entity_id=self.forwarder_id,
                     entity_type='FreightForwarder',
                     contact_id=contact_to_link_id,
@@ -338,6 +338,6 @@ class FreightForwarderDialog(QDialog):
             else:
                 existing_link = next((c for c in existing_contacts if c['contact_id'] == contact_to_link_id), None)
                 if existing_link and not existing_link.get('is_primary'):
-                    entity_contacts_crud.update_entity_contact_link(existing_link['entity_contact_id'], link_details)
+                    update_entity_contact_link(existing_link['entity_contact_id'], link_details)
 
             self.load_associated_contacts()

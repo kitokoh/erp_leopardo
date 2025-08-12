@@ -15,7 +15,7 @@ from PyQt5.QtMultimediaWidgets import QVideoWidget
 # These imports might need adjustment based on the final project structure
 # and how global instances or accessors are defined.
 # from .. import db as db_manager # Example if db is one level up
-from db.cruds.misc.company_assets_crud import company_assets_crud
+from app.db.cruds.misc.company_assets_crud import get_all_assets, add_asset, update_asset, delete_asset
 # from db.cruds.users_crud import users_crud # If needed for created_by_user_id
 
 logger = logging.getLogger(__name__)
@@ -196,7 +196,7 @@ class CameraManagementWidget(QWidget):
     def _load_cameras_from_db(self):
         self.camera_list_widget.clear()
         try:
-            camera_assets = company_assets_crud.get_assets(filters={'asset_type': 'Camera', 'is_deleted': 0})
+            camera_assets = get_all_assets(filters={'asset_type': 'Camera', 'is_deleted': 0})
             if not camera_assets:
                 logger.info("No active camera assets found.")
                 # Optionally show a message in the list or placeholder
@@ -271,7 +271,7 @@ class CameraManagementWidget(QWidget):
             data['created_by_user_id'] = self.current_user_id
 
             try:
-                asset_id = company_assets_crud.add_asset(data)
+                asset_id = add_asset(data)
                 if asset_id:
                     logger.info(f"Caméra ajoutée avec ID: {asset_id}")
                     self._load_cameras_from_db()
@@ -294,7 +294,7 @@ class CameraManagementWidget(QWidget):
             # data['updated_by_user_id'] = self.current_user_id # If model supports it
 
             try:
-                success = company_assets_crud.update_asset(camera_asset_to_edit['asset_id'], data)
+                success = update_asset(camera_asset_to_edit['asset_id'], data)
                 if success:
                     logger.info(f"Caméra mise à jour: {camera_asset_to_edit['asset_id']}")
                     self._load_cameras_from_db()
@@ -316,7 +316,7 @@ class CameraManagementWidget(QWidget):
                                        QMessageBox.Yes | QMessageBox.No)
         if confirm == QMessageBox.Yes:
             try:
-                success = company_assets_crud.delete_asset(camera_asset_to_delete['asset_id']) # Soft delete
+                success = delete_asset(camera_asset_to_delete['asset_id']) # Soft delete
                 if success:
                     logger.info(f"Caméra archivée: {camera_asset_to_delete['asset_id']}")
                     self._load_cameras_from_db()

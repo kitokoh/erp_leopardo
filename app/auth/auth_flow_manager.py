@@ -4,11 +4,11 @@ import logging
 from PyQt5.QtWidgets import QDialog, QMessageBox
 
 # Project-specific imports
-from gui.dialogs.login_dialog import LoginDialog
-from gui.dialogs.license_dialog import LicenseDialog
-from auth import authentication as auth_service
-from license_management import manager as license_manager
-from db.connection import get_db_connection
+from app.gui.dialogs.login_dialog import LoginDialog
+from app.license_management.ui import LicenseDialog
+from app.auth import authentication as auth_service
+from app.license_management import manager as license_manager
+from app.db.connection import get_db_connection
 
 class AuthFlowManager:
     """

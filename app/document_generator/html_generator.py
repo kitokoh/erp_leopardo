@@ -9,10 +9,10 @@ from .context_builder import get_document_context
 # For example, if it's a top-level module: from html_to_pdf_util import ...
 # If it's a utility module within document_generator: from .html_to_pdf_util import ...
 try:
-    from utils.html_to_pdf_util import render_html_template, convert_html_to_pdf
+    from app.utils.html_to_pdf_util import render_html_template, convert_html_to_pdf
 except ImportError:
     logging.error(
-        "Failed to import html_to_pdf_util from utils. Ensure it's accessible. "
+        "Failed to import html_to_pdf_util from app.utils. Ensure it's accessible. "
         "render_html_template and convert_html_to_pdf will not be available."
     )
     # Define dummy functions if import fails, to allow module to load for other purposes
