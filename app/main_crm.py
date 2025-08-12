@@ -3,12 +3,8 @@ import sys
 import os
 
 # Determine project root and add it to sys.path
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-elif sys.path[0] != PROJECT_ROOT:
-    # If it's in sys.path but not at the start, move it to the start
-    sys.path.remove(PROJECT_ROOT)
     sys.path.insert(0, PROJECT_ROOT)
 
 # Ensure this debug print is AFTER the sys.path modification and BEFORE any project imports
@@ -18,7 +14,7 @@ elif sys.path[0] != PROJECT_ROOT:
 
 # Now, other imports can follow
 import logging # For main.py's own logging needs, and for translator parts if setup_logging isn't called first
-import icons_rc # Import the compiled resource file
+from app import icons_rc # Import the compiled resource file
 import atexit # Added for stopping API server on exit
 
 # Core PyQt5 imports for application execution
@@ -111,18 +107,18 @@ class CRMModule(QMainWindow):
         initialize_database(CONFIG, PROJECT_ROOT)
 
         # --- Import DB-dependent modules AFTER initialization ---
-        from db.db_seed import run_seed, seed_only_hidroguc_products
-        from db.connection import get_db_connection
-        from db.cruds.misc.application_settings_crud import get_setting
-        from db.cruds.users import users_crud
-        from db.cruds.misc.companies_crud import get_all_companies, add_company
+        from app.db.db_seed import run_seed, seed_only_hidroguc_products
+        from app.db.connection import get_db_connection
+        from app.db.cruds.misc.application_settings_crud import get_setting
+        from app.db.cruds.users import users_crud
+        from app.db.cruds.misc.companies_crud import get_all_companies, add_company
         # --- End DB-dependent imports ---
 
         seed_only_hidroguc_products()
 
         # Set the configuration for document_generator.context_builder
         try:
-            from document_generator import context_builder as doc_gen_context_builder
+            from app.document_generator import context_builder as doc_gen_context_builder
             if hasattr(doc_gen_context_builder, 'set_document_generator_config'):
                 doc_gen_context_builder.set_document_generator_config(CONFIG)
                 logging.info("main.py: document_generator.context_builder.set_document_generator_config(CONFIG) called.")
@@ -138,8 +134,8 @@ class CRMModule(QMainWindow):
         try:
             conn_cleanup = get_db_connection() # Get a connection for cleanup tasks
             if conn_cleanup:
-                from db.cruds import user_session_tokens_crud
-                from db.cruds.users import password_reset_tokens_crud
+                from app.db.cruds import user_session_tokens_crud
+                from app.db.cruds.users import password_reset_tokens_crud
 
                 cleaned_session_tokens = user_session_tokens_crud.cleanup_expired_tokens(conn_cleanup)
                 logging.info(f"Cleaned up {cleaned_session_tokens} expired 'Remember Me' session tokens on startup.")
@@ -186,7 +182,7 @@ class CRMModule(QMainWindow):
             # current_app_lang remains system default or 'en'
 
         # 5. Display Splash Screen
-        from ui.splash_screen import SplashWindow
+        from app.ui.splash_screen import SplashWindow
         splash = SplashWindow(app_root_dir=APP_ROOT_DIR, language_code=current_app_lang)
         splash.show_splash()
 

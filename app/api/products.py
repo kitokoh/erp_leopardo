@@ -70,8 +70,8 @@ def format_product_response(db_product: Dict[str, Any], request: Request) -> Pro
 # --- Product CRUD Endpoints ---
 @router.post("", response_model=ProductResponse, status_code=201)
 async def create_product_api(
-    product: ProductCreate,
     request: Request,
+    product: ProductCreate,
     current_user: UserInDB = Depends(get_current_active_user)
 ):
     # product_data should not contain product_id as it's auto-generated
@@ -140,8 +140,8 @@ async def get_all_products_api(
 @router.put("/{product_id}", response_model=ProductResponse)
 async def update_product_api(
     product_id: int,
-    product_update: ProductUpdate,
     request: Request,
+    product_update: ProductUpdate,
     current_user: UserInDB = Depends(get_current_active_user)
 ):
     update_data = product_update.dict(exclude_unset=True)
@@ -201,8 +201,8 @@ async def delete_product_api(
 @router.post("/{product_id}/media_links", response_model=ProductImageLinkResponse, status_code=201)
 async def link_media_to_product_api(
     product_id: int,
-    link_request: LinkMediaToProductRequest,
     request_obj: Request, # Renamed to avoid conflict with pydantic 'request'
+    link_request: LinkMediaToProductRequest,
     current_user: UserInDB = Depends(get_current_active_user)
 ):
     # Check if product exists
@@ -256,8 +256,8 @@ async def link_media_to_product_api(
 @router.put("/media_links/{link_id}", response_model=ProductImageLinkResponse)
 async def update_product_media_link_api(
     link_id: int,
-    update_request: ProductImageLinkUpdateRequest,
     request_obj: Request,
+    update_request: ProductImageLinkUpdateRequest,
     current_user: UserInDB = Depends(get_current_active_user)
 ):
     if update_request.display_order is None and update_request.alt_text is None:
@@ -313,8 +313,8 @@ async def unlink_media_from_product_api(
 @router.post("/{product_id}/media_links/reorder", response_model=List[ProductImageLinkResponse])
 async def reorder_product_media_links_api(
     product_id: int,
-    reorder_request: ReorderProductMediaLinksRequest,
     request_obj: Request,
+    reorder_request: ReorderProductMediaLinksRequest,
     current_user: UserInDB = Depends(get_current_active_user)
 ):
     # Check if product exists
