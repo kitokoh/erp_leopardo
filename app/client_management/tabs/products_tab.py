@@ -11,13 +11,13 @@ from PyQt5.QtWidgets import QDialog
 import os # For path operations
 import uuid # For unique filenames
 
-import db as db_manager
-from db.cruds.products.products_crud import products_crud_instance as products_crud
-from db.cruds.invoices import commandes_crud
-from db.cruds.invoices import proforma_invoices_crud
-from utils.proforma_invoice_utils import get_proforma_invoice_context_data # For context
+from app import db as db_manager
+from app.db.cruds.products.products_crud import products_crud_instance as products_crud
+from app.db.cruds.invoices import commandes_crud
+from app.db.cruds.invoices import proforma_invoices_crud
+from app.utils.proforma_invoice_utils import get_proforma_invoice_context_data # For context
 
-from utils.html_to_pdf_util import render_html_template, convert_html_to_pdf, WeasyPrintError # For PDF generation
+from app.utils.html_to_pdf_util import render_html_template, convert_html_to_pdf, WeasyPrintError # For PDF generation
 # Import SUPPORTED_LANGUAGES, assuming documents_tab is a sibling
 from .documents_tab import SUPPORTED_LANGUAGES
 

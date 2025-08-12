@@ -6,7 +6,7 @@ import types # For creating mock module objects
 # --- Conditional mocking for __main__ START ---
 # This MUST be before any problematic imports like 'db'
 
-from gui.dialogs.template_dialog import TemplateDialog
+from app.gui.dialogs.template_dialog import TemplateDialog
 
 if __name__ == '__main__':
     print("MAIN_TOP: Pre-patching sys.modules for 'db' with a mock package structure.")
@@ -259,21 +259,6 @@ if __name__ == '__main__':
 
 import csv
 
-# Adjust sys.path to allow finding modules in the current directory structure
-# This needs to be done before other local package imports if running standalone
-current_dir_for_standalone = os.path.dirname(os.path.abspath(__file__))
-print(f"Executing from: {current_dir_for_standalone}") # Debug print
-if current_dir_for_standalone not in sys.path:
-    sys.path.insert(0, current_dir_for_standalone)
-    print(f"Inserted into sys.path: {current_dir_for_standalone}") # Debug print
-# If 'dialogs', 'company_management' etc. are in a parent or specific source directory:
-# parent_dir_for_standalone = os.path.abspath(os.path.join(current_dir_for_standalone, '..'))
-# if parent_dir_for_standalone not in sys.path:
-#     sys.path.insert(0, parent_dir_for_standalone)
-
-print(f"Initial sys.path: {sys.path}") # Debug print
-
-
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTabWidget, QLabel,
     QFormLayout, QLineEdit, QComboBox, QSpinBox, QFileDialog, QCheckBox,
@@ -287,7 +272,7 @@ from PyQt5.QtCore import Qt
 # This import will be problematic if 'db' is not in sys.path or structured as expected.
 # For the __main__ block, we'll mock it.
 try:
-    import db as db_manager # If __name__ == '__main__', this should import MockDBForGlobalImport
+    import app.db as db_manager # If __name__ == '__main__', this should import MockDBForGlobalImport
     if __name__ == '__main__':
         print(f"MAIN_POST_DB_IMPORT: db_manager is {db_manager}")
 except ImportError:
@@ -295,7 +280,7 @@ except ImportError:
     db_manager = None # Will be replaced by mock in __main__ if None
 
 try:
-    from db.cruds.products.products_crud import products_crud_instance
+    from app.db.cruds.products.products_crud import products_crud_instance
 except ImportError:
     print("ERROR: Failed to import 'products_crud_instance' from 'db.cruds.products_crud'. Export functionality will be affected.")
     products_crud_instance = None # Ensure it exists, even if None
@@ -304,18 +289,18 @@ except ImportError:
 # This requires gui.main_window to be importable.
 # If running settings_page.py standalone, this might need careful handling or mocking.
 try:
-    from utils.app_constants import CONFIGURABLE_MODULES # Import from new location
+    from app.utils.app_constants import CONFIGURABLE_MODULES # Import from new location
 except ImportError as e_configurable_modules:
     print(f"ERROR settings_page.py: Could not import CONFIGURABLE_MODULES from utils.app_constants: {e_configurable_modules}")
     CONFIGURABLE_MODULES = [] # Fallback to empty list
 
-from gui.dialogs.transporter_dialog import TransporterDialog
-from gui.dialogs.freight_forwarder_dialog import FreightForwarderDialog
-from company_management import CompanyTabWidget
-from securite.security_settings_page import SecuritySettingsPage # Import de la nouvelle page
-from gui.dialogs.smtp_config_dialog import SmtpConfigDialog
+from app.gui.dialogs.transporter_dialog import TransporterDialog
+from app.gui.dialogs.freight_forwarder_dialog import FreightForwarderDialog
+from app.company_management import CompanyTabWidget
+from app.securite.security_settings_page import SecuritySettingsPage # Import de la nouvelle page
+from app.gui.dialogs.smtp_config_dialog import SmtpConfigDialog
 try:
-    from user_profile_management.my_business_widget import MyBusinessWidget
+    from app.user_profile_management.my_business_widget import MyBusinessWidget
     USER_PROFILE_MODULE_AVAILABLE = True
 except ImportError as e_user_profile:
     print(f"WARNING: Could not import MyBusinessWidget: {e_user_profile}. 'My Business' tab will be unavailable.")

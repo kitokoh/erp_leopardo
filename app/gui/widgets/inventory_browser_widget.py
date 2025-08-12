@@ -25,34 +25,19 @@ from PyQt5.QtGui import QStandardItemModel, QStandardItem, QColor, QPen, QBrush,
 from PyQt5.QtCore import Qt, QModelIndex, QRectF
 
 # CRUD imports
-try:
-    from db.cruds.products.item_locations_crud import (
-        add_item_location, get_item_location_by_id,
-        get_item_locations_by_parent_id, get_all_item_locations,
-        update_item_location, delete_item_location,
-        link_item_to_location, get_locations_for_item,
-        update_item_in_location, get_item_in_specific_location,
-        get_full_location_path_str # Added
-    )
-except ImportError:
-    import os
-    project_root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-    if project_root_path not in sys.path:
-        sys.path.insert(0, project_root_path)
-    from db.cruds.products.item_locations_crud import (
-        add_item_location, get_item_location_by_id,
-        get_item_locations_by_parent_id, get_all_item_locations,
-        update_item_location, delete_item_location,
-        link_item_to_location, get_locations_for_item,
-        update_item_in_location, get_item_in_specific_location,
-        get_full_location_path_str # Added
-    )
-    # Attempt to import products_crud similarly if needed for standalone testing
-    # The import was removed as the function does not exist.
-    # The try/except block is no longer necessary for this specific import.
-    print("Warning: products_crud.get_products_by_name_pattern not found. Product search will not work.")
-    def get_products_by_name_pattern(*args, **kwargs): # Dummy function
-        return {'success': False, 'error': 'products_crud not available'}
+from app.db.cruds.products.item_locations_crud import (
+    add_item_location, get_item_location_by_id,
+    get_item_locations_by_parent_id, get_all_item_locations,
+    update_item_location, delete_item_location,
+    link_item_to_location, get_locations_for_item,
+    update_item_in_location, get_item_in_specific_location,
+    get_full_location_path_str # Added
+)
+# The import was removed as the function does not exist.
+# The try/except block is no longer necessary for this specific import.
+print("Warning: products_crud.get_products_by_name_pattern not found. Product search will not work.")
+def get_products_by_name_pattern(*args, **kwargs): # Dummy function
+    return {'success': False, 'error': 'products_crud not available'}
 
 
 class LocationEditDialog(QDialog):

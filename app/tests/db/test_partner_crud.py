@@ -13,7 +13,16 @@ if APP_ROOT_DIR not in sys.path:
     sys.path.insert(0, APP_ROOT_DIR)
 
 # Now import application modules
-from app.db.cruds.misc import partners_crud as db_manager
+from app.db.cruds.misc.partners_crud import (
+    add_partner_category, get_partner_category_by_id, get_partner_category_by_name,
+    update_partner_category, delete_partner_category, get_all_partner_categories,
+    add_partner, get_partner_by_id, get_partner_by_email, update_partner, delete_partner,
+    add_partner_contact, get_partner_contact_by_id, get_contacts_for_partner,
+    update_partner_contact, delete_partner_contact, delete_contacts_for_partner,
+    link_partner_to_category, get_categories_for_partner, get_partners_in_category,
+    unlink_partner_from_category, add_partner_interaction, get_interactions_for_partner,
+    update_partner_interaction, delete_partner_interaction
+)
 from app.db import init_schema as db_schema
 import app.config as db_config
 
@@ -66,36 +75,36 @@ class TestPartnerCRUD(unittest.TestCase):
 
     # --- PartnerCategories Tests ---
     def test_add_get_partner_category(self):
-        cat_id = db_manager.add_partner_category({"category_name": "Test Category", "description": "Desc"}, conn=self.conn) # Pass as dict
+        cat_id = add_partner_category({"category_name": "Test Category", "description": "Desc"}, conn=self.conn) # Pass as dict
         self.assertIsNotNone(cat_id)
-        cat = db_manager.get_partner_category_by_id(cat_id, conn=self.conn)
+        cat = get_partner_category_by_id(cat_id, conn=self.conn)
         self.assertEqual(cat['category_name'], "Test Category") # Corrected key
-        cat_by_name = db_manager.get_partner_category_by_name("Test Category", conn=self.conn)
+        cat_by_name = get_partner_category_by_name("Test Category", conn=self.conn)
         self.assertEqual(cat_by_name['partner_category_id'], cat_id) # Corrected key
 
     def test_update_partner_category(self):
-        cat_id = db_manager.add_partner_category({"category_name": "Old Name"}, conn=self.conn) # Pass as dict
-        updated = db_manager.update_partner_category(cat_id, {"category_name": "New Name", "description": "New Desc"}, conn=self.conn) # Pass as dict
+        cat_id = add_partner_category({"category_name": "Old Name"}, conn=self.conn) # Pass as dict
+        updated = update_partner_category(cat_id, {"category_name": "New Name", "description": "New Desc"}, conn=self.conn) # Pass as dict
         self.assertTrue(updated)
-        cat = db_manager.get_partner_category_by_id(cat_id, conn=self.conn)
+        cat = get_partner_category_by_id(cat_id, conn=self.conn)
         self.assertEqual(cat['category_name'], "New Name") # Corrected key
         self.assertEqual(cat['description'], "New Desc")
 
     def test_delete_partner_category(self):
-        cat_id = db_manager.add_partner_category({"category_name": "To Delete"}, conn=self.conn) # Pass as dict
-        deleted = db_manager.delete_partner_category(cat_id, conn=self.conn)
+        cat_id = add_partner_category({"category_name": "To Delete"}, conn=self.conn) # Pass as dict
+        deleted = delete_partner_category(cat_id, conn=self.conn)
         self.assertTrue(deleted)
-        self.assertIsNone(db_manager.get_partner_category_by_id(cat_id, conn=self.conn))
+        self.assertIsNone(get_partner_category_by_id(cat_id, conn=self.conn))
 
     def test_get_all_partner_categories(self):
-        db_manager.add_partner_category({"category_name": "Cat 1"}, conn=self.conn) # Pass as dict
-        db_manager.add_partner_category({"category_name": "Cat 2"}, conn=self.conn) # Pass as dict
-        cats = db_manager.get_all_partner_categories(conn=self.conn)
+        add_partner_category({"category_name": "Cat 1"}, conn=self.conn) # Pass as dict
+        add_partner_category({"category_name": "Cat 2"}, conn=self.conn) # Pass as dict
+        cats = get_all_partner_categories(conn=self.conn)
         self.assertEqual(len(cats), 2)
 
     def test_partner_category_name_unique(self):
-        db_manager.add_partner_category({"category_name": "Unique Cat"}, conn=self.conn) # Pass as dict
-        cat_id_duplicate = db_manager.add_partner_category({"category_name": "Unique Cat"}, conn=self.conn) # Pass as dict
+        add_partner_category({"category_name": "Unique Cat"}, conn=self.conn) # Pass as dict
+        cat_id_duplicate = add_partner_category({"category_name": "Unique Cat"}, conn=self.conn) # Pass as dict
         # add_partner_category should return existing ID on conflict if designed that way, or None if strictly new
         # Assuming it returns None or raises error handled by _manage_conn for failed new insert due to unique
         # The current crud add_partner_category returns existing ID if name is found.
@@ -105,34 +114,34 @@ class TestPartnerCRUD(unittest.TestCase):
     def test_add_get_partner(self):
         start_date = datetime.utcnow().strftime('%Y-%m-%d')
         self.assertIsNotNone(cat_id)
-        cat = db_manager.get_partner_category_by_id(cat_id, conn=self.conn)
+        cat = get_partner_category_by_id(cat_id, conn=self.conn)
         self.assertEqual(cat['name'], "Test Category")
-        cat_by_name = db_manager.get_partner_category_by_name("Test Category", conn=self.conn)
+        cat_by_name = get_partner_category_by_name("Test Category", conn=self.conn)
         self.assertEqual(cat_by_name['category_id'], cat_id)
 
     def test_update_partner_category(self):
-        cat_id = db_manager.add_partner_category("Old Name", conn=self.conn)
-        updated = db_manager.update_partner_category(cat_id, "New Name", "New Desc", conn=self.conn)
+        cat_id = add_partner_category("Old Name", conn=self.conn)
+        updated = update_partner_category(cat_id, "New Name", "New Desc", conn=self.conn)
         self.assertTrue(updated)
-        cat = db_manager.get_partner_category_by_id(cat_id, conn=self.conn)
+        cat = get_partner_category_by_id(cat_id, conn=self.conn)
         self.assertEqual(cat['name'], "New Name")
         self.assertEqual(cat['description'], "New Desc")
 
     def test_delete_partner_category(self):
-        cat_id = db_manager.add_partner_category("To Delete", conn=self.conn)
-        deleted = db_manager.delete_partner_category(cat_id, conn=self.conn)
+        cat_id = add_partner_category("To Delete", conn=self.conn)
+        deleted = delete_partner_category(cat_id, conn=self.conn)
         self.assertTrue(deleted)
-        self.assertIsNone(db_manager.get_partner_category_by_id(cat_id, conn=self.conn))
+        self.assertIsNone(get_partner_category_by_id(cat_id, conn=self.conn))
 
     def test_get_all_partner_categories(self):
-        db_manager.add_partner_category("Cat 1", conn=self.conn)
-        db_manager.add_partner_category("Cat 2", conn=self.conn)
-        cats = db_manager.get_all_partner_categories(conn=self.conn)
+        add_partner_category("Cat 1", conn=self.conn)
+        add_partner_category("Cat 2", conn=self.conn)
+        cats = get_all_partner_categories(conn=self.conn)
         self.assertEqual(len(cats), 2)
 
     def test_partner_category_name_unique(self):
-        db_manager.add_partner_category("Unique Cat", conn=self.conn)
-        cat_id_duplicate = db_manager.add_partner_category("Unique Cat", conn=self.conn)
+        add_partner_category("Unique Cat", conn=self.conn)
+        cat_id_duplicate = add_partner_category("Unique Cat", conn=self.conn)
         # add_partner_category should return existing ID on conflict if designed that way, or None if strictly new
         # Assuming it returns None or raises error handled by _manage_conn for failed new insert due to unique
         # The current crud add_partner_category returns existing ID if name is found.
@@ -153,14 +162,14 @@ class TestPartnerCRUD(unittest.TestCase):
             "collaboration_start_date": start_date,
             "collaboration_end_date": end_date
         }
-        partner_id = db_manager.add_partner(partner_data, conn=self.conn)
+        partner_id = add_partner(partner_data, conn=self.conn)
         self.assertIsNotNone(partner_id)
         try:
             uuid.UUID(partner_id) # Check if it's a valid UUID string
         except ValueError:
             self.fail("Partner ID is not a valid UUID string")
 
-        partner = db_manager.get_partner_by_id(partner_id, conn=self.conn)
+        partner = get_partner_by_id(partner_id, conn=self.conn)
         self.assertEqual(partner['partner_name'], "Test Partner Inc.") # Corrected key
         self.assertEqual(partner['email'], "contact@partnerinc.com")
         self.assertEqual(partner['status'], "Active")
@@ -169,41 +178,41 @@ class TestPartnerCRUD(unittest.TestCase):
         self.assertEqual(partner['collaboration_start_date'], start_date)
         self.assertEqual(partner['collaboration_end_date'], end_date)
 
-        partner_by_email = db_manager.get_partner_by_email("contact@partnerinc.com", conn=self.conn)
+        partner_by_email = get_partner_by_email("contact@partnerinc.com", conn=self.conn)
         self.assertEqual(partner_by_email['partner_id'], partner_id)
 
     def test_update_partner(self):
-        p_id = db_manager.add_partner({"partner_name": "Old Partner", "email": "old@p.com", "status": "Active"}, conn=self.conn) # Corrected key
+        p_id = add_partner({"partner_name": "Old Partner", "email": "old@p.com", "status": "Active"}, conn=self.conn) # Corrected key
         updated_data = {
             "partner_name": "New Partner",
             "phone": "555-0123",
             "status": "Inactive",
             "website_url": "http://new.example.com"
         }
-        updated = db_manager.update_partner(p_id, updated_data, conn=self.conn)
+        updated = update_partner(p_id, updated_data, conn=self.conn)
         self.assertTrue(updated)
-        partner = db_manager.get_partner_by_id(p_id, conn=self.conn)
+        partner = get_partner_by_id(p_id, conn=self.conn)
         self.assertEqual(partner['partner_name'], "New Partner") # Corrected key
         self.assertEqual(partner['phone'], "555-0123")
         self.assertEqual(partner['status'], "Inactive")
         self.assertEqual(partner['website_url'], "http://new.example.com")
 
     def test_delete_partner(self):
-        p_id = db_manager.add_partner({"partner_name": "Delete Me Partner", "email": "del@p.com"}, conn=self.conn) # Corrected key
-        deleted = db_manager.delete_partner(p_id, conn=self.conn)
+        p_id = add_partner({"partner_name": "Delete Me Partner", "email": "del@p.com"}, conn=self.conn) # Corrected key
+        deleted = delete_partner(p_id, conn=self.conn)
         self.assertTrue(deleted)
-        self.assertIsNone(db_manager.get_partner_by_id(p_id, conn=self.conn))
+        self.assertIsNone(get_partner_by_id(p_id, conn=self.conn))
 
     def test_partner_email_unique(self):
-        db_manager.add_partner({"partner_name": "Partner A", "email": "unique@example.com"}, conn=self.conn) # Corrected key
-        p_id_dup = db_manager.add_partner({"partner_name": "Partner B", "email": "unique@example.com"}, conn=self.conn) # Corrected key
+        add_partner({"partner_name": "Partner A", "email": "unique@example.com"}, conn=self.conn) # Corrected key
+        p_id_dup = add_partner({"partner_name": "Partner B", "email": "unique@example.com"}, conn=self.conn) # Corrected key
         self.assertIsNone(p_id_dup) # add_partner returns None on integrity error for unique email
 
     # --- PartnerContacts Tests ---
     def _create_test_partner(self, name_suffix=""): # Added suffix for more unique test partners
         partner_name = f"Contact Test Partner {name_suffix} {uuid.uuid4()}"
         email = f"ctp-{uuid.uuid4()}@example.com"
-        return db_manager.add_partner({"partner_name": partner_name, "email": email}, conn=self.conn)
+        return add_partner({"partner_name": partner_name, "email": email}, conn=self.conn)
 
 
     def test_add_get_partner_contact(self):
@@ -217,11 +226,11 @@ class TestPartnerCRUD(unittest.TestCase):
         }
         # add_partner_contact itself needs partner_id and the contact_payload.
         # The partner_id is passed as a separate argument to add_partner_contact.
-        partner_contact_link_id = db_manager.add_partner_contact(partner_id, contact_payload, conn=self.conn)
+        partner_contact_link_id = add_partner_contact(partner_id, contact_payload, conn=self.conn)
         self.assertIsNotNone(partner_contact_link_id)
 
         # get_partner_contact_by_id retrieves the *linked* contact, including central details
-        retrieved_linked_contact = db_manager.get_partner_contact_by_id(partner_contact_link_id, conn=self.conn)
+        retrieved_linked_contact = get_partner_contact_by_id(partner_contact_link_id, conn=self.conn)
         self.assertIsNotNone(retrieved_linked_contact)
         self.assertEqual(retrieved_linked_contact['displayName'], "John Doe")
         self.assertEqual(retrieved_linked_contact['partner_id'], partner_id)
@@ -230,24 +239,24 @@ class TestPartnerCRUD(unittest.TestCase):
 
     def test_get_contacts_for_partner(self):
         partner_id = self._create_test_partner("get_contacts")
-        db_manager.add_partner_contact(partner_id, {"displayName": "Jane", "email":"j@p.com"}, conn=self.conn)
-        db_manager.add_partner_contact(partner_id, {"displayName": "Mike", "email":"m@p.com"}, conn=self.conn)
-        contacts = db_manager.get_contacts_for_partner(partner_id, conn=self.conn)
+        add_partner_contact(partner_id, {"displayName": "Jane", "email":"j@p.com"}, conn=self.conn)
+        add_partner_contact(partner_id, {"displayName": "Mike", "email":"m@p.com"}, conn=self.conn)
+        contacts = get_contacts_for_partner(partner_id, conn=self.conn)
         self.assertEqual(len(contacts), 2)
 
     def test_update_partner_contact(self):
         partner_id = self._create_test_partner("update_contact")
         # Add contact first
         contact_payload_initial = {"displayName": "Old Contact", "position": "Intern"}
-        partner_contact_link_id = db_manager.add_partner_contact(partner_id, contact_payload_initial, conn=self.conn)
+        partner_contact_link_id = add_partner_contact(partner_id, contact_payload_initial, conn=self.conn)
         self.assertIsNotNone(partner_contact_link_id)
 
         # Now update
         update_payload = {"displayName": "New Contact", "position": "Manager", "is_primary": True}
-        updated = db_manager.update_partner_contact(partner_contact_link_id, update_payload, conn=self.conn)
+        updated = update_partner_contact(partner_contact_link_id, update_payload, conn=self.conn)
         self.assertTrue(updated)
 
-        retrieved_updated_contact = db_manager.get_partner_contact_by_id(partner_contact_link_id, conn=self.conn)
+        retrieved_updated_contact = get_partner_contact_by_id(partner_contact_link_id, conn=self.conn)
         self.assertEqual(retrieved_updated_contact['displayName'], "New Contact")
         self.assertEqual(retrieved_updated_contact['position'], "Manager")
         self.assertTrue(retrieved_updated_contact['is_primary'])
@@ -255,50 +264,50 @@ class TestPartnerCRUD(unittest.TestCase):
 
     def test_delete_partner_contact(self):
         partner_id = self._create_test_partner("delete_contact")
-        partner_contact_link_id = db_manager.add_partner_contact(partner_id, {"displayName": "Delete Contact"}, conn=self.conn)
-        deleted = db_manager.delete_partner_contact(partner_contact_link_id, conn=self.conn)
+        partner_contact_link_id = add_partner_contact(partner_id, {"displayName": "Delete Contact"}, conn=self.conn)
+        deleted = delete_partner_contact(partner_contact_link_id, conn=self.conn)
         self.assertTrue(deleted)
-        self.assertIsNone(db_manager.get_partner_contact_by_id(partner_contact_link_id, conn=self.conn))
+        self.assertIsNone(get_partner_contact_by_id(partner_contact_link_id, conn=self.conn))
 
     def test_delete_contacts_for_partner(self):
         partner_id = self._create_test_partner("delete_all_contacts")
-        db_manager.add_partner_contact(partner_id, {"displayName": "C1"}, conn=self.conn)
-        db_manager.add_partner_contact(partner_id, {"displayName": "C2"}, conn=self.conn)
-        deleted_all = db_manager.delete_contacts_for_partner(partner_id, conn=self.conn)
+        add_partner_contact(partner_id, {"displayName": "C1"}, conn=self.conn)
+        add_partner_contact(partner_id, {"displayName": "C2"}, conn=self.conn)
+        deleted_all = delete_contacts_for_partner(partner_id, conn=self.conn)
         self.assertTrue(deleted_all) # Assuming it returns True if successful
-        contacts = db_manager.get_contacts_for_partner(partner_id, conn=self.conn)
+        contacts = get_contacts_for_partner(partner_id, conn=self.conn)
         self.assertEqual(len(contacts), 0)
 
     # --- PartnerCategoryLink Tests ---
     def _create_test_category(self, name_suffix=""): # Added suffix for unique category names
         category_name = f"Link Test Cat {name_suffix} {uuid.uuid4()}"
-        return db_manager.add_partner_category({"category_name": category_name}, conn=self.conn)
+        return add_partner_category({"category_name": category_name}, conn=self.conn)
 
 
     def test_link_unlink_partner_to_category(self):
         partner_id = self._create_test_partner("link_cat")
         category_id = self._create_test_category("link_partner")
 
-        linked = db_manager.link_partner_to_category(partner_id, category_id, conn=self.conn)
+        linked = link_partner_to_category(partner_id, category_id, conn=self.conn)
         self.assertTrue(linked)
 
-        cats_for_partner = db_manager.get_categories_for_partner(partner_id, conn=self.conn)
+        cats_for_partner = get_categories_for_partner(partner_id, conn=self.conn)
         self.assertEqual(len(cats_for_partner), 1)
         self.assertEqual(cats_for_partner[0]['partner_category_id'], category_id) # Corrected key
 
-        partners_in_cat = db_manager.get_partners_in_category(category_id, conn=self.conn)
+        partners_in_cat = get_partners_in_category(category_id, conn=self.conn)
         self.assertEqual(len(partners_in_cat), 1)
         self.assertEqual(partners_in_cat[0]['partner_id'], partner_id)
 
         # Test linking again (should be idempotent success, link_partner_to_category returns True if link exists or was created)
-        linked_again = db_manager.link_partner_to_category(partner_id, category_id, conn=self.conn)
+        linked_again = link_partner_to_category(partner_id, category_id, conn=self.conn)
         self.assertTrue(linked_again) # Current CRUD returns True if exists
 
 
-        unlinked = db_manager.unlink_partner_from_category(partner_id, category_id, conn=self.conn)
+        unlinked = unlink_partner_from_category(partner_id, category_id, conn=self.conn)
         self.assertTrue(unlinked)
-        self.assertEqual(len(db_manager.get_categories_for_partner(partner_id, conn=self.conn)), 0)
-        self.assertEqual(len(db_manager.get_partners_in_category(category_id, conn=self.conn)), 0)
+        self.assertEqual(len(get_categories_for_partner(partner_id, conn=self.conn)), 0)
+        self.assertEqual(len(get_partners_in_category(category_id, conn=self.conn)), 0)
 
     # --- PartnerInteractions Tests ---
     def test_add_get_partner_interaction(self):
@@ -312,14 +321,14 @@ class TestPartnerCRUD(unittest.TestCase):
             "interaction_type": "Call",
             "notes": "Discussed project milestones."
         }
-        interaction_id = db_manager.add_partner_interaction(interaction_data, conn=self.conn)
+        interaction_id = add_partner_interaction(interaction_data, conn=self.conn)
         self.assertIsNotNone(interaction_id)
         try:
             uuid.UUID(interaction_id)
         except ValueError:
             self.fail("Interaction ID is not a valid UUID string")
 
-        interactions = db_manager.get_interactions_for_partner(partner_id, conn=self.conn)
+        interactions = get_interactions_for_partner(partner_id, conn=self.conn)
         self.assertEqual(len(interactions), 1)
         retrieved_interaction = interactions[0]
         self.assertEqual(retrieved_interaction['interaction_id'], interaction_id)
@@ -335,7 +344,7 @@ class TestPartnerCRUD(unittest.TestCase):
         self.assertIsNotNone(partner_id)
 
         initial_date = (datetime.utcnow() - timedelta(days=1)).strftime('%Y-%m-%d')
-        interaction_id = db_manager.add_partner_interaction({
+        interaction_id = add_partner_interaction({
             "partner_id": partner_id, "interaction_date": initial_date,
             "interaction_type": "Initial Meeting", "notes": "First contact."
         }, conn=self.conn)
@@ -347,10 +356,10 @@ class TestPartnerCRUD(unittest.TestCase):
             "interaction_type": "Follow-up Email",
             "notes": "Sent follow-up materials."
         }
-        updated = db_manager.update_partner_interaction(interaction_id, update_data, conn=self.conn)
+        updated = update_partner_interaction(interaction_id, update_data, conn=self.conn)
         self.assertTrue(updated)
 
-        interactions = db_manager.get_interactions_for_partner(partner_id, conn=self.conn)
+        interactions = get_interactions_for_partner(partner_id, conn=self.conn)
         self.assertEqual(len(interactions), 1)
         retrieved_interaction = interactions[0]
         self.assertEqual(retrieved_interaction['interaction_id'], interaction_id)
@@ -365,21 +374,21 @@ class TestPartnerCRUD(unittest.TestCase):
         partner_id = self._create_test_partner("interaction_delete")
         self.assertIsNotNone(partner_id)
 
-        interaction_id = db_manager.add_partner_interaction({
+        interaction_id = add_partner_interaction({
             "partner_id": partner_id, "interaction_date": datetime.utcnow().strftime('%Y-%m-%d'),
             "interaction_type": "Cleanup Test", "notes": "To be deleted."
         }, conn=self.conn)
         self.assertIsNotNone(interaction_id)
 
-        deleted = db_manager.delete_partner_interaction(interaction_id, conn=self.conn)
+        deleted = delete_partner_interaction(interaction_id, conn=self.conn)
         self.assertTrue(deleted)
 
-        interactions = db_manager.get_interactions_for_partner(partner_id, conn=self.conn)
+        interactions = get_interactions_for_partner(partner_id, conn=self.conn)
         self.assertEqual(len(interactions), 0)
 
         # Test deleting non-existent ID
         non_existent_id = str(uuid.uuid4())
-        deleted_non_existent = db_manager.delete_partner_interaction(non_existent_id, conn=self.conn)
+        deleted_non_existent = delete_partner_interaction(non_existent_id, conn=self.conn)
         self.assertFalse(deleted_non_existent)
 
 
@@ -392,23 +401,23 @@ class TestPartnerCRUD(unittest.TestCase):
         date_day_before = date_today - timedelta(days=2)
 
         # Add interactions out of order by date and creation time
-        interaction_id1 = db_manager.add_partner_interaction({
+        interaction_id1 = add_partner_interaction({
             "partner_id": partner_id, "interaction_date": date_yesterday.strftime('%Y-%m-%d'),
             "interaction_type": "Yesterday Call", "notes": "Note 1"
         }, conn=self.conn)
         # Simulate a slight delay for created_at difference
-        interaction_id2 = db_manager.add_partner_interaction({
+        interaction_id2 = add_partner_interaction({
             "partner_id": partner_id, "interaction_date": date_day_before.strftime('%Y-%m-%d'),
             "interaction_type": "Day Before Meeting", "notes": "Note 2"
         }, conn=self.conn)
-        interaction_id3 = db_manager.add_partner_interaction({ # Same date as id1, should be ordered by creation (id3 then id1)
+        interaction_id3 = add_partner_interaction({ # Same date as id1, should be ordered by creation (id3 then id1)
             "partner_id": partner_id, "interaction_date": date_yesterday.strftime('%Y-%m-%d'),
             "interaction_type": "Yesterday Email", "notes": "Note 3"
         }, conn=self.conn)
 
         self.assertTrue(all([interaction_id1, interaction_id2, interaction_id3]))
 
-        interactions = db_manager.get_interactions_for_partner(partner_id, conn=self.conn)
+        interactions = get_interactions_for_partner(partner_id, conn=self.conn)
         self.assertEqual(len(interactions), 3)
 
         # Expected order: date_yesterday (id3), date_yesterday (id1), date_day_before (id2)

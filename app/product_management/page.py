@@ -2,10 +2,10 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 from .edit_dialog import ProductEditDialog
-from db.cruds.products.products_crud import products_crud_instance
-from utils import html_to_pdf_util
+from app.db.cruds.products.products_crud import products_crud_instance
+from app.utils import html_to_pdf_util
 # Import for RBAC
-from auth.permissions import has_permission, P_MANAGE_GLOBAL_PRODUCTS, P_VIEW_GLOBAL_PRODUCTS
+from app.auth.permissions import has_permission, P_MANAGE_GLOBAL_PRODUCTS, P_VIEW_GLOBAL_PRODUCTS
 
 class ProductManagementPage(QWidget):
     def __init__(self, current_user_info: dict, parent=None): # Added current_user_info

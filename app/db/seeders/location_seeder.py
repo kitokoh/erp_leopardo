@@ -5,7 +5,7 @@ import logging
 import sqlite3
 
 from app.db.cruds.misc.locations_crud import get_or_add_country, get_or_add_city, get_country_by_name
-from app.db.cruds.misc import regions_crud
+from app.db.cruds.misc.regions_crud import get_region_by_name_and_country_id, add_region
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -95,12 +95,12 @@ def seed_default_regions(conn: sqlite3.Connection, logger: logging.Logger):
 
         country_id = country['country_id']
         for region_name in region_names:
-            existing_region = regions_crud.get_region_by_name_and_country_id(region_name, country_id, conn=conn)
+            existing_region = get_region_by_name_and_country_id(region_name, country_id, conn=conn)
             if existing_region:
                 skipped_count += 1
                 continue
 
-            region_id = regions_crud.add_region(region_name, country_id, conn=conn)
+            region_id = add_region(region_name, country_id, conn=conn)
             if region_id:
                 added_count += 1
                 logger.info(f"Added region '{region_name}' to '{country_name}'.")

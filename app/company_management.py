@@ -16,17 +16,8 @@ from contact_manager.sync_service import handle_contact_change_from_platform # F
 import logging # Added for logging
 from PyQt5.QtWidgets import QGroupBox
 
-# Adjust path to import db_manager from the parent directory / current dir
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
-if current_dir not in sys.path: # for running directly if db.py is alongside
-    sys.path.insert(0, current_dir)
-
-
 # Import company CRUD functions directly
-from db.cruds.misc.companies_crud import (
+from app.db.cruds.misc.companies_crud import (
     get_all_companies,
     add_company,
     update_company,
@@ -35,7 +26,7 @@ from db.cruds.misc.companies_crud import (
     get_company_by_id # Add if needed elsewhere
 )
 # Import personnel and contact link CRUD functions directly
-from db.cruds.misc.company_personnel_crud import (
+from app.db.cruds.misc.company_personnel_crud import (
     get_contacts_for_personnel,
     add_company_personnel,
     get_personnel_for_company,
@@ -49,7 +40,7 @@ from db.cruds.misc.company_personnel_crud import (
 # Keep other db imports for now, will be refactored incrementally
 try:
     # Company and personnel functions are now imported directly above.
-    from db.init_schema import initialize_database
+    from app.db.init_schema import initialize_database
     db_available = True # This flag is now mainly for initialize_database
     print("Core DB functions (initialize_database) imported successfully.")
 except ImportError as e:
@@ -73,7 +64,7 @@ except ImportError as e:
     print("Failed to import initialize_database. Some features may not work or setup might be incomplete.")
 
 # Define APP_ROOT_DIR
-APP_ROOT_DIR = parent_dir
+APP_ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 logger = logging.getLogger(__name__) # Setup logger for this module
 
 

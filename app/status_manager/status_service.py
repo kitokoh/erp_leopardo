@@ -3,10 +3,13 @@ from typing import List, Optional
 
 # Attempt to import CRUD functions from the existing db module
 try:
-    from db.cruds.misc import status_settings_crud
+    from app.db.cruds.misc.status_settings_crud import (
+        get_status_setting_by_id, get_all_status_settings, add_status_setting,
+        update_status_setting, is_status_in_use, delete_status_setting
+    )
     # We also need to check usage in Clients and Commandes
-    from db.cruds.clients import clients_crud
-    from db.cruds.invoices import commandes_crud
+    from app.db.cruds.clients import clients_crud
+    from app.db.cruds.invoices import commandes_crud
 except ImportError as e:
     logging.error(f"StatusManager Service: Could not import DB CRUD modules: {e}. Ensure PYTHONPATH is set correctly.")
     # To allow the rest of the file to be parsed, provide dummy fallbacks if needed,
@@ -35,11 +38,11 @@ def get_status_by_id(status_id: int) -> Optional[Status]:
     """
     Retrieves a specific status by its ID.
     """
-    if not status_settings_crud:
+    if not get_status_setting_by_id:
         logger.error("status_settings_crud module not available.")
         return None
     try:
-        db_row = status_settings_crud.get_status_setting_by_id(status_id)
+        db_row = get_status_setting_by_id(status_id)
         return _map_db_row_to_status_object(db_row)
     except Exception as e:
         logger.error(f"Error in get_status_by_id for ID {status_id}: {e}", exc_info=True)
@@ -50,14 +53,14 @@ def get_statuses_by_type(status_type: StatusType, type_filter_string: Optional[s
     Retrieves all statuses of a specific type.
     Can accept StatusType enum or a string for type_filter_string for flexibility.
     """
-    if not status_settings_crud:
+    if not get_all_status_settings:
         logger.error("status_settings_crud module not available.")
         return []
 
     type_val_to_filter = type_filter_string if type_filter_string else status_type.value
 
     try:
-        db_rows = status_settings_crud.get_all_status_settings(type_filter=type_val_to_filter)
+        db_rows = get_all_status_settings(type_filter=type_val_to_filter)
         statuses = [_map_db_row_to_status_object(row) for row in db_rows if row]
         return [s for s in statuses if s] # Filter out None objects from mapping errors
     except Exception as e:
@@ -68,11 +71,11 @@ def get_all_statuses() -> List[Status]:
     """
     Retrieves all statuses defined in the system.
     """
-    if not status_settings_crud:
+    if not get_all_status_settings:
         logger.error("status_settings_crud module not available.")
         return []
     try:
-        db_rows = status_settings_crud.get_all_status_settings()
+        db_rows = get_all_status_settings()
         statuses = [_map_db_row_to_status_object(row) for row in db_rows if row]
         return [s for s in statuses if s] # Filter out None objects
     except Exception as e:
@@ -90,23 +93,23 @@ def add_status(
     """
     Adds a new status to the system.
     This function needs to be adapted if 'is_archival' and 'icon_name'
-    are not direct columns in StatusSettings or handled by status_settings_crud.add_status_setting.
+    are not direct columns in StatusSettings or handled by add_status_setting.
 
-    Assuming status_settings_crud.add_status_setting will be updated or
+    Assuming add_status_setting will be updated or
     we'll handle these fields separately if they are in a different table or structure.
     For now, this implementation assumes add_status_setting can take them.
     If not, this is a point of future adjustment.
     """
-    if not status_settings_crud:
+    if not add_status_setting:
         logger.error("status_settings_crud module not available.")
         return None
 
-    # The current status_settings_crud.add_status_setting does not take is_archival or icon_name.
+    # The current add_status_setting does not take is_archival or icon_name.
     # This will require either:
-    # 1. Modifying status_settings_crud.add_status_setting
+    # 1. Modifying add_status_setting
     # 2. Adding a subsequent update step here after creation.
     # For now, let's proceed as if it could, and note this for later.
-    # TODO: Adapt if status_settings_crud.add_status_setting cannot handle all fields.
+    # TODO: Adapt if add_status_setting cannot handle all fields.
 
     try:
         # Call the CRUD function. If it needs modification for new fields, that's a separate step.
@@ -116,7 +119,7 @@ def add_status(
         # It does NOT currently accept is_archival or icon_name.
         # We will call it with the known parameters first.
 
-        new_status_id = status_settings_crud.add_status_setting(
+        new_status_id = add_status_setting(
             status_name=name,
             status_type=type.value,
             color_hex=color_hex,
@@ -129,7 +132,7 @@ def add_status(
             # we would need an update call here.
             # Example:
             # if is_archival or icon_name:
-            #     success_update = status_settings_crud.update_status_setting(
+            #     success_update = update_status_setting(
             #         status_id=new_status_id,
             #         status_name=name, # Must pass existing or new name/type
             #         status_type=type.value,
@@ -165,7 +168,7 @@ def update_status(
     Updates an existing status.
     Fields that are None will not be updated.
     """
-    if not status_settings_crud:
+    if not update_status_setting:
         logger.error("status_settings_crud module not available.")
         return False
 
@@ -179,7 +182,7 @@ def update_status(
     # The CRUD function `update_status_setting` signature is:
     # (status_id: int, status_name: str, status_type: str, color_hex: str = None, sort_order: int = None)
     # It does NOT currently accept is_archival or icon_name.
-    # TODO: Adapt if status_settings_crud.update_status_setting cannot handle all fields.
+    # TODO: Adapt if update_status_setting cannot handle all fields.
 
     updated_name = name if name is not None else current_status.name
     updated_type_str = type.value if type is not None else current_status.type.value
@@ -190,7 +193,7 @@ def update_status(
     # We need to ensure is_archival and icon_name are also handled, likely by modifying the CRUD.
 
     try:
-        success = status_settings_crud.update_status_setting(
+        success = update_status_setting(
             status_id=status_id,
             status_name=updated_name,
             status_type=updated_type_str,
@@ -205,7 +208,7 @@ def update_status(
         # db_update_payload = {}
         # if name is not None: db_update_payload['status_name'] = name
         # ... etc for all fields
-        # success = status_settings_crud.SOME_MORE_COMPREHENSIVE_UPDATE_FUNCTION(status_id, db_update_payload)
+        # success = SOME_MORE_COMPREHENSIVE_UPDATE_FUNCTION(status_id, db_update_payload)
 
         return success
     except Exception as e:
@@ -216,13 +219,13 @@ def is_status_in_use(status_id: int) -> bool:
     """
     Checks if a status is currently in use by Clients or Commandes.
     """
-    if not status_settings_crud or not clients_crud or not commandes_crud:
+    if not is_status_in_use or not clients_crud or not commandes_crud:
         logger.error("Required CRUD modules not available for is_status_in_use.")
         return True # Safer to assume in use if checks cannot be performed
 
     try:
         # Check in Clients (this function already exists in status_settings_crud)
-        if status_settings_crud.is_status_in_use(status_id): # Checks Clients table
+        if is_status_in_use(status_id): # Checks Clients table
             logger.info(f"Status ID {status_id} is in use by Clients.")
             return True
 
@@ -269,7 +272,7 @@ def delete_status(status_id: int) -> bool:
     """
     Deletes a status if it's not currently in use.
     """
-    if not status_settings_crud:
+    if not delete_status_setting:
         logger.error("status_settings_crud module not available.")
         return False
 
@@ -281,7 +284,7 @@ def delete_status(status_id: int) -> bool:
         return False
 
     try:
-        return status_settings_crud.delete_status_setting(status_id)
+        return delete_status_setting(status_id)
     except Exception as e:
         logger.error(f"Error in delete_status for ID {status_id}: {e}", exc_info=True)
         return False

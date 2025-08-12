@@ -9,13 +9,13 @@ from PyQt5.QtWidgets import QAbstractItemView, QComboBox # Added QComboBox (alre
 
 # Assuming users_crud and roles_crud are accessible for fetching data
 # and auth.permissions for permission checking if actions were added here.
-from db.cruds.users import users_crud
-from db.cruds.misc import activity_logs_crud
-from auth.permissions import has_permission, P_MANAGE_USERS
-from db.cruds.users import roles_crud # For populating roles in edit dialog
+from app.db.cruds.users import users_crud
+from app.db.cruds.misc.activity_logs_crud import add_activity_log
+from app.auth.permissions import has_permission, P_MANAGE_USERS
+from app.db.cruds.users import roles_crud # For populating roles in edit dialog
 
 # Placeholder for EditUserDialog, will be created later
-# from dialogs.edit_user_dialog import EditUserDialog
+# from app.gui.dialogs.edit_user_dialog import EditUserDialog
 
 class UserManagementPage(QWidget):
     def __init__(self, current_user_info: dict, parent=None):
@@ -164,7 +164,7 @@ class UserManagementPage(QWidget):
         # QMessageBox.information(self, self.tr("Fonctionnalité à venir"), self.tr("L'ajout d'utilisateurs sera implémenté prochainement."))
         # For now, try to open the EditUserDialog in 'add' mode if it supports it, or a specific AddUserDialog.
         # Assuming EditUserDialog can handle user_id_to_edit=None for add mode.
-        from dialogs.edit_user_dialog import EditUserDialog # Local import to avoid circular if EditUserDialog imports this module
+        from app.gui.dialogs.edit_user_dialog import EditUserDialog # Local import to avoid circular if EditUserDialog imports this module
 
         role_name = self.current_user_info.get('role_name') if self.current_user_info else None
         if not has_permission(role_name, P_MANAGE_USERS):
@@ -276,7 +276,7 @@ class UserManagementPage(QWidget):
                                     self.tr("Veuillez sélectionner un utilisateur à modifier."))
             return
 
-        from dialogs.edit_user_dialog import EditUserDialog
+        from app.gui.dialogs.edit_user_dialog import EditUserDialog
 
         edit_dialog = EditUserDialog(user_id=selected_user_id, # Matches constructor
                                      current_admin_user_info=self.current_user_info,
@@ -329,7 +329,7 @@ class UserManagementPage(QWidget):
                         "related_entity_type": "User",
                         "related_entity_id": selected_user_id
                     }
-                    activity_logs_crud.add_activity_log(log_data)
+                    add_activity_log(log_data)
                     logging.info(f"Activity logged for USER_STATUS_CHANGED: {selected_user_id} by {self.current_user_info.get('user_id')}")
                 except Exception as e_log:
                     logging.error(f"Failed to log USER_STATUS_CHANGED activity for user {selected_user_id}: {e_log}", exc_info=True)
@@ -358,7 +358,7 @@ class UserManagementPage(QWidget):
 
         username_to_display = user_data.get('username', selected_user_id)
 
-        from dialogs.reset_password_dialog import ResetPasswordDialog
+        from app.gui.dialogs.reset_password_dialog import ResetPasswordDialog
 
         reset_dialog = ResetPasswordDialog(username=username_to_display, parent=self)
         if reset_dialog.exec_() == QDialog.Accepted:
@@ -375,7 +375,7 @@ class UserManagementPage(QWidget):
                         "related_entity_type": "User",
                         "related_entity_id": selected_user_id
                     }
-                    activity_logs_crud.add_activity_log(log_data)
+                    add_activity_log(log_data)
                     logging.info(f"Activity logged for USER_PASSWORD_RESET: {selected_user_id} by {self.current_user_info.get('user_id')}")
                 except Exception as e_log:
                     logging.error(f"Failed to log USER_PASSWORD_RESET activity for user {selected_user_id}: {e_log}", exc_info=True)
@@ -435,7 +435,7 @@ class UserManagementPage(QWidget):
                         "related_entity_type": "User",
                         "related_entity_id": selected_user_id_to_delete
                     }
-                    activity_logs_crud.add_activity_log(log_data)
+                    add_activity_log(log_data)
                     logging.info(f"Activity logged for USER_SOFT_DELETED: {selected_user_id_to_delete} by {current_admin_user_id}")
                 except Exception as e_log:
                     logging.error(f"Failed to log USER_SOFT_DELETED activity for user {selected_user_id_to_delete}: {e_log}", exc_info=True)

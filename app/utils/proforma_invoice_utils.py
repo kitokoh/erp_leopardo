@@ -9,24 +9,24 @@ from typing import Optional, List, Dict, Any, Union
 
 # Attempt to import ProformaInvoice model for type hinting
 try:
-    from db.models.misc.proforma_invoices import ProformaInvoice
+    from app.db.models.misc.proforma_invoices import ProformaInvoice
 except ImportError:
     logging.warning("Could not import ProformaInvoice from db.models.misc. Type hinting will use Any.")
     ProformaInvoice = Any # Fallback type
 
 # Attempt to import from db module
 try:
-    from db.connection import get_db_connection
-    from db.cruds.misc.companies_crud import get_company_by_id as db_get_company_by_id
-    from db.cruds.misc.company_personnel_crud import get_personnel_for_company as db_get_personnel_for_company
-    from db.cruds.clients.clients_crud import get_client_by_id as db_get_client_by_id
-    from db.cruds.misc.locations_crud import get_country_by_id as db_get_country_by_id, get_city_by_id as db_get_city_by_id
-    from db.cruds.misc.contacts_crud import get_contacts_for_client as db_get_contacts_for_client
-    from db.cruds.projects.projects_crud import get_project_by_id as db_get_project_by_id
-    from db.cruds.products.products_crud import get_product_by_id as db_get_product_by_id
-    from db.cruds.clients.client_project_products_crud import get_products_for_client_or_project as db_get_products_for_client_or_project
-    from db.cruds.misc.notes_crud import get_effective_document_note as db_get_effective_document_note
-    from db.cruds.misc.application_settings_crud import get_next_invoice_number
+    from app.db.connection import get_db_connection
+    from app.db.cruds.misc.companies_crud import get_company_by_id as db_get_company_by_id
+    from app.db.cruds.misc.company_personnel_crud import get_personnel_for_company as db_get_personnel_for_company
+    from app.db.cruds.clients.clients_crud import get_client_by_id as db_get_client_by_id
+    from app.db.cruds.misc.locations_crud import get_country_by_id as db_get_country_by_id, get_city_by_id as db_get_city_by_id
+    from app.db.cruds.misc.contacts_crud import get_contacts_for_client as db_get_contacts_for_client
+    from app.db.cruds.projects.projects_crud import get_project_by_id as db_get_project_by_id
+    from app.db.cruds.products.products_crud import get_product_by_id as db_get_product_by_id
+    from app.db.cruds.clients.client_project_products_crud import get_products_for_client_or_project as db_get_products_for_client_or_project
+    from app.db.cruds.misc.notes_crud import get_effective_document_note as db_get_effective_document_note
+    from app.db.cruds.misc.application_settings_crud import get_next_invoice_number
 except ImportError as e:
     logging.warning(f"Could not import all dependencies from db or cruds: {e}. Using placeholder functions. Full functionality requires db modules to be correctly structured and accessible.")
     # Define placeholder functions if db.py or its functions are not found

@@ -45,10 +45,10 @@ import logging
 # )
 
 # Corrected imports from specific CRUD modules
-from db.cruds.misc.status_settings_crud import get_status_setting_by_id, get_all_status_settings, get_status_setting_by_name
-from db.cruds.projects.projects_crud import get_all_projects, get_project_by_id, add_project, update_project, delete_project
+from app.db.cruds.misc.status_settings_crud import get_status_setting_by_id, get_all_status_settings, get_status_setting_by_name
+from app.db.cruds.projects.projects_crud import get_all_projects, get_project_by_id, add_project, update_project, delete_project
 # search_projects, get_projects_by_status, get_projects_by_user # These were missing, import if they exist or comment out usage
-from db.cruds.projects.tasks_crud import (
+from app.db.cruds.projects.tasks_crud import (
     get_task_by_id, add_task, update_task, delete_task,
     get_tasks_by_project_id, # Use this or get_tasks_by_project_id_ordered_by_sequence for get_tasks_for_project
     get_tasks_by_project_id_ordered_by_sequence,
@@ -56,20 +56,20 @@ from db.cruds.projects.tasks_crud import (
     add_task_dependency, get_predecessor_tasks, remove_task_dependency
     # get_tasks_by_status, # This was missing, import if it exists or comment out usage
 )
-from db.cruds.projects.kpis_crud import get_kpis_for_project
-from db.cruds.misc.activity_logs_crud import add_activity_log, get_activity_logs
-from db.cruds.users.users_crud import get_user_by_id, list_users as get_all_users, update_user_password as update_user, verify_user_password
-from db.cruds.users.team_members_crud import get_all_team_members, get_team_member_by_id, add_team_member, update_team_member, delete_team_member
-from db.cruds.clients.clients_crud import get_all_clients
-from db.cruds.misc.cover_pages_crud import get_cover_pages_for_client, add_cover_page, update_cover_page, delete_cover_page, get_cover_page_by_id
-from db.cruds.templates_crud import get_all_file_based_templates
-from db.cruds.misc.cover_page_templates_crud import get_cover_page_template_by_id
-from db.cruds.projects.milestones_crud import get_milestones_for_project, add_milestone, get_milestone_by_id, update_milestone, delete_milestone
-from db.init_schema import initialize_database # initialize_database is usually in init_schema or db module directly
+from app.db.cruds.projects.kpis_crud import get_kpis_for_project
+from app.db.cruds.misc.activity_logs_crud import add_activity_log, get_activity_logs
+from app.db.cruds.users.users_crud import get_user_by_id, list_users as get_all_users, update_user_password as update_user, verify_user_password
+from app.db.cruds.users.team_members_crud import get_all_team_members, get_team_member_by_id, add_team_member, update_team_member, delete_team_member
+from app.db.cruds.clients.clients_crud import get_all_clients
+from app.db.cruds.misc.cover_pages_crud import get_cover_pages_for_client, add_cover_page, update_cover_page, delete_cover_page, get_cover_page_by_id
+from app.db.cruds.templates_crud import get_all_file_based_templates
+from app.db.cruds.misc.cover_page_templates_crud import get_cover_page_template_by_id
+from app.db.cruds.projects.milestones_crud import get_milestones_for_project, add_milestone, get_milestone_by_id, update_milestone, delete_milestone
+from app.db.init_schema import initialize_database # initialize_database is usually in init_schema or db module directly
 
 # Missing log/file functions - to be addressed if project_logs_crud and project_files_crud are created
-from db.cruds import project_logs_crud # Assuming this file will be created with add_project_log, get_project_logs
-from db.cruds.projects import project_files_crud
+from app.db.cruds import project_logs_crud # Assuming this file will be created with add_project_log, get_project_logs
+from app.db.cruds.projects import project_files_crud
 # For specific function imports, if preferred:
 
 # from db.cruds.project_logs_crud import add_project_log, get_project_logs

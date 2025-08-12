@@ -4,7 +4,7 @@ from datetime import datetime
 import json
 import logging
 from ..generic_crud import _manage_conn
-from ..products.products_crud import products_crud_instance
+from app.db.cruds.products.products_crud import products_crud_instance
 
 logger = logging.getLogger(__name__)
 

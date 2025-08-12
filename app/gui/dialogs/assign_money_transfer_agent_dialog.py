@@ -9,8 +9,8 @@ from PyQt5.QtWidgets import (
 # Assuming CRUD functions are directly importable from their modules
 # Adjust if a central db_manager is used for these specific CRUDs as well
 try:
-    from db.cruds import money_transfer_agents_crud as mta_crud
-    from db.cruds import client_order_money_transfer_agents_crud as coma_crud
+    from app.db.cruds.clients import money_transfer_agents_crud as mta_crud
+    from app.db.cruds.clients import client_order_money_transfer_agents_crud as coma_crud
 except ImportError as e:
     # This is a critical problem for the dialog's functionality.
     # A real application might log this and disable functionality or show an error.

@@ -1,55 +1,25 @@
 # -*- coding: utf-8 -*-
 import os
 import shutil
-import sqlite3 # Should be checked if still needed directly, db_manager should handle most
+import sqlite3
 from datetime import datetime, timedelta
-from PyQt5.QtWidgets import QMessageBox, QDialog, QInputDialog # QInputDialog was used in add_new_country/city, not directly in moved methods but good to keep context
-# from PyQt5.QtCore import QStandardPaths # Removed as not used by these functions
+from PyQt5.QtWidgets import QMessageBox, QDialog, QInputDialog
 
-# -*- coding: utf-8 -*-
-import os
-import shutil
-import sqlite3 # Should be checked if still needed directly, db_manager should handle most
-from datetime import datetime, timedelta
-from PyQt5.QtWidgets import QMessageBox, QDialog, QInputDialog # QInputDialog was used in add_new_country/city, not directly in moved methods but good to keep context
-# from PyQt5.QtCore import QStandardPaths # Removed as not used by these functions
-
-# Import necessary functions directly from their new CRUD module locations
-from client_management.client_controller import ClientController # Added
-from controllers.contact_controller import ContactController # Added
-from db.cruds.misc.locations_crud import get_country_by_id, get_city_by_id
-from db.cruds.misc.status_settings_crud import get_status_setting_by_name, get_status_setting_by_id
-from db.cruds.clients.clients_crud import clients_crud_instance
-from db.cruds.projects.projects_crud import add_project, get_project_by_id, delete_project
-from db.cruds.projects.tasks_crud import add_task
-from db.cruds.misc.contacts_crud import get_contact_by_email, add_contact, update_contact, link_contact_to_client, get_contacts_for_client, update_client_contact_link
-from db.cruds.products.products_crud import products_crud_instance
-
-from db.cruds.clients.client_project_products_crud import add_product_to_client_or_project, get_products_for_client_or_project
-
-import logging # For logging errors or info
-# Confirm import of products_crud_instance at module load time
-if 'products_crud_instance' in globals():
-    logging.info(f"DM_LOGIC: products_crud_instance successfully imported at module level: {products_crud_instance}")
-else:
-    logging.error("DM_LOGIC: products_crud_instance is NOT DEFINED at module level after import line!")
-
-
-# Import dialogs that are used within the moved logic
-# Assuming these dialogs are in a 'dialogs.py' or similar accessible location.
-# If they are defined in main.py and not moved yet, this will cause an issue.
-# For this step, we assume they are accessible.
-from gui.dialogs import (
-    ContactDialog, ProductDialog, CreateDocumentDialog
-)
-from gui.dialogs.edit_client_dialog import EditClientDialog
-# If ClientWidget is used by any logic here (e.g. for refreshing tabs), it would also need to be importable.
-# from client_widget import ClientWidget # Not directly used in the functions being moved, but DocumentManager uses it.
-from gui.dialogs.edit_client_dialog import EditClientDialog
-from .app_utils import sanitize_foldername # Import the new utility
-
-import logging # For logging errors or info
-from db.cruds.misc import activity_logs_crud
+from app.client_management.client_controller import ClientController
+from app.controllers.contact_controller import ContactController
+from app.db.cruds.misc.locations_crud import get_country_by_id, get_city_by_id
+from app.db.cruds.misc.status_settings_crud import get_status_setting_by_name, get_status_setting_by_id
+from app.db.cruds.clients.clients_crud import clients_crud_instance
+from app.db.cruds.projects.projects_crud import add_project, get_project_by_id, delete_project
+from app.db.cruds.projects.tasks_crud import add_task
+from app.db.cruds.misc.contacts_crud import get_contact_by_email, add_contact, update_contact, link_contact_to_client, get_contacts_for_client, update_client_contact_link
+from app.db.cruds.products.products_crud import products_crud_instance
+from app.db.cruds.clients.client_project_products_crud import add_product_to_client_or_project, get_products_for_client_or_project
+from app.gui.dialogs import ContactDialog, ProductDialog, CreateDocumentDialog
+from app.gui.dialogs.edit_client_dialog import EditClientDialog
+from .app_utils import sanitize_foldername
+import logging
+from app.db.cruds.misc.activity_logs_crud import add_activity_log
 
 def handle_create_client_execution(doc_manager, client_data_dict=None):
     client_controller = ClientController() # Instantiate controller
@@ -850,7 +820,7 @@ def archive_client_status(doc_manager, client_id):
                 "related_entity_id": client_id,
                 "related_client_id": client_id
             }
-            activity_logs_crud.add_activity_log(log_data)
+            add_activity_log(log_data)
             logging.info(f"Activity logged for CLIENT_ARCHIVED: {client_id}")
         except Exception as e_log:
             logging.error(f"Failed to log CLIENT_ARCHIVED activity for client {client_id}: {e_log}", exc_info=True)

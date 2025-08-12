@@ -285,3 +285,19 @@ def update_client_contact_link(client_contact_id: int, details: dict, conn: sqli
     except sqlite3.Error as e:
         logging.error(f"Error updating client_contact_link {client_contact_id}: {e}")
         return False
+
+@_manage_conn
+def clear_primary_contact_for_client(client_id: str, except_contact_id: int = None, conn: sqlite3.Connection = None) -> bool:
+    """Sets is_primary_for_client to False for all contacts of a client, with an optional exception."""
+    cursor = conn.cursor()
+    sql = "UPDATE ClientContacts SET is_primary_for_client = 0 WHERE client_id = ?"
+    params = [client_id]
+    if except_contact_id is not None:
+        sql += " AND contact_id != ?"
+        params.append(except_contact_id)
+    try:
+        cursor.execute(sql, tuple(params))
+        return True
+    except sqlite3.Error as e:
+        logging.error(f"Error clearing primary contact for client {client_id}: {e}")
+        return False

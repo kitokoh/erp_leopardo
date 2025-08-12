@@ -9,13 +9,20 @@ from PyQt5.QtCore import QDate, Qt, QStringListModel
 import uuid
 import logging
 
-from app.db.cruds.misc import experience_crud, tags_crud
+from app.db.cruds.misc.experience_crud import (
+    get_all_experiences, add_experience, add_experience_tag, add_experience_related_entity,
+    add_experience_media, get_experience_by_id, get_tags_for_experience,
+    get_related_entities_for_experience, get_media_for_experience, update_experience,
+    remove_all_tags_for_experience, remove_all_related_entities_for_experience,
+    remove_all_media_for_experience, delete_experience
+)
+from app.db.cruds.misc.tags_crud import get_tag_by_name, add_tag, get_tags
 from app.db.cruds.clients import clients_crud
 from app.db.cruds.projects import projects_crud
 from app.db.cruds.products.products_crud import products_crud_instance as products_crud
-from app.db.cruds.misc import partners_crud
-from app.db.cruds.misc import company_assets_crud
-from app.db.cruds.misc import media_items_crud
+from app.db.cruds.misc.partners_crud import get_partner_by_id, get_all_partners
+from app.db.cruds.misc.company_assets_crud import get_asset_by_id, get_all_assets
+from app.db.cruds.misc.media_items_crud import get_all_media_items
 
 
 
@@ -116,7 +123,7 @@ class ExperienceModuleWidget(QWidget):
             else: filters_dict = passed_filters
 
             self.experiences_table.setEnabled(False); self._show_table_placeholder("Loading experiences...")
-            experiences_data = experience_crud.get_all_experiences(filters=filters_dict)
+            experiences_data = get_all_experiences(filters=filters_dict)
             if not experiences_data: self._show_table_placeholder("No experiences found.")
             else: self._show_table_placeholder("") # Clear placeholder before populating
             for r, exp in enumerate(experiences_data):
@@ -136,14 +143,14 @@ class ExperienceModuleWidget(QWidget):
         all_ok = True
         for name in [n.strip() for n in tags_str.split(',') if n.strip()]:
             try:
-                tag = tags_crud.get_tag_by_name(name)
-                tid = tag['tag_id'] if tag else tags_crud.add_tag({"tag_name": name}) # Assumes add_tag returns ID
+                tag = get_tag_by_name(name)
+                tid = tag['tag_id'] if tag else add_tag({"tag_name": name}) # Assumes add_tag returns ID
                 if tid:
-                    if not experience_crud.add_experience_tag(experience_id, tid): all_ok = False
+                    if not add_experience_tag(experience_id, tid): all_ok = False
                 else: # Fallback if add_tag didn't return ID or failed silently
-                    tag_check = tags_crud.get_tag_by_name(name)
+                    tag_check = get_tag_by_name(name)
                     if tag_check:
-                        if not experience_crud.add_experience_tag(experience_id, tag_check['tag_id']): all_ok = False
+                        if not add_experience_tag(experience_id, tag_check['tag_id']): all_ok = False
                     else: QMessageBox.warning(self, "Tag Error", f"Could not find/create ID for tag: {name}"); all_ok = False
             except Exception as e: logging.error(f"Error processing tag '{name}': {e}", exc_info=True); all_ok = False
         return all_ok
@@ -155,12 +162,12 @@ class ExperienceModuleWidget(QWidget):
             data = dialog.get_data()
             core_data = {"title":data["title"], "description":data["description"], "experience_date":data["experience_date"], "type":data["type"], "user_id":self.current_user_id}
             new_id = None
-            try: new_id = experience_crud.add_experience(core_data); assert new_id
+            try: new_id = add_experience(core_data); assert new_id
             except Exception as e: logging.error(f"Add exp error: {e}", exc_info=True); QMessageBox.critical(self, "Add Error", f"Failed: {e}"); return
 
             tags_ok = self._handle_tags(new_id, data.get("tags_str"))
-            ents_ok = all(experience_crud.add_experience_related_entity(new_id, el['type'], el['id']) for el in data.get("related_entities",[]))
-            media_ok = all(experience_crud.add_experience_media(new_id, mid) for mid in data.get("media_ids",[]))
+            ents_ok = all(add_experience_related_entity(new_id, el['type'], el['id']) for el in data.get("related_entities",[]))
+            media_ok = all(add_experience_media(new_id, mid) for mid in data.get("media_ids",[]))
 
             if tags_ok and ents_ok and media_ok: QMessageBox.information(self, "Success", "Experience added.")
             else: QMessageBox.warning(self, "Partial Success", "Experience added, but some links may have failed.")
@@ -171,23 +178,23 @@ class ExperienceModuleWidget(QWidget):
         if not sel: QMessageBox.warning(self, "No Selection", "Select experience to edit."); return
         exp_id = self.experiences_table.item(sel[0].row(), 0).data(Qt.UserRole)
         try:
-            details = experience_crud.get_experience_by_id(exp_id)
+            details = get_experience_by_id(exp_id)
             if not details: QMessageBox.critical(self, "Error", "Cannot retrieve details."); return
-            details["tags_list"] = experience_crud.get_tags_for_experience(exp_id)
+            details["tags_list"] = get_tags_for_experience(exp_id)
 
-            raw_ents = experience_crud.get_related_entities_for_experience(exp_id); details["related_entities"] = []
+            raw_ents = get_related_entities_for_experience(exp_id); details["related_entities"] = []
             for e in raw_ents:
                 ename = f"{e['entity_type']}:{e['entity_id']}"
                 try:
                     if e['entity_type'] == 'Client': ename = clients_crud.get_client_by_id(e['entity_id']).get('client_name', ename)
                     elif e['entity_type'] == 'Project': ename = projects_crud.get_project_by_id(e['entity_id']).get('project_name', ename)
                     elif e['entity_type'] == 'Product': ename = products_crud.get_product_by_id(e['entity_id']).get('product_name', ename)
-                    elif e['entity_type'] == 'Partner': ename = partners_crud.get_partner_by_id(e['entity_id']).get('partner_name', ename)
-                    elif e['entity_type'] == 'CompanyAsset': ename = company_assets_crud.get_asset_by_id(e['entity_id']).get('asset_name', ename)
+                    elif e['entity_type'] == 'Partner': ename = get_partner_by_id(e['entity_id']).get('partner_name', ename)
+                    elif e['entity_type'] == 'CompanyAsset': ename = get_asset_by_id(e['entity_id']).get('asset_name', ename)
                 except Exception as fetch_err: logging.warning(f"Name fetch error {e['entity_type']} {e['entity_id']}: {fetch_err}")
                 details["related_entities"].append({"type":e["entity_type"], "id":e["entity_id"], "name":ename})
 
-            raw_media = experience_crud.get_media_for_experience(exp_id)
+            raw_media = get_media_for_experience(exp_id)
             details["media_links"] = [{"id":m["media_item_id"], "name":m.get("media_title",m["media_item_id"])} for m in raw_media]
         except Exception as e: logging.error(f"Edit fetch error: {e}", exc_info=True); QMessageBox.critical(self, "Fetch Error", f"Failed: {e}"); return
 
@@ -195,19 +202,19 @@ class ExperienceModuleWidget(QWidget):
         if dialog.exec_() == QDialog.Accepted:
             data = dialog.get_data()
             core_data = {"title":data["title"], "description":data["description"], "experience_date":data["experience_date"], "type":data["type"]}
-            try: assert experience_crud.update_experience(exp_id, core_data)
+            try: assert update_experience(exp_id, core_data)
             except Exception as e: logging.error(f"Update exp error {exp_id}: {e}", exc_info=True); QMessageBox.critical(self, "Update Error", f"Failed: {e}"); self._load_experiences(); return
 
             results = []
-            try: experience_crud.remove_all_tags_for_experience(exp_id); results.append(self._handle_tags(exp_id, data.get("tags_str")))
+            try: remove_all_tags_for_experience(exp_id); results.append(self._handle_tags(exp_id, data.get("tags_str")))
             except Exception as e: results.append(False); logging.error(f"Tag update error: {e}", exc_info=True)
             try:
-                experience_crud.remove_all_related_entities_for_experience(exp_id)
-                results.append(all(experience_crud.add_experience_related_entity(exp_id,el['type'],el['id']) for el in data.get("related_entities",[])))
+                remove_all_related_entities_for_experience(exp_id)
+                results.append(all(add_experience_related_entity(exp_id,el['type'],el['id']) for el in data.get("related_entities",[])))
             except Exception as e: results.append(False); logging.error(f"Entity update error: {e}", exc_info=True)
             try:
-                experience_crud.remove_all_media_for_experience(exp_id)
-                results.append(all(experience_crud.add_experience_media(exp_id, mid) for mid in data.get("media_ids",[])))
+                remove_all_media_for_experience(exp_id)
+                results.append(all(add_experience_media(exp_id, mid) for mid in data.get("media_ids",[])))
             except Exception as e: results.append(False); logging.error(f"Media update error: {e}", exc_info=True)
 
             if all(results): QMessageBox.information(self, "Success", "Experience updated.")
@@ -222,7 +229,7 @@ class ExperienceModuleWidget(QWidget):
         reply = QMessageBox.question(self, "Delete Experience", f"Delete '{title}'?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply == QMessageBox.Yes:
             try:
-                if experience_crud.delete_experience(exp_id): QMessageBox.information(self, "Success", "Experience deleted.")
+                if delete_experience(exp_id): QMessageBox.information(self, "Success", "Experience deleted.")
                 else: QMessageBox.warning(self, "Delete Failed", "Failed to delete.")
             except Exception as e: logging.error(f"Delete error {exp_id}: {e}", exc_info=True); QMessageBox.critical(self, "Delete Error", f"Error: {e}")
             finally: self._load_experiences()
@@ -264,8 +271,8 @@ class SelectEntityDialog(QDialog):
 
             crud_map = {
                 "Client": clients_crud.get_all_clients, "Project": projects_crud.get_all_projects,
-                "Product": products_crud.get_products, "Partner": partners_crud.get_all_partners,
-                "CompanyAsset": company_assets_crud.get_all_assets
+                "Product": products_crud.get_products, "Partner": get_all_partners,
+                "CompanyAsset": get_all_assets
             }
             id_field_map = {"Client":"client_id","Project":"project_id","Product":"product_id","Partner":"partner_id","CompanyAsset":"asset_id"}
             name_field_map = {"Client":"client_name","Project":"project_name","Product":"product_name","Partner":"partner_name","CompanyAsset":"asset_name"}
@@ -298,7 +305,7 @@ class SelectMediaDialog(QDialog):
         self.media_list_widget.clear(); search_term=self.search_media_edit.text().strip(); filters={}
         if search_term: filters['title_like']=search_term
         try:
-            all_media = media_items_crud.get_all_media_items(filters=filters) if media_items_crud else []
+            all_media = get_all_media_items(filters=filters) if get_all_media_items else []
             if not all_media and search_term: self.media_list_widget.addItem("No media found matching search.")
             elif not all_media: self.media_list_widget.addItem("No media items available.")
             for media in all_media:
@@ -362,7 +369,7 @@ class AddEditExperienceDialog(QDialog):
     def _load_all_tags_for_completer(self):
         try:
             # Assuming get_tags() with default arguments returns all tags
-            all_tags_data = tags_crud.get_tags() # Assumes this returns list of dicts like [{'tag_id': 1, 'tag_name': 'urgent'}, ...]
+            all_tags_data = get_tags() # Assumes this returns list of dicts like [{'tag_id': 1, 'tag_name': 'urgent'}, ...]
             if all_tags_data:
                 tag_names_list = [tag['tag_name'] for tag in all_tags_data if 'tag_name' in tag]
                 self.all_tags_model.setStringList(tag_names_list)

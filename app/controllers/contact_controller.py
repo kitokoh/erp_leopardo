@@ -1,5 +1,8 @@
 # controllers/contact_controller.py
-from db.cruds.misc import contacts_crud
+from app.db.cruds.misc.contacts_crud import (
+    get_contact_by_id, get_contact_by_email, get_contacts_for_client,
+    add_contact, update_contact, link_contact_to_client, update_client_contact_link
+)
 import logging
 
 class ContactController:
@@ -12,7 +15,7 @@ class ContactController:
     def get_contact_by_id(self, contact_id):
         """Fetches a contact by its ID."""
         try:
-            return contacts_crud.get_contact_by_id(contact_id)
+            return get_contact_by_id(contact_id)
         except Exception as e:
             logging.error(f"Error in ContactController.get_contact_by_id: {e}")
             return None
@@ -20,7 +23,7 @@ class ContactController:
     def get_contact_by_email(self, email):
         """Fetches a contact by its email."""
         try:
-            return contacts_crud.get_contact_by_email(email)
+            return get_contact_by_email(email)
         except Exception as e:
             logging.error(f"Error in ContactController.get_contact_by_email: {e}")
             return None
@@ -30,19 +33,19 @@ class ContactController:
         Can optionally fetch only the primary contact.
         """
         try:
-            # Assuming contacts_crud.get_contacts_for_client does not take primary_only
+            # Assuming get_contacts_for_client does not take primary_only
             # If primary_only filtering is needed, it should be implemented in contacts_crud
             # or filtered here after fetching all contacts.
-            # For now, remove primary_only from the call to contacts_crud.
+            # For now, remove primary_only from the call to .
             if primary_only:
                 # Placeholder: If primary_only is True, this controller method needs
-                # to fetch all and then filter, or contacts_crud.get_contacts_for_client
+                # to fetch all and then filter, or get_contacts_for_client
                 # needs to support it. For the error reported, the CRUD layer doesn't support it.
                 # This path is not taken by the problematic call from the logs.
-                all_contacts = contacts_crud.get_contacts_for_client(client_id)
+                all_contacts = get_contacts_for_client(client_id)
                 return [c for c in all_contacts if c.get('is_primary_for_client')]
             else:
-                return contacts_crud.get_contacts_for_client(client_id)
+                return get_contacts_for_client(client_id)
         except Exception as e:
             logging.error(f"Error in ContactController.get_contacts_for_client: {e}")
             return []
@@ -66,8 +69,8 @@ class ContactController:
             # return None
 
         try:
-            # contacts_crud.add_contact is expected to return the new contact's ID
-            new_contact_id = contacts_crud.add_contact(contact_data)
+            # add_contact is expected to return the new contact's ID
+            new_contact_id = add_contact(contact_data)
             return new_contact_id
         except Exception as e:
             logging.error(f"Error in ContactController.add_contact: {e}")
@@ -92,8 +95,8 @@ class ContactController:
             # return False
 
         try:
-            # contacts_crud.update_contact is expected to return a boolean or affected row count
-            success = contacts_crud.update_contact(contact_id, contact_data)
+            # update_contact is expected to return a boolean or affected row count
+            success = update_contact(contact_id, contact_data)
             return bool(success) # Ensure boolean
         except Exception as e:
             logging.error(f"Error in ContactController.update_contact for ID {contact_id}: {e}")
@@ -108,9 +111,9 @@ class ContactController:
             logging.warning("ContactController.link_contact_to_client: Missing client_id or contact_id.")
             return None
         try:
-            # contacts_crud.link_contact_to_client is expected to return link ID
+            # link_contact_to_client is expected to return link ID
             # Role is accepted in signature for future use but not passed to CRUD yet.
-            link_id = contacts_crud.link_contact_to_client(
+            link_id = link_contact_to_client(
                 client_id,
                 contact_id,
                 is_primary,
@@ -132,7 +135,7 @@ class ContactController:
             logging.warning("ContactController.update_client_contact_link: Missing client_contact_id or data.")
             return False
         try:
-            success = contacts_crud.update_client_contact_link(client_contact_id, link_data)
+            success = update_client_contact_link(client_contact_id, link_data)
             return bool(success)
         except Exception as e:
             logging.error(f"Error updating client_contact_link ID {client_contact_id}: {e}")

@@ -7,7 +7,7 @@ from app.db.models.projects.project import Project
 from app.db.models.settings.status_setting import StatusSetting
 from ..generic_crud import _manage_conn
 
-from app.db.models import Client
+from app.db.models.clients.client import Client
 
 logger = logging.getLogger(__name__)
 
