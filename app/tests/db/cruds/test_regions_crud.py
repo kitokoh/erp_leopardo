@@ -1,7 +1,8 @@
 import unittest
 import sqlite3
 import os
-from app.db.cruds import regions_crud, countries_crud # Assuming countries_crud exists for setup
+from app.db.cruds.misc import regions_crud
+from app.db.cruds.misc import locations_crud as countries_crud
 from app.db.init_schema import initialize_database # To set up in-memory DB
 
 # Use a consistent in-memory database for tests

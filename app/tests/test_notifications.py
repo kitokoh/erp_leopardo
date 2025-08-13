@@ -9,8 +9,8 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from PyQt5.QtWidgets import QApplication, QMainWindow
-from notifications import NotificationManager, NotificationWidget
-from app.main import get_notification_manager # Assuming main.py is in the root
+from app.notifications import NotificationManager, NotificationWidget
+from app.main_crm import get_notification_manager # Assuming main.py is in the root
 
 class TestNotificationSystem(unittest.TestCase):
 

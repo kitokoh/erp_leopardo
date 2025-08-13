@@ -13,8 +13,7 @@ from app.db.cruds.misc.application_settings_crud import get_setting
 from app.db.cruds.clients import clients_crud_instance as clients_crud
 from app.db.cruds.products.products_crud import products_crud_instance as products_crud
 from app.db.cruds.projects import get_project_by_id
-from app.db.cruds.misc.countries_crud import get_country_by_id
-from app.db.cruds.misc.cities_crud import get_city_by_id
+from app.db.cruds.misc.locations_crud import get_country_by_id, get_city_by_id
 from app.db.cruds.clients import get_products_for_client_or_project, get_client_document_notes
 from app.db.cruds.misc.contacts_crud import get_contacts_for_client
 from app.db.cruds.products import product_media_links_crud

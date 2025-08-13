@@ -12,7 +12,7 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from app.db.cruds.company_assets_crud import CompanyAssetsCRUD
+from app.db.cruds.misc import company_assets_crud
 
 class TestCompanyAssetsCRUD(unittest.TestCase):
 
@@ -43,7 +43,7 @@ class TestCompanyAssetsCRUD(unittest.TestCase):
         self.conn.commit()
         # Instantiate the CRUD class for testing, it will use its default db_path unless one is provided
         # For these unit tests, we explicitly pass the connection to each method.
-        self.assets_crud = CompanyAssetsCRUD()
+        self.assets_crud = company_assets_crud
         # Note: The CompanyAssetsCRUD instance itself doesn't store the conn.
         # We must pass self.conn to each method call.
 

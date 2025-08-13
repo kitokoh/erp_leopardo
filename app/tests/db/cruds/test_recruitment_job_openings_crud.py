@@ -5,7 +5,7 @@ from datetime import datetime, date, timedelta
 
 # Ensure this path is correct based on the project structure.
 # If tests/ is at the same level as db/, this should work.
-from app.db.cruds.recruitment_job_openings_crud import add_job_opening
+from app.db.cruds.recruitment.recruitment_job_openings_crud import add_job_opening
 
 class TestMinimalRecruitmentJobOpeningsCRUD(unittest.TestCase):
 

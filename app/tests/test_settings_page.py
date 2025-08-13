@@ -74,13 +74,13 @@ mock_utils = MagicMock()
 sys.modules['utils'] = mock_utils
 
 
-from app.settings_page import SettingsPage # Now this should import
+from app.settings.settings_page import SettingsPage # Now this should import
 
 class TestSettingsPageDataHandling(unittest.TestCase):
 
-    @patch('settings_page.users_crud_instance.get_user_by_id') # Patch for __init__
-    @patch('settings_page.db_manager.get_all_transporters') # Patch for _load_transporters_table
-    @patch('settings_page.db_manager.get_all_freight_forwarders') # Patch for _load_forwarders_table
+    @patch('app.settings.settings_page.users_crud_instance.get_user_by_id') # Patch for __init__
+    @patch('app.settings.settings_page.db_manager.get_all_transporters') # Patch for _load_transporters_table
+    @patch('app.settings.settings_page.db_manager.get_all_freight_forwarders') # Patch for _load_forwarders_table
     def setUp(self, mock_get_all_ff, mock_get_all_trans, mock_get_user_init):
         # Mock main_config that SettingsPage expects
         self.mock_main_config = {
@@ -194,8 +194,8 @@ class TestSettingsPageDataHandling(unittest.TestCase):
         }
         self.assertEqual(self.settings_page.get_email_settings_data(), expected_data)
 
-    @patch('settings_page.utils.save_config')
-    @patch('settings_page.QMessageBox.information') # Mock QMessageBox
+    @patch('app.settings.settings_page.utils.save_config')
+    @patch('app.settings.settings_page.QMessageBox.information') # Mock QMessageBox
     def test_save_all_settings(self, mock_qmessagebox_info, mock_save_config_util):
         # Mock the data gathering methods
         self.settings_page.get_general_settings_data = MagicMock(return_value={"language": "de", "templates_dir": "/test"})

@@ -11,7 +11,10 @@ from unittest.mock import patch
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
 # Import the new models
-from app.db.models import Base, Client, StatusSetting, User
+from app.db.connection import Base
+from app.db.models.clients.client import Client
+from app.db.models.settings.status_setting import StatusSetting
+from app.db.models.users.user import User
 # Import the instance for testing
 from app.db.cruds.clients_crud import clients_crud_instance
 
@@ -61,7 +64,7 @@ class TestClientsCRUD(unittest.TestCase):
         self.session.close()
         Base.metadata.drop_all(self.engine)
 
-    @patch('db.cruds.clients_crud.status_service')
+    @patch('app.db.cruds.clients.clients_crud.status_service')
     def test_add_client_success(self, mock_status_service):
         # Mock the status service to return dummy IDs
         mock_status_service.get_default_status_for_commande_creation.return_value.status_id = 1

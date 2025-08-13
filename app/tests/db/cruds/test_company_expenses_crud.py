@@ -11,19 +11,19 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 # Now import after path adjustment
-from app.db.cruds.company_expenses_crud import (
+from app.db.cruds.misc.company_expenses_crud import (
     add_company_facture, get_company_facture_by_id, update_company_facture, soft_delete_company_facture, get_all_company_factures,
     add_company_expense, get_company_expense_by_id, update_company_expense, soft_delete_company_expense, get_all_company_expenses,
     link_facture_to_expense, unlink_facture_from_expense
 )
-import app.db.init_schema  # To initialize schema in memory
-from app.db.connection import get_db_connection # To override for in-memory testing
+from app.db import init_schema  # To initialize schema in memory
+from app.db import connection # To override for in-memory testing
 
 # Store the original get_db_connection function
-original_get_db_connection = db.connection.get_db_connection
+original_get_db_connection = connection.get_db_connection
 original_db_path = None
-if hasattr(db.init_schema, 'config') and hasattr(db.init_schema.config, 'DATABASE_PATH'):
-    original_db_path = db.init_schema.config.DATABASE_PATH
+if hasattr(init_schema, 'config') and hasattr(init_schema.config, 'DATABASE_PATH'):
+    original_db_path = init_schema.config.DATABASE_PATH
 
 
 def get_in_memory_db_connection():
@@ -38,22 +38,22 @@ class TestCompanyExpensesCRUD(unittest.TestCase):
     def setUpClass(cls):
         # Override the database path and connection function for testing
         if original_db_path: # Ensure config was loaded
-            db.init_schema.config.DATABASE_PATH = ":memory:"
-        db.connection.get_db_connection = get_in_memory_db_connection
+            init_schema.config.DATABASE_PATH = ":memory:"
+        connection.get_db_connection = get_in_memory_db_connection
 
         # Initialize the schema in the in-memory database
         # We need a connection to pass to initialize_database if it expects one,
         # or it should use the overridden get_db_connection internally.
         # The current init_schema.initialize_database creates its own connection using config.DATABASE_PATH
-        db.init_schema.initialize_database()
+        init_schema.initialize_database()
 
 
     @classmethod
     def tearDownClass(cls):
         # Restore original settings
         if original_db_path:
-             db.init_schema.config.DATABASE_PATH = original_db_path
-        db.connection.get_db_connection = original_get_db_connection
+             init_schema.config.DATABASE_PATH = original_db_path
+        connection.get_db_connection = original_get_db_connection
 
     def setUp(self):
         # Each test method will get a fresh connection and cursor if needed,

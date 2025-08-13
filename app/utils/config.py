@@ -1,6 +1,7 @@
 # utils/config.py
 import os
 import json
+import secrets
 from PyQt5.QtCore import QStandardPaths, QCoreApplication
 from PyQt5.QtWidgets import QMessageBox
 
@@ -26,22 +27,24 @@ def load_config(app_root_dir, default_templates_dir, default_clients_dir):
     Requires app_root_dir to construct default paths if config file doesn't exist.
     """
     config_path = get_config_file_path()
+    config_needs_saving = False
+
     if os.path.exists(config_path):
         try:
             with open(config_path, "r", encoding="utf-8") as f:
                 user_config = json.load(f)
-                # Ensure 'database_type' defaults to 'sqlite' if not present
-                user_config.setdefault('database_type', 'sqlite')
-                return user_config
         except (IOError, json.JSONDecodeError) as e:
-            print(f"Error loading config: {e}. Using defaults.")
+            print(f"Error loading config: {e}. Reverting to defaults.")
+            user_config = {} # Start fresh if config is corrupt
+    else:
+        user_config = {}
 
-    # If config file doesn't exist or is invalid, return defaults
+    # Define defaults
     default_config = {
-        "templates_dir": default_templates_dir, # Use passed default
-        "clients_dir": default_clients_dir,     # Use passed default
+        "templates_dir": default_templates_dir,
+        "clients_dir": default_clients_dir,
         "database_path": os.path.join(app_root_dir, "app_data.db"),
-        "database_type": "sqlite", # Ensure default is sqlite
+        "database_type": "sqlite",
         "language": "fr",
         "smtp_server": "",
         "smtp_port": 587,
@@ -49,9 +52,28 @@ def load_config(app_root_dir, default_templates_dir, default_clients_dir):
         "smtp_password": "",
         "default_reminder_days": 30,
         "download_monitor_enabled": False,
-        "download_monitor_path": os.path.join(os.path.expanduser('~'), 'Downloads')
+        "download_monitor_path": os.path.join(os.path.expanduser('~'), 'Downloads'),
+        "API_SECRET_KEY": secrets.token_hex(32) # Always generate a secure default
     }
-    return default_config
+
+    # Merge defaults into user_config for any missing keys
+    for key, value in default_config.items():
+        if key not in user_config:
+            user_config[key] = value
+            config_needs_saving = True
+            print(f"Config key '{key}' was missing. Set to default.")
+
+    # Specifically check for API_SECRET_KEY and regenerate if empty or weak, for security.
+    if not user_config.get("API_SECRET_KEY") or len(user_config.get("API_SECRET_KEY", "")) < 64:
+        user_config["API_SECRET_KEY"] = secrets.token_hex(32)
+        config_needs_saving = True
+        print("API_SECRET_KEY was missing, empty, or weak. A new secure key has been generated.")
+
+    if config_needs_saving:
+        print("Configuration updated with defaults or new keys, saving...")
+        save_config(user_config)
+
+    return user_config
 
 def save_config(config_data):
     try:

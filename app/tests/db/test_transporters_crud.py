@@ -8,26 +8,15 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from app.db.cruds.transporters_crud import (
+from app.db.cruds.misc.transporters_crud import (
     add_transporter, get_transporter_by_id, get_all_transporters,
     update_transporter, delete_transporter
 )
-from app.db.utils import get_db_connection # Used by CRUDs, not directly in test usually
+from app.db.connection import get_db_connection # Used by CRUDs, not directly in test usually
 from app.db.init_schema import initialize_database
 
-# Mock config for testing if config is imported by db.init_schema or db.utils
-# This is to ensure DATABASE_PATH is controlled during tests.
-class MockConfig:
-    DATABASE_PATH = os.path.join(project_root, "test_app_data.db")
-    DEFAULT_ADMIN_USERNAME = "test_admin"
-    DEFAULT_ADMIN_PASSWORD = "test_password"
-
-# Apply the mock config at the module level for db.init_schema
-# This is a common pattern if the modules it uses (like config.py) are at the root
-# and are imported when db.init_schema is loaded.
-# We need to ensure that when db.init_schema (or its imports) try to import 'config',
-# they get our mock.
-sys.modules['config'] = MockConfig
+from app.tests.mocks import mock_config
+sys.modules['config'] = mock_config
 
 
 class TestTransportersCrud(unittest.TestCase):

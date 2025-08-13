@@ -10,8 +10,8 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from app.db.cruds.asset_assignments_crud import AssetAssignmentsCRUD
-from app.db.cruds.company_assets_crud import CompanyAssetsCRUD
+from app.db.cruds.misc import asset_assignments_crud
+from app.db.cruds.misc import company_assets_crud
 # We will use direct SQL for CompanyPersonnel to avoid pulling in its full dependencies for this test.
 
 class TestAssetAssignmentsCRUD(unittest.TestCase):
@@ -65,8 +65,8 @@ class TestAssetAssignmentsCRUD(unittest.TestCase):
         """)
         self.conn.commit()
 
-        self.assignments_crud = AssetAssignmentsCRUD()
-        self.assets_crud = CompanyAssetsCRUD() # To add sample assets for FK
+        self.assignments_crud = asset_assignments_crud
+        self.assets_crud = company_assets_crud # To add sample assets for FK
 
         # Add sample asset
         self.sample_asset_id = self.assets_crud.add_asset({

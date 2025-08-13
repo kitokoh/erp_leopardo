@@ -2,14 +2,16 @@ import unittest
 import sqlite3
 import os
 import uuid
-from app.db.cruds import users_crud, roles_crud
+from app.db.cruds.users import users_crud, roles_crud
 from app.db.init_schema import initialize_database # To setup schema in memory
 from app.utils import hash_password # For creating users
 
 # Define a global path for a temporary test database file
 TEST_DB_PATH = "test_app_data_users_crud.db"
 
-from app.db.models import Base, User, Role
+from app.db.connection import Base
+from app.db.models.users.user import User
+from app.db.models.users.role import Role
 
 class TestUsersCrud(unittest.TestCase):
 

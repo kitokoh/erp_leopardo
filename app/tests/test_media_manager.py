@@ -12,6 +12,8 @@ import cv2
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from typing import List, Dict, Any # Added import
+from app.tests.mocks.mock_config import MockConfig
+sys.modules['config'] = MockConfig
 from app.media_manager import operations, models
 from app.db.init_schema import initialize_database
 from app.db.connection import get_db_connection

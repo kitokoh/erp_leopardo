@@ -6,8 +6,20 @@ from app.db.connection import Base
 from ..employees.employee import Employee
 from .leave_type import LeaveType
 from ..users.user import User
-from app.api.models import LeaveRequestStatusEnum
+import enum
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Float, Enum as SQLAlchemyEnum
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+from app.db.connection import Base
+from ..employees.employee import Employee
+from .leave_type import LeaveType
+from ..users.user import User
 
+class LeaveRequestStatusEnum(str, enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    CANCELLED = "cancelled"
 
 class LeaveRequest(Base):
     __tablename__ = 'leave_requests'
