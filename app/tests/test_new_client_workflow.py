@@ -9,7 +9,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from app.gui.main_window import DocumentManager
-from dialogs import ContactDialog, ProductDialog, CreateDocumentDialog
+from app.gui.dialogs import ContactDialog, ProductDialog, CreateDocumentDialog
 import app.db as db_manager
 
 print("Starting test_new_client_workflow.py")

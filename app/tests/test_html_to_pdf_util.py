@@ -1,6 +1,6 @@
 import unittest
 import os
-from html_to_pdf_util import populate_html, convert_html_to_pdf, WeasyPrintError
+from app.utils.html_to_pdf_util import render_html_template as populate_html, convert_html_to_pdf, WeasyPrintError
 
 # Determine APP_ROOT_DIR for potential file operations if needed later.
 # For tests, usually, the current working directory or the directory of the test file is sufficient.

@@ -35,6 +35,12 @@ from app.db.cruds.products.item_locations_crud import (
 )
 from app.db.cruds.products.products_crud import products_crud_instance as products_crud
 
+# The import was removed as the function does not exist.
+# The try/except block is no longer necessary for this specific import.
+print("Warning: products_crud.get_products_by_name_pattern not found. Product search will not work.")
+def get_products_by_name_pattern(*args, **kwargs): # Dummy function
+    return {'success': False, 'error': 'products_crud not available'}
+
 
 class LocationEditDialog(QDialog):
     def __init__(self, location_data=None, parent_id=None, existing_locations=None, parent_widget=None):

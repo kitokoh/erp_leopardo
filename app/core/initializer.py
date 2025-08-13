@@ -44,8 +44,8 @@ def initialize_database(config, project_root):
 
     # These imports are inside the function because they depend on the db path and alembic migrations running first
     import db
-    from db.db_seed import run_seed
-    from user_profile_management.database_setup import create_tables as create_user_profile_tables, seed_data as seed_user_profile_data
+    from app.db.db_seed import seed_all_data as run_seed
+    from app.user_profile_management.database_setup import create_tables as create_user_profile_tables, seed_data as seed_user_profile_data
 
     if hasattr(db, 'connection') and hasattr(db.connection, 'initialize_engine_and_session'):
         db.connection.initialize_engine_and_session(config)

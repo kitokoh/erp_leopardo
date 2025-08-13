@@ -10,12 +10,12 @@ APP_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 sys.path.append(APP_ROOT)
 
 # For get_next_invoice_number
-from app.db.cruds.application_settings_crud import get_next_invoice_number, set_setting, get_setting
+from app.db.cruds.misc.application_settings_crud import get_next_invoice_number, set_setting, get_setting
 from app.db.init_schema import initialize_database
-import app.db.db_config as db_config
+from app.db import config as db_config
 
 # For get_final_invoice_context_data
-from proforma_invoice_utils import get_final_invoice_context_data
+from app.utils.proforma_invoice_utils import get_final_invoice_context_data
 # Mocked dependencies from proforma_invoice_utils's perspective
 # These are the names as they would be accessed *within* proforma_invoice_utils.py
 # Based on its try-except import block, they are defined in its global scope.
@@ -78,7 +78,7 @@ class TestGetNextInvoiceNumber(unittest.TestCase):
         conn.commit()
         conn.close()
 
-        with patch('db.cruds.application_settings_crud.datetime') as mock_datetime_crud:
+        with patch('app.db.cruds.misc.application_settings_crud.datetime') as mock_datetime_crud:
             # Configure the mock for the first call (last year)
             mock_now_last_year = MagicMock()
             mock_now_last_year.year = last_year_val
@@ -104,16 +104,16 @@ class TestGetNextInvoiceNumber(unittest.TestCase):
 class TestGetFinalInvoiceContextData(unittest.TestCase):
 
     # Patching the names as they are defined/imported in proforma_invoice_utils.py
-    @patch('proforma_invoice_utils.get_next_invoice_number')
-    @patch('proforma_invoice_utils.get_company_by_id')
-    @patch('proforma_invoice_utils.get_client_by_id')
-    @patch('proforma_invoice_utils.get_project_by_id')
-    @patch('proforma_invoice_utils._get_batch_products_and_equivalents')
-    @patch('proforma_invoice_utils.get_contacts_for_client') # Used for client representative
-    @patch('proforma_invoice_utils.get_personnel_for_company') # Used for seller representative
-    @patch('proforma_invoice_utils.get_country_by_id') # Used for client address
-    @patch('proforma_invoice_utils.get_city_by_id') # Used for client address
-    @patch('proforma_invoice_utils.get_db_session') # Mock session creation
+    @patch('app.utils.proforma_invoice_utils.get_next_invoice_number')
+    @patch('app.utils.proforma_invoice_utils.get_company_by_id')
+    @patch('app.utils.proforma_invoice_utils.get_client_by_id')
+    @patch('app.utils.proforma_invoice_utils.get_project_by_id')
+    @patch('app.utils.proforma_invoice_utils._get_batch_products_and_equivalents')
+    @patch('app.utils.proforma_invoice_utils.get_contacts_for_client') # Used for client representative
+    @patch('app.utils.proforma_invoice_utils.get_personnel_for_company') # Used for seller representative
+    @patch('app.utils.proforma_invoice_utils.get_country_by_id') # Used for client address
+    @patch('app.utils.proforma_invoice_utils.get_city_by_id') # Used for client address
+    @patch('app.utils.proforma_invoice_utils.get_db_session') # Mock session creation
     def test_basic_context_generation(self, mock_get_session, mock_get_city, mock_get_country, mock_get_personnel, mock_get_contacts, mock_batch_prod, mock_get_proj, mock_get_client, mock_get_comp, mock_get_next_inv_num):
 
         mock_session = MagicMock()

@@ -88,7 +88,7 @@ sys.modules['db_main_manager'] = db_manager_mock # If used directly
 
 
 # Now import the classes to be tested
-from dialogs import CreateDocumentDialog, ProductDialog
+from app.gui.dialogs import CreateDocumentDialog, ProductDialog
 from app.client_management.ui.client_main_widget import ClientMainWidget as ClientWidget # Alias for convenience if tests use ClientWidget
 # from db.db_seed import seed_initial_data # For testing db_seed.py if needed
 # from db.cruds import locations_crud # For testing locations_crud.py if needed
@@ -97,7 +97,7 @@ class TestCreateDocumentDialog(unittest.TestCase):
 
     def setUp(self):
         # Reset mocks for db_manager before each test in this class
-        self.db_manager_patcher = patch('dialogs.db_manager', autospec=True)
+        self.db_manager_patcher = patch('app.gui.dialogs.db_manager', autospec=True)
         self.mock_db_manager = self.db_manager_patcher.start()
         self.addCleanup(self.db_manager_patcher.stop)
 
@@ -113,7 +113,7 @@ class TestCreateDocumentDialog(unittest.TestCase):
         mock_qdialog.Accepted = 1
 
 
-    @patch('dialogs.QListWidgetItem') # Patch QListWidgetItem where it's used
+    @patch('app.gui.dialogs.create_document_dialog.QListWidgetItem') # Patch QListWidgetItem where it's used
     def test_load_templates_no_defaults(self, mock_q_list_widget_item_class):
         # Scenario: No default templates available
         self.mock_db_manager.get_all_file_based_templates.return_value = [
@@ -140,8 +140,8 @@ class TestCreateDocumentDialog(unittest.TestCase):
         self.assertFalse(any("[D]" in call[0][0] for call in calls_to_qlistwidgetitem))
 
 
-    @patch('dialogs.QListWidgetItem')
-    @patch('dialogs.QFont') # Also mock QFont if used for bolding
+    @patch('app.gui.dialogs.create_document_dialog.QListWidgetItem')
+    @patch('app.gui.dialogs.create_document_dialog.QFont') # Also mock QFont if used for bolding
     def test_load_templates_with_matching_defaults(self, mock_q_font_class, mock_q_list_widget_item_class):
         # Scenario: Default templates available and match filters
         self.mock_db_manager.get_all_file_based_templates.return_value = [
@@ -209,7 +209,7 @@ class TestCreateDocumentDialog(unittest.TestCase):
         mock_q_font_class.return_value.setBold.assert_called_with(True)
 
 
-    @patch('dialogs.QListWidgetItem')
+    @patch('app.gui.dialogs.create_document_dialog.QListWidgetItem')
     def test_load_templates_default_not_matching_filter(self, mock_q_list_widget_item_class):
         # Scenario: Default templates exist but don't match current language/type filters
         self.mock_db_manager.get_all_file_based_templates.return_value = [
@@ -231,7 +231,7 @@ class TestCreateDocumentDialog(unittest.TestCase):
 class TestProductDialog(unittest.TestCase):
 
     def setUp(self):
-        self.db_manager_patcher = patch('dialogs.db_manager', autospec=True)
+        self.db_manager_patcher = patch('app.gui.dialogs.db_manager', autospec=True)
         self.mock_db_manager = self.db_manager_patcher.start()
         self.addCleanup(self.db_manager_patcher.stop)
 

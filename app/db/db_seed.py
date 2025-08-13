@@ -1,6 +1,6 @@
 import logging
 from db.connection import get_db_connection
-from db.seeders.location_seeder import seed_locations
+from db.seeders.location_seeder import seed_all_locations
 from db.seeders.role_permission_seeder import seed_roles_and_permissions
 # Import other seeders as they are created
 # from db.seeders.product_seeder import seed_products
@@ -16,7 +16,7 @@ def seed_all_data():
         conn = get_db_connection()
 
         # Call seeders in a logical order
-        seed_locations(conn, logger)
+        seed_all_locations(conn, logger)
         seed_roles_and_permissions(conn, logger)
         # seed_products(conn, logger)
 

@@ -12,9 +12,9 @@ if project_root not in sys.path:
 
 from app.db.init_schema import initialize_database
 from app.db.connection import get_db_connection
-from app.db.cruds import notes_crud
-from app.db.cruds import client_documents_crud # For setting up related data
-from app.db.cruds import commandes_crud # For setting up related data
+from app.db.cruds.misc import notes_crud
+from app.db.cruds.clients import client_documents_crud
+from app.db.cruds.invoices import commandes_crud
 
 # Use an in-memory database for testing
 TEST_DB_PATH = ":memory:"

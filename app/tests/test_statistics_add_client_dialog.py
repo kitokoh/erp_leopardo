@@ -43,7 +43,7 @@ def tearDownModule():
     q_app = None
 
 
-from dialogs.statistics_add_client_dialog import StatisticsAddClientDialog
+from app.gui.dialogs.statistics_add_client_dialog import StatisticsAddClientDialog
 
 class TestStatisticsAddClientDialog(unittest.TestCase):
 
@@ -74,7 +74,7 @@ class TestStatisticsAddClientDialog(unittest.TestCase):
         # We will patch db_manager for each test method to ensure clean mocks.
 
         # Default mock for db_manager functions
-        self.db_manager_patcher = patch('dialogs.statistics_add_client_dialog.db_manager')
+        self.db_manager_patcher = patch('app.gui.dialogs.statistics_add_client_dialog.db_manager')
         self.mock_db_manager = self.db_manager_patcher.start()
 
         self.mock_db_manager.get_all_countries.return_value = self.mock_countries
@@ -134,7 +134,7 @@ class TestStatisticsAddClientDialog(unittest.TestCase):
         # Stop the default patcher for this test to set up a specific scenario first
         self.db_manager_patcher.stop()
 
-        db_m_patcher = patch('dialogs.statistics_add_client_dialog.db_manager')
+        db_m_patcher = patch('app.gui.dialogs.statistics_add_client_dialog.db_manager')
         mock_db_m = db_m_patcher.start()
         mock_db_m.get_all_countries.return_value = self.mock_countries
         mock_db_m.get_all_cities.side_effect = self.get_mock_cities

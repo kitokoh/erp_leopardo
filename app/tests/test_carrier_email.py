@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QApplication, QPushButton
 # Ensure the application instance is created once
 # app = QApplication.instance() if QApplication.instance() else QApplication([]) # Managed by pytest-qt
 
-from carrier_email_dialog import CarrierEmailDialog
+from app.gui.dialogs.carrier_email_dialog import CarrierEmailDialog
 # For testing ClientWidget logic, we might need ClientWidget itself or a mock
 # from client_management.ui.client_main_widget import ClientMainWidget # Corrected path and class name
 
@@ -19,8 +19,8 @@ from carrier_email_dialog import CarrierEmailDialog
 
 class TestCarrierEmailDialog(unittest.TestCase):
 
-    @patch('carrier_email_dialog.db_manager')
-    @patch('carrier_email_dialog.EmailSenderService')
+    @patch('app.gui.dialogs.carrier_email_dialog.db_manager')
+    @patch('app.gui.dialogs.carrier_email_dialog.EmailSenderService')
     def test_send_email_success(self, MockEmailSenderService, mock_db_module):
         mock_email_service_instance = MockEmailSenderService.return_value
         mock_email_service_instance.is_configured.return_value = True
@@ -47,8 +47,8 @@ class TestCarrierEmailDialog(unittest.TestCase):
         mock_db_module.update_client_transporter_email_status.assert_called_once_with(123, "Sent")
         # dialog.accept would be called, check if QMessageBox was shown (harder to test directly)
 
-    @patch('carrier_email_dialog.db_manager')
-    @patch('carrier_email_dialog.EmailSenderService')
+    @patch('app.gui.dialogs.carrier_email_dialog.db_manager')
+    @patch('app.gui.dialogs.carrier_email_dialog.EmailSenderService')
     def test_send_email_failure_service(self, MockEmailSenderService, mock_db_module):
         mock_email_service_instance = MockEmailSenderService.return_value
         mock_email_service_instance.is_configured.return_value = True
@@ -62,8 +62,8 @@ class TestCarrierEmailDialog(unittest.TestCase):
 
         mock_db_module.update_client_transporter_email_status.assert_called_once_with(123, "Failed")
 
-    @patch('carrier_email_dialog.db_manager')
-    @patch('carrier_email_dialog.EmailSenderService')
+    @patch('app.gui.dialogs.carrier_email_dialog.db_manager')
+    @patch('app.gui.dialogs.carrier_email_dialog.EmailSenderService')
     def test_send_email_exception(self, MockEmailSenderService, mock_db_module):
         mock_email_service_instance = MockEmailSenderService.return_value
         mock_email_service_instance.is_configured.return_value = True

@@ -1,6 +1,14 @@
 import uuid
 import enum
 from pydantic import BaseModel, Field, EmailStr
+from app.db.connection import Base
+from app.db.models.employees.employee import Employee
+from app.db.models.documents.document_category import DocumentCategory
+from app.db.models.documents.employee_document import EmployeeDocument
+from app.db.models.leave.leave_type import LeaveType
+from app.db.models.performance.goal import Goal
+from app.db.models.users.user import User
+from app.db.models.leave.leave_request import LeaveRequestStatusEnum
 from typing import Optional, List, Dict, Any
 from datetime import date, datetime
 
@@ -491,12 +499,6 @@ class ProformaInvoiceBase(BaseModel):
 
     class Config:
         from_attributes = True
-
-class LeaveRequestStatusEnum(str, enum.Enum):
-    PENDING = "pending"
-    APPROVED = "approved"
-    REJECTED = "rejected"
-    CANCELLED = "cancelled"
 
 # LeaveType
 class LeaveTypeBase(BaseModel):

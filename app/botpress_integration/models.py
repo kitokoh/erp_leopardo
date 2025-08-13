@@ -5,7 +5,7 @@ from datetime import datetime
 
 # DATABASE_URL = "sqlite:///./botpress_integration.db"  # Example SQLite URL - Should be managed centrally
 
-from db.connection import Base # Use the central Base
+from app.db.connection import Base, engine # Use the central Base
 
 class UserBotpressSettings(Base):
     __tablename__ = "user_botpress_settings"
@@ -38,10 +38,11 @@ class UserPrompt(Base):
         return f"<UserPrompt(prompt_name='{self.prompt_name}')>"
 
 # Engine and session setup should be managed centrally.
-# Remove local engine, SessionLocal, and create_db_and_tables.
+# Remove local engine, SessionLocal.
+# create_db_and_tables is kept for testing purposes.
 
-# def create_db_and_tables():
-#     Base.metadata.create_all(bind=engine) # engine would come from db.connection
+def create_db_and_tables():
+    Base.metadata.create_all(bind=engine) # engine would come from db.connection
 
 # The __main__ block below was for testing this module's DB setup independently.
 # It should be removed or adapted if specific testing for these models is needed

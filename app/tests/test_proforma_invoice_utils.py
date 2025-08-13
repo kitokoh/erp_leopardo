@@ -8,7 +8,7 @@ from datetime import datetime
 # This assumes proforma_invoice_utils.py is in the parent directory of tests/
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from proforma_invoice_utils import get_proforma_invoice_context_data, _format_address_parts, format_currency
+from app.utils.proforma_invoice_utils import get_proforma_invoice_context_data, _format_address_parts, format_currency
 
 # --- Mock ProformaInvoice and ProformaInvoiceItem classes ---
 # These are simplified versions of what might be SQLAlchemy models
@@ -67,16 +67,16 @@ class TestProformaInvoiceUtils(unittest.TestCase):
         self.assertEqual(format_currency(None, "£"), "N/A £")
         self.assertEqual(format_currency(50.75, "USD", 2), "50,75 USD") # Test with explicit currency symbol
 
-    @patch('proforma_invoice_utils.get_db_connection')
-    @patch('proforma_invoice_utils.db_get_company_by_id')
-    @patch('proforma_invoice_utils.db_get_personnel_for_company')
-    @patch('proforma_invoice_utils.db_get_client_by_id')
-    @patch('proforma_invoice_utils.db_get_country_by_id')
-    @patch('proforma_invoice_utils.db_get_city_by_id')
-    @patch('proforma_invoice_utils.db_get_contacts_for_client')
-    @patch('proforma_invoice_utils.db_get_project_by_id')
-    @patch('proforma_invoice_utils._get_batch_products_and_equivalents')
-    @patch('proforma_invoice_utils.db_get_client_document_notes')
+    @patch('app.utils.proforma_invoice_utils.get_db_connection')
+    @patch('app.utils.proforma_invoice_utils.db_get_company_by_id')
+    @patch('app.utils.proforma_invoice_utils.db_get_personnel_for_company')
+    @patch('app.utils.proforma_invoice_utils.db_get_client_by_id')
+    @patch('app.utils.proforma_invoice_utils.db_get_country_by_id')
+    @patch('app.utils.proforma_invoice_utils.db_get_city_by_id')
+    @patch('app.utils.proforma_invoice_utils.db_get_contacts_for_client')
+    @patch('app.utils.proforma_invoice_utils.db_get_project_by_id')
+    @patch('app.utils.proforma_invoice_utils._get_batch_products_and_equivalents')
+    @patch('app.utils.proforma_invoice_utils.db_get_client_document_notes')
     @patch('os.path.exists') # Mock os.path.exists for logo file check
     def test_get_proforma_invoice_context_data_with_instance_french(
         self, mock_os_path_exists, mock_get_client_doc_notes, mock_get_batch_products,
@@ -150,7 +150,7 @@ class TestProformaInvoiceUtils(unittest.TestCase):
 
         # --- Call the function under test ---
         # Patching PROJECT_ROOT_DIR_CONTEXT and LOGO_SUBDIR_CONTEXT for consistent test runs
-        with patch.dict(sys.modules['proforma_invoice_utils'].__dict__, {
+        with patch.dict(sys.modules['app.utils.proforma_invoice_utils'].__dict__, {
             'PROJECT_ROOT_DIR_CONTEXT': os.path.abspath(os.path.join(os.path.dirname(__file__), '..')), # Assumes tests/ is one level down
             'LOGO_SUBDIR_CONTEXT': os.path.join("assets", "logos")
         }):

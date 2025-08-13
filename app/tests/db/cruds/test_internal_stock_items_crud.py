@@ -321,4 +321,3 @@ def test_get_total_items_count(db_conn, sample_items):
     assert active_count_after_add == 5
     total_count_after_add = internal_stock_items_crud.get_total_items_count(conn=db_conn, include_deleted=True)
     assert total_count_after_add == 6
-```
