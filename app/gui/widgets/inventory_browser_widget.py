@@ -33,6 +33,8 @@ from app.db.cruds.products.item_locations_crud import (
     update_item_in_location, get_item_in_specific_location,
     get_full_location_path_str # Added
 )
+from app.db.cruds.products.products_crud import products_crud_instance as products_crud
+
 # The import was removed as the function does not exist.
 # The try/except block is no longer necessary for this specific import.
 print("Warning: products_crud.get_products_by_name_pattern not found. Product search will not work.")
@@ -318,15 +320,31 @@ class InventoryBrowserWidget(QWidget):
         pass
 
     def search_products(self):
-        # TODO: Implement the logic to search products based on input
-        # and refresh the product_details_table or a product list.
-        # For now, this is a placeholder to prevent AttributeError.
-        print(f"Placeholder: {self.__class__.__name__}.search_products() called.")
-        # Consider actual implementation:
-        # - Get search term from self.search_product_input
-        # - Query database for products matching the term
-        # - Populate self.product_details_table or another widget
-        pass
+        search_term = self.product_search_input.text().strip()
+        if not search_term:
+            QMessageBox.information(self, self.tr("Search"), self.tr("Please enter a product name or code to search."))
+            return
+
+        self.product_search_results_list.clear()
+        try:
+            # Assuming the ORM-based CRUD, which requires a db session.
+            # This widget needs a way to get a session. For now, let's assume
+            # a get_db_session() utility exists.
+            from app.db.session import get_db_session
+            with get_db_session() as db:
+                products = products_crud.get_products_by_name_pattern(name_pattern=search_term, db=db)
+
+            if products:
+                for product in products:
+                    item = QListWidgetItem(f"{product.product_name} ({product.product_code})")
+                    item.setData(Qt.UserRole, product.product_id)
+                    item.setData(Qt.UserRole + 1, product.product_name) # Store name for dialog
+                    self.product_search_results_list.addItem(item)
+            else:
+                self.product_search_results_list.addItem(self.tr("No products found."))
+        except Exception as e:
+            QMessageBox.critical(self, self.tr("Search Error"), self.tr("An error occurred while searching for products: {0}").format(str(e)))
+            logging.error(f"Error searching products: {e}", exc_info=True)
 
     def on_product_selection_changed(self):
         # TODO: Implement logic to handle product selection changes.

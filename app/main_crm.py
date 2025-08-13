@@ -107,6 +107,7 @@ class CRMModule(QMainWindow):
         initialize_database(CONFIG, PROJECT_ROOT)
 
         # --- Import DB-dependent modules AFTER initialization ---
+
         from app.db.db_seed import seed_all_data as run_seed
         from app.db.seeders.hidroguc_product_seeder import seed_hidroguc_products as seed_only_hidroguc_products
         from app.db.connection import get_db_connection
@@ -114,6 +115,7 @@ class CRMModule(QMainWindow):
         from app.db.cruds.users import users_crud
         from app.db.cruds.misc.companies_crud import get_all_companies, add_company
         # --- End DB-dependent imports ---
+
 
         # Seed Hidroguc products with proper session management
         db_session_for_hidroguc = None

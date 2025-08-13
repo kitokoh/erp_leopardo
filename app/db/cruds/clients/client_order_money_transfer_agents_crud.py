@@ -12,18 +12,7 @@ from ...connection import get_db_connection
 # If not, connection management will be manual within each function.
 # For this example, let's assume a _manage_conn is defined similarly to other CRUD files.
 # If it's in generic_crud.py:
-try:
-    from .generic_crud import _manage_conn
-except ImportError:
-    logging.warning("generic_crud._manage_conn not found. Manual connection management will be used or this needs to be addressed.")
-    # Define a dummy decorator if it's missing, to allow the code to be structured as intended,
-    # but this would mean connections are not actually managed by it.
-    def _manage_conn(func):
-        def wrapper(*args, **kwargs):
-            # This dummy version does not manage connections.
-            # Replace with actual implementation or ensure generic_crud is correct.
-            return func(*args, **kwargs)
-        return wrapper
+from app.db.generic_crud import _manage_conn
 
 logger = logging.getLogger(__name__)
 
