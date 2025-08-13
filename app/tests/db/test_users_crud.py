@@ -7,7 +7,7 @@ import time # For slight delay in timestamp checks
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
-from app.db.cruds.users_crud import UsersCRUD
+import app.db.cruds.users.users_crud as users_crud
 
 class TestUsersCRUD(unittest.TestCase):
     def setUp(self):
@@ -34,7 +34,7 @@ class TestUsersCRUD(unittest.TestCase):
         """)
         self.conn.commit()
 
-        self.users_crud = UsersCRUD()
+        self.users_crud = users_crud
 
         self.user_data1 = {
             'username': 'testuser1',

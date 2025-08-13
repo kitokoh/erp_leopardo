@@ -5,7 +5,7 @@ import sqlite3
 
 from app.db.cruds.users.roles_crud import add_role, get_role_by_name
 from app.db.cruds.users.permissions_crud import add_permission, get_permission_by_key
-from app.db.cruds.role_permissions_crud import add_role_permission
+from app.db.cruds.role_permissions_crud import add_permission_to_role
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -56,9 +56,9 @@ def seed_roles_and_permissions(conn: sqlite3.Connection, logger: logging.Logger)
 
         for perm_key in permissions_to_assign:
             # We don't need to check if perm_key exists in the permissions table
-            # because add_role_permission should handle that (or fail gracefully).
+            # because add_permission_to_role should handle that (or fail gracefully).
             # The foreign key constraint will enforce integrity.
-            add_role_permission(role_id, perm_key, conn=conn)
+            add_permission_to_role(role_id, perm_key, conn=conn)
 
         logger.info(f"Assigned {len(permissions_to_assign)} permissions to role '{role_name}'.")
 

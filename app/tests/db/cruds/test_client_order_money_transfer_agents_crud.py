@@ -8,18 +8,19 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 
 from app.db.init_schema import initialize_database
-from app.db.cruds.client_order_money_transfer_agents_crud import (
+from app.db.cruds.clients.client_order_money_transfer_agents_crud import (
     assign_agent_to_client_order,
     get_assigned_agents_for_client_order,
     get_assigned_agents_for_client,
     update_assignment_details,
     unassign_agent_from_client_order
 )
-from app.db.cruds.money_transfer_agents_crud import add_money_transfer_agent
-from app.db.cruds.clients_crud import add_client
-from app.db.cruds.projects_crud import add_project
-from app.db.cruds.users_crud import add_user_direct # Assuming a simple user add for created_by
-from app.db.cruds.locations_crud import add_country, add_city # For agent prerequisites
+from app.db.cruds.misc.money_transfer_agents_crud import add_money_transfer_agent
+from app.db.cruds.clients.clients_crud import add_client
+from app.db.cruds.projects.projects_crud import add_project
+from app.db.cruds.users.users_crud import add_user # Assuming a simple user add for created_by
+from app.db.cruds.users import roles_crud
+from app.db.cruds.misc.locations_crud import add_country, add_city # For agent prerequisites
 
 ORIGINAL_DB_PATH_COMA = None
 TEST_DB_PATH_COMA = ":memory:"
@@ -60,12 +61,16 @@ def db_connection_coma() -> sqlite3.Connection:
 # --- Helper function to create prerequisite data for COMA tests ---
 def create_coma_prerequisites(conn, client_name="Test Client COMA", project_name="Test Project COMA", agent_name="Test Agent COMA"):
     # User (for created_by_user_id in client)
+    role_id = roles_crud.add_role("admin", conn=conn)
+    if role_id is None: # It might already exist
+        role = roles_crud.get_role_by_name("admin", conn=conn)
+        role_id = role['role_id']
+
     user_data = {
         "username": f"testuser_{str(uuid.uuid4())[:8]}", "password": "password",
-        "email": f"user_{str(uuid.uuid4())[:4]}@example.com", "full_name": "Test User", "role": "admin"
+        "email": f"user_{str(uuid.uuid4())[:4]}@example.com", "full_name": "Test User", "role_id": role_id
     }
-    user_res = add_user_direct(user_data['username'], user_data['password'], user_data['email'], user_data['full_name'], user_data['role'], conn=conn)
-    user_id = user_res['user_id'] if user_res['success'] else None
+    user_id = add_user(db=conn, username=user_data['username'], password=user_data['password'], role_id=user_data['role_id'], full_name=user_data['full_name'], email=user_data['email'])
     assert user_id is not None, "Failed to create user for COMA tests"
 
     # Client

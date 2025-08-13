@@ -2,7 +2,10 @@ import unittest
 import sqlite3
 import os
 import uuid
-from app.db.cruds import referents_crud, clients_crud, countries_crud, regions_crud, users_crud, status_settings_crud
+from app.db.cruds.misc import referents_crud, regions_crud, status_settings_crud
+from app.db.cruds.clients import clients_crud
+from app.db.cruds.misc import locations_crud as countries_crud
+from app.db.cruds.users import users_crud
 from app.db.init_schema import initialize_database
 
 TEST_DB_PATH = ":memory:"

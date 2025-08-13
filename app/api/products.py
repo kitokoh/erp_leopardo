@@ -201,7 +201,7 @@ async def delete_product_api(
 @router.post("/{product_id}/media_links", response_model=ProductImageLinkResponse, status_code=201)
 async def link_media_to_product_api(
     product_id: int,
-    request_obj: Request, # Renamed to avoid conflict with pydantic 'request'
+    request_obj: Request,
     link_request: LinkMediaToProductRequest,
     current_user: UserInDB = Depends(get_current_active_user)
 ):

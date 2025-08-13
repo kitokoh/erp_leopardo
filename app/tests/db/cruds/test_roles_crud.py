@@ -1,6 +1,6 @@
 import pytest
 import sqlite3
-from app.db.cruds import roles_crud
+from app.db.cruds.users import roles_crud
 from app.db.connection import get_db_connection # Pourrait être mocké ou utilisé pour setup
 from app.db.init_schema import initialize_database # Pour s'assurer que la table Roles existe
 

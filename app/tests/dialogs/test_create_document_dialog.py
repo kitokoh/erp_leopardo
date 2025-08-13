@@ -7,7 +7,7 @@ import os
 
 # Adjust path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from dialogs.create_document_dialog import CreateDocumentDialog
+from app.gui.dialogs.create_document_dialog import CreateDocumentDialog
 
 # Ensure QApplication instance exists
 app = None
@@ -41,7 +41,7 @@ class TestCreateDocumentDialog(unittest.TestCase):
         self.patch_qmessagebox = patch('PyQt5.QtWidgets.QMessageBox')
         self.mock_qmessagebox = self.patch_qmessagebox.start()
 
-        self.patch_logging = patch('dialogs.create_document_dialog.logging')
+        self.patch_logging = patch('app.gui.dialogs.create_document_dialog.logging')
         self.mock_logging = self.patch_logging.start()
 
         self.patch_os_path_exists = patch('os.path.exists')
@@ -57,8 +57,8 @@ class TestCreateDocumentDialog(unittest.TestCase):
     # The key change is how category_id_filter is asserted.
     # Assuming the 'General' category (ID 1 for these tests) has a purpose like 'client_document'.
 
-    @patch('dialogs.create_document_dialog.get_all_template_categories')
-    @patch('dialogs.create_document_dialog.db_manager')
+    @patch('app.gui.dialogs.create_document_dialog.get_all_template_categories')
+    @patch('app.gui.dialogs.create_document_dialog.db_manager')
     def test_load_templates_no_default_templates(self, mock_db_manager, mock_get_all_categories):
         mock_get_all_categories.return_value = [{'category_id': 1, 'category_name': 'General', 'purpose': 'client_document'}]
         mock_db_manager.get_all_templates.return_value = [
@@ -79,8 +79,8 @@ class TestCreateDocumentDialog(unittest.TestCase):
             self.assertFalse(item.text().startswith("[D]"))
 
 
-    @patch('dialogs.create_document_dialog.get_all_template_categories')
-    @patch('dialogs.create_document_dialog.db_manager')
+    @patch('app.gui.dialogs.create_document_dialog.get_all_template_categories')
+    @patch('app.gui.dialogs.create_document_dialog.db_manager')
     def test_load_templates_global_default_only(self, mock_db_manager, mock_get_all_categories):
         mock_get_all_categories.return_value = [{'category_id': 1, 'category_name': 'General', 'purpose': 'client_document'}]
         mock_db_manager.get_all_templates.return_value = [
@@ -94,8 +94,8 @@ class TestCreateDocumentDialog(unittest.TestCase):
         self.assertIn("[D] GlobalDefault (fr) - gd.html", item_texts)
 
 
-    @patch('dialogs.create_document_dialog.get_all_template_categories')
-    @patch('dialogs.create_document_dialog.db_manager')
+    @patch('app.gui.dialogs.create_document_dialog.get_all_template_categories')
+    @patch('app.gui.dialogs.create_document_dialog.db_manager')
     def test_load_templates_client_specific_default_only(self, mock_db_manager, mock_get_all_categories):
         mock_get_all_categories.return_value = [{'category_id': 1, 'category_name': 'General', 'purpose': 'client_document'}]
         # Test with client's primary lang 'en'
@@ -109,8 +109,8 @@ class TestCreateDocumentDialog(unittest.TestCase):
         item_texts = [dialog.templates_list.item(i).text() for i in range(dialog.templates_list.count())]
         self.assertIn("[D] ClientDefault (en) - cd.html", item_texts)
 
-    @patch('dialogs.create_document_dialog.get_all_template_categories')
-    @patch('dialogs.create_document_dialog.db_manager')
+    @patch('app.gui.dialogs.create_document_dialog.get_all_template_categories')
+    @patch('app.gui.dialogs.create_document_dialog.db_manager')
     def test_load_templates_client_overrides_global_default(self, mock_db_manager, mock_get_all_categories):
         mock_get_all_categories.return_value = [{'category_id': 1, 'category_name': 'General', 'purpose': 'client_document'}]
         # client primary lang 'fr'
@@ -130,8 +130,8 @@ class TestCreateDocumentDialog(unittest.TestCase):
         self.assertTrue(default_found)
 
     # --- New comprehensive test for category filtering and UI filters ---
-    @patch('dialogs.create_document_dialog.get_all_template_categories')
-    @patch('dialogs.create_document_dialog.db_manager')
+    @patch('app.gui.dialogs.create_document_dialog.get_all_template_categories')
+    @patch('app.gui.dialogs.create_document_dialog.db_manager')
     def test_load_templates_initial_population_and_filtering(self, mock_db_manager, mock_get_all_categories_crud):
         # Setup Mocks for this specific test
         mock_categories_data = [

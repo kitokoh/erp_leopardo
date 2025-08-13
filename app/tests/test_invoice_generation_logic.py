@@ -12,20 +12,20 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from invoice_generation_logic import generate_final_invoice_pdf
-from html_to_pdf_util import WeasyPrintError # Assuming this is defined in html_to_pdf_util
+from app.utils.invoice_generation_logic import generate_final_invoice_pdf
+from app.utils.html_to_pdf_util import WeasyPrintError # Assuming this is defined in html_to_pdf_util
 
 # Disable logging for tests to keep output clean, unless debugging
 logging.disable(logging.CRITICAL)
 
 class TestGenerateFinalInvoicePdf(unittest.TestCase):
 
-    @patch('invoice_generation_logic.convert_html_to_pdf')
-    @patch('invoice_generation_logic.render_html_template')
-    @patch('invoice_generation_logic.get_final_invoice_context_data')
+    @patch('app.utils.invoice_generation_logic.convert_html_to_pdf')
+    @patch('app.utils.invoice_generation_logic.render_html_template')
+    @patch('app.utils.invoice_generation_logic.get_final_invoice_context_data')
     @patch('builtins.open', new_callable=mock_open)
     @patch('os.path.exists')
-    @patch('invoice_generation_logic.TEMPLATES_DIR', "/fake/templates_root_dir") # Patch module-level constant
+    @patch('app.utils.invoice_generation_logic.TEMPLATES_DIR', "/fake/templates_root_dir") # Patch module-level constant
     def test_successful_generation(self, mock_path_exists, mock_file_open, mock_get_context, mock_render_html, mock_convert_pdf):
         # --- Setup Mocks ---
         mock_path_exists.return_value = True # Assume template file exists
@@ -88,7 +88,7 @@ class TestGenerateFinalInvoicePdf(unittest.TestCase):
         mock_convert_pdf.assert_called_with(rendered_html_content, base_url=os.path.dirname(expected_template_path))
 
 
-    @patch('invoice_generation_logic.get_final_invoice_context_data', return_value=None)
+    @patch('app.utils.invoice_generation_logic.get_final_invoice_context_data', return_value=None)
     def test_context_generation_fails(self, mock_get_context):
         pdf_bytes, filename, context_used = generate_final_invoice_pdf(
             client_id='c1', company_id='comp1', target_language_code='en', line_items=[]
@@ -98,9 +98,9 @@ class TestGenerateFinalInvoicePdf(unittest.TestCase):
         self.assertIsNone(context_used) # Context generation itself failed
         mock_get_context.assert_called_once()
 
-    @patch('invoice_generation_logic.TEMPLATES_DIR', "/fake/templates")
+    @patch('app.utils.invoice_generation_logic.TEMPLATES_DIR', "/fake/templates")
     @patch('os.path.exists', return_value=False) # Simulate template not found
-    @patch('invoice_generation_logic.get_final_invoice_context_data')
+    @patch('app.utils.invoice_generation_logic.get_final_invoice_context_data')
     def test_template_not_found(self, mock_get_context, mock_path_exists):
         mock_get_context.return_value = {"doc": {}, "client": {}} # Minimal valid context
 
@@ -114,12 +114,12 @@ class TestGenerateFinalInvoicePdf(unittest.TestCase):
         expected_template_path = os.path.join("/fake/templates", "fr", "final_invoice_template.html")
         mock_path_exists.assert_called_with(expected_template_path)
 
-    @patch('invoice_generation_logic.TEMPLATES_DIR', "/fake/templates")
+    @patch('app.utils.invoice_generation_logic.TEMPLATES_DIR', "/fake/templates")
     @patch('os.path.exists', return_value=True)
     @patch('builtins.open', new_callable=mock_open, read_data="dummy template data")
-    @patch('invoice_generation_logic.render_html_template')
-    @patch('invoice_generation_logic.convert_html_to_pdf', side_effect=WeasyPrintError("PDF Conversion Error From Test"))
-    @patch('invoice_generation_logic.get_final_invoice_context_data')
+    @patch('app.utils.invoice_generation_logic.render_html_template')
+    @patch('app.utils.invoice_generation_logic.convert_html_to_pdf', side_effect=WeasyPrintError("PDF Conversion Error From Test"))
+    @patch('app.utils.invoice_generation_logic.get_final_invoice_context_data')
     def test_pdf_conversion_fails(self, mock_get_context, mock_convert_pdf, mock_render_html, mock_file_open, mock_path_exists):
         mock_get_context.return_value = {"doc": {}, "client": {}} # Minimal context
         mock_render_html.return_value = "dummy rendered html"
