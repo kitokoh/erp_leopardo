@@ -11,7 +11,7 @@ from app.db.cruds.misc.locations_crud import get_country_by_name, get_city_by_na
 from app.db.cruds.misc.partners_crud import get_partner_category_by_name, add_partner_category
 from app.db.cruds.misc.referents_crud import get_referent_by_client_id, add_referent
 from app.db.cruds.misc.application_settings_crud import set_setting
-from app.db.cruds import commandes_crud
+from app.db.cruds.invoices import commandes_crud
 from app.auth.roles import SUPER_ADMIN
 
 def seed_initial_setup(conn: sqlite3.Connection, logger: logging.Logger):

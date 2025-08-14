@@ -10,11 +10,11 @@ import tempfile
 import os
 
 # Assuming these imports are valid for the project structure
-from ..db.cruds.company_assets_crud import company_assets_crud
-from ..db.cruds.asset_assignments_crud import asset_assignments_crud
-from ..db.cruds.asset_media_links_crud import asset_media_links_crud
+from app.db.cruds.misc import company_assets_crud
+from app.db.cruds.misc import asset_assignments_crud
+from app.db.cruds.misc import asset_media_links_crud
 # from ..db.cruds.media_items_crud import media_items_crud # Assuming this might exist for validating media_item_id
-from ..models.user_models import User # Standardized path
+from app.models.user_models import User # Standardized path
 from .auth import get_current_active_user # Standardized path
 from app.media_manager import operations as media_manager_operations # Assumed import
 from fastapi import UploadFile, File, Form

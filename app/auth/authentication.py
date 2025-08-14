@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone # Added timedelta and timezon
 from app.db.cruds.users import users_crud
 from app.db.cruds.misc.activity_logs_crud import add_activity_log
 from app.db.cruds.misc.application_settings_crud import get_setting
-from app.db.cruds import user_session_tokens_crud
+from app.db.cruds.users import user_session_tokens_crud
 from app.utils.security_helpers import generate_secure_token, hash_token_for_storage # New helpers
 from app.license_management import manager as license_manager # Already imported below, moved up for clarity
 from app.db.connection import get_db_connection # Already imported below, moved up

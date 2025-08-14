@@ -153,7 +153,7 @@ class CRMModule(QMainWindow):
         try:
             conn_cleanup = get_db_connection() # Get a connection for cleanup tasks
             if conn_cleanup:
-                from app.db.cruds import user_session_tokens_crud
+                from app.db.cruds.users import user_session_tokens_crud
                 from app.db.cruds.users import password_reset_tokens_crud
 
                 cleaned_session_tokens = user_session_tokens_crud.cleanup_expired_tokens(conn_cleanup)
@@ -288,7 +288,7 @@ class CRMModule(QMainWindow):
 
 def main():
     # Instantiate the API server manager. Its __init__ registers the shutdown hook.
-    api_server_manager = APIServerManager()
+    # api_server_manager = APIServerManager()
     # To start the server (optional, disabled for now):
     # api_server_manager.start_server()
 

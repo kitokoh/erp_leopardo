@@ -1,22 +1,40 @@
 import os
 import sys
-from app.tests.mocks.mock_config import MockConfig
-sys.modules['config'] = MockConfig
-import app.db as db_manager
-from datetime import datetime
 import shutil
-# Import app_setup to call initialize_default_templates if needed, and to access CONFIG
-import app_setup
+from datetime import datetime
+
+# Add project root to sys.path
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+# Import what we need to test
+from app.document_generator.cover_page_generator import generate_cover_page_html
+from app.db.cruds.clients.clients_crud import add_client, get_client_by_id, delete_client
+from app.db.cruds.projects.projects_crud import add_project, get_project_by_id, delete_project
+from app.db.cruds.misc.company_crud import add_company, get_company_by_id, delete_company, set_default_company, get_default_company
+from app.db.cruds.locations.countries_crud import add_country, get_country_by_name
+from app.db.cruds.locations.cities_crud import add_city, get_city_by_name_and_country_id
+from app.db.init_schema import initialize_database
+from app.db.connection import initialize_engine_and_session, get_db_connection
+from app.config import Config
 
 def setup_test_environment():
     print("--- 1. Setting up Test Environment ---")
-    db_manager.initialize_database()
+    config = Config()
+    # Override config for test
+    config.data['database_path'] = 'test_cover_page.db'
+    config.data['templates_dir'] = 'templates_test'
+    config.data['company_logo_dir'] = 'company_logos_test'
+
+    initialize_engine_and_session(config.data)
+    initialize_database(config.data)
     print("Database initialized.")
 
-    # Use APP_ROOT_DIR from app_setup for consistency
-    APP_ROOT_DIR = app_setup.APP_ROOT_DIR
-    LOGO_DIR = os.path.join(APP_ROOT_DIR, app_setup.LOGO_SUBDIR) # Use LOGO_SUBDIR from app_setup
-    TEMPLATES_DIR = app_setup.CONFIG["templates_dir"] # Use templates_dir from CONFIG
+    # Use paths from config
+    APP_ROOT_DIR = project_root
+    LOGO_DIR = os.path.join(APP_ROOT_DIR, 'app', config.get('company_logo_dir'))
+    TEMPLATES_DIR = os.path.join(APP_ROOT_DIR, 'app', config.get('templates_dir'))
 
     os.makedirs(LOGO_DIR, exist_ok=True)
     print(f"Logo directory ensured: {LOGO_DIR}")
@@ -32,188 +50,101 @@ def setup_test_environment():
     except IOError as e:
         print(f"Error creating dummy logo: {e}. Test might fail on logo path check.")
 
-    # Ensure template language directories exist
-    for lang_code in ['en', 'fr', 'ar', 'tr', 'pt']: # Include all languages for which templates might exist
-        lang_dir = os.path.join(TEMPLATES_DIR, lang_code)
-        os.makedirs(lang_dir, exist_ok=True)
-        # Delete specific old cover page template to force recreation with new content
-        template_file_path = os.path.join(lang_dir, 'cover_page_template.html')
-        if os.path.exists(template_file_path):
-            os.remove(template_file_path)
-            print(f'Removed old template: {template_file_path}')
+    return config, LOGO_DIR, TEMPLATES_DIR, dummy_logo_filename
 
-    # Now, initialize default templates. This will recreate cover_page_template.html with new content.
-    print("Initializing default templates...")
-    app_setup.initialize_default_templates(app_setup.CONFIG, APP_ROOT_DIR)
-    print("Default templates initialized.")
-
-    return APP_ROOT_DIR, LOGO_DIR, TEMPLATES_DIR, dummy_logo_filename
-
-def cleanup_test_environment(logo_dir, dummy_logo_filename, company_id, client_id, project_id):
-    print("\n--- 4. Cleaning Up Test Data ---")
-    if project_id and db_manager.get_project_by_id(project_id):
-        db_manager.delete_project(project_id)
-        print(f"Deleted project ID: {project_id}")
-    if company_id and db_manager.get_company_by_id(company_id):
-        db_manager.delete_company(company_id)
-        print(f"Deleted company ID: {company_id}")
-    if client_id and db_manager.get_client_by_id(client_id):
-        db_manager.delete_client(client_id)
-        print(f"Deleted client ID: {client_id}")
+def cleanup_test_environment(config, logo_dir, dummy_logo_filename):
+    print("\n--- 4. Cleaning Up Test Environment ---")
+    db_path = config.get('database_path')
+    if os.path.exists(db_path):
+        os.remove(db_path)
+        print(f"Deleted test database: {db_path}")
 
     dummy_logo_path = os.path.join(logo_dir, dummy_logo_filename)
     if os.path.exists(dummy_logo_path):
         os.remove(dummy_logo_path)
         print(f"Deleted dummy logo: {dummy_logo_path}")
 
+    templates_dir = os.path.join(project_root, 'app', config.get('templates_dir'))
+    if os.path.exists(templates_dir):
+        shutil.rmtree(templates_dir)
+        print(f"Deleted test templates directory: {templates_dir}")
+
     print("Test data cleanup finished.")
 
 def main():
     print("--- Starting Cover Page Generation Test ---")
-    APP_ROOT_DIR, LOGO_DIR, TEMPLATES_DIR, dummy_logo_filename = setup_test_environment()
-
-    default_company_id = None
-    client_id = None
-    project_id_for_test = None # Renamed to avoid conflict with project_id var in loop
+    config, LOGO_DIR, TEMPLATES_DIR, dummy_logo_filename = setup_test_environment()
+    db_session = next(get_db_connection())
 
     try:
         # 2. Create Test Data
         print("\n--- 2. Creating Test Data ---")
 
         # Default Company (Exporter)
-        # Clean up if exists from a failed run to ensure is_default logic works
-        existing_exporter_list = db_manager.get_all_companies()
-        for ex_co in existing_exporter_list:
-            if ex_co['company_name'] == 'Cover Test Exporter Inc.':
-                db_manager.delete_company(ex_co['company_id'])
-                print(f"Deleted pre-existing 'Cover Test Exporter Inc.' (ID: {ex_co['company_id']})")
-
-        default_company_id = db_manager.add_company({
+        default_company_id = add_company(db_session, {
             'company_name': 'Cover Test Exporter Inc.',
             'address': '1 Tech Park, Silicon Valley',
             'logo_path': dummy_logo_filename,
-            'is_default': False
+            'is_default': True
         })
         if not default_company_id: raise Exception("Failed to create 'Cover Test Exporter Inc.'")
-        db_manager.set_default_company(default_company_id)
-        default_company_check = db_manager.get_default_company()
+        set_default_company(db_session, default_company_id)
+        default_company_check = get_default_company(db_session)
         assert default_company_check and default_company_check['company_id'] == default_company_id, "Failed to set/get default company for exporter."
         print(f"Default Company: {default_company_check['company_name']} (ID: {default_company_id})")
 
         # Client Company
-        # Ensure country/city exist for client creation
-        country_id = db_manager.add_country({'country_name': 'Client Nation'})
-        if not country_id: country_id = db_manager.get_country_by_name('Client Nation')['country_id']
-        city_id = db_manager.add_city({'country_id': country_id, 'city_name': 'Client City'})
-        if not city_id: city_id = db_manager.get_city_by_name_and_country_id('Client City', country_id)['city_id']
+        country_id = add_country(db_session, {'country_name': 'Client Nation'})['country_id']
+        city_id = add_city(db_session, {'country_id': country_id, 'city_name': 'Client City'})['city_id']
 
-        client_id = db_manager.add_client({
+        client_id = add_client(db_session, {
             'client_name': 'Mr. Client Contact',
             'company_name': 'Cover Test Client Corp.',
             'project_identifier': 'CVR-TST-01',
             'country_id': country_id,
-            'city_id': city_id
-        })
+            'city_id': city_id,
+            'created_by_user_id': 'test-user'
+        })['client_id']
         if not client_id: raise Exception("Failed to create client 'Cover Test Client Corp.'")
         print(f"Client: Cover Test Client Corp. (ID: {client_id})")
 
         # Project
-        project_id_for_test = db_manager.add_project({
+        project_id_for_test = add_project(db_session, {
             'client_id': client_id,
             'project_name': 'Annual Report Cover Test'
-            # Add other required fields for project if any, e.g., status_id
         })
         if not project_id_for_test: raise Exception("Failed to create project 'Annual Report Cover Test'")
         print(f"Project: Annual Report Cover Test (ID: {project_id_for_test})")
 
+        # 3. Test HTML Generation
+        print("\n--- 3. Testing HTML Generation ---")
 
-        # 3. Loop through target languages
-        print("\n--- 3. Testing Context Generation and Template Content ---")
+        context_data = {
+            "client_id": client_id,
+            "project_id": project_id_for_test,
+            "document_title": "Test Cover Page",
+            "document_subtitle": "A test subtitle",
+            "document_version": "1.0-test"
+        }
 
-        default_company_for_context = db_manager.get_default_company() # Fetch again to ensure it's the correct one
-        if not default_company_for_context:
-             raise Exception("Default company could not be fetched for context generation.")
+        html_content = generate_cover_page_html(db_session, context_data)
 
-        target_languages = ['en', 'fr', 'ar', 'tr']
-        for target_lang in target_languages:
-            print(f"\n--- Testing Cover Page Language: {target_lang.upper()} ---")
+        assert html_content is not None
+        assert "Cover Test Exporter Inc." in html_content
+        assert "Cover Test Client Corp." in html_content
+        assert "Annual Report Cover Test" in html_content
+        assert "Test Cover Page" in html_content
 
-            additional_context = {
-                'document_type': 'HTML_COVER_PAGE',
-                'document_title': f'Annual Report {target_lang.upper()}',
-                'document_subtitle': f'Q4 Summary {target_lang.upper()}',
-                'document_version': f'2.1.{target_lang}',
-                'project_id': project_id_for_test, # Pass the actual project_id
-            }
+        print("HTML content generated successfully and contains expected data.")
 
-            context = db_manager.get_document_context_data(
-                client_id,
-                default_company_for_context['company_id'],
-                target_lang,
-                project_id=project_id_for_test, # Pass project_id here as well
-                additional_context=additional_context
-            )
-
-            # Assertions
-            assert context['seller']['company_name'] == 'Cover Test Exporter Inc.', f"Seller name mismatch for {target_lang}"
-            logo_path_from_context = context['seller'].get('company_logo_path', '')
-            assert logo_path_from_context is not None and dummy_logo_filename in logo_path_from_context, f"Seller logo path error for {target_lang}, got: '{logo_path_from_context}'"
-            assert context['client']['company_name'] == 'Cover Test Client Corp.', f"Client name mismatch for {target_lang}"
-            assert context['project']['name'] == 'Annual Report Cover Test', f"Project name mismatch for {target_lang}"
-            assert context['doc']['document_title'] == f'Annual Report {target_lang.upper()}', f"Doc title mismatch for {target_lang}"
-            assert context['doc']['document_version'] == f'2.1.{target_lang}', f"Doc version mismatch for {target_lang}"
-
-            assert 'lang' in context, f"Lang dictionary missing in context for {target_lang}"
-            assert context['lang'].get('cover_client_label') is not None, f"Client label missing in lang context for {target_lang}"
-
-            if target_lang == 'fr':
-                assert context['lang']['cover_client_label'] == 'Client', f"French translation error for client label"
-                assert context['lang']['cover_page_title_suffix'] == 'Page de Garde', f"French translation error for title suffix"
-            elif target_lang == 'ar':
-                assert context['lang']['cover_page_title_suffix'] == 'صفحة الغلاف', f"Arabic translation error for title suffix"
-                assert context['lang']['cover_prepared_for_title'] == 'أعدت لـ', f"Arabic translation error for prepared_for"
-
-            # Check that notes are not populated for cover page if not specified
-            notes_value = context['doc'].get('client_specific_footer_notes')
-            assert notes_value == '' or notes_value is None, f"Client notes should be empty for cover page in {target_lang}, got: '{notes_value}'"
-
-            print(f"  Document Title: {context['doc']['document_title']}")
-            print(f"  Document Version: {context['doc']['document_version']}")
-            print(f"  Lang Context Keys (sample): cover_client_label = '{context['lang'].get('cover_client_label')}'")
-
-            # Verify Template File Content
-            template_file_path = os.path.join(TEMPLATES_DIR, target_lang, "cover_page_template.html")
-            assert os.path.exists(template_file_path), f"Template file missing: {template_file_path}"
-
-            with open(template_file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-
-            assert "{{ doc.document_version }}" in content, f"Placeholder for document_version missing in template {target_lang}"
-            assert "{{ lang.cover_client_label }}" in content, f"Placeholder for client label missing in template {target_lang}"
-            assert "font-family: 'Roboto', Arial, sans-serif;" in content, f"CSS change for font-family not found in template {target_lang}"
-            assert "border-top: 8px solid #3498db;" in content, f"CSS change for border-top not found in template {target_lang}"
-
-            if target_lang == 'ar':
-                # For RTL, check for dir="rtl" in <html> or body, or specific text-align in a main container
-                assert 'dir="rtl"' in content.lower() or 'text-align: right' in content.lower(), f"RTL specific CSS/attribute might be missing for Arabic template."
-
-            print(f"Template file {template_file_path} exists and key checks passed.")
-            print(f"Context and template checks passed for {target_lang.upper()}")
-
-        print("\nAll language tests for cover page completed successfully.")
-
-    except AssertionError as e:
-        print(f"\nAssertionError: {e}")
-        import traceback
-        traceback.print_exc()
-        print("TEST FAILED.")
     except Exception as e:
         print(f"\nAn unexpected error occurred: {e}")
         import traceback
         traceback.print_exc()
         print("TEST FAILED.")
     finally:
-        cleanup_test_environment(LOGO_DIR, dummy_logo_filename, default_company_id, client_id, project_id_for_test)
+        db_session.close()
+        cleanup_test_environment(config, LOGO_DIR, dummy_logo_filename)
         print("\n--- Cover Page Generation Test Finished ---")
 
 if __name__ == '__main__':

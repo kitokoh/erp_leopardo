@@ -13,7 +13,7 @@ from app.api.models import (
     LeaveSummaryReportResponse,
     LeaveRequestStatusEnum # The Enum itself for query param
 )
-from app.db.cruds import hr_reports_crud # The new CRUD module
+from app.db.cruds.misc import hr_reports_crud
 
 router = APIRouter(
     prefix="/hr-reports",

@@ -5,7 +5,7 @@ import json
 from datetime import datetime, timedelta
 
 # Module to be tested
-from app.db.cruds import internal_stock_items_crud
+from app.db.cruds.products import internal_stock_items_crud
 
 @pytest.fixture
 def db_conn():

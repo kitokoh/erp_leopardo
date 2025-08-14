@@ -21,7 +21,7 @@ from app.api.models import (
     DocumentCategoryCreate, DocumentCategoryResponse, DocumentCategoryBase,
     EmployeeDocumentCreate, EmployeeDocumentResponse, EmployeeDocumentUpdate
 )
-from app.db.cruds import employees_crud, employee_documents_crud, users_crud # Assuming users_crud for DB users
+from app.db.cruds.users import employees_crud, employee_documents_crud, users_crud
 
 # --- Test Database Setup ---
 DATABASE_URL = "sqlite:///:memory:"
@@ -59,6 +59,9 @@ def mock_user_factory() -> Callable[[str, str], UserInDB]:
     def _create_mock_user(user_id: str, role: str) -> UserInDB:
         return UserInDB(user_id=user_id, username=f"user_{user_id}", email=f"user_{user_id}@example.com", role=role, is_active=True, full_name=f"User {user_id}")
     return _create_mock_user
+
+from app.db.models.users.user import User
+from typing import Callable
 
 @pytest.fixture
 def create_test_user_in_db(test_db_session: Session) -> Callable[[str, str], User]:

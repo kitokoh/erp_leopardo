@@ -3,7 +3,7 @@ import sqlite3
 import uuid
 from datetime import datetime, timezone
 import logging
-from .generic_crud import _manage_conn
+from app.db.cruds.generic_crud import _manage_conn
 
 logger = logging.getLogger(__name__)
 

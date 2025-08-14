@@ -54,16 +54,16 @@ except Exception as e:
     logger.error(f"Error during initial font registration for pagedegrde: {e}", exc_info=True)
 
 
-# def generate_cover_page_pdf(
-#     client_id: int,
-#     company_id: int, # Seller company ID
-#     language_code: str,
-#     output_pdf_path: str,
-#     project_id: int = None,
-#     document_type_for_context: str = None, # e.g., "Proforma Invoice", "Technical Proposal"
-#     additional_context_overrides: dict = None, # For overriding specific config_dict fields
-#     db_conn=None
-# ) -> bool:
+def generate_cover_page_pdf(
+    client_id: int,
+    company_id: int, # Seller company ID
+    language_code: str,
+    output_pdf_path: str,
+    project_id: int = None,
+    document_type_for_context: str = None, # e.g., "Proforma Invoice", "Technical Proposal"
+    additional_context_overrides: dict = None, # For overriding specific config_dict fields
+    db_conn=None
+) -> bool:
 #     """
 #     Generates a PDF cover page using ReportLab logic via pagedegrde module.
 
@@ -282,12 +282,12 @@ if __name__ == '__main__':
         if output_path:
             try:
                 with open(output_path, "wb") as f:
-                    f.write(b"%PDF-1.4\n%Dummy PDF content for cover page.\n"
-                            f"Title: {config_dict.get('title', '')}\n"
-                            f"Author: {config_dict.get('author', '')}\n"
-                            f"Institution: {config_dict.get('institution', '')}\n"
-                            f"Logo present: {'Yes' if config_dict.get('logo_data') else 'No'}\n"
-                            b"%%EOF")
+                    f.write(b"%PDF-1.4\n%Dummy PDF content for cover page.\n")
+                    f.write(f"Title: {config_dict.get('title', '')}\n".encode('utf-8'))
+                    f.write(f"Author: {config_dict.get('author', '')}\n".encode('utf-8'))
+                    f.write(f"Institution: {config_dict.get('institution', '')}\n".encode('utf-8'))
+                    f.write(f"Logo present: {'Yes' if config_dict.get('logo_data') else 'No'}\n".encode('utf-8'))
+                    f.write(b"%%EOF")
                 logger.info(f"[MOCK] Dummy PDF saved to {output_path}")
                 return True # Indicate success (saved internally)
             except Exception as e:
@@ -360,4 +360,3 @@ if __name__ == '__main__':
     logger.info("Cover Page generator test run finished.")
     # Note: Requires pagedegrde.py to be correctly structured and importable.
     # The quality of the PDF depends entirely on the pagedegrde.generate_cover_page_logic function.
-```

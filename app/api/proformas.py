@@ -9,7 +9,7 @@ from sqlalchemy import func # Added for func.now()
 
 # Assuming db managing and models are structured as previously discussed
 # Adjust paths if your project structure is different
-from app.db.cruds import proforma_invoices_crud
+from app.db.cruds.invoices import proforma_invoices_crud
 # For other db operations (like fetching client, company, or adding ClientDocument)
 # that use the main sqlite3-based 'db' facade:
 from app.db import get_client_by_id as get_client_by_id_sqlite

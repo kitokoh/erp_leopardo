@@ -1,4 +1,4 @@
-import unittest
+import pytest
 import os
 import shutil
 import json
@@ -9,275 +9,158 @@ import asyncio
 from PIL import Image
 import cv2
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Add project root to sys.path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-from typing import List, Dict, Any # Added import
-from app.tests.mocks.mock_config import MockConfig
-sys.modules['config'] = MockConfig
 from app.media_manager import operations, models
 from app.db.init_schema import initialize_database
-from app.db.connection import get_db_connection
+from app.db.connection import get_db_connection, initialize_engine_and_session
 from app.db.cruds.users import users_crud
-from app.config import MEDIA_FILES_BASE_PATH, DEFAULT_DOWNLOAD_PATH, DATABASE_PATH, APP_ROOT_DIR
+from app.config import CONFIG
 
-class TestMediaManager(unittest.TestCase):
-    test_user_id_1 = None
-    test_user_id_2 = None
-    THUMBNAIL_SUBDIR = operations.THUMBNAIL_DIR_NAME
+@pytest.fixture(scope="module")
+def event_loop():
+    """Create an instance of the default event loop for each test module."""
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()
 
-    @classmethod
-    def setUpClass(cls):
-        # This setup is problematic as it modifies a global config.
-        # A better approach would be to pass the test DB path to functions.
-        # For now, we'll keep it but acknowledge it's not ideal.
-        # db.DATABASE_NAME = os.path.basename(DATABASE_PATH)
-        initialize_database()
+@pytest.fixture(scope="module")
+def test_db():
+    config = CONFIG
+    config.data['database_path'] = 'test_media_manager.db'
+    config.data['media_files_path'] = '/tmp/media_files_test'
+    config.data['default_download_path'] = '/tmp/downloads_test'
 
-        conn_setup = get_db_connection()
-        conn_setup.execute("PRAGMA foreign_keys = ON;")
+    initialize_engine_and_session(config.data)
+    initialize_database(config.data)
 
-        user1_data = {'username': 'test_uploader_1', 'password_hash': 'password1', 'full_name': 'Test Uploader One', 'email': 'uploader1@test.com', 'role_id': 1} # Assuming role_id 1 exists
-        user2_data = {'username': 'test_uploader_2', 'password_hash': 'password2', 'full_name': 'Test Uploader Two', 'email': 'uploader2@test.com', 'role_id': 1}
+    os.makedirs(config.get('media_files_path'), exist_ok=True)
+    os.makedirs(config.get('default_download_path'), exist_ok=True)
 
-        existing_user1 = users_crud.get_user_by_username(user1_data['username'], conn=conn_setup)
-        if existing_user1: users_crud.delete_user(existing_user1['user_id'], conn=conn_setup)
+    yield config
 
-        existing_user2 = users_crud.get_user_by_username(user2_data['username'], conn=conn_setup)
-        if existing_user2: users_crud.delete_user(existing_user2['user_id'], conn=conn_setup)
+    os.remove(config.get('database_path'))
+    shutil.rmtree(config.get('media_files_path'))
+    shutil.rmtree(config.get('default_download_path'))
 
-        cls.test_user_id_1 = users_crud.add_user(user1_data, conn=conn_setup)
-        cls.test_user_id_2 = users_crud.add_user(user2_data, conn=conn_setup)
+@pytest.fixture(scope="function")
+def db_session(test_db):
+    session = next(get_db_connection())
+    yield session
+    session.close()
 
-        if not cls.test_user_id_1 or not cls.test_user_id_2:
-            if not cls.test_user_id_1:
-                u1 = users_crud.get_user_by_username(user1_data['username'], conn=conn_setup)
-                if u1: cls.test_user_id_1 = u1['user_id']
-            if not cls.test_user_id_2:
-                u2 = users_crud.get_user_by_username(user2_data['username'], conn=conn_setup)
-                if u2: cls.test_user_id_2 = u2['user_id']
-            if not cls.test_user_id_1 or not cls.test_user_id_2:
-                 raise Exception("Failed to create or retrieve test users for MediaManager tests.")
-        conn_setup.commit()
-        conn_setup.close()
+@pytest.fixture(scope="module")
+def test_users(test_db):
+    session = next(get_db_connection())
+    user1_data = {'username': 'test_uploader_1', 'password_hash': 'password1', 'full_name': 'Test Uploader One', 'email': 'uploader1@test.com', 'role_id': 1}
+    user2_data = {'username': 'test_uploader_2', 'password_hash': 'password2', 'full_name': 'Test Uploader Two', 'email': 'uploader2@test.com', 'role_id': 1}
 
+    user1_id = users_crud.add_user(session, user1_data)
+    user2_id = users_crud.add_user(session, user2_data)
 
-    @classmethod
-    def tearDownClass(cls):
-        conn_teardown = get_db_connection()
-        if cls.test_user_id_1:
-            users_crud.delete_user(cls.test_user_id_1, conn=conn_teardown)
-        if cls.test_user_id_2:
-            users_crud.delete_user(cls.test_user_id_2, conn=conn_teardown)
-        conn_teardown.commit()
-        conn_teardown.close()
+    session.commit()
 
+    yield user1_id, user2_id
 
-    def setUp(self):
-        self.media_files_base_path_config = MEDIA_FILES_BASE_PATH
-        self.thumbnails_path = os.path.join(self.media_files_base_path_config, self.THUMBNAIL_SUBDIR)
-        self.test_download_dir = os.path.join(APP_ROOT_DIR, 'test_media_downloads_temp')
-
-        self.conn = get_db_connection()
-        self.conn.execute("PRAGMA foreign_keys = ON;")
-        self.cursor = self.conn.cursor()
-        self.cursor.execute("DELETE FROM MediaItemTags")
-        self.cursor.execute("DELETE FROM Tags")
-        self.cursor.execute("DELETE FROM MediaItems")
-        self.conn.commit()
-
-        for path in [self.media_files_base_path_config, self.thumbnails_path, self.test_download_dir]:
-            if os.path.exists(path):
-                shutil.rmtree(path, ignore_errors=True)
-            os.makedirs(path, exist_ok=True)
-
-        self.dummy_image_path = "dummy_image.png"
-        try:
-            img = Image.new('RGB', (60, 30), color = 'red')
-            img.save(self.dummy_image_path)
-        except Exception as e:
-            print(f"Warning: Could not create dummy PNG image for tests: {e}")
-            open(self.dummy_image_path, 'w').close()
-
-        self.dummy_video_path = "dummy_video.mp4"
-        open(self.dummy_video_path, 'w').close()
+    users_crud.delete_user(session, user1_id)
+    users_crud.delete_user(session, user2_id)
+    session.commit()
+    session.close()
 
 
-    def tearDown(self):
-        try:
-            self.cursor.execute("DELETE FROM MediaItemTags")
-            self.cursor.execute("DELETE FROM Tags")
-            self.cursor.execute("DELETE FROM MediaItems")
-            self.conn.commit()
-        except sqlite3.Error as e: print(f"Error cleaning tables in tearDown: {e}")
-        finally:
-            if self.conn: self.conn.close()
+@pytest.fixture(scope="function")
+def dummy_files():
+    dummy_image_path = "dummy_image.png"
+    img = Image.new('RGB', (60, 30), color = 'red')
+    img.save(dummy_image_path)
 
-        for path in [self.media_files_base_path_config, self.test_download_dir]:
-             if os.path.exists(path): shutil.rmtree(path, ignore_errors=True)
+    dummy_video_path = "dummy_video.mp4"
+    open(dummy_video_path, 'w').close()
 
-        if os.path.exists(self.dummy_video_path): os.remove(self.dummy_video_path)
-        if os.path.exists(self.dummy_image_path): os.remove(self.dummy_image_path)
+    yield dummy_image_path, dummy_video_path
 
-    def test_models_to_dict_from_dict(self):
-        video_metadata = {"duration": "10:00", "resolution": "1080p"}
-        video = models.VideoItem(id="v1", title="Video 1", description="Desc v1", filepath=os.path.join("v1.mp4"), tags=["tag1", "tag2"], thumbnail_path=".thumbnails/v1.jpg", metadata=video_metadata)
-        video_dict = video.to_dict()
-        self.assertEqual(video_dict['metadata'], video_metadata)
-        reconstructed_video = models.MediaItem.from_dict(video_dict)
-        self.assertEqual(video, reconstructed_video)
-        self.assertEqual(reconstructed_video.metadata, video_metadata)
+    os.remove(dummy_image_path)
+    os.remove(dummy_video_path)
 
-        # Test with metadata_json string as input (simulating DB row)
-        video_dict_from_db_row = {
-            'id': "v1db", 'title': "Video DB", 'description': "Desc DB", 'type': "video",
-            'filepath': "v1db.mp4", 'tags': ["db", "test"],
-            'thumbnail_path': ".thumbnails/v1db.jpg",
-            'metadata_json': json.dumps(video_metadata) # metadata as JSON string
-        }
-        reconstructed_from_db_row = models.MediaItem.from_dict(video_dict_from_db_row)
-        self.assertIsInstance(reconstructed_from_db_row, models.VideoItem)
-        self.assertEqual(reconstructed_from_db_row.metadata, video_metadata)
+def test_models_to_dict_from_dict():
+    video_metadata = {"duration": "10:00", "resolution": "1080p"}
+    video = models.VideoItem(id="v1", title="Video 1", description="Desc v1", filepath=os.path.join("v1.mp4"), tags=["tag1", "tag2"], thumbnail_path=".thumbnails/v1.jpg", metadata=video_metadata)
+    video_dict = video.to_dict()
+    assert video_dict['metadata'] == video_metadata
+    reconstructed_video = models.MediaItem.from_dict(video_dict)
+    assert video == reconstructed_video
+    assert reconstructed_video.metadata == video_metadata
 
+    video_dict_from_db_row = {
+        'id': "v1db", 'title': "Video DB", 'description': "Desc DB", 'type': "video",
+        'filepath': "v1db.mp4", 'tags': ["db", "test"],
+        'thumbnail_path': ".thumbnails/v1db.jpg",
+        'metadata_json': json.dumps(video_metadata)
+    }
+    reconstructed_from_db_row = models.MediaItem.from_dict(video_dict_from_db_row)
+    assert isinstance(reconstructed_from_db_row, models.VideoItem)
+    assert reconstructed_from_db_row.metadata == video_metadata
 
-    async def test_add_media(self):
-        sample_metadata = {"source": "test_camera", "quality": "high"}
-        video_item_obj = await operations.add_video("Async Test Video", "A test video for DB.", self.dummy_video_path, uploader_user_id=self.test_user_id_1, tags=["tutorial", "testing"], metadata=sample_metadata)
-        self.assertIsInstance(video_item_obj, models.VideoItem)
-        # Check user-provided metadata and some auto-extracted (if dummy file allows)
-        self.assertEqual(video_item_obj.metadata.get("source"), "test_camera")
-        self.assertTrue("width" in video_item_obj.metadata) # Auto-extracted
+@pytest.mark.asyncio
+async def test_add_media(test_db, db_session, test_users, dummy_files):
+    user1_id, _ = test_users
+    dummy_image_path, dummy_video_path = dummy_files
 
-        self.cursor.execute("SELECT metadata_json FROM MediaItems WHERE media_item_id = ?", (video_item_obj.id,))
-        video_row = self.cursor.fetchone()
-        self.assertIsNotNone(video_row)
-        db_metadata = json.loads(video_row['metadata_json'])
-        self.assertEqual(db_metadata.get("source"), "test_camera")
-        self.assertTrue("width" in db_metadata)
+    sample_metadata = {"source": "test_camera", "quality": "high"}
+    video_item_obj = await operations.add_video("Async Test Video", "A test video for DB.", dummy_video_path, uploader_user_id=user1_id, tags=["tutorial", "testing"], metadata=sample_metadata)
 
-        # Test image metadata
-        image_metadata = {"user_caption": "A beautiful test image"}
-        image_item_obj = await operations.add_image("Async Test Image", "A test image for DB.", self.dummy_image_path, uploader_user_id=self.test_user_id_1, tags=["nature", "testing"], metadata=image_metadata)
-        self.assertEqual(image_item_obj.metadata.get("user_caption"), "A beautiful test image")
-        self.assertTrue("width" in image_item_obj.metadata) # Auto-extracted from dummy PNG
-        self.assertTrue("height" in image_item_obj.metadata)
-        self.assertEqual(image_item_obj.metadata.get("format"), "PNG") # Dummy is PNG
+    assert isinstance(video_item_obj, models.VideoItem)
+    assert video_item_obj.metadata.get("source") == "test_camera"
 
-        self.cursor.execute("SELECT metadata_json FROM MediaItems WHERE media_item_id = ?", (image_item_obj.id,))
-        image_db_meta_json = self.cursor.fetchone()['metadata_json']
-        image_db_metadata = json.loads(image_db_meta_json)
-        self.assertEqual(image_db_metadata.get("user_caption"), "A beautiful test image")
-        self.assertTrue("format" in image_db_metadata)
+    image_metadata = {"user_caption": "A beautiful test image"}
+    image_item_obj = await operations.add_image("Async Test Image", "A test image for DB.", dummy_image_path, uploader_user_id=user1_id, tags=["nature", "testing"], metadata=image_metadata)
 
+    assert image_item_obj.metadata.get("user_caption") == "A beautiful test image"
+    assert "width" in image_item_obj.metadata
+    assert image_item_obj.metadata.get("format") == "PNG"
 
-        # ... (rest of add_media assertions for file paths, other fields)
-        self.assertTrue(os.path.exists(os.path.join(MEDIA_FILES_BASE_PATH, video_item_obj.filepath)))
-        self.assertTrue(video_item_obj.filepath.startswith(video_item_obj.id))
-        if video_item_obj.thumbnail_path:
-             self.assertTrue(os.path.exists(os.path.join(MEDIA_FILES_BASE_PATH, video_item_obj.thumbnail_path)))
+@pytest.mark.asyncio
+async def test_list_media(test_db, db_session, test_users, dummy_files):
+    user1_id, user2_id = test_users
+    dummy_image_path, dummy_video_path = dummy_files
 
+    v1 = await operations.add_video("Video Alpha", "Desc video alpha", dummy_video_path, uploader_user_id=user1_id, tags=["catX", "videoTag"])
+    i1 = await operations.add_image("Image Beta", "Desc image beta", dummy_image_path, uploader_user_id=user2_id, tags=["catY", "imageTag"])
 
-    async def test_list_media(self):
-        meta1 = {"key1": "val1", "source": "list_test_cam1"}
-        meta2 = {"key2": "val2", "source": "list_test_cam2"}
-        v1 = await operations.add_video("Video Alpha", "Desc video alpha", self.dummy_video_path, uploader_user_id=self.test_user_id_1, tags=["catX", "videoTag"], metadata=meta1)
-        i1 = await operations.add_image("Image Beta", "Desc image beta", self.dummy_image_path, uploader_user_id=self.test_user_id_2, tags=["catY", "imageTag"], metadata=meta2)
+    all_items = operations.list_media()
+    assert len(all_items) == 2
 
-        all_items = operations.list_media()
-        self.assertEqual(len(all_items), 2)
-        item_v1_listed = next(i for i in all_items if i.id == v1.id)
-        self.assertListEqual(sorted(item_v1_listed.tags), sorted(["catx", "videotag"]))
-        self.assertIsNotNone(item_v1_listed.thumbnail_path)
-        self.assertTrue("width" in item_v1_listed.metadata) # Auto-extracted
-        self.assertEqual(item_v1_listed.metadata.get("source"), "list_test_cam1") # User-provided
+    item_v1_listed = next(i for i in all_items if i.id == v1.id)
+    assert sorted(item_v1_listed.tags) == sorted(["catx", "videotag"])
 
-        item_i1_listed = next(i for i in all_items if i.id == i1.id)
-        self.assertTrue("format" in item_i1_listed.metadata) # Auto-extracted
-        self.assertEqual(item_i1_listed.metadata.get("source"), "list_test_cam2") # User-provided
-        # ... (rest of list_media assertions)
+@pytest.mark.asyncio
+async def test_search_media(test_db, db_session, test_users, dummy_files):
+    user1_id, _ = test_users
+    dummy_image_path, dummy_video_path = dummy_files
 
+    v_s1_u1 = await operations.add_video("Alpha Search User1", "Journey to alpha point.", dummy_video_path, uploader_user_id=user1_id, tags=["adventureS"])
+    results = operations.search_media(query="Alpha Search User1")
+    assert len(results) == 1
+    assert results[0].id == v_s1_u1.id
 
-    async def test_search_media(self):
-        meta_search = {"priority": "high", "project_code": "XYZ"}
-        v_s1_u1 = await operations.add_video("Alpha Search User1", "Journey to alpha point.", self.dummy_video_path, uploader_user_id=self.test_user_id_1, tags=["adventureS"], metadata=meta_search)
-        results = operations.search_media(query="Alpha Search User1")
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0].id, v_s1_u1.id)
-        self.assertListEqual(sorted(results[0].tags), sorted(["adventures"]))
-        self.assertIsNotNone(results[0].thumbnail_path)
-        self.assertEqual(results[0].metadata.get("project_code"), "XYZ")
-        self.assertTrue("width" in results[0].metadata)
-        # ... (rest of search_media tests)
+@pytest.mark.asyncio
+async def test_download_media(test_db, db_session, test_users, dummy_files):
+    user1_id, _ = test_users
+    dummy_image_path, dummy_video_path = dummy_files
+    config = test_db
 
+    v1 = await operations.add_video("Download Vid Async", "Vid to download", dummy_video_path, uploader_user_id=user1_id, tags=["download", "videoAsync"])
+    l1 = operations.add_link("Download Link Async", "Link to save", "http://download-async.example.com", uploader_user_id=user1_id, tags=["download", "linkAsync"])
 
-    async def test_get_media_items_by_ids(self):
-        meta_get = {"format": "landscape", "camera_model": "Nikon Z6"}
-        v1 = await operations.add_video("Video One DB Get", "Desc One", self.dummy_video_path, uploader_user_id=self.test_user_id_1, tags=["cat1get", "vidGet"], metadata=meta_get)
-        items = operations.get_media_items_by_ids([v1.id])
-        self.assertEqual(len(items), 1)
-        self.assertListEqual(sorted(items[0].tags), sorted(["cat1get", "vidget"]))
-        self.assertIsNotNone(items[0].thumbnail_path)
-        self.assertEqual(items[0].metadata.get("camera_model"), "Nikon Z6")
-        self.assertTrue("width" in items[0].metadata)
+    media_ids_to_download = [v1.id, l1.id]
+    downloaded_files = await operations.download_selected_media(media_ids_to_download, config.get('default_download_path'))
 
-
-    async def test_download_selected_media(self):
-        meta_dl = {"project": "Project X"}
-        v1 = await operations.add_video("Download Vid Async", "Vid to download", self.dummy_video_path, uploader_user_id=self.test_user_id_1, tags=["download", "videoAsync"], metadata=meta_dl)
-        l1 = operations.add_link("Download Link Async", "Link to save", "http://download-async.example.com", uploader_user_id=self.test_user_id_1, tags=["download", "linkAsync"], metadata={"source": "web"})
-        # ... (rest of download test setup)
-        media_ids_to_download = [v1.id, l1.id]
-        downloaded_files = await operations.download_selected_media(media_ids_to_download, self.test_download_dir)
-        # ... (assertions for files)
-        links_file_path = os.path.join(self.test_download_dir, "downloaded_links.txt")
-        with open(links_file_path, 'r') as f:
-            content = f.read()
-            self.assertIn("Tags: download, linkasync", content)
-            self.assertIn(f"Metadata: {json.dumps({'source': 'web'})}", content)
-
-
-    async def test_placeholder_sharing_functions(self):
-        meta_share = {"audience": "public"}
-        v1 = await operations.add_video("Share Vid Async", "Vid to share DB", self.dummy_video_path, uploader_user_id=self.test_user_id_1, tags=["shareAsync"], metadata=meta_share)
-        # ... (rest of placeholder tests)
-        email_output = self.get_printed_output(operations.share_media_by_email, [v1.id], "test@example.com")
-        self.assertIn("shareasync", email_output)
-        self.assertIn(json.dumps(meta_share), email_output)
-
-
-    def _add_media_with_timestamps(self, title: str, item_type:str, created_at_iso: str, updated_at_iso: str, filepath: str | None = None, url: str | None = None, uploader_user_id=None, tags: List[str] | None = None, thumbnail_path: str | None = None, metadata: Dict[str,Any] | None = None) -> str:
-        item_id = operations._generate_id()
-        db_filepath = filepath
-        metadata_json_str = json.dumps(metadata) if metadata else None
-        self.cursor.execute(
-            """INSERT INTO MediaItems (media_item_id, title, description, item_type, filepath, url, uploader_user_id, created_at, updated_at, thumbnail_path, metadata_json)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (item_id, title, f"Description for {title}", item_type,
-             db_filepath, url, uploader_user_id, created_at_iso, updated_at_iso, thumbnail_path, metadata_json_str)
-        )
-        if tags:
-            for tag_name in tags:
-                tag_id = operations._get_or_create_tag_id(tag_name, self.cursor)
-                self.cursor.execute("INSERT INTO MediaItemTags (media_item_id, tag_id) VALUES (?,?)", (item_id, tag_id))
-        self.conn.commit()
-        return item_id
-
-    async def test_search_media_by_date(self):
-        meta_date_search = {"event": "New Year"}
-        id1 = self._add_media_with_timestamps("Created Early Date", "link", "2023-01-01T10:00:00Z", "2023-01-05T10:00:00Z", uploader_user_id=self.test_user_id_1, url="http://early.date.com", tags=["dated"], metadata=meta_date_search)
-        results = operations.search_media(created_after="2023-01-01T09:00:00Z", filter_by_uploader_id=self.test_user_id_1)
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0].id, id1)
-        self.assertListEqual(sorted(results[0].tags), ["dated"])
-        self.assertIsNone(results[0].thumbnail_path)
-        self.assertEqual(results[0].metadata, meta_date_search)
-
-    def get_printed_output(self, func, *args, **kwargs):
-        import io
-        from contextlib import redirect_stdout
-        f = io.StringIO()
-        with redirect_stdout(f):
-            func(*args, **kwargs)
-        return f.getvalue()
-
-if __name__ == '__main__':
-    unittest.main()
+    assert len(downloaded_files) == 2
+    links_file_path = os.path.join(config.get('default_download_path'), "downloaded_links.txt")
+    assert links_file_path in downloaded_files
+    with open(links_file_path, 'r') as f:
+        content = f.read()
+        assert "http://download-async.example.com" in content

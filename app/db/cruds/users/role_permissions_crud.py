@@ -6,7 +6,7 @@ from sqlalchemy.engine import Engine, Connection as SQLAlchemyConnection
 from sqlalchemy.sql import text as sqlalchemy_text
 from sqlalchemy.exc import SQLAlchemyError
 
-from .generic_crud import _manage_conn
+from app.db.cruds.generic_crud import _manage_conn
 
 logger = logging.getLogger(__name__)
 

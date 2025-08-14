@@ -4,10 +4,10 @@ from datetime import date, datetime # datetime import added for completeness, th
 
 # Assuming models.py is in the same directory as this payments.py file (e.g. /api/payments.py and /api/models.py)
 # If payments.py is in /api/ and models.py is in /api/
-import models # Corrected based on typical FastAPI structure if main.py is above 'api'
+from . import models # Corrected based on typical FastAPI structure if main.py is above 'api'
 # If invoices_crud.py is in /db/cruds/ and this file is in /api/
 # The path would be from ..db.cruds import invoices_crud
-from ..db.cruds import invoices_crud
+from ..db.cruds.invoices import invoices_crud
 
 
 router = APIRouter(

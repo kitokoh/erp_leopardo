@@ -7,8 +7,12 @@ from typing import Generator, Optional, Any, Dict, Callable, List as PyList
 from datetime import date, datetime, timedelta
 
 # Adjust these imports based on your project structure
+from app.db.models.base import Base
+from app.db.models.users.employee import Employee
+from app.db.models.users.user import User
+from app.db.models.leave.leave_type import LeaveType
+from app.db.models.leave.leave_request import LeaveRequest, LeaveRequestStatusEnum
 from app.api.models import (
-    Base, UserInDB, Employee, LeaveType, LeaveRequest, LeaveRequestStatusEnum,
     HeadcountReportResponse, AnniversaryReportResponse, LeaveSummaryReportResponse
 )
 from app.api.hr_reports import router as hr_reports_router # The router to test
@@ -16,7 +20,9 @@ from app.api.dependencies import get_db         # The actual DB dependency
 from app.api.auth import get_current_active_user # The actual auth dependency
 
 # Import CRUD modules for setting up test data
-from app.db.cruds import employees_crud, leave_crud, users_crud, hr_reports_crud
+from app.db.cruds.users import employees_crud, users_crud
+from app.db.cruds.leave import leave_crud
+from app.db.cruds.misc import hr_reports_crud
 
 # --- Test Database Setup ---
 DATABASE_URL = "sqlite:///:memory:"

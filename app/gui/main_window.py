@@ -99,7 +99,7 @@ from app.services.download_monitor_service import DownloadMonitorService
 from app.gui.dialogs.assign_document_dialog import AssignDocumentToClientDialog
 from app.db.cruds.clients.client_documents_crud import add_client_document # For assign dialog
 import os # For path checks in download monitor init
-from app.db.cruds import user_saved_filters_crud # Import for saved filters
+from app.db.cruds.users import user_saved_filters_crud
 
 from app.calendar_module.calendar_widget import CalendarWidget # Import CalendarWidget
 from app.user_management.page import UserManagementPage # Import UserManagementPage

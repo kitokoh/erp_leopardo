@@ -17,7 +17,8 @@ from app.api.models import (
     LeaveRequest, LeaveRequestCreate, LeaveRequestResponse, LeaveRequestUpdate,
     LeaveRequestStatusEnum # Enum for status
 )
-from app.db.cruds import leave_crud, employees_crud # CRUD modules
+from app.db.cruds.leave import leave_crud
+from app.db.cruds.users import employees_crud
 
 router = APIRouter(
     prefix="/leave",

@@ -33,13 +33,7 @@ from app.db.cruds.products.item_locations_crud import (
     update_item_in_location, get_item_in_specific_location,
     get_full_location_path_str # Added
 )
-from app.db.cruds.products.products_crud import products_crud_instance as products_crud
-
-# The import was removed as the function does not exist.
-# The try/except block is no longer necessary for this specific import.
-print("Warning: products_crud.get_products_by_name_pattern not found. Product search will not work.")
-def get_products_by_name_pattern(*args, **kwargs): # Dummy function
-    return {'success': False, 'error': 'products_crud not available'}
+from app.db.cruds.products.products_crud import get_products_by_name_pattern
 
 
 class LocationEditDialog(QDialog):
@@ -330,14 +324,14 @@ class InventoryBrowserWidget(QWidget):
             # Assuming the ORM-based CRUD, which requires a db session.
             # This widget needs a way to get a session. For now, let's assume
             # a get_db_session() utility exists.
-            from app.db.session import get_db_session
-            with get_db_session() as db:
-                products = products_crud.get_products_by_name_pattern(name_pattern=search_term, db=db)
+            from app.db.connection import get_db_connection
+            with get_db_connection() as db:
+                products = get_products_by_name_pattern(name_pattern=search_term, conn=db)
 
             if products:
                 for product in products:
-                    item = QListWidgetItem(f"{product.product_name} ({product.product_code})")
-                    item.setData(Qt.UserRole, product.product_id)
+                    item = QListWidgetItem(f"{product['product_name']} ({product['product_code']})")
+                    item.setData(Qt.UserRole, product['product_id'])
                     item.setData(Qt.UserRole + 1, product.product_name) # Store name for dialog
                     self.product_search_results_list.addItem(item)
             else:

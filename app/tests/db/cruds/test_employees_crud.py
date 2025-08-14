@@ -7,7 +7,7 @@ from typing import Generator
 # Assuming your project structure allows these imports
 # Adjust if your Base and models are located elsewhere
 from app.api.models import Base, Employee, EmployeeCreate, EmployeeUpdate
-from app.db.cruds import employees_crud
+from app.db.cruds.users import employees_crud
 
 # Use an in-memory SQLite database for testing
 DATABASE_URL = "sqlite:///:memory:"

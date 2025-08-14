@@ -13,7 +13,7 @@ sys.path.append(APP_ROOT)
 
 from app.db.cruds.invoices import invoices_crud
 from app.db import init_schema # To initialize the database schema
-from app.db import db_config # To override DATABASE_PATH for tests
+from app import config
 
 # Hold the original DATABASE_PATH
 ORIGINAL_DB_PATH = None

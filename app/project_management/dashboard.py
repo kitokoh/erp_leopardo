@@ -68,7 +68,7 @@ from app.db.cruds.projects.milestones_crud import get_milestones_for_project, ad
 from app.db.init_schema import initialize_database # initialize_database is usually in init_schema or db module directly
 
 # Missing log/file functions - to be addressed if project_logs_crud and project_files_crud are created
-from app.db.cruds import project_logs_crud # Assuming this file will be created with add_project_log, get_project_logs
+from app.db.cruds.projects import project_logs_crud
 from app.db.cruds.projects import project_files_crud
 # For specific function imports, if preferred:
 

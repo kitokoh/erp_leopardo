@@ -14,7 +14,8 @@ from app.api.models import (
     PerformanceReview, PerformanceReviewCreate, PerformanceReviewResponse, PerformanceReviewUpdate, PerformanceReviewStatusEnum,
     EmployeeResponse # For potential nested responses, though not explicitly used in all signatures here
 )
-from app.db.cruds import performance_crud, employees_crud
+from app.db.cruds.performance import performance_crud
+from app.db.cruds.users import employees_crud
 
 
 router = APIRouter(

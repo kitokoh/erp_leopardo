@@ -12,7 +12,7 @@ from app.api.models import (
     DocumentCategory, DocumentCategoryCreate, DocumentCategoryBase,
     EmployeeDocument, EmployeeDocumentCreate, EmployeeDocumentUpdate
 )
-from app.db.cruds import employee_documents_crud, employees_crud # Assuming users_crud for creating users
+from app.db.cruds.users import employee_documents_crud, employees_crud
 
 # Use an in-memory SQLite database for testing
 DATABASE_URL = "sqlite:///:memory:"
