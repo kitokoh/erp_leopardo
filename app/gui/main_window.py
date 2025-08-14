@@ -144,8 +144,25 @@ from PyQt5.QtGui import QColor, QLinearGradient, QPalette # Added QColor
 from PyQt5.QtWidgets import QGraphicsDropShadowEffect # Added QGraphicsDropShadowEffect
 from PyQt5.QtCore import QPropertyAnimation # Added QPropertyAnimation
 from PyQt5.QtWidgets import QFrame
-from PyQt5.QtCore import QSize
+from PyQt5.QtCore import QSize, QThread, pyqtSignal
 
+from app.update_checker import UpdateChecker
+from app.telemetry import telemetry_manager
+from app.gui.dialogs.telemetry_consent_dialog import TelemetryConsentDialog
+from app.db import db_manager
+
+class UpdateCheckThread(QThread):
+    """Worker thread to check for updates in the background."""
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent_window = parent
+
+    def run(self):
+        try:
+            checker = UpdateChecker(self.parent_window)
+            checker.check_for_updates(silent=True)
+        except Exception as e:
+            logging.error(f"Error in update check thread: {e}")
 
 
 class ClientListItemWidget(QWidget):
@@ -531,6 +548,12 @@ class DocumentManager(QMainWindow):
         self._gradient_pos = 0.0
 
         self._setup_app_title_animation()
+
+        # Run a silent update check on startup
+        self.run_update_check_silent()
+
+        # Initialize telemetry system
+        self.initialize_telemetry()
 
 
 
@@ -1557,6 +1580,11 @@ class DocumentManager(QMainWindow):
         self.about_action.triggered.connect(self.show_about_dialog)
         self.searchable_actions_map[self.tr("À propos")] = self.about_action
 
+        # Update Checker Action
+        self.update_action = QAction("🔄 " + self.tr("Vérifier les mises à jour"), self)
+        self.update_action.triggered.connect(self.run_update_check_manual)
+        self.searchable_actions_map[self.tr("Vérifier les mises à jour")] = self.update_action
+
         self.search_timer = QTimer(self)
         self.search_timer.setSingleShot(True)
         self.search_timer.timeout.connect(self._update_search_completer)
@@ -1679,6 +1707,10 @@ class DocumentManager(QMainWindow):
             (self.tr("Administration 🛡️"), None, [
                 (self.tr("Gérer les Utilisateurs"), self.manage_users_action),
                 (self.tr("Gérer les Rôles"), self.manage_roles_action)
+            ]),
+            (self.tr("Aide ❓"), None, [
+                (self.tr("Vérifier les mises à jour"), self.update_action),
+                (self.tr("À propos"), self.about_action)
             ]),
         ]
 
@@ -3483,3 +3515,35 @@ class DocumentManager(QMainWindow):
     def mouseReleaseEvent(self, event: QMouseEvent):
         if hasattr(self, 'is_dragging'):
             self.is_dragging = False
+
+    def run_update_check_manual(self):
+        """Runs the update check manually and shows all dialogs."""
+        try:
+            checker = UpdateChecker(self)
+            checker.check_for_updates(silent=False)
+        except Exception as e:
+            logging.error(f"Failed to run manual update check: {e}")
+            QMessageBox.critical(self, "Error", f"An unexpected error occurred while checking for updates: {e}")
+
+    def run_update_check_silent(self):
+        """Runs the update check in a background thread."""
+        self.update_thread = UpdateCheckThread(self)
+        self.update_thread.start()
+
+    def initialize_telemetry(self):
+        """
+        Checks for telemetry consent and starts the telemetry manager if approved.
+        """
+        if TelemetryConsentDialog.should_show():
+            logging.info("Telemetry consent not set. Showing dialog.")
+            dialog = TelemetryConsentDialog(self)
+            dialog.exec_() # The dialog handles saving the setting
+
+        # After the dialog is shown (or if it wasn't needed), check the setting
+        consent_given_str = db_manager.get_setting('telemetry_consent', 'False')
+        if consent_given_str.lower() == 'true':
+            logging.info("Telemetry consent is enabled. Starting TelemetryManager.")
+            telemetry_manager.start()
+            telemetry_manager.track_event("app_started")
+        else:
+            logging.info("Telemetry consent is disabled. TelemetryManager will not be started.")
