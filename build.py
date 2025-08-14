@@ -38,6 +38,15 @@ def run_command(command, cwd="."):
         logging.error("Stdout:\n" + e.stdout)
         return False
 
+def inject_version_info():
+    """Writes the app version to a file that the application can access."""
+    logging.info(f"Injecting version '{APP_VERSION}' into app/_version.py")
+    version_file_path = os.path.join('app', '_version.py')
+    with open(version_file_path, 'w') as f:
+        f.write(f'__version__ = "{APP_VERSION}"\n')
+    logging.info("Version injection complete.")
+    return True
+
 def clean():
     """Remove previous build and distribution artifacts."""
     logging.info("--- Cleaning up previous build artifacts ---")
@@ -47,6 +56,11 @@ def clean():
             logging.info(f"Removed directory: {path}")
     if os.path.exists("build.log"):
         os.remove("build.log")
+    # Also remove the generated version file
+    if os.path.exists(os.path.join('app', '_version.py')):
+        os.remove(os.path.join('app', '_version.py'))
+        logging.info("Removed app/_version.py")
+
     os.makedirs(OBFUSCATED_SRC_DIR, exist_ok=True)
     os.makedirs(INSTALLER_DIR, exist_ok=True)
     logging.info("--- Cleanup complete ---")
@@ -186,6 +200,9 @@ def main():
         if not run_inno_setup(): sys.exit(1)
     elif args.command == "full":
         clean()
+        if not inject_version_info():
+            sys.exit(1)
+
         use_obfuscation = not args.no_obfuscation
         if use_obfuscation:
             if not run_obfuscation():
