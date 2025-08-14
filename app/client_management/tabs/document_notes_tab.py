@@ -8,8 +8,8 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
 
-import db as db_manager
-from auth.permissions import has_permission, P_MANAGE_CLIENT_DOCUMENTS # For button permissions
+from app import db as db_manager
+from app.auth.permissions import has_permission, P_MANAGE_CLIENT_DOCUMENTS # For button permissions
 # Import SUPPORTED_LANGUAGES, assuming documents_tab is a sibling or from a central const
 from .documents_tab import SUPPORTED_LANGUAGES
 

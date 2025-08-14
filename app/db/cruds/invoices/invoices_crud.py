@@ -19,21 +19,7 @@ _project_root_dir = os.path.abspath(os.path.join(_current_file_dir, "..", ".."))
 if _project_root_dir not in sys.path:
     sys.path.insert(0, _project_root_dir)
 
-try:
-    from config import DATABASE_PATH
-    # logging.debug(f"invoices_crud: Successfully imported DATABASE_PATH: {DATABASE_PATH}")
-except ImportError as e:
-    logging.error(f"CRITICAL: Could not import DATABASE_PATH from config.py (path: {_project_root_dir}): {e}. Falling back to a default path.", exc_info=True)
-    # Fallback path relative to this file if config.py isn't found at assumed project root
-    _db_dir_fallback = os.path.join(os.path.dirname(_current_file_dir), "data_fallback") # db/data_fallback/
-    os.makedirs(_db_dir_fallback, exist_ok=True)
-    DATABASE_PATH = os.path.join(_db_dir_fallback, "app_invoices_fallback.db")
-    logging.warning(f"invoices_crud: Using fallback DATABASE_PATH: {DATABASE_PATH}")
-finally:
-    # Clean up sys.path if the directory was added by this specific import logic
-    if sys.path[0] == _project_root_dir: # Check if it's the one we added
-        sys.path.pop(0)
-        # logging.debug(f"invoices_crud: Removed {_project_root_dir} from sys.path after import attempt.")
+from app.config import DATABASE_PATH
 
 
 logger = logging.getLogger(__name__) # Initialize logger for this module

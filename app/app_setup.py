@@ -9,8 +9,8 @@ import pandas as pd
 from PyQt5.QtCore import QFile, QTextStream # QStandardPaths, QLocale, QLibraryInfo removed
 # from PyQt5.QtGui import QFont # Removed as QFont is not used here
 # Assuming db_manager and other necessary utils will be imported if functions using them are moved.
-from config import DATABASE_NAME as CENTRAL_DATABASE_NAME # For DATABASE_NAME
-from utils import load_config # Changed from app_utils
+from app.config import DATABASE_NAME as CENTRAL_DATABASE_NAME, CONFIG as AppConfig # For DATABASE_NAME
+# from utils import load_config # Changed from app_utils
 
 # --- Global Constants and Configurations ---
 if getattr(sys, 'frozen', False):
@@ -26,7 +26,7 @@ LOGO_SUBDIR = os.path.join("resources", "company_logos")
 DATABASE_NAME = CENTRAL_DATABASE_NAME
 
 # CONFIG loading logic
-CONFIG = load_config(APP_ROOT_DIR, DEFAULT_TEMPLATES_DIR, DEFAULT_CLIENTS_DIR)
+CONFIG = AppConfig
 
 # Ensure directories exist after CONFIG is loaded
 os.makedirs(CONFIG["templates_dir"], exist_ok=True)

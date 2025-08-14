@@ -7,9 +7,9 @@ from .proforma_invoice_utils import get_final_invoice_context_data
 # Assuming html_to_pdf_util.py is in the same directory or accessible
 from .html_to_pdf_util import render_html_template, convert_html_to_pdf, WeasyPrintError
 
-from app_setup import get_app_config
+from app.app_setup import get_app_config
 CONFIG = get_app_config()
-from db.cruds.clients import clients_crud
+from app.db.cruds.clients import clients_crud
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 

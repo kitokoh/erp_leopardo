@@ -1,7 +1,7 @@
 import logging
-from db.connection import get_db_connection
-from db.seeders.location_seeder import seed_all_locations
-from db.seeders.role_permission_seeder import seed_roles_and_permissions
+from app.db.connection import get_db_connection
+from app.db.seeders.location_seeder import seed_all_locations
+from app.db.seeders.role_permission_seeder import seed_roles_and_permissions
 # Import other seeders as they are created
 # from db.seeders.product_seeder import seed_products
 
