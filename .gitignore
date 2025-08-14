@@ -118,3 +118,12 @@ docs/_templates/
 *.egg-info
 Pipfile.lock
 poetry.lock
+
+# Build artifacts
+*.spec
+/app/compilation/LeopardoAI-Installer/
+
+# Obfuscation
+/obfuscated_src/
+.pyarmor_runtime_000000/
+.pyarmor_capsule.zip
