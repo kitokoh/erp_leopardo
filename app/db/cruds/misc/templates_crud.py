@@ -6,19 +6,7 @@ import logging
 from typing import List, Optional, Union # Added Union
 import sys # Add sys for path manipulation
 
-# Get the project root directory
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
-try:
-    import config
-except ImportError:
-    print("CRITICAL: config.py not found at project root by templates_crud.py. Path construction may fail.")
-    # Define a minimal fallback config object if needed for APP_ROOT_DIR, or let it fail if config is essential.
-    class config_fallback_templates:
-        APP_ROOT_DIR = project_root # Best guess fallback
-    config = config_fallback_templates
+from app import config
 
 from ..generic_crud import _manage_conn
 from .template_categories_crud import add_template_category, get_template_category_by_name

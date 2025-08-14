@@ -14,14 +14,14 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIcon, QDesktopServices, QFont
 from PyQt5.QtCore import Qt, QUrl, QStandardPaths
 
-from gui.widgets.pdf_viewer_widget import PdfViewerWidget # Ajout de l'importation
-import db as db_manager
-from db.cruds.clients import client_documents_crud
-from db.cruds.projects import projects_crud
+from app.gui.widgets.pdf_viewer_widget import PdfViewerWidget # Ajout de l'importation
+from app import db as db_manager
+from app.db.cruds.clients import client_documents_crud
+from app.db.cruds.projects import projects_crud
 
-from excel_editor import ExcelEditor
-from gui.widgets.html_editor import HtmlEditor
-from utils.app_constants import SUPPORTED_LANGUAGES # Import centralisé
+from app.excel_editor import ExcelEditor
+from app.gui.widgets.html_editor import HtmlEditor
+from app.utils.app_constants import SUPPORTED_LANGUAGES # Import centralisé
 # Other necessary dialogs and modules will be imported as needed, or passed from parent
 from typing import Optional
 

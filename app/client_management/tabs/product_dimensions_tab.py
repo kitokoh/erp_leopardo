@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
 
-import db as db_manager
+from app import db as db_manager
 # ClientProductDimensionDialog will be passed from the parent (ClientMainWidget)
 
 class ProductDimensionsTab(QWidget):
