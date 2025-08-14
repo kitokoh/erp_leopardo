@@ -6,7 +6,7 @@ import json
 from datetime import datetime
 from typing import List, Dict, Any
 from . import models
-import db
+from app import db
 
 import asyncio
 import aiofiles
@@ -15,7 +15,9 @@ import aiofiles.os as aios
 from PIL import Image, ExifTags # Added ExifTags
 import cv2
 
-from config import MEDIA_FILES_BASE_PATH, DEFAULT_DOWNLOAD_PATH
+from app.config import CONFIG
+MEDIA_FILES_BASE_PATH = CONFIG.get('media_files_path')
+DEFAULT_DOWNLOAD_PATH = CONFIG.get('default_download_path')
 
 THUMBNAIL_SIZE = (128, 128)
 THUMBNAIL_DIR_NAME = ".thumbnails"

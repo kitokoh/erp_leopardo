@@ -6,14 +6,15 @@ from typing import Generator, List as PyList, Optional
 from datetime import date, datetime
 
 # Adjust imports based on your project structure
-from app.api.models import (
-    Base, Employee, User,
-    Goal, GoalCreate, GoalUpdate, GoalStatusEnum,
-    ReviewCycle, ReviewCycleCreate, ReviewCycleUpdate,
-    PerformanceReview, PerformanceReviewCreate, PerformanceReviewUpdate, PerformanceReviewStatusEnum,
-    performance_review_goals_link # Association table for M2M check
-)
-from app.db.cruds import performance_crud, employees_crud # Assuming users_crud for creating users (or direct User creation)
+from app.db.connection import Base
+from app.db.models.employees.employee import Employee
+from app.db.models.users.user import User
+from app.db.models.performance.goal import Goal, GoalCreate, GoalUpdate, GoalStatusEnum
+from app.db.models.performance.review_cycle import ReviewCycle, ReviewCycleCreate, ReviewCycleUpdate
+from app.db.models.performance.performance_review import PerformanceReview, PerformanceReviewCreate, PerformanceReviewUpdate, PerformanceReviewStatusEnum
+from app.db.models.performance.performance_review_goal_link import performance_review_goals_link
+from app.db.cruds.performance import performance_crud
+from app.db.cruds.users import employees_crud
 
 # Use an in-memory SQLite database for testing
 DATABASE_URL = "sqlite:///:memory:"

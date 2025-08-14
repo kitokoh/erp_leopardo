@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QPixmap, QFont, QIcon # Added QIcon
 from PyQt5.QtCore import Qt, QSettings, pyqtSignal
-from app.db.cruds import users_crud # To get user details including biometric status
+from app.db.cruds.users import users_crud
 from app.auth import authentication # For the main login function and setting current user
 from app.security_module.biometric_auth import BiometricAuthenticator # For biometric verification
 

@@ -16,7 +16,7 @@ from app.db.models.clients.client import Client
 from app.db.models.settings.status_setting import StatusSetting
 from app.db.models.users.user import User
 # Import the instance for testing
-from app.db.cruds.clients_crud import clients_crud_instance
+from app.db.cruds.clients.clients_crud import clients_crud_instance
 
 # Helper for date formatting consistent with the app
 def format_datetime_for_db(dt_obj):

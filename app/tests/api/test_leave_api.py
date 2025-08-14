@@ -7,18 +7,24 @@ from typing import Generator, Optional, Any, Dict, Callable, List as PyList # Re
 from datetime import date, datetime
 
 # Adjust these imports based on your project structure
+from app.db.models.base import Base
+from app.db.models.users.user import User
+from app.db.models.users.employee import Employee
+from app.db.models.leave.leave_type import LeaveType
+from app.db.models.leave.leave_balance import LeaveBalance
+from app.db.models.leave.leave_request import LeaveRequest, LeaveRequestStatusEnum
 from app.api.models import (
-    Base, UserInDB, Employee, LeaveType, LeaveBalance, LeaveRequest, # SQLAlchemy models
+    UserInDB,
     LeaveTypeCreate, LeaveTypeResponse, LeaveTypeBase,
     LeaveBalanceCreate, LeaveBalanceResponse, LeaveBalanceUpdate,
-    LeaveRequestCreate, LeaveRequestResponse, LeaveRequestUpdate,
-    LeaveRequestStatusEnum
+    LeaveRequestCreate, LeaveRequestResponse, LeaveRequestUpdate
 )
 from app.api.leave import router as leave_router # The router to test
 from app.api.dependencies import get_db         # The actual DB dependency
 from app.api.auth import get_current_active_user # The actual auth dependency
 
-from app.db.cruds import employees_crud, leave_crud # For setting up test data
+from app.db.cruds.users import employees_crud
+from app.db.cruds.leave import leave_crud
 
 # --- Test Database Setup ---
 DATABASE_URL = "sqlite:///:memory:"

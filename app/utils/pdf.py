@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import QMessageBox
 # Assuming db_manager, html_to_pdf_util, and html_editor are accessible from this new path.
 # If they are at the root, direct imports like these should work if PYTHONPATH is set up.
 # Otherwise, they might need to be relative or adjusted based on project structure.
-import db as db_manager
+from app import db as db_manager
 from .html_to_pdf_util import convert_html_to_pdf
 # HtmlEditor is imported deferred inside the function.
 

@@ -1,6 +1,6 @@
 import sqlite3
 import logging
-from .generic_crud import _manage_conn
+from ..generic_crud import _manage_conn
 
 logger = logging.getLogger(__name__)
 

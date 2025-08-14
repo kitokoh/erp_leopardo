@@ -151,6 +151,21 @@ class ClientsCRUD(GenericCRUD):
             self.logger.error(f"Error getting client by ID {client_id}: {e}", exc_info=True)
             return None
 
+    def get_client_by_project_identifier(self, db: Session, project_identifier: str, include_deleted: bool = False) -> Client | None:
+        """
+        Fetches a single client by their project_identifier using the ORM.
+        """
+        try:
+            query = db.query(Client).filter(Client.project_identifier == project_identifier)
+            if not include_deleted:
+                query = query.filter(Client.is_deleted == False)
+
+            client = query.first()
+            return client
+        except Exception as e:
+            self.logger.error(f"Error getting client by project_identifier {project_identifier}: {e}", exc_info=True)
+            return None
+
     def get_all_clients(self, db: Session, filters: dict = None, limit: int = None, offset: int = 0, include_deleted: bool = False) -> list[dict]:
         """
         Retrieves all clients, with optional filtering, pagination, and inclusion of
@@ -944,6 +959,7 @@ clients_crud_instance = ClientsCRUD()
 # Expose specific CRUD methods for direct import
 get_all_clients = clients_crud_instance.get_all_clients
 get_client_by_id = clients_crud_instance.get_client_by_id
+get_client_by_project_identifier = clients_crud_instance.get_client_by_project_identifier
 add_client = clients_crud_instance.add_client
 update_client = clients_crud_instance.update_client
 delete_client = clients_crud_instance.delete_client
@@ -966,6 +982,7 @@ __all__ = [
     "add_client",
     "get_total_clients_count",
     "get_client_by_id",
+    "get_client_by_project_identifier",
     "get_all_clients",
     "update_client",
     "delete_client", # Soft delete

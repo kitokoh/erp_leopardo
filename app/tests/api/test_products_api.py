@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 
 from app.api.products import router as products_router
 from app.api.auth import get_current_active_user # Import the dependency
-from app.db.cruds import products_crud # To interact with DB directly for setup/assertions
+from app.db.cruds.products import products_crud
 from models import ProductCreate, ProductResponse, ProductUpdate, UserInDB # Pydantic models
 
 # Global variable for the database connection

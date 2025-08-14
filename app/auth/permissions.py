@@ -149,7 +149,7 @@ PERMISSION_MAP = {
 
 # Import necessary CRUDs for the new has_permission logic
 from app.db.cruds.users import roles_crud, permissions_crud
-from app.db.cruds import role_permissions_crud
+from app.db.cruds.users import role_permissions_crud
 from app.auth.roles import SUPER_ADMIN as SUPER_ADMIN_ROLE_CONSTANT
 
 def has_permission(user_role_name: str, required_permission_key: str) -> bool:

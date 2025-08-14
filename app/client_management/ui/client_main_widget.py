@@ -81,7 +81,7 @@ from app.db.cruds.products.products_crud import get_product_by_id
 from app.db.cruds.projects import projects_crud
 
 # SAV
-from app.db.cruds import sav_crud
+from app.db.cruds.clients import sav_crud
 
 # Users
 from app.db.cruds.users import users_crud

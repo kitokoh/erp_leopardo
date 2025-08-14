@@ -6,8 +6,8 @@ import os # For URL construction if base URL comes from env
 # Or from ..db import cruds if api is a subdir of a main app package
 # For this subtask, let's assume db.cruds gives access to modules
 from app.db.cruds.products import products_crud
-import app.db.cruds.product_media_links_crud as product_media_links_crud
-from ..models import ( # Relative import from parent models.py
+from app.db.cruds.products import product_media_links_crud
+from .models import ( # Relative import from parent models.py
     ProductResponse, ProductCreate, ProductUpdate, ProductBase,
     LinkMediaToProductRequest, ProductImageLinkResponse, ProductImageLinkUpdateRequest,
     ReorderProductMediaLinksRequest,
@@ -93,8 +93,8 @@ async def create_product_api(
 
 @router.get("/{product_id}", response_model=ProductResponse)
 async def get_product_api(
-    product_id: int = Path(..., description="The ID of the product to retrieve"),
     request: Request,
+    product_id: int = Path(..., description="The ID of the product to retrieve"),
     current_user: UserInDB = Depends(get_current_active_user) # Optional auth
 ):
     db_product = products_crud.get_product_by_id(id=product_id)
@@ -104,8 +104,8 @@ async def get_product_api(
 
 @router.get("/code/{product_code}", response_model=ProductResponse)
 async def get_product_by_code_api(
-    product_code: str = Path(..., description="The product code of the product to retrieve"),
     request: Request,
+    product_code: str = Path(..., description="The product code of the product to retrieve"),
     current_user: UserInDB = Depends(get_current_active_user) # Optional auth
 ):
     # products_crud functions are decorated with @_manage_conn

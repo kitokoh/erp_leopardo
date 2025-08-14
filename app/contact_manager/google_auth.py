@@ -12,12 +12,12 @@ import uuid
 # from google.auth.transport.requests import Request
 # import requests # For direct HTTP calls
 
-from db.cruds import (
+from app.db.cruds.misc.google_sync_crud import (
     get_user_google_account_by_google_account_id,
     update_user_google_account,
     add_user_google_account,
     get_user_google_account_by_user_id,
-    get_google_account_by_id,
+    get_user_google_account_by_id as get_google_account_by_id,
     delete_user_google_account
 )
 
