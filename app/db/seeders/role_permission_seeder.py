@@ -5,7 +5,7 @@ import sqlite3
 
 from app.db.cruds.users.roles_crud import add_role, get_role_by_name
 from app.db.cruds.users.permissions_crud import add_permission, get_permission_by_key
-from app.db.cruds.role_permissions_crud import add_permission_to_role
+from app.db.cruds.users.role_permissions_crud import add_permission_to_role
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

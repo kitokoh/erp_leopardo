@@ -151,6 +151,7 @@ from app.telemetry import telemetry_manager
 from app.gui.dialogs.telemetry_consent_dialog import TelemetryConsentDialog
 from app.db import db_manager
 
+
 class UpdateCheckThread(QThread):
     """Worker thread to check for updates in the background."""
     def __init__(self, parent):
@@ -554,6 +555,7 @@ class DocumentManager(QMainWindow):
 
         # Initialize telemetry system
         self.initialize_telemetry()
+
 
 
 
@@ -3547,3 +3549,4 @@ class DocumentManager(QMainWindow):
             telemetry_manager.track_event("app_started")
         else:
             logging.info("Telemetry consent is disabled. TelemetryManager will not be started.")
+

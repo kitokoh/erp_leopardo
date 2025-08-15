@@ -9,11 +9,12 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QLocale, QDate # Added QLocale, QDate
 
-import db as db_manager
-from auth.permissions import has_permission, P_MANAGE_CLIENT_DOCUMENTS
-# SAVTicketDialog will be imported locally or passed if it's a shared component.
-# For now, assume it might be imported locally if specific to SAV.
-# from sav.ticket_dialog import SAVTicketDialog # Placeholder
+from app import db as db_manager
+from app.auth.permissions import has_permission, P_MANAGE_CLIENT_DOCUMENTS
+from app.utils.app_constants import SUPPORTED_LANGUAGES
+
+# Assuming ClientDocumentNoteDialog is passed or imported if self-contained
+# For now, it will be passed via constructor from ClientMainWidget
 from PyQt5.QtWidgets import QGroupBox
 from PyQt5.QtCore import QDateTime
 from PyQt5.QtWidgets import QDialog
@@ -35,7 +36,7 @@ class SAVTab(QWidget):
             self.SAVTicketDialog = self.parent_widget.SAVTicketDialog
         else:
             try:
-                from sav.ticket_dialog import SAVTicketDialog as SAVTicketDialogModule
+                from app.sav.ticket_dialog import SAVTicketDialog as SAVTicketDialogModule
                 self.SAVTicketDialog = SAVTicketDialogModule
                 logging.info("SAVTab: SAVTicketDialog imported locally.")
             except ImportError:
@@ -473,5 +474,3 @@ class SAVTab(QWidget):
 
     def refresh_tab_data(self):
         self.update_sav_tab_visibility_and_load_data()
-
-

@@ -2,20 +2,19 @@
 import logging
 import os
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QPushButton, QMessageBox, QApplication,
-    QGroupBox, QLabel, QTableWidget, QTableWidgetItem, QHBoxLayout,
-    QHeaderView, QAbstractItemView, QDialog  # Added QDialog, QGroupBox, QLabel, etc.
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QTableWidget,
+    QTableWidgetItem, QHeaderView, QAbstractItemView, QMessageBox, QApplication,
+    QGroupBox, QDialog
 )
 from PyQt5.QtGui import QIcon, QDesktopServices
-from PyQt5.QtCore import Qt, QUrl, QLocale, QDate # Added QLocale, QDate
+from PyQt5.QtCore import Qt, QUrl, QLocale, QDate
 
-import db as db_manager # This should give access to db.cruds.invoices_crud
-from db.cruds.invoices import invoices_crud
-# from invoicing.final_invoice_data_dialog import FinalInvoiceDataDialog # Already present
-from invoicing.record_payment_dialog import RecordPaymentDialog # To be created/imported
-from utils.document_manager_logic import create_final_invoice_and_update_db
-from auth.permissions import has_permission, P_MANAGE_CLIENT_BILLING, P_VIEW_CLIENT_BILLING
-from utils.file_utils import get_document_full_path # For opening PDF
+from app import db as db_manager
+from app.db.cruds.invoices import invoices_crud
+from app.invoicing.record_payment_dialog import RecordPaymentDialog
+from app.utils.document_manager_logic import create_final_invoice_and_update_db
+from app.auth.permissions import has_permission, P_MANAGE_CLIENT_BILLING, P_VIEW_CLIENT_BILLING
+from app.utils.file_utils import get_document_full_path
 
 class BillingTab(QWidget):
     def __init__(self, client_info: dict, current_user_info: dict,
@@ -244,29 +243,10 @@ class BillingTab(QWidget):
             # The function get_document_full_path should handle the logic of joining these.
 
             # We need the base path for the client. This might be stored in client_info or fetched.
-            # For now, let's assume ClientDocuments.file_path_relative is relative to a base client documents directory.
-            # And file_name_on_disk is the actual file name.
-
-            # The function `get_document_full_path` should ideally take `client_info` or `client_id`
-            # and the `doc_details` (or parts of it) to construct the full path.
-            # Let's assume `get_document_full_path` can derive it from `self.config.CLIENTS_BASE_DIR`
-            # and the client/document specific parts.
-
-            # Re-checking `get_document_full_path` signature from `utils/app_utils.py` (if available)
-            # If it's `get_document_full_path(config, client_id, project_identifier, relative_doc_path, filename)`
-            # Then relative_doc_path would be doc_details['file_path_relative'] and filename would be doc_details['file_name_on_disk']
-
-            # Let's assume `file_path_relative` in `ClientDocuments` is the path from the root of *all* client documents
-            # and `file_name_on_disk` is the actual name.
+            # For now, let's assume `ClientDocuments.file_path_relative` is relative to a base client documents directory.
+            # And `file_name_on_disk` is the actual file name.
             # So, full_path = os.path.join(self.config.CLIENTS_DOCUMENTS_BASE_DIR, relative_path, file_name_on_disk)
             # But it's better to use a utility function if available.
-
-            # Simplification: Assuming `file_path_relative` is already the path from some known root
-            # and `file_name_on_disk` is the file.
-            # Let's assume `ClientDocuments.file_path_relative` is the directory and `file_name_on_disk` is the file.
-            # The `create_final_invoice_and_update_db` stores `file_path_relative` as something like `client_X/project_Y`
-            # and `file_name_on_disk` as `invoice_123.pdf`.
-            # So, the full path would be BASE_CLIENT_DOCS_DIR / file_path_relative / file_name_on_disk.
 
             # The `get_document_full_path` in `app_utils.py` is:
             # get_document_full_path(app_config, client_default_base_folder, relative_file_path, file_name_on_disk)
@@ -327,7 +307,7 @@ class BillingTab(QWidget):
             return
 
         # Need to import FinalInvoiceDataDialog if not already. It is.
-        from invoicing.final_invoice_data_dialog import FinalInvoiceDataDialog
+        from app.invoicing.final_invoice_data_dialog import FinalInvoiceDataDialog
         dialog = FinalInvoiceDataDialog(client_id=client_id, current_user_id=self.current_user_info.get('user_id'), config=self.config, parent=self)
         if dialog.exec_() == QDialog.Accepted:
             invoice_data_from_dialog = dialog.get_invoice_data() # Renamed to avoid conflict
@@ -408,4 +388,3 @@ class BillingTab(QWidget):
         self.load_invoices_table()
         self.apply_permissions_to_tab() # Re-apply permissions which might affect visibility
         logging.info("BillingTab refreshed.")
-

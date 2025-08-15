@@ -88,6 +88,7 @@ class CRMModule(QMainWindow):
 
     def init_app(self):
         # 1. Configure logging as the very first step.
+        logging.info("STEP 1: Setting up logging.")
         setup_logging()
         logging.info("Application starting...")
         logging.info(f"CONFIGURED DATABASE_PATH: {CONFIG.get('database_path', 'NOT FOUND IN CONFIG')}")
@@ -96,6 +97,7 @@ class CRMModule(QMainWindow):
         atexit.register(logging.shutdown)
         logging.info("logging.shutdown registered with atexit.")
 
+        logging.info("STEP 2: Setting up database connection.")
         # Set the database configuration for db.connection module
         # This must be done after app_setup.CONFIG is loaded and before any db operations
         if hasattr(db, 'connection') and hasattr(db.connection, 'set_db_config'):
@@ -105,9 +107,10 @@ class CRMModule(QMainWindow):
             logging.error("main.py: Could not find db.connection.set_db_config. DB calls might fail.")
         # Initialize the database. This function now encapsulates all DB setup.
         initialize_database(CONFIG, PROJECT_ROOT)
+        logging.info("STEP 2: Database setup complete.")
 
         # --- Import DB-dependent modules AFTER initialization ---
-
+        logging.info("STEP 3: Importing DB-dependent modules.")
         from app.db.db_seed import seed_all_data as run_seed
         from app.db.seeders.hidroguc_product_seeder import seed_hidroguc_products as seed_only_hidroguc_products
         from app.db.connection import get_db_connection
@@ -115,9 +118,10 @@ class CRMModule(QMainWindow):
         from app.db.cruds.users import users_crud
         from app.db.cruds.misc.companies_crud import get_all_companies, add_company
         # --- End DB-dependent imports ---
-
+        logging.info("STEP 3: DB-dependent modules imported.")
 
         # Seed Hidroguc products with proper session management
+        logging.info("STEP 4: Seeding Hidroguc products.")
         db_session_for_hidroguc = None
         try:
             db_session_for_hidroguc = get_db_connection()
@@ -134,8 +138,10 @@ class CRMModule(QMainWindow):
         finally:
             if db_session_for_hidroguc:
                 db_session_for_hidroguc.close()
+        logging.info("STEP 4: Hidroguc products seeding complete.")
 
         # Set the configuration for document_generator.context_builder
+        logging.info("STEP 5: Configuring document generator.")
         try:
             from app.document_generator import context_builder as doc_gen_context_builder
             if hasattr(doc_gen_context_builder, 'set_document_generator_config'):
@@ -147,8 +153,10 @@ class CRMModule(QMainWindow):
             logging.error("main.py: Failed to import document_generator.context_builder to set its config.")
         except Exception as e_docgen_conf:
             logging.error(f"main.py: Error setting document_generator config: {e_docgen_conf}", exc_info=True)
+        logging.info("STEP 5: Document generator configuration complete.")
 
         # --- Token Cleanup on Startup ---
+        logging.info("STEP 6: Cleaning up expired tokens.")
         conn_cleanup = None
         try:
             conn_cleanup = get_db_connection() # Get a connection for cleanup tasks
@@ -172,6 +180,7 @@ class CRMModule(QMainWindow):
             if conn_cleanup:
                 conn_cleanup.close()
         # --- End Token Cleanup ---
+        logging.info("STEP 6: Token cleanup complete.")
 
         # The session timeout is now managed within the SessionManager.
         # timeout_minutes = CONFIG.get("session_timeout_minutes", 30)
@@ -180,12 +189,17 @@ class CRMModule(QMainWindow):
         logging.info(f"SessionManager initialized with a timeout of {timeout_minutes} minutes.")
 
         # 2. Create QApplication Instance
+        logging.info("STEP 7: Creating QApplication instance.")
         app = QApplication.instance() or QApplication(sys.argv)
+        logging.info("STEP 7: QApplication instance created.")
 
         # 3. Setup basic Qt application settings
+        logging.info("STEP 8: Setting up Qt application.")
         setup_qt_application(app)
+        logging.info("STEP 8: Qt application setup complete.")
 
         # 4. Determine language for splash screen and translations
+        logging.info("STEP 9: Determining language.")
         current_app_lang = QLocale.system().name().split('_')[0] # Default
         try:
             language_code_from_db = get_setting('user_selected_language')
@@ -199,13 +213,17 @@ class CRMModule(QMainWindow):
         except Exception as e_lang:
             logging.error(f"Error getting language, defaulting. Error: {e_lang}")
             # current_app_lang remains system default or 'en'
+        logging.info("STEP 9: Language determined.")
 
         # 5. Display Splash Screen
+        logging.info("STEP 10: Displaying splash screen.")
         from app.ui.splash_screen import SplashWindow
         splash = SplashWindow(app_root_dir=APP_ROOT_DIR, language_code=current_app_lang)
         splash.show_splash()
+        logging.info("STEP 10: Splash screen displayed.")
 
         # 6. Load Global Stylesheet
+        logging.info("STEP 11: Loading stylesheet.")
         theme = get_setting('theme', default='Light')
         if theme == 'Dark':
             dark_theme_path = os.path.join(APP_ROOT_DIR, "resources", "styles", "dark_theme.qss")
@@ -216,15 +234,21 @@ class CRMModule(QMainWindow):
                 load_stylesheet_global(app)
         else:
             load_stylesheet_global(app)
+        logging.info("STEP 11: Stylesheet loaded.")
 
         # 7. Setup Translations
+        logging.info("STEP 12: Setting up translations.")
         setup_translations(app, current_app_lang, APP_ROOT_DIR)
+        logging.info("STEP 12: Translations setup complete.")
 
         # 9. Initialize Default Templates
+        logging.info("STEP 13: Initializing default templates.")
         initialize_default_templates(CONFIG, APP_ROOT_DIR)
         logging.info("Call to app_setup.initialize_default_templates completed (ensures template files on disk).")
+        logging.info("STEP 13: Default templates initialized.")
 
         # --- Coordinated Data Seeding ---
+        logging.info("STEP 14: Seeding data.")
         try:
             logging.info("Attempting to run data seeding if necessary...")
             db_session_for_check = db.connection.get_db_connection()
@@ -238,8 +262,10 @@ class CRMModule(QMainWindow):
         except Exception as e_seed_run:
             logging.error(f"An unexpected error occurred when calling run_seed(): {e_seed_run}", exc_info=True)
         # --- End Coordinated Data Seeding ---
+        logging.info("STEP 14: Data seeding complete.")
 
         # --- Startup Dialog Logic ---
+        logging.info("STEP 15: Handling startup dialog logic.")
         show_setup_prompt_config_value = CONFIG.get("show_initial_setup_on_startup", False)
         first_launch_detected = is_first_launch(APP_ROOT_DIR, CONFIG.get('templates_dir'), CONFIG.get('clients_dir'))
         companies_exist = bool(get_all_companies())
@@ -266,20 +292,25 @@ class CRMModule(QMainWindow):
         if should_reset_config_flag_after_dialog:
             CONFIG["show_initial_setup_on_startup"] = False
             save_config(CONFIG)
+        logging.info("STEP 15: Startup dialog logic complete.")
 
         # --- Authentication Flow ---
+        logging.info("STEP 16: Starting authentication flow.")
         auth_flow_manager = AuthFlowManager(self.session_manager, splash)
         auth_success, user_info, license_info = auth_flow_manager.execute_auth_flow()
+        logging.info("STEP 16: Authentication flow complete.")
 
         if auth_success and user_info and license_info:
             # The auth flow manager now handles starting the session.
             # We just need to create the main window.
+            logging.info("STEP 17: Authentication successful. Creating main window.")
             self.main_widget = DocumentManager(APP_ROOT_DIR, user_info, license_info, session_manager=self.session_manager)
             self.setCentralWidget(self.main_widget)
             notification_manager = NotificationManager(parent_window=self)
             QApplication.instance().notification_manager = notification_manager
             splash.finish_splash(self)
             self.showMaximized()
+            logging.info("STEP 17: Main window created.")
         else:
             # AuthFlowManager handled user cancellation or a critical failure.
             # It has already hidden the splash screen. We just need to exit.
