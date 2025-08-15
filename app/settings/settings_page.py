@@ -533,7 +533,11 @@ class SettingsPage(QWidget):
 
         self.check_license_on_startup_checkbox = QCheckBox(self.tr("Vérifier la validité de la licence au démarrage"))
         self.check_license_on_startup_checkbox.setToolTip(self.tr("Si décoché, l'application ne vérifiera pas la licence au démarrage et autorisera l'accès."))
-        behavior_layout.addRow(self.check_license_on_startup_checkbox) # Add to the form layout
+        behavior_layout.addRow(self.check_license_on_startup_checkbox)
+
+        self.telemetry_consent_checkbox = QCheckBox(self.tr("Allow anonymous usage data to be sent"))
+        self.telemetry_consent_checkbox.setToolTip(self.tr("Help improve the application by sending anonymous usage statistics."))
+        behavior_layout.addRow(self.telemetry_consent_checkbox)
 
         main_layout.addWidget(behavior_group)
 
@@ -1615,6 +1619,10 @@ class SettingsPage(QWidget):
             check_license_str = db_manager.get_setting('check_license_on_startup', default='True')
             self.check_license_on_startup_checkbox.setChecked(check_license_str.lower() == 'true')
 
+            # Load telemetry consent setting
+            telemetry_consent_str = db_manager.get_setting('telemetry_consent', default='False')
+            self.telemetry_consent_checkbox.setChecked(telemetry_consent_str.lower() == 'true')
+
             # Load theme setting
             theme_value = db_manager.get_setting('theme', default='Light')
             self.theme_combo.setCurrentText(theme_value)
@@ -1884,6 +1892,11 @@ class SettingsPage(QWidget):
             check_license_value = self.check_license_on_startup_checkbox.isChecked()
             db_manager.set_setting('check_license_on_startup', 'True' if check_license_value else 'False')
             print(f"License check on startup setting saved to DB: {check_license_value}")
+
+            # Save the telemetry consent setting directly to DB
+            telemetry_consent_value = self.telemetry_consent_checkbox.isChecked()
+            db_manager.set_setting('telemetry_consent', 'True' if telemetry_consent_value else 'False')
+            print(f"Telemetry consent setting saved to DB: {telemetry_consent_value}")
 
             # Save theme setting
             theme_value = self.theme_combo.currentText()

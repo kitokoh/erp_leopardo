@@ -147,6 +147,10 @@ from PyQt5.QtWidgets import QFrame
 from PyQt5.QtCore import QSize, QThread, pyqtSignal
 
 from app.update_checker import UpdateChecker
+from app.telemetry import telemetry_manager
+from app.gui.dialogs.telemetry_consent_dialog import TelemetryConsentDialog
+from app.db import db_manager
+
 
 class UpdateCheckThread(QThread):
     """Worker thread to check for updates in the background."""
@@ -548,6 +552,10 @@ class DocumentManager(QMainWindow):
 
         # Run a silent update check on startup
         self.run_update_check_silent()
+
+        # Initialize telemetry system
+        self.initialize_telemetry()
+
 
 
 
@@ -3523,3 +3531,22 @@ class DocumentManager(QMainWindow):
         """Runs the update check in a background thread."""
         self.update_thread = UpdateCheckThread(self)
         self.update_thread.start()
+
+    def initialize_telemetry(self):
+        """
+        Checks for telemetry consent and starts the telemetry manager if approved.
+        """
+        if TelemetryConsentDialog.should_show():
+            logging.info("Telemetry consent not set. Showing dialog.")
+            dialog = TelemetryConsentDialog(self)
+            dialog.exec_() # The dialog handles saving the setting
+
+        # After the dialog is shown (or if it wasn't needed), check the setting
+        consent_given_str = db_manager.get_setting('telemetry_consent', 'False')
+        if consent_given_str.lower() == 'true':
+            logging.info("Telemetry consent is enabled. Starting TelemetryManager.")
+            telemetry_manager.start()
+            telemetry_manager.track_event("app_started")
+        else:
+            logging.info("Telemetry consent is disabled. TelemetryManager will not be started.")
+
