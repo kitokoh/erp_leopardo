@@ -95,6 +95,7 @@ from app.db.models.users import role, rolepermissions, user, user_motivational_m
 print("Alembic env.py: All models imported.")
 
 
+
 print("Alembic env.py: Finished importing application models.")
 
 target_metadata = Base.metadata
