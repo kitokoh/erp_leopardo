@@ -126,14 +126,5 @@ class TelemetryManager:
 
         logging.info("Telemetry worker thread has stopped.")
 
-            except Empty:
-                # If the queue is empty, wait for a while
-                self.stop_event.wait(timeout=30)
-            except Exception as e:
-                logging.error(f"Error in telemetry worker thread: {e}")
-                self.stop_event.wait(timeout=60) # Wait longer after an error
-
-        logging.info("Telemetry worker thread has stopped.")
-
 # Global instance for easy access from anywhere in the app
 telemetry_manager = TelemetryManager()

@@ -62,12 +62,38 @@ from app.db.connection import Base, initialize_engine_and_session, get_db_connec
 
 # Explicitly import all modules containing SQLAlchemy models that use the central Base
 # This is crucial for Alembic's autogenerate feature to detect all tables and changes.
-print("Alembic env.py: Importing consolidated application models...")
-try:
-    from app.db.models import *
-    print("  Successfully imported all models from app.db.models")
-except ImportError as e:
-    print(f"  CRITICAL: Could not import from app.db.models: {e}")
+print("Alembic env.py: Importing all application models for metadata detection...")
+from app.db.models.clients import client, client_assignedpersonnel, client_freightforwarders, client_transporters, clientcontacts, clientdocumentnotes, clientnotes, clientorder_moneytransferagents, clientprojectproducts, clientvisits
+from app.db.models.documents import businessselecteddocuments, client_documents, defaultdocumentnotes, document_category, documenttypes, employee_document, partnerdocuments
+from app.db.models.employees import employee
+from app.db.models.leave import leave_balance, leave_request, leave_type
+from app.db.models.locations import city, country, itemlocations, itemstoragelocations
+from app.db.models.misc import (
+    activitylog, assetassignments, assetmedialinks, businessprofile,
+    businessusecases, candidateprogress, candidates, companies,
+    company_expenses, company_factures, companyassets, companypersonnel,
+    companypersonnelcontacts, contactlistmembers, contactlists, contacts,
+    contactsynclog, coverpages, coverpagetemplates, emailreminders,
+    entitycontacts, experiencemedia, experiencerelatedentities,
+    experiences, experiencetags, freightforwarders, importantdates,
+    internalstockitems, interviews, invoices, jobopenings, kpis,
+    licenses, media_items, menuconfiguration, moneytransferagents,
+    motivational_messages, partnercategories, partnercategorylink,
+    partnercontacts, partners, passwordresettokens, permissions,
+    proforma_invoice_items, proforma_invoices, recruitmentsteps,
+    referents, regions, reportconfigfields, reportconfigfilters,
+    reportconfigurations, savtickets, scheduledemails, sectors,
+    smtpconfigs, tags, tasks, teammembers, templatecategories,
+    templates, transporters, usecases
+)
+from app.db.models.orders import commande, commandedocumentnotes, commandeitems
+from app.db.models.performance import goal, performance_review, review_cycle
+from app.db.models.products import product, product_storage_locations, productdimensions, productequivalencies, productmedialinks
+from app.db.models.projects import project
+from app.db.models.settings import applicationsettings, companycalendarsettings, status_setting
+from app.db.models.users import role, rolepermissions, user, user_motivational_messages, user_saved_filters, usercalendarevents, usergoogleaccounts, usersessiontokens
+print("Alembic env.py: All models imported.")
+
 
 
 print("Alembic env.py: Finished importing application models.")
