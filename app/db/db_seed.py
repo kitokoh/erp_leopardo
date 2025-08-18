@@ -1,5 +1,14 @@
 import logging
-from app.db.connection import get_db_connection
+import sys
+import os
+
+# Ensure the app's root directory is in the Python path
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from app.config import CONFIG
+from app.db.connection import get_db_connection, set_db_config
 from app.db.seeders.location_seeder import seed_all_locations
 from app.db.seeders.role_permission_seeder import seed_roles_and_permissions
 # Import other seeders as they are created
@@ -12,6 +21,10 @@ def seed_all_data():
     logger = logging.getLogger(__name__)
     logger.info("Starting master data seeding process...")
 
+    # Set the database configuration before trying to connect
+    set_db_config(CONFIG)
+
+    conn = None  # Initialize conn to None
     try:
         conn = get_db_connection()
 
@@ -25,14 +38,16 @@ def seed_all_data():
 
     except Exception as e:
         logger.error(f"An error occurred during the master seeding process: {e}", exc_info=True)
-        if 'conn' in locals() and conn:
+        if conn:
             conn.rollback()
             logger.info("Transaction rolled back.")
     finally:
-        if 'conn' in locals() and conn:
+        if conn:
             conn.close()
             logger.info("Database connection closed.")
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+    print("Running database seeder script...")
     seed_all_data()
+    print("Seeding process finished.")

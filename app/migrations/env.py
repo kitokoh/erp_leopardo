@@ -25,23 +25,23 @@ if project_root not in sys.path:
     sys.path.append(project_root)
 
 # Now you can import your app's modules
-from config import CONFIG  # Assuming your main config dict is named CONFIG
-from db.connection import Base, initialize_engine_and_session, get_db_connection # Import Base and db setup
+from app.config import CONFIG  # Assuming your main config dict is named CONFIG
+from app.db.connection import Base, initialize_engine_and_session, get_db_connection # Import Base and db setup
 # Import all your models here so Base.metadata is populated
 # Example:
-# from accounting.models import *
-# from api.models import *  # If you have models there
-# from botpress_integration.models import *
-# from calendar_module.models import *
-# from client_management.models import * # Assuming models might be here or in subdirs
-# from conference_manager.models import *
-# from contact_manager.models import * # Assuming models might be here
-# from db.models import * # If you have a central db.models or similar
-# from media_manager.models import *
-# from project_management.models import * # Assuming models might be here
-# from recruitment.models import * # Assuming models might be here
-# from status_manager.status_models import *
-# from user_profile_management.models import *
+# from app.accounting.models import *
+# from app.api.models import *  # If you have models there
+# from app.botpress_integration.models import *
+# from app.calendar_module.models import *
+# from app.client_management.models import * # Assuming models might be here or in subdirs
+# from app.conference_manager.models import *
+# from app.contact_manager.models import * # Assuming models might be here
+# from app.db.models import * # If you have a central db.models or similar
+# from app.media_manager.models import *
+# from app.project_management.models import * # Assuming models might be here
+# from app.recruitment.models import * # Assuming models might be here
+# from app.status_manager.status_models import *
+# from app.user_profile_management.models import *
 # ... and so on for every module that defines SQLAlchemy models
 
 # Ensure all models are loaded by importing them.
@@ -55,8 +55,8 @@ from db.connection import Base, initialize_engine_and_session, get_db_connection
 # You might need to explicitly import each module containing models.
 # For example, if your models are in db/models/user.py, db/models/product.py, etc.
 # you would do:
-# from db.models.user import User
-# from db.models.product import Product
+# from app.db.models.user import User
+# from app.db.models.product import Product
 # For now, we rely on Base being populated when the app runs initialize_engine_and_session.
 # This might require manual creation of initial migration scripts if autogenerate misses tables.
 
@@ -64,10 +64,10 @@ from db.connection import Base, initialize_engine_and_session, get_db_connection
 # This is crucial for Alembic's autogenerate feature to detect all tables and changes.
 print("Alembic env.py: Importing consolidated application models...")
 try:
-    from db.models import *
-    print("  Successfully imported all models from db.models")
+    from app.db.models import *
+    print("  Successfully imported all models from app.db.models")
 except ImportError as e:
-    print(f"  CRITICAL: Could not import from db.models: {e}")
+    print(f"  CRITICAL: Could not import from app.db.models: {e}")
 
 
 print("Alembic env.py: Finished importing application models.")

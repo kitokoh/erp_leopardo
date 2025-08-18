@@ -46,8 +46,12 @@ def seed_countries_from_geojson(conn: sqlite3.Connection, logger: logging.Logger
     added_count = 0
     skipped_count = 0
     for feature in geojson_data['features']:
-        country_name = feature['properties']['name']
-        country_iso_a2 = feature['properties']['iso_a2']
+        country_name = feature['properties'].get('name')
+        country_iso_a2 = feature['properties'].get('iso_a2')
+
+        if not country_name:
+            skipped_count += 1
+            continue
 
         existing_country = get_country_by_name(country_name, conn=conn)
         if existing_country:
