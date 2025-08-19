@@ -9,7 +9,7 @@ from typing import Optional, List, Dict, Any, Union
 
 # Attempt to import ProformaInvoice model for type hinting
 try:
-    from app.db.models.misc.proforma_invoices import ProformaInvoice
+    from app.models.db.misc.proforma_invoices import ProformaInvoice
 except ImportError:
     logging.warning("Could not import ProformaInvoice from db.models.misc. Type hinting will use Any.")
     ProformaInvoice = Any # Fallback type

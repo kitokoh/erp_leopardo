@@ -5,7 +5,7 @@ from .edit_dialog import ProductEditDialog
 from app.db.cruds.products.products_crud import products_crud_instance
 from app.utils import html_to_pdf_util
 # Import for RBAC
-from app.auth.permissions import has_permission, P_MANAGE_GLOBAL_PRODUCTS, P_VIEW_GLOBAL_PRODUCTS
+from app.services.auth.permissions import has_permission, P_MANAGE_GLOBAL_PRODUCTS, P_VIEW_GLOBAL_PRODUCTS
 
 class ProductManagementPage(QWidget):
     def __init__(self, current_user_info: dict, parent=None): # Added current_user_info

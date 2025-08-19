@@ -60,7 +60,7 @@ def mock_user_factory() -> Callable[[str, str], UserInDB]:
         return UserInDB(user_id=user_id, username=f"user_{user_id}", email=f"user_{user_id}@example.com", role=role, is_active=True, full_name=f"User {user_id}")
     return _create_mock_user
 
-from app.db.models.users.user import User
+from app.models.db.users.user import User
 from typing import Callable
 
 @pytest.fixture

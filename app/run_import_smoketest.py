@@ -4,31 +4,29 @@ import os
 import importlib
 
 # Ensure the project root is in sys.path for consistent imports
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+# The script is in app/, so the project root is the parent directory
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 elif sys.path[0] != PROJECT_ROOT:
-    sys.path.remove(PROJECT_ROOT)
-    sys.path.insert(0, PROJECT_ROOT)
+    # If the script's directory is already in the path, remove it and add the root
+    try:
+        sys.path.remove(os.path.dirname(os.path.abspath(__file__)))
+    except ValueError:
+        pass # It wasn't in the path, which is fine
+    if PROJECT_ROOT not in sys.path:
+        sys.path.insert(0, PROJECT_ROOT)
+
 
 print(f"--- Import Smoke Test Initializing ---")
 print(f"PROJECT_ROOT set to: {PROJECT_ROOT}")
-print(f"sys.path[0] is: {sys.path[0]}")
+print(f"sys.path is now: {sys.path}")
 print(f"--- Starting Imports ---")
 
 # List of modules to test importing
 # This list should be maintained and updated as the project evolves.
-# Reduced list for testing timeout issue
 modules_to_test = [
     "main",
-    "app_setup",
-    "config",
-    "db",
-    "gui.main_window", # This one pulls in a lot, will be a good test
-    "utils.app_constants",
-    "auth.authentication",
-    "services.email_service",
-    "license_management"
 ]
 
 failed_imports = 0

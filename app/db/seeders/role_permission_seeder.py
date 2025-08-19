@@ -9,7 +9,9 @@ from app.db.cruds.users.role_permissions_crud import add_permission_to_role
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-def seed_roles_and_permissions(conn: sqlite3.Connection, logger: logging.Logger):
+from sqlalchemy.orm import Session
+
+def seed_roles_and_permissions(db: Session, logger: logging.Logger):
     """
     Seeds roles, permissions, and their relationships from the default_roles_permissions.json file.
     """
@@ -28,22 +30,23 @@ def seed_roles_and_permissions(conn: sqlite3.Connection, logger: logging.Logger)
     for perm_data in data.get("permissions", []):
         key = perm_data["key"]
         all_permission_keys.append(key)
-        existing_perm = get_permission_by_key(key, conn=conn)
+        existing_perm = get_permission_by_key(db, key)
         if not existing_perm:
-            add_permission(key, perm_data["description"], conn=conn)
+            add_permission(db, key, perm_data["description"])
             logger.info(f"Added permission: {key}")
     logger.info("Finished seeding Permissions table.")
 
     # 2. Seed Roles and RolePermissions
     for role_data in data.get("roles", []):
         role_name = role_data["name"]
-        existing_role = get_role_by_name(role_name, conn=conn)
+        existing_role = get_role_by_name(db, role_name)
         if existing_role:
-            role_id = existing_role['role_id']
+            role_id = existing_role.role_id
             logger.info(f"Role '{role_name}' already exists with ID {role_id}.")
         else:
-            role_id = add_role(role_name, role_data["description"], conn=conn)
-            if role_id:
+            new_role = add_role(db, role_name, role_data["description"])
+            if new_role:
+                role_id = new_role.role_id
                 logger.info(f"Added role '{role_name}' with ID {role_id}.")
             else:
                 logger.error(f"Failed to add role '{role_name}'. Skipping its permissions.")
@@ -55,10 +58,7 @@ def seed_roles_and_permissions(conn: sqlite3.Connection, logger: logging.Logger)
             permissions_to_assign = all_permission_keys
 
         for perm_key in permissions_to_assign:
-            # We don't need to check if perm_key exists in the permissions table
-            # because add_permission_to_role should handle that (or fail gracefully).
-            # The foreign key constraint will enforce integrity.
-            add_permission_to_role(role_id, perm_key, conn=conn)
+            add_permission_to_role(db, role_id, perm_key)
 
         logger.info(f"Assigned {len(permissions_to_assign)} permissions to role '{role_name}'.")
 

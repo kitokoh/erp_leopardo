@@ -6,6 +6,19 @@ from PyQt5.QtWidgets import QMessageBox, QApplication
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt, QLibraryInfo, QTranslator, QLocale
 
+# Import the function directly to avoid circular import issues with the 'db' package
+from app.db.connection import initialize_engine_and_session
+
+def handle_critical_error(message, details=""):
+    """Handles critical errors by logging and exiting, or showing a message box."""
+    logging.critical(f"{message}: {details}", exc_info=True)
+    if os.environ.get("TESTING") == "1":
+        print(f"CRITICAL ERROR: {message}\n{details}")
+        sys.exit(1)
+    else:
+        QMessageBox.critical(None, "Erreur Critique", f"{message}\n{details}")
+        sys.exit(1)
+
 def initialize_database(config, project_root):
     """
     Handles the entire database setup process:
@@ -34,26 +47,20 @@ def initialize_database(config, project_root):
         logging.info("Alembic upgrade head command completed.")
 
     except ImportError:
-        logging.critical("Alembic is not installed. Cannot proceed with database migrations.", exc_info=True)
-        QMessageBox.critical(None, "Erreur Critique", "Alembic n'est pas installé. L'application ne peut pas démarrer.")
-        sys.exit(1)
+        handle_critical_error("Alembic n'est pas installé. L'application ne peut pas démarrer.", "Alembic is not installed. Cannot proceed with database migrations.")
     except Exception as e_alembic:
-        logging.critical(f"Alembic migration failed: {e_alembic}", exc_info=True)
-        QMessageBox.critical(None, "Erreur de Migration", f"Une erreur critique est survenue lors de la migration de la base de données:\\n{e_alembic}")
-        sys.exit(1)
+        handle_critical_error("Une erreur critique est survenue lors de la migration de la base de données.", str(e_alembic))
+
+    # Now that migrations are done, initialize the ORM engine
+    try:
+        initialize_engine_and_session(config)
+        logging.info("SQLAlchemy engine and session have been initialized.")
+    except Exception as e_orm_init:
+        handle_critical_error("Impossible d'initialiser le moteur de la base de données ORM.", str(e_orm_init))
 
     # These imports are inside the function because they depend on the db path and alembic migrations running first
-    import db
     from app.db.db_seed import seed_all_data as run_seed
     from app.user_profile_management.database_setup import create_tables as create_user_profile_tables, seed_data as seed_user_profile_data
-
-    if hasattr(db, 'connection') and hasattr(db.connection, 'initialize_engine_and_session'):
-        db.connection.initialize_engine_and_session(config)
-        logging.info("SQLAlchemy engine and session have been initialized.")
-    else:
-        logging.critical("Could not find db.connection.initialize_engine_and_session. Cannot create ORM engine.")
-        QMessageBox.critical(None, "Erreur Critique", "Impossible d'initialiser le moteur de la base de données ORM.")
-        sys.exit(1)
 
     logging.info("Table creation is now handled by Alembic migrations. Skipping redundant create_all call.")
 

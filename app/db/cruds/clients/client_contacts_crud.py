@@ -1,8 +1,8 @@
 # db/cruds/clients/client_contacts_crud.py
 import logging
 from app.db.generic_crud import _manage_conn
-from app.db.models.clients.clientcontacts import Clientcontacts
-from app.db.models.clients.client import Client
+from app.models.db.clients.clientcontacts import Clientcontacts
+from app.models.db.clients.client import Client
 
 logger = logging.getLogger(__name__)
 

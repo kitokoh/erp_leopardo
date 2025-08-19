@@ -10,12 +10,12 @@ sys.path.insert(0, project_root)
 from PyQt5.QtWidgets import QDialog
 from alembic.config import Config as AlembicConfig
 from alembic import command
-from app.app_setup import setup_logging, APP_ROOT_DIR, CONFIG
+from app.core.app_setup import setup_logging, APP_ROOT_DIR, CONFIG
 from app.db.connection import initialize_engine_and_session, set_db_config
 from app.db.db_seed import seed_all_data
-from app.gui.dialogs.login_dialog import LoginDialog
-from app.gui.main_window import DocumentManager
-from app.auth import authentication
+from app.views.gui.dialogs.login_dialog import LoginDialog
+# from app.views.gui.main_window import DocumentManager # Temporarily disabled for login test
+from app.services.auth import authentication
 
 def run_migrations():
     """Finds the alembic.ini file and runs migrations."""
@@ -50,6 +50,9 @@ def main():
     # 1. Setup Logging
     setup_logging()
     logging.info("Application starting up...")
+    from app.core.config import APP_ROOT_DIR, DATABASE_PATH
+    print(f"APP_ROOT_DIR: {APP_ROOT_DIR}")
+    print(f"DATABASE_PATH: {DATABASE_PATH}")
 
     # 2. Load Configuration
     # load_config() is called in app_setup, which is imported.
@@ -116,22 +119,26 @@ def main():
         if success and user_info:
             logging.info(f"Login successful for user: {user_info.get('username')}")
 
-            # 6. Instantiate and show the Main Window
-            try:
-                main_window = DocumentManager(
-                    app_root_dir=APP_ROOT_DIR,
-                    current_user_info=user_info,
-                    current_license_info=license_info,
-                    # session_manager can be added here if needed
-                )
-                main_window.show()
-                logging.info("Main window (DocumentManager) shown.")
+            # 6. Instantiate and show the Main Window (Temporarily commented out to test login)
+            # try:
+            #     main_window = DocumentManager(
+            #         app_root_dir=APP_ROOT_DIR,
+            #         current_user_info=user_info,
+            #         current_license_info=license_info,
+            #         # session_manager can be added here if needed
+            #     )
+            #     main_window.show()
+            #     logging.info("Main window (DocumentManager) shown.")
 
-                # 7. Start Event Loop
-                sys.exit(app.exec_())
-            except Exception as e:
-                logging.critical(f"Failed to create or show main window: {e}", exc_info=True)
-                QMessageBox.critical(None, "Application Error", f"Failed to create the main application window: {e}")
+            #     # 7. Start Event Loop
+            #     sys.exit(app.exec_())
+            # except Exception as e:
+            #     logging.critical(f"Failed to create or show main window: {e}", exc_info=True)
+            #     QMessageBox.critical(None, "Application Error", f"Failed to create the main application window: {e}")
+
+            # For testing, just show a success message and exit
+            QMessageBox.information(None, "Login Successful", "Login was successful. The main window is currently disabled for testing.")
+            sys.exit(0)
 
         else:
             logging.warning("Login failed or was cancelled.")

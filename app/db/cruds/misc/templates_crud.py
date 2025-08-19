@@ -6,7 +6,7 @@ import logging
 from typing import List, Optional, Union # Added Union
 import sys # Add sys for path manipulation
 
-from app import config
+from app.core import config
 
 from ..generic_crud import _manage_conn
 from .template_categories_crud import add_template_category, get_template_category_by_name

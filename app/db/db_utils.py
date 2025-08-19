@@ -10,7 +10,7 @@ import shutil
 # --- Configuration Import ---
 # Assuming main.py or the entry script handles adding project root to sys.path
 try:
-    from app import config # This should now find config.py at the root if sys.path is correct
+    from app.core import config # This should now find config.py at the root if sys.path is correct
     db_config = config # Alias config as db_config for compatibility
 except ImportError as e:
     logging.critical(f"CRITICAL: config.py not found. Ensure project root is in sys.path. Error: {e}")

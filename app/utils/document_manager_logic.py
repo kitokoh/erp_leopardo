@@ -5,7 +5,7 @@ import sqlite3
 from datetime import datetime, timedelta
 from PyQt5.QtWidgets import QMessageBox, QDialog, QInputDialog
 
-from app.client_management.client_controller import ClientController
+from app.views.client_management.client_controller import ClientController
 from app.controllers.contact_controller import ContactController
 from app.db.cruds.misc.locations_crud import get_country_by_id, get_city_by_id
 from app.db.cruds.misc.status_settings_crud import get_status_setting_by_name, get_status_setting_by_id
@@ -15,8 +15,8 @@ from app.db.cruds.projects.tasks_crud import add_task
 from app.db.cruds.misc.contacts_crud import get_contact_by_email, add_contact, update_contact, link_contact_to_client, get_contacts_for_client, update_client_contact_link
 from app.db.cruds.products.products_crud import products_crud_instance
 from app.db.cruds.clients.client_project_products_crud import add_product_to_client_or_project, get_products_for_client_or_project
-from app.gui.dialogs import ContactDialog, ProductDialog, CreateDocumentDialog
-from app.gui.dialogs.edit_client_dialog import EditClientDialog
+from app.views.gui.dialogs import ContactDialog, ProductDialog, CreateDocumentDialog
+from app.views.gui.dialogs.edit_client_dialog import EditClientDialog
 from .app_utils import sanitize_foldername
 import logging
 from app.db.cruds.misc.activity_logs_crud import add_activity_log

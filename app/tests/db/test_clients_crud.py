@@ -12,9 +12,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 
 # Import the new models
 from app.db.connection import Base
-from app.db.models.clients.client import Client
-from app.db.models.settings.status_setting import StatusSetting
-from app.db.models.users.user import User
+from app.models.db.clients.client import Client
+from app.models.db.settings.status_setting import StatusSetting
+from app.models.db.users.user import User
 # Import the instance for testing
 from app.db.cruds.clients.clients_crud import clients_crud_instance
 

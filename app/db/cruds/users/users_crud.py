@@ -9,9 +9,9 @@ from sqlalchemy.sql import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.utils import hash_password as util_hash_password, verify_password as util_verify_password
-from ..generic_crud import _manage_conn
-from app.db.models.users.user import User
-from app.db.models.users.role import Role
+from app.db.generic_crud import _manage_conn
+from app.models.db.users.user import User
+from app.models.db.users.role import Role
 
 module_logger = logging.getLogger(__name__)
 
@@ -107,29 +107,19 @@ def add_user(db: Session, username: str, password: str, role_id: int, full_name:
             db.rollback()
         return None
 
-def get_user_by_username(db: Session, username: str, logger_passed: logging.Logger | None = None) -> dict | None:
+def get_user_by_username(db: Session, username: str, logger_passed: logging.Logger | None = None) -> User | None:
     current_logger = logger_passed if logger_passed else module_logger
-    sql_select_part = "SELECT u.*, r.role_name FROM Users u JOIN Roles r ON u.role_id = r.role_id"
-
-    # This query specifically finds active, non-deleted users.
-    sql_sqlite = f"{sql_select_part} WHERE u.username = ? AND u.is_active = 1 AND (u.is_deleted = 0 OR u.is_deleted IS NULL)"
-    sql_sa = text(f"{sql_select_part} WHERE u.username = :username AND u.is_active = 1 AND (u.is_deleted = 0 OR u.is_deleted IS NULL)")
-
-    params_sa = {"username": username}
-    params_sqlite = (username,)
-
-    db_obj, dialect = _get_cursor_and_dialect(db)
-    if not db_obj or not dialect:
-        current_logger.error(f"Unsupported connection type: {type(db)}")
+    print(f"Searching for user: {username}")
+    try:
+        user = db.query(User).filter(User.username == username, User.is_active == True, User.is_deleted == False).first()
+        if user:
+            print(f"User '{username}' found. Hash: {user.hashed_password}")
+        else:
+            print(f"User '{username}' not found.")
+        return user
+    except SQLAlchemyError as e:
+        current_logger.error(f"Database error getting user by username '{username}': {e}", exc_info=True)
         return None
-
-    user_data = _fetch_one_as_dict(db_obj, sql_sa, sql_sqlite, params_sa, params_sqlite, dialect, current_logger)
-
-    if user_data:
-        current_logger.debug(f"User '{username}' found. Hash: {user_data.get('hashed_password')}")
-    else:
-        current_logger.debug(f"User '{username}' not found.")
-    return user_data
 
 def get_any_user_by_username(db: Session, username: str, logger_passed: logging.Logger | None = None) -> dict | None:
     """Fetches a user by username, regardless of their is_active or is_deleted status."""

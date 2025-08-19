@@ -17,7 +17,7 @@ from app.db.cruds.products import products_crud
 from app.db.cruds.projects import projects_crud
 from app.db.cruds.misc.status_settings_crud import get_all_status_settings, get_status_setting_by_name
 from app.db.cruds.clients import client_project_products_crud # Added for linking products to client
-from app.gui.dialogs.product_dialog import ProductDialog
+from app.views.gui.dialogs.product_dialog import ProductDialog
 
 
 

@@ -7,13 +7,13 @@ from typing import Generator, Optional, Any, Dict, Callable, List as PyList
 from datetime import date, datetime
 
 # Adjust these imports based on your project structure
-from app.db.models.base import Base
-from app.db.models.users.user import User
-from app.db.models.users.employee import Employee
-from app.db.models.performance.goal import Goal, GoalStatusEnum
-from app.db.models.performance.review_cycle import ReviewCycle
-from app.db.models.performance.performance_review import PerformanceReview, PerformanceReviewStatusEnum
-from app.db.models.performance.performance_review_goal_link import performance_review_goals_link
+from app.models.db.base import Base
+from app.models.db.users.user import User
+from app.models.db.users.employee import Employee
+from app.models.db.performance.goal import Goal, GoalStatusEnum
+from app.models.db.performance.review_cycle import ReviewCycle
+from app.models.db.performance.performance_review import PerformanceReview, PerformanceReviewStatusEnum
+from app.models.db.performance.performance_review_goal_link import performance_review_goals_link
 from app.api.models import (
     UserInDB,
     GoalCreate, GoalUpdate, GoalResponse,

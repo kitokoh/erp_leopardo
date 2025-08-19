@@ -10,8 +10,8 @@ from app.utils import hash_password # For creating users
 TEST_DB_PATH = "test_app_data_users_crud.db"
 
 from app.db.connection import Base
-from app.db.models.users.user import User
-from app.db.models.users.role import Role
+from app.models.db.users.user import User
+from app.models.db.users.role import Role
 
 class TestUsersCrud(unittest.TestCase):
 
