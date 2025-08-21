@@ -7,7 +7,7 @@ from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt, QLibraryInfo, QTranslator, QLocale
 
 # Import the function directly to avoid circular import issues with the 'db' package
-from app.db.connection import initialize_engine_and_session
+from app.db.connection import initialize_engine_and_session, set_db_config
 
 def handle_critical_error(message, details=""):
     """Handles critical errors by logging and exiting, or showing a message box."""
@@ -27,6 +27,7 @@ def initialize_database(config, project_root):
     - Sets up SQLAlchemy engine and session.
     - Seeds the database if it was newly created.
     """
+    set_db_config(config)
     db_path = config.get('database_path')
     db_exists = os.path.exists(db_path) if db_path else False
 
@@ -42,9 +43,28 @@ def initialize_database(config, project_root):
             raise FileNotFoundError(f"Alembic configuration file not found at: {alembic_ini_path}")
 
         alembic_cfg = AlembicConfig(alembic_ini_path)
+        alembic_cfg.set_main_option('sqlalchemy.url', config['database_url'])
         logging.info("Attempting to upgrade database schema to head using Alembic...")
         alembic_command.upgrade(alembic_cfg, "head")
         logging.info("Alembic upgrade head command completed.")
+
+        # HACK: Manually create ApplicationSettings table to bypass Alembic issue
+        try:
+            from app.db.connection import get_raw_sqlite_connection
+            conn = get_raw_sqlite_connection(config['database_path'])
+            cursor = conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS application_settings (
+                    setting_key TEXT NOT NULL PRIMARY KEY,
+                    setting_value TEXT
+                )
+            """)
+            conn.commit()
+            conn.close()
+            logging.info("HACK: Manually ensured 'application_settings' table exists.")
+        except Exception as e_hack:
+            logging.error(f"HACK: Failed to manually create application_settings table: {e_hack}")
+        # END HACK
 
     except ImportError:
         handle_critical_error("Alembic n'est pas installé. L'application ne peut pas démarrer.", "Alembic is not installed. Cannot proceed with database migrations.")

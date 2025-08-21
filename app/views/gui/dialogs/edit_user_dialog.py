@@ -9,8 +9,8 @@ from PyQt5.QtCore import Qt # Added for Qt.TextSelectableByMouse
 from PyQt5.QtGui import QIcon
 from app.db.cruds.users import users_crud, roles_crud
 from app.db.cruds.misc.activity_logs_crud import add_activity_log
-from app.auth.permissions import P_MANAGE_USERS, has_permission
-from app.utils.auth import hash_password # Import the hashing function
+from app.services.auth.permissions import P_MANAGE_USERS, has_permission
+from app.utils import hash_password # Import the hashing function
 
 logger = logging.getLogger(__name__)
 

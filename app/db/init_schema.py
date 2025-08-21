@@ -47,7 +47,7 @@ except ImportError as e_main_sqlalchemy:
 
 from sqlalchemy import Table, Column, Text # Added for reflecting Users table more explicitly
 
-from app.auth.roles import SUPER_ADMIN
+from app.services.auth.roles import SUPER_ADMIN
 
 # Import CRUD functions (taken from db/schema.py, paths adjusted for db/init_schema.py)
 from app.db.cruds.users.users_crud import get_user_by_username

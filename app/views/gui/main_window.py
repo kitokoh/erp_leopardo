@@ -82,21 +82,21 @@ from app.utils import save_config
 from app.company_management import CompanyTabWidget
 from app.settings.settings_page import SettingsPage # Import the new SettingsPage
 from app.botpress_integration.ui_components import BotpressIntegrationUI # Import Botpress UI
-from app.gui.dialogs.carrier_map_dialog import CarrierMapDialog
+from app.views.gui.dialogs.carrier_map_dialog import CarrierMapDialog
 from app.voice_input_service import VoiceInputService # Added import
 
 from app.partners.partner_main_widget import PartnerMainWidget # Partner Management
-from app.gui.widgets.inventory_browser_widget import InventoryBrowserWidget # Inventory Management
-from app.camera_management.camera_management_widget import CameraManagementWidget # Camera Management
+from app.views.gui.widgets.inventory_browser_widget import InventoryBrowserWidget # Inventory Management
+# from app.camera_management.camera_management_widget import CameraManagementWidget # Camera Management
 
 from PyQt5.QtGui import QColor, QPalette # For ClientListItemWidget text color
 
 from app.recruitment.recruitment_dashboard import RecruitmentDashboard # Import RecruitmentDashboard
 
 from app.ui.home.home_page_widget import HomePageWidget # Updated import path
-from app.gui.widgets.experience_module_widget import ExperienceModuleWidget # Added
+from app.views.gui.widgets.experience_module_widget import ExperienceModuleWidget # Added
 from app.services.download_monitor_service import DownloadMonitorService
-from app.gui.dialogs.assign_document_dialog import AssignDocumentToClientDialog
+from app.views.gui.dialogs.assign_document_dialog import AssignDocumentToClientDialog
 from app.db.cruds.clients.client_documents_crud import add_client_document # For assign dialog
 import os # For path checks in download monitor init
 from app.db.cruds.users import user_saved_filters_crud
@@ -107,13 +107,13 @@ from app.user_management.page import UserManagementPage # Import UserManagementP
 from app.calculator.main_calculator_widget import MainCalculatorWidget # Import Calculator Widget
 # from db.connection import SessionLocal as AppSessionLocal_MW # Import SessionLocal for calculator
 from app.user_management.user_menu_button import UserMenuButton # Import UserMenuButton
-from app.gui.dialogs.edit_user_dialog import EditUserDialog # For handling edit/add user requests
-from app.gui.dialogs.role_management_dialog import RoleManagementDialog # Added for Role Management
+from app.views.gui.dialogs.edit_user_dialog import EditUserDialog # For handling edit/add user requests
+from app.views.gui.dialogs.role_management_dialog import RoleManagementDialog # Added for Role Management
 from app.commande_management.commandes_dashboard_widget import CommandesDashboardWidget # Import CommandesDashboardWidget
 from app.utils.app_constants import CONFIGURABLE_MODULES # Import from new location
-from app.gui.widgets.sidebar_navigation_widget import SidebarNavigationWidget # Import de la Sidebar
-from app.gui.widgets.notification_panel import NotificationPanel
-from app.gui.widgets.categorized_completer import CategorizedCompleter, CategoryDelegate
+from app.views.gui.widgets.sidebar_navigation_widget import SidebarNavigationWidget # Import de la Sidebar
+from app.views.gui.widgets.notification_panel import NotificationPanel
+from app.views.gui.widgets.categorized_completer import CategorizedCompleter, CategoryDelegate
 
 
 # B2C Restaurant Module Import
@@ -135,7 +135,7 @@ from app.license_management import (
 )
 
 # Import for menu customization
-from app.gui.dialogs.menu_customization_dialog import MenuCustomizationDialog
+from app.views.gui.dialogs.menu_customization_dialog import MenuCustomizationDialog
 from app.utils.app_constants import CONFIGURABLE_MODULES # For menu customization and default order
 import json # For handling menu config storage
 import random
@@ -148,8 +148,8 @@ from PyQt5.QtCore import QSize, QThread, pyqtSignal
 
 from app.update_checker import UpdateChecker
 from app.telemetry import telemetry_manager
-from app.gui.dialogs.telemetry_consent_dialog import TelemetryConsentDialog
-from app.db import db_manager
+from app.views.gui.dialogs.telemetry_consent_dialog import TelemetryConsentDialog
+import app.db as db_manager
 
 
 class UpdateCheckThread(QThread):
@@ -1507,8 +1507,8 @@ class DocumentManager(QMainWindow):
 
         self.recruitment_action = QAction("👨‍💼 " + self.tr("Recrutement"), self) # Use an existing icon or add new one
         self.recruitment_action.triggered.connect(self.show_recruitment_view)
-        self.camera_management_action = QAction("📹 " + self.tr("Gestion Caméras"), self)
-        self.camera_management_action.triggered.connect(self.show_camera_management_view)
+        # self.camera_management_action = QAction("📹 " + self.tr("Gestion Caméras"), self)
+        # self.camera_management_action.triggered.connect(self.show_camera_management_view)
 
         self.experience_management_action = QAction("🧠 " + self.tr("Gestion des Connaissances"), self) # Consider a more specific icon if available
         self.experience_management_action.triggered.connect(self.show_experience_module_view)
@@ -2291,26 +2291,26 @@ class DocumentManager(QMainWindow):
         self.main_area_stack.setCurrentWidget(self.recruitment_dashboard_instance)
         logging.info("Switched to Recruitment view.")
 
-    def show_camera_management_view(self):
-        if not self.module_states.get('camera_management', True):
-            QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Gestion Caméras est désactivé dans les paramètres."))
-            logging.info("Camera Management module is disabled by settings. View not shown.")
-            return
+    # def show_camera_management_view(self):
+    #     if not self.module_states.get('camera_management', True):
+    #         QMessageBox.warning(self, self.tr("Module Désactivé"), self.tr("Le module Gestion Caméras est désactivé dans les paramètres."))
+    #         logging.info("Camera Management module is disabled by settings. View not shown.")
+    #         return
 
-        if self.camera_management_widget_instance is None:
-            logging.info("DocumentManager: Lazily creating CameraManagementWidget...")
-            self.camera_management_widget_instance = CameraManagementWidget(parent=self, current_user_id=self.current_user_id)
-            self.main_area_stack.addWidget(self.camera_management_widget_instance)
-            logging.info("DocumentManager: CameraManagementWidget instance created and added to stack.")
-            if hasattr(self.camera_management_widget_instance, 'load_initial_data'):
-                self.camera_management_widget_instance.load_initial_data()
-        else: # Widget exists, ensure user_id is current if it can change
-            if hasattr(self.camera_management_widget_instance, 'set_current_user_id'):
-                self.camera_management_widget_instance.set_current_user_id(self.current_user_id)
+    #     if self.camera_management_widget_instance is None:
+    #         logging.info("DocumentManager: Lazily creating CameraManagementWidget...")
+    #         self.camera_management_widget_instance = CameraManagementWidget(parent=self, current_user_id=self.current_user_id)
+    #         self.main_area_stack.addWidget(self.camera_management_widget_instance)
+    #         logging.info("DocumentManager: CameraManagementWidget instance created and added to stack.")
+    #         if hasattr(self.camera_management_widget_instance, 'load_initial_data'):
+    #             self.camera_management_widget_instance.load_initial_data()
+    #     else: # Widget exists, ensure user_id is current if it can change
+    #         if hasattr(self.camera_management_widget_instance, 'set_current_user_id'):
+    #             self.camera_management_widget_instance.set_current_user_id(self.current_user_id)
 
 
-        self.main_area_stack.setCurrentWidget(self.camera_management_widget_instance)
-        logging.info("Switched to Camera Management view.")
+    #     self.main_area_stack.setCurrentWidget(self.camera_management_widget_instance)
+    #     logging.info("Switched to Camera Management view.")
 
     def show_about_dialog(self): QMessageBox.about(self, self.tr("À propos"), self.tr("<b>Gestionnaire de Documents Client</b><br><br>Version 4.0<br>Application de gestion de documents clients avec templates Excel.<br><br>Développé par Saadiya Management (Concept)"))
         

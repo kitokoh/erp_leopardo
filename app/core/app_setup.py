@@ -16,7 +16,7 @@ from app.core.config import DATABASE_NAME as CENTRAL_DATABASE_NAME, CONFIG as Ap
 if getattr(sys, 'frozen', False):
     APP_ROOT_DIR = sys._MEIPASS
 else:
-    APP_ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+    APP_ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 DEFAULT_TEMPLATES_DIR = os.path.join(APP_ROOT_DIR, "resources", "templates") # Updated path
 DEFAULT_ICONS_DIR = os.path.join(APP_ROOT_DIR, "resources", "icons") # Added for icons

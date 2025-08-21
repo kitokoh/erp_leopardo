@@ -7,7 +7,7 @@ from pathlib import Path
 # The project root is one level up.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-from app.core.config import settings
+from app.core.config import CONFIG
 from alembic.config import Config
 from alembic import command
 
@@ -25,8 +25,8 @@ def main():
     alembic_cfg.set_main_option("script_location", "migrations")
 
 
-    log.info(f"Setting database URL to: {settings.db.SQLITE_URL}")
-    alembic_cfg.set_main_option("sqlalchemy.url", settings.db.SQLITE_URL)
+    log.info(f"Setting database URL to: {CONFIG['database_url']}")
+    alembic_cfg.set_main_option("sqlalchemy.url", CONFIG['database_url'])
 
 
     log.info("Running Alembic revision to generate new migration script...")

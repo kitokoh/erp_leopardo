@@ -88,9 +88,9 @@ from .dialogs import (
 
 # The following imports need to be checked for correct relative paths
 # Assuming 'dialogs' at the root level is a sibling to 'project_management'
-from gui.dialogs.manage_product_master_dialog import ManageProductMasterDialog
-from gui.dialogs.product_equivalency_dialog import ProductEquivalencyDialog
-from gui.dialogs.add_edit_milestone_dialog import AddEditMilestoneDialog
+from app.views.gui.dialogs.manage_product_master_dialog import ManageProductMasterDialog
+from app.views.gui.dialogs.product_equivalency_dialog import ProductEquivalencyDialog
+from app.views.gui.dialogs.add_edit_milestone_dialog import AddEditMilestoneDialog
 
 
 try:

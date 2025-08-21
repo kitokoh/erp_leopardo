@@ -2,7 +2,8 @@ from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QHBoxLayo
 from PyQt5.QtCore import Qt
 
 # We need the db_manager to save the setting
-from app.db import db_manager
+from app.db.cruds.misc.application_settings_crud import get_setting, set_setting
+import logging
 
 class TelemetryConsentDialog(QDialog):
     def __init__(self, parent=None):
@@ -53,13 +54,13 @@ class TelemetryConsentDialog(QDialog):
     def accept(self):
         """User agreed to send data."""
         logging.info("User consented to telemetry.")
-        db_manager.set_setting('telemetry_consent', 'True')
+        set_setting('telemetry_consent', 'True')
         super().accept()
 
     def decline(self):
         """User declined to send data."""
         logging.info("User declined telemetry.")
-        db_manager.set_setting('telemetry_consent', 'False')
+        set_setting('telemetry_consent', 'False')
         super().reject()
 
     @staticmethod
@@ -68,5 +69,5 @@ class TelemetryConsentDialog(QDialog):
         Checks if the consent dialog should be shown.
         It should be shown only if the setting has never been set before.
         """
-        consent = db_manager.get_setting('telemetry_consent')
+        consent = get_setting('telemetry_consent')
         return consent is None

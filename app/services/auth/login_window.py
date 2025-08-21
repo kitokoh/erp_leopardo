@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QPixmap, QFont, QIcon # Added QIcon
 from PyQt5.QtCore import Qt, QSettings, pyqtSignal
 from app.db.cruds.users import users_crud
-from app.auth import authentication # For the main login function and setting current user
+from app.services.auth import authentication # For the main login function and setting current user
 from app.security_module.biometric_auth import BiometricAuthenticator # For biometric verification
 
 import uuid
@@ -136,12 +136,12 @@ class LoginWindow(QDialog):
         self.face_login_button.setVisible(False) # Initially hidden
         login_buttons_layout.addWidget(self.face_login_button, 2, 0, 1, 2) # Row 2
 
-        self.voice_login_button = QPushButton("🗣️ " + self.tr("Login with Voice"))
-        self.voice_login_button.setObjectName("secondaryButton")
-        self.voice_login_button.setMinimumHeight(35)
-        self.voice_login_button.clicked.connect(self.handle_voice_login)
-        self.voice_login_button.setVisible(False) # Initially hidden
-        login_buttons_layout.addWidget(self.voice_login_button, 3, 0, 1, 2) # Row 3
+        # self.voice_login_button = QPushButton("🗣️ " + self.tr("Login with Voice"))
+        # self.voice_login_button.setObjectName("secondaryButton")
+        # self.voice_login_button.setMinimumHeight(35)
+        # self.voice_login_button.clicked.connect(self.handle_voice_login)
+        # self.voice_login_button.setVisible(False) # Initially hidden
+        # login_buttons_layout.addWidget(self.voice_login_button, 3, 0, 1, 2) # Row 3
 
         self.form_layout.addLayout(login_buttons_layout)
 
@@ -198,11 +198,6 @@ class LoginWindow(QDialog):
 
     def check_biometric_options_for_user(self):
         """
-        Checks if biometric options (fingerprint, face, voice) are available on the system
-        AND enabled for the currently entered username in the application's database.
-        Updates the visibility of corresponding biometric login buttons.
-        Called when username_input text changes or initially.
-        """
         Checks if biometric options are available and enabled for the entered username
         and updates the visibility of biometric login buttons.
         """
@@ -211,8 +206,8 @@ class LoginWindow(QDialog):
         self.fingerprint_login_button.setVisible(False)
         if hasattr(self, 'face_login_button'):
             self.face_login_button.setVisible(False)
-        if hasattr(self, 'voice_login_button'):
-            self.voice_login_button.setVisible(False)
+        # if hasattr(self, 'voice_login_button'):
+        #     self.voice_login_button.setVisible(False)
 
         if not username:
             return
@@ -235,11 +230,11 @@ class LoginWindow(QDialog):
                     self.face_login_button.setVisible(True)
                     logging.info(f"Face login option shown for user {username}")
 
-            if hasattr(self, 'voice_login_button'):
-                if self.biometric_authenticator.is_method_available("voice") and \
-                   user_data.get('is_voice_auth_enabled'):
-                    self.voice_login_button.setVisible(True)
-                    logging.info(f"Voice login option shown for user {username}")
+            # if hasattr(self, 'voice_login_button'):
+            #     if self.biometric_authenticator.is_method_available("voice") and \
+            #        user_data.get('is_voice_auth_enabled'):
+            #         self.voice_login_button.setVisible(True)
+            #         logging.info(f"Voice login option shown for user {username}")
         else:
             # User not found, ensure buttons are hidden
             logging.debug(f"User {username} not found, biometric options hidden.")
@@ -452,4 +447,3 @@ if __name__ == '__main__':
     login_window = LoginWindow()
     login_window.show()
     sys.exit(app.exec_())
-

@@ -2,57 +2,82 @@
 import sys
 import os
 import importlib
+import logging
+from pathlib import Path
 
-# Ensure the project root is in sys.path for consistent imports
-# The script is in app/, so the project root is the parent directory
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-elif sys.path[0] != PROJECT_ROOT:
-    # If the script's directory is already in the path, remove it and add the root
-    try:
-        sys.path.remove(os.path.dirname(os.path.abspath(__file__)))
-    except ValueError:
-        pass # It wasn't in the path, which is fine
-    if PROJECT_ROOT not in sys.path:
-        sys.path.insert(0, PROJECT_ROOT)
+# --- Setup Logging ---
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
-
-print(f"--- Import Smoke Test Initializing ---")
-print(f"PROJECT_ROOT set to: {PROJECT_ROOT}")
-print(f"sys.path is now: {sys.path}")
-print(f"--- Starting Imports ---")
-
-# List of modules to test importing
-# This list should be maintained and updated as the project evolves.
-modules_to_test = [
-    "main",
-]
-
-failed_imports = 0
-successful_imports = 0
-
-for module_name in modules_to_test:
-    try:
-        importlib.import_module(module_name)
-        print(f"[SUCCESS] Successfully imported '{module_name}'")
-        successful_imports += 1
-    except ImportError as e:
-        print(f"[FAILURE] Failed to import '{module_name}': {e}")
-        import traceback
-        traceback.print_exc()
-        failed_imports += 1
-    except Exception as e: # Catch other potential errors during import (like syntax errors)
-        print(f"[ERROR] An unexpected error occurred while importing '{module_name}': {e}")
-        failed_imports += 1
-
-print(f"\n--- Import Smoke Test Summary ---")
-print(f"Successfully imported: {successful_imports} module(s)")
-print(f"Failed to import:    {failed_imports} module(s)")
-
-if failed_imports > 0:
-    print("\n[RESULT] Smoke test FAILED due to import errors.")
+# --- Project Path Setup ---
+try:
+    PROJECT_ROOT = Path(__file__).resolve().parent.parent
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    logging.info(f"--- Import Smoke Test Initializing ---")
+    logging.info(f"PROJECT_ROOT set to: {PROJECT_ROOT}")
+    logging.info(f"sys.path[0] is now: {sys.path[0]}")
+except Exception as e:
+    logging.critical(f"Failed to set up PROJECT_ROOT and sys.path: {e}")
     sys.exit(1)
-else:
-    print("\n[RESULT] Smoke test PASSED. All key modules imported successfully.")
-    sys.exit(0)
+
+def find_python_modules(root_dir: Path):
+    """Finds all .py files and converts them to module import strings."""
+    modules = []
+    for path in root_dir.rglob('*.py'):
+        if path.name == '__init__.py':
+            continue  # Skip __init__.py files for direct import test
+
+        # Create module string relative to the project root
+        relative_path = path.relative_to(PROJECT_ROOT)
+        module_string = str(relative_path).replace(os.path.sep, '.').replace('.py', '')
+
+        # Exclude certain problematic or non-essential files/folders
+        if any(part in module_string for part in ['migrations.versions', 'tests', 'venv', '.venv']):
+            continue
+
+        modules.append(module_string)
+    return modules
+
+def run_test():
+    """
+    Iterates through all found Python modules and attempts to import each one.
+    Reports success or failure for each module.
+    """
+    app_dir = PROJECT_ROOT / 'app'
+    modules_to_test = find_python_modules(app_dir)
+
+    logging.info(f"\n--- Starting Import Test for {len(modules_to_test)} modules ---")
+
+    successful_imports = []
+    failed_imports = []
+
+    for module_path in modules_to_test:
+        try:
+            print(f"Attempting to import: {module_path}") # More direct print
+            logging.info(f"Attempting to import: {module_path}")
+            importlib.import_module(module_path)
+            # logging.info(f"[SUCCESS] Imported: {module_path}")
+            successful_imports.append(module_path)
+        except ImportError as e:
+            logging.error(f"[FAILURE] Failed to import '{module_path}'. Error: {e}")
+            failed_imports.append((module_path, str(e)))
+        except Exception as e:
+            logging.error(f"[ERROR] An unexpected error occurred while importing '{module_path}': {e}")
+            failed_imports.append((module_path, str(e)))
+
+    # --- Summary ---
+    logging.info("\n--- Import Smoke Test Summary ---")
+    logging.info(f"Successfully imported: {len(successful_imports)} module(s)")
+    logging.info(f"Failed to import:    {len(failed_imports)} module(s)")
+
+    if failed_imports:
+        logging.error("\n[RESULT] Smoke test FAILED. The following modules could not be imported:")
+        for module, error in failed_imports:
+            logging.error(f"  - {module}: {error}")
+        sys.exit(1)
+    else:
+        logging.info("\n[RESULT] Smoke test PASSED. All key modules imported successfully.")
+        sys.exit(0)
+
+if __name__ == "__main__":
+    run_test()

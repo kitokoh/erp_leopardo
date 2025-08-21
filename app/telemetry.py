@@ -7,7 +7,7 @@ from queue import Queue, Empty
 
 from datetime import datetime, timezone
 from ._version import __version__
-from .db import db_manager
+from app.db.cruds.misc.application_settings_crud import get_setting, set_setting
 
 # A placeholder for the telemetry server endpoint
 TELEMETRY_ENDPOINT = "https://example.com/telemetry"
@@ -54,10 +54,10 @@ class TelemetryManager:
         """
         Retrieves the anonymous user ID from settings, or creates a new one.
         """
-        user_id = db_manager.get_setting('telemetry_user_id')
+        user_id = get_setting('telemetry_user_id')
         if not user_id:
             user_id = str(uuid.uuid4())
-            db_manager.set_setting('telemetry_user_id', user_id)
+            set_setting('telemetry_user_id', user_id)
             logging.info(f"Generated new telemetry user ID: {user_id}")
         return user_id
 
@@ -127,4 +127,12 @@ class TelemetryManager:
         logging.info("Telemetry worker thread has stopped.")
 
 # Global instance for easy access from anywhere in the app
-telemetry_manager = TelemetryManager()
+telemetry_manager = None
+
+def init_telemetry(settings_manager=None):
+    """Initializes the global telemetry manager singleton."""
+    global telemetry_manager
+    if telemetry_manager is None:
+        telemetry_manager = TelemetryManager(settings_manager=settings_manager)
+        # The start() method will be called from main.py after consent check
+    return telemetry_manager

@@ -410,6 +410,13 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('link_id')
     )
 
+    # Settings Tables
+    op.create_table('application_settings',
+    sa.Column('setting_key', sa.Text(), nullable=False),
+    sa.Column('setting_value', sa.Text(), nullable=True),
+    sa.PrimaryKeyConstraint('setting_key')
+    )
+
 def downgrade() -> None:
     """Downgrade schema."""
     op.drop_table('asset_media_links')
@@ -443,3 +450,4 @@ def downgrade() -> None:
     op.drop_table('users')
     op.drop_table('roles')
     op.drop_table('permissions')
+    op.drop_table('application_settings')

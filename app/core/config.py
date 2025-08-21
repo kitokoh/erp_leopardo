@@ -46,6 +46,7 @@ LICENSE_REQUEST_SERVER_URL = "http://127.0.0.1:5678/api/license/request"
 # Central CONFIG dictionary
 CONFIG = {
     "database_type": "sqlite",
+    "database_url": f"sqlite:///{DATABASE_PATH}",
     "app_root_dir": APP_ROOT_DIR,
     "database_name": DATABASE_NAME,
     "database_path": DATABASE_PATH,
