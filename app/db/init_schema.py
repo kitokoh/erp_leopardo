@@ -36,7 +36,7 @@ try:
     # Import specific models that use MainBase and need table creation here
     from app.calculator.models import CalculationHistory
     # from other_module.models import OtherModelUsingMainBase # Example for future models
-    from app.db.models.products.product import Product as Products # Import the Products SQLAlchemy model # RESTORED
+    from app.models.db.products.product import Product as Products # Import the Products SQLAlchemy model # RESTORED
     logging.info("DEBUG_INIT_DB: Products model import from db.models.products.product RESTORED.")
     MAIN_SQLALCHEMY_COMPONENTS_LOADED = True
 except ImportError as e_main_sqlalchemy:
@@ -47,7 +47,7 @@ except ImportError as e_main_sqlalchemy:
 
 from sqlalchemy import Table, Column, Text # Added for reflecting Users table more explicitly
 
-from app.auth.roles import SUPER_ADMIN
+from app.services.auth.roles import SUPER_ADMIN
 
 # Import CRUD functions (taken from db/schema.py, paths adjusted for db/init_schema.py)
 from app.db.cruds.users.users_crud import get_user_by_username

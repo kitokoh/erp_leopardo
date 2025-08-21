@@ -19,7 +19,7 @@ _project_root_dir = os.path.abspath(os.path.join(_current_file_dir, "..", ".."))
 if _project_root_dir not in sys.path:
     sys.path.insert(0, _project_root_dir)
 
-from app.config import DATABASE_PATH
+from app.core.config import DATABASE_PATH
 
 
 logger = logging.getLogger(__name__) # Initialize logger for this module

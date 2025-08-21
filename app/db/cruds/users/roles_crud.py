@@ -79,53 +79,20 @@ def _fetch_all_as_dict_list(db_obj, sql_query, params, dialect, logger_to_use=No
         return [] # Or re-raise
 
 
-@_manage_conn
-def add_role(role_name: str, description: str = None, conn=None) -> int | None:
+from app.models.db.users.role import Role
+
+def add_role(db: Session, role_name: str, description: str = None) -> Role | None:
     """Adds a new role to the Roles table."""
-    sql_sqlite = "INSERT INTO Roles (role_name, description) VALUES (?, ?)"
-    sql_sa = sqlalchemy_text("INSERT INTO Roles (role_name, description) VALUES (:role_name, :description)")
-
-    params_sqlite = (role_name, description)
-    params_sa = {"role_name": role_name, "description": description}
-
-    db_obj, dialect = _get_cursor_and_dialect(conn)
-    if not db_obj or not dialect:
-        logger.error(f"Unsupported connection type in add_role: {type(conn)}")
-        return None
-
     try:
-        result = _execute_query(db_obj, sql_sa if dialect == "sqlalchemy" else sql_sqlite,
-                                params_sa if dialect == "sqlalchemy" else params_sqlite, dialect)
-
-        last_id = None
-        if dialect == "sqlalchemy":
-            # For SQLAlchemy with SQLite, result.lastrowid should work.
-            # For other DBs, this might need adjustment or might not be standard.
-            if result and hasattr(result, 'lastrowid'):
-                last_id = result.lastrowid
-        elif dialect == "sqlite":
-             # db_obj is a cursor here
-            if result and hasattr(result, 'lastrowid'): # result is the cursor itself from _execute_query
-                last_id = result.lastrowid
-
-
-        if last_id is not None:
-            logger.info(f"Role '{role_name}' added successfully with ID {last_id}.")
-            return last_id
-        else: # Should not happen if insert is successful and lastrowid is supported
-            logger.warning(f"Role '{role_name}' added but could not retrieve lastrowid.")
-            return None # Or some other indicator of partial success/failure
-
-    except (sqlite3.IntegrityError, SQLAlchemyError) as e: # SQLAlchemyError might wrap IntegrityError
-        if isinstance(e, SQLAlchemyError) and isinstance(e.orig, sqlite3.IntegrityError): # Unwrap for SA
-             logger.error(f"Role '{role_name}' already exists (SA).")
-        elif isinstance(e, sqlite3.IntegrityError):
-             logger.error(f"Role '{role_name}' already exists (SQLite).")
-        else: # Other SQLAlchemyError
-            logger.error(f"Database error adding role '{role_name}': {e}", exc_info=True)
-        return None
-    except (sqlite3.Error, SQLAlchemyError) as e: # Catch broader errors
-        logger.error(f"General database error adding role '{role_name}': {e}", exc_info=True)
+        new_role = Role(role_name=role_name, description=description)
+        db.add(new_role)
+        db.commit()
+        db.refresh(new_role)
+        logger.info(f"Role '{role_name}' added successfully with ID {new_role.role_id}.")
+        return new_role
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error adding role '{role_name}': {e}", exc_info=True)
         return None
 
 
@@ -147,22 +114,13 @@ def get_role_by_id(role_id: int, conn=None) -> dict | None:
                               params_sa if dialect == "sqlalchemy" else params_sqlite, dialect, logger)
 
 
-@_manage_conn
-def get_role_by_name(role_name: str, conn=None) -> dict | None:
+def get_role_by_name(db: Session, role_name: str) -> Role | None:
     """Fetches a role by its name."""
-    sql_sqlite = "SELECT * FROM Roles WHERE role_name = ?"
-    sql_sa = sqlalchemy_text("SELECT * FROM Roles WHERE role_name = :role_name")
-
-    params_sqlite = (role_name,)
-    params_sa = {"role_name": role_name}
-
-    db_obj, dialect = _get_cursor_and_dialect(conn)
-    if not db_obj or not dialect:
-        logger.error(f"Unsupported connection type in get_role_by_name: {type(conn)}")
+    try:
+        return db.query(Role).filter(Role.role_name == role_name).first()
+    except SQLAlchemyError as e:
+        logger.error(f"Database error getting role by name '{role_name}': {e}", exc_info=True)
         return None
-
-    return _fetch_one_as_dict(db_obj, sql_sa if dialect == "sqlalchemy" else sql_sqlite,
-                              params_sa if dialect == "sqlalchemy" else params_sqlite, dialect, logger)
 
 
 @_manage_conn

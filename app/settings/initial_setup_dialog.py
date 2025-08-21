@@ -13,9 +13,9 @@ from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QFormLayout
 
 # Assuming db_manager.py is in the same directory or Python path
-import db as db_manager
+from .. import db as db_manager
 # Assuming app_setup.py defines these, adjust if they are in utils or config
-from app_setup import APP_ROOT_DIR, LOGO_SUBDIR
+from ..core.app_setup import APP_ROOT_DIR, LOGO_SUBDIR
 
 
 class CompanyInfoStepDialog(QDialog):

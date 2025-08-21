@@ -25,7 +25,7 @@ if project_root not in sys.path:
     sys.path.append(project_root)
 
 # Now you can import your app's modules
-from app.config import CONFIG  # Assuming your main config dict is named CONFIG
+from app.core.config import CONFIG  # Assuming your main config dict is named CONFIG
 from app.db.connection import Base, initialize_engine_and_session, get_db_connection # Import Base and db setup
 # Import all your models here so Base.metadata is populated
 # Example:
@@ -36,7 +36,7 @@ from app.db.connection import Base, initialize_engine_and_session, get_db_connec
 # from app.client_management.models import * # Assuming models might be here or in subdirs
 # from app.conference_manager.models import *
 # from app.contact_manager.models import * # Assuming models might be here
-# from app.db.models import * # If you have a central db.models or similar
+# from app.models.db import * # If you have a central db.models or similar
 # from app.media_manager.models import *
 # from app.project_management.models import * # Assuming models might be here
 # from app.recruitment.models import * # Assuming models might be here
@@ -55,20 +55,20 @@ from app.db.connection import Base, initialize_engine_and_session, get_db_connec
 # You might need to explicitly import each module containing models.
 # For example, if your models are in db/models/user.py, db/models/product.py, etc.
 # you would do:
-# from app.db.models.user import User
-# from app.db.models.product import Product
+# from app.models.db.user import User
+# from app.models.db.product import Product
 # For now, we rely on Base being populated when the app runs initialize_engine_and_session.
 # This might require manual creation of initial migration scripts if autogenerate misses tables.
 
 # Explicitly import all modules containing SQLAlchemy models that use the central Base
 # This is crucial for Alembic's autogenerate feature to detect all tables and changes.
 print("Alembic env.py: Importing all application models for metadata detection...")
-from app.db.models.clients import client, client_assignedpersonnel, client_freightforwarders, client_transporters, clientcontacts, clientdocumentnotes, clientnotes, clientorder_moneytransferagents, clientprojectproducts, clientvisits
-from app.db.models.documents import businessselecteddocuments, client_documents, defaultdocumentnotes, document_category, documenttypes, employee_document, partnerdocuments
-from app.db.models.employees import employee
-from app.db.models.leave import leave_balance, leave_request, leave_type
-from app.db.models.locations import city, country, itemlocations, itemstoragelocations
-from app.db.models.misc import (
+from app.models.db.clients import client, client_assignedpersonnel, client_freightforwarders, client_transporters, clientcontacts, clientdocumentnotes, clientnotes, clientorder_moneytransferagents, clientprojectproducts, clientvisits
+from app.models.db.documents import businessselecteddocuments, client_documents, defaultdocumentnotes, document_category, documenttypes, employee_document, partnerdocuments
+from app.models.db.employees import employee
+from app.models.db.leave import leave_balance, leave_request, leave_type
+from app.models.db.locations import city, country, itemlocations, itemstoragelocations
+from app.models.db.misc import (
     activitylog, assetassignments, assetmedialinks, businessprofile,
     businessusecases, candidateprogress, candidates, companies,
     company_expenses, company_factures, companyassets, companypersonnel,
@@ -86,12 +86,12 @@ from app.db.models.misc import (
     smtpconfigs, tags, tasks, teammembers, templatecategories,
     templates, transporters, usecases
 )
-from app.db.models.orders import commande, commandedocumentnotes, commandeitems
-from app.db.models.performance import goal, performance_review, review_cycle
-from app.db.models.products import product, product_storage_locations, productdimensions, productequivalencies, productmedialinks
-from app.db.models.projects import project
-from app.db.models.settings import applicationsettings, companycalendarsettings, status_setting
-from app.db.models.users import role, rolepermissions, user, user_motivational_messages, user_saved_filters, usercalendarevents, usergoogleaccounts, usersessiontokens
+from app.models.db.orders import commande, commandedocumentnotes, commandeitems
+from app.models.db.performance import goal, performance_review, review_cycle
+from app.models.db.products import product, product_storage_locations, productdimensions, productequivalencies, productmedialinks
+from app.models.db.projects import project
+from app.models.db.settings import applicationsettings, companycalendarsettings, status_setting
+from app.models.db.users import role, rolepermissions, user, user_motivational_messages, user_saved_filters, usercalendarevents, usergoogleaccounts, usersessiontokens
 print("Alembic env.py: All models imported.")
 
 

@@ -10,131 +10,33 @@ from app.db.cruds.generic_crud import _manage_conn
 
 logger = logging.getLogger(__name__)
 
-# Helper functions (copied from other CRUD modules)
-# Ideally, these should be in a shared db.crud_utils module
-def _get_cursor_and_dialect(conn):
-    if isinstance(conn, (Session, Engine, SQLAlchemyConnection)):
-        return conn, "sqlalchemy"
-    elif hasattr(conn, 'cursor'):
-        return conn.cursor(), "sqlite"
-    logger.warning(f"Unsupported connection type: {type(conn)} in _get_cursor_and_dialect (role_permissions_crud).")
-    return None, None
-
-def _execute_query(db_obj, sql_query, params, dialect, logger_to_use=None):
-    current_logger = logger_to_use if logger_to_use else logger
-    try:
-        if dialect == "sqlalchemy":
-            return db_obj.execute(sql_query, params)
-        elif dialect == "sqlite":
-            return db_obj.execute(sql_query, params)
-        else:
-            current_logger.error(f"Unsupported dialect '{dialect}' in _execute_query.")
-            return None
-    except (sqlite3.Error, SQLAlchemyError) as e: # Catch both types of errors
-        current_logger.error(f"Database error in _execute_query (dialect: {dialect}): {e}", exc_info=True)
-        raise # Re-raise for @_manage_conn to handle rollback/close
-
-def _fetch_one_as_dict(db_obj, sql_query, params, dialect, logger_to_use=None):
-    current_logger = logger_to_use if logger_to_use else logger
-    try:
-        row_data = None
-        if dialect == "sqlalchemy":
-            result = db_obj.execute(sql_query, params)
-            row = result.fetchone()
-            if row: row_data = dict(row._mapping)
-        elif dialect == "sqlite":
-            db_obj.execute(sql_query, params)
-            row = db_obj.fetchone()
-            if row:
-                column_names = [desc[0] for desc in db_obj.description]
-                row_data = dict(zip(column_names, row))
-        return row_data
-    except (sqlite3.Error, SQLAlchemyError) as e:
-        current_logger.error(f"Database error in _fetch_one_as_dict (dialect: {dialect}): {e}", exc_info=True)
-        return None
-
-def _fetch_all_as_dict_list(db_obj, sql_query, params, dialect, logger_to_use=None):
-    current_logger = logger_to_use if logger_to_use else logger
-    try:
-        rows_data = []
-        if dialect == "sqlalchemy":
-            result = db_obj.execute(sql_query, params)
-            for row in result.fetchall():
-                rows_data.append(dict(row._mapping))
-        elif dialect == "sqlite":
-            db_obj.execute(sql_query, params)
-            rows = db_obj.fetchall()
-            if rows:
-                column_names = [desc[0] for desc in db_obj.description]
-                for row_item in rows:
-                    rows_data.append(dict(zip(column_names, row_item)))
-        return rows_data
-    except (sqlite3.Error, SQLAlchemyError) as e:
-        current_logger.error(f"Database error in _fetch_all_as_dict_list (dialect: {dialect}): {e}", exc_info=True)
-        return []
 
 
-@_manage_conn
-def add_permission_to_role(role_id: int, permission_key: str, conn=None) -> bool:
+from app.models.db.users.rolepermissions import RolePermissions as RolePermission
+
+def add_permission_to_role(db: Session, role_id: int, permission_key: str) -> RolePermission | None:
     """
     Assigns a permission to a role.
-    Returns True if successful or if the assignment already exists.
-    Returns False on database error.
+    Returns the new RolePermission object if successful, or the existing one.
+    Returns None on database error.
     """
-    # SQLite's "INSERT OR IGNORE" is specific.
-    # For SQLAlchemy, a more generic approach for "upsert" or "insert if not exists"
-    # might involve a preliminary check or using database-specific dialect features.
-    # For simplicity here, we'll try the insert and catch integrity errors,
-    # or rely on the "OR IGNORE" for SQLite and a plain INSERT for SA (expecting potential error).
-    # A better SA way for "if not exists" often involves checking first.
-
-    sql_sqlite = "INSERT OR IGNORE INTO RolePermissions (role_id, permission_key) VALUES (?, ?)"
-    # For SA, a plain insert. If it fails due to PK violation, it means it exists.
-    # The `OR IGNORE` is not standard SQL for all DBs SA might support.
-    # We'll assume the calling logic or DB schema handles uniqueness for SA.
-    sql_sa = sqlalchemy_text("INSERT INTO RolePermissions (role_id, permission_key) VALUES (:role_id, :permission_key)")
-
-    params_sqlite = (role_id, permission_key)
-    params_sa = {"role_id": role_id, "permission_key": permission_key}
-
-    db_obj, dialect = _get_cursor_and_dialect(conn)
-    if not db_obj or not dialect:
-        logger.error(f"Unsupported connection type in add_permission_to_role: {type(conn)}")
-        return False
-
     try:
-        if dialect == "sqlalchemy":
-            # For SA, we might need to check existence first if "OR IGNORE" is not used/portable
-            # Or, attempt insert and catch specific integrity error for "already exists"
-            try:
-                result = _execute_query(db_obj, sql_sa, params_sa, dialect)
-                if result.rowcount > 0:
-                     logger.info(f"Permission '{permission_key}' added to role ID {role_id} (SA).")
-                # If rowcount is 0 but no error, it might mean some DBs don't report rowcount for INSERT like SQLite.
-                # Or, if the DB has an "ON CONFLICT DO NOTHING" type clause used with SA, rowcount might be 0.
-                # For this simple case, we assume success if no error.
-                return True
-            except SQLAlchemyError as e_sa:
-                # Check if it's a unique constraint violation (specific error codes/classes vary by DB)
-                # This is a simplification. Real check is more complex.
-                if "UNIQUE constraint failed" in str(e_sa) or "IntegrityError" in str(type(e_sa.orig)): # Check for SQLite through SA
-                    logger.info(f"Permission '{permission_key}' likely already assigned to role ID {role_id} (SA - Integrity).")
-                    return True # Treat as success if already exists
-                raise # Re-raise other SQLAlchemy errors
-        else: # sqlite
-            result = _execute_query(db_obj, sql_sqlite, params_sqlite, dialect) # db_obj is cursor
-            if result.rowcount > 0:
-                logger.info(f"Permission '{permission_key}' added to role ID {role_id} (SQLite).")
-            else:
-                logger.info(f"Permission '{permission_key}' likely already assigned to role ID {role_id} (SQLite - OR IGNORE).")
-            return True
+        # Check if the assignment already exists
+        existing_assignment = db.query(RolePermission).filter_by(role_id=role_id, permission_key=permission_key).first()
+        if existing_assignment:
+            logger.info(f"Permission '{permission_key}' is already assigned to role ID {role_id}.")
+            return existing_assignment
 
-    except (sqlite3.IntegrityError) as e_sqlite_integrity: # Explicitly for SQLite if not caught by OR IGNORE logic (e.g. FK fail)
-        logger.error(f"Integrity error (SQLite) adding permission '{permission_key}' to role {role_id}: {e_sqlite_integrity}. Check if role and permission exist.", exc_info=True)
-        return False
-    except (sqlite3.Error, SQLAlchemyError) as e: # Catch broader errors
+        new_assignment = RolePermission(role_id=role_id, permission_key=permission_key)
+        db.add(new_assignment)
+        db.commit()
+        db.refresh(new_assignment)
+        logger.info(f"Permission '{permission_key}' added to role ID {role_id}.")
+        return new_assignment
+    except SQLAlchemyError as e:
+        db.rollback()
         logger.error(f"Database error adding permission '{permission_key}' to role {role_id}: {e}", exc_info=True)
-        return False
+        return None
 
 
 @_manage_conn

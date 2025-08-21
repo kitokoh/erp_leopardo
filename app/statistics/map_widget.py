@@ -6,10 +6,10 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtCore import pyqtSlot, QObject, pyqtSignal, QTimer, QUrl
 from PyQt5.QtWebChannel import QWebChannel
 
-from app_setup import APP_ROOT_DIR
+from app.core.app_setup import APP_ROOT_DIR
 from .map_utils import generate_folium_map_html
 # For fetching data for the map - consider if this widget should do it, or receive data
-from db.cruds.clients.clients_crud import get_client_counts_by_country
+from app.db.cruds.clients.clients_crud import get_client_counts_by_country
 
 # A simplified MapInteractionHandler for the home page map, if needed.
 # Or, the home page map might be non-interactive beyond Folium's defaults.
@@ -60,7 +60,8 @@ class HomePageMapWidget(QWidget):
         self.interaction_handler.map_view_changed_signal.connect(self._on_map_view_changed)
 
     def _on_map_view_changed(self, lat, lng, zoom):
-        from db import get_setting, set_setting, get_db_connection
+        from app.db.cruds.application_settings_crud import get_setting, set_setting
+        from app.db.connection import get_db_connection
         db_session = get_db_connection()
         try:
             set_setting('map_last_lat', str(lat), db_session)
@@ -85,7 +86,7 @@ class HomePageMapWidget(QWidget):
             geojson_path = os.path.join(APP_ROOT_DIR, "resources", "assets", "world_countries.geojson")
 
             # 2. Generate Map HTML using the utility function
-            from db import get_setting
+            from app.db.cruds.application_settings_crud import get_setting
 
             scope = get_setting('geographic_scope', 'international')
             last_lat = float(get_setting('map_last_lat', '20'))

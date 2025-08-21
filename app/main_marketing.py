@@ -234,14 +234,6 @@ class MainWindowsales(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-class MarketingModule(Browser):
-    def __init__(self):
-        super().__init__()
-
-class LoginModule(QWidget):
-    def __init__(self):
-        super().__init__()
-        
 class Browser(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -267,6 +259,14 @@ class Browser(QMainWindow):
             }
         }
         self.load_menu_config()
+
+class MarketingModule(Browser):
+    def __init__(self):
+        super().__init__()
+
+class LoginModule(QWidget):
+    def __init__(self):
+        super().__init__()
     def control_application(self):
         self.db = DatabaseManager()
         self.flow_manager = FlowManager( self.db)

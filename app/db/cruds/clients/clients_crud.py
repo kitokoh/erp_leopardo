@@ -6,13 +6,13 @@ from sqlalchemy.sql import text
 from sqlalchemy.orm import Session # For type hinting Session
 from ..generic_crud import GenericCRUD, _manage_conn, _is_sqlalchemy_obj
 
-from app.db.models.clients.client import Client
-from app.db.models.orders.commande import Commande
-from app.db.models.projects.project import Project
-from app.db.models.settings.status_setting import StatusSetting
-from app.db.models.misc.templates import Template
-from app.db.models.locations.country import Country
-from app.db.models.locations.city import City
+from app.models.db.clients.client import Client
+from app.models.db.orders.commande import Commande
+from app.models.db.projects.project import Project
+from app.models.db.settings.status_setting import StatusSetting
+from app.models.db.misc.templates import Template
+from app.models.db.locations.country import Country
+from app.models.db.locations.city import City
 
 # --- Clients CRUD ---
 class ClientsCRUD(GenericCRUD):

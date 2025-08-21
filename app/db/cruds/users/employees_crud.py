@@ -6,8 +6,8 @@ from uuid import UUID
 # This assumes 'api' is a sibling directory to 'db' or installed as a package.
 # If 'api' is at the root, it might be 'from ..api.models import Employee, EmployeeCreate, EmployeeUpdate'
 # or if your project root is directly in PYTHONPATH, 'from api.models import ...'
-from app.db.models.employees.employee import Employee
-from app.api.models import EmployeeCreate, EmployeeUpdate
+from app.models.db.employees.employee import Employee
+from app.services.api.models import EmployeeCreate, EmployeeUpdate
 
 def create_employee(db: Session, employee: EmployeeCreate) -> Employee:
     """

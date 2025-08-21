@@ -7,12 +7,12 @@ from typing import Generator, Optional, Any, Dict, Callable, List as PyList # Re
 from datetime import date, datetime
 
 # Adjust these imports based on your project structure
-from app.db.models.base import Base
-from app.db.models.users.user import User
-from app.db.models.users.employee import Employee
-from app.db.models.leave.leave_type import LeaveType
-from app.db.models.leave.leave_balance import LeaveBalance
-from app.db.models.leave.leave_request import LeaveRequest, LeaveRequestStatusEnum
+from app.models.db.base import Base
+from app.models.db.users.user import User
+from app.models.db.users.employee import Employee
+from app.models.db.leave.leave_type import LeaveType
+from app.models.db.leave.leave_balance import LeaveBalance
+from app.models.db.leave.leave_request import LeaveRequest, LeaveRequestStatusEnum
 from app.api.models import (
     UserInDB,
     LeaveTypeCreate, LeaveTypeResponse, LeaveTypeBase,

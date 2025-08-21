@@ -19,8 +19,8 @@ from .quick_stats_widget import QuickStatsWidget # Import the new widget
 from .quick_stats_widget import QuickStatsWidget # Import the new widget
 from .module_card_widget import ModuleCardWidget # Ajout de l'import
 from app.statistics.map_widget import HomePageMapWidget
-from app.gui.dialogs.add_new_client_dialog import AddNewClientDialog
-from app.client_management.client_controller import ClientController
+from app.views.gui.dialogs.add_new_client_dialog import AddNewClientDialog
+from app.views.client_management.client_controller import ClientController
 from app.db.cruds.clients import clients_crud
 from app.db.cruds.projects import projects_crud
 from app.db.cruds.products import products_crud

@@ -44,15 +44,15 @@ from .data_loader import (
     get_total_sales_amount_for_period,
     get_active_clients_count
 )
-from db.cruds.clients.clients_crud import clients_crud_instance
-from db.connection import get_db_connection
+from app.db.cruds.clients.clients_crud import clients_crud_instance
+from app.db.connection import get_db_connection
 
-from gui.dialogs.add_new_client_dialog import AddNewClientDialog
-from client_management.client_controller import ClientController
+from app.views.gui.dialogs.add_new_client_dialog import AddNewClientDialog
+from app.views.client_management.client_controller import ClientController
 from PyQt5.QtWidgets import QComboBox
 
 
-from app_setup import APP_ROOT_DIR
+from app.core.app_setup import APP_ROOT_DIR
 
 
 class WorkerSignals(QObject):

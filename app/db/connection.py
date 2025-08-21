@@ -52,7 +52,7 @@ def get_raw_sqlite_connection(db_path_override=None) -> sqlite3.Connection:
         if not path_to_connect:
             raise ValueError("SQLite database path not found in application configuration for raw connection.")
 
-    logging.info(f"db.connection (get_raw_sqlite_connection): Attempting raw SQLite connection to: {path_to_connect}")
+    logging.info(f"db.connection (get_raw_sqlite_connection): Attempting raw SQLite connection to absolute path: {os.path.abspath(path_to_connect)}")
     conn = sqlite3.connect(path_to_connect, timeout=10) # Added timeout
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
@@ -194,7 +194,8 @@ def initialize_engine_and_session(app_config_param):
             else:
                 engine_url = f"sqlite:///{absolute_db_path}"
 
-            logging.info(f"db.connection: SQLAlchemy engine connecting to: {engine_url}")
+            logging.info(f"db.connection: SQLAlchemy engine connecting to absolute path: {absolute_db_path}")
+            logging.info(f"db.connection: SQLAlchemy engine connecting to URL: {engine_url}")
             try:
                 engine = create_engine(engine_url, connect_args={"check_same_thread": False, "timeout": 10}) # Increased timeout
                 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

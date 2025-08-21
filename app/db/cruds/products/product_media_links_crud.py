@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, update, delete
-from ...models.products.productmedialinks import ProductMediaLink
+from app.models.db.products.productmedialinks import ProductMediaLink
 from app.media_manager.models import MediaItem
 import logging
 from typing import List, Optional

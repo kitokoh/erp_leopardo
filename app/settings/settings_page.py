@@ -6,7 +6,7 @@ import types # For creating mock module objects
 # --- Conditional mocking for __main__ START ---
 # This MUST be before any problematic imports like 'db'
 
-from app.gui.dialogs.template_dialog import TemplateDialog
+from app.views.gui.dialogs.template_dialog import TemplateDialog
 
 if __name__ == '__main__':
     print("MAIN_TOP: Pre-patching sys.modules for 'db' with a mock package structure.")
@@ -294,11 +294,11 @@ except ImportError as e_configurable_modules:
     print(f"ERROR settings_page.py: Could not import CONFIGURABLE_MODULES from utils.app_constants: {e_configurable_modules}")
     CONFIGURABLE_MODULES = [] # Fallback to empty list
 
-from app.gui.dialogs.transporter_dialog import TransporterDialog
-from app.gui.dialogs.freight_forwarder_dialog import FreightForwarderDialog
+from app.views.gui.dialogs.transporter_dialog import TransporterDialog
+from app.views.gui.dialogs.freight_forwarder_dialog import FreightForwarderDialog
 from app.company_management import CompanyTabWidget
 from app.securite.security_settings_page import SecuritySettingsPage # Import de la nouvelle page
-from app.gui.dialogs.smtp_config_dialog import SmtpConfigDialog
+from app.views.gui.dialogs.smtp_config_dialog import SmtpConfigDialog
 try:
     from app.user_profile_management.my_business_widget import MyBusinessWidget
     USER_PROFILE_MODULE_AVAILABLE = True

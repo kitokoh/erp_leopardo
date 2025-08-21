@@ -6,9 +6,9 @@ from datetime import date, datetime, timedelta
 
 # Adjust imports based on your project structure
 from app.db.connection import Base
-from app.db.models.employees.employee import Employee
-from app.db.models.leave.leave_type import LeaveType
-from app.db.models.leave.leave_request import LeaveRequest, LeaveRequestStatusEnum
+from app.models.db.employees.employee import Employee
+from app.models.db.leave.leave_type import LeaveType
+from app.models.db.leave.leave_request import LeaveRequest, LeaveRequestStatusEnum
 from app.api.models import (
     HeadcountReportItem, AnniversaryReportItem, LeaveSummaryReportItem
 )

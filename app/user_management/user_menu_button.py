@@ -7,7 +7,7 @@ from PyQt5.QtCore import Qt, pyqtSignal, QPoint, QSize # Import QPoint
 
 from PyQt5.QtCore import Qt, pyqtSignal
 
-from auth.permissions import has_permission, P_MANAGE_USERS
+from app.services.auth.permissions import has_permission, P_MANAGE_USERS
 # Import EditUserDialog relatively if UserMenuButton is in the same directory level as dialogs,
 # or adjust path. Assuming main_window.py (parent) will handle dialog instantiation for now.
 

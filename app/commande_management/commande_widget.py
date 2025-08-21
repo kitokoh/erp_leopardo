@@ -17,7 +17,7 @@ from PyQt5.QtWidgets import QDialog
 
 from app import db
 from app.db.cruds.invoices import commandes_crud
-from app.config import CONFIG
+from app.core.config import CONFIG
 from .commande_dialog import CommandeDialog
 
 

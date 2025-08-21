@@ -35,7 +35,7 @@ def calculate_leave_duration(start_date: date, end_date: date, exclude_weekends:
         current_date += timedelta(days=1)
     return num_days
 
-from app.db.models.leave.leave_type import LeaveType
+from app.models.db.leave.leave_type import LeaveType
 
 # --- LeaveType CRUD ---
 
@@ -77,7 +77,7 @@ def delete_leave_type(db: Session, leave_type_id: int) -> Optional[LeaveType]:
         db.commit()
     return db_leave_type
 
-from app.db.models.leave.leave_balance import LeaveBalance
+from app.models.db.leave.leave_balance import LeaveBalance
 
 # --- LeaveBalance CRUD ---
 
@@ -119,7 +119,7 @@ def update_leave_balance(db: Session, leave_balance_id: int, balance_update_data
             raise
     return db_leave_balance
 
-from app.db.models.leave.leave_request import LeaveRequest
+from app.models.db.leave.leave_request import LeaveRequest
 
 # --- LeaveRequest CRUD & Logic ---
 

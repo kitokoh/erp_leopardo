@@ -16,7 +16,7 @@ from app.db.cruds.products import product_media_links_crud
 from app.media_manager import operations as media_ops
 from app.db.cruds.users.users_crud import get_user_by_username
 import asyncio # For running async functions
-from app.config import MEDIA_FILES_BASE_PATH # For resolving image paths
+from app.core.config import MEDIA_FILES_BASE_PATH # For resolving image paths
 import os
 import shutil # Added for file copying
 

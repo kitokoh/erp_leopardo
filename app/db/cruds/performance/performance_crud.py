@@ -12,7 +12,7 @@ from app.api.models import (
     PerformanceReviewBase as PerformanceReview, PerformanceReviewCreate, PerformanceReviewUpdate,
     EmployeeBase, UserInDB # Needed for relationships and context
 )
-from app.db.models.performance import Goal, GoalStatusEnum, PerformanceReviewStatusEnum
+from app.models.db.performance import Goal, GoalStatusEnum, PerformanceReviewStatusEnum
 
 # --- Goal CRUD ---
 

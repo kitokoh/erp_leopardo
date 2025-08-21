@@ -5,9 +5,9 @@ from PyQt5.QtWidgets import (
     QCheckBox, QGroupBox
 )
 from PyQt5.QtCore import Qt
-from security_module.biometric_auth import BiometricAuthenticator
+from app.security_module.biometric_auth import BiometricAuthenticator
 # Import get_current_user_id. Assuming this page is displayed only when a user is logged in.
-from auth.authentication import get_current_user_id
+from app.services.auth.authentication import get_current_user_id
 
 logger = logging.getLogger(__name__)
 

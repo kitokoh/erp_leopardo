@@ -15,7 +15,7 @@ import aiofiles.os as aios
 from PIL import Image, ExifTags # Added ExifTags
 import cv2
 
-from app.config import CONFIG
+from app.core.config import CONFIG
 MEDIA_FILES_BASE_PATH = CONFIG.get('media_files_path')
 DEFAULT_DOWNLOAD_PATH = CONFIG.get('default_download_path')
 

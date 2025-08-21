@@ -74,58 +74,33 @@ def _fetch_all_as_dict_list(db_obj, sql_query, params, dialect, logger_to_use=No
         return []
 
 
-@_manage_conn
-def add_permission(permission_key: str, description: str, conn=None) -> bool:
+from app.models.db.misc.permissions import Permission
+
+def add_permission(db: Session, permission_key: str, description: str) -> Permission | None:
     """
     Adds a new permission to the Permissions table.
     Mainly intended for initial seeding or administrative setup.
-    Returns True if successful, False otherwise.
     """
-    sql_sqlite = "INSERT INTO Permissions (permission_key, description) VALUES (?, ?)"
-    sql_sa = sqlalchemy_text("INSERT INTO Permissions (permission_key, description) VALUES (:permission_key, :description)")
-
-    params_sqlite = (permission_key, description)
-    params_sa = {"permission_key": permission_key, "description": description}
-
-    db_obj, dialect = _get_cursor_and_dialect(conn)
-    if not db_obj or not dialect:
-        logger.error(f"Unsupported connection type in add_permission: {type(conn)}")
-        return False
-
     try:
-        _execute_query(db_obj, sql_sa if dialect == "sqlalchemy" else sql_sqlite,
-                       params_sa if dialect == "sqlalchemy" else params_sqlite, dialect)
+        new_permission = Permission(permission_key=permission_key, description=description)
+        db.add(new_permission)
+        db.commit()
+        db.refresh(new_permission)
         logger.info(f"Permission '{permission_key}' added successfully.")
-        return True
-    except (sqlite3.IntegrityError, SQLAlchemyError) as e:
-        # Handle potential wrapped IntegrityError from SQLAlchemy
-        original_error = getattr(e, 'orig', e)
-        if isinstance(original_error, sqlite3.IntegrityError):
-            logger.warning(f"Permission '{permission_key}' already exists (IntegrityError). Skipping.")
-        else: # Other SQLAlchemyError or direct sqlite3.IntegrityError if not wrapped
-            logger.error(f"Database error adding permission '{permission_key}': {e}", exc_info=True)
-        return False # Not necessarily an error if called during seeding and it exists
-    except (sqlite3.Error, SQLAlchemyError) as e: # Broader catch
-        logger.error(f"General database error adding permission '{permission_key}': {e}", exc_info=True)
-        return False
-
-
-@_manage_conn
-def get_permission_by_key(permission_key: str, conn=None) -> dict | None:
-    """Fetches a permission by its key."""
-    sql_sqlite = "SELECT * FROM Permissions WHERE permission_key = ?"
-    sql_sa = sqlalchemy_text("SELECT * FROM Permissions WHERE permission_key = :permission_key")
-
-    params_sqlite = (permission_key,)
-    params_sa = {"permission_key": permission_key}
-
-    db_obj, dialect = _get_cursor_and_dialect(conn)
-    if not db_obj or not dialect:
-        logger.error(f"Unsupported connection type in get_permission_by_key: {type(conn)}")
+        return new_permission
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Database error adding permission '{permission_key}': {e}", exc_info=True)
         return None
 
-    return _fetch_one_as_dict(db_obj, sql_sa if dialect == "sqlalchemy" else sql_sqlite,
-                              params_sa if dialect == "sqlalchemy" else params_sqlite, dialect, logger)
+
+def get_permission_by_key(db: Session, permission_key: str) -> Permission | None:
+    """Fetches a permission by its key."""
+    try:
+        return db.query(Permission).filter(Permission.permission_key == permission_key).first()
+    except SQLAlchemyError as e:
+        logger.error(f"Database error getting permission by key '{permission_key}': {e}", exc_info=True)
+        return None
 
 
 @_manage_conn

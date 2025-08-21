@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtWidgets import QGridLayout
-from contact_manager.sync_service import handle_contact_change_from_platform # For Google Sync
+from app.contact_manager.sync_service import handle_contact_change_from_platform # For Google Sync
 import logging # Added for logging
 from PyQt5.QtWidgets import QGroupBox
 

@@ -2,7 +2,7 @@ import sqlite3
 import logging
 from datetime import datetime
 from sqlalchemy.orm import Session
-from app.db.models.locations import Country, City
+from app.models.db.locations import Country, City
 from ..generic_crud import _manage_conn
 
 # --- Countries CRUD ---
@@ -37,48 +37,31 @@ def get_country_by_id(id: int, conn: sqlite3.Connection = None) -> dict | None:
         logging.error(f"Error getting country by id {id}: {e}")
         return None
 
-@_manage_conn
-def get_or_add_country(country_name: str, conn: sqlite3.Connection = None) -> dict | None:
+def get_or_add_country(country_name: str, db: Session) -> Country | None:
     if not country_name:
         logging.warning("locations_crud.get_or_add_country: country_name is required.")
         return None
 
     logger_crud = logging.getLogger(__name__)
     logger_crud.info(f"locations_crud.get_or_add_country: Processing country: '{country_name}'")
-    cursor = conn.cursor()
+
     try:
-        cursor.execute("SELECT * FROM Countries WHERE country_name = ?", (country_name,))
-        row = cursor.fetchone()
-        if row:
-            logger_crud.info(f"locations_crud.get_or_add_country: Found existing country '{country_name}' with data: {dict(row)}")
-            return {key: row[key] for key in row.keys()}
+        country = db.query(Country).filter(Country.country_name == country_name).first()
+        if country:
+            logger_crud.info(f"locations_crud.get_or_add_country: Found existing country '{country_name}' with data: {country}")
+            return country
 
         else:
-            now = datetime.utcnow().isoformat() + "Z"
-            logger_crud.info(f"locations_crud.get_or_add_country: Country '{country_name}' not found, adding it now at {now}.")
-            sql = "INSERT INTO Countries (country_name, created_at, updated_at) VALUES (?, ?, ?)"
-            params = (country_name, now, now)
-            cursor.execute(sql, params)
-            new_country_id = cursor.lastrowid
-            if new_country_id:
-                logger_crud.info(f"locations_crud.get_or_add_country: Successfully added '{country_name}', new ID: {new_country_id}")
-                return {'country_id': new_country_id, 'country_name': country_name, 'created_at': now, 'updated_at': now}
-            else:
-                logger_crud.error(f"locations_crud.get_or_add_country: Failed to get lastrowid after inserting country: {country_name}")
-
-                return None
-    except sqlite3.IntegrityError:
-        logger_crud.warning(f"locations_crud.get_or_add_country: Integrity error (likely UNIQUE constraint) adding country '{country_name}', trying to fetch again.")
-        cursor.execute("SELECT * FROM Countries WHERE country_name = ?", (country_name,))
-        row_after_error = cursor.fetchone()
-        if row_after_error:
-            logger_crud.info(f"locations_crud.get_or_add_country: Fetched country '{country_name}' after IntegrityError: {dict(row_after_error)}")
-            return {key: row_after_error[key] for key in row_after_error.keys()}
-        else:
-            logger_crud.error(f"locations_crud.get_or_add_country: Failed to fetch country '{country_name}' even after IntegrityError recovery attempt.")
-            return None
-    except sqlite3.Error as e_general:
-        logger_crud.error(f"locations_crud.get_or_add_country: General SQLite error for '{country_name}': {e_general}")
+            logger_crud.info(f"locations_crud.get_or_add_country: Country '{country_name}' not found, adding it now.")
+            new_country = Country(country_name=country_name)
+            db.add(new_country)
+            db.commit()
+            db.refresh(new_country)
+            logger_crud.info(f"locations_crud.get_or_add_country: Successfully added '{country_name}', new ID: {new_country.country_id}")
+            return new_country
+    except Exception as e:
+        logger_crud.error(f"locations_crud.get_or_add_country: General error for '{country_name}': {e}")
+        db.rollback()
         return None
 
 @_manage_conn
@@ -178,37 +161,31 @@ def add_city(data: dict, conn: sqlite3.Connection = None) -> int | None:
         logging.error(f"Database error in add_city for '{data['city_name']}': {e}")
         return None
 
-@_manage_conn
-def get_or_add_city(city_name: str, country_id: int, conn: sqlite3.Connection = None) -> dict | None:
+def get_or_add_city(city_name: str, country_id: int, db: Session) -> City | None:
     if not city_name or not country_id:
         logging.warning("get_or_add_city: city_name and country_id are required.")
         return None
 
-    cursor = conn.cursor()
+    logger_crud = logging.getLogger(__name__)
+    logger_crud.info(f"locations_crud.get_or_add_city: Processing city: '{city_name}' for country_id: {country_id}")
+
     try:
-        cursor.execute("SELECT * FROM Cities WHERE city_name = ? AND country_id = ?", (city_name, country_id))
-        row = cursor.fetchone()
-        if row:
-            # return dict(row)
-            return {key: row[key] for key in row.keys()} if row else None
+        city = db.query(City).filter(City.city_name == city_name, City.country_id == country_id).first()
+        if city:
+            logger_crud.info(f"locations_crud.get_or_add_city: Found existing city '{city_name}' with data: {city}")
+            return city
+
         else:
-            now = datetime.utcnow().isoformat() + "Z"
-            sql = "INSERT INTO Cities (city_name, country_id, created_at, updated_at) VALUES (?, ?, ?, ?)"
-            params = (city_name, country_id, now, now)
-            cursor.execute(sql, params)
-            new_city_id = cursor.lastrowid
-            if new_city_id:
-                return {'city_id': new_city_id, 'city_name': city_name, 'country_id': country_id,
-                        'latitude': None, 'longitude': None, 'population': None, # Match potential full dict
-                        'created_at': now, 'updated_at': now}
-            else:
-                logging.error(f"Failed to get lastrowid after inserting city: {city_name}")
-                return None
-    except sqlite3.IntegrityError as e:
-        logging.error(f"Integrity error adding city '{city_name}' for country_id {country_id}: {e}")
-        return None
-    except sqlite3.Error as e_general:
-        logging.error(f"General SQLite error adding city '{city_name}': {e_general}")
+            logger_crud.info(f"locations_crud.get_or_add_city: City '{city_name}' not found, adding it now.")
+            new_city = City(city_name=city_name, country_id=country_id)
+            db.add(new_city)
+            db.commit()
+            db.refresh(new_city)
+            logger_crud.info(f"locations_crud.get_or_add_city: Successfully added '{city_name}', new ID: {new_city.city_id}")
+            return new_city
+    except Exception as e:
+        logger_crud.error(f"locations_crud.get_or_add_city: General error for '{city_name}': {e}")
+        db.rollback()
         return None
 
 @_manage_conn

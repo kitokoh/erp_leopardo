@@ -1,7 +1,7 @@
 # This module will contain the logic for biometric authentication.
 import platform
 import logging
-from db.cruds.users import users_crud
+from app.db.cruds.users import users_crud
 
 # security_module/biometric_auth.py
 """
@@ -13,7 +13,7 @@ through a common interface, abstracting away the OS-level details.
 """
 import platform
 import logging
-from db.cruds.users import users_crud
+from app.db.cruds.users import users_crud
 
 # Dynamically import handlers based on OS
 logger = logging.getLogger(__name__)
@@ -46,12 +46,12 @@ elif os_name == "Darwin": # macOS
 #     except ImportError as e:
 #         logger.error(f"Failed to import Linux biometric handler: {e}")
 
-try:
-    from .os_handlers import local_voice_handler as lvh_module
-    local_voice_handler_module = lvh_module
-    logger.info("Local voice handler module loaded.")
-except ImportError:
-    logger.warning("Local voice handler module not found or import error. Voice biometrics might be unavailable.")
+# try:
+#     from .os_handlers import local_voice_handler as lvh_module
+#     local_voice_handler_module = lvh_module
+#     logger.info("Local voice handler module loaded.")
+# except ImportError:
+#     logger.warning("Local voice handler module not found or import error. Voice biometrics might be unavailable.")
 
 
 class BiometricAuthenticator:
@@ -85,10 +85,10 @@ class BiometricAuthenticator:
         #     self.handler = linux_handler_module.LinuxBiometricHandler()
         #     logger.info("Using LinuxBiometricHandler.")
 
-        self.voice_handler = None
-        if local_voice_handler_module:
-             self.voice_handler = local_voice_handler_module.LocalVoiceHandler()
-             logger.info("Using LocalVoiceHandler for voice biometrics.")
+        # self.voice_handler = None
+        # if local_voice_handler_module:
+        #      self.voice_handler = lvh_module.LocalVoiceHandler()
+        #      logger.info("Using LocalVoiceHandler for voice biometrics.")
 
         if not self.handler and not self.voice_handler: # Check if any handler is set
             logger.warning(f"No suitable biometric handler initialized for OS: {os_name}. Biometric functions will be unavailable.")

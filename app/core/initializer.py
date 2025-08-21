@@ -6,6 +6,19 @@ from PyQt5.QtWidgets import QMessageBox, QApplication
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt, QLibraryInfo, QTranslator, QLocale
 
+# Import the function directly to avoid circular import issues with the 'db' package
+from app.db.connection import initialize_engine_and_session, set_db_config
+
+def handle_critical_error(message, details=""):
+    """Handles critical errors by logging and exiting, or showing a message box."""
+    logging.critical(f"{message}: {details}", exc_info=True)
+    if os.environ.get("TESTING") == "1":
+        print(f"CRITICAL ERROR: {message}\n{details}")
+        sys.exit(1)
+    else:
+        QMessageBox.critical(None, "Erreur Critique", f"{message}\n{details}")
+        sys.exit(1)
+
 def initialize_database(config, project_root):
     """
     Handles the entire database setup process:
@@ -14,6 +27,7 @@ def initialize_database(config, project_root):
     - Sets up SQLAlchemy engine and session.
     - Seeds the database if it was newly created.
     """
+    set_db_config(config)
     db_path = config.get('database_path')
     db_exists = os.path.exists(db_path) if db_path else False
 
@@ -29,31 +43,44 @@ def initialize_database(config, project_root):
             raise FileNotFoundError(f"Alembic configuration file not found at: {alembic_ini_path}")
 
         alembic_cfg = AlembicConfig(alembic_ini_path)
+        alembic_cfg.set_main_option('sqlalchemy.url', config['database_url'])
         logging.info("Attempting to upgrade database schema to head using Alembic...")
         alembic_command.upgrade(alembic_cfg, "head")
         logging.info("Alembic upgrade head command completed.")
 
+        # HACK: Manually create ApplicationSettings table to bypass Alembic issue
+        try:
+            from app.db.connection import get_raw_sqlite_connection
+            conn = get_raw_sqlite_connection(config['database_path'])
+            cursor = conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS application_settings (
+                    setting_key TEXT NOT NULL PRIMARY KEY,
+                    setting_value TEXT
+                )
+            """)
+            conn.commit()
+            conn.close()
+            logging.info("HACK: Manually ensured 'application_settings' table exists.")
+        except Exception as e_hack:
+            logging.error(f"HACK: Failed to manually create application_settings table: {e_hack}")
+        # END HACK
+
     except ImportError:
-        logging.critical("Alembic is not installed. Cannot proceed with database migrations.", exc_info=True)
-        QMessageBox.critical(None, "Erreur Critique", "Alembic n'est pas installé. L'application ne peut pas démarrer.")
-        sys.exit(1)
+        handle_critical_error("Alembic n'est pas installé. L'application ne peut pas démarrer.", "Alembic is not installed. Cannot proceed with database migrations.")
     except Exception as e_alembic:
-        logging.critical(f"Alembic migration failed: {e_alembic}", exc_info=True)
-        QMessageBox.critical(None, "Erreur de Migration", f"Une erreur critique est survenue lors de la migration de la base de données:\\n{e_alembic}")
-        sys.exit(1)
+        handle_critical_error("Une erreur critique est survenue lors de la migration de la base de données.", str(e_alembic))
+
+    # Now that migrations are done, initialize the ORM engine
+    try:
+        initialize_engine_and_session(config)
+        logging.info("SQLAlchemy engine and session have been initialized.")
+    except Exception as e_orm_init:
+        handle_critical_error("Impossible d'initialiser le moteur de la base de données ORM.", str(e_orm_init))
 
     # These imports are inside the function because they depend on the db path and alembic migrations running first
-    import db
     from app.db.db_seed import seed_all_data as run_seed
     from app.user_profile_management.database_setup import create_tables as create_user_profile_tables, seed_data as seed_user_profile_data
-
-    if hasattr(db, 'connection') and hasattr(db.connection, 'initialize_engine_and_session'):
-        db.connection.initialize_engine_and_session(config)
-        logging.info("SQLAlchemy engine and session have been initialized.")
-    else:
-        logging.critical("Could not find db.connection.initialize_engine_and_session. Cannot create ORM engine.")
-        QMessageBox.critical(None, "Erreur Critique", "Impossible d'initialiser le moteur de la base de données ORM.")
-        sys.exit(1)
 
     logging.info("Table creation is now handled by Alembic migrations. Skipping redundant create_all call.")
 

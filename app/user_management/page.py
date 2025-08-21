@@ -11,11 +11,11 @@ from PyQt5.QtWidgets import QAbstractItemView, QComboBox # Added QComboBox (alre
 # and auth.permissions for permission checking if actions were added here.
 from app.db.cruds.users import users_crud
 from app.db.cruds.misc.activity_logs_crud import add_activity_log
-from app.auth.permissions import has_permission, P_MANAGE_USERS
+from app.services.auth.permissions import has_permission, P_MANAGE_USERS
 from app.db.cruds.users import roles_crud # For populating roles in edit dialog
 
 # Placeholder for EditUserDialog, will be created later
-# from app.gui.dialogs.edit_user_dialog import EditUserDialog
+# from app.views.gui.dialogs.edit_user_dialog import EditUserDialog
 
 class UserManagementPage(QWidget):
     def __init__(self, current_user_info: dict, parent=None):
@@ -276,7 +276,7 @@ class UserManagementPage(QWidget):
                                     self.tr("Veuillez sélectionner un utilisateur à modifier."))
             return
 
-        from app.gui.dialogs.edit_user_dialog import EditUserDialog
+        from app.views.gui.dialogs.edit_user_dialog import EditUserDialog
 
         edit_dialog = EditUserDialog(user_id=selected_user_id, # Matches constructor
                                      current_admin_user_info=self.current_user_info,

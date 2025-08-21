@@ -8,8 +8,8 @@ from PyQt5.QtWidgets import QMessageBox, QDialog, QApplication
 from packaging.version import parse as parse_version
 
 from ._version import __version__
-from .gui.dialogs.update_dialog import UpdateDialog
-from .gui.dialogs.download_progress_dialog import DownloadProgressDialog
+from app.views.gui.dialogs.update_dialog import UpdateDialog
+from app.views.gui.dialogs.download_progress_dialog import DownloadProgressDialog
 
 # This should point to the location of your version manifest file on a server.
 VERSION_INFO_URL = "https://raw.githubusercontent.com/leopardo-ai/main/version.json" # Example URL
