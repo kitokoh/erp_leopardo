@@ -9,12 +9,12 @@ import shutil
 
 # --- Configuration Import ---
 # Assuming main.py or the entry script handles adding project root to sys.path
-try:
-    from app.core import config # This should now find config.py at the root if sys.path is correct
-    db_config = config # Alias config as db_config for compatibility
-except ImportError as e:
-    logging.critical(f"CRITICAL: config.py not found. Ensure project root is in sys.path. Error: {e}")
-    raise ImportError(f"config.py is essential and was not found.") from e
+# try:
+#     from app.core import config # This should now find config.py at the root if sys.path is correct
+#     db_config = config # Alias config as db_config for compatibility
+# except ImportError as e:
+#     logging.critical(f"CRITICAL: config.py not found. Ensure project root is in sys.path. Error: {e}")
+#     raise ImportError(f"config.py is essential and was not found.") from e
 # --- End Configuration Import ---
 
 # CRUD function imports
@@ -27,7 +27,7 @@ except ImportError as e:
 # This might require adjusting sys.path if document_generator is not a sibling package or installed.
 # Assuming app_dir (project root) is already in sys.path from the top of this file.
 try:
-    from document_generator.context_builder import get_document_context as _get_enhanced_document_context
+    from app.document_generator.context_builder import get_document_context as _get_enhanced_document_context
 except ImportError as e:
     logging.error(f"Failed to import enhanced context builder from document_generator: {e}. Falling back to basic context if any.")
     # Define a fallback or raise error if this is critical
@@ -114,7 +114,7 @@ def save_general_document_file(source_file_path: str, document_type_subfolder: s
     Returns:
         str | None: The full path to the saved file on success, or None on error.
     """
-    from app_config import CONFIG
+    from app.core.config import CONFIG
     try:
         templates_dir = CONFIG.get("templates_dir", "templates")
         target_dir = os.path.join(templates_dir, document_type_subfolder, language_code)

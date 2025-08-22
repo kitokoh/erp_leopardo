@@ -22,7 +22,7 @@ try:
         # Add other specific db functions if used elsewhere in this file
     )
     from app.db.cruds.clients import contacts_crud
-    import app.config as config # Changed from db_config, corrected indent
+    from app.core import config
 except (ImportError, ValueError) as e:
     # Fallback for potential execution context issues
     import sys

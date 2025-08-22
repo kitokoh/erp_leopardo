@@ -11,8 +11,8 @@ from PyQt5.QtGui import QIcon, QColor
 # Assuming APP_ROOT_DIR setup is done in the main application for db access
 # For standalone testing, this widget might need to ensure paths are set if not using compiled resources/modules.
 # For now, assume db.cruds are importable.
-from db.cruds import invoices_crud
-from db.cruds import clients_crud # Assuming this exists and has get_client_by_id
+from app.db.cruds.invoices import invoices_crud
+from app.db.cruds.clients import clients_crud
 
 # Dialogs
 from .invoice_details_dialog import InvoiceDetailsDialog

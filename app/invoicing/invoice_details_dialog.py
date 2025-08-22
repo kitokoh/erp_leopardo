@@ -8,8 +8,9 @@ from PyQt5.QtCore import Qt
 # Assuming APP_ROOT_DIR setup is done in the main application for db access
 # For standalone testing, this widget might need to ensure paths are set.
 # For now, assume db.cruds are importable.
-from db.cruds import invoices_crud, clients_crud
-from db.cruds import projects_crud # Assuming this exists with get_project_by_id
+from app.db.cruds.invoices import invoices_crud
+from app.db.cruds.clients import clients_crud
+from app.db.cruds.projects import projects_crud
 
 class InvoiceDetailsDialog(QDialog):
     def __init__(self, invoice_id, parent=None):
@@ -140,57 +141,57 @@ class InvoiceDetailsDialog(QDialog):
                     if child_layout is not None:
                         self._clear_layout(child_layout)
 
-if __name__ == '__main__':
-    app = QApplication(sys.argv)
-
-    # This dialog is best tested by launching it from InvoiceManagementWidget
-    # after an invoice is selected. For standalone, you'd need to ensure
-    # the database is set up and a valid invoice_id exists.
-
-    # Example of how to set up for standalone test (requires actual DB setup):
-    # ---
-    # APP_ROOT_DIR_STANDALONE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    # if APP_ROOT_DIR_STANDALONE not in sys.path:
-    #     sys.path.insert(0, APP_ROOT_DIR_STANDALONE)
-    # from db import db_config, init_schema
-    # from db.cruds import invoices_crud # To potentially add a test invoice
-    # db_config.DATABASE_PATH = "test_invoice_details.db" # Use a test DB
-    # init_schema.initialize_database()
-    #
-    # # Add a dummy client, project if needed by your FK constraints for invoices
-    # # client_id = clients_crud.add_client(...)
-    # # project_id = projects_crud.add_project(...)
-    #
-    # test_invoice_data = {
-    #     'client_id': "dummy_client_id", # Replace with actual or created client ID
-    #     'invoice_number': f"TEST-INV-{datetime.now().strftime('%Y%m%d%H%M%S')}",
-    #     'issue_date': "2023-01-01",
-    #     'due_date': "2023-02-01",
-    #     'total_amount': 123.45,
-    #     'currency': 'USD',
-    #     'payment_status': 'unpaid'
-    # }
-    # try:
-    #     # Ensure invoices_crud.add_invoice is adapted or use direct SQL to insert
-    #     # For this example, we assume such an invoice exists or is created.
-    #     # test_id = invoices_crud.add_invoice(test_invoice_data)
-    #     # if test_id:
-    #     #     dialog = InvoiceDetailsDialog(invoice_id=test_id)
-    #     #     dialog.exec_() # Use exec_() for modal dialog
-    #     # else:
-    #     #     print("Failed to create a test invoice for the dialog.")
-    #     print("To test InvoiceDetailsDialog, run it via InvoiceManagementWidget.")
-    # except Exception as e:
-    #     print(f"Error during standalone test setup: {e}")
-    # ---
-
-    main_window = QWidget()
-    layout = QVBoxLayout(main_window)
-    label = QLabel("To test InvoiceDetailsDialog, run it via InvoiceManagementWidget with a selected invoice.\n"
-                   "Ensure the database is initialized and contains invoices.")
-    layout.addWidget(label)
-    main_window.setWindowTitle("InvoiceDetailsDialog Test Placeholder")
-    main_window.show()
-
-    sys.exit(app.exec_())
+# if __name__ == '__main__':
+#     app = QApplication(sys.argv)
+#
+#     # This dialog is best tested by launching it from InvoiceManagementWidget
+#     # after an invoice is selected. For standalone, you'd need to ensure
+#     # the database is set up and a valid invoice_id exists.
+#
+#     # Example of how to set up for standalone test (requires actual DB setup):
+#     # ---
+#     # APP_ROOT_DIR_STANDALONE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+#     # if APP_ROOT_DIR_STANDALONE not in sys.path:
+#     #     sys.path.insert(0, APP_ROOT_DIR_STANDALONE)
+#     # from db import db_config, init_schema
+#     # from db.cruds import invoices_crud # To potentially add a test invoice
+#     # db_config.DATABASE_PATH = "test_invoice_details.db" # Use a test DB
+#     # init_schema.initialize_database()
+#     #
+#     # # Add a dummy client, project if needed by your FK constraints for invoices
+#     # # client_id = clients_crud.add_client(...)
+#     # # project_id = projects_crud.add_project(...)
+#     #
+#     # test_invoice_data = {
+#     #     'client_id': "dummy_client_id", # Replace with actual or created client ID
+#     #     'invoice_number': f"TEST-INV-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+#     #     'issue_date': "2023-01-01",
+#     #     'due_date': "2023-02-01",
+#     #     'total_amount': 123.45,
+#     #     'currency': 'USD',
+#     #     'payment_status': 'unpaid'
+#     # }
+#     # try:
+#     #     # Ensure invoices_crud.add_invoice is adapted or use direct SQL to insert
+#     #     # For this example, we assume such an invoice exists or is created.
+#     #     # test_id = invoices_crud.add_invoice(test_invoice_data)
+#     #     # if test_id:
+#     #     #     dialog = InvoiceDetailsDialog(invoice_id=test_id)
+#     #     #     dialog.exec_() # Use exec_() for modal dialog
+#     #     # else:
+#     #     #     print("Failed to create a test invoice for the dialog.")
+#     #     print("To test InvoiceDetailsDialog, run it via InvoiceManagementWidget.")
+#     # except Exception as e:
+#     #     print(f"Error during standalone test setup: {e}")
+#     # ---
+#
+#     main_window = QWidget()
+#     layout = QVBoxLayout(main_window)
+#     label = QLabel("To test InvoiceDetailsDialog, run it via InvoiceManagementWidget with a selected invoice.\n"
+#                    "Ensure the database is initialized and contains invoices.")
+#     layout.addWidget(label)
+#     main_window.setWindowTitle("InvoiceDetailsDialog Test Placeholder")
+#     main_window.show()
+#
+#     sys.exit(app.exec_())
 ```

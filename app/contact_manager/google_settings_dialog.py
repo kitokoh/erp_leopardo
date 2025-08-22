@@ -1,6 +1,7 @@
 # PyQt5 dialog for managing Google Account linking settings for contact synchronization.
 
 import sys
+import os
 import webbrowser
 from PyQt5.QtWidgets import (QDialog, QPushButton, QLabel, QVBoxLayout, QMessageBox, QApplication, QHBoxLayout)
 from PyQt5.QtCore import Qt

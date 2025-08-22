@@ -44,14 +44,14 @@ logger = logging.getLogger(__name__)
 
 # It's good practice for generate_cover_page_logic to handle its own font registration if possible.
 # If not, call it once, e.g., when this module is loaded or before the first PDF generation.
-try:
-    # Pass PAGEDEGARDE_APP_ROOT_DIR if _register_fonts expects it and it's defined.
-    # Some ReportLab setups might need a path to find fonts.
-    if callable(_register_fonts):
-        logger.info(f"Registering fonts for pagedegrde using APP_ROOT_DIR: {PAGEDEGARDE_APP_ROOT_DIR}")
-        _register_fonts(PAGEDEGARDE_APP_ROOT_DIR)
-except Exception as e:
-    logger.error(f"Error during initial font registration for pagedegrde: {e}", exc_info=True)
+# try:
+#     # Pass PAGEDEGARDE_APP_ROOT_DIR if _register_fonts expects it and it's defined.
+#     # Some ReportLab setups might need a path to find fonts.
+#     if callable(_register_fonts):
+#         logger.info(f"Registering fonts for pagedegrde using APP_ROOT_DIR: {PAGEDEGARDE_APP_ROOT_DIR}")
+#         _register_fonts(PAGEDEGARDE_APP_ROOT_DIR)
+# except Exception as e:
+#     logger.error(f"Error during initial font registration for pagedegrde: {e}", exc_info=True)
 
 
 def generate_cover_page_pdf(
@@ -64,6 +64,7 @@ def generate_cover_page_pdf(
     additional_context_overrides: dict = None, # For overriding specific config_dict fields
     db_conn=None
 ) -> bool:
+    pass
 #     """
 #     Generates a PDF cover page using ReportLab logic via pagedegrde module.
 

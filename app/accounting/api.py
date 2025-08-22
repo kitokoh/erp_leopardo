@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 from decimal import Decimal
 from datetime import date
 
 from . import cruds, models # models here refers to Pydantic models from accounting.models
-from api.dependencies import get_db_session # Assuming a general DB session dependency
+from app.api.dependencies import get_db_session # Assuming a general DB session dependency
 
 router = APIRouter(
     prefix="/accounting",

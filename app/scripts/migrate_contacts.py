@@ -17,12 +17,13 @@ if project_root not in sys.path:
 # --- Database and CRUD Imports ---
 # These imports are placed after sys.path manipulation to ensure they are found.
 try:
-    from db.connection import get_db_connection, DB_PATH
+    from app.db.connection import get_db_connection
+    from app.core.config import CONFIG
     # The central_add_contact and central_get_contact_by_email are used internally by the
     # add_partner_contact and add_personnel_contact CRUDs.
     # We only need to import the linking functions from partners_crud and company_personnel_crud.
-    from db.cruds.partners_crud import add_partner_contact as link_partner_to_contact
-    from db.cruds.company_personnel_crud import add_personnel_contact as link_personnel_to_contact
+    from app.db.cruds.misc.partners_crud import add_partner_contact as link_partner_to_contact
+    from app.db.cruds.misc.company_personnel_crud import add_personnel_contact as link_personnel_to_contact
 except ImportError as e:
     logging.error(f"Failed to import necessary modules. Ensure PYTHONPATH is correct and CRUDs exist: {e}")
     sys.exit(1)
@@ -163,7 +164,7 @@ def migrate_company_personnel_contacts(conn: sqlite3.Connection):
 def main():
     db_conn = None
     try:
-        logging.info(f"Connecting to database: {DB_PATH}")
+        logging.info(f"Connecting to database: {CONFIG['database_path']}")
         db_conn = get_db_connection()
         db_conn.row_factory = sqlite3.Row # Ensure dict-like row access for fetched data
 

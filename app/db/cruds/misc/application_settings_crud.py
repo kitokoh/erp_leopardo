@@ -1,3 +1,4 @@
+print("THIS FILE IS BEING IMPORTED: app/db/cruds/misc/application_settings_crud.py")
 import sqlite3 # Keep for type hint reference if _manage_conn can provide both
 from sqlalchemy.sql import text # Import text
 from sqlalchemy.orm import Session
@@ -14,7 +15,7 @@ def get_setting(key: str, default: any = None, conn=None) -> any:
         # Check if conn is SQLAlchemy Session, Engine, or Connection
         if isinstance(conn, (Session, Engine, SQLAlchemyConnection)):
             # SQLAlchemy execution
-            stmt = text("SELECT setting_value FROM ApplicationSettings WHERE setting_key = :key")
+            stmt = text("SELECT setting_value FROM application_settings WHERE setting_key = :key")
             result = conn.execute(stmt, {"key": key})
             row = result.fetchone()
             if row:
@@ -45,7 +46,7 @@ def set_setting(key: str, value: str, conn = None, **kwargs) -> bool: # conn typ
         logging.info(f"Setting value for key {key} = {value}")
         # Check if conn is an SQLAlchemy Session, Engine, or Connection
         if isinstance(conn, (Session, Engine, SQLAlchemyConnection)):
-            stmt = text("INSERT OR REPLACE INTO ApplicationSettings (setting_key, setting_value) VALUES (:key, :value)")
+            stmt = text("INSERT OR REPLACE INTO application_settings (setting_key, setting_value) VALUES (:key, :value)")
             result = conn.execute(stmt, {"key": key, "value": value})
             # For SQLAlchemy, commit is often handled by the session's context manager or explicitly outside.
             # _manage_conn is assumed to handle commit for session if it provided one.

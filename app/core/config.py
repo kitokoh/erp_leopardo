@@ -5,7 +5,7 @@ APP_ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # --- Database Settings ---
 DATABASE_NAME = "app_data.db"
-DATABASE_PATH = os.path.join(APP_ROOT_DIR, DATABASE_NAME)
+DATABASE_PATH = DATABASE_NAME
 
 # --- Default Admin User Settings (for initial seeding) ---
 DEFAULT_ADMIN_USERNAME = "admin"

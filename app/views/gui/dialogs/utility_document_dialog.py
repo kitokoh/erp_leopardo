@@ -10,16 +10,12 @@ from PyQt5.QtGui import QFont
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 
 # Assuming db.py and app_config.py are in the same directory or accessible in PYTHONPATH
-import app.db
-from app_config import CONFIG # For CONFIG.get("templates_dir")
+from app.core.config import CONFIG # For CONFIG.get("templates_dir")
+from app.db.cruds.misc.templates_crud import get_utility_documents, add_utility_document_template, get_template_by_id, update_template, delete_template
+from app.db.db_utils import get_document_context_data, save_general_document_file, delete_general_document_file
 
 # Placeholder for current_user_id. In a real app, this would come from an auth system.
 CURRENT_USER_ID = None # For now, preview won't use user-specific context
-
-# It's good practice to import specific functions if the module 'db' is large.
-# However, the existing code uses `db.some_function`, so we'll stick to that pattern
-# for existing calls, and use specific imports for new ones where appropriate.
-from app.db.utils import get_document_context_data # For potential future context-aware previews
 
 
 class AddEditUtilityDocDialog(QDialog):
@@ -206,7 +202,7 @@ class UtilityDocumentManagerDialog(QDialog):
             self.preview_area.setHtml(f"<p>{self.tr('Select a document to preview.')}</p>")
         try:
             # For now, load all languages. A language filter combo could be added.
-            utility_docs = db.get_utility_documents()
+            utility_docs = get_utility_documents()
             for doc in utility_docs:
                 item = QTreeWidgetItem(self.docs_tree)
                 item.setText(0, doc.get('template_name', 'N/A'))
@@ -306,7 +302,7 @@ class UtilityDocumentManagerDialog(QDialog):
                     proceed_with_save = False
 
             if proceed_with_save:
-                saved_file_full_path = db.save_general_document_file(
+                saved_file_full_path = save_general_document_file(
                     source_file_path=source_file_path,
                     document_type_subfolder=document_type_subfolder,
                     language_code=lang_code,
@@ -314,7 +310,7 @@ class UtilityDocumentManagerDialog(QDialog):
                 )
 
                 if saved_file_full_path:
-                    template_id = db.add_utility_document_template(
+                    template_id = add_utility_document_template(
                         name=doc_name_for_db,
                         language_code=lang_code,
                         base_file_name=target_base_name,
@@ -327,7 +323,7 @@ class UtilityDocumentManagerDialog(QDialog):
                     else:
                         QMessageBox.warning(self, "DB Error", "Failed to add utility document metadata to database.")
                         # If DB entry fails after successful file save, attempt to delete the just-saved file
-                        db.delete_general_document_file(document_type_subfolder, lang_code, target_base_name)
+                        delete_general_document_file(document_type_subfolder, lang_code, target_base_name)
                 else:
                     QMessageBox.warning(self, "File Error", "Failed to save document file.")
             else:
@@ -344,7 +340,7 @@ class UtilityDocumentManagerDialog(QDialog):
             QMessageBox.critical(self, "Error", "Invalid item selected (no template ID).")
             return
 
-        current_template_data = db.get_template_by_id(template_id)
+        current_template_data = get_template_by_id(template_id)
         if not current_template_data:
             QMessageBox.critical(self, "Error", f"Could not retrieve template data for ID: {template_id}")
             return
@@ -363,7 +359,7 @@ class UtilityDocumentManagerDialog(QDialog):
                 # base_file_name and template_type are not changed in "edit info" mode
             }
 
-            if db.update_template(template_id, update_payload):
+            if update_template(template_id, update_payload):
                 QMessageBox.information(self, "Success", "Document information updated.")
                 self.populate_docs_tree()
             else:
@@ -389,14 +385,14 @@ class UtilityDocumentManagerDialog(QDialog):
 
         if reply == QMessageBox.Yes:
             # First, try to delete the file
-            file_deleted = db.delete_general_document_file(
+            file_deleted = delete_general_document_file(
                 document_type_subfolder="utility_documents",
                 language_code=lang_code,
                 base_file_name=base_name
             )
 
             if file_deleted: # If file deletion was successful or file was already gone
-                if db.delete_template(template_id):
+                if delete_template(template_id):
                     QMessageBox.information(self, "Success", "Utility document and its file deleted.")
                     self.populate_docs_tree()
                 else:
@@ -409,10 +405,10 @@ class UtilityDocumentManagerDialog(QDialog):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     # Ensure DB and "Documents Utilitaires" category exist
-    db.initialize_database()
+    # db.initialize_database() # This is now handled by main app startup
 
     # Example: Add a dummy utility doc for testing if none exist for 'en'
-    util_docs_en = db.get_utility_documents(language_code='en')
+    util_docs_en = get_utility_documents(language_code='en')
     if not util_docs_en:
         print("Adding sample utility document for 'en' for testing dialog...")
         dummy_util_dir = os.path.join(CONFIG.get("templates_dir", "templates"), "utility_documents", "en")
@@ -425,7 +421,7 @@ if __name__ == "__main__":
                 with open(dummy_pdf_path, "wb") as f: # write bytes
                     f.write(b"%PDF-1.0\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Count 0>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF")
 
-            db.add_utility_document_template(
+            add_utility_document_template(
                 name="Sample Catalog EN",
                 language_code="en",
                 base_file_name=dummy_pdf_file,
