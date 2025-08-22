@@ -459,13 +459,136 @@ class ContactsManagerWidget(QWidget):
 
     def on_link_to_entity(self):
         selected_items = self.contacts_table.selectedItems()
-                for row in range(self.contacts_table.rowCount()):
-                    if self.contacts_table.item(row, 0).data(Qt.UserRole) == new_id:
-                        self.contacts_table.selectRow(row)
-                        break
-                QMessageBox.information(self, self.tr("Succès"), self.tr("Contact ajouté avec succès."))
+        if not selected_items:
+            QMessageBox.information(self, self.tr("Sélection"), self.tr("Veuillez d'abord sélectionner un contact à lier."))
+            return
+
+        contact_id = selected_items[0].data(Qt.UserRole)
+        contact_data_for_dialog = contacts_crud.get_contact_by_id(contact_id)
+        if not contact_data_for_dialog:
+            QMessageBox.warning(self, self.tr("Erreur"), self.tr("Impossible de récupérer les données du contact sélectionné."))
+            return
+
+        entity_types = {
+            "Transporter": "Transporter",
+            "FreightForwarder": "FreightForwarder",
+            "MoneyTransferAgent": "MoneyTransferAgent",
+            "Client": "Client",
+            "CompanyPersonnel": "CompanyPersonnel"
+            # Add "Partner" here if a PartnerDialog for selection exists or is simple enough for QInputDialog
+        }
+
+        chosen_type_key, ok = QInputDialog.getItem(self, self.tr("Choisir le Type d'Entité"),
+                                                self.tr("À quel type d'entité voulez-vous lier ce contact ?"),
+                                                list(entity_types.keys()), 0, False)
+
+        if ok and chosen_type_key:
+            entity_type_str = entity_types[chosen_type_key]
+
+            # This is a simplification. Ideally, a proper selection dialog for entities would be used.
+            entity_id_str, ok_id = QInputDialog.getText(self, self.tr(f"ID de l'{chosen_type_key}"),
+                                                        self.tr(f"Entrez l'ID de {chosen_type_key} :"))
+
+            if ok_id and entity_id_str.strip():
+                entity_id = entity_id_str.strip()
+
+                # Check if this exact link already exists to prevent duplicates before opening dialog
+                # This is a basic check. ContactDialog should ideally handle this on accept too.
+                if entity_type_str in ["Transporter", "FreightForwarder", "MoneyTransferAgent", "Partner"]:
+                    existing_links = entity_contacts_crud.get_contacts_for_entity(entity_id, entity_type_str)
+                    if any(str(link.get('contact_id')) == str(contact_id) for link in existing_links):
+                        QMessageBox.information(self, self.tr("Lien Existant"),
+                                                self.tr(f"Ce contact est déjà lié à {chosen_type_key} ID {entity_id}."))
+                        return
+                elif entity_type_str == "Client":
+                    # client_contacts_crud.get_specific_client_contact_link_details might be useful
+                    pass # Add similar check for clients if needed
+                elif entity_type_str == "CompanyPersonnel":
+                    # company_personnel_crud.get_contacts_for_personnel might be useful
+                    pass # Add similar check for personnel if needed
+
+
+                link_dialog = ContactDialog(contact_data=contact_data_for_dialog,
+                                            link_data={}, # New link, so empty link_data
+                                            manage_link_fields=True,
+                                            parent=self)
+                link_dialog.setWindowTitle(self.tr(f"Lier Contact à {chosen_type_key} (ID: {entity_id})"))
+
+                if link_dialog.exec_() == QDialog.Accepted:
+                    link_details = link_dialog.get_link_data()
+                    success = False
+                    new_link_id = None
+
+                    try:
+
+                        entity_id_to_use = entity_id # Default to string for generic entities
+
+                        if entity_type_str in ["Transporter", "FreightForwarder", "MoneyTransferAgent", "Partner"]:
+                            # For these, entity_id might be a string or int depending on their specific schemas.
+                            # entity_contacts_crud.link_contact_to_entity should handle type appropriately.
+                            # If they must be int, conversion with error handling would be needed here too.
+                            # For now, assume entity_contacts_crud is flexible or their IDs are typically strings.
+                            pass # entity_id_to_use remains as string from input for these
+
+                        elif entity_type_str == "Client":
+                            try:
+                                entity_id_to_use = int(entity_id)
+                            except ValueError:
+                                logger.error(f"Invalid Client ID format: {entity_id}. Must be an integer.")
+                                QMessageBox.warning(self, self.tr("Erreur ID Client"), self.tr("L'ID du client doit être un nombre entier."))
+                                return # Abort if client ID is invalid
+
+                        elif entity_type_str == "CompanyPersonnel":
+                            try:
+                                entity_id_to_use = int(entity_id)
+                            except ValueError:
+                                logger.error(f"Invalid Personnel ID format: {entity_id}. Must be an integer.")
+                                QMessageBox.warning(self, self.tr("Erreur ID Personnel"), self.tr("L'ID du personnel doit être un nombre entier."))
+                                return # Abort if personnel ID is invalid
+
+                        # Proceed with linking only if entity_id_to_use is valid for the type
+                        if entity_type_str in ["Transporter", "FreightForwarder", "MoneyTransferAgent", "Partner"]:
+                            new_link_id = entity_contacts_crud.link_contact_to_entity(
+                                entity_id=entity_id_to_use, # Use potentially string ID
+                                entity_type=entity_type_str,
+                                contact_id=contact_id,
+                                role_in_entity=link_details.get('role_in_entity'),
+                                is_primary=link_details.get('is_primary', False),
+                                can_receive_documents=link_details.get('can_receive_documents', True),
+                                notes=link_details.get('notes')
+                            )
+                            success = new_link_id is not None
+                        elif entity_type_str == "Client":
+                            new_link_id = client_contacts_crud.link_contact_to_client(
+                                client_id=entity_id_to_use,
+                                contact_id=contact_id,
+                                is_primary=link_details.get('is_primary', False),
+                                can_receive_documents=link_details.get('can_receive_documents', True)
+                            )
+                            success = new_link_id is not None
+                        elif entity_type_str == "CompanyPersonnel":
+                            new_link_id = company_personnel_crud.link_existing_contact_to_personnel(
+                                personnel_id=entity_id_to_use,
+                                contact_id=contact_id,
+                                is_primary=link_details.get('is_primary', False),
+                                can_receive_documents=link_details.get('can_receive_documents', True)
+                            )
+                            success = new_link_id is not None
+
+
+
+                        if success:
+                            QMessageBox.information(self, self.tr("Succès"), self.tr("Contact lié avec succès."))
+                            self.load_linked_entities(contact_id) # Refresh
+                        else:
+                            QMessageBox.warning(self, self.tr("Échec"), self.tr("Impossible de lier le contact à l'entité."))
+                    except Exception as e_link:
+                        logger.error(f"Erreur lors de la liaison du contact {contact_id} à {entity_type_str} {entity_id}: {e_link}", exc_info=True)
+                        QMessageBox.critical(self, self.tr("Erreur"), self.tr("Une erreur est survenue lors de la liaison."))
             else:
-                QMessageBox.warning(self, self.tr("Erreur"), self.tr("Impossible d'ajouter le contact."))
+                QMessageBox.information(self, self.tr("Annulé"), self.tr("ID d'entité non fourni."))
+        else:
+            QMessageBox.information(self, self.tr("Annulé"), self.tr("Aucun type d'entité choisi."))
 
     def on_edit_contact(self):
         selected_items = self.contacts_table.selectedItems()

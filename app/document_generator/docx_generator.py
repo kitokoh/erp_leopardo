@@ -329,5 +329,3 @@ if __name__ == '__main__':
     # The quality of placeholder replacement in headers/footers depends on
     # how they are structured in the template and `python-docx` capabilities.
     # Text boxes are generally not handled by this basic replacement logic.
-
-```

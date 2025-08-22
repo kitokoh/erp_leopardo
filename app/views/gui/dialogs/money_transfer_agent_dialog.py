@@ -9,10 +9,10 @@ import logging
 
 # Assuming CRUD functions are directly importable from their modules
 try:
-    import db.cruds.money_transfer_agents_crud as mta_crud
-    import db.cruds.contacts_crud as contacts_crud
-    import db.cruds.entity_contacts_crud as entity_contacts_crud
-    from db.cruds.locations_crud import get_all_countries, get_cities_for_country # For country/city dropdowns
+    from app.db.cruds.misc import money_transfer_agents_crud as mta_crud
+    from app.db.cruds.misc import contacts_crud
+    from app.db.cruds.misc import entity_contacts_crud
+    from app.db.cruds.misc.locations_crud import get_all_countries, get_all_cities
     from .contact_dialog import ContactDialog
 except ImportError as e:
     logging.error(f"CRITICAL: Failed to import CRUD modules for MoneyTransferAgentDialog: {e}", exc_info=True)
@@ -147,7 +147,7 @@ class MoneyTransferAgentDialog(QDialog):
             self.city_combo.setEnabled(True)
             self.city_combo.addItem(self.tr("Sélectionner une ville..."), None)
             try:
-                cities = get_cities_for_country(country_id)
+                cities = get_all_cities(country_id=country_id)
                 for city in cities:
                     self.city_combo.addItem(city['city_name'], city['city_id'])
                     self.cities_map[city['city_id']] = city['city_name']

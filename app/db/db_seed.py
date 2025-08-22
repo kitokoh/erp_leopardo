@@ -8,7 +8,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from app.core.config import CONFIG
-from app.db.connection import get_db_connection, set_db_config
+from app.db.connection import get_db_connection, set_db_config, initialize_engine_and_session
 from app.db.seeders.location_seeder import seed_all_locations
 from app.db.seeders.role_permission_seeder import seed_roles_and_permissions
 from app.db.seeders.user_seeder import seed_default_users
@@ -24,6 +24,7 @@ def seed_all_data():
 
     # Set the database configuration before trying to connect
     set_db_config(CONFIG)
+    initialize_engine_and_session(CONFIG)
 
     db = None  # Initialize db to None
     try:

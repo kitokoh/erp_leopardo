@@ -4,27 +4,19 @@ import datetime
 import json
 import os
 
-# Assuming access to db_manager and other cruds as in the original context_builder
-# This might need adjustment based on actual import paths if refactoring context_builder
-from db.cruds import (
-    get_company_by_id,
-    get_client_by_id,
-    referents_crud,
-    get_product_by_id,
-    get_products_for_client_or_project,
-    get_contacts_for_client,
-    get_country_by_id,
-    get_city_by_id,
-    get_project_by_id,
-    get_client_document_notes,
-    get_equivalent_products,
-    get_media_links_for_product,
-    get_personnel_for_company,
-    application_settings_crud,
-    # Assuming commandes_crud is available, e.g., from db import commandes_crud
-)
-# This import might need to be relative if commandes_crud is in db.cruds package
-# from db.cruds import commandes_crud # Or from db import commandes_crud if it's at that level
+from app.db.cruds.misc.companies_crud import get_company_by_id
+from app.db.cruds.clients.clients_crud import get_client_by_id
+from app.db.cruds.misc import referents_crud
+from app.db.cruds.products.products_crud import get_product_by_id, get_equivalent_products
+from app.db.cruds.clients.client_project_products_crud import get_products_for_client_or_project
+from app.db.cruds.misc.contacts_crud import get_contacts_for_client
+from app.db.cruds.misc.locations_crud import get_country_by_id, get_city_by_id
+from app.db.cruds.projects.projects_crud import get_project_by_id
+from app.db.cruds.clients.client_document_notes_crud import get_client_document_notes
+from app.db.cruds.products import product_media_links_crud
+from app.db.cruds.misc.company_personnel_crud import get_personnel_for_company
+from app.db.cruds.misc import application_settings_crud
+from app.db.cruds.invoices import commandes_crud
 
 logger = logging.getLogger(__name__)
 

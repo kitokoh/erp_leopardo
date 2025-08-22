@@ -6,7 +6,7 @@ import logging
 from typing import List, Optional, Union # Added Union
 import sys # Add sys for path manipulation
 
-from app.core import config
+from app.core.config import APP_ROOT_DIR
 
 from ..generic_crud import _manage_conn
 from .template_categories_crud import add_template_category, get_template_category_by_name
@@ -91,18 +91,18 @@ def add_default_template_if_not_exists(data: dict, conn: sqlite3.Connection = No
 
             if category_purpose == 'email':
                 # New path for email templates
-                template_base_path = os.path.join(config.APP_ROOT_DIR, "resources", "email_template_designs")
+                template_base_path = os.path.join(APP_ROOT_DIR, "resources", "email_template_designs")
 
                 fpath = os.path.join(template_base_path, base_file_name)
             elif category_purpose in ['client_document', 'utility_document', 'utility']: # 'utility' was seen in seed data
                 # Document templates are in resources/templates/[lang_code]/
-                template_base_path = os.path.join(config.APP_ROOT_DIR, "resources", "templates", language_code)
+                template_base_path = os.path.join(APP_ROOT_DIR, "resources", "templates", language_code)
                 fpath = os.path.join(template_base_path, base_file_name)
             else: # Fallback or undefined category_purpose
                 # This case should ideally not be hit if category_purpose is always correctly set during seeding.
                 # Defaulting to the new email path as a general fallback, but with a strong warning.
                 logging.error(f"CRITICAL: Undefined or missing category_purpose '{category_purpose}' for template '{name}'. Attempting new email template path structure as a fallback: resources/email_template_designs.")
-                template_base_path = os.path.join(config.APP_ROOT_DIR, "resources", "email_template_designs")
+                template_base_path = os.path.join(APP_ROOT_DIR, "resources", "email_template_designs")
 
                 fpath = os.path.join(template_base_path, base_file_name)
 
