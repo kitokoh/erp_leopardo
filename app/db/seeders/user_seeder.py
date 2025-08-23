@@ -11,7 +11,6 @@ def seed_default_users(db: Session, logger: logging.Logger):
     """
     Seeds the default super_admin and operational users if they don't exist.
     """
-    print("Seeding default users...")
     logger.info("Seeding default users...")
 
     # 1. Seed Super Admin User
