@@ -1,6 +1,7 @@
 import logging
 import sys
 import os
+from sqlalchemy.orm import Session
 
 # Ensure the app's root directory is in the Python path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -15,20 +16,15 @@ from app.db.seeders.user_seeder import seed_default_users
 # Import other seeders as they are created
 # from db.seeders.product_seeder import seed_products
 
-def seed_all_data():
+def seed_all_data(db: Session):
     """
     Master seeding function that calls all individual seeder modules.
+    It expects an already-created db session to be passed to it.
     """
     logger = logging.getLogger(__name__)
     logger.info("Starting master data seeding process...")
 
-    # Set the database configuration before trying to connect
-    set_db_config(CONFIG)
-
-    db = None  # Initialize db to None
     try:
-        db = get_db_connection()
-
         # Call seeders in a logical order
         seed_all_locations(db, logger)
         seed_roles_and_permissions(db, logger)
@@ -39,16 +35,19 @@ def seed_all_data():
 
     except Exception as e:
         logger.error(f"An error occurred during the master seeding process: {e}", exc_info=True)
-        if db:
-            db.rollback()
-            logger.info("Transaction rolled back.")
-    finally:
-        if db:
-            db.close()
-            logger.info("Database connection closed.")
+        db.rollback()
+        logger.info("Transaction rolled back.")
+        raise # Re-raise the exception to notify the caller
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
     print("Running database seeder script...")
-    seed_all_data()
+    from app.db.connection import initialize_engine_and_session, get_db_connection
+    set_db_config(CONFIG)
+    initialize_engine_and_session(CONFIG)
+    db_session = get_db_connection()
+    try:
+        seed_all_data(db_session)
+    finally:
+        db_session.close()
     print("Seeding process finished.")

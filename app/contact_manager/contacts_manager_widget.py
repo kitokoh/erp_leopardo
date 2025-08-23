@@ -1,23 +1,14 @@
 # -*- coding: utf-8 -*-
-from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
-    QPushButton, QLabel, QFormLayout, QLineEdit, QTextEdit, QScrollArea,
-    QHeaderView, QAbstractItemView, QSplitter, QGroupBox, QInputDialog
-)
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QIcon
-import logging
-
-# -*- coding: utf-8 -*-
-from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
-    QPushButton, QLabel, QFormLayout, QLineEdit, QTextEdit, QScrollArea,
-    QHeaderView, QAbstractItemView, QSplitter, QGroupBox, QInputDialog, QMessageBox, QDialog
-)
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QIcon
 import logging
 from datetime import datetime
+from PyQt5.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
+    QPushButton, QLabel, QFormLayout, QLineEdit, QTextEdit, QScrollArea,
+    QHeaderView, QAbstractItemView, QSplitter, QGroupBox, QInputDialog,
+    QMessageBox, QDialog
+)
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QIcon
 
 # Corrected, organized and absolute imports
 from app.db.cruds.clients import contacts_crud, client_contacts_crud
@@ -456,98 +447,6 @@ class ContactsManagerWidget(QWidget):
             except Exception as e:
                 logger.error(f"Erreur lors de la suppression du contact {contact_id}: {e}", exc_info=True)
                 QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("Une erreur critique est survenue lors de la suppression du contact:\n{e}"))
-
-    def on_link_to_entity(self):
-        selected_items = self.contacts_table.selectedItems()
-                for row in range(self.contacts_table.rowCount()):
-                    if self.contacts_table.item(row, 0).data(Qt.UserRole) == new_id:
-                        self.contacts_table.selectRow(row)
-                        break
-                QMessageBox.information(self, self.tr("Succès"), self.tr("Contact ajouté avec succès."))
-            else:
-                QMessageBox.warning(self, self.tr("Erreur"), self.tr("Impossible d'ajouter le contact."))
-
-    def on_edit_contact(self):
-        selected_items = self.contacts_table.selectedItems()
-        if not selected_items:
-            QMessageBox.information(self, self.tr("Sélection"), self.tr("Veuillez sélectionner un contact à modifier."))
-            return
-
-        contact_id = selected_items[0].data(Qt.UserRole)
-        if contact_id is None: return # Should not happen if selection is valid
-
-        contact_data_to_edit = contacts_crud.get_contact_by_id(contact_id)
-        if not contact_data_to_edit:
-            QMessageBox.warning(self, self.tr("Erreur"), self.tr("Contact non trouvé dans la base de données."))
-            self.load_contacts() # Refresh list in case it was deleted elsewhere
-            return
-
-        dialog = ContactDialog(contact_data=contact_data_to_edit, manage_link_fields=False, parent=self)
-        if dialog.exec_() == QDialog.Accepted:
-            updated_data = dialog.get_contact_data()
-            # Add user_id if available for updated_by_user_id if your CRUD supports it
-            # current_user_id = getattr(self, 'current_user_id', None)
-            # if current_user_id:
-            #    updated_data['updated_by_user_id'] = current_user_id # Assuming contacts_crud.update_contact handles this
-
-            if contacts_crud.update_contact(contact_id, updated_data):
-                self.load_contacts() # Refresh the list
-                # Reselect the row and refresh details
-                for row in range(self.contacts_table.rowCount()):
-                    if self.contacts_table.item(row, 0).data(Qt.UserRole) == contact_id:
-                        self.contacts_table.selectRow(row)
-                        # self.on_contact_selected() will be called, which calls display_contact_details
-                        break
-                QMessageBox.information(self, self.tr("Succès"), self.tr("Contact mis à jour avec succès."))
-            else:
-                QMessageBox.warning(self, self.tr("Erreur"), self.tr("Impossible de mettre à jour le contact."))
-
-    def on_delete_contact(self):
-        selected_items = self.contacts_table.selectedItems()
-        if not selected_items:
-            QMessageBox.information(self, self.tr("Sélection"), self.tr("Veuillez sélectionner un contact à supprimer."))
-            return
-
-        contact_id = selected_items[0].data(Qt.UserRole)
-        # It's better to get the name from the DB to be sure, but for the message, table item is usually fine.
-        contact_name_display = selected_items[0].text()
-
-        if contact_id is None: return
-
-        # Count linked entities for a more informative message
-        # Note: This might be slightly slow if there are many link types or very large tables.
-        # For now, it's acceptable for user confirmation.
-        linked_count = 0
-        try:
-            linked_count += len(entity_contacts_crud.get_entities_for_contact(contact_id))
-            linked_count += len(client_contacts_crud.get_clients_for_contact(contact_id))
-
-            linked_count += len(company_personnel_crud.get_personnel_linked_to_contact(contact_id))
-        except Exception as e:
-            logger.error(f"Erreur lors du comptage des entités liées pour le contact {contact_id}: {e}")
-            # Proceed with a generic message if counting fails
-
-        msg = self.tr(f"Êtes-vous sûr de vouloir supprimer définitivement le contact '{contact_name_display}'?")
-        if linked_count > 0:
-            msg += self.tr(f"\n\nCe contact est lié à {linked_count} entité(s) (clients, personnel, transporteurs, etc.).\n"
-                           "La suppression de ce contact central entraînera également la suppression de tous ces liens, "
-                           "conformément aux règles de la base de données (ON DELETE CASCADE).")
-        else:
-            msg += self.tr("\n\nCe contact n'est actuellement lié à aucune autre entité.")
-
-        msg += self.tr("\nCette action est irréversible.")
-
-        reply = QMessageBox.question(self, self.tr("Confirmation de Suppression"), msg,
-                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-
-        if reply == QMessageBox.Yes:
-            if contacts_crud.delete_contact(contact_id):
-                self.load_contacts() # Refresh the main list
-                self._clear_details_panel(clear_contact_form=True, clear_linked_entities=True) # Clear details
-                self._update_action_buttons_state() # Disable buttons as selection is lost
-                QMessageBox.information(self, self.tr("Succès"), self.tr("Contact supprimé avec succès."))
-            else:
-                QMessageBox.warning(self, self.tr("Erreur"), self.tr("Impossible de supprimer le contact de la base de données."))
 
     def on_link_to_entity(self):
         selected_items = self.contacts_table.selectedItems()

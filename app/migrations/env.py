@@ -25,43 +25,10 @@ if project_root not in sys.path:
     sys.path.append(project_root)
 
 # Now you can import your app's modules
-from app.core.config import CONFIG  # Assuming your main config dict is named CONFIG
-from app.db.connection import Base, initialize_engine_and_session, get_db_connection # Import Base and db setup
-# Import all your models here so Base.metadata is populated
-# Example:
-# from app.accounting.models import *
-# from app.api.models import *  # If you have models there
-# from app.botpress_integration.models import *
-# from app.calendar_module.models import *
-# from app.client_management.models import * # Assuming models might be here or in subdirs
-# from app.conference_manager.models import *
-# from app.contact_manager.models import * # Assuming models might be here
-# from app.models.db import * # If you have a central db.models or similar
-# from app.media_manager.models import *
-# from app.project_management.models import * # Assuming models might be here
-# from app.recruitment.models import * # Assuming models might be here
-# from app.status_manager.status_models import *
-# from app.user_profile_management.models import *
-# ... and so on for every module that defines SQLAlchemy models
+from app.core.config import CONFIG
+from app.db.connection import Base
 
-# Ensure all models are loaded by importing them.
-# This is a placeholder; you'll need to list all actual model modules.
-# For a large application, you might have a helper in db.models to import all.
-# For now, let's assume db.connection.Base.metadata will be populated
-# by the application's normal import sequence when it initializes the DB.
-# However, for autogenerate to work reliably, they must be imported here.
-
-# A more robust way to ensure all models are imported if they are scattered:
-# You might need to explicitly import each module containing models.
-# For example, if your models are in db/models/user.py, db/models/product.py, etc.
-# you would do:
-# from app.models.db.user import User
-# from app.models.db.product import Product
-# For now, we rely on Base being populated when the app runs initialize_engine_and_session.
-# This might require manual creation of initial migration scripts if autogenerate misses tables.
-
-# Explicitly import all modules containing SQLAlchemy models that use the central Base
-# This is crucial for Alembic's autogenerate feature to detect all tables and changes.
+# Explicitly import all modules containing SQLAlchemy models
 print("Alembic env.py: Importing all application models for metadata detection...")
 from app.models.db.clients import client, client_assignedpersonnel, client_freightforwarders, client_transporters, clientcontacts, clientdocumentnotes, clientnotes, clientorder_moneytransferagents, clientprojectproducts, clientvisits
 from app.models.db.documents import businessselecteddocuments, client_documents, defaultdocumentnotes, document_category, documenttypes, employee_document, partnerdocuments
@@ -95,35 +62,16 @@ from app.models.db.users import role, rolepermissions, user, user_motivational_m
 print("Alembic env.py: All models imported.")
 
 
-
 print("Alembic env.py: Finished importing application models.")
 
 target_metadata = Base.metadata
-# Ensure target_metadata is not None, which can happen if Base wasn't correctly populated
 if target_metadata is None:
     print("CRITICAL ERROR in Alembic env.py: target_metadata is None. This usually means Base.metadata was not populated correctly. Ensure all SQLAlchemy models are imported before this line and that they use the central 'Base' from db.connection.")
-    # Depending on how critical this is, you might want to raise an error:
-    # raise RuntimeError("Alembic target_metadata is None. Model imports might have failed or Base not correctly used.")
-
-
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
+    raise RuntimeError("Alembic target_metadata is None. Model imports might have failed or Base not correctly used.")
 
 
 def run_migrations_offline() -> None:
-    """Run migrations in 'offline' mode.
-
-    This configures the context with just a URL
-    and not an Engine, though an Engine is acceptable
-    here as well.  By skipping the Engine creation
-    we don't even need a DBAPI to be available.
-
-    Calls to context.execute() here emit the given string to the
-    script output.
-
-    """
+    """Run migrations in 'offline' mode."""
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
@@ -137,25 +85,15 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode.
-
-    In this scenario we need to create an Engine
-    and associate a connection with the context.
-
-    """
-    # Get the application's configuration
-    # This assumes CONFIG is already populated when env.py is run.
-    # If app_setup.load_config() needs to be called, it should happen before this.
+    """Run migrations in 'online' mode."""
     app_config = CONFIG
-
-    # Determine database URL from application's config
     db_type = app_config.get('database_type', 'sqlite')
     db_url = None
 
     if db_type == 'sqlite':
         db_path = app_config.get('database_path', 'app_data.db')
         if not os.path.isabs(db_path):
-            db_path = os.path.join(project_root, db_path) # project_root defined above
+            db_path = os.path.join(project_root, db_path)
         db_url = f"sqlite:///{db_path}"
     elif db_type == 'postgresql':
         pg_user = app_config.get('postgresql_user')
@@ -169,18 +107,10 @@ def run_migrations_online() -> None:
     else:
         raise ValueError(f"Unsupported database_type for Alembic: {db_type}")
 
-    # Update the Alembic config with the dynamically determined URL
-    # This makes it available for engine_from_config if needed, or for direct use
     config.set_main_option('sqlalchemy.url', db_url)
 
-    # It's often better to create the engine directly using the app's existing mechanism
-    # if it's already configured for SQLAlchemy (like initialize_engine_and_session)
-    # However, Alembic's default is engine_from_config.
-    # If your initialize_engine_and_session creates and returns the engine, you could use that.
-    # For now, let's stick to Alembic's way but ensure it uses our dynamic URL.
-
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}), # This will now use the db_url from above
+        config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
@@ -190,7 +120,6 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             render_as_batch=True,
-            # compare_type=True, # Uncomment if you want to detect column type changes
         )
 
         with context.begin_transaction():
