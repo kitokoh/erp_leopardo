@@ -1,73 +1,64 @@
-import sys
 import os
+import sys
 import logging
 
-# Add the project root to the Python path
+# Ensure the app module is in the Python path
 project_root = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, project_root)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-from app.core.app_setup import setup_logging, CONFIG
-from app.db.connection import initialize_engine_and_session, set_db_config, get_db_connection
-from app.services.auth import authentication
-from app.db.seeders.user_seeder import seed_default_users
-from app.db.seeders.role_permission_seeder import seed_roles_and_permissions
+from app.core.config import CONFIG
+from app.db.connection import initialize_engine_and_session, set_db_config
+from app.services.auth.authentication import login
 
-def test_login():
-    """Tests the admin login functionality."""
-    # 1. Setup Logging
-    setup_logging()
-    logging.info("Starting login test...")
+def run_login_only_test():
+    """
+    Tests only the admin login, assuming a migrated and seeded database.
+    """
+    logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(message)s')
 
-    # 2. Load Configuration and Initialize DB
-    if not CONFIG:
-        logging.critical("Failed to load configuration. Exiting.")
-        return
+    # 1. Configure for the test database
+    CONFIG['database_path'] = os.path.join(project_root, 'test.db')
+    CONFIG['database_url'] = f"sqlite:///{CONFIG['database_path']}"
 
-    # Clean slate
-    db_path = CONFIG.get("database_path")
-    if os.path.exists(db_path):
-        os.remove(db_path)
-        logging.info(f"Removed existing database file at {db_path}")
+    db_path = CONFIG['database_path']
 
+    if not os.path.exists(db_path):
+        logging.error(">>> Login Test FAILED: Database file does not exist. Run migration and seeding tests first. <<<")
+        return False
+
+    # 2. Initialize the engine and attempt to log in
+    logging.info("--- Running Admin Login Test ---")
     try:
+        # Must initialize the engine for get_db_connection to work
         set_db_config(CONFIG)
         initialize_engine_and_session(CONFIG)
-        logging.info("Database engine and session initialized successfully.")
-    except Exception as e:
-        logging.critical(f"Failed to initialize database: {e}", exc_info=True)
-        return
 
-    # 3. Seed data directly
-    db = None
-    try:
-        db = get_db_connection()
-        logging.info("Seeding roles and permissions...")
-        seed_roles_and_permissions(db, logging.getLogger())
-        logging.info("Seeding default users...")
-        seed_default_users(db, logging.getLogger())
+        success, message, user_data, license_details = login(
+            username=CONFIG['default_admin_username'],
+            password=CONFIG['default_admin_password'],
+            remember_me=False
+        )
+
+        if success and user_data and user_data.get('username') == CONFIG['default_admin_username']:
+            logging.info(">>> Admin Login Test PASSED <<<")
+            return True
+        else:
+            logging.error(f">>> Admin Login Test FAILED: {message} <<<")
+            return False
+
     except Exception as e:
-        logging.critical(f"Failed to seed data: {e}", exc_info=True)
-        if db:
-            db.rollback()
+        logging.error(">>> Admin Login Test FAILED: An exception occurred during login attempt.", exc_info=True)
+        return False
     finally:
-        if db:
-            db.close()
+        # Clean up the test database after the final test
+        if os.path.exists(db_path):
+            os.remove(db_path)
+            logging.info(f"Cleaned up test database: {db_path}")
 
-    # 4. Attempt Login
-    username = CONFIG.get("default_admin_username", "admin")
-    password = CONFIG.get("default_admin_password", "admin")
-    logging.info(f"Attempting login for user: {username}")
-
-    success, error_message, user_info, license_info = authentication.login(username, password)
-
-    if success:
-        logging.info("Login successful!")
-        logging.info(f"User Info: {user_info}")
-        logging.info(f"License Info: {license_info}")
-        print("\n[SUCCESS] Admin login test passed!")
-    else:
-        logging.error(f"Login failed: {error_message}")
-        print(f"\n[FAILURE] Admin login test failed: {error_message}")
 
 if __name__ == "__main__":
-    test_login()
+    if run_login_only_test():
+        sys.exit(0)
+    else:
+        sys.exit(1)

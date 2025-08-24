@@ -34,6 +34,21 @@ def set_db_config(config):
     _db_config = config
     logging.info("db.connection: Database configuration has been set.")
 
+def get_db_path() -> str:
+    """
+    Retrieves the database path from the centrally managed configuration.
+    """
+    if _db_config and 'database_path' in _db_config:
+        return _db_config['database_path']
+
+    # This is a critical failure. The config should always be set before this is called.
+    logging.error("CRITICAL: get_db_path() was called before the database configuration was set via set_db_config().")
+    # To prevent a crash in legacy code that might not initialize properly,
+    # we can return a default, but this indicates a code flow problem.
+    default_path = os.path.join(project_root, 'user_profile_data.db')
+    logging.warning(f"Falling back to a default database path: {default_path}")
+    return default_path
+
 def get_raw_sqlite_connection(db_path_override=None) -> sqlite3.Connection:
     """
     Explicitly returns a raw sqlite3.Connection.
@@ -58,112 +73,22 @@ def get_raw_sqlite_connection(db_path_override=None) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
 
-def get_db_connection(db_path_override=None) -> Union[sqlite3.Connection, Session]: # Modified return type hint
+def get_db_connection() -> Session:
     """
-    Returns a database connection object.
-    If SQLAlchemy SessionLocal is initialized, it returns a SQLAlchemy Session.
-    Otherwise, it falls back to the previous behavior (e.g., sqlite3.Connection).
+    Returns a new SQLAlchemy Session from the initialized SessionLocal.
+    This is the single, centralized way to get a database session.
+    It will raise an exception if the engine is not initialized.
     """
-    global _db_config, SessionLocal # Ensure SessionLocal is accessible
-    current_app_config_to_use = {}
+    if SessionLocal is None:
+        logging.critical(
+            "CRITICAL: get_db_connection() was called before the database engine was initialized. "
+            "Please call initialize_engine_and_session() at application startup."
+        )
+        raise RuntimeError("Database session factory is not initialized.")
 
-    # Prioritize SQLAlchemy session if SessionLocal is available
-    if SessionLocal:
-        db_session = SessionLocal()
-        # Log the engine URL associated with this SessionLocal to know which DB it's for
-        if db_session.bind:
-            logging.info(f"db.connection (get_db_connection - SQLAlchemy Session): Providing SQLAlchemy session linked to engine: {db_session.bind.url}")
-        else:
-            logging.warning("db.connection (get_db_connection - SQLAlchemy Session): SessionLocal is available but not bound to an engine.")
-        return db_session
-
-    # Fallback to original logic if SessionLocal is not initialized
-    logging.warning("db.connection (get_db_connection - Fallback): SessionLocal not initialized. Falling back to raw connection. Ensure initialize_engine_and_session is called for ORM features.")
-
-    if db_path_override:
-        path_to_connect = db_path_override
-        database_type = 'sqlite' # Assuming override is for SQLite for now
-        # No app_config needed if path is overridden directly
-    else:
-        if _db_config is None:
-            logging.critical(
-                "CRITICAL: Database configuration not set in db.connection. Call set_db_config() first."
-            )
-            raise ValueError("Database configuration not set. Cannot establish connection.")
-
-        current_app_config_to_use = _db_config
-        path_to_connect = current_app_config_to_use.get('database_path')
-        database_type = current_app_config_to_use.get('database_type', 'sqlite')
-
-        if not path_to_connect and database_type == 'sqlite':
-            logging.critical(
-                "CRITICAL: 'database_path' is missing or empty in the application configuration for SQLite, and no override was provided."
-            )
-            raise ValueError("SQLite database path not found in application configuration. Cannot establish connection.")
-
-    if database_type == 'sqlite':
-        if not path_to_connect: # Should be caught above if not overridden, but double check
-            raise ValueError("SQLite connection requires a valid database path.")
-        # Log specifically for raw SQLite connection path
-        logging.info(f"db.connection (get_db_connection - raw sqlite): Attempting to connect to SQLite DB at: {path_to_connect}")
-        conn = sqlite3.connect(path_to_connect)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON;")
-        return conn
-    elif database_type == 'postgresql':
-        try:
-            import psycopg2
-        except ImportError:
-            logging.critical("The 'psycopg2' library is required for PostgreSQL connections. Please install it (e.g., pip install psycopg2-binary).")
-            raise ImportError("psycopg2 library not found. Needed for PostgreSQL connection.")
-
-        pg_host = current_app_config_to_use.get('postgresql_host', 'localhost')
-        pg_port = current_app_config_to_use.get('postgresql_port', 5432)
-        pg_user = current_app_config_to_use.get('postgresql_user')
-        pg_password = current_app_config_to_use.get('postgresql_password')
-        pg_dbname = current_app_config_to_use.get('postgresql_dbname')
-        pg_ssl_mode = current_app_config_to_use.get('postgresql_ssl_mode', 'prefer')
-        pg_ssl_rootcert = current_app_config_to_use.get('postgresql_ssl_rootcert')
-        pg_ssl_clientcert = current_app_config_to_use.get('postgresql_ssl_clientcert')
-        pg_ssl_clientkey = current_app_config_to_use.get('postgresql_ssl_clientkey')
-
-
-        if not pg_user or not pg_dbname: # Check if pg_user is defined before using
-            logging.critical("PostgreSQL connection requires at least 'postgresql_user' and 'postgresql_dbname' in configuration.")
-            raise ValueError("Missing PostgreSQL user or database name in configuration.")
-
-        try:
-            conn_params = {
-                "dbname": pg_dbname,
-                "user": pg_user, # pg_user is now guaranteed to be checked
-                "password": pg_password,
-                "host": pg_host,
-                "port": pg_port,
-                "sslmode": pg_ssl_mode
-            }
-            if pg_ssl_mode not in ['disable', 'allow', 'prefer']: # Modes that might need certs
-                if pg_ssl_rootcert:
-                    conn_params["sslrootcert"] = pg_ssl_rootcert
-                if pg_ssl_clientcert:
-                    conn_params["sslcert"] = pg_ssl_clientcert
-                if pg_ssl_clientkey:
-                    conn_params["sslkey"] = pg_ssl_clientkey
-
-            logging.info(f"Attempting PostgreSQL connection to {pg_host}:{pg_port}/{pg_dbname} with SSL mode: {pg_ssl_mode}")
-            conn = psycopg2.connect(**conn_params)
-            logging.info(f"Successfully connected to PostgreSQL database '{pg_dbname}' on {pg_host}:{pg_port} (SSL: {pg_ssl_mode})")
-            return conn
-        except psycopg2.OperationalError as op_err:
-            logging.error(f"PostgreSQL OperationalError during connection: {op_err}")
-            raise ConnectionError(f"Erreur opérationnelle PostgreSQL: {op_err}") from op_err
-        except psycopg2.Error as e: # Catch other psycopg2 errors
-            logging.error(f"Unable to connect to PostgreSQL database (psycopg2.Error): {e}")
-            raise Exception(f"Erreur de connexion PostgreSQL générique: {e}") from e
-
-    elif database_type == 'mysql':
-        raise NotImplementedError("MySQL connection not yet implemented.")
-    else:
-        raise ValueError(f"Unsupported database_type: '{database_type}'. Please check configuration.")
+    db_session = SessionLocal()
+    logging.info(f"db.connection: Providing new SQLAlchemy session from factory. Engine: {db_session.bind.url}")
+    return db_session
 
 
 # This function will be called from main.py after config is loaded and app_setup is fully initialized
@@ -197,7 +122,7 @@ def initialize_engine_and_session(app_config_param):
             logging.info(f"db.connection: SQLAlchemy engine connecting to absolute path: {absolute_db_path}")
             logging.info(f"db.connection: SQLAlchemy engine connecting to URL: {engine_url}")
             try:
-                engine = create_engine(engine_url, connect_args={"check_same_thread": False, "timeout": 10}) # Increased timeout
+                engine = create_engine(engine_url, connect_args={"check_same_thread": False, "timeout": 30}) # Increased timeout
                 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
                 logging.info("db.connection: SQLAlchemy engine and SessionLocal created successfully for SQLite.")
             except Exception as e:

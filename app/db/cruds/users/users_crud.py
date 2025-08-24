@@ -3,7 +3,7 @@ import sqlite3
 import uuid
 from datetime import datetime
 import logging
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.engine import Engine, Connection as SQLAlchemyConnection
 from sqlalchemy.sql import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -109,13 +109,14 @@ def add_user(db: Session, username: str, password: str, role_id: int, full_name:
 
 def get_user_by_username(db: Session, username: str, logger_passed: logging.Logger | None = None) -> User | None:
     current_logger = logger_passed if logger_passed else module_logger
-    print(f"Searching for user: {username}")
+    current_logger.debug(f"Searching for active user: {username}")
     try:
-        user = db.query(User).filter(User.username == username, User.is_active == True, User.is_deleted == False).first()
+        # Use joinedload to eagerly fetch the Role relationship, preventing subsequent queries
+        user = db.query(User).options(joinedload(User.role)).filter(User.username == username, User.is_active == True, User.is_deleted == False).first()
         if user:
-            print(f"User '{username}' found. Hash: {user.hashed_password}")
+            current_logger.debug(f"User '{username}' found.")
         else:
-            print(f"User '{username}' not found.")
+            current_logger.debug(f"User '{username}' not found.")
         return user
     except SQLAlchemyError as e:
         current_logger.error(f"Database error getting user by username '{username}': {e}", exc_info=True)

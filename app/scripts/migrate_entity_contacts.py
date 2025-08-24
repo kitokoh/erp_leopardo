@@ -14,13 +14,13 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 try:
-    from db.connection import get_db_connection
-    import db.cruds.contacts_crud as contacts_crud
-    import db.cruds.entity_contacts_crud as entity_contacts_crud
+    from app.db.connection import get_db_connection
+    import app.db.cruds.contacts_crud as contacts_crud
+    import app.db.cruds.entity_contacts_crud as entity_contacts_crud
     # We might need CRUDs for Transporters, FreightForwarders, Partners if we decide to nullify their direct contact fields
-    import db.cruds.transporters_crud as transporters_crud
-    import db.cruds.freight_forwarders_crud as freight_forwarders_crud
-    import db.cruds.partners_crud as partners_crud
+    import app.db.cruds.transporters_crud as transporters_crud
+    import app.db.cruds.freight_forwarders_crud as freight_forwarders_crud
+    import app.db.cruds.partners_crud as partners_crud
 
 except ImportError as e:
     logging.error(f"Failed to import necessary modules. Ensure you are running from a context where db modules are accessible: {e}")
