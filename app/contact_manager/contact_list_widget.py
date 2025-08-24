@@ -2,6 +2,7 @@
 # This includes contacts from the platform (clients, partners, etc.) and Google Contacts.
 
 import sys
+import os
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
                              QLineEdit, QPushButton, QComboBox, QLabel, QHeaderView, QAbstractItemView,
                              QApplication, QMessageBox) # Added QMessageBox and QApplication

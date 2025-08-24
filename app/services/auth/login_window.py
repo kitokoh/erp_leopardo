@@ -212,7 +212,13 @@ class LoginWindow(QDialog):
         if not username:
             return
 
-        user_data = users_crud.get_user_by_username(username) # Fetches full user data including biometric flags
+        db_session = self._get_db_connection()
+        if not db_session:
+            return # Can't check without a DB session
+        try:
+            user_data = users_crud.get_user_by_username(db_session, username) # Fetches full user data
+        finally:
+            db_session.close()
         if user_data:
             user_id = user_data.get('user_id')
             if not user_id:

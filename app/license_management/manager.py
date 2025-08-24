@@ -5,8 +5,8 @@ from datetime import datetime, timedelta, timezone
 import platform
 import hashlib # For machine identifier
 
-from db.cruds import licenses_crud, activity_logs_crud # Assuming activity_logs_crud exists and is relevant
-from db.connection import get_db_connection # To be used if a function needs its own connection
+from app.db.cruds import licenses_crud, activity_logs_crud # Assuming activity_logs_crud exists and is relevant
+from app.db.connection import get_db_connection # To be used if a function needs its own connection
 
 # Expose cruds for ui.py compatibility
 cruds = licenses_crud

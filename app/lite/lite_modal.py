@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 # Placeholder for db access, will be refined
-import db as db_manager
+from app.db import cruds as db_manager
 import os # Added for sys.path manipulation
 from .lite_handler import LiteDocumentHandler # Import LiteDocumentHandler
 
@@ -401,11 +401,15 @@ if __name__ == '__main__':
     import sys
     from PyQt5.QtWidgets import QApplication
     # Assuming db.py is in the parent directory
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-    import db as db_manager
+    # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    from app.db import cruds as db_manager
+    from app.db.connection import initialize_engine_and_session, set_db_config
+    from app.core.config import CONFIG
 
     app = QApplication(sys.argv)
-    db_manager.initialize_database() # Ensure DB is ready
+    # db_manager.initialize_database() # Ensure DB is ready
+    set_db_config(CONFIG)
+    initialize_engine_and_session(CONFIG)
 
     all_clients_for_test = db_manager.get_all_clients()
     test_id_client = None

@@ -8,8 +8,8 @@ from PyQt5.QtCore import Qt
 # Assuming APP_ROOT_DIR setup is done in the main application for db access
 # For standalone testing, this widget might need to ensure paths are set.
 # For now, assume db.cruds are importable.
-from db.cruds import invoices_crud, clients_crud
-from db.cruds import projects_crud # Assuming this exists with get_project_by_id
+from app.db.cruds import invoices_crud, clients_crud
+from app.db.cruds import projects_crud # Assuming this exists with get_project_by_id
 
 class InvoiceDetailsDialog(QDialog):
     def __init__(self, invoice_id, parent=None):
