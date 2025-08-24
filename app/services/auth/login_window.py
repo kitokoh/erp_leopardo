@@ -11,8 +11,10 @@ from app.services.auth import authentication
 from app.security_module.biometric_auth import BiometricAuthenticator
 
 import uuid
-import logging # Added for logging
-import random # Added for promotional text
+import logging
+import random
+
+logger = logging.getLogger(__name__)
 
 class LoginWindow(QDialog):
     PROMOTIONAL_TEXTS = [
