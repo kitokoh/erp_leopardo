@@ -85,30 +85,47 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode."""
-    app_config = CONFIG
-    db_type = app_config.get('database_type', 'sqlite')
-    db_url = None
+    """Run migrations in 'online' mode.
 
-    if db_type == 'sqlite':
-        db_path = app_config.get('database_path', 'app_data.db')
-        if not os.path.isabs(db_path):
-            db_path = os.path.join(project_root, db_path)
-        db_url = f"sqlite:///{db_path}"
-    elif db_type == 'postgresql':
-        pg_user = app_config.get('postgresql_user')
-        pg_password = app_config.get('postgresql_password')
-        pg_host = app_config.get('postgresql_host')
-        pg_port = app_config.get('postgresql_port')
-        pg_dbname = app_config.get('postgresql_dbname')
-        if not all([pg_user, pg_password, pg_host, pg_port, pg_dbname]):
-            raise ValueError("Missing required PostgreSQL connection parameters in config for Alembic.")
-        db_url = f"postgresql://{pg_user}:{pg_password}@{pg_host}:{pg_port}/{pg_dbname}"
+    This function now prioritizes the `ALEMBIC_DATABASE_URL` environment
+    variable if it is set. This allows for dynamic configuration of the
+    database URL, which is essential for testing. If the environment
+    variable is not set, it falls back to the configuration defined in
+    the application's config file.
+    """
+    db_url = os.environ.get('ALEMBIC_DATABASE_URL')
+
+    if db_url:
+        print(f"Alembic using database URL from environment variable: {db_url}")
     else:
-        raise ValueError(f"Unsupported database_type for Alembic: {db_type}")
+        print("Alembic using database URL from application config.")
+        app_config = CONFIG
+        db_type = app_config.get('database_type', 'sqlite')
 
+        if db_type == 'sqlite':
+            db_path = app_config.get('database_path', 'app_data.db')
+            if not os.path.isabs(db_path):
+                db_path = os.path.join(project_root, db_path)
+            db_url = f"sqlite:///{db_path}"
+        elif db_type == 'postgresql':
+            pg_user = app_config.get('postgresql_user')
+            pg_password = app_config.get('postgresql_password')
+            pg_host = app_config.get('postgresql_host')
+            pg_port = app_config.get('postgresql_port')
+            pg_dbname = app_config.get('postgresql_dbname')
+            if not all([pg_user, pg_password, pg_host, pg_port, pg_dbname]):
+                raise ValueError("Missing required PostgreSQL connection parameters in config for Alembic.")
+            db_url = f"postgresql://{pg_user}:{pg_password}@{pg_host}:{pg_port}/{pg_dbname}"
+        else:
+            raise ValueError(f"Unsupported database_type for Alembic: {db_type}")
+
+    if not db_url:
+        raise ValueError("Database URL for Alembic could not be determined.")
+
+    # Set the database URL in the Alembic config
     config.set_main_option('sqlalchemy.url', db_url)
 
+    # Create an engine and connect
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",

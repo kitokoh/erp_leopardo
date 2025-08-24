@@ -40,8 +40,6 @@ packages = [{include = "app"}]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<4.0"
-pyqt5 = "5.15.11"
-pyqt5-qt5 = "5.15.2"
 pyqt5-sip = "12.17.0"
 openpyxl = ">=3.0.0"
 python-docx = ">=0.8.0"
