@@ -19,7 +19,7 @@ def add_session_token(conn, user_id: str, token_hash: str, expires_at: datetime,
     expires_at_iso = expires_at.isoformat()
 
     sql_stmt = """
-        INSERT INTO UserSessionTokens (
+        INSERT INTO user_session_tokens (
             token_id, user_id, token_hash, device_identifier,
             expires_at, created_at, last_used_at
         ) VALUES (:token_id, :user_id, :token_hash, :device_identifier,
@@ -40,7 +40,7 @@ def add_session_token(conn, user_id: str, token_hash: str, expires_at: datetime,
             # For simplicity, assuming sqlite3 version supports named placeholders or adapting sql_stmt
             # Adapting to qmark style for broader compatibility:
             sql_qmark = """
-                INSERT INTO UserSessionTokens (
+                INSERT INTO user_session_tokens (
                     token_id, user_id, token_hash, device_identifier,
                     expires_at, created_at, last_used_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -62,7 +62,7 @@ def add_session_token(conn, user_id: str, token_hash: str, expires_at: datetime,
 def get_session_token_by_hash(conn, token_hash: str) -> dict | None:
     now_utc_iso = datetime.now(timezone.utc).isoformat()
     sql_stmt = """
-        SELECT * FROM UserSessionTokens
+        SELECT * FROM user_session_tokens
         WHERE token_hash = :token_hash AND expires_at > :now_utc_iso
     """
     params = {"token_hash": token_hash, "now_utc_iso": now_utc_iso}
@@ -76,7 +76,7 @@ def get_session_token_by_hash(conn, token_hash: str) -> dict | None:
                 return dict(row._mapping) # SQLAlchemy Row to dict
         else: # sqlite3.Connection
             # Adapting to qmark style
-            sql_qmark = "SELECT * FROM UserSessionTokens WHERE token_hash = ? AND expires_at > ?"
+            sql_qmark = "SELECT * FROM user_session_tokens WHERE token_hash = ? AND expires_at > ?"
             qmark_params = (token_hash, now_utc_iso)
             cursor = conn.cursor()
             # Ensure row factory is set for dict results if needed, or adapt
@@ -99,7 +99,7 @@ def get_session_token_by_hash(conn, token_hash: str) -> dict | None:
 
 def update_token_last_used(conn, token_hash: str) -> bool:
     now_utc_iso = datetime.now(timezone.utc).isoformat()
-    sql_stmt = "UPDATE UserSessionTokens SET last_used_at = :now_utc_iso WHERE token_hash = :token_hash"
+    sql_stmt = "UPDATE user_session_tokens SET last_used_at = :now_utc_iso WHERE token_hash = :token_hash"
     params = {"now_utc_iso": now_utc_iso, "token_hash": token_hash}
 
     try:
@@ -109,7 +109,7 @@ def update_token_last_used(conn, token_hash: str) -> bool:
             return result.rowcount > 0
         else: # sqlite3.Connection
             # Adapting to qmark style
-            sql_qmark = "UPDATE UserSessionTokens SET last_used_at = ? WHERE token_hash = ?"
+            sql_qmark = "UPDATE user_session_tokens SET last_used_at = ? WHERE token_hash = ?"
             qmark_params = (now_utc_iso, token_hash)
             cursor = conn.cursor()
             cursor.execute(sql_qmark, qmark_params)
@@ -121,7 +121,7 @@ def update_token_last_used(conn, token_hash: str) -> bool:
         return False
 
 def delete_session_token(conn, token_hash: str) -> bool:
-    sql_stmt = "DELETE FROM UserSessionTokens WHERE token_hash = :token_hash"
+    sql_stmt = "DELETE FROM user_session_tokens WHERE token_hash = :token_hash"
     params = {"token_hash": token_hash}
 
     try:
@@ -131,7 +131,7 @@ def delete_session_token(conn, token_hash: str) -> bool:
             deleted_count = result.rowcount
         else: # sqlite3.Connection
             # Adapting to qmark style
-            sql_qmark = "DELETE FROM UserSessionTokens WHERE token_hash = ?"
+            sql_qmark = "DELETE FROM user_session_tokens WHERE token_hash = ?"
             qmark_params = (token_hash,)
             cursor = conn.cursor()
             cursor.execute(sql_qmark, qmark_params)
@@ -149,7 +149,7 @@ def delete_session_token(conn, token_hash: str) -> bool:
         return False
 
 def delete_all_user_session_tokens(conn, user_id: str) -> int:
-    sql_stmt = "DELETE FROM UserSessionTokens WHERE user_id = :user_id"
+    sql_stmt = "DELETE FROM user_session_tokens WHERE user_id = :user_id"
     params = {"user_id": user_id}
     deleted_count = 0
     try:
@@ -159,7 +159,7 @@ def delete_all_user_session_tokens(conn, user_id: str) -> int:
             deleted_count = result.rowcount
         else: # sqlite3.Connection
             # Adapting to qmark style
-            sql_qmark = "DELETE FROM UserSessionTokens WHERE user_id = ?"
+            sql_qmark = "DELETE FROM user_session_tokens WHERE user_id = ?"
             qmark_params = (user_id,)
             cursor = conn.cursor()
             cursor.execute(sql_qmark, qmark_params)
@@ -186,11 +186,11 @@ def cleanup_expired_tokens(conn, specific_hash: str | None = None) -> int:
         if _is_sqlalchemy_session(conn):
             sa_params = {"now_utc_iso": now_utc_iso}
             if specific_hash:
-                sql_stmt = "DELETE FROM UserSessionTokens WHERE token_hash = :specific_hash AND expires_at <= :now_utc_iso"
+                sql_stmt = "DELETE FROM user_session_tokens WHERE token_hash = :specific_hash AND expires_at <= :now_utc_iso"
                 sa_params["specific_hash"] = specific_hash
                 log_msg_start = f"Cleaning up specific expired token (if any) for hash {specific_hash[:10]}... (SQLAlchemy)"
             else:
-                sql_stmt = "DELETE FROM UserSessionTokens WHERE expires_at <= :now_utc_iso"
+                sql_stmt = "DELETE FROM user_session_tokens WHERE expires_at <= :now_utc_iso"
                 log_msg_start = "Cleaning up all expired session tokens... (SQLAlchemy)"
 
             logger.info(log_msg_start)
@@ -199,11 +199,11 @@ def cleanup_expired_tokens(conn, specific_hash: str | None = None) -> int:
             deleted_count = result.rowcount
         else: # sqlite3.Connection
             if specific_hash:
-                sql_qmark = "DELETE FROM UserSessionTokens WHERE token_hash = ? AND expires_at <= ?"
+                sql_qmark = "DELETE FROM user_session_tokens WHERE token_hash = ? AND expires_at <= ?"
                 qmark_params = (specific_hash, now_utc_iso)
                 log_msg_start = f"Cleaning up specific expired token (if any) for hash {specific_hash[:10]}... (sqlite3)"
             else:
-                sql_qmark = "DELETE FROM UserSessionTokens WHERE expires_at <= ?"
+                sql_qmark = "DELETE FROM user_session_tokens WHERE expires_at <= ?"
                 qmark_params = (now_utc_iso,)
                 log_msg_start = "Cleaning up all expired session tokens... (sqlite3)"
 

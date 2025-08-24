@@ -1,128 +1,79 @@
 import json
 import os
-import uuid
 import logging
-import sqlite3
-
-from app.db.cruds.misc.locations_crud import get_or_add_country, get_or_add_city, get_country_by_name
-from app.db.cruds.misc.regions_crud import get_region_by_name_and_country_id, add_region
+from sqlalchemy.orm import Session
+from app.models.db.locations import Country, City
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sqlalchemy.orm import Session
-
-def seed_locations_from_json(db: Session, logger: logging.Logger):
-    """Seeds countries and cities from the default_countries.json file."""
-    logger.info("Seeding countries and cities from default_countries.json...")
+def seed_all_locations(db: Session, logger: logging.Logger):
+    """
+    Refactored function to seed locations from JSON using a bulk insert strategy.
+    """
+    logger.info("--- Starting refactored location seeding ---")
     json_path = os.path.join(PROJECT_ROOT, "db", "seed_data", "default_countries.json")
 
     if not os.path.exists(json_path):
-        logger.error(f"JSON file not found at: {json_path}. Skipping location seeding from JSON.")
+        logger.error(f"JSON file not found: {json_path}. Skipping location seeding.")
         return
 
-    with open(json_path, 'r', encoding='utf-8') as f:
-        countries_cities = json.load(f)
+    try:
+        with open(json_path, 'r', encoding='utf-8') as f:
+            countries_cities = json.load(f)
 
-    for country_name, city_name in countries_cities.items():
-        country = get_or_add_country(country_name, db=db)
-        if country:
-            get_or_add_city(city_name, country.country_id, db=db)
+        logger.info(f"Loaded {len(countries_cities)} country/city pairs from JSON.")
+
+        # 1. Prepare country data
+        existing_countries_q = db.query(Country.country_name).all()
+        existing_countries = {c[0] for c in existing_countries_q}
+
+        unique_countries_in_json = {country_name for country_name in countries_cities.keys()}
+
+        new_country_mappings = [
+            {"country_name": name} for name in unique_countries_in_json if name not in existing_countries
+        ]
+
+        # 2. Bulk insert new countries
+        if new_country_mappings:
+            logger.info(f"Adding {len(new_country_mappings)} new countries.")
+            db.bulk_insert_mappings(Country, new_country_mappings)
+            db.commit()
+            logger.info("New countries have been bulk inserted.")
         else:
-            logger.error(f"Failed to get or add country '{country_name}'. Cannot add city '{city_name}'.")
-    logger.info(f"Finished seeding {len(countries_cities)} countries/cities from JSON.")
+            logger.info("No new countries to add.")
 
+        # 3. Get a map of all countries (new and existing) to their IDs
+        all_countries_q = db.query(Country.country_id, Country.country_name).all()
+        country_map = {name: id for id, name in all_countries_q}
 
-def seed_countries_from_geojson(conn: sqlite3.Connection, logger: logging.Logger):
-    """Seeds countries from the world_countries.geojson file."""
-    logger.info("Attempting to seed countries from GeoJSON file...")
-    cursor = conn.cursor()
-    geojson_path = os.path.join(PROJECT_ROOT, "resources", "assets", "world_countries.geojson")
+        # 4. Prepare city data
+        existing_cities_q = db.query(City.city_name, City.country_id).all()
+        existing_cities = {(name, country_id) for name, country_id in existing_cities_q}
 
-    if not os.path.exists(geojson_path):
-        logger.error(f"GeoJSON file not found at: {geojson_path}. Skipping country seeding from GeoJSON.")
-        return
-
-    with open(geojson_path, 'r', encoding='utf-8') as f:
-        geojson_data = json.load(f)
-
-    added_count = 0
-    skipped_count = 0
-    for feature in geojson_data['features']:
-        country_name = feature['properties'].get('name')
-        country_iso_a2 = feature['properties'].get('iso_a2')
-
-        if not country_name:
-            skipped_count += 1
-            continue
-
-        existing_country = get_country_by_name(country_name, conn=conn)
-        if existing_country:
-            if not existing_country.get('iso_a2_code'):
-                try:
-                    cursor.execute("UPDATE Countries SET iso_a2_code = ? WHERE country_id = ?", (country_iso_a2, existing_country['country_id']))
-                    logger.info(f"Updated missing iso_a2_code for existing country: {country_name}")
-                except sqlite3.Error as e:
-                    logger.error(f"Error updating iso_a2_code for {country_name}: {e}")
-            skipped_count += 1
-            continue
-
-        country_id = str(uuid.uuid4())
-        try:
-            cursor.execute("INSERT INTO Countries (country_id, country_name, iso_a2_code) VALUES (?, ?, ?)",
-                           (country_id, country_name, country_iso_a2))
-            added_count += 1
-        except sqlite3.IntegrityError:
-            logger.warning(f"Country '{country_name}' already exists (IntegrityError). Skipping.")
-            skipped_count += 1
-        except Exception as e:
-            logger.error(f"Error adding country '{country_name}': {e}")
-            skipped_count += 1
-
-    logger.info(f"Finished seeding countries from GeoJSON. Added: {added_count}, Skipped/Existing: {skipped_count}")
-
-
-def seed_default_regions(conn: sqlite3.Connection, logger: logging.Logger):
-    """Seeds default regions for a predefined list of countries."""
-    logger.info("Attempting to seed default regions...")
-    default_regions_data = {
-        "France": ["Île-de-France", "Occitanie", "Nouvelle-Aquitaine", "Auvergne-Rhône-Alpes"],
-        "USA": ["California", "New York", "Texas", "Florida"],
-        "Algeria": ["Alger", "Oran", "Constantine"]
-    }
-
-    added_count = 0
-    skipped_count = 0
-    for country_name, region_names in default_regions_data.items():
-        country = get_country_by_name(country_name, conn=conn)
-        if not country or 'country_id' not in country:
-            logger.warning(f"Country '{country_name}' not found for seeding its regions. Skipping.")
-            skipped_count += len(region_names)
-            continue
-
-        country_id = country['country_id']
-        for region_name in region_names:
-            existing_region = get_region_by_name_and_country_id(region_name, country_id, conn=conn)
-            if existing_region:
-                skipped_count += 1
+        city_mappings_to_insert = []
+        for country_name, city_name in countries_cities.items():
+            country_id = country_map.get(country_name)
+            if not country_id:
+                logger.warning(f"Could not find country ID for '{country_name}' while preparing cities. Skipping city '{city_name}'.")
                 continue
 
-            region_id = add_region(region_name, country_id, conn=conn)
-            if region_id:
-                added_count += 1
-                logger.info(f"Added region '{region_name}' to '{country_name}'.")
-            else:
-                logger.warning(f"Failed to add region '{region_name}' to '{country_name}'.")
-                skipped_count +=1
-    logger.info(f"Default regions seeding complete. Added: {added_count}, Skipped/Existing: {skipped_count}")
+            if (city_name, country_id) not in existing_cities:
+                city_mappings_to_insert.append({
+                    "city_name": city_name,
+                    "country_id": country_id
+                })
 
+        # 5. Bulk insert new cities
+        if city_mappings_to_insert:
+            logger.info(f"Adding {len(city_mappings_to_insert)} new cities.")
+            db.bulk_insert_mappings(City, city_mappings_to_insert)
+            db.commit()
+            logger.info("New cities have been bulk inserted.")
+        else:
+            logger.info("No new cities to add.")
 
-def seed_all_locations(db: Session, logger: logging.Logger):
-    """Runs all location-related seeding functions."""
-    logger.info("--- Starting all location seeding ---")
-    seed_locations_from_json(db, logger)
-    # The following functions still use raw SQLite, they need to be refactored
-    # or the seeder needs to handle both connection types.
-    # For now, commenting them out to allow the app to start.
-    # seed_countries_from_geojson(db, logger)
-    # seed_default_regions(db, logger)
-    logger.info("--- Finished all location seeding ---")
+        logger.info("--- Finished refactored location seeding ---")
+
+    except Exception as e:
+        logger.error(f"An error occurred during the refactored location seeding: {e}", exc_info=True)
+        db.rollback()
