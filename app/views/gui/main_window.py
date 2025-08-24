@@ -29,7 +29,9 @@ from PyQt5.QtCore import Qt, QUrl, QTimer, pyqtSlot, QByteArray, QDate, QEvent, 
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 # from PyQt5.QtWebChannel import QWebChannel # QWebChannel removed as DocumentManager no longer uses its own map.
 
-import app.db as db_manager
+from app.db.cruds.misc.application_settings_crud import get_setting, set_setting
+from app.db.cruds.misc.locations_crud import get_all_countries, get_country_by_id, get_city_by_id
+from app.db.cruds.misc.status_settings_crud import get_status_setting_by_id
 from app.db.cruds.clients.clients_crud import clients_crud_instance
 from app.db.cruds.products.products_crud import products_crud_instance
 
@@ -149,7 +151,6 @@ from PyQt5.QtCore import QSize, QThread, pyqtSignal
 from app.update_checker import UpdateChecker
 from app.telemetry import telemetry_manager
 from app.views.gui.dialogs.telemetry_consent_dialog import TelemetryConsentDialog
-import app.db as db_manager
 
 
 class UpdateCheckThread(QThread):
@@ -423,7 +424,7 @@ class DocumentManager(QMainWindow):
         self.download_monitor_service = None # Initialize download monitor service
 
         # Use get_setting with default, falling back to config, then to a hardcoded default.
-        self.config['google_maps_review_url'] = db_manager.get_setting(
+        self.config['google_maps_review_url'] = get_setting(
             'google_maps_review_url',
             default=self.config.get('google_maps_review_url', 'https://maps.google.com/?cid=YOUR_CID_HERE_FALLBACK_CONFIG')
         )
@@ -715,17 +716,10 @@ class DocumentManager(QMainWindow):
 
     def _load_module_states(self):
         """Loads the enabled/disabled state of configurable modules from the database."""
-        if not db_manager:
-            logging.warning("DB manager not available, cannot load module states. All modules will default to enabled.")
-            # Default all to True if DB is not available, so basic functionality isn't hindered
-            for module_info in CONFIGURABLE_MODULES:
-                self.module_states[module_info['name']] = True
-            return
-
         logging.info("Loading module states...")
         for module_info in CONFIGURABLE_MODULES:
             # Default to 'True' (string) if setting is not found, then convert to boolean
-            is_enabled_str = db_manager.get_setting(module_info['key'], default='True')
+            is_enabled_str = get_setting(module_info['key'], default='True')
             logging.info(f"Module Key: {module_info['key']}, Value from DB (or default): '{is_enabled_str}'")
             is_enabled = is_enabled_str.lower() == 'true' if isinstance(is_enabled_str, str) else bool(is_enabled_str)
             self.module_states[module_info['name']] = is_enabled
@@ -1316,7 +1310,7 @@ class DocumentManager(QMainWindow):
         self.main_splitter.addWidget(right_pane_splitter)
 
         # Load or set default splitter sizes
-        saved_splitter_state_hex = db_manager.get_setting('client_list_splitter_state', default=None)
+        saved_splitter_state_hex = get_setting('client_list_splitter_state', default=None)
         if saved_splitter_state_hex:
             try:
                 splitter_state_byte_array = QByteArray.fromHex(saved_splitter_state_hex.encode('utf-8'))
@@ -1393,7 +1387,7 @@ class DocumentManager(QMainWindow):
         try:
             splitter_state_byte_array = self.main_splitter.saveState()
             splitter_state_hex = splitter_state_byte_array.toHex().data().decode('utf-8')
-            db_manager.set_setting('client_list_splitter_state', splitter_state_hex)
+            set_setting('client_list_splitter_state', splitter_state_hex)
             logging.info(f"Client list splitter state saved (pos: {pos}, index: {index}).")
         except Exception as e:
             logging.error(f"Error saving splitter state: {e}", exc_info=True)
@@ -2503,7 +2497,7 @@ class DocumentManager(QMainWindow):
         self.country_filter_combo.clear()
         self.country_filter_combo.addItem(self.tr("Tous les pays"), None)
         try:
-            countries = db_manager.get_all_countries() # Attempt to get countries
+            countries = get_all_countries() # Attempt to get countries
             if countries is None: countries = []
             for country_dict in countries:
                 self.country_filter_combo.addItem(country_dict['country_name'], country_dict.get('country_id'))
@@ -2587,13 +2581,13 @@ class DocumentManager(QMainWindow):
 
         # Proceed with augmenting and displaying the fresh client_data_to_show
         if 'country' not in client_data_to_show and client_data_to_show.get('country_id'):
-            country_obj = db_manager.get_country_by_id(client_data_to_show['country_id'])
+            country_obj = get_country_by_id(client_data_to_show['country_id'])
             client_data_to_show['country'] = country_obj.get('country_name', "N/A") if country_obj else "N/A"
         if 'city' not in client_data_to_show and client_data_to_show.get('city_id'):
-            city_obj = db_manager.get_city_by_id(client_data_to_show['city_id'])
+            city_obj = get_city_by_id(client_data_to_show['city_id'])
             client_data_to_show['city'] = city_obj.get('city_name', "N/A") if city_obj else "N/A"
         if 'status' not in client_data_to_show and client_data_to_show.get('status_id'):
-            status_obj = db_manager.get_status_setting_by_id(client_data_to_show['status_id'])
+            status_obj = get_status_setting_by_id(client_data_to_show['status_id'])
             client_data_to_show['status'] = status_obj.get('status_name', "N/A") if status_obj else "N/A"
 
         logging.info(f"open_client_tab_by_id: client_id_to_open={client_id_to_open}, "
