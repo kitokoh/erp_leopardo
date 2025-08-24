@@ -18,8 +18,9 @@ from app.db.connection import get_db_connection # Already imported below, moved 
 
 logger = logging.getLogger(__name__)
 
-# Module-level variable to store the current user's data
+# Module-level variables to store the current user's data and license details
 _current_user_data = None
+_current_license_details = None
 
 # Removed the older, duplicated login function.
 # The active login function is defined further down (starting around line 227 in original file).
@@ -68,6 +69,10 @@ def get_current_user_role() -> str | None:
         return _current_user_data.get('role_name')
     return None
 
+def get_current_license_details() -> dict | None:
+    """Retrieves the currently loaded license details."""
+    return _current_license_details
+
 # --- Remember Me Functionality (Token-Based) ---
 from PyQt5.QtCore import QSettings
 
@@ -115,8 +120,9 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
     """
     logger.info("AUTHENTICATION_LOGIN: login function CALLED.")
 
-    global _current_user_data
+    global _current_user_data, _current_license_details
     _current_user_data = None # Reset global user data at start of login attempt
+    _current_license_details = None
 
     # Clear any old token from QSettings before a new manual login attempt.
     clear_remember_me_token_from_settings()
@@ -201,9 +207,11 @@ def login(username: str, password: str, remember_me: bool = False) -> tuple[bool
 
         if not is_license_valid:
             logger.warning(f"Login for '{username}' successful, but license is invalid: {license_msg}")
+            _current_license_details = license_details
             return True, license_msg, _current_user_data, license_details
 
         logger.info(f"Login and license check successful for {username}.")
+        _current_license_details = license_details
         return True, None, _current_user_data, license_details
 
     except Exception as e:
@@ -220,7 +228,9 @@ def login_with_session_token(token_from_qsettings: str) -> tuple[bool, str | Non
     Attempts to log in a user using a session token from QSettings.
     Returns: (success, message, user_data, license_info)
     """
-    global _current_user_data
+    global _current_user_data, _current_license_details
+    _current_user_data = None
+    _current_license_details = None
     logger.info("Attempting login with session token.")
 
     if not token_from_qsettings:
@@ -331,10 +341,10 @@ def login_with_session_token(token_from_qsettings: str) -> tuple[bool, str | Non
         logger.debug(f"AUTH_TOKEN_LOGIN: Final license state: valid={is_license_valid}, msg='{license_msg}', details={license_details}")
         if not is_license_valid: # This implies should_check_license was True and the check failed
             logger.warning(f"Token login for '{user['username']}' successful, but license is invalid: {license_msg}")
-            # User is authenticated, but license is an issue.
-            # main.py will handle showing LicenseDialog if needed.
-            return True, license_msg, _current_user_data, license_details # Return True for auth, with license message
+            _current_license_details = license_details
+            return True, license_msg, _current_user_data, license_details
 
+        _current_license_details = license_details
         return True, None, _current_user_data, license_details # Auth and license OK (either by check or bypass)
 
 
