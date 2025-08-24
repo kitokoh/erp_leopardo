@@ -5,9 +5,10 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QPixmap, QFont, QIcon # Added QIcon
 from PyQt5.QtCore import Qt, QSettings, pyqtSignal
+from app.db.connection import get_db_connection
 from app.db.cruds.users import users_crud
-from app.services.auth import authentication # For the main login function and setting current user
-from app.security_module.biometric_auth import BiometricAuthenticator # For biometric verification
+from app.services.auth import authentication
+from app.security_module.biometric_auth import BiometricAuthenticator
 
 import uuid
 import logging # Added for logging
@@ -202,75 +203,44 @@ class LoginWindow(QDialog):
         and updates the visibility of biometric login buttons.
         """
         username = self.username_input.text().strip()
-        # Hide by default, show only if conditions are met
         self.fingerprint_login_button.setVisible(False)
-        if hasattr(self, 'face_login_button'):
-            self.face_login_button.setVisible(False)
-        # if hasattr(self, 'voice_login_button'):
-        #     self.voice_login_button.setVisible(False)
+        if hasattr(self, 'face_login_button'): self.face_login_button.setVisible(False)
 
         if not username:
             return
 
-        db_session = self._get_db_connection()
-        if not db_session:
-            return # Can't check without a DB session
+        db_session = None
         try:
-            user_data = users_crud.get_user_by_username(db_session, username) # Fetches full user data
-        finally:
-            db_session.close()
-        if user_data:
-            user_id = user_data.get('user_id')
-            if not user_id:
-                return
-
-            # Fingerprint
-            if self.biometric_authenticator.is_method_available("fingerprint") and \
-               user_data.get('is_fingerprint_auth_enabled'):
-                self.fingerprint_login_button.setVisible(True)
-                logging.info(f"Fingerprint login option shown for user {username}")
-
-            if hasattr(self, 'face_login_button'):
-                if self.biometric_authenticator.is_method_available("face") and \
-                   user_data.get('is_face_auth_enabled'):
+            db_session = get_db_connection()
+            user = users_crud.get_user_by_username(db_session, username)
+            if user:
+                # Fingerprint
+                if self.biometric_authenticator.is_method_available("fingerprint") and user.is_fingerprint_auth_enabled:
+                    self.fingerprint_login_button.setVisible(True)
+                    logging.info(f"Fingerprint login option shown for user {username}")
+                # Face
+                if hasattr(self, 'face_login_button') and self.biometric_authenticator.is_method_available("face") and user.is_face_auth_enabled:
                     self.face_login_button.setVisible(True)
                     logging.info(f"Face login option shown for user {username}")
-
-            # if hasattr(self, 'voice_login_button'):
-            #     if self.biometric_authenticator.is_method_available("voice") and \
-            #        user_data.get('is_voice_auth_enabled'):
-            #         self.voice_login_button.setVisible(True)
-            #         logging.info(f"Voice login option shown for user {username}")
-        else:
-            # User not found, ensure buttons are hidden
-            logging.debug(f"User {username} not found, biometric options hidden.")
+            else:
+                logging.debug(f"User {username} not found, biometric options hidden.")
+        except Exception as e:
+            logging.error(f"Error checking biometric options for {username}: {e}", exc_info=True)
+        finally:
+            if db_session:
+                db_session.close()
 
 
     def _perform_login_success(self, user_data: dict):
         """Shared logic for successful login (password or biometric)."""
-        self.current_user = user_data # Store the full user data
-        self.session_token = uuid.uuid4().hex # Generate a session token (though less relevant for local app)
+        self.current_user = user_data
+        self.session_token = uuid.uuid4().hex
 
-        # Use the global authentication module to set the current user state
-        # This also handles the remember_me logic via auth.authentication.login if we route through it,
-        # or we replicate remember_me saving here.
-        # For simplicity, we'll call auth.authentication.set_current_user directly.
-        # And handle remember_me separately if needed.
+        authentication.set_current_user(user_data)
 
-        authentication.set_current_user({
-            'user_id': user_data['user_id'],
-            'username': user_data['username'],
-            'full_name': user_data.get('full_name'),
-            'email': user_data.get('email'),
-            'role_id': user_data['role_id'],
-            'role_name': user_data.get('role_name') # Ensure role_name is in user_data
-        })
-
-        # Handle "Remember Me" preference from auth.authentication
-        # This was previously part of auth.authentication.login()
-        username = user_data['username']
-        remember = self.remember_me_checkbox.isChecked()
-        authentication.save_remember_me_preference(username, remember)
+        # "Remember Me" is now handled entirely within authentication.login,
+        # but for biometric login, we might need to decide if it implies remember_me.
+        # For now, we assume biometric does not trigger remember_me token generation.
 
         logging.info(f"Login successful for user: {user_data['username']}. Session token: {self.session_token}")
         self.accept()
@@ -287,111 +257,74 @@ class LoginWindow(QDialog):
             return
 
         # Use the main authentication.login function
-        # Pass the state of the remember_me_checkbox
-        success, error_message, user_data = authentication.login(
+        success, message, user_data, license_details = authentication.login(
             username,
             password,
             remember_me=self.remember_me_checkbox.isChecked()
         )
 
         if success:
-            # self.current_user is set by authentication.login via _current_user_data
-            # self.session_token can be set here if needed for the dialog's own state,
-            # but main session management is now in authentication module.
-            self.session_token = uuid.uuid4().hex # Example, might not be used if all state is global
-            self.current_user = authentication.get_current_user() # Get the globally set user
-            self.accept() # Close dialog, main window will check authentication.get_current_user()
+            # The global current_user is set by authentication.login()
+            self.current_user = authentication.get_current_user()
+            self.accept()
         else:
-            self.current_user = None # Ensure local current_user is cleared
-            self.session_token = None
-            QMessageBox.warning(self, self.tr("Login Failed"), error_message or self.tr("Invalid username or password."))
+            self.current_user = None
+            QMessageBox.warning(self, self.tr("Login Failed"), message or self.tr("Invalid username or password."))
 
     def handle_fingerprint_login(self):
-        username = self.username_input.text().strip()
-        if not username:
-            QMessageBox.warning(self, self.tr("Login Failed"), self.tr("Username is required for fingerprint login."))
-            return
-
-        user_data = users_crud.get_user_by_username(username)
-        if not user_data:
-            QMessageBox.warning(self, self.tr("Login Failed"), self.tr("User not found."))
-            return
-
-        user_id = user_data.get('user_id')
-        if not self.biometric_authenticator.is_method_enabled_for_user(user_id, "fingerprint"):
-            QMessageBox.warning(self, self.tr("Login Failed"), self.tr("Fingerprint login is not enabled for this user."))
-            return
-
-        QMessageBox.information(self, self.tr("Fingerprint Login"), self.tr("Please use your fingerprint scanner now (Simulated)."))
-
-        # Simulate a successful verification
-        if self.biometric_authenticator.verify_fingerprint(user_id):
-            logging.info(f"Fingerprint login successful for user: {username}")
-            # On successful biometric login, we need to populate the session similar to password login
-            # We already have user_data from get_user_by_username
-            users_crud.record_login_time(user_id) # Record login time
-            self._perform_login_success(user_data) # Use shared success logic
-        else:
-            QMessageBox.warning(self, self.tr("Login Failed"), self.tr("Fingerprint verification failed (Simulated)."))
-            logging.warning(f"Fingerprint login failed for user: {username}")
+        self._handle_biometric_login("fingerprint")
 
     def handle_face_login(self):
-        """Handles login attempt using face recognition."""
-        username = self.username_input.text().strip()
-        if not username:
-            QMessageBox.warning(self, self.tr("Login Failed"), self.tr("Username is required for face login."))
-            return
-
-        user_data = users_crud.get_user_by_username(username)
-        if not user_data:
-            QMessageBox.warning(self, self.tr("Login Failed"), self.tr("User not found."))
-            return
-
-        user_id = user_data.get('user_id')
-        if not self.biometric_authenticator.is_method_enabled_for_user(user_id, "face"):
-            QMessageBox.warning(self, self.tr("Login Failed"), self.tr("Face login is not enabled for this user."))
-            return
-
-        # UI prompt for face scan (actual OS prompt is triggered by verify_face)
-        QMessageBox.information(self, self.tr("Face Login"),
-                                self.tr("Please look at the camera for verification.\n(OS prompt will appear if supported and configured)."))
-
-        if self.biometric_authenticator.verify_face(user_id):
-            logging.info(f"Face login successful for user: {username}")
-            users_crud.record_login_time(user_id)
-            self._perform_login_success(user_data)
-        else:
-            QMessageBox.warning(self, self.tr("Login Failed"), self.tr("Face verification failed."))
-            logging.warning(f"Face login failed for user: {username}")
+        self._handle_biometric_login("face")
 
     def handle_voice_login(self):
-        """Handles login attempt using voice recognition."""
+        self._handle_biometric_login("voice")
+
+    def _handle_biometric_login(self, method: str):
         username = self.username_input.text().strip()
         if not username:
-            QMessageBox.warning(self, self.tr("Login Failed"), self.tr("Username is required for voice login."))
+            QMessageBox.warning(self, self.tr("Login Failed"), self.tr(f"Username is required for {method} login."))
             return
 
-        user_data = users_crud.get_user_by_username(username)
-        if not user_data:
-            QMessageBox.warning(self, self.tr("Login Failed"), self.tr("User not found."))
-            return
+        db_session = None
+        try:
+            db_session = get_db_connection()
+            user = users_crud.get_user_by_username(db_session, username)
 
-        user_id = user_data.get('user_id')
-        if not self.biometric_authenticator.is_method_enabled_for_user(user_id, "voice"):
-            QMessageBox.warning(self, self.tr("Login Failed"), self.tr("Voice login is not enabled for this user."))
-            return
+            if not user:
+                QMessageBox.warning(self, self.tr("Login Failed"), self.tr("User not found."))
+                return
 
-        # UI prompt for voice input
-        QMessageBox.information(self, self.tr("Voice Login"),
-                                self.tr("Please speak your passphrase clearly into the microphone."))
+            if not getattr(user, f'is_{method}_auth_enabled', False):
+                QMessageBox.warning(self, self.tr("Login Failed"), self.tr(f"{method.capitalize()} login is not enabled for this user."))
+                return
 
-        if self.biometric_authenticator.verify_voice(user_id):
-            logging.info(f"Voice login successful for user: {username}")
-            users_crud.record_login_time(user_id)
-            self._perform_login_success(user_data)
-        else:
-            QMessageBox.warning(self, self.tr("Login Failed"), self.tr("Voice verification failed."))
-            logging.warning(f"Voice login failed for user: {username}")
+            # Placeholder for UI prompt, actual prompt is handled by authenticator
+            QMessageBox.information(self, self.tr(f"{method.capitalize()} Login"), self.tr(f"Please use your {method} sensor."))
+
+            # The actual biometric verification call
+            verify_function = getattr(self.biometric_authenticator, f"verify_{method}")
+            if verify_function(user.user_id):
+                logging.info(f"{method.capitalize()} login successful for user: {username}")
+                users_crud.record_login_time(db_session, user.user_id)
+
+                # Convert the ORM object to a dict for _perform_login_success
+                user_data_dict = {
+                    'user_id': user.user_id, 'username': user.username, 'full_name': user.full_name,
+                    'email': user.email, 'role_id': user.role_id,
+                    'role_name': user.role.role_name if user.role else 'N/A'
+                }
+                self._perform_login_success(user_data_dict)
+            else:
+                QMessageBox.warning(self, self.tr("Login Failed"), self.tr(f"{method.capitalize()} verification failed."))
+                logging.warning(f"{method.capitalize()} login failed for user: {username}")
+
+        except Exception as e:
+            logging.error(f"Error during {method} login for {username}: {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Error"), self.tr("An unexpected error occurred during login."))
+        finally:
+            if db_session:
+                db_session.close()
 
 
     def get_session_token(self) -> str | None:
