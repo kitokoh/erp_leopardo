@@ -55,22 +55,19 @@ def main():
     # 4. Handle Login
     login_dialog = LoginDialog()
     if login_dialog.exec_() == QDialog.Accepted:
-        login_output = login_dialog.get_raw_login_output()
-        if not login_output:
-             QMessageBox.critical(None, "Login Error", "Failed to get login information from the dialog.")
-             return
+        # After a successful login, the user info is stored globally in the authentication service
+        current_user = authentication.get_current_user()
+        license_details = authentication.get_current_license_details()
 
-        success, error_message, user_info, license_info = login_output
-
-        if success and user_info:
-            logging.info(f"Login successful for user: {user_info.get('username')}")
+        if current_user:
+            logging.info(f"Login successful for user: {current_user.get('username')}")
 
             # 5. Instantiate and show the Main Window
             try:
                 main_window = DocumentManager(
                     app_root_dir=APP_ROOT_DIR,
-                    current_user_info=user_info,
-                    current_license_info=license_info,
+                    current_user_info=current_user,
+                    current_license_info=license_details,
                 )
                 main_window.show()
                 logging.info("Main window (DocumentManager) shown.")
@@ -81,7 +78,9 @@ def main():
                 logging.critical(f"Failed to create or show main window: {e}", exc_info=True)
                 QMessageBox.critical(None, "Application Error", f"Failed to create the main application window: {e}")
         else:
-            logging.warning("Login failed or was cancelled.")
+            # This case might occur if the dialog is accepted but the global user is not set (e.g., an error).
+            logging.error("Login dialog was accepted, but no user is authenticated. Exiting.")
+            QMessageBox.critical(None, "Login Error", "Login failed for an unknown reason.")
     else:
         logging.info("Login dialog was cancelled. Exiting application.")
 

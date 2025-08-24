@@ -9,8 +9,8 @@ from datetime import datetime # Not directly used, but good for potential date l
 
 # Assuming APP_ROOT_DIR setup is done in the main application for db access
 # For now, assume db.cruds are importable.
-from db.cruds import invoices_crud, clients_crud
-from db.cruds import projects_crud # Assumed to exist with get_projects_by_client or similar
+from app.db.cruds import invoices_crud, clients_crud
+from app.db.cruds import projects_crud # Assumed to exist with get_projects_by_client or similar
 
 class ManualInvoiceDialog(QDialog):
     def __init__(self, parent=None):
