@@ -416,9 +416,1238 @@ def upgrade() -> None:
     sa.Column('setting_value', sa.Text(), nullable=True),
     sa.PrimaryKeyConstraint('setting_key')
     )
+    op.create_table('company_factures',
+    sa.Column('facture_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('original_file_name', sa.String(), nullable=True),
+    sa.Column('stored_file_path', sa.String(), nullable=True),
+    sa.Column('file_mime_type', sa.String(), nullable=True),
+    sa.Column('upload_date', sa.DateTime(), nullable=True),
+    sa.Column('extraction_status', sa.String(), nullable=True),
+    sa.Column('extracted_data_json', sa.Text(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.Column('is_deleted', sa.Boolean(), server_default=sa.text('0'), nullable=False),
+    sa.Column('deleted_at', sa.DateTime(), nullable=True),
+    sa.PrimaryKeyConstraint('facture_id')
+    )
+    op.create_table('freight_forwarders',
+    sa.Column('forwarder_id', sa.String(), nullable=False),
+    sa.Column('name', sa.String(), nullable=True),
+    sa.Column('contact_person', sa.String(), nullable=True),
+    sa.Column('phone', sa.String(), nullable=True),
+    sa.Column('email', sa.String(), nullable=True),
+    sa.Column('address', sa.Text(), nullable=True),
+    sa.Column('services_offered', sa.Text(), nullable=True),
+    sa.Column('notes', sa.Text(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.PrimaryKeyConstraint('forwarder_id')
+    )
+    op.create_table('internal_stock_items',
+    sa.Column('item_id', sa.String(), nullable=False),
+    sa.Column('item_name', sa.String(), nullable=True),
+    sa.Column('item_code', sa.String(), nullable=True),
+    sa.Column('category', sa.String(), nullable=True),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('quantity', sa.REAL(), nullable=True),
+    sa.Column('unit_of_measure', sa.String(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.PrimaryKeyConstraint('item_id')
+    )
+    op.create_table('motivational_messages',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('language_code', sa.String(), nullable=True),
+    sa.Column('message', sa.String(), nullable=True),
+    sa.Column('day_of_year', sa.Integer(), nullable=True),
+    sa.Column('is_active', sa.Boolean(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('partner_categories',
+    sa.Column('partner_category_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('category_name', sa.String(), nullable=True),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('created_at', sa.String(), nullable=True),
+    sa.Column('updated_at', sa.String(), nullable=True),
+    sa.PrimaryKeyConstraint('partner_category_id')
+    )
+    op.create_table('products',
+    sa.Column('product_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('product_name', sa.String(), nullable=False),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('category', sa.String(), nullable=True),
+    sa.Column('language_code', sa.String(), nullable=False),
+    sa.Column('base_unit_price', sa.Float(), nullable=False),
+    sa.Column('unit_of_measure', sa.String(), nullable=True),
+    sa.Column('weight', sa.Float(), nullable=True),
+    sa.Column('dimensions', sa.Text(), nullable=True),
+    sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.Column('is_deleted', sa.Boolean(), server_default=sa.text('0'), nullable=False),
+    sa.Column('deleted_at', sa.DateTime(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.PrimaryKeyConstraint('product_id')
+    )
+    op.create_table('review_cycles',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('name', sa.String(length=255), nullable=False),
+    sa.Column('start_date', sa.DateTime(), nullable=False),
+    sa.Column('end_date', sa.DateTime(), nullable=False),
+    sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('name')
+    )
+    op.create_table('sectors',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('name', sa.String(), nullable=True),
+    sa.Column('type_association', sa.String(), nullable=True),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('smtp_configs',
+    sa.Column('smtp_config_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('config_name', sa.String(), nullable=True),
+    sa.Column('smtp_server', sa.String(), nullable=True),
+    sa.Column('smtp_port', sa.Integer(), nullable=True),
+    sa.Column('username', sa.String(), nullable=True),
+    sa.Column('password_encrypted', sa.String(), nullable=True),
+    sa.Column('use_tls', sa.Boolean(), nullable=True),
+    sa.Column('is_default', sa.Boolean(), nullable=True),
+    sa.Column('sender_email_address', sa.String(), nullable=True),
+    sa.Column('sender_display_name', sa.String(), nullable=True),
+    sa.PrimaryKeyConstraint('smtp_config_id')
+    )
+    op.create_table('status_settings',
+    sa.Column('status_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('status_name', sa.String(), nullable=False),
+    sa.Column('status_type', sa.String(), nullable=False),
+    sa.Column('color_hex', sa.String(), nullable=True),
+    sa.Column('icon_name', sa.String(), nullable=True),
+    sa.Column('default_duration_days', sa.Integer(), nullable=True),
+    sa.Column('is_archival_status', sa.Boolean(), nullable=True),
+    sa.Column('is_completion_status', sa.Boolean(), nullable=True),
+    sa.Column('sort_order', sa.Integer(), nullable=True),
+    sa.PrimaryKeyConstraint('status_id')
+    )
+    op.create_table('tags',
+    sa.Column('tag_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('tag_name', sa.String(), nullable=False),
+    sa.PrimaryKeyConstraint('tag_id'),
+    sa.UniqueConstraint('tag_name')
+    )
+    op.create_table('template_categories',
+    sa.Column('category_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('category_name', sa.Text(), nullable=False),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('purpose', sa.Text(), nullable=True),
+    sa.PrimaryKeyConstraint('category_id'),
+    sa.UniqueConstraint('category_name')
+    )
+    op.create_table('templates',
+    sa.Column('template_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('template_name', sa.String(), nullable=True),
+    sa.Column('template_type', sa.String(), nullable=True),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('base_file_name', sa.String(), nullable=True),
+    sa.Column('language_code', sa.String(), nullable=True),
+    sa.Column('is_default_for_type_lang', sa.Boolean(), nullable=True),
+    sa.Column('category_id', sa.Integer(), nullable=True),
+    sa.Column('content_definition', sa.Text(), nullable=True),
+    sa.Column('email_subject_template', sa.Text(), nullable=True),
+    sa.Column('email_variables_info', sa.Text(), nullable=True),
+    sa.Column('cover_page_config_json', sa.Text(), nullable=True),
+    sa.Column('document_mapping_config_json', sa.Text(), nullable=True),
+    sa.Column('raw_template_file_data', sa.LargeBinary(), nullable=True),
+    sa.Column('version', sa.String(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.Column('created_by_user_id', sa.String(), nullable=True),
+    sa.Column('client_id', sa.String(), nullable=True),
+    sa.ForeignKeyConstraint(['category_id'], ['template_categories.category_id'], ),
+    sa.ForeignKeyConstraint(['client_id'], ['clients.client_id'], ),
+    sa.ForeignKeyConstraint(['created_by_user_id'], ['users.user_id'], ),
+    sa.PrimaryKeyConstraint('template_id')
+    )
+    op.create_table('transporters',
+    sa.Column('transporter_id', sa.String(), nullable=False),
+    sa.Column('name', sa.String(), nullable=True),
+    sa.Column('contact_person', sa.String(), nullable=True),
+    sa.Column('phone', sa.String(), nullable=True),
+    sa.Column('email', sa.String(), nullable=True),
+    sa.Column('address', sa.Text(), nullable=True),
+    sa.Column('service_area', sa.Text(), nullable=True),
+    sa.Column('notes', sa.Text(), nullable=True),
+    sa.Column('latitude', sa.REAL(), nullable=True),
+    sa.Column('longitude', sa.REAL(), nullable=True),
+    sa.Column('current_cargo', sa.Text(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.PrimaryKeyConstraint('transporter_id')
+    )
+    op.create_table('use_cases',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('name', sa.String(), nullable=True),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('user_motivational_messages',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('message', sa.Text(), nullable=False),
+    sa.Column('language_code', sa.Text(), nullable=True),
+    sa.Column('is_active', sa.Boolean(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('client__freight_forwarders',
+    sa.Column('client_forwarder_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('client_id', sa.String(), nullable=False),
+    sa.Column('forwarder_id', sa.Text(), nullable=False),
+    sa.Column('assigned_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['client_id'], ['clients.client_id'], ),
+    sa.ForeignKeyConstraint(['forwarder_id'], ['freight_forwarders.forwarder_id'], ),
+    sa.PrimaryKeyConstraint('client_forwarder_id')
+    )
+    op.create_table('client__transporters',
+    sa.Column('client_transporter_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('client_id', sa.String(), nullable=False),
+    sa.Column('transporter_id', sa.Text(), nullable=False),
+    sa.Column('assigned_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['client_id'], ['clients.client_id'], ),
+    sa.ForeignKeyConstraint(['transporter_id'], ['transporters.transporter_id'], ),
+    sa.PrimaryKeyConstraint('client_transporter_id')
+    )
+    op.create_table('important_dates',
+    sa.Column('important_date_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('date_name', sa.String(), nullable=True),
+    sa.Column('date_value', sa.Date(), nullable=True),
+    sa.Column('is_recurring_annually', sa.Boolean(), nullable=True),
+    sa.Column('language_code', sa.String(), nullable=True),
+    sa.Column('email_template_id', sa.Integer(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['email_template_id'], ['templates.template_id'], ),
+    sa.PrimaryKeyConstraint('important_date_id')
+    )
+    op.create_table('partners',
+    sa.Column('partner_id', sa.String(), nullable=False),
+    sa.Column('partner_name', sa.String(), nullable=True),
+    sa.Column('partner_category_id', sa.Integer(), nullable=True),
+    sa.Column('contact_person_name', sa.String(), nullable=True),
+    sa.Column('email', sa.String(), nullable=True),
+    sa.Column('phone', sa.String(), nullable=True),
+    sa.Column('address', sa.Text(), nullable=True),
+    sa.Column('website_url', sa.String(), nullable=True),
+    sa.Column('services_offered', sa.Text(), nullable=True),
+    sa.Column('collaboration_start_date', sa.String(), nullable=True),
+    sa.Column('status', sa.String(), nullable=True),
+    sa.Column('notes', sa.Text(), nullable=True),
+    sa.Column('created_at', sa.String(), nullable=True),
+    sa.Column('updated_at', sa.String(), nullable=True),
+    sa.ForeignKeyConstraint(['partner_category_id'], ['partner_categories.partner_category_id'], ),
+    sa.PrimaryKeyConstraint('partner_id')
+    )
+    op.create_table('product_dimensions',
+    sa.Column('product_id', sa.Integer(), nullable=False),
+    sa.Column('dim_A', sa.String(), nullable=True),
+    sa.Column('dim_B', sa.String(), nullable=True),
+    sa.Column('dim_C', sa.String(), nullable=True),
+    sa.Column('dim_D', sa.String(), nullable=True),
+    sa.Column('dim_E', sa.String(), nullable=True),
+    sa.Column('dim_F', sa.String(), nullable=True),
+    sa.Column('dim_G', sa.String(), nullable=True),
+    sa.Column('dim_H', sa.String(), nullable=True),
+    sa.Column('dim_I', sa.String(), nullable=True),
+    sa.Column('dim_J', sa.String(), nullable=True),
+    sa.Column('technical_image_path', sa.String(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['product_id'], ['products.product_id'], ),
+    sa.PrimaryKeyConstraint('product_id')
+    )
+    op.create_table('product_equivalencies',
+    sa.Column('equivalence_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('product_id_a', sa.Integer(), nullable=False),
+    sa.Column('product_id_b', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['product_id_a'], ['products.product_id'], ),
+    sa.ForeignKeyConstraint(['product_id_b'], ['products.product_id'], ),
+    sa.PrimaryKeyConstraint('equivalence_id')
+    )
+    op.create_table('product_media_links',
+    sa.Column('link_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('product_id', sa.Integer(), nullable=False),
+    sa.Column('media_item_id', sa.String(), nullable=False),
+    sa.Column('display_order', sa.Integer(), nullable=True),
+    sa.Column('alt_text', sa.String(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['media_item_id'], ['media_items.media_item_id'], ),
+    sa.ForeignKeyConstraint(['product_id'], ['products.product_id'], ),
+    sa.PrimaryKeyConstraint('link_id')
+    )
+    op.create_table('product_storage_locations',
+    sa.Column('product_storage_location_id', sa.String(), nullable=False),
+    sa.Column('product_id', sa.Integer(), nullable=True),
+    sa.Column('location_id', sa.String(), nullable=True),
+    sa.Column('quantity_at_location', sa.REAL(), nullable=True),
+    sa.Column('last_updated', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['location_id'], ['item_locations.location_id'], ),
+    sa.ForeignKeyConstraint(['product_id'], ['products.product_id'], ),
+    sa.PrimaryKeyConstraint('product_storage_location_id')
+    )
+    op.create_table('regions',
+    sa.Column('region_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('region_name', sa.String(), nullable=True),
+    sa.Column('country_id', sa.Integer(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['country_id'], ['countries.country_id'], ),
+    sa.PrimaryKeyConstraint('region_id')
+    )
+    op.create_table('business_profile',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('user_id', sa.String(), nullable=True),
+    sa.Column('name', sa.String(), nullable=True),
+    sa.Column('business_type', sa.String(), nullable=True),
+    sa.Column('sector_id', sa.Integer(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['sector_id'], ['sectors.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['users.user_id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('client__assigned_personnel',
+    sa.Column('assignment_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('client_id', sa.String(), nullable=False),
+    sa.Column('personnel_id', sa.Integer(), nullable=False),
+    sa.Column('assigned_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['client_id'], ['clients.client_id'], ),
+    sa.ForeignKeyConstraint(['personnel_id'], ['company_personnel.personnel_id'], ),
+    sa.PrimaryKeyConstraint('assignment_id')
+    )
+    op.create_table('company_calendar_settings',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('user_id', sa.Text(), nullable=False),
+    sa.Column('business_type', sa.Text(), nullable=True),
+    sa.Column('activity_category', sa.Text(), nullable=True),
+    sa.Column('country_iso', sa.Text(), nullable=False),
+    sa.Column('region', sa.Text(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['user_id'], ['users.user_id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('user_id')
+    )
+    op.create_table('company_expenses',
+    sa.Column('expense_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('expense_date', sa.Date(), nullable=True),
+    sa.Column('amount', sa.REAL(), nullable=True),
+    sa.Column('currency', sa.String(), nullable=True),
+    sa.Column('recipient_name', sa.String(), nullable=True),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('facture_id', sa.Integer(), nullable=True),
+    sa.Column('created_by_user_id', sa.String(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.Column('is_deleted', sa.Boolean(), server_default=sa.text('0'), nullable=False),
+    sa.Column('deleted_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['created_by_user_id'], ['users.user_id'], ),
+    sa.ForeignKeyConstraint(['facture_id'], ['company_factures.facture_id'], ),
+    sa.PrimaryKeyConstraint('expense_id'),
+    sa.UniqueConstraint('facture_id')
+    )
+    op.create_table('contact_lists',
+    sa.Column('list_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('list_name', sa.String(), nullable=True),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('created_by_user_id', sa.String(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['created_by_user_id'], ['users.user_id'], ),
+    sa.PrimaryKeyConstraint('list_id')
+    )
+    op.create_table('contacts',
+    sa.Column('contact_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('name', sa.String(), nullable=True),
+    sa.Column('email', sa.String(), nullable=True),
+    sa.Column('phone', sa.String(), nullable=True),
+    sa.Column('position', sa.String(), nullable=True),
+    sa.Column('company_name', sa.String(), nullable=True),
+    sa.Column('notes', sa.Text(), nullable=True),
+    sa.Column('givenName', sa.String(), nullable=True),
+    sa.Column('familyName', sa.String(), nullable=True),
+    sa.Column('displayName', sa.String(), nullable=True),
+    sa.Column('phone_type', sa.String(), nullable=True),
+    sa.Column('email_type', sa.String(), nullable=True),
+    sa.Column('address_formattedValue', sa.String(), nullable=True),
+    sa.Column('address_streetAddress', sa.String(), nullable=True),
+    sa.Column('address_city', sa.String(), nullable=True),
+    sa.Column('address_region', sa.String(), nullable=True),
+    sa.Column('address_postalCode', sa.String(), nullable=True),
+    sa.Column('address_country', sa.String(), nullable=True),
+    sa.Column('organization_name', sa.String(), nullable=True),
+    sa.Column('organization_title', sa.String(), nullable=True),
+    sa.Column('birthday_date', sa.String(), nullable=True),
+    sa.Column('created_by_user_id', sa.String(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.Column('employee_status', sa.String(), nullable=True),
+    sa.ForeignKeyConstraint(['created_by_user_id'], ['users.user_id'], ),
+    sa.PrimaryKeyConstraint('contact_id')
+    )
+    op.create_table('cover_page_templates',
+    sa.Column('template_id', sa.String(), nullable=False),
+    sa.Column('template_name', sa.String(), nullable=True),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('default_title', sa.String(), nullable=True),
+    sa.Column('default_subtitle', sa.String(), nullable=True),
+    sa.Column('default_author', sa.String(), nullable=True),
+    sa.Column('style_config_json', sa.Text(), nullable=True),
+    sa.Column('is_default_template', sa.Integer(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.Column('created_by_user_id', sa.String(), nullable=True),
+    sa.ForeignKeyConstraint(['created_by_user_id'], ['users.user_id'], ),
+    sa.PrimaryKeyConstraint('template_id')
+    )
+    op.create_table('experiences',
+    sa.Column('experience_id', sa.String(), nullable=False),
+    sa.Column('title', sa.String(), nullable=True),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('experience_date', sa.Date(), nullable=True),
+    sa.Column('type', sa.String(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.Column('user_id', sa.String(), nullable=True),
+    sa.ForeignKeyConstraint(['user_id'], ['users.user_id'], ),
+    sa.PrimaryKeyConstraint('experience_id')
+    )
+    op.create_table('goals',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('employee_id', sa.String(), nullable=False),
+    sa.Column('set_by_id', sa.String(), nullable=True),
+    sa.Column('title', sa.String(length=255), nullable=False),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('due_date', sa.DateTime(), nullable=True),
+    sa.Column('status', sa.Enum('OPEN', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', name='goalstatusenum'), nullable=False),
+    sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.ForeignKeyConstraint(['employee_id'], ['employees.id'], ),
+    sa.ForeignKeyConstraint(['set_by_id'], ['users.user_id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    with op.batch_alter_table('goals', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_goals_employee_id'), ['employee_id'], unique=False)
+
+    op.create_table('job_openings',
+    sa.Column('job_opening_id', sa.String(), nullable=False),
+    sa.Column('title', sa.String(), nullable=True),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('status_id', sa.Integer(), nullable=True),
+    sa.Column('department_id', sa.Integer(), nullable=True),
+    sa.Column('created_by_user_id', sa.String(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.Column('closing_date', sa.Date(), nullable=True),
+    sa.ForeignKeyConstraint(['created_by_user_id'], ['users.user_id'], ),
+    sa.ForeignKeyConstraint(['status_id'], ['status_settings.status_id'], ),
+    sa.PrimaryKeyConstraint('job_opening_id')
+    )
+    op.create_table('licenses',
+    sa.Column('license_id', sa.String(), nullable=False),
+    sa.Column('user_id', sa.Text(), nullable=False),
+    sa.Column('license_type', sa.String(), nullable=True),
+    sa.Column('license_key', sa.String(), nullable=True),
+    sa.Column('activation_date', sa.DateTime(), nullable=True),
+    sa.Column('expiration_date', sa.DateTime(), nullable=True),
+    sa.Column('machine_info', sa.Text(), nullable=True),
+    sa.Column('is_active', sa.Boolean(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['user_id'], ['users.user_id'], ),
+    sa.PrimaryKeyConstraint('license_id')
+    )
+    op.create_table('menu_configuration',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('user_id', sa.String(), nullable=True),
+    sa.Column('item_name', sa.String(), nullable=True),
+    sa.Column('item_order', sa.Integer(), nullable=True),
+    sa.Column('is_visible', sa.Boolean(), nullable=True),
+    sa.Column('module_identifier', sa.String(), nullable=True),
+    sa.Column('parent_id', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['parent_id'], ['menu_configuration.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['users.user_id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('money_transfer_agents',
+    sa.Column('agent_id', sa.String(), nullable=False),
+    sa.Column('name', sa.String(), nullable=True),
+    sa.Column('agent_type', sa.String(), nullable=True),
+    sa.Column('phone_number', sa.String(), nullable=True),
+    sa.Column('email', sa.String(), nullable=True),
+    sa.Column('country_id', sa.String(), nullable=True),
+    sa.Column('city_id', sa.String(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True),
+    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('is_deleted', sa.Boolean(), server_default=sa.text('0'), nullable=False),
+    sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True),
+    sa.ForeignKeyConstraint(['city_id'], ['cities.city_id'], ),
+    sa.ForeignKeyConstraint(['country_id'], ['countries.country_id'], ),
+    sa.PrimaryKeyConstraint('agent_id')
+    )
+    op.create_table('partner_category_link',
+    sa.Column('partner_id', sa.Text(), nullable=False),
+    sa.Column('partner_category_id', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['partner_category_id'], ['partner_categories.partner_category_id'], ),
+    sa.ForeignKeyConstraint(['partner_id'], ['partners.partner_id'], ),
+    sa.PrimaryKeyConstraint('partner_id', 'partner_category_id')
+    )
+    op.create_table('password_reset_tokens',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('user_id', sa.Text(), nullable=False),
+    sa.Column('token_hash', sa.String(), nullable=True),
+    sa.Column('expires_at', sa.DateTime(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('used_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['user_id'], ['users.user_id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('performance_reviews',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('employee_id', sa.String(), nullable=False),
+    sa.Column('reviewer_id', sa.String(), nullable=True),
+    sa.Column('review_cycle_id', sa.Integer(), nullable=True),
+    sa.Column('review_date', sa.DateTime(), nullable=True),
+    sa.Column('overall_rating', sa.Integer(), nullable=True),
+    sa.Column('strengths', sa.Text(), nullable=True),
+    sa.Column('areas_for_improvement', sa.Text(), nullable=True),
+    sa.Column('employee_comments', sa.Text(), nullable=True),
+    sa.Column('manager_comments', sa.Text(), nullable=True),
+    sa.Column('status', sa.Enum('DRAFT', 'PENDING_EMPLOYEE_REVIEW', 'PENDING_MANAGER_REVIEW', 'COMPLETED', name='performancereviewstatusenum'), nullable=False),
+    sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.ForeignKeyConstraint(['employee_id'], ['employees.id'], ),
+    sa.ForeignKeyConstraint(['review_cycle_id'], ['review_cycles.id'], ),
+    sa.ForeignKeyConstraint(['reviewer_id'], ['users.user_id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    with op.batch_alter_table('performance_reviews', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_performance_reviews_employee_id'), ['employee_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_performance_reviews_reviewer_id'), ['reviewer_id'], unique=False)
+
+    op.create_table('referents',
+    sa.Column('referent_id', sa.String(), nullable=False),
+    sa.Column('client_id', sa.Text(), nullable=False),
+    sa.Column('country_id', sa.Integer(), nullable=False),
+    sa.Column('region_id', sa.Integer(), nullable=True),
+    sa.Column('city_id', sa.Integer(), nullable=True),
+    sa.Column('referent_since', sa.DateTime(), nullable=True),
+    sa.Column('notes', sa.Text(), nullable=True),
+    sa.Column('is_active', sa.Boolean(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.Column('created_by_user_id', sa.String(), nullable=True),
+    sa.ForeignKeyConstraint(['city_id'], ['cities.city_id'], ),
+    sa.ForeignKeyConstraint(['client_id'], ['clients.client_id'], ),
+    sa.ForeignKeyConstraint(['country_id'], ['countries.country_id'], ),
+    sa.ForeignKeyConstraint(['created_by_user_id'], ['users.user_id'], ),
+    sa.ForeignKeyConstraint(['region_id'], ['regions.region_id'], ),
+    sa.PrimaryKeyConstraint('referent_id'),
+    sa.UniqueConstraint('client_id')
+    )
+    op.create_table('report_configurations',
+    sa.Column('report_config_id', sa.String(), nullable=False),
+    sa.Column('report_name', sa.String(), nullable=True),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('target_entity', sa.String(), nullable=True),
+    sa.Column('output_format', sa.String(), nullable=True),
+    sa.Column('created_by_user_id', sa.String(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.Column('is_system_report', sa.Boolean(), nullable=True),
+    sa.ForeignKeyConstraint(['created_by_user_id'], ['users.user_id'], ),
+    sa.PrimaryKeyConstraint('report_config_id')
+    )
+    op.create_table('team_members',
+    sa.Column('team_member_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('user_id', sa.Text(), nullable=True),
+    sa.Column('full_name', sa.String(), nullable=True),
+    sa.Column('email', sa.String(), nullable=True),
+    sa.Column('role_or_title', sa.String(), nullable=True),
+    sa.Column('department', sa.String(), nullable=True),
+    sa.Column('phone_number', sa.String(), nullable=True),
+    sa.Column('profile_picture_url', sa.String(), nullable=True),
+    sa.Column('is_active', sa.Boolean(), nullable=True),
+    sa.Column('notes', sa.Text(), nullable=True),
+    sa.Column('hire_date', sa.String(), nullable=True),
+    sa.Column('performance', sa.Integer(), nullable=True),
+    sa.Column('skills', sa.Text(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['user_id'], ['users.user_id'], ),
+    sa.PrimaryKeyConstraint('team_member_id'),
+    sa.UniqueConstraint('user_id')
+    )
+    op.create_table('user_calendar_events',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('user_id', sa.Text(), nullable=False),
+    sa.Column('event_date', sa.Date(), nullable=False),
+    sa.Column('event_type', sa.Text(), nullable=False),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['user_id'], ['users.user_id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('user_google_accounts',
+    sa.Column('user_google_account_id', sa.Text(), nullable=False),
+    sa.Column('user_id', sa.Text(), nullable=False),
+    sa.Column('google_account_id', sa.Text(), nullable=False),
+    sa.Column('access_token', sa.Text(), nullable=True),
+    sa.Column('last_sync_initiated_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True),
+    sa.ForeignKeyConstraint(['user_id'], ['users.user_id'], ),
+    sa.PrimaryKeyConstraint('user_google_account_id'),
+    sa.UniqueConstraint('google_account_id')
+    )
+    with op.batch_alter_table('user_google_accounts', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_user_google_accounts_user_id'), ['user_id'], unique=False)
+
+    op.create_table('user_saved_filters',
+    sa.Column('id', sa.Text(), nullable=False),
+    sa.Column('user_id', sa.Text(), nullable=False),
+    sa.Column('filter_name', sa.Text(), nullable=False),
+    sa.Column('filter_parameters_json', sa.Text(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['user_id'], ['users.user_id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('user_session_tokens',
+    sa.Column('token_id', sa.Text(), nullable=False),
+    sa.Column('user_id', sa.Text(), nullable=False),
+    sa.Column('token_hash', sa.Text(), nullable=False),
+    sa.Column('device_identifier', sa.Text(), nullable=True),
+    sa.Column('expires_at', sa.DateTime(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('last_used_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['user_id'], ['users.user_id'], ),
+    sa.PrimaryKeyConstraint('token_id'),
+    sa.UniqueConstraint('token_hash')
+    )
+    op.create_table('business_use_cases',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('business_profile_id', sa.Integer(), nullable=True),
+    sa.Column('use_case_id', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['business_profile_id'], ['business_profile.id'], ),
+    sa.ForeignKeyConstraint(['use_case_id'], ['use_cases.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('candidates',
+    sa.Column('candidate_id', sa.String(), nullable=False),
+    sa.Column('job_opening_id', sa.Text(), nullable=False),
+    sa.Column('first_name', sa.String(), nullable=True),
+    sa.Column('last_name', sa.String(), nullable=True),
+    sa.Column('email', sa.String(), nullable=True),
+    sa.Column('phone', sa.String(), nullable=True),
+    sa.Column('resume_path', sa.String(), nullable=True),
+    sa.Column('cover_letter_path', sa.String(), nullable=True),
+    sa.Column('application_source', sa.String(), nullable=True),
+    sa.Column('current_status_id', sa.Integer(), nullable=True),
+    sa.Column('application_date', sa.DateTime(), nullable=True),
+    sa.Column('notes', sa.String(), nullable=True),
+    sa.Column('linked_contact_id', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['current_status_id'], ['status_settings.status_id'], ),
+    sa.ForeignKeyConstraint(['job_opening_id'], ['job_openings.job_opening_id'], ),
+    sa.ForeignKeyConstraint(['linked_contact_id'], ['contacts.contact_id'], ),
+    sa.PrimaryKeyConstraint('candidate_id')
+    )
+    op.create_table('client_order_money_transfer_agents',
+    sa.Column('client_order_money_transfer_agent_id', sa.Text(), nullable=False),
+    sa.Column('client_id', sa.Text(), nullable=False),
+    sa.Column('money_transfer_agent_id', sa.Text(), nullable=False),
+    sa.Column('order_id', sa.Text(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.Column('is_deleted', sa.Boolean(), server_default=sa.text('0'), nullable=False),
+    sa.ForeignKeyConstraint(['client_id'], ['clients.client_id'], ),
+    sa.ForeignKeyConstraint(['money_transfer_agent_id'], ['money_transfer_agents.agent_id'], ),
+    sa.PrimaryKeyConstraint('client_order_money_transfer_agent_id')
+    )
+    op.create_table('company_personnel_contacts',
+    sa.Column('company_personnel_contact_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('personnel_id', sa.Integer(), nullable=True),
+    sa.Column('contact_id', sa.Integer(), nullable=True),
+    sa.Column('is_primary', sa.Boolean(), nullable=True),
+    sa.Column('can_receive_documents', sa.Boolean(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['contact_id'], ['contacts.contact_id'], ),
+    sa.ForeignKeyConstraint(['personnel_id'], ['company_personnel.personnel_id'], ),
+    sa.PrimaryKeyConstraint('company_personnel_contact_id')
+    )
+    op.create_table('contact_list_members',
+    sa.Column('list_member_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('list_id', sa.Integer(), nullable=False),
+    sa.Column('contact_id', sa.Integer(), nullable=False),
+    sa.Column('added_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['contact_id'], ['contacts.contact_id'], ),
+    sa.ForeignKeyConstraint(['list_id'], ['contact_lists.list_id'], ),
+    sa.PrimaryKeyConstraint('list_member_id')
+    )
+    op.create_table('contact_sync_log',
+    sa.Column('sync_log_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('user_google_account_id', sa.Text(), nullable=True),
+    sa.Column('local_contact_id', sa.Text(), nullable=True),
+    sa.Column('local_contact_type', sa.Text(), nullable=True),
+    sa.Column('google_contact_id', sa.Text(), nullable=True),
+    sa.Column('platform_etag', sa.Text(), nullable=True),
+    sa.Column('google_etag', sa.Text(), nullable=True),
+    sa.Column('last_sync_timestamp', sa.DateTime(), nullable=True),
+    sa.Column('sync_status', sa.Text(), nullable=True),
+    sa.Column('sync_direction', sa.Text(), nullable=True),
+    sa.Column('error_message', sa.Text(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['user_google_account_id'], ['user_google_accounts.user_google_account_id'], ),
+    sa.PrimaryKeyConstraint('sync_log_id')
+    )
+    op.create_table('entity_contacts',
+    sa.Column('entity_contact_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('entity_id', sa.Text(), nullable=False),
+    sa.Column('entity_type', sa.Text(), nullable=False),
+    sa.Column('contact_id', sa.Integer(), nullable=False),
+    sa.Column('role_in_entity', sa.Text(), nullable=True),
+    sa.Column('is_primary', sa.Boolean(), nullable=True),
+    sa.Column('can_receive_documents', sa.Boolean(), nullable=True),
+    sa.Column('notes', sa.Text(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['contact_id'], ['contacts.contact_id'], ),
+    sa.PrimaryKeyConstraint('entity_contact_id')
+    )
+    op.create_table('experience_media',
+    sa.Column('experience_media_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('experience_id', sa.String(), nullable=True),
+    sa.Column('media_item_id', sa.String(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['experience_id'], ['experiences.experience_id'], ),
+    sa.ForeignKeyConstraint(['media_item_id'], ['media_items.media_item_id'], ),
+    sa.PrimaryKeyConstraint('experience_media_id')
+    )
+    op.create_table('experience_related_entities',
+    sa.Column('experience_related_entity_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('experience_id', sa.String(), nullable=True),
+    sa.Column('entity_type', sa.String(), nullable=True),
+    sa.Column('entity_id', sa.String(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['experience_id'], ['experiences.experience_id'], ),
+    sa.PrimaryKeyConstraint('experience_related_entity_id')
+    )
+    op.create_table('experience_tags',
+    sa.Column('experience_tag_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('experience_id', sa.String(), nullable=True),
+    sa.Column('tag_id', sa.Integer(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['experience_id'], ['experiences.experience_id'], ),
+    sa.ForeignKeyConstraint(['tag_id'], ['tags.tag_id'], ),
+    sa.PrimaryKeyConstraint('experience_tag_id')
+    )
+    op.create_table('partner_contacts',
+    sa.Column('partner_contact_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('partner_id', sa.String(), nullable=True),
+    sa.Column('contact_id', sa.Integer(), nullable=True),
+    sa.Column('is_primary', sa.Boolean(), nullable=True),
+    sa.Column('can_receive_documents', sa.Boolean(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['contact_id'], ['contacts.contact_id'], ),
+    sa.ForeignKeyConstraint(['partner_id'], ['partners.partner_id'], ),
+    sa.PrimaryKeyConstraint('partner_contact_id')
+    )
+    op.create_table('performance_review_goals_link',
+    sa.Column('performance_review_id', sa.Integer(), nullable=False),
+    sa.Column('goal_id', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['goal_id'], ['goals.id'], ),
+    sa.ForeignKeyConstraint(['performance_review_id'], ['performance_reviews.id'], ),
+    sa.PrimaryKeyConstraint('performance_review_id', 'goal_id')
+    )
+    op.create_table('projects',
+    sa.Column('project_id', sa.String(), nullable=False),
+    sa.Column('client_id', sa.String(), nullable=True),
+    sa.Column('project_name', sa.String(), nullable=False),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('start_date', sa.Date(), nullable=True),
+    sa.Column('deadline_date', sa.Date(), nullable=True),
+    sa.Column('budget', sa.REAL(), nullable=True),
+    sa.Column('status_id', sa.Integer(), nullable=True),
+    sa.Column('progress_percentage', sa.Integer(), nullable=True),
+    sa.Column('manager_team_member_id', sa.String(), nullable=True),
+    sa.Column('priority', sa.Integer(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True),
+    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('is_deleted', sa.Boolean(), server_default=sa.text('0'), nullable=False),
+    sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True),
+    sa.ForeignKeyConstraint(['client_id'], ['clients.client_id'], ),
+    sa.ForeignKeyConstraint(['manager_team_member_id'], ['team_members.team_member_id'], ),
+    sa.ForeignKeyConstraint(['status_id'], ['status_settings.status_id'], ),
+    sa.PrimaryKeyConstraint('project_id')
+    )
+    op.create_table('recruitment_steps',
+    sa.Column('recruitment_step_id', sa.String(), nullable=False),
+    sa.Column('job_opening_id', sa.Text(), nullable=False),
+    sa.Column('step_name', sa.String(), nullable=True),
+    sa.Column('step_order', sa.Integer(), nullable=True),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.ForeignKeyConstraint(['job_opening_id'], ['job_openings.job_opening_id'], ),
+    sa.PrimaryKeyConstraint('recruitment_step_id')
+    )
+    op.create_table('report_config_fields',
+    sa.Column('report_config_field_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('report_config_id', sa.Text(), nullable=False),
+    sa.Column('field_name', sa.String(), nullable=True),
+    sa.Column('display_name', sa.String(), nullable=True),
+    sa.Column('sort_order', sa.Integer(), nullable=True),
+    sa.Column('sort_direction', sa.String(), nullable=True),
+    sa.Column('group_by_priority', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['report_config_id'], ['report_configurations.report_config_id'], ),
+    sa.PrimaryKeyConstraint('report_config_field_id')
+    )
+    op.create_table('report_config_filters',
+    sa.Column('report_config_filter_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('report_config_id', sa.Text(), nullable=False),
+    sa.Column('field_name', sa.String(), nullable=True),
+    sa.Column('operator', sa.String(), nullable=True),
+    sa.Column('filter_value_1', sa.Text(), nullable=True),
+    sa.Column('filter_value_2', sa.Text(), nullable=True),
+    sa.Column('logical_group', sa.String(), nullable=True),
+    sa.ForeignKeyConstraint(['report_config_id'], ['report_configurations.report_config_id'], ),
+    sa.PrimaryKeyConstraint('report_config_filter_id')
+    )
+    op.create_table('candidate_progress',
+    sa.Column('candidate_progress_id', sa.String(), nullable=False),
+    sa.Column('candidate_id', sa.Text(), nullable=False),
+    sa.Column('recruitment_step_id', sa.Text(), nullable=False),
+    sa.Column('status_id', sa.Integer(), nullable=True),
+    sa.Column('notes', sa.String(), nullable=True),
+    sa.Column('completed_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['candidate_id'], ['candidates.candidate_id'], ),
+    sa.ForeignKeyConstraint(['recruitment_step_id'], ['recruitment_steps.recruitment_step_id'], ),
+    sa.ForeignKeyConstraint(['status_id'], ['status_settings.status_id'], ),
+    sa.PrimaryKeyConstraint('candidate_progress_id')
+    )
+    op.create_table('client_project_products',
+    sa.Column('client_project_product_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('client_id', sa.Text(), nullable=False),
+    sa.Column('project_id', sa.Text(), nullable=True),
+    sa.Column('product_id', sa.Integer(), nullable=False),
+    sa.Column('added_by_user_id', sa.Text(), nullable=True),
+    sa.Column('quantity', sa.Integer(), nullable=False),
+    sa.Column('unit_price_override', sa.REAL(), nullable=True),
+    sa.Column('total_price_calculated', sa.REAL(), nullable=True),
+    sa.Column('serial_number', sa.Text(), nullable=True),
+    sa.Column('purchase_confirmed_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('added_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True),
+    sa.Column('client_specific_product_name', sa.Text(), nullable=True),
+    sa.Column('line_description', sa.Text(), nullable=True),
+    sa.Column('line_weight', sa.REAL(), nullable=True),
+    sa.Column('line_dimensions_notes', sa.Text(), nullable=True),
+    sa.ForeignKeyConstraint(['added_by_user_id'], ['users.user_id'], ),
+    sa.ForeignKeyConstraint(['client_id'], ['clients.client_id'], ),
+    sa.ForeignKeyConstraint(['product_id'], ['products.product_id'], ),
+    sa.ForeignKeyConstraint(['project_id'], ['projects.project_id'], ),
+    sa.PrimaryKeyConstraint('client_project_product_id')
+    )
+    op.create_table('commandes',
+    sa.Column('commande_id', sa.String(), nullable=False),
+    sa.Column('client_id', sa.String(), nullable=True),
+    sa.Column('project_id', sa.String(), nullable=True),
+    sa.Column('commande_reference', sa.String(), nullable=False),
+    sa.Column('commande_date', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.Column('status_commande_id', sa.Integer(), nullable=True),
+    sa.Column('description_commande', sa.Text(), nullable=True),
+    sa.Column('notes', sa.Text(), nullable=True),
+    sa.Column('is_default', sa.Boolean(), nullable=True),
+    sa.Column('total_ht', sa.REAL(), nullable=True),
+    sa.Column('total_ttc', sa.REAL(), nullable=True),
+    sa.Column('currency', sa.String(), nullable=False),
+    sa.Column('shipping_address', sa.Text(), nullable=True),
+    sa.Column('billing_address', sa.Text(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.Column('created_by_user_id', sa.String(), nullable=True),
+    sa.Column('deleted_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['client_id'], ['clients.client_id'], ),
+    sa.ForeignKeyConstraint(['created_by_user_id'], ['users.user_id'], ),
+    sa.ForeignKeyConstraint(['project_id'], ['projects.project_id'], ),
+    sa.ForeignKeyConstraint(['status_commande_id'], ['status_settings.status_id'], ),
+    sa.PrimaryKeyConstraint('commande_id'),
+    sa.UniqueConstraint('commande_reference')
+    )
+    op.create_table('cover_pages',
+    sa.Column('cover_page_id', sa.String(), nullable=False),
+    sa.Column('cover_page_name', sa.String(), nullable=True),
+    sa.Column('client_id', sa.String(), nullable=True),
+    sa.Column('project_id', sa.String(), nullable=True),
+    sa.Column('template_id', sa.Text(), nullable=False),
+    sa.Column('title', sa.String(), nullable=True),
+    sa.Column('subtitle', sa.String(), nullable=True),
+    sa.Column('author_text', sa.String(), nullable=True),
+    sa.Column('institution_text', sa.String(), nullable=True),
+    sa.Column('department_text', sa.String(), nullable=True),
+    sa.Column('document_type_text', sa.String(), nullable=True),
+    sa.Column('document_version', sa.String(), nullable=True),
+    sa.Column('creation_date', sa.Date(), nullable=True),
+    sa.Column('logo_name', sa.String(), nullable=True),
+    sa.Column('logo_data', sa.LargeBinary(), nullable=True),
+    sa.Column('custom_style_config_json', sa.Text(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.Column('created_by_user_id', sa.String(), nullable=True),
+    sa.ForeignKeyConstraint(['client_id'], ['clients.client_id'], ),
+    sa.ForeignKeyConstraint(['created_by_user_id'], ['users.user_id'], ),
+    sa.ForeignKeyConstraint(['project_id'], ['projects.project_id'], ),
+    sa.ForeignKeyConstraint(['template_id'], ['cover_page_templates.template_id'], ),
+    sa.PrimaryKeyConstraint('cover_page_id')
+    )
+    op.create_table('interviews',
+    sa.Column('interview_id', sa.String(), nullable=False),
+    sa.Column('candidate_id', sa.Text(), nullable=False),
+    sa.Column('job_opening_id', sa.Text(), nullable=False),
+    sa.Column('recruitment_step_id', sa.Text(), nullable=True),
+    sa.Column('interviewer_team_member_id', sa.Integer(), nullable=True),
+    sa.Column('scheduled_at', sa.DateTime(), nullable=True),
+    sa.Column('duration_minutes', sa.Integer(), nullable=True),
+    sa.Column('interview_type', sa.String(), nullable=True),
+    sa.Column('location_or_link', sa.String(), nullable=True),
+    sa.Column('status_id', sa.Integer(), nullable=True),
+    sa.Column('feedback_notes_overall', sa.Text(), nullable=True),
+    sa.Column('feedback_rating', sa.Integer(), nullable=True),
+    sa.Column('created_by_user_id', sa.String(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['candidate_id'], ['candidates.candidate_id'], ),
+    sa.ForeignKeyConstraint(['created_by_user_id'], ['users.user_id'], ),
+    sa.ForeignKeyConstraint(['interviewer_team_member_id'], ['team_members.team_member_id'], ),
+    sa.ForeignKeyConstraint(['job_opening_id'], ['job_openings.job_opening_id'], ),
+    sa.ForeignKeyConstraint(['recruitment_step_id'], ['recruitment_steps.recruitment_step_id'], ),
+    sa.ForeignKeyConstraint(['status_id'], ['status_settings.status_id'], ),
+    sa.PrimaryKeyConstraint('interview_id')
+    )
+    op.create_table('kp_is',
+    sa.Column('kpi_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('project_id', sa.String(), nullable=True),
+    sa.Column('name', sa.String(), nullable=True),
+    sa.Column('value', sa.REAL(), nullable=True),
+    sa.Column('target', sa.REAL(), nullable=True),
+    sa.Column('trend', sa.String(), nullable=True),
+    sa.Column('unit', sa.String(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['project_id'], ['projects.project_id'], ),
+    sa.PrimaryKeyConstraint('kpi_id')
+    )
+    op.create_table('scheduled_emails',
+    sa.Column('scheduled_email_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('recipient_email', sa.String(), nullable=True),
+    sa.Column('subject', sa.String(), nullable=True),
+    sa.Column('body_html', sa.Text(), nullable=True),
+    sa.Column('body_text', sa.Text(), nullable=True),
+    sa.Column('scheduled_send_at', sa.DateTime(), nullable=True),
+    sa.Column('status', sa.String(), nullable=True),
+    sa.Column('sent_at', sa.DateTime(), nullable=True),
+    sa.Column('error_message', sa.Text(), nullable=True),
+    sa.Column('related_client_id', sa.String(), nullable=True),
+    sa.Column('related_project_id', sa.String(), nullable=True),
+    sa.Column('created_by_user_id', sa.String(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['created_by_user_id'], ['users.user_id'], ),
+    sa.ForeignKeyConstraint(['related_client_id'], ['clients.client_id'], ),
+    sa.ForeignKeyConstraint(['related_project_id'], ['projects.project_id'], ),
+    sa.PrimaryKeyConstraint('scheduled_email_id')
+    )
+    op.create_table('tasks',
+    sa.Column('task_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('project_id', sa.Text(), nullable=False),
+    sa.Column('task_name', sa.String(), nullable=True),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('status_id', sa.Integer(), nullable=True),
+    sa.Column('assignee_team_member_id', sa.Integer(), nullable=True),
+    sa.Column('reporter_team_member_id', sa.Integer(), nullable=True),
+    sa.Column('due_date', sa.Date(), nullable=True),
+    sa.Column('priority', sa.Integer(), nullable=True),
+    sa.Column('estimated_hours', sa.REAL(), nullable=True),
+    sa.Column('actual_hours_spent', sa.REAL(), nullable=True),
+    sa.Column('parent_task_id', sa.Integer(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.Column('completed_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['assignee_team_member_id'], ['team_members.team_member_id'], ),
+    sa.ForeignKeyConstraint(['parent_task_id'], ['tasks.task_id'], ),
+    sa.ForeignKeyConstraint(['project_id'], ['projects.project_id'], ),
+    sa.ForeignKeyConstraint(['reporter_team_member_id'], ['team_members.team_member_id'], ),
+    sa.ForeignKeyConstraint(['status_id'], ['status_settings.status_id'], ),
+    sa.PrimaryKeyConstraint('task_id')
+    )
+    op.create_table('commande_document_notes',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('commande_document_id', sa.Text(), nullable=False),
+    sa.Column('note_content', sa.Text(), nullable=False),
+    sa.Column('language_code', sa.Text(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['commande_document_id'], ['client_documents.document_id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('commande_items',
+    sa.Column('item_id', sa.Text(), nullable=False),
+    sa.Column('commande_id', sa.Text(), nullable=False),
+    sa.Column('product_id', sa.Integer(), nullable=False),
+    sa.Column('description_item', sa.Text(), nullable=False),
+    sa.Column('quantity', sa.REAL(), nullable=False),
+    sa.Column('unit_price_ht', sa.REAL(), nullable=False),
+    sa.Column('vat_rate', sa.REAL(), nullable=True),
+    sa.Column('total_item_ht', sa.REAL(), nullable=False),
+    sa.Column('total_item_ttc', sa.REAL(), nullable=False),
+    sa.Column('weight', sa.REAL(), nullable=True),
+    sa.Column('dimensions_text', sa.Text(), nullable=True),
+    sa.Column('product_language_code', sa.Text(), nullable=True),
+    sa.ForeignKeyConstraint(['commande_id'], ['commandes.commande_id'], ),
+    sa.ForeignKeyConstraint(['product_id'], ['products.product_id'], ),
+    sa.PrimaryKeyConstraint('item_id')
+    )
+    op.create_table('email_reminders',
+    sa.Column('reminder_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('scheduled_email_id', sa.Integer(), nullable=False),
+    sa.Column('reminder_type', sa.String(), nullable=True),
+    sa.Column('reminder_send_at', sa.DateTime(), nullable=True),
+    sa.Column('status', sa.String(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['scheduled_email_id'], ['scheduled_emails.scheduled_email_id'], ),
+    sa.PrimaryKeyConstraint('reminder_id')
+    )
+    op.create_table('invoices',
+    sa.Column('invoice_id', sa.String(), nullable=False),
+    sa.Column('client_id', sa.Text(), nullable=False),
+    sa.Column('project_id', sa.Text(), nullable=True),
+    sa.Column('document_id', sa.Text(), nullable=True),
+    sa.Column('invoice_number', sa.String(), nullable=True),
+    sa.Column('issue_date', sa.Date(), nullable=True),
+    sa.Column('due_date', sa.Date(), nullable=True),
+    sa.Column('total_amount', sa.REAL(), nullable=True),
+    sa.Column('currency', sa.String(), nullable=True),
+    sa.Column('payment_status', sa.String(), nullable=True),
+    sa.Column('payment_date', sa.Date(), nullable=True),
+    sa.Column('payment_method', sa.String(), nullable=True),
+    sa.Column('transaction_id', sa.String(), nullable=True),
+    sa.Column('notes', sa.Text(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['client_id'], ['clients.client_id'], ),
+    sa.ForeignKeyConstraint(['document_id'], ['client_documents.document_id'], ),
+    sa.ForeignKeyConstraint(['project_id'], ['projects.project_id'], ),
+    sa.PrimaryKeyConstraint('invoice_id')
+    )
+    op.create_table('proforma_invoices',
+    sa.Column('id', sa.String(), nullable=False),
+    sa.Column('proforma_invoice_number', sa.String(), nullable=False),
+    sa.Column('client_id', sa.String(), nullable=False),
+    sa.Column('project_id', sa.String(), nullable=True),
+    sa.Column('company_id', sa.String(), nullable=False),
+    sa.Column('created_date', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.Column('sent_date', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('status', sa.Enum('DRAFT', 'SENT', 'ACCEPTED', 'REJECTED', 'INVOICED', 'CANCELLED', name='proformainvoicestatusenum'), nullable=False),
+    sa.Column('currency', sa.String(length=3), nullable=False),
+    sa.Column('subtotal_amount', sa.Float(), nullable=False),
+    sa.Column('discount_amount', sa.Float(), nullable=True),
+    sa.Column('vat_amount', sa.Float(), nullable=False),
+    sa.Column('grand_total_amount', sa.Float(), nullable=False),
+    sa.Column('payment_terms', sa.String(), nullable=True),
+    sa.Column('delivery_terms', sa.String(), nullable=True),
+    sa.Column('incoterms', sa.String(), nullable=True),
+    sa.Column('named_place_of_delivery', sa.String(), nullable=True),
+    sa.Column('notes', sa.Text(), nullable=True),
+    sa.Column('linked_document_id', sa.String(), nullable=True),
+    sa.Column('generated_invoice_id', sa.String(), nullable=True),
+    sa.ForeignKeyConstraint(['client_id'], ['clients.client_id'], ),
+    sa.ForeignKeyConstraint(['company_id'], ['companies.company_id'], ),
+    sa.ForeignKeyConstraint(['generated_invoice_id'], ['client_documents.document_id'], ),
+    sa.ForeignKeyConstraint(['linked_document_id'], ['client_documents.document_id'], ),
+    sa.ForeignKeyConstraint(['project_id'], ['projects.project_id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('proforma_invoice_number')
+    )
+    op.create_table('sav_tickets',
+    sa.Column('ticket_id', sa.String(), nullable=False),
+    sa.Column('client_id', sa.String(), nullable=True),
+    sa.Column('client_project_product_id', sa.Integer(), nullable=False),
+    sa.Column('issue_description', sa.Text(), nullable=True),
+    sa.Column('status_id', sa.Integer(), nullable=True),
+    sa.Column('assigned_technician_id', sa.Integer(), nullable=True),
+    sa.Column('resolution_details', sa.Text(), nullable=True),
+    sa.Column('opened_at', sa.DateTime(), nullable=True),
+    sa.Column('closed_at', sa.DateTime(), nullable=True),
+    sa.Column('created_by_user_id', sa.String(), nullable=True),
+    sa.ForeignKeyConstraint(['assigned_technician_id'], ['team_members.team_member_id'], ),
+    sa.ForeignKeyConstraint(['client_id'], ['clients.client_id'], ),
+    sa.ForeignKeyConstraint(['client_project_product_id'], ['client_project_products.client_project_product_id'], ),
+    sa.ForeignKeyConstraint(['created_by_user_id'], ['users.user_id'], ),
+    sa.ForeignKeyConstraint(['status_id'], ['status_settings.status_id'], ),
+    sa.PrimaryKeyConstraint('ticket_id')
+    )
+    op.create_table('proforma_invoice_items',
+    sa.Column('id', sa.String(), nullable=False),
+    sa.Column('proforma_invoice_id', sa.String(), nullable=True),
+    sa.Column('product_id', sa.Integer(), nullable=True),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('quantity', sa.REAL(), nullable=True),
+    sa.Column('unit_price', sa.REAL(), nullable=True),
+    sa.Column('total_price', sa.REAL(), nullable=True),
+    sa.ForeignKeyConstraint(['product_id'], ['products.product_id'], ),
+    sa.ForeignKeyConstraint(['proforma_invoice_id'], ['proforma_invoices.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    with op.batch_alter_table('client_contacts', schema=None) as batch_op:
+        batch_op.create_foreign_key('fk_client_contacts_contacts', 'contacts', ['contact_id'], ['contact_id'])
+
+    with op.batch_alter_table('client_documents', schema=None) as batch_op:
+        batch_op.create_foreign_key('fk_client_documents_projects', 'projects', ['project_id'], ['project_id'])
+        batch_op.create_foreign_key('fk_client_documents_templates', 'templates', ['source_template_id'], ['template_id'])
+
+    with op.batch_alter_table('clients', schema=None) as batch_op:
+        batch_op.create_foreign_key('fk_clients_status_settings', 'status_settings', ['status_id'], ['status_id'])
+        batch_op.create_foreign_key('fk_clients_templates', 'templates', ['default_template_id'], ['template_id'])
+
+    with op.batch_alter_table('employees', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_employees_email'), ['email'], unique=True)
+
+    with op.batch_alter_table('leave_balances', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_leave_balances_employee_id'), ['employee_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_leave_balances_leave_type_id'), ['leave_type_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_leave_balances_year'), ['year'], unique=False)
+
+    with op.batch_alter_table('leave_requests', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_leave_requests_employee_id'), ['employee_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_leave_requests_leave_type_id'), ['leave_type_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_leave_requests_status'), ['status'], unique=False)
+
 
 def downgrade() -> None:
     """Downgrade schema."""
+    with op.batch_alter_table('leave_requests', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_leave_requests_status'))
+        batch_op.drop_index(batch_op.f('ix_leave_requests_leave_type_id'))
+        batch_op.drop_index(batch_op.f('ix_leave_requests_employee_id'))
+
+    with op.batch_alter_table('leave_balances', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_leave_balances_year'))
+        batch_op.drop_index(batch_op.f('ix_leave_balances_leave_type_id'))
+        batch_op.drop_index(batch_op.f('ix_leave_balances_employee_id'))
+
+    with op.batch_alter_table('employees', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_employees_email'))
+
+    with op.batch_alter_table('clients', schema=None) as batch_op:
+        batch_op.drop_constraint('fk_clients_templates', type_='foreignkey')
+        batch_op.drop_constraint('fk_clients_status_settings', type_='foreignkey')
+
+    with op.batch_alter_table('client_documents', schema=None) as batch_op:
+        batch_op.drop_constraint('fk_client_documents_templates', type_='foreignkey')
+        batch_op.drop_constraint('fk_client_documents_projects', type_='foreignkey')
+
+    with op.batch_alter_table('client_contacts', schema=None) as batch_op:
+        batch_op.drop_constraint('fk_client_contacts_contacts', type_='foreignkey')
+
+    op.drop_table('proforma_invoice_items')
+    op.drop_table('sav_tickets')
+    op.drop_table('proforma_invoices')
+    op.drop_table('invoices')
+    op.drop_table('email_reminders')
+    op.drop_table('commande_items')
+    op.drop_table('commande_document_notes')
+    op.drop_table('tasks')
+    op.drop_table('scheduled_emails')
+    op.drop_table('kp_is')
+    op.drop_table('interviews')
+    op.drop_table('cover_pages')
+    op.drop_table('commandes')
+    op.drop_table('client_project_products')
+    op.drop_table('candidate_progress')
+    op.drop_table('report_config_filters')
+    op.drop_table('report_config_fields')
+    op.drop_table('recruitment_steps')
+    op.drop_table('projects')
+    op.drop_table('performance_review_goals_link')
+    op.drop_table('partner_contacts')
+    op.drop_table('experience_tags')
+    op.drop_table('experience_related_entities')
+    op.drop_table('experience_media')
+    op.drop_table('entity_contacts')
+    op.drop_table('contact_sync_log')
+    op.drop_table('contact_list_members')
+    op.drop_table('company_personnel_contacts')
+    op.drop_table('client_order_money_transfer_agents')
+    op.drop_table('candidates')
+    op.drop_table('business_use_cases')
+    op.drop_table('user_session_tokens')
+    op.drop_table('user_saved_filters')
+    with op.batch_alter_table('user_google_accounts', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_user_google_accounts_user_id'))
+
+    op.drop_table('user_google_accounts')
+    op.drop_table('user_calendar_events')
+    op.drop_table('team_members')
+    op.drop_table('report_configurations')
+    op.drop_table('referents')
+    with op.batch_alter_table('performance_reviews', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_performance_reviews_reviewer_id'))
+        batch_op.drop_index(batch_op.f('ix_performance_reviews_employee_id'))
+
+    op.drop_table('performance_reviews')
+    op.drop_table('password_reset_tokens')
+    op.drop_table('partner_category_link')
+    op.drop_table('money_transfer_agents')
+    op.drop_table('menu_configuration')
+    op.drop_table('licenses')
+    op.drop_table('job_openings')
+    with op.batch_alter_table('goals', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_goals_employee_id'))
+
+    op.drop_table('goals')
+    op.drop_table('experiences')
+    op.drop_table('cover_page_templates')
+    op.drop_table('contacts')
+    op.drop_table('contact_lists')
+    op.drop_table('company_expenses')
+    op.drop_table('company_calendar_settings')
+    op.drop_table('client__assigned_personnel')
+    op.drop_table('business_profile')
+    op.drop_table('regions')
+    op.drop_table('product_storage_locations')
+    op.drop_table('product_media_links')
+    op.drop_table('product_equivalencies')
+    op.drop_table('product_dimensions')
+    op.drop_table('partners')
+    op.drop_table('important_dates')
+    op.drop_table('client__transporters')
+    op.drop_table('client__freight_forwarders')
+    op.drop_table('user_motivational_messages')
+    op.drop_table('use_cases')
+    op.drop_table('transporters')
+    op.drop_table('templates')
+    op.drop_table('template_categories')
+    op.drop_table('tags')
+    op.drop_table('status_settings')
+    op.drop_table('smtp_configs')
+    op.drop_table('sectors')
+    op.drop_table('review_cycles')
+    op.drop_table('products')
+    op.drop_table('partner_categories')
+    op.drop_table('motivational_messages')
+    op.drop_table('internal_stock_items')
+    op.drop_table('freight_forwarders')
+    op.drop_table('company_factures')
     op.drop_table('asset_media_links')
     op.drop_table('media_items')
     op.drop_table('asset_assignments')
