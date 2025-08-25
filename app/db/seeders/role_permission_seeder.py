@@ -60,6 +60,8 @@ def seed_roles_and_permissions(db: Session, logger: logging.Logger):
         for perm_key in permissions_to_assign:
             add_permission_to_role(db, role_id, perm_key)
 
-        logger.info(f"Assigned {len(permissions_to_assign)} permissions to role '{role_name}'.")
+        db.commit() # Commit after all permissions for a role are staged
+
+        logger.info(f"Committed {len(permissions_to_assign)} permissions for role '{role_name}'.")
 
     logger.info("Finished seeding Roles and RolePermissions.")
