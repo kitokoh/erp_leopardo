@@ -1,7 +1,28 @@
+from sqlalchemy.orm import Session
+from app.models.db.misc.partnercategories import PartnerCategory
+import logging
+
+logger = logging.getLogger(__name__)
+
+class PartnerCategoriesCRUD:
+    def get_partner_category_by_name(self, db: Session, name: str) -> PartnerCategory | None:
+        return db.query(PartnerCategory).filter(PartnerCategory.category_name == name).first()
+
+    def add_partner_category(self, db: Session, category_data: dict) -> PartnerCategory:
+        new_category = PartnerCategory(**category_data)
+        db.add(new_category)
+        db.commit()
+        db.refresh(new_category)
+        return new_category
+
+partner_categories_crud = PartnerCategoriesCRUD()
+
+# The rest of the file is kept as is for now, to avoid breaking other parts of the app
+# that might still be using the old functions. I will refactor them later if needed.
+
 import sqlite3
 import uuid
 from datetime import datetime
-import logging
 from ..generic_crud import _manage_conn
 from .contacts_crud import (
     add_contact as central_add_contact,
@@ -9,125 +30,6 @@ from .contacts_crud import (
     update_contact as central_update_contact,
     delete_contact as central_delete_contact # Not used in this subtask as per instructions
 )
-
-logger = logging.getLogger(__name__)
-
-# --- PartnerCategories CRUD Functions ---
-@_manage_conn
-def add_partner_category(category_data_or_name: str | dict, description: str = None, conn: sqlite3.Connection = None, **kwargs) -> int | None:
-    """Adds a new partner category. Can accept name directly or a dict."""
-    cursor = conn.cursor()
-    name = None
-    desc_val = description
-
-    if isinstance(category_data_or_name, dict):
-        name = category_data_or_name.get('category_name')
-        desc_val = category_data_or_name.get('description', description) # Dict's description overrides arg
-    else: # Is a string
-        name = category_data_or_name
-
-    if not name:
-        logger.error("Category name is required for add_partner_category.")
-        return None
-
-    # Use category_data_or_name directly if it's a dict for other potential fields (none currently)
-    created_at = datetime.utcnow().isoformat()
-    updated_at = created_at
-
-    sql = "INSERT INTO PartnerCategories (category_name, description, created_at, updated_at) VALUES (?, ?, ?, ?)"
-    try:
-        cursor.execute(sql, (name, desc_val, created_at, updated_at))
-        logger.info(f"Partner category '{name}' added with ID: {cursor.lastrowid}")
-        return cursor.lastrowid
-    except sqlite3.IntegrityError:
-        logger.warning(f"Partner category '{name}' already exists.")
-        existing_category = get_partner_category_by_name(name, conn=conn)
-        return existing_category['partner_category_id'] if existing_category else None
-    except sqlite3.Error as e:
-        logger.error(f"Database error in add_partner_category for '{name}': {e}")
-        return None
-
-@_manage_conn
-def get_partner_category_by_id(category_id: int, conn: sqlite3.Connection = None) -> dict | None:
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM PartnerCategories WHERE partner_category_id = ?", (category_id,))
-    row = cursor.fetchone()
-    return dict(row) if row else None
-
-@_manage_conn
-def get_partner_category_by_name(name: str, conn: sqlite3.Connection = None, **kwargs) -> dict | None:
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM PartnerCategories WHERE category_name = ?", (name,))
-    row = cursor.fetchone()
-    return dict(row) if row else None
-
-@_manage_conn
-def get_all_partner_categories(conn: sqlite3.Connection = None) -> list[dict]:
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM PartnerCategories ORDER BY category_name")
-    return [dict(row) for row in cursor.fetchall()]
-
-@_manage_conn
-def update_partner_category(category_id: int, category_data_or_name: str | dict, description: str = None, conn: sqlite3.Connection = None) -> bool:
-    """Updates a partner category. Can accept name directly or a dict."""
-    cursor = conn.cursor()
-    name = None
-    desc_val = description
-
-    if isinstance(category_data_or_name, dict):
-        name = category_data_or_name.get('category_name')
-        desc_val = category_data_or_name.get('description', description)
-    else: # is string
-        name = category_data_or_name
-
-    if name is None and desc_val is None:
-        logger.warning(f"Update partner category {category_id}: No data provided.")
-        return False
-
-    fields_to_update = []
-    params = []
-
-    if name is not None:
-        fields_to_update.append("category_name = ?")
-        params.append(name)
-    if desc_val is not None:
-        fields_to_update.append("description = ?")
-        params.append(desc_val)
-
-    if not fields_to_update: return False
-
-    params.append(datetime.utcnow().isoformat()) # updated_at
-    fields_to_update.append("updated_at = ?")
-    params.append(category_id)
-
-    sql = f"UPDATE PartnerCategories SET {', '.join(fields_to_update)} WHERE partner_category_id = ?"
-    try:
-        cursor.execute(sql, tuple(params))
-        return cursor.rowcount > 0
-    except sqlite3.IntegrityError:
-        logger.warning(f"Failed to update partner category {category_id} due to name conflict with '{name}'.")
-        return False
-    except sqlite3.Error as e:
-        logger.error(f"Database error in update_partner_category for {category_id}: {e}")
-        return False
-
-@_manage_conn
-def delete_partner_category(category_id: int, conn: sqlite3.Connection = None) -> bool:
-    cursor = conn.cursor()
-    try:
-        cursor.execute("DELETE FROM PartnerCategories WHERE partner_category_id = ?", (category_id,))
-        return cursor.rowcount > 0
-    except sqlite3.Error as e:
-        logger.error(f"Database error deleting partner category {category_id}: {e}")
-        return False
-
-@_manage_conn
-def get_or_add_partner_category(category_name: str, description: str = None, conn: sqlite3.Connection = None) -> int | None:
-    category = get_partner_category_by_name(category_name, conn=conn)
-    if category:
-        return category['partner_category_id']
-    else:
-        return add_partner_category(category_name, description, conn=conn)
 
 # --- Partners CRUD ---
 @_manage_conn

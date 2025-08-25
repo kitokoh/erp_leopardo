@@ -8,6 +8,7 @@ class Product(Base):
 
     product_id = Column(Integer, primary_key=True, autoincrement=True)
     product_name = Column(String, nullable=False)
+    product_code = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     category = Column(String, nullable=True)
     language_code = Column(String, default='fr', nullable=False)

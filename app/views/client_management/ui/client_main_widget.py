@@ -56,7 +56,7 @@ from app.db.cruds.clients.client_transporters_crud import (
 )
 from app.db.cruds.clients.client_freight_forwarders_crud import unassign_forwarder_from_client, get_assigned_forwarders_for_client
 from app.db.cruds.clients.client_document_notes_crud import get_client_document_notes, delete_client_document_note, get_client_document_note_by_id
-from app.db.cruds.clients.client_documents_crud import add_client_document, delete_client_document
+from app.db.cruds.clients.client_documents_crud import add_client_document #, delete_client_document
 from app.db.cruds.clients import client_order_money_transfer_agents_crud as coma_crud
 
 # Misc

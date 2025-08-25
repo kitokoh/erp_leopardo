@@ -932,18 +932,21 @@ class DocumentsTab(QWidget):
         if reply == QMessageBox.Yes:
             QApplication.setOverrideCursor(Qt.WaitCursor)
             try:
-                db_deleted = client_documents_crud.delete_client_document(document_id)
-                if db_deleted:
-                    if file_path_abs and os.path.exists(file_path_abs):
-                        try:
-                            os.remove(file_path_abs)
-                            self.notify(self.tr("Succès"), self.tr("Document et fichier supprimés."), type='SUCCESS')
-                        except OSError as e_file:
-                            self.notify(self.tr("Erreur Fichier"), self.tr("DB supprimé, échec suppression fichier: {0}").format(str(e_file)), type='ERROR')
-                    else:
-                         self.notify(self.tr("Succès (Partiel)"), self.tr("DB supprimé. Fichier non trouvé sur le disque ou chemin non fourni."), type='WARNING')
-                else:
-                    self.notify(self.tr("Erreur DB"), self.tr("Échec suppression DB."), type='ERROR')
+                # --- TEMPORARILY DISABLED ---
+                logging.warning(f"Document deletion for ID {document_id} is temporarily disabled.")
+                self.notify(self.tr("Fonctionnalité Désactivée"), self.tr("La suppression de document est temporairement désactivée."), type='WARNING')
+                # db_deleted = client_documents_crud.delete_client_document(document_id)
+                # if db_deleted:
+                #     if file_path_abs and os.path.exists(file_path_abs):
+                #         try:
+                #             os.remove(file_path_abs)
+                #             self.notify(self.tr("Succès"), self.tr("Document et fichier supprimés."), type='SUCCESS')
+                #         except OSError as e_file:
+                #             self.notify(self.tr("Erreur Fichier"), self.tr("DB supprimé, échec suppression fichier: {0}").format(str(e_file)), type='ERROR')
+                #     else:
+                #          self.notify(self.tr("Succès (Partiel)"), self.tr("DB supprimé. Fichier non trouvé sur le disque ou chemin non fourni."), type='WARNING')
+                # else:
+                #     self.notify(self.tr("Erreur DB"), self.tr("Échec suppression DB."), type='ERROR')
             except Exception as e:
                 self.notify(self.tr("Erreur Suppression"), str(e), type='CRITICAL')
             finally:

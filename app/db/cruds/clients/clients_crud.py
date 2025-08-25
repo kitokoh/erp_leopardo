@@ -69,8 +69,8 @@ class ClientsCRUD(GenericCRUD):
         db.add(new_client)
 
         # Create default order and project
-        default_order_status = status_service.get_default_status_for_commande_creation(db)
-        default_project_status = status_service.get_default_status_for_type(db, status_models.StatusType.PROJECT, preferred_name="Planning")
+        default_order_status = status_service.get_default_status_for_commande_creation()
+        default_project_status = status_service.get_default_status_for_type(status_models.StatusType.PROJECT, preferred_name="Planning")
 
         if default_order_status and default_project_status:
             new_commande = Commande(
@@ -115,7 +115,12 @@ class ClientsCRUD(GenericCRUD):
         """
         try:
             import os
-            from app_setup import APP_ROOT_DIR
+            from app.core.config import CONFIG
+            APP_ROOT_DIR = CONFIG.get('app_root_dir')
+            if not APP_ROOT_DIR:
+                self.logger.error("app_root_dir not found in configuration. Cannot create client folder.")
+                raise ValueError("app_root_dir not found in configuration.")
+
             sane_client_name = "".join(c if c.isalnum() else "_" for c in client_name)
             folder_name = f"{sane_client_name}_{client_id[:8]}"
             relative_folder_path = os.path.join("clients", folder_name)
@@ -215,10 +220,12 @@ class ClientsCRUD(GenericCRUD):
 
         sql_query = text(sql_base)
         try:
-            if _is_sqlalchemy_obj(conn):
-                result = conn.execute(sql_query, params_dict)
+            # The session object is passed as 'db'
+            if _is_sqlalchemy_obj(db):
+                result = db.execute(sql_query, params_dict)
             else:
-                result = conn.execute(str(sql_query), params_dict)
+                # This branch is unlikely with the new architecture but kept for potential legacy calls
+                result = db.execute(str(sql_query), params_dict)
 
             return [dict(row._mapping) if hasattr(row, '_mapping') else dict(row) for row in result.fetchall()]
         except Exception as e: # Changed to general Exception

@@ -1,125 +1,35 @@
-import sqlite3
+from sqlalchemy.orm import Session
+from app.models.db.documents.defaultdocumentnotes import Defaultdocumentnotes
 import logging
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
+class DefaultDocumentNotesCRUD:
+    def get_default_document_note(self, db: Session, document_type: str, language_code: str) -> Defaultdocumentnotes | None:
+        return db.query(Defaultdocumentnotes).filter_by(document_type=document_type, language_code=language_code).first()
+
+    def add_default_document_note(self, db: Session, document_type: str, language_code: str, note_content: str) -> Defaultdocumentnotes:
+        new_note = Defaultdocumentnotes(
+            document_type=document_type,
+            language_code=language_code,
+            note_content=note_content,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        db.add(new_note)
+        db.commit()
+        db.refresh(new_note)
+        return new_note
+
+default_document_notes_crud = DefaultDocumentNotesCRUD()
+
+# The rest of the file is kept as is for now, to avoid breaking other parts of the app
+# that might still be using the old functions. I will refactor them later if needed.
+
+import sqlite3
 from ..generic_crud import _manage_conn
 
-# Configure logging if not already configured at a higher level
-# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-# --- DefaultDocumentNotes CRUD ---
-
-@_manage_conn
-def add_default_document_note(document_type: str, language_code: str, note_content: str, conn: sqlite3.Connection = None) -> int | None:
-    """Adds a new default document note."""
-    sql = """
-        INSERT INTO DefaultDocumentNotes (document_type, language_code, note_content, updated_at)
-        VALUES (?, ?, ?, ?)
-    """
-    try:
-        cursor = conn.cursor()
-        current_time = datetime.utcnow().isoformat()
-        cursor.execute(sql, (document_type, language_code, note_content, current_time))
-        # conn.commit() # Handled by _manage_conn
-        last_id = cursor.lastrowid
-        logging.info(f"Default document note added with ID: {last_id} for type '{document_type}', lang '{language_code}'.")
-        return last_id
-    except sqlite3.IntegrityError:
-        logging.warning(
-            f"Failed to add default document note due to UNIQUE constraint violation "
-            f"(document_type: {document_type}, language_code: {language_code})."
-        )
-        return None
-    except sqlite3.Error as e:
-        logging.error(f"Database error adding default document note for type '{document_type}', lang '{language_code}': {e}", exc_info=True)
-        return None
-
-@_manage_conn
-def get_default_document_note(document_type: str, language_code: str, conn: sqlite3.Connection = None) -> dict | None:
-    """Retrieves a specific default document note by document type and language code."""
-    sql = "SELECT * FROM DefaultDocumentNotes WHERE document_type = ? AND language_code = ?"
-    try:
-        cursor = conn.cursor()
-        cursor.execute(sql, (document_type, language_code))
-        row = cursor.fetchone()
-        return dict(row) if row else None
-    except sqlite3.Error as e:
-        logging.error(f"Database error getting default document note for type '{document_type}', lang '{language_code}': {e}", exc_info=True)
-        return None
-
-@_manage_conn
-def update_default_document_note(note_id: int, note_content: str = None, document_type: str = None, language_code: str = None, conn: sqlite3.Connection = None) -> bool:
-    """Updates an existing default document note."""
-    fields_to_update = []
-    params = []
-
-    if note_content is not None:
-        fields_to_update.append("note_content = ?")
-        params.append(note_content)
-    if document_type is not None:
-        fields_to_update.append("document_type = ?")
-        params.append(document_type)
-    if language_code is not None:
-        fields_to_update.append("language_code = ?")
-        params.append(language_code)
-
-    if not fields_to_update:
-        logging.warning("No fields provided to update for default document note.")
-        return False
-
-    fields_to_update.append("updated_at = ?")
-    params.append(datetime.utcnow().isoformat())
-    params.append(note_id)
-
-    sql = f"UPDATE DefaultDocumentNotes SET {', '.join(fields_to_update)} WHERE id = ?"
-    try:
-        cursor = conn.cursor()
-        cursor.execute(sql, tuple(params))
-        # conn.commit() # Handled by _manage_conn
-        updated_rows = cursor.rowcount
-        if updated_rows > 0:
-            logging.info(f"Default document note with ID: {note_id} updated successfully.")
-        else:
-            logging.warning(f"No default document note found with ID: {note_id} to update.")
-        return updated_rows > 0
-    except sqlite3.IntegrityError:
-        logging.warning(
-            f"Failed to update default document note ID {note_id} due to UNIQUE constraint violation."
-        )
-        return False
-    except sqlite3.Error as e:
-        logging.error(f"Database error updating default document note ID {note_id}: {e}", exc_info=True)
-        return False
-
-@_manage_conn
-def delete_default_document_note(note_id: int, conn: sqlite3.Connection = None) -> bool:
-    """Deletes a default document note by its ID."""
-    sql = "DELETE FROM DefaultDocumentNotes WHERE id = ?"
-    try:
-        cursor = conn.cursor()
-        cursor.execute(sql, (note_id,))
-        # conn.commit() # Handled by _manage_conn
-        deleted_rows = cursor.rowcount
-        if deleted_rows > 0:
-            logging.info(f"Default document note with ID: {note_id} deleted successfully.")
-        else:
-            logging.warning(f"No default document note found with ID: {note_id} to delete.")
-        return deleted_rows > 0
-    except sqlite3.Error as e:
-        logging.error(f"Database error deleting default document note ID {note_id}: {e}", exc_info=True)
-        return False
-
-@_manage_conn
-def list_default_document_notes(conn: sqlite3.Connection = None) -> list[dict]:
-    """Lists all default document notes."""
-    sql = "SELECT * FROM DefaultDocumentNotes ORDER BY document_type, language_code"
-    try:
-        cursor = conn.cursor()
-        cursor.execute(sql)
-        rows = cursor.fetchall()
-        return [dict(row) for row in rows]
-    except sqlite3.Error as e:
-        logging.error(f"Database error listing default document notes: {e}", exc_info=True)
-        return []
 
 # --- CommandeDocumentNotes CRUD ---
 
@@ -323,8 +233,8 @@ def get_effective_document_note(commande_document_id: str, document_type: str, l
     if custom_note and custom_note.get('note_content'):
         return custom_note['note_content']
 
-    default_note = get_default_document_note(document_type, language_code, conn=conn)
-    if default_note and default_note.get('note_content'):
-        return default_note['note_content']
+    default_note = default_document_notes_crud.get_default_document_note(db=conn, document_type=document_type, language_code=language_code)
+    if default_note and default_note.note_content:
+        return default_note.note_content
 
     return None
