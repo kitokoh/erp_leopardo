@@ -24,21 +24,30 @@ from app.db.cruds.projects.projects_crud import get_active_project_count_by_coun
 
 @cached(cache)
 def fetch_global_stats(start_date, end_date):
-    current_total_clients = get_total_clients_count()
-    current_active_clients = get_active_clients_count()
-    total_projects = get_total_projects_count()
-    active_projects = get_active_projects_count()
-    total_products = get_total_products_count()
-    sales_in_period = get_total_sales_from_proforma(start_date, end_date)
+    db_session = None
+    try:
+        db_session = get_db_connection()
+        current_total_clients = get_total_clients_count(db_session)
+        current_active_clients = get_active_clients_count(db_session)
+        total_projects = get_total_projects_count(db_session)
+        active_projects = get_active_projects_count(db_session)
+        total_products = products_crud.get_total_products_count(db_session)
+        sales_in_period = get_total_sales_from_proforma(start_date, end_date)
 
-    return {
-        "total_clients": current_total_clients,
-        "active_clients": current_active_clients,
-        "total_projects": total_projects,
-        "active_projects": active_projects,
-        "total_products": total_products,
-        "sales_in_period": sales_in_period,
-    }
+        return {
+            "total_clients": current_total_clients,
+            "active_clients": current_active_clients,
+            "total_projects": total_projects,
+            "active_projects": active_projects,
+            "total_products": total_products,
+            "sales_in_period": sales_in_period,
+        }
+    except Exception as e:
+        logging.error(f"Error in fetch_global_stats: {e}", exc_info=True)
+        return {}
+    finally:
+        if db_session:
+            db_session.close()
 
 @cached(cache)
 def get_total_sales_from_proforma(start_date, end_date) -> float:
@@ -60,22 +69,16 @@ def get_total_sales_from_proforma(start_date, end_date) -> float:
                 logging.error(f"Error closing db_session in get_total_sales_from_proforma: {e_close}", exc_info=True)
 
 @cached(cache)
-def get_country_stats(country_name):
-    country_obj = get_country_by_name(country_name)
+def get_country_stats(db_session, country_name):
+    country_obj = get_country_by_name(db_session, country_name)
     if not country_obj:
         logging.error(f"Country '{country_name}' not found in DB.")
         return None
 
     country_id = country_obj['country_id']
-    client_count = clients_crud_instance.get_client_count_by_country_id(country_id=country_id, include_deleted=False)
-    project_count = get_active_project_count_by_country_id(country_id=country_id)
-
-    db_session_proforma = get_db_connection()
-    sales_value = 0.0
-    try:
-        sales_value = get_total_proforma_sales_for_country_id(db_session_proforma, country_id=country_id)
-    finally:
-        if db_session_proforma: db_session_proforma.close()
+    client_count = clients_crud_instance.get_client_count_by_country_id(db_session, country_id=country_id, include_deleted=False)
+    project_count = get_active_project_count_by_country_id(db_session, country_id=country_id)
+    sales_value = get_total_proforma_sales_for_country_id(db_session, country_id=country_id)
 
     return {
         "client_count": client_count,

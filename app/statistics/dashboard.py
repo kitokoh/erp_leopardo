@@ -246,14 +246,18 @@ class StatisticsDashboard(QWidget):
         self._display_client_details_in_panel(client_id, client_name)
 
     def _on_map_view_changed(self, lat, lng, zoom):
-        db_session = get_db_connection()
+        db_session = None
         try:
-            from db.cruds.application_settings_crud import set_setting
-            set_setting('map_last_lat', str(lat), db_session)
-            set_setting('map_last_lng', str(lng), db_session)
-            set_setting('map_last_zoom', str(zoom), db_session)
+            from app.db.cruds.misc.application_settings_crud import set_setting
+            db_session = get_db_connection()
+            set_setting('map_last_lat', str(lat), conn=db_session)
+            set_setting('map_last_lng', str(lng), conn=db_session)
+            set_setting('map_last_zoom', str(zoom), conn=db_session)
+        except Exception as e:
+            logging.error(f"Error saving map view state: {e}", exc_info=True)
         finally:
-            db_session.close()
+            if db_session:
+                db_session.close()
 
     def handle_refresh_button_clicked(self):
         modifiers = QApplication.keyboardModifiers()
@@ -482,8 +486,10 @@ class StatisticsDashboard(QWidget):
     def _show_country_stats_view(self, country_name: str):
         logging.info(f"Fetching and showing stats for country: {country_name}")
         QApplication.setOverrideCursor(Qt.WaitCursor)
+        db_session = None
         try:
-            stats = get_country_stats(country_name)
+            db_session = get_db_connection()
+            stats = get_country_stats(db_session, country_name)
             if not stats:
                 self._show_global_stats_view()
                 if hasattr(self, 'parent') and callable(self.parent) and hasattr(self.parent(), 'notify'):
@@ -501,6 +507,8 @@ class StatisticsDashboard(QWidget):
             if hasattr(self, 'parent') and callable(self.parent) and hasattr(self.parent(), 'notify'):
                 self.parent().notify(self.tr("Erreur"), self.tr("Impossible de charger les statistiques pour {0}.").format(country_name), "ERROR")
         finally:
+            if db_session:
+                db_session.close()
             QApplication.restoreOverrideCursor()
 
 
@@ -508,14 +516,18 @@ class StatisticsDashboard(QWidget):
     def _display_client_details_in_panel(self, client_id_str, client_name_str):
         logging.info(f"Displaying details for client: {client_name_str} (ID: {client_id_str}) in panel.")
         QApplication.setOverrideCursor(Qt.WaitCursor)
+        db_session = None
         try:
-            client_data = clients_crud_instance.get_client_by_id(client_id_str, include_deleted=True, include_details=True)
+            db_session = get_db_connection()
+            client_data = clients_crud_instance.get_client_by_id(db_session, client_id_str, include_deleted=True, include_details=True)
             self.client_details_widget.update_details(client_data)
             self.stats_stack.setCurrentWidget(self.client_details_widget)
         except Exception as e:
             logging.error(f"Error fetching/displaying client details for ID {client_id_str}: {e}", exc_info=True)
             self.client_details_widget.update_details(None) # Show error message
         finally:
+            if db_session:
+                db_session.close()
             QApplication.restoreOverrideCursor()
 
 
@@ -535,32 +547,37 @@ class StatisticsDashboard(QWidget):
         if not os.path.exists(geojson_path):
             return None, self.tr("Les données géographiques de la carte (GeoJSON) sont introuvables.")
 
-        clients_by_country_counts = get_client_counts_by_country()
-        all_clients_for_main_map_popups = clients_crud_instance.get_all_clients_with_details(include_deleted=False)
-
-        db_session = get_db_connection()
+        db_session = None
         try:
-            from db.cruds.application_settings_crud import get_setting
+            from app.db.cruds.misc.application_settings_crud import get_setting
+            db_session = get_db_connection()
+
+            clients_by_country_counts = get_client_counts_by_country(db_session)
+            all_clients_for_main_map_popups = clients_crud_instance.get_all_clients_with_details(db_session, include_deleted=False)
+
             scope = get_setting('geographic_scope', 'international', conn=db_session)
             last_lat = float(get_setting('map_last_lat', '20', conn=db_session))
             last_lng = float(get_setting('map_last_lng', '0', conn=db_session))
             last_zoom = int(get_setting('map_last_zoom', '2', conn=db_session))
+
+            map_html_content = generate_folium_map_html(
+                geojson_path=geojson_path,
+                clients_by_country_counts=clients_by_country_counts,
+                all_clients_details_for_popups=all_clients_for_main_map_popups,
+                app_translator_func=self.tr,
+                map_interaction_handler_name="pyMapConnector",
+                focused_country_iso_a2=focus_country_iso_a2,
+                scope=scope,
+                initial_location=[last_lat, last_lng],
+                initial_zoom=last_zoom
+            )
+            return map_html_content, None
+        except Exception as e:
+            logging.error(f"Error in _generate_map_html_worker: {e}", exc_info=True)
+            return None, str(e)
         finally:
             if db_session:
                 db_session.close()
-
-        map_html_content = generate_folium_map_html(
-            geojson_path=geojson_path,
-            clients_by_country_counts=clients_by_country_counts,
-            all_clients_details_for_popups=all_clients_for_main_map_popups,
-            app_translator_func=self.tr,
-            map_interaction_handler_name="pyMapConnector",
-            focused_country_iso_a2=focus_country_iso_a2,
-            scope=scope,
-            initial_location=[last_lat, last_lng],
-            initial_zoom=last_zoom
-        )
-        return map_html_content, None
 
     def _on_map_html_generated(self, result):
         map_html_content, error_message = result
@@ -694,9 +711,11 @@ class StatisticsDashboard(QWidget):
 
 
     def update_business_health_score(self):
+        db_session = None
         try:
-            total_clients_count = get_total_clients_count()
-            active_clients_count = get_active_clients_count()
+            db_session = get_db_connection()
+            total_clients_count = get_total_clients_count(db_session)
+            active_clients_count = get_active_clients_count(db_session)
             health_score = (active_clients_count / total_clients_count) * 100 if total_clients_count and total_clients_count > 0 else 0
             self.health_score_value_label.setText(f"{health_score:.0f} %")
             self.health_score_progress_bar.setValue(int(health_score))
@@ -709,6 +728,9 @@ class StatisticsDashboard(QWidget):
             self.health_score_value_label.setText(self.tr("Erreur"))
             self.health_score_progress_bar.setValue(0)
             self.health_score_progress_bar.setStyleSheet("")
+        finally:
+            if db_session:
+                db_session.close()
 
 
     def _setup_segmentation_tab_ui_internal(self):
@@ -764,8 +786,10 @@ class StatisticsDashboard(QWidget):
         table.setSortingEnabled(False)
         table.setRowCount(0)
         QApplication.setOverrideCursor(Qt.WaitCursor)
+        db_session = None
         try:
-            data_rows = data_fetch_func()
+            db_session = get_db_connection()
+            data_rows = data_fetch_func(db_session)
             if data_rows is None: data_rows = []
 
             if not data_rows:
@@ -794,6 +818,8 @@ class StatisticsDashboard(QWidget):
             if table.columnCount() > 0:
                  table.setSpan(0,0, 1, table.columnCount())
         finally:
+            if db_session:
+                db_session.close()
             table.setSortingEnabled(True)
             QApplication.restoreOverrideCursor()
 
@@ -805,7 +831,9 @@ class StatisticsDashboard(QWidget):
             return
 
         QApplication.setOverrideCursor(Qt.WaitCursor)
+        db_session = None
         try:
+            db_session = get_db_connection()
             ax_patches = event.artist.axes.patches
             wedge_index = ax_patches.index(event.artist)
 
@@ -813,7 +841,8 @@ class StatisticsDashboard(QWidget):
                 status_name = self.last_pie_chart_labels[wedge_index]
                 logging.info(f"Clicked on status: {status_name} (index: {wedge_index})")
 
-                status_obj = get_status_setting_by_name(status_name, 'Client')
+                from app.db.cruds.misc.status_settings_crud import get_status_setting_by_name
+                status_obj = get_status_setting_by_name(db_session, status_name, 'Client')
                 if not status_obj:
                     logging.error(f"Status '{status_name}' not found in DB for type 'Client'.")
                     if hasattr(self, 'parent') and callable(self.parent) and hasattr(self.parent(), 'notify'):
@@ -821,7 +850,7 @@ class StatisticsDashboard(QWidget):
                     return
 
                 status_id = status_obj['status_id']
-                clients = clients_crud_instance.get_clients_by_status_id(status_id=status_id, include_deleted=False)
+                clients = clients_crud_instance.get_clients_by_status_id(db_session, status_id=status_id, include_deleted=False)
                 self.status_client_list_widget.update_display(status_name, clients)
                 self.stats_stack.setCurrentWidget(self.status_client_list_widget)
             else:
@@ -831,14 +860,24 @@ class StatisticsDashboard(QWidget):
         except Exception as e:
             logging.error(f"Error handling pie chart pick event: {e}", exc_info=True)
         finally:
+            if db_session:
+                db_session.close()
             QApplication.restoreOverrideCursor()
 
 
 
     def _update_status_segmentation_chart(self):
         logging.info("Updating status segmentation chart...")
-        status_data = get_client_segmentation_by_status()
-        self.status_chart.update_chart(status_data, self._on_status_chart_slice_picked)
+        db_session = None
+        try:
+            db_session = get_db_connection()
+            status_data = get_client_segmentation_by_status(db_session)
+            self.status_chart.update_chart(status_data, self._on_status_chart_slice_picked)
+        except Exception as e:
+            logging.error(f"Error updating status segmentation chart: {e}", exc_info=True)
+        finally:
+            if db_session:
+                db_session.close()
 
 
     def update_customer_segmentation_views(self):

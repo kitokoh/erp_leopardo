@@ -14,7 +14,7 @@ def get_setting(key: str, default: any = None, conn=None) -> any:
         # Check if conn is SQLAlchemy Session, Engine, or Connection
         if isinstance(conn, (Session, Engine, SQLAlchemyConnection)):
             # SQLAlchemy execution
-            stmt = text("SELECT setting_value FROM ApplicationSettings WHERE setting_key = :key")
+            stmt = text("SELECT setting_value FROM application_settings WHERE setting_key = :key")
             result = conn.execute(stmt, {"key": key})
             row = result.fetchone()
             if row:
@@ -22,7 +22,7 @@ def get_setting(key: str, default: any = None, conn=None) -> any:
                 value_to_return = row[0]
         elif hasattr(conn, 'cursor'): # Fallback to sqlite3.Connection interface
             cursor = conn.cursor()
-            cursor.execute("SELECT setting_value FROM ApplicationSettings WHERE setting_key = ?", (key,))
+            cursor.execute("SELECT setting_value FROM application_settings WHERE setting_key = ?", (key,))
             row = cursor.fetchone()
             if row:
                 # sqlite3 rows can be accessed by index or by name if row_factory is set
@@ -45,7 +45,7 @@ def set_setting(key: str, value: str, conn = None, **kwargs) -> bool: # conn typ
         logging.info(f"Setting value for key {key} = {value}")
         # Check if conn is an SQLAlchemy Session, Engine, or Connection
         if isinstance(conn, (Session, Engine, SQLAlchemyConnection)):
-            stmt = text("INSERT OR REPLACE INTO ApplicationSettings (setting_key, setting_value) VALUES (:key, :value)")
+            stmt = text("INSERT OR REPLACE INTO application_settings (setting_key, setting_value) VALUES (:key, :value)")
             result = conn.execute(stmt, {"key": key, "value": value})
             # For SQLAlchemy, commit is often handled by the session's context manager or explicitly outside.
             # _manage_conn is assumed to handle commit for session if it provided one.
@@ -55,7 +55,7 @@ def set_setting(key: str, value: str, conn = None, **kwargs) -> bool: # conn typ
         elif hasattr(conn, 'cursor'): # Fallback to sqlite3.Connection interface (DBAPI)
             # This branch handles raw sqlite3 connections
             cursor = conn.cursor()
-            sql = "INSERT OR REPLACE INTO ApplicationSettings (setting_key, setting_value) VALUES (?, ?)"
+            sql = "INSERT OR REPLACE INTO application_settings (setting_key, setting_value) VALUES (?, ?)"
             cursor.execute(sql, (key, value))
             # conn.commit() is handled by _manage_conn for sqlite3
             return cursor.rowcount > 0

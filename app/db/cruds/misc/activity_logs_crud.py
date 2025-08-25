@@ -82,8 +82,8 @@ def add_activity_log(data: dict, conn=None) -> int | None:
     sql_sqlite_placeholders = "(?, ?, ?, ?, ?, ?, ?)"
     sql_sa_placeholders = "(:user_id, :action_type, :details, :related_entity_type, :related_entity_id, :related_client_id, :created_at)"
 
-    sql_sqlite = f"INSERT INTO ActivityLog {sql_cols} VALUES {sql_sqlite_placeholders}"
-    sql_sa = sqlalchemy_text(f"INSERT INTO ActivityLog {sql_cols} VALUES {sql_sa_placeholders}")
+    sql_sqlite = f"INSERT INTO activity_log {sql_cols} VALUES {sql_sqlite_placeholders}"
+    sql_sa = sqlalchemy_text(f"INSERT INTO activity_log {sql_cols} VALUES {sql_sa_placeholders}")
 
     params_sa = {
         "user_id": data.get('user_id'),
@@ -128,7 +128,7 @@ def add_activity_log(data: dict, conn=None) -> int | None:
 
 @_manage_conn
 def get_activity_logs(limit: int = 100, offset: int = 0, user_id_filter: str = None, conn=None) -> list[dict]:
-    base_sql = "SELECT * FROM ActivityLog"
+    base_sql = "SELECT * FROM activity_log"
     conditions_sqlite = []
     params_sqlite_list = []
 
@@ -178,8 +178,8 @@ def get_activity_logs(limit: int = 100, offset: int = 0, user_id_filter: str = N
 
 @_manage_conn
 def get_activity_log_by_id(log_id: int, conn=None) -> dict | None:
-    sql_sqlite = "SELECT * FROM ActivityLog WHERE log_id = ?"
-    sql_sa = sqlalchemy_text("SELECT * FROM ActivityLog WHERE log_id = :log_id")
+    sql_sqlite = "SELECT * FROM activity_log WHERE log_id = ?"
+    sql_sa = sqlalchemy_text("SELECT * FROM activity_log WHERE log_id = :log_id")
 
     params_sqlite = (log_id,)
     params_sa = {"log_id": log_id}

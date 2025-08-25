@@ -127,49 +127,41 @@ class HomePageWidget(QWidget):
 
     def _get_stats_for_module(self, module_id: str) -> list[dict]:
         """
-        Récupère les données statistiques pour un module donné.
-        Pour l'instant, retourne des données factices.
-        Devra être connecté aux vrais services/CRUDs plus tard.
+        Fetches statistical data for a given module, handling the database session.
         """
-        # logging.debug(f"HomePageWidget: Récupération des stats pour le module_id: {module_id}")
-
-        # Note: Les imports suivants sont supposés être faits en haut du fichier
-        # from db import db_manager
-        # from db.cruds.clients_crud import get_active_clients_count
-        # from project_management.cruds import get_active_projects_count, get_overdue_tasks_count
-        # etc. pour les autres modules.
-
-        # Pour cette simulation, nous allons appeler des fonctions placeholder qui existent dans ce fichier.
+        db_session = None
         try:
+            db_session = self.main_window.get_db_connection()
             if module_id == "btnClientDocuments":
-                active_clients = clients_crud.get_active_clients_count()
-                # Assumons une fonction pour les documents récents, sinon mettons une valeur statique
-                docs_recents = 12 # Placeholder, car la fonction n'existe pas
-                return [
-                    {'value': str(active_clients), 'label': self.tr('Clients Actifs')},
-                    {'value': str(docs_recents), 'label': self.tr('Docs Récents')}
-                ]
+                active_clients = clients_crud.get_active_clients_count(db_session)
+                return [{'value': str(active_clients), 'label': self.tr('Clients Actifs')}]
+
             elif module_id == "btnProjectManagement":
-                active_projects = projects_crud.get_active_projects_count()
-                overdue_tasks = projects_crud.get_overdue_tasks_count()
+                active_projects = projects_crud.get_active_projects_count(db_session)
+                overdue_tasks = projects_crud.get_overdue_tasks_count(db_session)
                 return [
                     {'value': str(active_projects), 'label': self.tr('Projets en Cours'), 'color': '#28A745'},
                     {'value': str(overdue_tasks), 'label': self.tr('Tâches en Retard'), 'color': '#DC3545' if overdue_tasks > 0 else '#28A745'}
                 ]
+
             elif module_id == "btnProductManagement":
-                total_products = products_crud.get_total_products_count()
-                return [
-                    {'value': str(total_products), 'label': self.tr('Produits Actifs')}
-                ]
+                total_products = products_crud.get_total_products_count(db_session)
+                return [{'value': str(total_products), 'label': self.tr('Produits Actifs')}]
+
             elif module_id == "btnRecruitment":
-                open_positions = len(recruitment_job_openings_crud.get_all_job_openings())
-                new_candidates = len(recruitment_candidates_crud.get_all_candidates())
+                open_positions = len(recruitment_job_openings_crud.get_all_job_openings(db_session))
+                new_candidates = len(recruitment_candidates_crud.get_all_candidates(db_session))
                 return [
                     {'value': str(open_positions), 'label': self.tr('Postes Ouverts')},
                     {'value': str(new_candidates), 'label': self.tr('Nouv. Candidatures')}
                 ]
         except Exception as e:
-            print(f"Erreur lors de la récupération des statistiques pour {module_id}: {e}")
+            logging.error(f"Erreur lors de la récupération des statistiques pour {module_id}: {e}", exc_info=True)
+            # Return an error message in the stat display
+            return [{'value': '!', 'label': self.tr('Erreur')}]
+        finally:
+            if db_session:
+                db_session.close()
         return []
 
 

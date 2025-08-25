@@ -6,7 +6,9 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QFont, QColor, QIcon
 from PyQt5.QtCore import Qt, QRect
-import app.db as db_manager # Used by both classes
+from app.db.connection import get_db_connection
+from app.db.cruds.clients.clients_crud import get_active_clients_count, get_all_clients
+from app.db.cruds.misc.status_settings_crud import get_status_setting_by_name
 
 # --- UI Components ---
 
@@ -37,12 +39,17 @@ class MyScoreWidget(QWidget):
         # For simplicity, adding as is. Can be wrapped in QGroupBox in StatisticsWidget if needed.
 
     def update_score(self):
+        db_session = None
         try:
-            active_clients_count = db_manager.get_active_clients_count()
+            db_session = get_db_connection()
+            active_clients_count = get_active_clients_count(db_session)
             self.score_label.setText(str(active_clients_count))
         except Exception as e:
             print(f"Error updating My Score: {e}")
             self.score_label.setText(self.tr("Error"))
+        finally:
+            if db_session:
+                db_session.close()
 
 
 class StatisticsWidget(QWidget):
@@ -91,8 +98,10 @@ class StatisticsWidget(QWidget):
 
 
     def update_stats(self):
+        db_session = None
         try:
-            all_clients = db_manager.get_all_clients()
+            db_session = get_db_connection()
+            all_clients = get_all_clients(db_session)
             if all_clients is None: all_clients = []
 
             total_clients = len(all_clients)
@@ -101,10 +110,10 @@ class StatisticsWidget(QWidget):
             total_val = sum(c.get('price', 0) for c in all_clients if c.get('price') is not None)
             self.value_label.setText(f"{total_val:,.2f} €")
 
-            status_en_cours_obj = db_manager.get_status_setting_by_name('En cours', 'Client')
+            status_en_cours_obj = get_status_setting_by_name(db_session, 'En cours', 'Client')
             status_en_cours_id = status_en_cours_obj['status_id'] if status_en_cours_obj else None
 
-            status_urgent_obj = db_manager.get_status_setting_by_name('Urgent', 'Client')
+            status_urgent_obj = get_status_setting_by_name(db_session, 'Urgent', 'Client')
             status_urgent_id = status_urgent_obj['status_id'] if status_urgent_obj else None
 
             ongoing_count = 0
@@ -117,14 +126,16 @@ class StatisticsWidget(QWidget):
                 urgent_count = sum(1 for c in all_clients if c.get('status_id') == status_urgent_id)
             self.urgent_label.setText(str(urgent_count))
 
-            # Update MyScoreWidget
-            if hasattr(self, 'my_score_widget_internal'): # Check if it's initialized
+            if hasattr(self, 'my_score_widget_internal'):
                 self.my_score_widget_internal.update_score()
-            elif hasattr(self, 'my_score_widget'): # If using Option 1
+            elif hasattr(self, 'my_score_widget'):
                  self.my_score_widget.update_score()
 
         except Exception as e:
             print(f"Erreur de mise à jour des statistiques: {str(e)}")
+        finally:
+            if db_session:
+                db_session.close()
 
 
 class StatusDelegate(QStyledItemDelegate):
@@ -137,10 +148,11 @@ class StatusDelegate(QStyledItemDelegate):
         bg_color_hex = "#95a5a6" # Default color
         icon_name = None
 
-        if status_name_for_delegate: # This condition now correctly uses the string
+        if status_name_for_delegate:
+            db_session = None
             try:
-                # Ensure 'Client' is the correct status_type context here
-                status_setting = db_manager.get_status_setting_by_name(status_name_for_delegate, 'Client')
+                db_session = get_db_connection()
+                status_setting = get_status_setting_by_name(db_session, status_name_for_delegate, 'Client')
                 if status_setting:
                     if status_setting.get('color_hex'):
                         bg_color_hex = status_setting['color_hex']
@@ -148,6 +160,9 @@ class StatusDelegate(QStyledItemDelegate):
                         icon_name = status_setting['icon_name']
             except Exception as e:
                 print(f"Error fetching status color/icon for delegate: {e}")
+            finally:
+                if db_session:
+                    db_session.close()
 
         painter.save()
 

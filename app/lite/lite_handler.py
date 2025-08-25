@@ -5,19 +5,20 @@ from PyQt5.QtGui import QDesktopServices
 from PyQt5.QtCore import QUrl
 
 # Adjust sys.path to include the parent directory for db and utils
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-import db as db_manager
-import html_to_pdf_util
-from app_config import CONFIG
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from app.db import cruds as db_manager # Corrected import
+from app.utils import html_to_pdf as html_to_pdf_util # Corrected import
+from app.core.config import CONFIG # Corrected import
 from PyQt5.QtGui import QDesktopServices # Added
 from PyQt5.QtCore import QUrl # Added
 
 try:
-    from email_service import EmailSenderService
+    from app.services.email.email_service import EmailSenderService
 except ImportError:
+    # This fallback might still be needed if the script is run in a weird context
     if os.path.abspath(os.path.join(os.path.dirname(__file__), '..')) not in sys.path:
         sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-    from email_service import EmailSenderService
+    from app.services.email.email_service import EmailSenderService
 
 
 class LiteDocumentHandler:

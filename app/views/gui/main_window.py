@@ -29,7 +29,10 @@ from PyQt5.QtCore import Qt, QUrl, QTimer, pyqtSlot, QByteArray, QDate, QEvent, 
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 # from PyQt5.QtWebChannel import QWebChannel # QWebChannel removed as DocumentManager no longer uses its own map.
 
-import app.db as db_manager
+from app.db.cruds.misc.application_settings_crud import get_setting, set_setting
+from app.db.cruds.misc.locations_crud import get_all_countries, get_country_by_id, get_city_by_id
+from app.db.cruds.misc.status_settings_crud import get_status_setting_by_id
+from app.db.connection import get_db_connection
 from app.db.cruds.clients.clients_crud import clients_crud_instance
 from app.db.cruds.products.products_crud import products_crud_instance
 
@@ -149,7 +152,6 @@ from PyQt5.QtCore import QSize, QThread, pyqtSignal
 from app.update_checker import UpdateChecker
 from app.telemetry import telemetry_manager
 from app.views.gui.dialogs.telemetry_consent_dialog import TelemetryConsentDialog
-import app.db as db_manager
 
 
 class UpdateCheckThread(QThread):
@@ -423,7 +425,7 @@ class DocumentManager(QMainWindow):
         self.download_monitor_service = None # Initialize download monitor service
 
         # Use get_setting with default, falling back to config, then to a hardcoded default.
-        self.config['google_maps_review_url'] = db_manager.get_setting(
+        self.config['google_maps_review_url'] = get_setting(
             'google_maps_review_url',
             default=self.config.get('google_maps_review_url', 'https://maps.google.com/?cid=YOUR_CID_HERE_FALLBACK_CONFIG')
         )
@@ -715,17 +717,10 @@ class DocumentManager(QMainWindow):
 
     def _load_module_states(self):
         """Loads the enabled/disabled state of configurable modules from the database."""
-        if not db_manager:
-            logging.warning("DB manager not available, cannot load module states. All modules will default to enabled.")
-            # Default all to True if DB is not available, so basic functionality isn't hindered
-            for module_info in CONFIGURABLE_MODULES:
-                self.module_states[module_info['name']] = True
-            return
-
         logging.info("Loading module states...")
         for module_info in CONFIGURABLE_MODULES:
             # Default to 'True' (string) if setting is not found, then convert to boolean
-            is_enabled_str = db_manager.get_setting(module_info['key'], default='True')
+            is_enabled_str = get_setting(module_info['key'], default='True')
             logging.info(f"Module Key: {module_info['key']}, Value from DB (or default): '{is_enabled_str}'")
             is_enabled = is_enabled_str.lower() == 'true' if isinstance(is_enabled_str, str) else bool(is_enabled_str)
             self.module_states[module_info['name']] = is_enabled
@@ -1316,7 +1311,7 @@ class DocumentManager(QMainWindow):
         self.main_splitter.addWidget(right_pane_splitter)
 
         # Load or set default splitter sizes
-        saved_splitter_state_hex = db_manager.get_setting('client_list_splitter_state', default=None)
+        saved_splitter_state_hex = get_setting('client_list_splitter_state', default=None)
         if saved_splitter_state_hex:
             try:
                 splitter_state_byte_array = QByteArray.fromHex(saved_splitter_state_hex.encode('utf-8'))
@@ -1393,7 +1388,7 @@ class DocumentManager(QMainWindow):
         try:
             splitter_state_byte_array = self.main_splitter.saveState()
             splitter_state_hex = splitter_state_byte_array.toHex().data().decode('utf-8')
-            db_manager.set_setting('client_list_splitter_state', splitter_state_hex)
+            set_setting('client_list_splitter_state', splitter_state_hex)
             logging.info(f"Client list splitter state saved (pos: {pos}, index: {index}).")
         except Exception as e:
             logging.error(f"Error saving splitter state: {e}", exc_info=True)
@@ -2319,7 +2314,6 @@ class DocumentManager(QMainWindow):
         self.load_clients_from_db_slot()
 
     def load_clients_from_db_slot(self):
-        # status_id_filter = self.status_filter_combo.currentData() # Old single status filter
         country_id_filter = self.country_filter_combo.currentData()
         category_filter_text = self.category_filter_input.text().strip() if hasattr(self, 'category_filter_input') else None
 
@@ -2329,8 +2323,8 @@ class DocumentManager(QMainWindow):
         elif isinstance(archive_filter_data, bool): include_deleted_filter = archive_filter_data
 
         filters_for_crud = {}
-        # if self.selected_status_ids_filter: # Use the list of selected status IDs
-        #     filters_for_crud['status_ids'] = self.selected_status_ids_filter
+        if self.selected_status_ids_filter: # Use the list of selected status IDs
+             filters_for_crud['status_ids'] = self.selected_status_ids_filter
 
         if country_id_filter is not None: filters_for_crud['country_id'] = country_id_filter
         if category_filter_text: filters_for_crud['category'] = category_filter_text
@@ -2349,33 +2343,39 @@ class DocumentManager(QMainWindow):
         if hasattr(self, 'sort_order_combo') and self.sort_order_combo.currentData():
             filters_for_crud['order_direction'] = self.sort_order_combo.currentData()
 
-        # Note: la méthode get_all_clients_with_details a été modifiée pour extraire
-        # 'order_by_field' et 'order_direction' de `filters` et les utiliser,
-        # puis les retirer pour ne pas qu'ils soient interprétés comme des conditions WHERE.
+        db = None
+        try:
+            db = get_db_connection()
+            # Mettre à jour le nombre total de clients filtrés
+            temp_filters_for_count = filters_for_crud.copy()
+            # The CRUD method for counting should ideally be separate, but for now we fetch all matching IDs.
+            # A more optimized get_all_clients_with_details could return the count as part of its result.
+            # For now, we assume it returns a list and we count it.
+            all_matching_clients = clients_crud_instance.get_all_clients_with_details(
+                db=db,
+                filters=temp_filters_for_count,
+                include_deleted=include_deleted_filter,
+                limit=None, offset=0
+            )
+            self.total_filtered_clients = len(all_matching_clients)
 
-        # Mettre à jour le nombre total de clients filtrés
-        # Pour cela, il faut appeler la méthode CRUD sans limit/offset mais avec les filtres
-        # Cela peut être coûteux si non optimisé. Idéalement, une méthode get_count(filters) serait mieux.
-        # Pour l'instant, on récupère tout pour compter, puis on pagine.
-        # La méthode CRUD get_all_clients_with_details s'attend à ce que order_by_field et order_direction soient dans filters.
-        temp_filters_for_count = filters_for_crud.copy() # Copier pour ne pas modifier l'original pour la pagination
+            # Charger et afficher la page actuelle de clients
+            # This assumes load_and_display_clients is modified to accept a 'db' argument.
+            # If it's not, this will raise a TypeError, which is a clear indicator for the next fix.
+            load_and_display_clients(self, db, filters=filters_for_crud, limit=self.limit_per_page, offset=self.current_offset, include_deleted=include_deleted_filter)
 
-        all_matching_clients = clients_crud_instance.get_all_clients_with_details(
-            filters=temp_filters_for_count,
-            include_deleted=include_deleted_filter,
-            limit=None, offset=0, conn=None # Pas de pagination pour le comptage
-        )
-        self.total_filtered_clients = len(all_matching_clients)
+        except Exception as e:
+            logging.error(f"Error loading clients from database: {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur Base de Données"), self.tr("Impossible de charger la liste des clients."))
+            # Reset client list on error to provide clear feedback
+            self.client_list_widget.clear()
+            self.clients_data_map.clear()
+            self.total_filtered_clients = 0
+        finally:
+            if db:
+                db.close()
 
-        # Charger et afficher la page actuelle de clients
-        # `load_and_display_clients` utilise `get_all_clients_with_details` en interne.
-        # Il faut s'assurer que `load_and_display_clients` passe bien les filtres (y compris de tri)
-        # à `get_all_clients_with_details`.
-        # La logique actuelle de `load_and_display_clients` devrait déjà le faire si `filters_for_crud` contient les clés de tri.
-        load_and_display_clients(self, filters=filters_for_crud, limit=self.limit_per_page, offset=self.current_offset, include_deleted=include_deleted_filter)
-
-        self.update_pagination_controls() # Mettre à jour les contrôles de pagination
-        # filter_and_display_clients(self) # Cette ligne semble redondante si load_and_display_clients fait déjà l'affichage
+        self.update_pagination_controls()
 
     def filter_client_list_display_slot(self):
         self.current_offset = 0 # Réinitialiser à la première page lors d'un changement de filtre/tri
@@ -2503,7 +2503,7 @@ class DocumentManager(QMainWindow):
         self.country_filter_combo.clear()
         self.country_filter_combo.addItem(self.tr("Tous les pays"), None)
         try:
-            countries = db_manager.get_all_countries() # Attempt to get countries
+            countries = get_all_countries() # Attempt to get countries
             if countries is None: countries = []
             for country_dict in countries:
                 self.country_filter_combo.addItem(country_dict['country_name'], country_dict.get('country_id'))
@@ -2532,135 +2532,101 @@ class DocumentManager(QMainWindow):
             logging.warning("handle_client_list_click: No client_data or client_id found in item data.")
         
     def open_client_tab_by_id(self, client_id_to_open):
-        # Attempt to fetch fresh client data directly from the database
         logging.info(f"open_client_tab_by_id: Called with client_id_to_open={client_id_to_open}")
-        client_data_to_show = clients_crud_instance.get_client_by_id(client_id_to_open, include_deleted=True)
-        logging.info(f"open_client_tab_by_id: client_data_to_show after fetching from DB: {client_data_to_show}")
+        db = None
+        client_data_to_show = None
+        try:
+            db = get_db_connection()
+            client_data_to_show = clients_crud_instance.get_client_by_id(db, client_id_to_open, include_deleted=True)
+            logging.info(f"open_client_tab_by_id: client_data_to_show after fetching from DB: {client_data_to_show}")
 
-        if client_data_to_show:
-            # Ensure default_base_folder_path exists and is valid, then alias to base_folder_path
+            if not client_data_to_show:
+                QMessageBox.warning(self, self.tr("Erreur"), self.tr("Impossible de récupérer les données à jour pour le client (ID: {0}). Le client pourrait ne pas exister ou être archivé.").format(client_id_to_open))
+                return
+
+            # --- Augment client data with related info ---
+            if 'country' not in client_data_to_show and client_data_to_show.get('country_id'):
+                country_obj = get_country_by_id(db, client_data_to_show['country_id'])
+                client_data_to_show['country'] = country_obj.get('country_name', "N/A") if country_obj else "N/A"
+            if 'city' not in client_data_to_show and client_data_to_show.get('city_id'):
+                city_obj = get_city_by_id(db, client_data_to_show['city_id'])
+                client_data_to_show['city'] = city_obj.get('city_name', "N/A") if city_obj else "N/A"
+            if 'status' not in client_data_to_show and client_data_to_show.get('status_id'):
+                status_obj = get_status_setting_by_id(db, client_data_to_show['status_id'])
+                client_data_to_show['status'] = status_obj.get('status_name', "N/A") if status_obj else "N/A"
+
+            # --- Handle folder path ---
             current_default_path = client_data_to_show.get("default_base_folder_path")
             if not current_default_path or not current_default_path.strip():
                 client_name_for_folder = client_data_to_show.get("client_name", "unknown_client")
-                client_id_for_folder = client_data_to_show.get("client_id", "no_id")
                 sane_client_name = "".join(c if c.isalnum() else "_" for c in client_name_for_folder)
-
-                # Ensure clients_dir itself is a valid part of the path construction
-                # CONFIG.get('clients_dir', 'clients') gives the relative path like 'clients'
-                clients_base_subdir = CONFIG.get('clients_dir', 'clients') # e.g., "clients"
-
-                relative_folder = os.path.join(clients_base_subdir, f"{sane_client_name}_{client_id_for_folder[:8]}")
+                clients_base_subdir = CONFIG.get('clients_dir', 'clients')
+                relative_folder = os.path.join(clients_base_subdir, f"{sane_client_name}_{client_id_to_open[:8]}")
                 client_data_to_show["default_base_folder_path"] = relative_folder
-
                 abs_folder_path = os.path.join(self.app_root_dir, relative_folder)
-                try:
-                    os.makedirs(abs_folder_path, exist_ok=True)
-                    logging.info(f"Ensured client folder exists at: {abs_folder_path}")
-                    # Update the database so this path is persistent
-                    clients_crud_instance.update_client(client_id_to_open, {"default_base_folder_path": relative_folder})
-                    logging.info(f"Client {client_id_to_open} was missing default_base_folder_path. Constructed, assigned, and DB updated: {relative_folder}.")
-                except OSError as e_mkdir:
-                    logging.error(f"Failed to create directory {abs_folder_path}: {e_mkdir}")
-                    # Proceeding without this could still lead to issues, but client_data_to_show will have the path
+                os.makedirs(abs_folder_path, exist_ok=True)
+                clients_crud_instance.update_client(db, client_id_to_open, {"default_base_folder_path": relative_folder})
+                logging.info(f"Client {client_id_to_open} path created and saved: {relative_folder}.")
 
-            # Ensure base_folder_path is an alias to default_base_folder_path for ClientMainWidget
             client_data_to_show["base_folder_path"] = client_data_to_show.get("default_base_folder_path")
 
-        if client_data_to_show and 'created_at' in client_data_to_show and client_data_to_show['created_at']:
-            try:
-                created_at_str = client_data_to_show['created_at']
-                # Python's fromisoformat handles 'Z' correctly in 3.7+
-                # If older version, might need: created_at_str = created_at_str.replace('Z', '+00:00')
-                dt_object = datetime.fromisoformat(created_at_str.replace('Z', '+00:00')) # Ensure Z is handled
+            # --- Handle Timestamps and Languages ---
+            if client_data_to_show.get('created_at'):
+                dt_object = datetime.fromisoformat(str(client_data_to_show['created_at']).replace('Z', '+00:00'))
                 client_data_to_show['creation_date'] = dt_object.strftime('%Y-%m-%d')
-            except ValueError as e:
-                logging.error(f"Error parsing 'created_at' timestamp: {client_data_to_show['created_at']} - {e}")
-                client_data_to_show['creation_date'] = 'N/A' # Default on error
-        elif client_data_to_show:
-            client_data_to_show['creation_date'] = 'N/A' # Default if 'created_at' is missing or None
+            else:
+                client_data_to_show['creation_date'] = 'N/A'
+
+            selected_languages_value = client_data_to_show.get('selected_languages')
+            if isinstance(selected_languages_value, str) and selected_languages_value.strip():
+                parsed_langs = [lang.strip() for lang in selected_languages_value.split(',') if lang.strip()]
+                client_data_to_show['selected_languages'] = parsed_langs if parsed_langs else ['fr']
+            elif not isinstance(selected_languages_value, list) or not selected_languages_value:
+                client_data_to_show['selected_languages'] = ['fr']
+
+        except Exception as e:
+            logging.error(f"Error preparing client data for tab (ID: {client_id_to_open}): {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur Préparation Données"), self.tr("Une erreur est survenue lors de la préparation des données du client."))
+            return
+        finally:
+            if db:
+                db.close()
 
         if not client_data_to_show:
-            # If fetching from DB fails, show an error and return.
-            # Relying on self.clients_data_map might show stale or deleted client data.
-            QMessageBox.warning(self, self.tr("Erreur"), self.tr("Impossible de récupérer les données à jour pour le client (ID: {0}). Le client pourrait ne pas exister ou être archivé.").format(client_id_to_open))
-            return
+             logging.error(f"Exiting open_client_tab_by_id because client_data_to_show is null for ID: {client_id_to_open}")
+             return
 
-        # Proceed with augmenting and displaying the fresh client_data_to_show
-        if 'country' not in client_data_to_show and client_data_to_show.get('country_id'):
-            country_obj = db_manager.get_country_by_id(client_data_to_show['country_id'])
-            client_data_to_show['country'] = country_obj.get('country_name', "N/A") if country_obj else "N/A"
-        if 'city' not in client_data_to_show and client_data_to_show.get('city_id'):
-            city_obj = db_manager.get_city_by_id(client_data_to_show['city_id'])
-            client_data_to_show['city'] = city_obj.get('city_name', "N/A") if city_obj else "N/A"
-        if 'status' not in client_data_to_show and client_data_to_show.get('status_id'):
-            status_obj = db_manager.get_status_setting_by_id(client_data_to_show['status_id'])
-            client_data_to_show['status'] = status_obj.get('status_name', "N/A") if status_obj else "N/A"
-
-        logging.info(f"open_client_tab_by_id: client_id_to_open={client_id_to_open}, "
-                     f"client_data_to_show name={client_data_to_show.get('client_name')}, "
-                     f"email={client_data_to_show.get('email')}, phone={client_data_to_show.get('phone')}")
-
-        # Ensure selected_languages is a list, defaulting to ['fr'] if null/empty from DB
-        selected_languages_value = client_data_to_show.get('selected_languages')
-        if isinstance(selected_languages_value, str) and selected_languages_value.strip():
-            # If it's a non-empty string, parse it
-            parsed_langs = [lang.strip() for lang in selected_languages_value.split(',') if lang.strip()]
-            client_data_to_show['selected_languages'] = parsed_langs if parsed_langs else ['fr']
-        elif isinstance(selected_languages_value, list):
-            # If it's already a list (e.g. from tests or direct data manipulation)
-            # Use as is, but default to ['fr'] if the list is empty
-            client_data_to_show['selected_languages'] = selected_languages_value if selected_languages_value else ['fr']
-        else:
-            # If it's None, empty string, or any other type, default to ['fr']
-            client_data_to_show['selected_languages'] = ['fr']
-
-        # A final safety net: if after all processing selected_languages is somehow empty (e.g. parsed string resulted in empty list), default to ['fr']
-        if not client_data_to_show.get('selected_languages'):
-            client_data_to_show['selected_languages'] = ['fr']
-
-        logging.info(f"open_client_tab_by_id: client_data_to_show after augmentation: {client_data_to_show}")
-
+        # --- Check for existing tab and update or create new one ---
         for i in range(self.client_tabs_widget.count()):
             tab_widget_ref = self.client_tabs_widget.widget(i)
             if hasattr(tab_widget_ref, 'client_info') and tab_widget_ref.client_info["client_id"] == client_id_to_open:
-                logging.info(f"main_window.open_client_tab_by_id: Refreshing existing tab for client_id: {client_id_to_open}")
+                logging.info(f"Refreshing existing tab for client_id: {client_id_to_open}")
                 self.client_tabs_widget.setCurrentIndex(i)
                 if hasattr(tab_widget_ref, 'refresh_display'):
                     tab_widget_ref.refresh_display(client_data_to_show)
                 return
 
-        logging.info(f"main_window.open_client_tab_by_id: Preparing to instantiate ClientMainWidget with data: {client_data_to_show}")
-        logging.info(f"main_window.open_client_tab_by_id: Attempting to create ClientMainWidget for client_id: {client_id_to_open}")
+        # --- Create and add new tab ---
         try:
             notification_manager = QApplication.instance().notification_manager
-            client_widget = ClientMainWidget( # Changed ClientWidget to ClientMainWidget
+            client_widget = ClientMainWidget(
                 client_info=client_data_to_show,
                 config=self.config,
                 app_root_dir=self.app_root_dir,
                 notification_manager=notification_manager,
                 current_user_info=self.current_user_info,
-                client_controller_instance=self.client_controller_instance, # Pass ClientController instance
+                client_controller_instance=self.client_controller_instance,
                 parent=self
             )
-            logging.info(f"main_window.open_client_tab_by_id: Successfully created ClientMainWidget for client_id: {client_id_to_open} with user_info.") # Log updated
-        except Exception as e:
-            logging.error(f"main_window.open_client_tab_by_id: Error instantiating ClientMainWidget for client_id: {client_id_to_open} - {e}", exc_info=True)
-            QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("Impossible de créer l'onglet client. Erreur: {0}").format(str(e)))
-            return
-
-        logging.info(f"main_window.open_client_tab_by_id: Attempting to add ClientMainWidget to tab for client_id: {client_id_to_open}")
-        try:
             client_name_for_tab = client_data_to_show.get("client_name", self.tr("Client Inconnu"))
             index = self.client_tabs_widget.addTab(client_widget, client_name_for_tab)
             self.client_tabs_widget.setCurrentIndex(index)
-            logging.info(f"main_window.open_client_tab_by_id: Successfully added ClientMainWidget tab for client_id: {client_id_to_open} at index {index}")
+            logging.info(f"Successfully created and added tab for client: {client_name_for_tab}")
         except Exception as e:
-            logging.error(f"main_window.open_client_tab_by_id: Error adding ClientMainWidget to tab for client_id: {client_id_to_open} - {e}", exc_info=True)
-            QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("Impossible d'ajouter l'onglet client au gestionnaire d'onglets. Erreur: {0}").format(str(e)))
-            # Attempt to clean up the partially created widget if it exists
+            logging.error(f"Error instantiating or adding ClientMainWidget tab: {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur Critique"), self.tr("Impossible de créer ou d'ajouter l'onglet client. Erreur: {0}").format(str(e)))
             if 'client_widget' in locals() and client_widget:
                 client_widget.deleteLater()
-            return
             
     def close_client_tab(self, index): 
         widget_to_close = self.client_tabs_widget.widget(index) 
@@ -2955,8 +2921,10 @@ class DocumentManager(QMainWindow):
             self.load_filter_combo.blockSignals(False)
             return
 
+        db = None
         try:
-            saved_filters = user_saved_filters_crud.get_saved_filters_for_user(self.current_user_id)
+            db = get_db_connection()
+            saved_filters = user_saved_filters_crud.get_saved_filters_for_user(db, self.current_user_id)
             if saved_filters:
                 for filt in saved_filters:
                     self.load_filter_combo.addItem(filt['filter_name'], filt['id'])
@@ -2965,6 +2933,8 @@ class DocumentManager(QMainWindow):
             logging.error(f"Error populating saved filters combo: {e}", exc_info=True)
             self.notify(self.tr("Erreur Filtres Sauvegardés"), self.tr("Impossible de charger les filtres sauvegardés."), type='ERROR')
         finally:
+            if db:
+                db.close()
             self.load_filter_combo.blockSignals(False)
 
     def apply_saved_filter_slot(self, index: int):
@@ -2977,9 +2947,10 @@ class DocumentManager(QMainWindow):
             return
 
         logging.info(f"Applying saved filter with ID: {saved_filter_id}")
-
+        db = None
         try:
-            filter_data = user_saved_filters_crud.get_saved_filter_by_id(saved_filter_id, self.current_user_id)
+            db = get_db_connection()
+            filter_data = user_saved_filters_crud.get_saved_filter_by_id(db, saved_filter_id, self.current_user_id)
             if not filter_data or 'filter_parameters' not in filter_data:
                 self.notify(self.tr("Erreur Chargement Filtre"), self.tr("Filtre non trouvé ou corrompu."), type='ERROR')
                 self.populate_saved_filters_combo() # Refresh combo in case filter was deleted elsewhere
@@ -2988,7 +2959,7 @@ class DocumentManager(QMainWindow):
             params = filter_data['filter_parameters']
 
             # Block signals on individual filter controls to prevent multiple refreshes
-            self.status_filter_combo.blockSignals(True)
+            self.status_filter_button.blockSignals(True)
             self.client_archive_filter_combo.blockSignals(True)
             self.country_filter_combo.blockSignals(True)
             self.search_input_field.blockSignals(True)
@@ -3005,11 +2976,12 @@ class DocumentManager(QMainWindow):
                  # Try to get status name for single selection display
                 status_name_display = self.tr("Statut: Inconnu")
                 try:
-                    status_info = db_manager.get_status_setting_by_id(self.selected_status_ids_filter[0])
+                    # DB session is already open here
+                    status_info = get_status_setting_by_id(db, self.selected_status_ids_filter[0])
                     if status_info: status_name_display = status_info.get('status_name', self.tr("Inconnu"))
                     self.status_filter_button.setText(self.tr("Statut: {0}").format(status_name_display))
                 except Exception as e_status_name_saved:
-                    logging.error(f"Error fetching status name for saved ID {self.selected_status_ids_filter[0]}: {e_status_name_saved}")
+                    logging.error(f"Error fetching status name for saved ID {self.selected_status_ids_filter[0]}: {e_status_name_saved}", exc_info=True)
                     self.status_filter_button.setText(self.tr("Statut: ID {0}").format(self.selected_status_ids_filter[0]))
             else:
                 self.status_filter_button.setText(self.tr("Statut: {0} sélectionnés").format(len(self.selected_status_ids_filter)))
@@ -3058,7 +3030,7 @@ class DocumentManager(QMainWindow):
                     self.more_filters_button.setChecked(show_collapsible) # This will trigger toggle_more_filters_visibility
 
             # Unblock signals
-            self.status_filter_combo.blockSignals(False)
+            self.status_filter_button.blockSignals(False)
             self.client_archive_filter_combo.blockSignals(False)
             self.country_filter_combo.blockSignals(False)
             self.search_input_field.blockSignals(False)
@@ -3075,6 +3047,8 @@ class DocumentManager(QMainWindow):
             logging.error(f"Error applying saved filter ID {saved_filter_id}: {e}", exc_info=True)
             self.notify(self.tr("Erreur Application Filtre"), self.tr("Une erreur est survenue lors de l'application du filtre."), type='ERROR')
         finally:
+            if db:
+                db.close()
             # Reset combo to placeholder to allow re-selection or show current state is "custom"
             # This also prevents the slot from re-triggering if a programmatic change happened during filter application
             self.load_filter_combo.blockSignals(True)
@@ -3142,8 +3116,11 @@ class DocumentManager(QMainWindow):
             self.notify(self.tr("Aucun Filtre Actif"), self.tr("Aucun critère de filtre n'est actuellement défini pour la sauvegarde."), type='INFO')
             return
 
+        db = None
         try:
+            db = get_db_connection()
             new_filter_id = user_saved_filters_crud.add_saved_filter(
+                db=db,
                 user_id=self.current_user_id,
                 filter_name=filter_name,
                 filter_parameters=parameters_dict
@@ -3162,6 +3139,9 @@ class DocumentManager(QMainWindow):
         except Exception as e:
             logging.error(f"Error saving filter '{filter_name}': {e}", exc_info=True)
             self.notify(self.tr("Erreur Sauvegarde"), self.tr("Une erreur est survenue: {0}").format(str(e)), type='ERROR')
+        finally:
+            if db:
+                db.close()
 
     def open_manage_filters_dialog_slot(self):
         """Opens the dialog to manage saved filters."""
@@ -3470,20 +3450,29 @@ class DocumentManager(QMainWindow):
             return
 
         item_type, item_name = parts
-        if item_type == "Action":
-            action = self.searchable_actions_map.get(item_name)
-            if action:
-                action.trigger()
-        elif item_type == "Client":
-            clients = clients_crud_instance.search_clients_by_name(item_name)
-            if clients:
-                self.open_client_tab_by_id(clients[0]['client_id'])
-        elif item_type == "Product":
-            # This would require a way to show a product's details, e.g., a product dialog
-            pass
-        # elif item_type == "Project":
-            # This would require a way to show a project's details
-            # pass
+        db = None
+        try:
+            if item_type == "Action":
+                action = self.searchable_actions_map.get(item_name)
+                if action:
+                    action.trigger()
+            elif item_type == "Client":
+                db = get_db_connection()
+                clients = clients_crud_instance.search_clients_by_name(db, item_name)
+                if clients:
+                    self.open_client_tab_by_id(clients[0]['client_id'])
+            elif item_type == "Product":
+                # This would require a way to show a product's details, e.g., a product dialog
+                pass
+            # elif item_type == "Project":
+                # This would require a way to show a project's details
+                # pass
+        except Exception as e:
+            logging.error(f"Error activating search item '{activated_text}': {e}", exc_info=True)
+            QMessageBox.critical(self, self.tr("Erreur Recherche"), self.tr("Une erreur est survenue lors de l'activation de l'élément de recherche."))
+        finally:
+            if db:
+                db.close()
 
     def mousePressEvent(self, event: QMouseEvent):
         # This event handler is for the window dragging and for custom title bar button clicks.

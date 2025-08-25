@@ -22,604 +22,170 @@ import logging
 from app.db.cruds.misc.activity_logs_crud import add_activity_log
 
 def handle_create_client_execution(doc_manager, client_data_dict=None):
-    client_controller = ClientController() # Instantiate controller
-
     if not client_data_dict:
-        # This path should ideally not be taken if AddNewClientDialog is always used
         QMessageBox.critical(doc_manager, "Erreur", "Données client non fournies.")
         return
 
-    # Basic validation of data from dialog (raw names)
     client_name_val = client_data_dict.get("client_name", "").strip()
-    country_name_for_folder = client_data_dict.get("country_name", "").strip() # Used for folder name
+    country_name_for_folder = client_data_dict.get("country_name", "").strip()
     project_identifier_val = client_data_dict.get("project_identifier", "").strip()
 
     if not client_name_val or not country_name_for_folder or not project_identifier_val:
         QMessageBox.warning(doc_manager, doc_manager.tr("Champs Requis"), doc_manager.tr("Nom client, Pays et ID Projet sont obligatoires."))
-        doc_manager.notify(title=doc_manager.tr("Champs Requis Manquants"),
-                           message=doc_manager.tr("Nom client, Pays et ID Projet sont obligatoires pour la création."),
-                           type='WARNING')
         return
 
-    # --- Client Creation via Controller ---
-    client_data_dict_for_controller = client_data_dict.copy()
-    client_data_dict_for_controller['created_by_user_id'] = doc_manager.current_user_id
-
-    created_client_info = client_controller.create_client(client_data_dict_for_controller)
-
+    db = None
     actual_new_client_id = None
-    new_project_id_central_db = None # Define for later use in error handling
-
-    if not created_client_info or not created_client_info.get("client_id"):
-        error_msg = doc_manager.tr("Le contrôleur n'a pas pu créer le client. Réponse nulle.")
-        if created_client_info and created_client_info.get("error"):
-            error_msg = created_client_info.get("error")
-
-        QMessageBox.critical(doc_manager, doc_manager.tr("Erreur DB"), error_msg)
-        doc_manager.notify(title=doc_manager.tr("Erreur Création Client"),
-                           message=error_msg,
-                           type='ERROR')
-        return
-
-    actual_new_client_id = created_client_info.get("client_id")
-    client_name_for_notification = created_client_info.get("client_name", client_name_val)
-    doc_manager.notify(title=doc_manager.tr("Client Créé (DB)"),
-                       message=doc_manager.tr("Client '{0}' (ID: {1}) créé avec succès dans la base de données.").format(client_name_for_notification, actual_new_client_id),
-                       type='SUCCESS')
-
-    country_id_val = created_client_info.get("country_id") # Resolved by controller
-    city_id_val = created_client_info.get("city_id")       # Resolved by controller
-
-    # --- Folder Creation ---
-    # Sanitize components before creating the folder name
-    client_name_sane = sanitize_foldername(client_name_val)
-    country_name_sane = sanitize_foldername(country_name_for_folder)
-    project_id_sane = sanitize_foldername(project_identifier_val)
-
-    folder_name_str = f"{client_name_sane}_{country_name_sane}_{project_id_sane}"
-    # The sanitize_foldername function should handle spaces and slashes,
-    # so .replace(" ", "_").replace("/", "-") might be redundant or could be removed
-    # depending on how thoroughly sanitize_foldername is implemented.
-    # For now, let's assume sanitize_foldername is comprehensive enough.
-
-    base_folder_full_path = os.path.join(doc_manager.config["clients_dir"], folder_name_str)
-
-    # Note: project_identifier uniqueness should ideally be handled by client_controller.create_client
-    # If it returns successfully, we assume project_identifier is unique.
-    # The folder path uniqueness is a separate check.
-    if os.path.exists(base_folder_full_path):
-        QMessageBox.warning(doc_manager, doc_manager.tr("Dossier Existant"),
-                            doc_manager.tr("Un dossier client avec un chemin similaire existe déjà: {0}. Le client a été créé en DB, mais le dossier n'est pas unique.").format(base_folder_full_path))
-        doc_manager.notify(title=doc_manager.tr("Dossier Client Existant"),
-                           message=doc_manager.tr("Un dossier client avec le chemin '{0}' existe déjà. Le client ID {1} a été créé en DB mais le dossier n'est pas unique.").format(base_folder_full_path, actual_new_client_id),
-                           type='WARNING')
-        # Client exists in DB. We might want to update it with this path, or allow user to change, or rollback.
-        # For now, proceed and update client with this path, assuming user might consolidate.
-        # This behavior might need refinement based on product requirements.
+    base_folder_full_path = None
 
     try:
+        db = get_db_connection()
+        client_controller = ClientController()
+        contact_controller = ContactController(current_user_id=doc_manager.current_user_id)
+
+        # --- Step 1: Create Client in DB ---
+        client_data_dict_for_controller = client_data_dict.copy()
+        client_data_dict_for_controller['created_by_user_id'] = doc_manager.current_user_id
+        created_client_info = client_controller.create_client(db, client_data_dict_for_controller)
+
+        if not created_client_info or not created_client_info.get("client_id"):
+            error_msg = created_client_info.get("error", doc_manager.tr("Le contrôleur n'a pas pu créer le client."))
+            raise Exception(error_msg)
+
+        actual_new_client_id = created_client_info.get("client_id")
+        logging.info(f"Client pre-committed to DB with ID: {actual_new_client_id}")
+
+        # --- Step 2: Create Folder Structure ---
+        client_name_sane = sanitize_foldername(client_name_val)
+        country_name_sane = sanitize_foldername(country_name_for_folder)
+        project_id_sane = sanitize_foldername(project_identifier_val)
+        folder_name_str = f"{client_name_sane}_{country_name_sane}_{project_id_sane}"
+        base_folder_full_path = os.path.join(doc_manager.config["clients_dir"], folder_name_str)
+
+        if os.path.exists(base_folder_full_path):
+             logging.warning(f"Client folder path {base_folder_full_path} already exists.")
+             # Decide if this is a critical error or just a warning. For now, continue.
+
         os.makedirs(base_folder_full_path, exist_ok=True)
-        # Update client record with the base_folder_full_path
-        if actual_new_client_id: # Ensure client ID is valid
-            clients_crud_instance.update_client(actual_new_client_id, {'default_base_folder_path': base_folder_full_path})
-            created_client_info['default_base_folder_path'] = base_folder_full_path # Keep our local copy updated
+        clients_crud_instance.update_client(db, actual_new_client_id, {'default_base_folder_path': base_folder_full_path})
+        created_client_info['default_base_folder_path'] = base_folder_full_path
 
-        # Create language subfolders
-        # Ensure selected_languages is a string from controller, then split.
-        selected_langs_str = created_client_info.get("languages", "fr") # 'languages' is the key from controller
+        selected_langs_str = created_client_info.get("languages", "fr")
         selected_langs_list = selected_langs_str.split(',') if isinstance(selected_langs_str, str) else ["fr"]
-
-
         for lang_code in selected_langs_list:
             os.makedirs(os.path.join(base_folder_full_path, lang_code.strip()), exist_ok=True)
 
-    except OSError as e_os:
-        QMessageBox.critical(doc_manager, doc_manager.tr("Erreur Dossier"), doc_manager.tr("Erreur de création du dossier client:\n{0}").format(str(e_os)))
-        doc_manager.notify(title=doc_manager.tr("Erreur Création Dossier"), message=doc_manager.tr("Erreur de création du dossier pour le client '{0}'.").format(client_name_val), type='ERROR')
-        if actual_new_client_id:
-            clients_crud_instance.delete_client(actual_new_client_id) # Rollback client creation
-            doc_manager.notify(title=doc_manager.tr("Rollback DB"), message=doc_manager.tr("Entrée client (ID: {0}) annulée suite à l'erreur de dossier.").format(actual_new_client_id), type='INFO')
-        return # Stop further execution
+        # --- Step 3: Open Commande Dialog ---
+        from app.views.gui.dialogs.commande_dialog import CommandeDialog
+        commande_dialog = CommandeDialog(client_id=actual_new_client_id, current_user_id=doc_manager.current_user_id, parent=doc_manager)
 
-    # --- Project and Task Creation (remains largely the same, using actual_new_client_id) ---
-    try:
-        project_status_planning_obj = get_status_setting_by_name("Planning", "Project")
-        project_status_id_for_pm = project_status_planning_obj['status_id'] if project_status_planning_obj else None
-
-        if not project_status_id_for_pm:
-            QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Configuration Projet"),
-                                doc_manager.tr("Statut de projet par défaut 'Planning' non trouvé. Le projet ne sera pas créé avec un statut initial."))
-            doc_manager.notify(title=doc_manager.tr("Erreur Configuration Projet"),
-                               message=doc_manager.tr("Statut projet par défaut 'Planning' non trouvé."),
-                               type='WARNING')
-
-        project_data_for_db = {
-            'client_id': actual_new_client_id,
-            'project_name': f"Projet pour {created_client_info.get('client_name', client_name_val)}", # Use name from controller if available
-            'description': f"Projet pour client: {created_client_info.get('client_name', client_name_val)}. Besoin initial: {created_client_info.get('primary_need_description', '')}",
-            'start_date': datetime.now().strftime("%Y-%m-%d"),
-            'deadline_date': (datetime.now() + timedelta(days=60)).strftime("%Y-%m-%d"),
-            'budget': created_client_info.get('price', 0.0), # Price from controller (likely 0 or default)
-            'status_id': project_status_id_for_pm,
-            'priority': 1
-        }
-        logging.info(f"Attempting to create project for client {actual_new_client_id} with data: {project_data_for_db}")
-        new_project_id_central_db = add_project(project_data_for_db)
-
-        if new_project_id_central_db:
-            QMessageBox.information(doc_manager, doc_manager.tr("Projet Créé (Central DB)"),
-                                    doc_manager.tr("Un projet associé a été créé pour {0}.").format(created_client_info.get('client_name', client_name_val)))
-
-            task_status_todo_obj = get_status_setting_by_name("To Do", "Task")
-            task_status_id_for_todo = task_status_todo_obj['status_id'] if task_status_todo_obj else None
-
-            if not task_status_id_for_todo:
-                QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Configuration Tâche"),
-                                    doc_manager.tr("Statut de tâche par défaut 'To Do' non trouvé."))
-
-            standard_tasks = [
-                {"name": "Initial Client Consultation & Needs Assessment", "description": "Understand client requirements, objectives, target markets, and budget.", "priority_val": 2, "deadline_days": 3},
-                {"name": "Market Research & Analysis", "description": "Research target international markets, including competition, regulations, and cultural nuances.", "priority_val": 1, "deadline_days": 7},
-                {"name": "Post-Sales Follow-up & Support", "description": "Follow up with the client after delivery.", "priority_val": 1, "deadline_days": 60}
-            ]
-
-            for task_item in standard_tasks:
-                task_deadline = (datetime.now() + timedelta(days=task_item["deadline_days"])).strftime("%Y-%m-%d")
-                task_data_for_db = {
-                    'project_id': new_project_id_central_db,
-                    'task_name': task_item["name"],
-                    'description': task_item["description"],
-                    'status_id': task_status_id_for_todo,
-                    'priority': task_item["priority_val"],
-                    'due_date': task_deadline
-                }
-                logging.info(f"Attempting to add task for project {new_project_id_central_db} with data: {task_data_for_db}")
-                add_task(task_data_for_db)
-            QMessageBox.information(doc_manager, doc_manager.tr("Tâches Créées (Central DB)"),
-                                    doc_manager.tr("Des tâches standard ont été ajoutées au projet pour {0}.").format(created_client_info.get('client_name', client_name_val)))
+        project_id_for_tasks = None
+        if commande_dialog.exec_() == QDialog.Accepted:
+            if hasattr(commande_dialog, 'get_created_project_id'):
+                project_id_for_tasks = commande_dialog.get_created_project_id()
         else:
-            logging.error(f"Failed to create project for client {actual_new_client_id}. Data attempted: {project_data_for_db}")
-            QMessageBox.warning(doc_manager, doc_manager.tr("Erreur DB Projet"),
-                                doc_manager.tr("Le client a été créé, mais la création du projet associé a échoué."))
-            doc_manager.notify(title=doc_manager.tr("Erreur Création Projet Associé"),
-                               message=doc_manager.tr("Client créé (ID: {0}), mais échec de la création du projet associé.").format(actual_new_client_id),
-                               type='WARNING')
+            logging.info(f"User cancelled initial CommandeDialog for client {actual_new_client_id}.")
 
-        # --- Update UI Map Data (ui_map_data) ---
-        client_dict_from_controller = created_client_info # Use the data from controller
-
-        ui_map_data = None
-        if client_dict_from_controller:
-            # Fetch names for IDs obtained from controller
-            country_obj = get_country_by_id(client_dict_from_controller.get('country_id')) if client_dict_from_controller.get('country_id') else None
-            city_obj = get_city_by_id(client_dict_from_controller.get('city_id')) if client_dict_from_controller.get('city_id') else None
-            status_id_from_controller = client_dict_from_controller.get('client_status_id')
-            status_obj = get_status_setting_by_id(status_id_from_controller) if status_id_from_controller else None
-            sel_langs_str_ui = client_dict_from_controller.get('languages', 'fr')
-            sel_langs_list_ui = sel_langs_str_ui.split(',') if isinstance(sel_langs_str_ui, str) else ['fr']
-
-            ui_map_data = {
-                "client_id": client_dict_from_controller.get('client_id'),
-                "client_name": client_dict_from_controller.get('client_name'),
-                "company_name": client_dict_from_controller.get('company_name'),
-                "need": client_dict_from_controller.get('primary_need_description'),
-                "country": country_obj['country_name'] if country_obj else client_data_dict.get("country_name", "N/A"),
-                "country_id": client_dict_from_controller.get('country_id'),
-                "city": city_obj['city_name'] if city_obj else client_data_dict.get("city_name", "N/A"),
-                "city_id": client_dict_from_controller.get('city_id'),
-                "project_identifier": client_dict_from_controller.get('project_identifier'), # This is the client's main project ID
-                "default_base_folder_path": client_dict_from_controller.get('default_base_folder_path'),
-                "base_folder_path": client_dict_from_controller.get('default_base_folder_path'), # Alias for ClientWidget
-                "selected_languages": sel_langs_list_ui,
-                "price": client_dict_from_controller.get('price', 0),
-                "notes": client_dict_from_controller.get('notes', ''),
-                "status": status_obj['status_name'] if status_obj else "N/A",
-                "status_id": status_id_from_controller,
-                "creation_date": client_dict_from_controller.get('created_at','').split("T")[0] if client_dict_from_controller.get('created_at') else datetime.now().strftime("%Y-%m-%d"),
-                "category": client_dict_from_controller.get('category', 'Standard')
-            }
-            doc_manager.clients_data_map[actual_new_client_id] = ui_map_data
-            doc_manager.add_client_to_list_widget(ui_map_data) # Add to the list widget in DocumentManager UI
-
-        # --- Automatic Commande Creation ---
-        commande_created_project_id = None
-        if actual_new_client_id: # Ensure client was successfully created
-            logging.info(f"Attempting to automatically create first commande for new client {actual_new_client_id}")
-            from commande_management.commande_dialog import CommandeDialog # Local import
-
-            # Instantiate CommandeDialog. It should handle fetching next commande_reference internally.
-            # It will also handle creation of its associated project.
-            commande_dialog = CommandeDialog(client_id=actual_new_client_id,
-                                             current_user_id=doc_manager.current_user_id,
-                                             # No commande_id_to_edit, so it's a new commande
-                                             parent=doc_manager)
-
-            # Open the dialog for the user to fill in details and products
-            if commande_dialog.exec_() == QDialog.Accepted:
-                # CommandeDialog's accept_dialog method handles saving the commande and its items.
-                # It also handles creating/linking the project.
-                # We need to get the project_id that was created or linked by the CommandeDialog.
-                if hasattr(commande_dialog, 'get_created_project_id'):
-                    commande_created_project_id = commande_dialog.get_created_project_id()
-                    if commande_created_project_id:
-                         logging.info(f"Commande dialog created/linked project ID: {commande_created_project_id} for the new commande.")
-                else:
-                    logging.warning("CommandeDialog does not have get_created_project_id() method. Cannot retrieve project_id for tasks.")
-
-                doc_manager.notify(title=doc_manager.tr("Première Commande Créée"),
-                                   message=doc_manager.tr("La première commande a été créée et initialisée."), type='SUCCESS')
-                # Refresh ClientWidget's Commande tab if it's open
-                for i in range(doc_manager.client_tabs_widget.count()):
-                    tab_widget = doc_manager.client_tabs_widget.widget(i)
-                    if hasattr(tab_widget, 'client_info') and tab_widget.client_info.get("client_id") == actual_new_client_id:
-                        if hasattr(tab_widget, 'commandes_tab_widget') and hasattr(tab_widget.commandes_tab_widget, 'refresh_commandes'):
-                             tab_widget.commandes_tab_widget.refresh_commandes()
-                        break
-            else:
-                logging.info(f"User cancelled the initial CommandeDialog for client {actual_new_client_id}.")
-                # If the user cancels the first commande, we might still want a default project.
-                # Or, we might decide that no project is created if the first commande is cancelled.
-                # For now, let's proceed with creating a default project if no commande-linked project exists.
-                doc_manager.notify(title=doc_manager.tr("Création de Commande Annulée"),
-                                   message=doc_manager.tr("La création de la première commande a été annulée. Un projet administratif général sera créé."), type='INFO')
-
-        # --- Project and Task Creation ---
-        # Use project_id from commande if available, otherwise create a default project.
-        project_id_for_tasks = commande_created_project_id
-
+        # --- Step 4: Create Default Project and Tasks if needed ---
         if not project_id_for_tasks:
-            logging.info(f"No project linked from commande for client {actual_new_client_id}. Creating default administrative project.")
-            project_status_planning_obj = get_status_setting_by_name("Planning", "Project")
-            project_status_id_for_pm = project_status_planning_obj['status_id'] if project_status_planning_obj else None
-            if not project_status_id_for_pm:
-                 QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Configuration Projet"),
-                                     doc_manager.tr("Statut de projet par défaut 'Planning' non trouvé."))
+            project_status_planning_obj = get_status_setting_by_name(db, "Planning", "Project")
             project_data_for_db_default = {
                 'client_id': actual_new_client_id,
                 'project_name': f"Projet Administratif pour {created_client_info.get('client_name', client_name_val)}",
                 'description': f"Suivi administratif général pour client: {created_client_info.get('client_name', client_name_val)}.",
                 'start_date': datetime.now().strftime("%Y-%m-%d"),
-                'status_id': project_status_id_for_pm,
-                'priority': 0
+                'status_id': project_status_planning_obj['status_id'] if project_status_planning_obj else None, 'priority': 0
             }
-            new_default_project_id = add_project(project_data_for_db_default)
-            if new_default_project_id:
-                project_id_for_tasks = new_default_project_id
-                QMessageBox.information(doc_manager, doc_manager.tr("Projet Administratif Créé"),
-                                        doc_manager.tr("Un projet administratif général a été créé pour {0}.").format(created_client_info.get('client_name', client_name_val)))
-            else:
-                QMessageBox.warning(doc_manager, doc_manager.tr("Erreur DB Projet"),
-                                    doc_manager.tr("La création du projet administratif général a échoué."))
+            project_id_for_tasks = add_project(db, project_data_for_db_default)
+            if not project_id_for_tasks:
+                raise Exception("Failed to create default administrative project.")
 
-        # Ensure a clean transition to the next block of code.
-        # All lines between the above 'else' and the below 'if' must be either comments or truly blank.
-        # Any hidden 'try:' statement would be removed by this re-application of the structure.
+        task_status_todo_obj = get_status_setting_by_name(db, "To Do", "Task")
+        standard_tasks = [
+            {"name": "Initial Client Consultation", "priority_val": 2, "deadline_days": 3},
+            {"name": "Market Research", "priority_val": 1, "deadline_days": 7},
+            {"name": "Post-Sales Follow-up", "priority_val": 1, "deadline_days": 60}
+        ]
+        for task_item in standard_tasks:
+            task_data = {
+                'project_id': project_id_for_tasks, 'task_name': task_item["name"],
+                'description': task_item.get("description", ""), 'status_id': task_status_todo_obj['status_id'] if task_status_todo_obj else None,
+                'priority': task_item["priority_val"], 'due_date': (datetime.now() + timedelta(days=task_item["deadline_days"])).strftime("%Y-%m-%d")
+            }
+            add_task(db, task_data)
 
-        # Now, if project_id_for_tasks is set (either from commande or default creation), create tasks for it.
-        if project_id_for_tasks:
-            task_status_todo_obj = get_status_setting_by_name("To Do", "Task")
-            task_status_id_for_todo = task_status_todo_obj['status_id'] if task_status_todo_obj else None
-            if not task_status_id_for_todo:
-                QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Configuration Tâche"),
-                                    doc_manager.tr("Statut de tâche par défaut 'To Do' non trouvé."))
+        # --- Step 5: Handle Contact ---
+        existing_contacts = get_contacts_for_client(db, actual_new_client_id, limit=1)
+        contact_dialog = ContactDialog(parent=doc_manager, manage_link_fields=not existing_contacts)
+        if contact_dialog.exec_() == QDialog.Accepted:
+            contact_form_data = contact_dialog.get_contact_data()
+            contact_controller.get_or_create_contact_and_link(db, client_id=actual_new_client_id, contact_form_data=contact_form_data)
 
-            standard_tasks = [
-                {"name": "Initial Client Consultation & Needs Assessment", "description": "Understand client requirements, objectives, target markets, and budget.", "priority_val": 2, "deadline_days": 3},
-                {"name": "Market Research & Analysis", "description": "Research target international markets, including competition, regulations, and cultural nuances.", "priority_val": 1, "deadline_days": 7},
-                {"name": "Post-Sales Follow-up & Support", "description": "Follow up with the client after delivery.", "priority_val": 1, "deadline_days": 60}
-            ]
-            for task_item in standard_tasks:
-                task_deadline = (datetime.now() + timedelta(days=task_item["deadline_days"])).strftime("%Y-%m-%d")
-                task_data_for_db = {
-                    'project_id': project_id_for_tasks,
-                    'task_name': task_item["name"],
-                    'description': task_item["description"],
-                    'status_id': task_status_id_for_todo,
-                    'priority': task_item["priority_val"],
-                    'due_date': task_deadline
-                }
-                add_task(task_data_for_db)
-            QMessageBox.information(doc_manager, doc_manager.tr("Tâches Créées"),
-                                    doc_manager.tr("Des tâches standard ont été ajoutées au projet associé."))
-        else:
-            logging.warning(f"No project ID available (commande or default) for client {actual_new_client_id}. No tasks created.")
-        # Assuming a phantom 'try' block was before the 'if project_id_for_tasks:' at line 374 (or before comments at L369)
+        # --- Step 6: Commit Transaction ---
+        db.commit()
+        logging.info(f"Successfully committed all creation steps for client {actual_new_client_id}.")
 
-        # Notify about project and task creation if successful
-        if project_id_for_tasks:
-            doc_manager.notify(title=doc_manager.tr("Configuration Initiale Client Terminée"),
-                               message=doc_manager.tr("Projet et tâches initiales créés pour '{0}'.").format(created_client_info.get('client_name', client_name_val)),
-                               type='INFO')
-
-
-        if ui_map_data: # This block should run regardless of commande creation, to ensure Proforma/Contact/Product dialogs sequence
-            # --- BEGIN AUTO PROFORMA GENERATION ---
-            # This section is now executed AFTER the Commande and its items are established (if any)
-            # and after the ContactDialog.
-            # The project_id used for Proforma should be project_id_for_tasks.
+    except Exception as e:
+        if db: db.rollback()
+        logging.error(f"Error during client creation transaction: {e}", exc_info=True)
+        QMessageBox.critical(doc_manager, doc_manager.tr("Erreur Création Client"), str(e))
+        # Cleanup folder if client creation failed after folder was made
+        if base_folder_full_path and os.path.exists(base_folder_full_path) and not actual_new_client_id:
             try:
+                shutil.rmtree(base_folder_full_path)
+                logging.info(f"Cleaned up created folder due to error: {base_folder_full_path}")
+            except OSError as e_cleanup:
+                logging.error(f"Failed to cleanup folder '{base_folder_full_path}': {e_cleanup}")
+        return
+    finally:
+        if db:
+            db.close()
 
-                logging.info(f"Starting automatic Proforma generation for new client ID: {actual_new_client_id}, using project ID: {project_id_for_tasks}")
-
-                # 1. Determine Proforma Language
-                selected_langs_str = created_client_info.get("languages", "fr")
-                proforma_language_codes = [lang.strip() for lang in selected_langs_str.split(',') if lang.strip()]
-
-                if not proforma_language_codes:
-                    default_lang_from_config = doc_manager.config.get("default_document_language", "fr")
-                    proforma_language_codes = [default_lang_from_config]
-                    logging.info(f"No specific languages selected for client {actual_new_client_id}, defaulting Proforma to: {proforma_language_codes[0]}")
-
-                target_proforma_lang = proforma_language_codes[0]
-                logging.info(f"Target language for automatic Proforma: {target_proforma_lang}")
-
-                # 2. Fetch Default Proforma Template
-                from db.cruds import templates_crud
-                default_proforma_template = templates_crud.get_template_by_type_lang_default(
-                    template_type="HTML_PROFORMA",
-                    language_code=target_proforma_lang,
-                    client_id=None
-                )
-
-                if not default_proforma_template:
-                    logging.error(f"No default Proforma template found for language '{target_proforma_lang}'. Skipping auto-generation.")
-                    doc_manager.notify(title=doc_manager.tr("Modèle Proforma Manquant"),
-                                       message=doc_manager.tr("Aucun modèle Proforma par défaut trouvé pour la langue '{0}'. La génération automatique est annulée.").format(target_proforma_lang),
-                                       type='WARNING')
-                    raise Exception(f"Default Proforma template not found for {target_proforma_lang}")
-
-                template_base_filename = default_proforma_template.get('base_file_name')
-                template_inherent_language = default_proforma_template.get('language_code')
-
-                template_file_on_disk_abs = os.path.join(
-                    doc_manager.config.get("templates_dir", "templates"),
-                    template_inherent_language,
-                    template_base_filename
-                )
-
-                if not os.path.exists(template_file_on_disk_abs):
-                    logging.error(f"Default Proforma template file not found on disk: {template_file_on_disk_abs}")
-                    doc_manager.notify(title=doc_manager.tr("Fichier Modèle Introuvable"),
-                                       message=doc_manager.tr("Fichier modèle Proforma '{0}' introuvable pour la langue '{1}'. Génération auto annulée.").format(template_base_filename, target_proforma_lang),
-                                       type='ERROR')
-                    raise Exception(f"Default Proforma template file not found: {template_file_on_disk_abs}")
-
-                # 3. Determine Company ID (Default Company)
-                from db.cruds import companies_crud
-                default_company = companies_crud.get_default_company()
-                if not default_company or not default_company.get("company_id"):
-                    logging.error("No default company configured. Cannot generate Proforma.")
-                    doc_manager.notify(title=doc_manager.tr("Erreur Configuration Société"),
-                                       message=doc_manager.tr("Aucune société par défaut n'est configurée. La génération automatique de Proforma est annulée."),
-                                       type='ERROR')
-                    raise Exception("Default company not configured.")
-
-                auto_proforma_company_id = default_company.get("company_id")
-
-                # 4. Generate Proforma PDF
-                client_info_for_pdf_gen = created_client_info.copy() # This is the main client info
-                client_info_for_pdf_gen['base_folder_path'] = base_folder_full_path # Ensure this is the correct, created path
-
-                from utils import generate_pdf_for_document
-
-                proforma_doc_title_base = default_proforma_template.get('template_name', 'Facture_Proforma')
-
-                # Try to get commande reference if a commande was created
-                # This is a bit indirect; ideally CommandeDialog would pass back the commande_reference if created.
-                # For now, try to fetch the latest commande if one was made.
-                commande_ref_for_proforma = f"PF-AUTO-{datetime.now().strftime('%Y%m%d%H%M%S')}" # Default
-                if hasattr(commande_dialog, 'get_created_commande_reference'): # Check if CommandeDialog can provide this
-                    _ref = commande_dialog.get_created_commande_reference()
-                    if _ref: commande_ref_for_proforma = _ref
-
-                proforma_specific_additional_context = {
-                    'document_title': f"{proforma_doc_title_base} - {client_info_for_pdf_gen.get('client_name', 'Client')}",
-                    'proforma_id': commande_ref_for_proforma # Use commande_reference if available
-                }
-
-                generated_pdf_path = generate_pdf_for_document(
-                    source_file_path=template_file_on_disk_abs,
-                    client_info=client_info_for_pdf_gen,
-                    app_root_dir=doc_manager.app_root_dir,
-                    parent_widget=doc_manager,
-                    target_language_code=target_proforma_lang,
-                    project_id=project_id_for_tasks, # Use the determined project_id
-                    additional_context=proforma_specific_additional_context,
-                    document_type_for_context=default_proforma_template.get('template_type'),
-                    allow_empty_products=True
-                )
-                logging.info(f"Called generate_pdf_for_document for AUTO PROFORMA. File: {template_base_filename}, Lang: {target_proforma_lang}, allow_empty_products=True. Result path: {generated_pdf_path}")
-
-
-                if not generated_pdf_path or not os.path.exists(generated_pdf_path):
-                    logging.error(f"Automatic Proforma PDF generation failed for client {actual_new_client_id}.")
-                    raise Exception("Automatic Proforma PDF generation failed.")
-
-                logging.info(f"Automatic Proforma PDF generated successfully: {generated_pdf_path}")
-
-                # 5. Save Document Record to ClientDocuments
-                from db.cruds import client_documents_crud
-                relative_pdf_path_for_db = os.path.relpath(generated_pdf_path, base_folder_full_path)
-
-                # Link to commande_id if available
-                linked_commande_id = None
-                if hasattr(commande_dialog, 'get_created_commande_id'): # CommandeDialog should expose this
-                    linked_commande_id = commande_dialog.get_created_commande_id()
-
-                auto_proforma_doc_data = {
-                    'client_id': actual_new_client_id,
-                    'project_id': project_id_for_tasks, # Use the determined project_id
-                    'commande_id': linked_commande_id, # Link to the commande if one was created
-                    'order_identifier': commande_ref_for_proforma, # Use commande_reference or generated proforma_id
-                    'document_name': os.path.basename(generated_pdf_path),
-                    'file_name_on_disk': os.path.basename(generated_pdf_path),
-                    'file_path_relative': relative_pdf_path_for_db,
-                    'document_type_generated': "PROFORMA_PDF", # Or more specific if template type says so
-                    'source_template_id': default_proforma_template.get('template_id'),
-                    'user_id': doc_manager.current_user_id,
-                    'language_code': target_proforma_lang,
-                    'version_tag': "1.0"
-                }
-
-                new_client_doc_db_id = client_documents_crud.add_client_document(auto_proforma_doc_data)
-
-                if not new_client_doc_db_id:
-                    logging.error(f"Failed to save auto-generated Proforma to ClientDocuments for client {actual_new_client_id}.")
-                    if os.path.exists(generated_pdf_path):
-                        try: os.remove(generated_pdf_path)
-                        except OSError: logging.error(f"Failed to cleanup generated PDF: {generated_pdf_path}")
-                    doc_manager.notify(title=doc_manager.tr("Erreur DB Document"),
-                                       message=doc_manager.tr("Proforma PDF généré mais échec de l'enregistrement en base de données."),
-                                       type='ERROR')
-                    raise Exception("Failed to save auto-generated Proforma to ClientDocuments.")
-
-                logging.info(f"Auto-generated Proforma (Doc ID: {new_client_doc_db_id}) saved to ClientDocuments for client {actual_new_client_id}.")
-                doc_manager.notify(title=doc_manager.tr("Proforma Automatique Créée"),
-                                   message=doc_manager.tr("Une facture Proforma a été automatiquement générée et ajoutée pour le client en langue '{0}'.").format(target_proforma_lang),
-                                   type='SUCCESS')
-
-            except Exception as e_auto_proforma:
-                logging.error(f"Error during automatic Proforma generation for client {actual_new_client_id}: {e_auto_proforma}", exc_info=True)
-                doc_manager.notify(title=doc_manager.tr("Échec Proforma Auto"),
-                                   message=doc_manager.tr("La génération automatique de la Proforma a échoué. Raison: {0}").format(str(e_auto_proforma)),
-                                   type='WARNING')
-            # --- END AUTO PROFORMA GENERATION ---
-
-            # Call ContactDialog after Commande and Project/Tasks logic
-            contact_controller = ContactController(current_user_id=doc_manager.current_user_id)
-            existing_contacts = get_contacts_for_client(actual_new_client_id, limit=1)
-            is_first_contact = not existing_contacts
-            # If it's the first contact, we likely want to capture their role/link details.
-            contact_dialog = ContactDialog(parent=doc_manager,
-                                           manage_link_fields=is_first_contact)
-            if contact_dialog.exec_() == QDialog.Accepted:
-                contact_form_data = contact_dialog.get_contact_data() # Get general contact data
-                link_form_data = contact_dialog.get_link_data() # Get link-specific data if manage_link_fields was true
-
-                # Combine contact_form_data and link_form_data for the controller,
-                # or adjust controller to accept them separately.
-                # For now, assuming ContactController's get_or_create_contact_and_link
-                # expects a single dict that might include link fields if present.
-                # The ContactDialog.get_data() in the original code was not defined.
-                # It should be get_contact_data() and potentially get_link_data().
-
-                # Let's assume contact_form_data might be augmented by link_form_data
-                # if link_form_data is not None.
-                # The ContactController will need to correctly interpret these fields.
-                # A common pattern is for link_form_data to contain fields like 'role_in_entity', 'is_primary'.
-                # These need to be part of the data passed to the controller if it's to create the EntityContact link.
-
-                # Create a dictionary for the controller that includes all necessary info.
-                # The contact_controller.get_or_create_contact_and_link expects 'contact_form_data'
-                # which should contain all necessary details.
-                # If link_form_data is available, merge it into contact_form_data.
-                # This matches the likely expectation of the controller.
-                final_data_for_controller = contact_form_data.copy()
-                if link_form_data:
-                    final_data_for_controller.update(link_form_data)
-                # Also, ensure 'is_primary' is correctly set if it's the first contact and no explicit choice was made.
-                # The ContactDialog's is_primary_checkbox handles this for the form.
-                # The controller will use what's in final_data_for_controller.
-
-                contact_id_linked, link_id = contact_controller.get_or_create_contact_and_link(
-                    client_id=actual_new_client_id,
-                    contact_form_data=contact_form_data
-                )
-                if contact_id_linked:
-                    logging.info(f"Contact processed successfully for client {actual_new_client_id}. Contact ID: {contact_id_linked}, Link ID: {link_id}")
-                else:
-                    logging.error(f"Failed to process contact for client {actual_new_client_id} using ContactController.")
-                    QMessageBox.warning(doc_manager,
-                                        doc_manager.tr("Erreur Contact"),
-                                        doc_manager.tr("Le traitement du contact a échoué."))
-            else:
-                logging.info(f"ContactDialog was cancelled for client {actual_new_client_id}.")
-
-            # The ProductDialog call that was here is removed, as products are now part of CommandeDialog.
-            # The CreateDocumentDialog call that was here is also removed, as Proforma is auto-generated.
-            # Further document creation can be done from ClientWidget.
-
-        else: # ui_map_data was not populated (should not happen if controller succeeded)
-             QMessageBox.warning(doc_manager, doc_manager.tr("Erreur Données Client"), doc_manager.tr("Les données du client (ui_map_data) ne sont pas disponibles pour la séquence de dialogue."))
-# # --- After contact_dialog.exec_() block ---
-
-
-# --- Final notifications and UI updates (outside the main if ui_map_data block, but relies on its outcomes) ---
-
+    # --- Step 7: Post-Commit UI Updates ---
+    if actual_new_client_id:
         doc_manager.notify(title=doc_manager.tr("Client Créé"),
-                           message=doc_manager.tr("Le client '{0}' (ID: {1}) a été créé avec succès.").format(created_client_info.get('client_name', client_name_val), actual_new_client_id),
+                           message=doc_manager.tr("Le client '{0}' a été créé avec succès.").format(client_name_val),
                            type='SUCCESS')
+        doc_manager.load_clients_from_db_slot() # Full refresh
         doc_manager.open_client_tab_by_id(actual_new_client_id)
 
-        # Update statistics dashboard
-        stats_dashboard = doc_manager.get_statistics_widget_instance() # This gets/creates StatisticsDashboard
-        if stats_dashboard:
-            if hasattr(stats_dashboard, 'refresh_all_dashboard_content'):
-                stats_dashboard.refresh_all_dashboard_content()
-                logging.info("Called refresh_all_dashboard_content on StatisticsDashboard.")
-            elif hasattr(stats_dashboard, 'update_stats'): # Fallback
-                stats_dashboard.update_stats()
-                logging.info("Called update_stats on StatisticsDashboard.")
-            else:
-                logging.warning("StatisticsDashboard instance does not have a known method to refresh stats.")
-        else:
-            logging.info("Statistics module/dashboard not available, skipping stats update after client creation.")
+        stats_dashboard = doc_manager.get_statistics_widget_instance()
+        if stats_dashboard and hasattr(stats_dashboard, 'refresh_all_dashboard_content'):
+            stats_dashboard.refresh_all_dashboard_content()
 
 
-    except sqlite3.IntegrityError as e_sqlite_integrity: # This might be caught by controller now
-        logging.error(f"Database integrity error: {client_name_val}", exc_info=True)
-        error_msg_detail = str(e_sqlite_integrity).lower()
-        user_message = doc_manager.tr("Erreur de base de données.")
-        if "unique constraint failed: clients.project_identifier" in error_msg_detail: # Should be caught by controller
-            user_message = doc_manager.tr("L'ID de Projet '{0}' existe déjà.").format(project_identifier_val)
-        elif "unique constraint failed: clients.default_base_folder_path" in error_msg_detail: # Path created from user input
-             user_message = doc_manager.tr("Un client avec un nom ou un chemin de dossier résultant similaire existe déjà.")
-        QMessageBox.critical(doc_manager, doc_manager.tr("Erreur de Données"), user_message)
-        doc_manager.notify(title=doc_manager.tr("Erreur Données Client"), message=user_message, type='ERROR')
-        # If client was created by controller but project/task fails here, client still exists.
-        # Consider if rollback is needed for controller-created client if subsequent steps fail.
-        # For now, if controller created client, it remains.
-      # This part needs careful consideration of transactional behavior.
-        # If client was created (actual_new_client_id is not None), but this later part fails,
-        # the client exists in DB, but project/tasks might not.
-        # The original code had some rollback logic for client if os.makedirs failed after client creation.
-        # That specific OSError is handled above with rollback. This is for other exceptions.
+from sqlalchemy.orm import Session
+from app.db.connection import get_db_connection
 
-
-def load_and_display_clients(doc_manager, filters: dict = None, limit: int = None, offset: int = 0, include_deleted: bool = False):
+def load_and_display_clients(doc_manager, db: Session, filters: dict = None, limit: int = None, offset: int = 0, include_deleted: bool = False):
     """
     Loads client data from the database and displays it in the UI.
-    Now accepts filters, pagination, and include_deleted parameters.
+    Now accepts a db session, filters, pagination, and include_deleted parameters.
     """
     doc_manager.clients_data_map.clear()
     doc_manager.client_list_widget.clear()
     try:
-        # Use get_all_clients_with_details for richer data for UI map
-        # The 'filters' dict here is for the CRUD method, not the UI search term yet.
-        # UI search term will be applied on top of this loaded data or by refining the filters dict.
         all_clients_dicts = clients_crud_instance.get_all_clients_with_details(
+            db=db,
             filters=filters,
             limit=limit,
             offset=offset,
             include_deleted=include_deleted
         )
-        # get_all_clients_with_details already sorts by client_name
-        # if all_clients_dicts is None: all_clients_dicts = [] # Already returns list
-        # all_clients_dicts.sort(key=lambda c: c.get('client_name', '')) # Sorting done by CRUD
 
         for client_data in all_clients_dicts:
             country_name = "N/A"
             if client_data.get('country_id'):
-                country_obj = get_country_by_id(client_data['country_id'])
+                country_obj = get_country_by_id(db, client_data['country_id'])
                 if country_obj: country_name = country_obj['country_name']
             city_name = "N/A"
             if client_data.get('city_id'):
-                city_obj = get_city_by_id(client_data['city_id'])
+                city_obj = get_city_by_id(db, client_data['city_id'])
                 if city_obj: city_name = city_obj['city_name']
             status_name = "N/A"
             status_id_val = client_data.get('status_id')
             if status_id_val:
-                status_obj = get_status_setting_by_id(status_id_val)
+                status_obj = get_status_setting_by_id(db, status_id_val)
                 if status_obj: status_name = status_obj['status_name']
 
             adapted_client_dict = {
@@ -635,8 +201,9 @@ def load_and_display_clients(doc_manager, filters: dict = None, limit: int = Non
                 "category": client_data.get('category', 'Standard')
             }
             doc_manager.clients_data_map[adapted_client_dict["client_id"]] = adapted_client_dict
-            doc_manager.add_client_to_list_widget(adapted_client_dict) # add_client_to_list_widget is a method of DocumentManager
+            doc_manager.add_client_to_list_widget(adapted_client_dict)
     except Exception as e:
+        logging.error(f"Error loading and displaying clients: {e}", exc_info=True)
         QMessageBox.critical(doc_manager, doc_manager.tr("Erreur DB"), doc_manager.tr("Erreur de chargement des clients:\n{0}").format(str(e)))
 
 def filter_and_display_clients(doc_manager):
@@ -661,16 +228,16 @@ def filter_and_display_clients(doc_manager):
         doc_manager.add_client_to_list_widget(client_data_val) # add_client_to_list_widget is a method of DocumentManager
 
 def perform_old_clients_check(doc_manager):
+    db = None
     try:
+        db = get_db_connection()
         reminder_days_val = doc_manager.config.get("default_reminder_days", 30)
-        s_archived_obj = get_status_setting_by_name('Archivé', 'Client')
+        s_archived_obj = get_status_setting_by_name(db, 'Archivé', 'Client')
         s_archived_id = s_archived_obj['status_id'] if s_archived_obj else -1
-        s_complete_obj = get_status_setting_by_name('Complété', 'Client')
+        s_complete_obj = get_status_setting_by_name(db, 'Complété', 'Client')
         s_complete_id = s_complete_obj['status_id'] if s_complete_obj else -2
 
-        # Get all non-deleted clients for this check by default
-        all_clients = clients_crud_instance.get_all_clients(include_deleted=False)
-        # if all_clients is None: all_clients = [] # get_all_clients returns list
+        all_clients = clients_crud_instance.get_all_clients(db, include_deleted=False)
         old_clients_to_notify = []
         cutoff_date = datetime.now() - timedelta(days=reminder_days_val)
 
@@ -679,19 +246,17 @@ def perform_old_clients_check(doc_manager):
                 creation_date_str = client.get('created_at')
                 if creation_date_str:
                     try:
-                        if 'T' in creation_date_str and '.' in creation_date_str:
-                            client_creation_date = datetime.fromisoformat(creation_date_str.split('.')[0])
-                        elif 'T' in creation_date_str:
-                             client_creation_date = datetime.fromisoformat(creation_date_str.replace('Z', ''))
-                        else:
-                            client_creation_date = datetime.strptime(creation_date_str, "%Y-%m-%d")
+                        # Robust parsing for different ISO formats
+                        dt_str = str(creation_date_str).split('.')[0].replace('Z', '')
+                        client_creation_date = datetime.fromisoformat(dt_str)
+
                         if client_creation_date <= cutoff_date:
                             old_clients_to_notify.append({
                                 'client_id': client.get('client_id'),
                                 'client_name': client.get('client_name'),
                                 'creation_date_str': client_creation_date.strftime("%Y-%m-%d")
                             })
-                    except ValueError as ve:
+                    except (ValueError, TypeError) as ve:
                         logging.warning(f"Could not parse creation_date '{creation_date_str}' for client {client.get('client_id')}: {ve}")
                         continue
         if old_clients_to_notify:
@@ -703,196 +268,193 @@ def perform_old_clients_check(doc_manager):
             )
             if reply == QMessageBox.Yes:
                 for c_info in old_clients_to_notify:
-                    archive_client_status(doc_manager, c_info['client_id']) # Call the refactored function
+                    archive_client_status(doc_manager, c_info['client_id'])
     except Exception as e:
-        logging.error(f"Erreur vérification clients anciens: {type(e).__name__} - {str(e)}", exc_info=True) # Log exception type and full traceback
+        logging.error(f"Erreur vérification clients anciens: {type(e).__name__} - {str(e)}", exc_info=True)
+    finally:
+        if db:
+            db.close()
 
 def handle_open_edit_client_dialog(doc_manager, client_id):
-    current_client_data = doc_manager.clients_data_map.get(client_id)
-    if not current_client_data:
-        QMessageBox.warning(doc_manager, doc_manager.tr("Erreur"), doc_manager.tr("Client non trouvé."))
-        doc_manager.notify(title=doc_manager.tr("Client Introuvable"),
-                           message=doc_manager.tr("Les données du client (ID: {0}) n'ont pas pu être chargées pour modification.").format(client_id),
-                           type='ERROR')
-        return
+    # This function is called from the UI, so it should manage its own session.
+    db = None
+    try:
+        db = get_db_connection()
+        # Fetch the most recent client data to populate the dialog
+        current_client_data = clients_crud_instance.get_client_by_id(db, client_id, include_deleted=True)
+        if not current_client_data:
+            QMessageBox.warning(doc_manager, doc_manager.tr("Erreur"), doc_manager.tr("Client non trouvé."))
+            doc_manager.notify(title=doc_manager.tr("Client Introuvable"),
+                               message=doc_manager.tr("Les données du client (ID: {0}) n'ont pas pu être chargées pour modification.").format(client_id),
+                               type='ERROR')
+            return
 
-    dialog = EditClientDialog(current_client_data, doc_manager.config, doc_manager) # Pass doc_manager as parent
-    if dialog.exec_() == QDialog.Accepted:
-        updated_form_data = dialog.get_data()
-        data_for_db_update = {
-            'client_name': updated_form_data.get('client_name'), 'company_name': updated_form_data.get('company_name'),
-            'primary_need_description': updated_form_data.get('primary_need_description'), 'project_identifier': updated_form_data.get('project_identifier'),
-            'country_id': updated_form_data.get('country_id'), 'city_id': updated_form_data.get('city_id'),
-            'selected_languages': updated_form_data.get('selected_languages'), 'status_id': updated_form_data.get('status_id'),
-            'notes': updated_form_data.get('notes'), 'category': updated_form_data.get('category')
-        }
-        # Use clients_crud_instance.update_client
-        update_result = clients_crud_instance.update_client(client_id, data_for_db_update)
-        if update_result['success']:
-            # load_and_display_clients needs to be called with current filters/pagination
-            # This might require main_window to handle the refresh.
-            # For now, assume a simple refresh.
-            doc_manager.load_clients_from_db_slot() # Call the slot in main_window for full refresh logic
-            # The following lines might be redundant if load_clients_from_db_slot updates clients_data_map
-            # and refreshes tabs correctly.
-            # load_and_display_clients(doc_manager) # Refresh map and list widget
-            updated_client_data_for_tab = doc_manager.clients_data_map.get(client_id) # Get fresh data after load_and_display_clients
-            client_name_for_notify = updated_client_data_for_tab.get('client_name', str(client_id)) if updated_client_data_for_tab else str(client_id)
-            doc_manager.notify(title=doc_manager.tr("Client Mis à Jour"),
-                               message=doc_manager.tr("Les informations du client '{0}' ont été mises à jour.").format(client_name_for_notify),
-                               type='SUCCESS')
-            tab_refreshed = False
-            for i in range(doc_manager.client_tabs_widget.count()):
-                tab_widget = doc_manager.client_tabs_widget.widget(i)
-                if hasattr(tab_widget, 'client_info') and tab_widget.client_info.get("client_id") == client_id:
-                    if hasattr(tab_widget, 'refresh_display'):
-                        if updated_client_data_for_tab: # Ensure it's not None
+        dialog = EditClientDialog(current_client_data, doc_manager.config, doc_manager)
+        if dialog.exec_() == QDialog.Accepted:
+            updated_form_data = dialog.get_data()
+            data_for_db_update = {
+                'client_name': updated_form_data.get('client_name'), 'company_name': updated_form_data.get('company_name'),
+                'primary_need_description': updated_form_data.get('primary_need_description'), 'project_identifier': updated_form_data.get('project_identifier'),
+                'country_id': updated_form_data.get('country_id'), 'city_id': updated_form_data.get('city_id'),
+                'selected_languages': updated_form_data.get('selected_languages'), 'status_id': updated_form_data.get('status_id'),
+                'notes': updated_form_data.get('notes'), 'category': updated_form_data.get('category')
+            }
+            update_result = clients_crud_instance.update_client(db, client_id, data_for_db_update)
+            if update_result['success']:
+                doc_manager.load_clients_from_db_slot() # This reloads the main list and map
+
+                # After reloading, get the fresh data to notify and update tab
+                updated_client_data_for_tab = doc_manager.clients_data_map.get(client_id)
+                client_name_for_notify = updated_client_data_for_tab.get('client_name', str(client_id)) if updated_client_data_for_tab else str(client_id)
+                doc_manager.notify(title=doc_manager.tr("Client Mis à Jour"),
+                                   message=doc_manager.tr("Les informations du client '{0}' ont été mises à jour.").format(client_name_for_notify),
+                                   type='SUCCESS')
+
+                for i in range(doc_manager.client_tabs_widget.count()):
+                    tab_widget = doc_manager.client_tabs_widget.widget(i)
+                    if hasattr(tab_widget, 'client_info') and tab_widget.client_info.get("client_id") == client_id:
+                        if hasattr(tab_widget, 'refresh_display') and updated_client_data_for_tab:
                             tab_widget.refresh_display(updated_client_data_for_tab)
                             doc_manager.client_tabs_widget.setTabText(i, updated_client_data_for_tab.get('client_name', 'Client'))
-                            tab_refreshed = True
-                    break
-            doc_manager.stats_widget.update_stats()
-        else:
-            QMessageBox.warning(doc_manager, doc_manager.tr("Erreur"), doc_manager.tr("Échec de la mise à jour du client."))
-            doc_manager.notify(title=doc_manager.tr("Erreur Mise à Jour Client"),
-                               message=doc_manager.tr("Impossible de mettre à jour les informations du client ID: {0}.").format(client_id),
-                               type='ERROR')
+                        break
+
+                # Refresh stats widget if it exists
+                if hasattr(doc_manager, 'statistics_summary_widget_instance') and doc_manager.statistics_summary_widget_instance:
+                    if hasattr(doc_manager.statistics_summary_widget_instance, 'update_stats'):
+                        doc_manager.statistics_summary_widget_instance.update_stats()
+
+            else:
+                QMessageBox.warning(doc_manager, doc_manager.tr("Erreur"), doc_manager.tr("Échec de la mise à jour du client."))
+                doc_manager.notify(title=doc_manager.tr("Erreur Mise à Jour Client"),
+                                   message=doc_manager.tr("Impossible de mettre à jour les informations du client ID: {0}.").format(client_id),
+                                   type='ERROR')
+    except Exception as e:
+        logging.error(f"Error during edit client dialog or update for client {client_id}: {e}", exc_info=True)
+        QMessageBox.critical(doc_manager, doc_manager.tr("Erreur Inattendue"), doc_manager.tr("Une erreur inattendue est survenue."))
+    finally:
+        if db:
+            db.close()
 
 def archive_client_status(doc_manager, client_id):
     if client_id not in doc_manager.clients_data_map: return
+
+    client_name_for_notify = doc_manager.clients_data_map[client_id].get('client_name', str(client_id))
+    db = None
     try:
-        status_archived_obj = get_status_setting_by_name('Archivé', 'Client')
+        db = get_db_connection()
+        status_archived_obj = get_status_setting_by_name(db, 'Archivé', 'Client')
         if not status_archived_obj:
             QMessageBox.critical(doc_manager, doc_manager.tr("Erreur Configuration"),
                                  doc_manager.tr("Statut 'Archivé' non trouvé. Veuillez configurer les statuts."))
-            doc_manager.notify(title=doc_manager.tr("Erreur Configuration Statut"),
-                               message=doc_manager.tr("Statut 'Archivé' non trouvé. Impossible d'archiver."),
-                               type='ERROR')
             return
-        archived_status_id = status_archived_obj['status_id']
-        client_name_for_notify = doc_manager.clients_data_map[client_id].get('client_name', str(client_id))
 
-        # Update client to archived status and also set soft delete flags
+        archived_status_id = status_archived_obj['status_id']
+
         update_data = {
             'status_id': archived_status_id,
-            'is_deleted': True, # Explicitly mark as soft-deleted
+            'is_deleted': True,
             'deleted_at': datetime.utcnow().isoformat() + "Z"
         }
-        update_result = clients_crud_instance.update_client(client_id, update_data)
+        update_result = clients_crud_instance.update_client(db, client_id, update_data)
 
-        if update_result['success'] and update_result.get('updated_count', 0) > 0:
-            # Update local map, though a full refresh might be better
-            if client_id in doc_manager.clients_data_map:
-                doc_manager.clients_data_map[client_id]["status"] = status_archived_obj['status_name'] # "Archivé"
-                doc_manager.clients_data_map[client_id]["status_id"] = archived_status_id
-                doc_manager.clients_data_map[client_id]["is_deleted"] = True # Reflect soft delete in map
-
-            # Refresh display considering current filters (especially include_deleted)
-            doc_manager.filter_client_list_display_slot() # Use the main_window slot
-            # load_and_display_clients(doc_manager) # Or call with current filters
-            filter_and_display_clients(doc_manager) # Refresh list display
-            for i in range(doc_manager.client_tabs_widget.count()):
-                tab_w = doc_manager.client_tabs_widget.widget(i)
-                if hasattr(tab_w, 'client_info') and tab_w.client_info["client_id"] == client_id:
-                    if hasattr(tab_w, 'status_combo'): # Check if ClientWidget has status_combo
-                        tab_w.status_combo.setCurrentText("Archivé") # Update status combo in open tab
-                    break
-            doc_manager.stats_widget.update_stats()
-            # QMessageBox.information(doc_manager, doc_manager.tr("Client Archivé"),
-            #                         doc_manager.tr("Le client '{0}' a été archivé.").format(client_name_for_notify))
-            doc_manager.notify(title=doc_manager.tr("Client Archivé"),
-                               message=doc_manager.tr("Le client '{0}' a été archivé.").format(client_name_for_notify),
-                               type='INFO')
-        else:
-            QMessageBox.critical(doc_manager, doc_manager.tr("Erreur DB"),
-                                 doc_manager.tr("Erreur d'archivage du client. Vérifiez les logs."))
-            doc_manager.notify(title=doc_manager.tr("Erreur Archivage"),
-                               message=doc_manager.tr("Erreur d'archivage du client '{0}'.").format(client_name_for_notify),
-                               type='ERROR')
-
-        # Log activity for client archival
-        try:
+        if update_result.get('success'):
             log_data = {
                 "user_id": doc_manager.current_user_id,
-                "action_type": "CLIENT_ARCHIVED", # Or CLIENT_STATUS_CHANGED
+                "action_type": "CLIENT_ARCHIVED",
                 "details": f"Client '{client_name_for_notify}' (ID: {client_id}) archivé.",
                 "related_entity_type": "Client",
                 "related_entity_id": client_id,
                 "related_client_id": client_id
             }
-            add_activity_log(log_data)
-            logging.info(f"Activity logged for CLIENT_ARCHIVED: {client_id}")
-        except Exception as e_log:
-            logging.error(f"Failed to log CLIENT_ARCHIVED activity for client {client_id}: {e_log}", exc_info=True)
+            add_activity_log(db, log_data)
 
+            # Commit changes before refreshing UI
+            db.commit()
+
+            # UI updates after successful DB operations
+            doc_manager.load_clients_from_db_slot()
+
+            # Close the tab for the archived client
+            for i in range(doc_manager.client_tabs_widget.count()):
+                tab_w = doc_manager.client_tabs_widget.widget(i)
+                if hasattr(tab_w, 'client_info') and tab_w.client_info["client_id"] == client_id:
+                    doc_manager.close_client_tab(i)
+                    break
+
+            if hasattr(doc_manager, 'statistics_summary_widget_instance') and doc_manager.statistics_summary_widget_instance:
+                if hasattr(doc_manager.statistics_summary_widget_instance, 'update_stats'):
+                    doc_manager.statistics_summary_widget_instance.update_stats()
+
+            doc_manager.notify(title=doc_manager.tr("Client Archivé"),
+                               message=doc_manager.tr("Le client '{0}' a été archivé.").format(client_name_for_notify),
+                               type='INFO')
+        else:
+            db.rollback()
+            error_msg = update_result.get('error', 'Unknown error')
+            QMessageBox.critical(doc_manager, doc_manager.tr("Erreur DB"),
+                                 doc_manager.tr("Erreur d'archivage du client: {0}").format(error_msg))
     except Exception as e:
-        QMessageBox.critical(doc_manager, doc_manager.tr("Erreur DB"), doc_manager.tr("Erreur d'archivage du client:\n{0}").format(str(e)))
-        doc_manager.notify(title=doc_manager.tr("Erreur Archivage Inattendue"),
-                           message=doc_manager.tr("Erreur inattendue lors de l'archivage du client '{0}'.").format(client_name_for_notify),
-                           type='ERROR')
+        if db: db.rollback()
+        logging.error(f"Erreur inattendue lors de l'archivage du client '{client_name_for_notify}': {e}", exc_info=True)
+        QMessageBox.critical(doc_manager, doc_manager.tr("Erreur Inattendue"), doc_manager.tr("Erreur d'archivage du client:\n{0}").format(str(e)))
+    finally:
+        if db:
+            db.close()
 
 def permanently_delete_client(doc_manager, client_id):
     if client_id not in doc_manager.clients_data_map: return
     client_name_val = doc_manager.clients_data_map[client_id]['client_name']
-    client_folder_path = doc_manager.clients_data_map[client_id]["base_folder_path"]
 
+    # The confirmation dialog text should reflect that this is a soft delete (archival)
     reply = QMessageBox.question(
-        doc_manager, doc_manager.tr("Confirmer Suppression"),
-        doc_manager.tr("Supprimer '{0}'?\nCeci supprimera le client de la base de données et son dossier de fichiers (si possible).\nCette action est irréversible.").format(client_name_val),
+        doc_manager, doc_manager.tr("Confirmer l'Archivage"),
+        doc_manager.tr("Archiver '{0}'?\nCeci marquera le client comme supprimé et le cachera des listes par défaut. Le dossier du client ne sera PAS supprimé.\nCette action peut généralement être annulée.").format(client_name_val),
         QMessageBox.Yes | QMessageBox.No, QMessageBox.No
     )
-    if reply == QMessageBox.Yes:
-        try:
-            # clients_crud_instance.delete_client now handles soft delete AND status update.
-            delete_result = clients_crud_instance.delete_client(client_id)
+    if reply == QMessageBox.No:
+        return
 
-            if delete_result['success']:
-                # Folder removal logic might be re-evaluated.
-                # For soft delete, typically data isn't removed from filesystem immediately.
-                # For now, keeping the rmtree logic but it's less common with soft delete.
-                # Consider making folder archival a separate process or based on a longer-term policy.
-                # logging.info(f"Client {client_id} soft-deleted. Folder {client_folder_path} was NOT removed as part of soft delete.")
-                # Le dossier n'est PAS supprimé lors d'un soft delete.
-                # La suppression de dossier pourrait être une action manuelle séparée ou lors d'un hard delete futur.
-                logging.info(f"Client {client_id} marqué comme supprimé (soft delete). Le dossier {client_folder_path} n'est PAS supprimé.")
+    db = None
+    try:
+        db = get_db_connection()
+        # The function clients_crud_instance.delete_client performs a soft delete.
+        delete_result = clients_crud_instance.delete_client(db, client_id)
 
+        if delete_result.get('success'):
+            db.commit()
+            logging.info(f"Client {client_id} marked as deleted (soft delete).")
 
-                # Update UI
-                if client_id in doc_manager.clients_data_map:
-                    # Option 1: Remove from map if not showing archived (depends on filter logic)
-                    # Option 2: Update client_data_map entry to reflect new status and is_deleted, then let filter handle it.
-                    # For simplicity with current filter_client_list_display_slot, a full refresh via load_clients_from_db_slot is better.
-                    pass # Let load_clients_from_db_slot handle map refresh
+            # Update UI
+            doc_manager.load_clients_from_db_slot()
 
-                doc_manager.load_clients_from_db_slot() # This will reload and re-filter the list
+            # Close the tab for the archived client if it's open
+            for i in range(doc_manager.client_tabs_widget.count()):
+                tab_widget = doc_manager.client_tabs_widget.widget(i)
+                if hasattr(tab_widget, 'client_info') and tab_widget.client_info.get("client_id") == client_id:
+                    doc_manager.close_client_tab(i)
+                    logging.info(f"Closed tab for archived client {client_id}.")
+                    break
 
-                # Close the tab for the archived client if it's open
-                for i in range(doc_manager.client_tabs_widget.count()):
-                    tab_widget = doc_manager.client_tabs_widget.widget(i)
-                    if hasattr(tab_widget, 'client_info') and tab_widget.client_info.get("client_id") == client_id:
-                        doc_manager.close_client_tab(i)
-                        logging.info(f"Closed tab for archived client {client_id}.")
-                        break
+            if hasattr(doc_manager, 'statistics_summary_widget_instance') and doc_manager.statistics_summary_widget_instance:
+                if hasattr(doc_manager.statistics_summary_widget_instance, 'update_stats'):
+                    doc_manager.statistics_summary_widget_instance.update_stats()
 
-                if hasattr(doc_manager, 'stats_widget') and doc_manager.stats_widget: # Check if stats_widget exists
-                    doc_manager.stats_widget.update_stats()
-
-                doc_manager.notify(title=doc_manager.tr("Client Archivé"),
-                                   message=doc_manager.tr("Le client '{0}' a été archivé avec succès.").format(client_name_val),
-                                   type='INFO') # Changed from SUCCESS to INFO as it's an archival
-            else:
-                error_message = delete_result.get('error', doc_manager.tr("Erreur inconnue lors de l'archivage."))
-                QMessageBox.critical(doc_manager, doc_manager.tr("Erreur Archivage"),
-                                     doc_manager.tr("Erreur lors de l'archivage du client: {0}").format(error_message))
-                doc_manager.notify(title=doc_manager.tr("Erreur Archivage"),
-                                   message=doc_manager.tr("Erreur d'archivage du client '{0}': {1}").format(client_name_val, error_message),
-                                   type='ERROR')
-        except Exception as e_archive: # Catch any other unexpected error during the process
-             QMessageBox.critical(doc_manager, doc_manager.tr("Erreur Inattendue"),
-                                  doc_manager.tr("Une erreur inattendue est survenue lors de l'archivage du client:\n{0}").format(str(e_archive)))
-             doc_manager.notify(title=doc_manager.tr("Erreur Archivage Inattendue"),
-                                message=doc_manager.tr("Erreur inattendue lors de l'archivage du client '{0}'.").format(client_name_val),
-                                type='ERROR')
+            doc_manager.notify(title=doc_manager.tr("Client Archivé"),
+                               message=doc_manager.tr("Le client '{0}' a été archivé avec succès.").format(client_name_val),
+                               type='INFO')
+        else:
+            db.rollback()
+            error_message = delete_result.get('error', doc_manager.tr("Erreur inconnue lors de l'archivage."))
+            QMessageBox.critical(doc_manager, doc_manager.tr("Erreur Archivage"),
+                                 doc_manager.tr("Erreur lors de l'archivage du client: {0}").format(error_message))
+    except Exception as e_archive:
+        if db: db.rollback()
+        logging.error(f"Erreur inattendue lors de l'archivage (soft delete) du client '{client_name_val}': {e_archive}", exc_info=True)
+        QMessageBox.critical(doc_manager, doc_manager.tr("Erreur Inattendue"),
+                             doc_manager.tr("Une erreur inattendue est survenue lors de l'archivage du client:\n{0}").format(str(e_archive)))
+    finally:
+        if db:
+            db.close()
 
 # --- Invoice Generation and DB Update Logic ---
 # Assuming invoice_generation_logic.py is at the same level or in PYTHONPATH
@@ -911,152 +473,96 @@ def create_final_invoice_and_update_db(
     created_by_user_id: str = None
 ) -> tuple[bool, str | None, str | None]:
     """
-    Generates a final invoice PDF, saves it, and creates corresponding entries
-    in ClientDocuments and Invoices tables.
-
-    Args:
-        client_id: ID of the client.
-        company_id: ID of the seller company.
-        target_language_code: Language for the invoice.
-        line_items: List of product/service line items.
-        project_id: Optional project ID.
-        additional_context_overrides: Optional dict to override context values.
-        created_by_user_id: Optional ID of the user creating the document.
-
-    Returns:
-        Tuple: (success_status, new_invoice_table_id, new_client_document_id)
+    Generates a final invoice PDF and creates corresponding DB entries in a single transaction.
     """
     logging.info(f"Attempting to create final invoice for client {client_id}, project {project_id}")
 
-    pdf_bytes, suggested_filename, full_context = generate_final_invoice_pdf(
-        client_id=client_id,
-        company_id=company_id,
-        target_language_code=target_language_code,
-        line_items=line_items,
-        project_id=project_id,
-        additional_context_overrides=additional_context_overrides
-    )
+    db = None
+    final_pdf_path = None
+    new_client_doc_id = None
 
-    if pdf_bytes is None or full_context is None:
-        logging.error(f"Failed to generate PDF bytes or context for client {client_id}.")
-        return False, None, None
-
-    # Determine Save Path & Save PDF
     try:
-        client_data = clients_crud.get_client_by_id(client_id) # Assumes this returns a dict-like object
-        if not client_data or not client_data.get('default_base_folder_path'):
-            logging.error(f"Client data or base folder path not found for client_id: {client_id}")
-            return False, None, None
+        db = get_db_connection()
 
-        # Construct save directory: <client_base_folder>/<lang>/Invoices/
-        # Ensure lang code is filesystem-friendly; it usually is (e.g., "en", "fr")
+        # Step 1: Generate PDF bytes and context in memory. This part doesn't need the DB yet.
+        pdf_bytes, suggested_filename, full_context = generate_final_invoice_pdf(
+            db=db, # Pass db session to generator in case it needs it
+            client_id=client_id,
+            company_id=company_id,
+            target_language_code=target_language_code,
+            line_items=line_items,
+            project_id=project_id,
+            additional_context_overrides=additional_context_overrides
+        )
+
+        if pdf_bytes is None or full_context is None:
+            raise Exception("Failed to generate PDF bytes or context.")
+
+        # Step 2: Determine Save Path
+        client_data = clients_crud_instance.get_client_by_id(db, client_id)
+        if not client_data or not client_data.get('default_base_folder_path'):
+            raise Exception(f"Client data or base folder path not found for client_id: {client_id}")
+
         save_directory = os.path.join(client_data['default_base_folder_path'], target_language_code, "Invoices")
         os.makedirs(save_directory, exist_ok=True)
-
         final_pdf_path = os.path.join(save_directory, suggested_filename)
 
-        with open(final_pdf_path, 'wb') as f:
-            f.write(pdf_bytes)
-        logging.info(f"Successfully saved final invoice PDF to: {final_pdf_path}")
-
-    except IOError as e:
-        logging.error(f"IOError saving PDF for client {client_id}: {e}", exc_info=True)
-        return False, None, None
-    except Exception as e: # Catch other potential errors from client_data fetching or os ops
-        logging.error(f"Error during PDF saving prep for client {client_id}: {e}", exc_info=True)
-        return False, None, None
-
-    # Create ClientDocuments Entry
-    new_client_doc_id = None
-    try:
-        # Ensure default_base_folder_path ends with a separator for clean relpath, or handle robustly
+        # Step 3: Create ClientDocuments Entry
         base_path_for_rel = client_data['default_base_folder_path']
-        if not base_path_for_rel.endswith(os.path.sep):
-            base_path_for_rel += os.path.sep
-
-        # Check if final_pdf_path is indeed under base_path_for_rel before making relpath
-        # This is a basic check. os.path.commonpath can be more robust if paths are complex.
-        if not final_pdf_path.startswith(base_path_for_rel):
-            logging.error(f"Generated PDF path '{final_pdf_path}' is not under client base folder '{base_path_for_rel}'. Cannot determine relative path.")
-            # Consider cleanup: os.remove(final_pdf_path)
-            return False, None, None
-
         relative_pdf_path = os.path.relpath(final_pdf_path, base_path_for_rel)
 
-
         client_doc_data = {
-            'document_id': str(uuid.uuid4()), # Generate a new UUID for the document
-            'client_id': client_id,
-            'project_id': project_id,
-            'order_identifier': full_context.get("doc", {}).get("invoice_number"), # Use invoice number as order_identifier
-            'document_name': suggested_filename,
-            'file_name_on_disk': suggested_filename,
-            'file_path_relative': relative_pdf_path,
-            'document_type_generated': "FINAL_INVOICE", # Specific type for final invoices
-            'source_template_id': None, # Not directly from a template record in DB in this flow
-            'version_tag': "1.0",
+            'client_id': client_id, 'project_id': project_id,
+            'order_identifier': full_context.get("doc", {}).get("invoice_number"),
+            'document_name': suggested_filename, 'file_name_on_disk': suggested_filename,
+            'file_path_relative': relative_pdf_path, 'document_type_generated': "FINAL_INVOICE",
+            'source_template_id': None, 'version_tag': "1.0",
             'notes': f"Final Invoice generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            'created_at': datetime.now().isoformat(),
-            'updated_at': datetime.now().isoformat(),
             'created_by_user_id': created_by_user_id
         }
-        new_client_doc_id_from_crud = client_documents_crud.add_client_document(client_doc_data)
+        new_client_doc_id = client_documents_crud.add_client_document(db, client_doc_data)
+        if not new_client_doc_id:
+            raise Exception("Failed to create ClientDocuments DB entry.")
+        logging.info(f"ClientDocuments entry pre-committed with ID: {new_client_doc_id}")
 
-        if not new_client_doc_id_from_crud: # add_client_document should return the ID string
-            logging.error(f"Failed to create ClientDocuments entry for invoice {suggested_filename}, client {client_id}.")
-            # Consider cleanup: os.remove(final_pdf_path)
-            return False, None, None
-        new_client_doc_id = client_doc_data['document_id'] # Use the UUID we generated
-        logging.info(f"ClientDocuments entry created with ID: {new_client_doc_id} (CRUD returned: {new_client_doc_id_from_crud})")
-
-    except Exception as e:
-        logging.error(f"Error creating ClientDocuments entry for client {client_id}: {e}", exc_info=True)
-        # Consider cleanup: os.remove(final_pdf_path) if it was saved
-        return False, None, None
-
-    # Create Invoices Table Entry
-    new_invoice_table_id = None
-    try:
+        # Step 4: Create Invoices Table Entry
         doc_ctx = full_context.get("doc", {})
         invoice_table_data = {
-            'invoice_id': str(uuid.uuid4()), # Generate a new UUID for the invoice table primary key
-            'client_id': client_id,
-            'project_id': project_id,
-            'document_id': new_client_doc_id, # Link to the ClientDocuments entry
-            'invoice_number': doc_ctx.get("invoice_number"),
-            'issue_date': doc_ctx.get("issue_date"),
-            'due_date': doc_ctx.get("due_date"),
-            'total_amount': doc_ctx.get("grand_total_amount_raw"), # Use raw numeric value
-            'currency': doc_ctx.get("currency_symbol"), # Ensure this is just symbol or code as per DB
-            'payment_status': 'unpaid', # Default for new final invoices
-            'payment_date': None,
-            'payment_method': None,
-            'transaction_id': None,
+            'client_id': client_id, 'project_id': project_id,
+            'document_id': new_client_doc_id,
+            'invoice_number': doc_ctx.get("invoice_number"), 'issue_date': doc_ctx.get("issue_date"),
+            'due_date': doc_ctx.get("due_date"), 'total_amount': doc_ctx.get("grand_total_amount_raw"),
+            'currency': doc_ctx.get("currency_symbol"), 'payment_status': 'unpaid',
             'notes': doc_ctx.get("notes", ""),
-            # created_at, updated_at are usually handled by DB defaults in Invoices table
         }
+        new_invoice_table_id = invoices_crud.add_invoice(db, invoice_table_data)
+        if not new_invoice_table_id:
+            raise Exception("Failed to create Invoices table DB entry.")
+        logging.info(f"Invoices table entry pre-committed with ID: {new_invoice_table_id}")
 
-        # Ensure currency is just the code/symbol, not amount + symbol
-        if invoice_table_data['currency'] and ' ' in invoice_table_data['currency']: # e.g. "1,234.00 EUR"
-             invoice_table_data['currency'] = invoice_table_data['currency'].split(' ')[-1]
-        elif len(invoice_table_data.get('currency', '')) > 3 : # e.g. "EUR" is fine, but "Euro" might be too long if schema expects code
-             # This logic depends on how currency_symbol is formatted by format_currency and what DB expects
-             # For now, assume currency_symbol from context is just the code like "USD", "EUR"
-             pass
+        # Step 5: Write PDF to disk
+        with open(final_pdf_path, 'wb') as f:
+            f.write(pdf_bytes)
+        logging.info(f"Successfully wrote final invoice PDF to: {final_pdf_path}")
 
+        # Step 6: Commit transaction
+        db.commit()
+        logging.info(f"Successfully committed invoice transaction for client {client_id}.")
 
-        new_invoice_table_id_from_crud = invoices_crud.add_invoice(invoice_table_data)
-        if not new_invoice_table_id_from_crud:
-            logging.error(f"Failed to create Invoices table entry for invoice number {doc_ctx.get('invoice_number')}.")
-            # Consider cleanup: os.remove(final_pdf_path) and client_documents_crud.delete_client_document(new_client_doc_id)
-            return False, None, new_client_doc_id
-        new_invoice_table_id = invoice_table_data['invoice_id'] # Use the UUID we generated
-        logging.info(f"Invoices table entry created with ID: {new_invoice_table_id} (CRUD returned: {new_invoice_table_id_from_crud})")
+        return True, new_invoice_table_id, new_client_doc_id
 
     except Exception as e:
-        logging.error(f"Error creating Invoices table entry for client {client_id}: {e}", exc_info=True)
-        # Consider cleanup: os.remove(final_pdf_path) and client_documents_crud.delete_client_document(new_client_doc_id) if new_client_doc_id exists
-        return False, None, new_client_doc_id
-
-    logging.info(f"Successfully created final invoice, ClientDocument, and Invoice DB entry for client {client_id}. Invoice ID: {new_invoice_table_id}, Document ID: {new_client_doc_id}")
-    return True, new_invoice_table_id, new_client_doc_id
+        logging.error(f"Error in invoice creation transaction for client {client_id}: {e}", exc_info=True)
+        if db:
+            db.rollback()
+        # Cleanup partial artifacts if they were created before the error
+        if final_pdf_path and os.path.exists(final_pdf_path):
+            try:
+                os.remove(final_pdf_path)
+                logging.info(f"Cleaned up partially created PDF file: {final_pdf_path}")
+            except OSError as e_cleanup:
+                logging.error(f"Failed to cleanup PDF file '{final_pdf_path}': {e_cleanup}")
+        return False, None, new_client_doc_id # Return doc id if it was created, for potential manual cleanup
+    finally:
+        if db:
+            db.close()

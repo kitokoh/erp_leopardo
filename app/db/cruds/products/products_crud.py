@@ -3,6 +3,9 @@ import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 from ...generic_crud import _manage_conn
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+from app.models.db.products.product import Product
 
 logger = logging.getLogger(__name__)
 
@@ -147,9 +150,17 @@ def get_equivalent_products(product_id: int, conn: sqlite3.Connection = None):
     logger.warning("get_equivalent_products is not implemented")
     return []
 
-def get_total_products_count(conn: sqlite3.Connection = None, include_deleted: bool = False) -> int:
-    logger.warning("get_total_products_count is not implemented")
-    return 0
+def get_total_products_count(db: Session, include_deleted: bool = False) -> int:
+    """Counts the total number of products in the database."""
+    try:
+        query = db.query(func.count(Product.product_id))
+        if not include_deleted:
+            query = query.filter(Product.is_deleted == False)
+        count = query.scalar()
+        return count if count is not None else 0
+    except Exception as e:
+        logger.error(f"Error counting products: {e}", exc_info=True)
+        return 0
 
 # This is a class instance that is not used anymore, but kept for compatibility with other files that might import it.
 class ProductsCRUD:
