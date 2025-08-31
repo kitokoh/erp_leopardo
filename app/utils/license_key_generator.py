@@ -1,10 +1,8 @@
-"""
 License Key Generator Utility
 
 This script generates RSA key pairs and creates signed license keys.
 License data is provided as a JSON structure, signed with a private RSA key.
 The application can then verify the license using the corresponding public key.
-"""
 import argparse
 import json
 import uuid
@@ -210,4 +208,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-"""

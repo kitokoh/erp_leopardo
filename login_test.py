@@ -17,14 +17,13 @@ def run_login_only_test():
     """
     logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(message)s')
 
-    # 1. Configure for the test database
-    CONFIG['database_path'] = os.path.join(project_root, 'test.db')
-    CONFIG['database_url'] = f"sqlite:///{CONFIG['database_path']}"
-
-    db_path = CONFIG['database_path']
+    # 1. Configure for the application database
+    db_path = os.path.join(project_root, 'app_data.db')
+    CONFIG['database_path'] = db_path
+    CONFIG['database_url'] = f"sqlite:///{db_path}"
 
     if not os.path.exists(db_path):
-        logging.error(">>> Login Test FAILED: Database file does not exist. Run migration and seeding tests first. <<<")
+        logging.error(f">>> Login Test FAILED: Database file does not exist at {db_path}. Run migration and seeding first. <<<")
         return False
 
     # 2. Initialize the engine and attempt to log in
@@ -50,11 +49,6 @@ def run_login_only_test():
     except Exception as e:
         logging.error(">>> Admin Login Test FAILED: An exception occurred during login attempt.", exc_info=True)
         return False
-    finally:
-        # Clean up the test database after the final test
-        if os.path.exists(db_path):
-            os.remove(db_path)
-            logging.info(f"Cleaned up test database: {db_path}")
 
 
 if __name__ == "__main__":

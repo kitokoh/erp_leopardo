@@ -1,7 +1,8 @@
 import os
 
 # --- Application Root ---
-APP_ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+# The correct root is three levels up from this file's directory (app/core/ -> app/ -> app -> /)
+APP_ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # --- Database Settings ---
 DATABASE_NAME = "app_data.db"
