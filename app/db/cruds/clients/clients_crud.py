@@ -30,7 +30,7 @@ class ClientsCRUD(GenericCRUD):
         self.id_column = "client_id"
         self.logger = logging.getLogger(__name__) # Add logger instance
 
-    def add_client(self, db: Session, data: dict) -> dict:
+    def add_client(self, data: dict, conn: Session) -> dict:
         """
         Adds a new client to the database using the ORM.
         """
@@ -66,11 +66,11 @@ class ClientsCRUD(GenericCRUD):
             created_by_user_id=data.get('created_by_user_id'),
             default_template_id=data.get('default_template_id')
         )
-        db.add(new_client)
+        conn.add(new_client)
 
         # Create default order and project
-        default_order_status = status_service.get_default_status_for_commande_creation(db)
-        default_project_status = status_service.get_default_status_for_type(db, status_models.StatusType.PROJECT, preferred_name="Planning")
+        default_order_status = status_service.get_default_status_for_commande_creation()
+        default_project_status = status_service.get_default_status_for_type(status_models.StatusType.PROJECT, preferred_name="Planning")
 
         if default_order_status and default_project_status:
             new_commande = Commande(
@@ -83,7 +83,7 @@ class ClientsCRUD(GenericCRUD):
                 is_default=True,
                 description_commande="Default Order"
             )
-            db.add(new_commande)
+            conn.add(new_commande)
 
             new_project = Project(
                 project_id=str(uuid.uuid4()),
@@ -93,20 +93,20 @@ class ClientsCRUD(GenericCRUD):
                 description=f"Default project automatically created for order {new_commande.commande_reference}.",
                 manager_team_member_id=data.get('created_by_user_id')
             )
-            db.add(new_project)
+            conn.add(new_project)
             # The relationship should handle this, but explicit assignment is safe
             new_commande.project_id = new_project.project_id
         else:
             self.logger.warning("Could not find default statuses for Order or Project. Client will be created without them.")
 
         try:
-            db.commit()
-            db.refresh(new_client)
+            conn.commit()
+            conn.refresh(new_client)
             self.logger.info(f"Successfully added client {new_client.client_id}")
             return {'success': True, 'client_id': new_client.client_id}
         except Exception as e:
             self.logger.error(f"Transaction failed during client creation: {e}", exc_info=True)
-            db.rollback()
+            conn.rollback()
             return {'success': False, 'error': f"Database transaction failed: {e}"}
 
     def create_client_folder(self, client_id: str, client_name: str) -> str | None:
@@ -126,13 +126,13 @@ class ClientsCRUD(GenericCRUD):
             self.logger.error(f"Failed to create folder for client {client_id}: {e}", exc_info=True)
             return None
 
-    def get_client_by_id(self, db: Session, client_id: str, include_deleted: bool = False) -> Client | None:
+    def get_client_by_id(self, client_id: str, conn: Session, include_deleted: bool = False) -> Client | None:
         """
         Fetches a single client by their client_id using the ORM.
 
         Args:
-            db (Session): SQLAlchemy Session.
             client_id (str): The UUID of the client to fetch.
+            conn (Session): SQLAlchemy Session.
             include_deleted (bool, optional): If True, includes soft-deleted clients.
                                               Defaults to False.
 
@@ -140,7 +140,7 @@ class ClientsCRUD(GenericCRUD):
             Client | None: The SQLAlchemy Client object if found, otherwise None.
         """
         try:
-            query = db.query(Client).filter(Client.client_id == client_id)
+            query = conn.query(Client).filter(Client.client_id == client_id)
             if not include_deleted:
                 # Assuming is_deleted is a boolean or 0/1
                 query = query.filter(Client.is_deleted == False)
@@ -151,12 +151,12 @@ class ClientsCRUD(GenericCRUD):
             self.logger.error(f"Error getting client by ID {client_id}: {e}", exc_info=True)
             return None
 
-    def get_client_by_project_identifier(self, db: Session, project_identifier: str, include_deleted: bool = False) -> Client | None:
+    def get_client_by_project_identifier(self, project_identifier: str, conn: Session, include_deleted: bool = False) -> Client | None:
         """
         Fetches a single client by their project_identifier using the ORM.
         """
         try:
-            query = db.query(Client).filter(Client.project_identifier == project_identifier)
+            query = conn.query(Client).filter(Client.project_identifier == project_identifier)
             if not include_deleted:
                 query = query.filter(Client.is_deleted == False)
 
@@ -166,7 +166,7 @@ class ClientsCRUD(GenericCRUD):
             self.logger.error(f"Error getting client by project_identifier {project_identifier}: {e}", exc_info=True)
             return None
 
-    def get_all_clients(self, db: Session, filters: dict = None, limit: int = None, offset: int = 0, include_deleted: bool = False) -> list[dict]:
+    def get_all_clients(self, filters: dict, conn: Session, limit: int = None, offset: int = 0, include_deleted: bool = False) -> list[dict]:
         """
         Retrieves all clients, with optional filtering, pagination, and inclusion of
         soft-deleted records.
@@ -225,7 +225,7 @@ class ClientsCRUD(GenericCRUD):
             self.logger.error(f"Failed to get all clients with filters '{filters}': {e}", exc_info=True)
             return []
 
-    def update_client(self, db: Session, client_id: str, client_data: dict) -> dict:
+    def update_client(self, client_id: str, client_data: dict, conn: Session) -> dict:
         """
         Updates an existing client's information using the ORM.
         """
@@ -250,13 +250,13 @@ class ClientsCRUD(GenericCRUD):
             conn.rollback()
             return {'success': False, 'error': str(e)}
 
-    def delete_client(self, db: Session, client_id: str) -> dict:
+    def delete_client(self, client_id: str, conn: Session) -> dict:
         """
         Soft deletes a client by setting `is_deleted = True`, `deleted_at` to the current UTC timestamp,
         and updating the client's status to 'Archivé'. Uses the ORM.
 
         Args:
-            db (Session): SQLAlchemy Session.
+            conn (Session): SQLAlchemy Session.
             client_id (str): The UUID of the client to soft delete.
 
         Returns:
@@ -271,7 +271,7 @@ class ClientsCRUD(GenericCRUD):
             return {'success': False, 'error': "Client ID is required for deletion."}
 
         try:
-            client_to_delete = db.query(Client).filter(Client.client_id == client_id, Client.is_deleted == False).first()
+            client_to_delete = conn.query(Client).filter(Client.client_id == client_id, Client.is_deleted == False).first()
 
             if not client_to_delete:
                 self.logger.warning(f"Client {client_id} not found or already deleted.")
@@ -281,7 +281,7 @@ class ClientsCRUD(GenericCRUD):
             client_to_delete.deleted_at = datetime.utcnow()
 
             message = f"Client {client_id} soft deleted."
-            archived_status = status_service.get_archived_status_for_client(db)
+            archived_status = status_service.get_archived_status_for_client(conn)
 
             if archived_status:
                 client_to_delete.status_id = archived_status.status_id
@@ -290,15 +290,15 @@ class ClientsCRUD(GenericCRUD):
                 self.logger.error(f"Could not find 'Archivé' status for Client type. Status will not be updated during soft delete.")
                 message += " Status NOT updated to 'Archivé' due to missing status configuration."
 
-            db.commit()
+            conn.commit()
             self.logger.info(message)
             return {'success': True, 'message': message}
         except Exception as e:
-            db.rollback()
+            conn.rollback()
             self.logger.error(f"Failed to soft delete client {client_id}: {e}", exc_info=True)
             return {'success': False, 'error': str(e)}
 
-    def get_all_clients_with_details(self, db: Session, filters: dict = None, limit: int = None, offset: int = 0, include_deleted: bool = False) -> list[dict]:
+    def get_all_clients_with_details(self, filters: dict, conn: Session, limit: int = None, offset: int = 0, include_deleted: bool = False) -> list[dict]:
         """
         Retrieves all clients along with details from joined tables (Countries, Cities, StatusSettings).
         Supports pagination and filtering of soft-deleted records.
@@ -421,7 +421,7 @@ class ClientsCRUD(GenericCRUD):
             self.logger.error(f"Failed to get all clients with details: {e}", exc_info=True)
             return []
 
-    def get_active_clients_count(self, db: Session, include_deleted: bool = False) -> int:
+    def get_active_clients_count(self, conn: Session, include_deleted: bool = False) -> int:
         """
         Counts active clients. Active status is determined by `StatusSettings.is_archival_status`.
         Clients with no status are also considered active.
@@ -453,7 +453,7 @@ class ClientsCRUD(GenericCRUD):
             self.logger.error(f"Failed to get active clients count: {e}", exc_info=True)
             return 0
 
-    def get_client_counts_by_country(self, db: Session, include_deleted: bool = False) -> list[dict]:
+    def get_client_counts_by_country(self, conn: Session, include_deleted: bool = False) -> list[dict]:
         """
         Gets client counts grouped by country.
 
@@ -490,7 +490,7 @@ class ClientsCRUD(GenericCRUD):
             self.logger.error(f"Failed to get client counts by country: {e}", exc_info=True)
             return []
 
-    def get_client_segmentation_by_city(self, db: Session, include_deleted: bool = False) -> list[dict]:
+    def get_client_segmentation_by_city(self, conn: Session, include_deleted: bool = False) -> list[dict]:
         """
         Gets client counts grouped by country and city.
 
@@ -528,7 +528,7 @@ class ClientsCRUD(GenericCRUD):
             self.logger.error(f"Failed to get client segmentation by city: {e}", exc_info=True)
             return []
 
-    def get_client_segmentation_by_status(self, db: Session, include_deleted: bool = False) -> list[dict]:
+    def get_client_segmentation_by_status(self, conn: Session, include_deleted: bool = False) -> list[dict]:
         """
         Gets client counts grouped by status name.
 
@@ -561,7 +561,7 @@ class ClientsCRUD(GenericCRUD):
             self.logger.error(f"Failed to get client segmentation by status: {e}", exc_info=True)
             return []
 
-    def get_client_segmentation_by_category(self, db: Session, include_deleted: bool = False) -> list[dict]:
+    def get_client_segmentation_by_category(self, conn: Session, include_deleted: bool = False) -> list[dict]:
         """
         Gets client counts grouped by category.
 
@@ -593,7 +593,7 @@ class ClientsCRUD(GenericCRUD):
             self.logger.error(f"Failed to get client segmentation by category: {e}", exc_info=True)
             return []
 
-    def get_clients_by_archival_status(self, db: Session, is_archived: bool, include_null_status_for_active: bool = True, include_deleted: bool = False) -> list[dict]:
+    def get_clients_by_archival_status(self, is_archived: bool, conn: Session, include_null_status_for_active: bool = True, include_deleted: bool = False) -> list[dict]:
         """
         Retrieves clients based on their archival status (derived from StatusSettings).
 
@@ -667,7 +667,7 @@ class ClientsCRUD(GenericCRUD):
             self.logger.error(f"Failed to get clients by archival status (is_archived={is_archived}): {e}", exc_info=True)
             return []
 
-    def get_active_clients_per_country(self, db: Session, include_deleted: bool = False) -> dict:
+    def get_active_clients_per_country(self, conn: Session, include_deleted: bool = False) -> dict:
         """
         Retrieves active clients, mapping them by country.
 
@@ -729,7 +729,7 @@ class ClientsCRUD(GenericCRUD):
         return clients_by_country_map
 
     # --- ClientNotes CRUD ---
-    def add_client_note(self, db: Session, client_id: str, note_text: str, user_id: str = None) -> dict:
+    def add_client_note(self, client_id: str, note_text: str, conn: Session, user_id: str = None) -> dict:
         """
         Adds a note for a specific client.
 
@@ -762,7 +762,7 @@ class ClientsCRUD(GenericCRUD):
             self.logger.error(f"Failed to add client note for client {client_id}: {e}", exc_info=True)
             return {'success': False, 'error': str(e)}
 
-    def get_client_notes(self, db: Session, client_id: str) -> list[dict]:
+    def get_client_notes(self, client_id: str, conn: Session) -> list[dict]:
         """
         Retrieves all notes for a specific client, ordered by timestamp descending.
         Client notes are not subject to the client's soft delete status directly;
@@ -783,7 +783,7 @@ class ClientsCRUD(GenericCRUD):
             self.logger.error(f"Failed to get client notes for client {client_id}: {e}", exc_info=True)
             return []
 
-    def get_total_clients_count(self, db: Session, include_deleted: bool = False) -> int:
+    def get_total_clients_count(self, conn: Session, include_deleted: bool = False) -> int:
         sql_str = "SELECT COUNT(client_id) as total_count FROM Clients"
         params_dict = {}
         conditions = []
@@ -802,7 +802,7 @@ class ClientsCRUD(GenericCRUD):
             self.logger.error(f"Error getting total clients count (include_deleted={include_deleted}): {e}", exc_info=True)
             return 0
 
-    def get_clients_count_created_between(self, db: Session, start_date_iso: str, end_date_iso: str, include_deleted: bool = False) -> int:
+    def get_clients_count_created_between(self, start_date_iso: str, end_date_iso: str, conn: Session, include_deleted: bool = False) -> int:
         """
         Counts clients created within a specific date range.
 
@@ -830,7 +830,7 @@ class ClientsCRUD(GenericCRUD):
             self.logger.error(f"Error getting clients count created between {start_date_iso} and {end_date_iso} (include_deleted={include_deleted}): {e}", exc_info=True)
             return 0
 
-    def get_total_clients_count_up_to_date(self, db: Session, date_iso_end: str) -> int:
+    def get_total_clients_count_up_to_date(self, date_iso_end: str, conn: Session) -> int:
         sql = """
             SELECT COUNT(client_id) as count
             FROM Clients
@@ -848,7 +848,7 @@ class ClientsCRUD(GenericCRUD):
             self.logger.error(f"DB error in get_total_clients_count_up_to_date for date {date_iso_end}: {e}", exc_info=True)
             return 0
 
-    def get_active_clients_count_up_to_date(self, db: Session, date_iso_end: str) -> int:
+    def get_active_clients_count_up_to_date(self, date_iso_end: str, conn: Session) -> int:
         sql = """
             SELECT COUNT(c.client_id) as count
             FROM Clients c
@@ -868,7 +868,7 @@ class ClientsCRUD(GenericCRUD):
             self.logger.error(f"DB error in get_active_clients_count_up_to_date for {date_iso_end}: {e}", exc_info=True)
             return 0
 
-    def get_clients_by_status_id(self, db: Session, status_id: int, include_deleted: bool = False) -> list[dict]:
+    def get_clients_by_status_id(self, status_id: int, conn: Session, include_deleted: bool = False) -> list[dict]:
         """
         Retrieves clients matching a specific status_id, including details from joined tables.
         """
@@ -902,7 +902,7 @@ class ClientsCRUD(GenericCRUD):
             self.logger.error(f"Failed to get clients for status_id {status_id}: {e}", exc_info=True)
             return []
 
-    def get_client_count_by_country_id(self, db: Session, country_id: int, include_deleted: bool = False) -> int:
+    def get_client_count_by_country_id(self, country_id: int, conn: Session, include_deleted: bool = False) -> int:
         """
         Counts clients for a specific country_id.
 
@@ -929,7 +929,7 @@ class ClientsCRUD(GenericCRUD):
             self.logger.error(f"Error getting client count for country_id {country_id}: {e}", exc_info=True)
             return 0
 
-    def search_clients_by_name(self, db: Session, name_query: str, limit: int = 10) -> list[dict]:
+    def search_clients_by_name(self, name_query: str, conn: Session, limit: int = 10) -> list[dict]:
         """
         Searches for clients by name (client_name or company_name).
         """
@@ -957,10 +957,10 @@ class ClientsCRUD(GenericCRUD):
 clients_crud_instance = ClientsCRUD()
 
 # Expose specific CRUD methods for direct import
+add_client = clients_crud_instance.add_client
 get_all_clients = clients_crud_instance.get_all_clients
 get_client_by_id = clients_crud_instance.get_client_by_id
 get_client_by_project_identifier = clients_crud_instance.get_client_by_project_identifier
-add_client = clients_crud_instance.add_client
 update_client = clients_crud_instance.update_client
 delete_client = clients_crud_instance.delete_client
 get_all_clients_with_details = clients_crud_instance.get_all_clients_with_details

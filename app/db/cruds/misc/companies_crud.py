@@ -37,11 +37,11 @@ def add_company(company_data: dict, conn = None) -> str | None:
             sa_placeholders = ", ".join([f":{col}" for col in params_dict.keys() if col in base_sql_cols.split(", ")]) # Ensure order matches columns
             # Need to ensure the columns in SQL match the keys in params_dict used for placeholders
             # For simplicity, let's assume params_dict keys are exactly the column names
-            sql_sa = f"INSERT INTO Companies ({base_sql_cols}) VALUES ({sa_placeholders})"
+            sql_sa = f"INSERT INTO companies ({base_sql_cols}) VALUES ({sa_placeholders})"
             conn.execute(sqlalchemy_text(sql_sa), params_dict)
         else:
             # For sqlite3, order matters for '?'
-            sql_sqlite = f"INSERT INTO Companies ({base_sql_cols}) VALUES (?,?,?,?,?,?,?,?,?)"
+            sql_sqlite = f"INSERT INTO companies ({base_sql_cols}) VALUES (?,?,?,?,?,?,?,?,?)"
             # Ensure params_tuple matches the order of base_sql_cols
             params_tuple = (
                 new_id, company_data['company_name'], company_data.get('address'),
@@ -60,14 +60,14 @@ def add_company(company_data: dict, conn = None) -> str | None:
 
 @_manage_conn
 def get_company_by_id(company_id: str, conn = None) -> dict | None:
-    sql = "SELECT * FROM Companies WHERE company_id = :company_id"
+    sql = "SELECT * FROM companies WHERE company_id = :company_id"
     try:
         if _is_sa_obj(conn):
             result = conn.execute(sqlalchemy_text(sql), {"company_id": company_id})
             row = result.fetchone()
             return dict(row._mapping) if row else None
         else:
-            sql_sqlite = "SELECT * FROM Companies WHERE company_id = ?"
+            sql_sqlite = "SELECT * FROM companies WHERE company_id = ?"
             original_factory = conn.row_factory
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
@@ -81,7 +81,7 @@ def get_company_by_id(company_id: str, conn = None) -> dict | None:
 
 @_manage_conn
 def get_all_companies(conn = None) -> list[dict]:
-    sql = "SELECT * FROM Companies ORDER BY company_name"
+    sql = "SELECT * FROM companies ORDER BY company_name"
     try:
         if _is_sa_obj(conn):
             result = conn.execute(sqlalchemy_text(sql))
@@ -113,13 +113,13 @@ def update_company(company_id: str, data: dict, conn = None) -> bool:
     try:
         if _is_sa_obj(conn):
             set_clause_parts = [f"{key} = :{key}" for key in fields_to_update.keys()]
-            sql_sa = f"UPDATE Companies SET {', '.join(set_clause_parts)} WHERE company_id = :company_id"
+            sql_sa = f"UPDATE companies SET {', '.join(set_clause_parts)} WHERE company_id = :company_id"
             params_sa = {**fields_to_update, "company_id": company_id}
             result = conn.execute(sqlalchemy_text(sql_sa), params_sa)
             rowcount = result.rowcount
         else:
             set_clause_sqlite = [f"{key} = ?" for key in fields_to_update.keys()]
-            sql_sqlite = f"UPDATE Companies SET {', '.join(set_clause_sqlite)} WHERE company_id = ?"
+            sql_sqlite = f"UPDATE companies SET {', '.join(set_clause_sqlite)} WHERE company_id = ?"
             params_sqlite = list(fields_to_update.values())
             params_sqlite.append(company_id)
             cursor = conn.cursor()
@@ -137,13 +137,13 @@ def update_company(company_id: str, data: dict, conn = None) -> bool:
 
 @_manage_conn
 def delete_company(company_id: str, conn = None) -> bool:
-    sql = "DELETE FROM Companies WHERE company_id = :company_id"
+    sql = "DELETE FROM companies WHERE company_id = :company_id"
     try:
         if _is_sa_obj(conn):
             result = conn.execute(sqlalchemy_text(sql), {"company_id": company_id})
             rowcount = result.rowcount
         else:
-            sql_sqlite = "DELETE FROM Companies WHERE company_id = ?"
+            sql_sqlite = "DELETE FROM companies WHERE company_id = ?"
             cursor = conn.cursor()
             cursor.execute(sql_sqlite, (company_id,))
             rowcount = cursor.rowcount
@@ -162,15 +162,15 @@ def set_default_company(company_id: str, conn = None) -> bool:
     try:
         if _is_sa_obj(conn):
             # Reset existing default(s)
-            sql_reset = "UPDATE Companies SET is_default = :false_val WHERE is_default = :true_val AND company_id != :company_id"
+            sql_reset = "UPDATE companies SET is_default = :false_val WHERE is_default = :true_val AND company_id != :company_id"
             conn.execute(sqlalchemy_text(sql_reset), {"false_val": False, "true_val": True, "company_id": company_id})
             # Set new default
-            sql_set = "UPDATE Companies SET is_default = :true_val WHERE company_id = :company_id"
+            sql_set = "UPDATE companies SET is_default = :true_val WHERE company_id = :company_id"
             conn.execute(sqlalchemy_text(sql_set), {"true_val": True, "company_id": company_id})
         else:
             cursor = conn.cursor()
-            cursor.execute("UPDATE Companies SET is_default = FALSE WHERE is_default = TRUE AND company_id != ?", (company_id,))
-            cursor.execute("UPDATE Companies SET is_default = TRUE WHERE company_id = ?", (company_id,))
+            cursor.execute("UPDATE companies SET is_default = FALSE WHERE is_default = TRUE AND company_id != ?", (company_id,))
+            cursor.execute("UPDATE companies SET is_default = TRUE WHERE company_id = ?", (company_id,))
 
         logger.info(f"Company ID {company_id} set as default.")
         return True
@@ -180,14 +180,14 @@ def set_default_company(company_id: str, conn = None) -> bool:
 
 @_manage_conn
 def get_default_company(conn = None) -> dict | None:
-    sql = "SELECT * FROM Companies WHERE is_default = :is_default_true"
+    sql = "SELECT * FROM companies WHERE is_default = :is_default_true"
     try:
         if _is_sa_obj(conn):
             result = conn.execute(sqlalchemy_text(sql), {"is_default_true": True})
             row = result.fetchone()
             return dict(row._mapping) if row else None
         else:
-            sql_sqlite = "SELECT * FROM Companies WHERE is_default = TRUE" # sqlite3 handles TRUE as 1
+            sql_sqlite = "SELECT * FROM companies WHERE is_default = TRUE" # sqlite3 handles TRUE as 1
             original_factory = conn.row_factory
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()

@@ -2,6 +2,9 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.connection import Base
+from app.models.db.employees.employee import Employee
+from app.models.db.documents.document_category import DocumentCategory
+from app.models.db.users.user import User
 
 class EmployeeDocument(Base):
     __tablename__ = 'employee_documents'

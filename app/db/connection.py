@@ -5,8 +5,8 @@ import logging
 from typing import Union
 
 # Attempt to define project_root. This might need adjustment based on actual project structure.
-# Assuming 'db' is a subdirectory of the project root.
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Assuming 'db' is a subdirectory of 'app', and 'app' is in the project root.
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 # --- SQLAlchemy Setup ---

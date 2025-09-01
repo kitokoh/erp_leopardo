@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Foreign
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func, false
 from app.db.connection import Base
+from app.models.db.documents.client_documents import ClientDocument
 from app.models.db.locations.country import Country
 from app.models.db.locations.city import City
 from app.models.db.settings.status_setting import StatusSetting
