@@ -14,8 +14,8 @@ from app.db.cruds.misc import company_assets_crud
 from app.db.cruds.misc import asset_assignments_crud
 from app.db.cruds.misc import asset_media_links_crud
 # from ..db.cruds.media_items_crud import media_items_crud # Assuming this might exist for validating media_item_id
-from app.models.user_models import User # Standardized path
-from .auth import get_current_active_user # Standardized path
+from .models import UserInDB # Corrected import
+from .auth import get_current_active_user
 from app.media_manager import operations as media_manager_operations # Assumed import
 from fastapi import UploadFile, File, Form
 
@@ -138,7 +138,7 @@ class AssetMediaUpload(BaseModel):
 @router.post("/", response_model=CompanyAsset, status_code=status.HTTP_201_CREATED)
 async def create_company_asset(
     asset_in: CompanyAssetCreate,
-    current_user: User = Depends(get_current_active_user)
+    current_user: UserInDB = Depends(get_current_active_user)
 ):
     """
     Create a new company asset.
@@ -182,7 +182,7 @@ async def list_company_assets(
     limit: int = 100,
     offset: int = 0,
     include_deleted: bool = False,
-    current_user: User = Depends(get_current_active_user)
+    current_user: UserInDB = Depends(get_current_active_user)
 ):
     """
     List all company assets with optional filtering and pagination.
@@ -211,7 +211,7 @@ async def list_company_assets(
 async def get_company_asset(
     asset_id: str,
     include_deleted: bool = False,
-    current_user: User = Depends(get_current_active_user)
+    current_user: UserInDB = Depends(get_current_active_user)
 ):
     """
     Get a specific company asset by its ID.
@@ -228,7 +228,7 @@ async def get_company_asset(
 async def update_company_asset(
     asset_id: str,
     asset_in: CompanyAssetUpdate,
-    current_user: User = Depends(get_current_active_user)
+    current_user: UserInDB = Depends(get_current_active_user)
 ):
     """
     Update an existing company asset.
@@ -274,7 +274,7 @@ async def update_company_asset(
 @router.delete("/{asset_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def soft_delete_company_asset(
     asset_id: str,
-    current_user: User = Depends(get_current_active_user)
+    current_user: UserInDB = Depends(get_current_active_user)
 ):
     """
     Soft delete a company asset by its ID.
@@ -300,7 +300,7 @@ async def soft_delete_company_asset(
 @router.post("/assignments/", response_model=AssetAssignment, status_code=status.HTTP_201_CREATED)
 async def create_asset_assignment(
     assignment_in: AssetAssignmentCreate,
-    current_user: User = Depends(get_current_active_user)
+    current_user: UserInDB = Depends(get_current_active_user)
 ):
     """
     Create a new asset assignment.
@@ -346,7 +346,7 @@ async def create_asset_assignment(
 @router.get("/assignments/{assignment_id}", response_model=AssetAssignment)
 async def get_asset_assignment_by_id(
     assignment_id: str,
-    current_user: User = Depends(get_current_active_user)
+    current_user: UserInDB = Depends(get_current_active_user)
 ):
     """
     Get a specific asset assignment by its ID.
@@ -364,7 +364,7 @@ async def list_assignments_for_an_asset(
     assignment_status: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
-    current_user: User = Depends(get_current_active_user)
+    current_user: UserInDB = Depends(get_current_active_user)
 ):
     """
     List all assignments for a specific asset.
@@ -397,7 +397,7 @@ async def list_assignments_for_a_personnel(
     assignment_status: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
-    current_user: User = Depends(get_current_active_user)
+    current_user: UserInDB = Depends(get_current_active_user)
 ):
     """
     List all assignments for a specific personnel member.
@@ -426,7 +426,7 @@ async def list_assignments_for_a_personnel(
 async def update_asset_assignment(
     assignment_id: str,
     assignment_in: AssetAssignmentUpdate,
-    current_user: User = Depends(get_current_active_user)
+    current_user: UserInDB = Depends(get_current_active_user)
 ):
     """
     Update an existing asset assignment.
@@ -463,7 +463,7 @@ async def list_all_assignments(
     assignment_status: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
-    current_user: User = Depends(get_current_active_user) # Potentially restrict to admin/manager roles
+    current_user: UserInDB = Depends(get_current_active_user) # Potentially restrict to admin/manager roles
 ):
     """
     List all asset assignments, typically for admin or reporting purposes.
@@ -494,7 +494,7 @@ async def list_all_assignments(
 async def link_media_item_to_asset(
     asset_id: str,
     link_in: AssetMediaLinkCreate, # Contains media_item_id, alt_text, display_order
-    current_user: User = Depends(get_current_active_user)
+    current_user: UserInDB = Depends(get_current_active_user)
 ):
     """
     Link an existing media item to an asset.
@@ -590,7 +590,7 @@ async def upload_new_media_and_link_to_asset(
     alt_text: Optional[str] = Form(None), # For the AssetMediaLink
     display_order: int = Form(0),       # For the AssetMediaLink
     tags: Optional[List[str]] = Form(None), # For the MediaItem, FastAPI converts list-like form data
-    current_user: User = Depends(get_current_active_user)
+    current_user: UserInDB = Depends(get_current_active_user)
 ):
     """
     Upload a new media file (image, video, document) and link it to an asset.
@@ -684,7 +684,7 @@ async def upload_new_media_and_link_to_asset(
 @router.get("/assets/{asset_id}/media", response_model=List[AssetMediaLink])
 async def list_media_for_asset(
     asset_id: str,
-    current_user: User = Depends(get_current_active_user)
+    current_user: UserInDB = Depends(get_current_active_user)
 ):
     """
     List all media linked to a specific asset.
@@ -703,7 +703,7 @@ async def list_media_for_asset(
 async def unlink_media_item_from_asset(
     asset_id: str,
     media_item_id: str,
-    current_user: User = Depends(get_current_active_user)
+    current_user: UserInDB = Depends(get_current_active_user)
 ):
     """
     Unlink a media item from an asset. This does not delete the media item itself.
@@ -732,7 +732,7 @@ async def unlink_media_item_from_asset(
 async def update_asset_media_display_order(
     asset_id: str,
     ordered_media_item_ids: List[str], # List of media_item_ids in the new desired order
-    current_user: User = Depends(get_current_active_user)
+    current_user: UserInDB = Depends(get_current_active_user)
 ):
     """
     Update the display order of all media items linked to a specific asset.
@@ -830,5 +830,3 @@ if __name__ == "__main__": # pragma: no cover
     print("\nAll basic model validations complete (if no errors above).")
     print("Note: `is_deleted: bool = False` on CompanyAsset means by default, active records are represented this way. If a soft-deleted asset is fetched and mapped to this model, its `is_deleted` field should be True.")
     print("`display_order: Optional[int] = 0` in AssetMediaLinkBase was changed to `display_order: int = 0` to reflect the prompt's default value making it non-optional.")
-
-```

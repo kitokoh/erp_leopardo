@@ -64,6 +64,7 @@ def generate_cover_page_pdf(
     additional_context_overrides: dict = None, # For overriding specific config_dict fields
     db_conn=None
 ) -> bool:
+    pass
 #     """
 #     Generates a PDF cover page using ReportLab logic via pagedegrde module.
 

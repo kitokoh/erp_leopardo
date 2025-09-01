@@ -3,15 +3,14 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from datetime import datetime, date # Ensure both are imported
 
-# Project-specific imports
-from app.api.dependencies import get_db
-from app.api.auth import get_current_active_user # Assuming UserInDB is returned
-from app.api.models import (
-    UserInDB, # User model for dependency injection
+from app.api.dependencies import get_db_session as get_db
+from .auth import get_current_active_user
+from .models import (
+    UserInDB,
     HeadcountReportResponse,
     AnniversaryReportResponse,
     LeaveSummaryReportResponse,
-    LeaveRequestStatusEnum # The Enum itself for query param
+    LeaveRequestStatusEnum
 )
 from app.db.cruds.misc import hr_reports_crud
 

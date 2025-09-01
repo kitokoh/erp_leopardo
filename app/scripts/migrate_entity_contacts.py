@@ -15,12 +15,13 @@ if PROJECT_ROOT not in sys.path:
 
 try:
     from app.db.connection import get_db_connection
-    import app.db.cruds.contacts_crud as contacts_crud
-    import app.db.cruds.entity_contacts_crud as entity_contacts_crud
-    # We might need CRUDs for Transporters, FreightForwarders, Partners if we decide to nullify their direct contact fields
-    import app.db.cruds.transporters_crud as transporters_crud
-    import app.db.cruds.freight_forwarders_crud as freight_forwarders_crud
-    import app.db.cruds.partners_crud as partners_crud
+    from app.db.cruds.misc import (
+        contacts_crud,
+        entity_contacts_crud,
+        transporters_crud,
+        freight_forwarders_crud,
+        partners_crud
+    )
 
 except ImportError as e:
     logging.error(f"Failed to import necessary modules. Ensure you are running from a context where db modules are accessible: {e}")

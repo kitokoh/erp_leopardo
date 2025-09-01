@@ -99,8 +99,8 @@ def add_role(db: Session, role_name: str, description: str = None) -> Role | Non
 @_manage_conn
 def get_role_by_id(role_id: int, conn=None) -> dict | None:
     """Fetches a role by its ID."""
-    sql_sqlite = "SELECT * FROM Roles WHERE role_id = ?"
-    sql_sa = sqlalchemy_text("SELECT * FROM Roles WHERE role_id = :role_id")
+    sql_sqlite = "SELECT * FROM roles WHERE role_id = ?"
+    sql_sa = sqlalchemy_text("SELECT * FROM roles WHERE role_id = :role_id")
 
     params_sqlite = (role_id,)
     params_sa = {"role_id": role_id}
@@ -126,7 +126,7 @@ def get_role_by_name(db: Session, role_name: str) -> Role | None:
 @_manage_conn
 def list_roles(conn=None) -> list[dict]:
     """Lists all roles."""
-    sql_common = "SELECT * FROM Roles ORDER BY role_name"
+    sql_common = "SELECT * FROM roles ORDER BY role_name"
     sql_sqlite = sql_common
     sql_sa = sqlalchemy_text(sql_common)
 
@@ -146,8 +146,8 @@ def list_roles(conn=None) -> list[dict]:
 @_manage_conn
 def update_role(role_id: int, role_name: str, description: str = None, conn=None) -> bool:
     """Updates an existing role's name and description."""
-    sql_sqlite = "UPDATE Roles SET role_name = ?, description = ? WHERE role_id = ?"
-    sql_sa = sqlalchemy_text("UPDATE Roles SET role_name = :role_name, description = :description WHERE role_id = :role_id")
+    sql_sqlite = "UPDATE roles SET role_name = ?, description = ? WHERE role_id = ?"
+    sql_sa = sqlalchemy_text("UPDATE roles SET role_name = :role_name, description = :description WHERE role_id = :role_id")
 
     params_sqlite = (role_name, description, role_id)
     params_sa = {"role_name": role_name, "description": description, "role_id": role_id}
@@ -181,8 +181,8 @@ def update_role(role_id: int, role_name: str, description: str = None, conn=None
 @_manage_conn
 def delete_role(role_id: int, conn=None) -> bool:
     """Deletes a role by its ID."""
-    sql_sqlite = "DELETE FROM Roles WHERE role_id = ?"
-    sql_sa = sqlalchemy_text("DELETE FROM Roles WHERE role_id = :role_id")
+    sql_sqlite = "DELETE FROM roles WHERE role_id = ?"
+    sql_sa = sqlalchemy_text("DELETE FROM roles WHERE role_id = :role_id")
 
     params_sqlite = (role_id,)
     params_sa = {"role_id": role_id}
@@ -212,8 +212,8 @@ def delete_role(role_id: int, conn=None) -> bool:
 @_manage_conn
 def is_role_used(role_id: int, conn=None) -> bool:
     """Checks if a role is currently assigned to any user."""
-    sql_sqlite = "SELECT 1 FROM Users WHERE role_id = ? LIMIT 1"
-    sql_sa = sqlalchemy_text("SELECT 1 FROM Users WHERE role_id = :role_id LIMIT 1")
+    sql_sqlite = "SELECT 1 FROM users WHERE role_id = ? LIMIT 1"
+    sql_sa = sqlalchemy_text("SELECT 1 FROM users WHERE role_id = :role_id LIMIT 1")
 
     params_sqlite = (role_id,)
     params_sa = {"role_id": role_id}

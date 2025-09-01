@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta
 from app.models.db.employees.employee import Employee
 from app.models.db.leave.leave_request import LeaveRequest, LeaveRequestStatusEnum
 from app.models.db.leave.leave_type import LeaveType
-from app.api.models import (
+from app.services.api.models import (
     HeadcountReportItem, # For type hinting return structure, not direct instantiation here
     AnniversaryReportItem,
     LeaveSummaryReportItem

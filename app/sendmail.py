@@ -35,7 +35,7 @@ from PyQt5.QtCore import Qt, QDateTime, QTimer, QThread, pyqtSignal, QSize
 from PyQt5.QtGui import QFont, QPalette, QColor, QIcon, QPixmap
 from PyQt5.QtWidgets import QAction
 
-from app.db.cruds.smtp_configs_crud import (
+from app.db.cruds.misc.smtp_configs_crud import (
     add_smtp_config,
     get_all_smtp_configs,
     delete_smtp_config,

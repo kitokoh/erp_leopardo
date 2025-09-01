@@ -7,7 +7,7 @@ from datetime import date, datetime # datetime import added for completeness, th
 from . import models # Corrected based on typical FastAPI structure if main.py is above 'api'
 # If invoices_crud.py is in /db/cruds/ and this file is in /api/
 # The path would be from ..db.cruds import invoices_crud
-from ..db.cruds.invoices import invoices_crud
+from app.db.cruds.invoices import invoices_crud
 
 
 router = APIRouter(
@@ -145,56 +145,3 @@ async def list_invoices_for_project(project_id: str = Path(..., title="Project I
     # No need to raise 404 if list is empty, an empty list is a valid response.
     return invoices
 
-# Example of how to include this router in your main FastAPI application:
-# from fastapi import FastAPI
-# from . import payments # Assuming payments.py is in the same directory as main.py or a sub-directory
-#
-# app = FastAPI()
-# app.include_router(payments.router)
-#
-# # To run (example): uvicorn main:app --reload
-#
-# Note on imports:
-# The import `import models` assumes that 'models.py' is in the SAME directory as 'payments.py'.
-# If your project structure is:
-# /app
-#   /api
-#     payments.py
-#     models.py
-#   /db
-#     /cruds
-#       invoices_crud.py
-#   main.py
-#
-# And you run uvicorn from /app (e.g. uvicorn main:app), then:
-# - `import models` inside payments.py might need to be `from . import models`
-# - `from ..db.cruds import invoices_crud` would be correct for payments.py to access invoices_crud.py
-# The current code `import models` might be problematic if `api` is not directly in PYTHONPATH.
-# For robustness, `from . import models` is generally preferred if models.py is a sibling.
-# I've used `import models` as per the prompt's example `from .. import models` which implies models.py is in the parent of `api/`.
-# However, the prompt states `models.py is in the parent directory (api/)` which means it is a sibling of `payments.py` if `payments.py` is in `api/`.
-# Let's stick to `import models` for now and assume PYTHONPATH or the execution context handles it.
-# A safer bet is `from . import models` if they are in the same directory.
-# I will adjust the model import to `from . import models` for typical FastAPI project structures.
-
-# Re-adjusting based on typical structure where main.py is at project root,
-# and api files are in an 'api' subfolder.
-# If main.py is in /app, and payments.py is in /app/api/, and models.py is in /app/api/
-# then `from . import models` is correct.
-# If invoices_crud.py is in /app/db/cruds/, then `from ..db.cruds import invoices_crud` is correct.
-# The initial import paths provided in the prompt were slightly ambiguous.
-# The current code for `invoices_crud` import `from ..db.cruds import invoices_crud` is standard.
-# For `models`, `from . import models` is more standard if `models.py` is in the same `api` directory.
-# I will change `import models` to `from . import models`.
-# This change is done directly in the created file block.
-# The tool does not allow editing the thought process after generation, so this note serves as clarification.
-# The generated code will have `from . import models`.
-# The `datetime` import was added as it's good practice, though not strictly used in annotations in this file.
-# Pydantic v1 vs v2: Using `model_dump()` for v2, as it's the newer standard. If the project uses v1, it should be `.dict()`.
-# The CRUD functions are assumed to handle date string conversions if they store dates as strings. Pydantic models use `date` objects.
-# The `list_all_invoices` filters for dates: converting date objects to ISO format strings for the CRUD.
-# Added `status_code=201` for successful POST.
-# Added `Path(...)` for path parameters to make them required.
-# Added `Query(...)` descriptions for better OpenAPI docs.
-# Corrected Pydantic v1 `.dict()` to v2 `.model_dump()`.
-```

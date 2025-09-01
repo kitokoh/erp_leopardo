@@ -84,6 +84,7 @@ ehthumbs.db
 *.sql
 *.mdb
 *.sdb
+app_data.db_test*
 
 ### Environnement et configurations ###
 *.env

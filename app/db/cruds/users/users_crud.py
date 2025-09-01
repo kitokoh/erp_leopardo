@@ -322,24 +322,24 @@ def verify_user_password(db: Session, username: str, password: str, logger_passe
         current_logger.warning("Username and password are required for verification.")
         return None
 
-    user = get_user_by_username(username, db=db, logger_passed=current_logger)
+    user = get_user_by_username(db=db, username=username, logger_passed=current_logger)
 
     if user:
-        if not user.get('is_active'):
+        if not user.is_active:
             current_logger.warning(f"Login attempt for inactive user: {username}")
             return None
-        if 'hashed_password' not in user:
+        if not hasattr(user, 'hashed_password'):
             current_logger.error(f"User record for {username} missing 'hashed_password'.")
             return None
 
-        verified, new_hash = util_verify_password(password, user['hashed_password'], logger_passed=current_logger)
+        verified, new_hash = util_verify_password(password, user.hashed_password, logger_passed=current_logger)
 
         if verified:
             current_logger.info(f"Password verification successful for user: {username}")
-            record_login_time(user['user_id'], db=db, logger_passed=current_logger)
+            record_login_time(db=db, user_id=user.user_id, logger_passed=current_logger)
             if new_hash:
                 current_logger.info(f"Password hash for user '{username}' needs upgrade.")
-                if _update_user_password_hash_only(user['user_id'], new_hash, db=db, logger_passed=current_logger):
+                if _update_user_password_hash_only(user.user_id, new_hash, db=db, logger_passed=current_logger):
                     current_logger.info(f"Upgraded password hash for user '{username}'.")
                 else:
                     current_logger.error(f"Failed to upgrade password hash for user '{username}'.")

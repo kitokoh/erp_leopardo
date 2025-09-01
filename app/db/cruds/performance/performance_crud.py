@@ -6,12 +6,13 @@ from datetime import date, datetime
 
 # Assuming your project structure allows these imports
 # Adjust if your models are located elsewhere
-from app.api.models import (
+from app.services.api.models import (
     GoalBase, GoalCreate, GoalUpdate,
-    ReviewCycleBase as ReviewCycle, ReviewCycleCreate, ReviewCycleUpdate,
-    PerformanceReviewBase as PerformanceReview, PerformanceReviewCreate, PerformanceReviewUpdate,
+    ReviewCycleBase, ReviewCycleCreate, ReviewCycleUpdate,
+    PerformanceReviewBase, PerformanceReviewCreate, PerformanceReviewUpdate,
     EmployeeBase, UserInDB # Needed for relationships and context
 )
+from app.models.db.performance import ReviewCycle, PerformanceReview
 from app.models.db.performance import Goal, GoalStatusEnum, PerformanceReviewStatusEnum
 
 # --- Goal CRUD ---
