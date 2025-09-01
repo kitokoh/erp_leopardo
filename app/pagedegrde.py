@@ -34,18 +34,18 @@ from PyQt5.QtGui import (QFont, QPixmap, QPalette, QColor, QIcon, QLinearGradien
 from reportlab.pdfgen import canvas as reportlab_canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
-# from reportlab.lib.colors import HexColor
-# from reportlab.lib.utils import ImageReader
+from reportlab.lib.colors import HexColor
+from reportlab.lib.utils import ImageReader
 # from reportlab.platypus import Paragraph
 # from reportlab.lib.styles import getSampleStyleSheet
 # from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
-# from reportlab.pdfbase import pdfmetrics
-# from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 # from reportlab.graphics.shapes import Line, Drawing
 # from reportlab.graphics.barcode import code128, qr
 # from reportlab.graphics import renderPDF
 import io # Added for io.BytesIO
-from utils.html_to_pdf_util import render_html_template, convert_html_to_pdf, WeasyPrintError # Added
+from app.utils.html_to_pdf_util import render_html_template, convert_html_to_pdf, WeasyPrintError # Added
 
 # Define APP_ROOT_DIR for font path resolution
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
@@ -657,8 +657,8 @@ class PreviewWidget(QGraphicsView):
             self.scene.addItem(self.page_item)
             
             # Calculate scene rect based on A4 size in pixels
-        self.page_width_px = (self.page_width / 25.4) * self.dpi
-        self.page_height_px = (self.page_height / 25.4) * self.dpi
+            self.page_width_px = (self.page_width / 25.4) * self.dpi
+            self.page_height_px = (self.page_height / 25.4) * self.dpi
             
             self.scene.setSceneRect(0, 0, self.page_width_px, self.page_height_px)
             self.page_item.setPos(0,0) # Ensure pixmap is at the origin of its coordinate system
@@ -2110,262 +2110,265 @@ class CoverPageGenerator(QMainWindow):
                           )
 
 # # --- Font Registration Logic ---
-# def _register_fonts(app_root_dir: str) -> Tuple[Dict[str, str], List[str]]:
-#     """
-#     Registers custom fonts and returns a mapping of requested to effective font names
-#     and a list of warning messages for fonts that failed to load.
-#     Tries to load Arial, Arial-Bold, and Showcard Gothic (or showg).
-#     Falls back to Helvetica/Helvetica-Bold if custom fonts are not found.
-#     """
-#     font_mapping = {
-#         'Arial': 'Helvetica',
-#         'Arial-Bold': 'Helvetica-Bold',
-#         'Showcard Gothic': 'Helvetica' # Default fallback for Showcard Gothic
-#     }
-#     warnings = []
+def _register_fonts(app_root_dir: str) -> Tuple[Dict[str, str], List[str]]:
+    """
+    Registers custom fonts and returns a mapping of requested to effective font names
+    and a list of warning messages for fonts that failed to load.
+    Tries to load Arial, Arial-Bold, and Showcard Gothic (or showg).
+    Falls back to Helvetica/Helvetica-Bold if custom fonts are not found.
+    """
+    font_mapping = {
+        'Arial': 'Helvetica',
+        'Arial-Bold': 'Helvetica-Bold',
+        'Showcard Gothic': 'Helvetica' # Default fallback for Showcard Gothic
+    }
+    warnings = []
 
-#     # Arial
-#     arial_font_name = 'Arial'
-#     arial_path = os.path.join(app_root_dir, 'fonts', 'arial.ttf')
-#     try:
-#         if os.path.exists(arial_path):
-#             pdfmetrics.registerFont(TTFont(arial_font_name, arial_path))
-#             font_mapping[arial_font_name] = arial_font_name
-#             # print(f"Successfully registered {arial_font_name} from {arial_path}") # Optional: keep for debugging
-#         else:
-#             msg = f"Custom Arial font not found at {arial_path}. Using fallback '{font_mapping[arial_font_name]}'."
-#             warnings.append(msg)
-#             print(msg, file=sys.stderr)
-#     except Exception as e:
-#         msg = f"Error registering custom Arial font from {arial_path}: {e}. Using fallback '{font_mapping[arial_font_name]}'."
-#         warnings.append(msg)
-#         print(msg, file=sys.stderr)
+    # Arial
+    arial_font_name = 'Arial'
+    arial_path = os.path.join(app_root_dir, 'fonts', 'arial.ttf')
+    try:
+        if os.path.exists(arial_path):
+            pdfmetrics.registerFont(TTFont(arial_font_name, arial_path))
+            font_mapping[arial_font_name] = arial_font_name
+            # print(f"Successfully registered {arial_font_name} from {arial_path}") # Optional: keep for debugging
+        else:
+            msg = f"Custom Arial font not found at {arial_path}. Using fallback '{font_mapping[arial_font_name]}'."
+            warnings.append(msg)
+            print(msg, file=sys.stderr)
+    except Exception as e:
+        msg = f"Error registering custom Arial font from {arial_path}: {e}. Using fallback '{font_mapping[arial_font_name]}'."
+        warnings.append(msg)
+        print(msg, file=sys.stderr)
 
-#     # Arial Bold
-#     arial_bold_font_name = 'Arial-Bold'
-#     arial_bold_path = os.path.join(app_root_dir, 'fonts', 'arialbd.ttf')
-#     try:
-#         if os.path.exists(arial_bold_path):
-#             pdfmetrics.registerFont(TTFont(arial_bold_font_name, arial_bold_path))
-#             font_mapping[arial_bold_font_name] = arial_bold_font_name
-#             # print(f"Successfully registered {arial_bold_font_name} from {arial_bold_path}")
-#         else:
-#             msg = f"Custom Arial Bold font 'arialbd.ttf' not found in 'fonts/'. Using fallback '{font_mapping[arial_bold_font_name]}'."
-#             warnings.append(msg)
-#             print(msg, file=sys.stderr)
-#     except Exception as e:
-#         msg = f"Error registering custom Arial Bold font from {arial_bold_path}: {e}. Using fallback '{font_mapping[arial_bold_font_name]}'."
-#         warnings.append(msg)
-#         print(msg, file=sys.stderr)
+    # Arial Bold
+    arial_bold_font_name = 'Arial-Bold'
+    arial_bold_path = os.path.join(app_root_dir, 'fonts', 'arialbd.ttf')
+    try:
+        if os.path.exists(arial_bold_path):
+            pdfmetrics.registerFont(TTFont(arial_bold_font_name, arial_bold_path))
+            font_mapping[arial_bold_font_name] = arial_bold_font_name
+            # print(f"Successfully registered {arial_bold_font_name} from {arial_bold_path}")
+        else:
+            msg = f"Custom Arial Bold font 'arialbd.ttf' not found in 'fonts/'. Using fallback '{font_mapping[arial_bold_font_name]}'."
+            warnings.append(msg)
+            print(msg, file=sys.stderr)
+    except Exception as e:
+        msg = f"Error registering custom Arial Bold font from {arial_bold_path}: {e}. Using fallback '{font_mapping[arial_bold_font_name]}'."
+        warnings.append(msg)
+        print(msg, file=sys.stderr)
 
-#     # Showcard Gothic
-#     showcard_font_name = 'Showcard Gothic'
-#     showcard_paths_to_try = [
-#         os.path.join(app_root_dir, 'fonts', 'ShowcardGothic.ttf'),
-#         os.path.join(app_root_dir, 'fonts', 'showg.ttf') # Alternative name
-#     ]
-#     showcard_registered_successfully = False
-#     for showcard_path in showcard_paths_to_try:
-#         if os.path.exists(showcard_path):
-#             try:
-#                 pdfmetrics.registerFont(TTFont(showcard_font_name, showcard_path))
-#                 font_mapping[showcard_font_name] = showcard_font_name
-#                 # print(f"Successfully registered {showcard_font_name} from {showcard_path}")
-#                 showcard_registered_successfully = True
-#                 break # Found and registered
-#             except Exception as e:
-#                 # Log error for this specific path but continue trying other paths
-#                 msg = f"Error registering '{showcard_font_name}' font from {showcard_path}: {e}."
-#                 warnings.append(msg) # Add to warnings, but don't necessarily use fallback yet
-#                 print(msg, file=sys.stderr)
+    # Showcard Gothic
+    showcard_font_name = 'Showcard Gothic'
+    showcard_paths_to_try = [
+        os.path.join(app_root_dir, 'fonts', 'ShowcardGothic.ttf'),
+        os.path.join(app_root_dir, 'fonts', 'showg.ttf') # Alternative name
+    ]
+    showcard_registered_successfully = False
+    for showcard_path in showcard_paths_to_try:
+        if os.path.exists(showcard_path):
+            try:
+                pdfmetrics.registerFont(TTFont(showcard_font_name, showcard_path))
+                font_mapping[showcard_font_name] = showcard_font_name
+                # print(f"Successfully registered {showcard_font_name} from {showcard_path}")
+                showcard_registered_successfully = True
+                break # Found and registered
+            except Exception as e:
+                # Log error for this specific path but continue trying other paths
+                msg = f"Error registering '{showcard_font_name}' font from {showcard_path}: {e}."
+                warnings.append(msg) # Add to warnings, but don't necessarily use fallback yet
+                print(msg, file=sys.stderr)
 
-#     if not showcard_registered_successfully:
-#         # This means all attempts failed or no path existed
-#         final_fallback_msg = (f"Failed to load custom '{showcard_font_name}' font from all expected paths. "
-#                               f"Using fallback '{font_mapping[showcard_font_name]}'. Appearance will differ.")
-#         # Add this specific message if it's not already captured (e.g. if paths didn't exist)
-#         # To avoid duplicate generic messages if specific path errors were already added.
-#         if not any(showcard_font_name in w for w in warnings if showcard_path in w): # check if a path specific error for showcard was added
-#             warnings.append(final_fallback_msg)
-#         print(final_fallback_msg, file=sys.stderr)
+    if not showcard_registered_successfully:
+        # This means all attempts failed or no path existed
+        final_fallback_msg = (f"Failed to load custom '{showcard_font_name}' font from all expected paths. "
+                              f"Using fallback '{font_mapping[showcard_font_name]}'. Appearance will differ.")
+        # Add this specific message if it's not already captured (e.g. if paths didn't exist)
+        # To avoid duplicate generic messages if specific path errors were already added.
+        if not any(showcard_font_name in w for w in warnings if showcard_path in w): # check if a path specific error for showcard was added
+            warnings.append(final_fallback_msg)
+        print(final_fallback_msg, file=sys.stderr)
 
-#     return font_mapping, warnings
+    return font_mapping, warnings
 
-# # --- Standalone PDF Generation Logic ---
-# def generate_cover_page_logic(config: Dict[str, Any]) -> bytes:
-#     """
-#     Generates a cover page PDF based on the provided configuration dictionary.
+# --- Standalone PDF Generation Logic ---
+def generate_cover_page_logic(config: Dict[str, Any]) -> bytes:
+    """
+    Generates a cover page PDF based on the provided configuration dictionary.
 
-#     Args:
-#         config (Dict[str, Any]): A dictionary containing parameters for PDF generation.
-#             Expected keys include:
-#             - 'title' (str): Main title of the document.
-#             - 'subtitle' (str, optional): Subtitle of the document.
-#             - 'author' (str, optional): Author's name.
-#             - 'institution' (str, optional): Institution name.
-#             - 'department' (str, optional): Department name.
-#             - 'doc_type' (str, optional): Type of document (e.g., "Report").
-#             - 'date' (str, optional): Date string.
-#             - 'version' (str, optional): Version string.
-#             - 'font_name' (str, optional): Default font name (e.g., 'Arial', 'Helvetica'). Defaults to 'Helvetica'.
-#             - 'font_size_title' (int, optional): Font size for the title. Defaults to 24.
-#             - 'font_size_subtitle' (int, optional): Font size for the subtitle. Defaults to 18.
-#             - 'font_size_author' (int, optional): Font size for author/institution. Defaults to 12.
-#             - 'font_size_footer' (int, optional): Font size for footer text. Defaults to 8 or 10.
-#             - 'text_color' (str, optional): Main text color (e.g., '#000000'). Not fully implemented for all elements yet.
-#             - 'logo_data' (bytes, optional): Byte data of the logo image.
-#             - 'logo_width_mm' (int, optional): Width of the logo in mm. Defaults to 50.
-#             - 'logo_height_mm' (int, optional): Max height of the logo in mm. Defaults to 50.
-#             - 'logo_x_mm' (int, optional): X position of the logo in mm.
-#             - 'logo_y_mm' (int, optional): Y position of the logo in mm.
-#             - 'show_horizontal_line' (bool, optional): Whether to show a horizontal line. Defaults to True.
-#             - 'line_y_position_mm' (int, optional): Y position of the horizontal line in mm.
-#             - 'line_color_hex' (str, optional): Color of the line in hex (e.g., '#000000').
-#             - 'line_thickness_pt' (float, optional): Thickness of the line in points.
-#             - 'margin_top' (int, optional): Top margin in mm. Defaults to 25.
-#             - 'margin_bottom' (int, optional): Bottom margin in mm. Defaults to 25.
-#             - 'margin_left' (int, optional): Left margin in mm. Defaults to 20.
-#             - 'margin_right' (int, optional): Right margin in mm. Defaults to 20.
-#             - 'footer_text' (str, optional): Text for the footer.
-#             - 'template_style' (str, optional): Style hint (e.g., 'Modern'). Currently not heavily used by this basic logic.
+    Args:
+        config (Dict[str, Any]): A dictionary containing parameters for PDF generation.
+            Expected keys include:
+            - 'title' (str): Main title of the document.
+            - 'subtitle' (str, optional): Subtitle of the document.
+            - 'author' (str, optional): Author's name.
+            - 'institution' (str, optional): Institution name.
+            - 'department' (str, optional): Department name.
+            - 'doc_type' (str, optional): Type of document (e.g., "Report").
+            - 'date' (str, optional): Date string.
+            - 'version' (str, optional): Version string.
+            - 'font_name' (str, optional): Default font name (e.g., 'Arial', 'Helvetica'). Defaults to 'Helvetica'.
+            - 'font_size_title' (int, optional): Font size for the title. Defaults to 24.
+            - 'font_size_subtitle' (int, optional): Font size for the subtitle. Defaults to 18.
+            - 'font_size_author' (int, optional): Font size for author/institution. Defaults to 12.
+            - 'font_size_footer' (int, optional): Font size for footer text. Defaults to 8 or 10.
+            - 'text_color' (str, optional): Main text color (e.g., '#000000'). Not fully implemented for all elements yet.
+            - 'logo_data' (bytes, optional): Byte data of the logo image.
+            - 'logo_width_mm' (int, optional): Width of the logo in mm. Defaults to 50.
+            - 'logo_height_mm' (int, optional): Max height of the logo in mm. Defaults to 50.
+            - 'logo_x_mm' (int, optional): X position of the logo in mm.
+            - 'logo_y_mm' (int, optional): Y position of the logo in mm.
+            - 'show_horizontal_line' (bool, optional): Whether to show a horizontal line. Defaults to True.
+            - 'line_y_position_mm' (int, optional): Y position of the horizontal line in mm.
+            - 'line_color_hex' (str, optional): Color of the line in hex (e.g., '#000000').
+            - 'line_thickness_pt' (float, optional): Thickness of the line in points.
+            - 'margin_top' (int, optional): Top margin in mm. Defaults to 25.
+            - 'margin_bottom' (int, optional): Bottom margin in mm. Defaults to 25.
+            - 'margin_left' (int, optional): Left margin in mm. Defaults to 20.
+            - 'margin_right' (int, optional): Right margin in mm. Defaults to 20.
+            - 'footer_text' (str, optional): Text for the footer.
+            - 'template_style' (str, optional): Style hint (e.g., 'Modern'). Currently not heavily used by this basic logic.
 
 
-#     Returns:
-#         bytes: The generated PDF as a byte string.
+    Returns:
+        bytes: The generated PDF as a byte string.
 
-#     Raises:
-#         Exception: If any error occurs during PDF generation.
-#     """
-#     buffer = io.BytesIO()
+    Raises:
+        Exception: If any error occurs during PDF generation.
+    """
+    buffer = io.BytesIO()
 
-#     # --- Register Fonts ---
-#     registered_fonts_map, font_warnings = _register_fonts(APP_ROOT_DIR)
-#     if font_warnings:
-#         for warning_message in font_warnings:
-#             print(f"Font Warning (generate_cover_page_logic): {warning_message}", file=sys.stderr)
+    # --- Register Fonts ---
+    registered_fonts_map, font_warnings = _register_fonts(APP_ROOT_DIR)
+    if font_warnings:
+        for warning_message in font_warnings:
+            print(f"Font Warning (generate_cover_page_logic): {warning_message}", file=sys.stderr)
 
-#     effective_arial_font = registered_fonts_map.get('Arial', 'Helvetica')
-#     effective_arial_bold_font = registered_fonts_map.get('Arial-Bold', 'Helvetica-Bold')
-#     effective_showcard_font = registered_fonts_map.get('Showcard Gothic', 'Helvetica')
-#     # --- End Font Registration ---
+    effective_arial_font = registered_fonts_map.get('Arial', 'Helvetica')
+    effective_arial_bold_font = registered_fonts_map.get('Arial-Bold', 'Helvetica-Bold')
+    effective_showcard_font = registered_fonts_map.get('Showcard Gothic', 'Helvetica')
+    # --- End Font Registration ---
 
-#     c = reportlab_canvas.Canvas(buffer, pagesize=A4)
+    c = reportlab_canvas.Canvas(buffer, pagesize=A4)
 
-#     # Determine base font to use based on pdf_config and registration success
-#     requested_base_font_name = config.get("font_name", APP_CONFIG.get("default_font", "Arial"))
-#     base_font_to_use = None
-#     standard_pdf_fonts = [ # Common standard fonts ReportLab knows
-#         "Courier", "Courier-Bold", "Courier-Oblique", "Courier-BoldOblique",
-#         "Helvetica", "Helvetica-Bold", "Helvetica-Oblique", "Helvetica-BoldOblique",
-#         "Times-Roman", "Times-Bold", "Times-Italic", "Times-BoldItalic",
-#         "Symbol", "ZapfDingbats"
-#     ]
+    # Determine base font to use based on pdf_config and registration success
+    requested_base_font_name = config.get("font_name", APP_CONFIG.get("default_font", "Arial"))
+    base_font_to_use = None
+    standard_pdf_fonts = [ # Common standard fonts ReportLab knows
+        "Courier", "Courier-Bold", "Courier-Oblique", "Courier-BoldOblique",
+        "Helvetica", "Helvetica-Bold", "Helvetica-Oblique", "Helvetica-BoldOblique",
+        "Times-Roman", "Times-Bold", "Times-Italic", "Times-BoldItalic",
+        "Symbol", "ZapfDingbats"
+    ]
 
-#     if requested_base_font_name in registered_fonts_map:
-#         base_font_to_use = registered_fonts_map[requested_base_font_name]
-#         # Warnings for custom fonts already handled by printing messages from _register_fonts's return
-#     elif requested_base_font_name in standard_pdf_fonts:
-#         base_font_to_use = requested_base_font_name
-#     else:
-#         warning_message = f"Font '{requested_base_font_name}' is not a registered custom font or a standard PDF font. Falling back to default font '{effective_arial_font}'."
-#         print(f"Warning (generate_cover_page_logic): {warning_message}", file=sys.stderr)
-#         base_font_to_use = effective_arial_font # Fallback
+    if requested_base_font_name in registered_fonts_map:
+        base_font_to_use = registered_fonts_map[requested_base_font_name]
+        # Warnings for custom fonts already handled by printing messages from _register_fonts's return
+    elif requested_base_font_name in standard_pdf_fonts:
+        base_font_to_use = requested_base_font_name
+    else:
+        warning_message = f"Font '{requested_base_font_name}' is not a registered custom font or a standard PDF font. Falling back to default font '{effective_arial_font}'."
+        print(f"Warning (generate_cover_page_logic): {warning_message}", file=sys.stderr)
+        base_font_to_use = effective_arial_font # Fallback
 
-#     if not base_font_to_use: # Safeguard
-#         base_font_to_use = effective_arial_font
-#     # Title
-#     c.setFont(base_font_to_use, config.get("font_size_title", 24))
-#     title_y = A4[1] - config.get("margin_top", 25) * mm - 30 * mm # Example y position
-#     if config.get("title"):
-#         c.drawCentredString(A4[0] / 2, title_y, config.get("title"))
+    if not base_font_to_use: # Safeguard
+        base_font_to_use = effective_arial_font
+    # Title
+    c.setFont(base_font_to_use, config.get("font_size_title", 24))
+    title_y = A4[1] - config.get("margin_top", 25) * mm - 30 * mm # Example y position
+    if config.get("title"):
+        c.drawCentredString(A4[0] / 2, title_y, config.get("title"))
 
-#     # Subtitle
-#     # Assuming subtitle uses the same base font as title
-#     c.setFont(base_font_to_use, config.get("font_size_subtitle", 18))
-#     if config.get("subtitle"):
-#         title_y -= 15 * mm # Adjust Y position
-#         c.drawCentredString(A4[0] / 2, title_y, config.get("subtitle"))
+    # Subtitle
+    # Assuming subtitle uses the same base font as title
+    c.setFont(base_font_to_use, config.get("font_size_subtitle", 18))
+    if config.get("subtitle"):
+        title_y -= 15 * mm # Adjust Y position
+        c.drawCentredString(A4[0] / 2, title_y, config.get("subtitle"))
 
-#     # Author
-#     # Assuming author uses the same base font
-#     c.setFont(base_font_to_use, config.get("font_size_author", 12))
-#     if config.get("author"):
-#         author_y = A4[1] / 2  # Example position, make configurable via config
-#         c.drawCentredString(A4[0] / 2, author_y, config.get("author"))
+    # Author
+    # Assuming author uses the same base font
+    c.setFont(base_font_to_use, config.get("font_size_author", 12))
+    if config.get("author"):
+        author_y = A4[1] / 2  # Example position, make configurable via config
+        c.drawCentredString(A4[0] / 2, author_y, config.get("author"))
 
-#     # Institution (similar to author)
-#     if config.get("institution"):
-#         # Assuming same font as author for now
-#         institution_y = author_y - 10 * mm # Adjust as needed
-#         c.drawCentredString(A4[0] / 2, institution_y, config.get("institution"))
+    # Institution (similar to author)
+    if config.get("institution"):
+        # Assuming same font as author for now
+        institution_y = author_y - 10 * mm # Adjust as needed
+        c.drawCentredString(A4[0] / 2, institution_y, config.get("institution"))
 
-#     # Department (similar to institution)
-#     if config.get("department"):
-#         department_y = institution_y - 7*mm
-#         c.drawCentredString(A4[0]/2, department_y, config.get("department"))
+    # Department (similar to institution)
+    if config.get("department"):
+        department_y = institution_y - 7*mm
+        c.drawCentredString(A4[0]/2, department_y, config.get("department"))
 
-#     # Document Type
-#     if config.get("doc_type"):
-#         # Assuming same font
-#         doc_type_y = department_y - 15*mm # Adjust
-#         c.drawCentredString(A4[0]/2, doc_type_y, config.get("doc_type"))
+    # Document Type
+    if config.get("doc_type"):
+        # Assuming same font
+        doc_type_y = department_y - 15*mm # Adjust
+        c.drawCentredString(A4[0]/2, doc_type_y, config.get("doc_type"))
 
-#     # Date & Version (typically at bottom or specific locations)
-#     # Assuming these also use the base_font_to_use or a generic one like effective_arial_font
-#     c.setFont(base_font_to_use, config.get("font_size_footer", 10)) # Example, use a specific size
+    # Date & Version (typically at bottom or specific locations)
+    # Assuming these also use the base_font_to_use or a generic one like effective_arial_font
+    c.setFont(base_font_to_use, config.get("font_size_footer", 10)) # Example, use a specific size
 
-#     date_text = config.get("date", "")
-#     version_text = config.get("version", "")
+    date_text = config.get("date", "")
+    version_text = config.get("version", "")
 
-#     if date_text:
-#         c.drawString(config.get("margin_left", 20)*mm, config.get("margin_bottom", 25)*mm + 10*mm, f"Date: {date_text}")
-#     if version_text:
+    if date_text:
+        c.drawString(config.get("margin_left", 20)*mm, config.get("margin_bottom", 25)*mm + 10*mm, f"Date: {date_text}")
+    if version_text:
         c.drawRightString(A4[0] - config.get("margin_right", 20)*mm, config.get("margin_bottom", 25)*mm + 10*mm, f"Version: {version_text}")
 
 
-#     # Logo
-#     if config.get("logo_data"):
-#         try:
-#             logo_buffer = io.BytesIO(config.get("logo_data")) # ReportLab ImageReader needs a file-like object
-#             logo_image = ImageReader(logo_buffer)
+    # Logo
+    if config.get("logo_data"):
+        try:
+            from reportlab.lib.utils import ImageReader
+            logo_buffer = io.BytesIO(config.get("logo_data")) # ReportLab ImageReader needs a file-like object
+            logo_image = ImageReader(logo_buffer)
 
-#             # Positioning and sizing from config, with defaults
-#             logo_width_mm = config.get("logo_width_mm", 50)
-#             logo_height_mm = config.get("logo_height_mm", 50) # Not used directly if preserveAspectRatio=True for drawImage
+            # Positioning and sizing from config, with defaults
+            logo_width_mm = config.get("logo_width_mm", 50)
+            logo_height_mm = config.get("logo_height_mm", 50) # Not used directly if preserveAspectRatio=True for drawImage
 
-#             # Default to top center if not specified
-#             default_logo_x = (config.get("page_width", 210) - logo_width_mm) / 2
-#             default_logo_y = config.get("page_height", 297) - config.get("margin_top", 25) - logo_width_mm - 10 # above title typically
+            # Default to top center if not specified
+            default_logo_x_mm = (config.get("page_width", 210) - logo_width_mm) / 2
+            default_logo_y_mm = config.get("page_height", 297) - config.get("margin_top", 25) - logo_width_mm - 10 # above title typically
 
-#             logo_x_mm = config.get("logo_x_mm", default_logo_x_mm)
-#             logo_y_mm = config.get("logo_y_mm", default_logo_y_mm)
+            logo_x_mm = config.get("logo_x_mm", default_logo_x_mm)
+            logo_y_mm = config.get("logo_y_mm", default_logo_y_mm)
 
             c.drawImage(logo_image, logo_x_mm * mm, logo_y_mm * mm,
                         width=logo_width_mm * mm, height=logo_height_mm*mm, # height is max_height with preserveAspectRatio
-#                         preserveAspectRatio=True, anchor='c', mask='auto')
-#         except Exception as logo_e:
-#             print(f"Error drawing logo in PDF (logic function): {logo_e}", file=sys.stderr)
-#             # Optionally draw a placeholder or skip
+                        preserveAspectRatio=True, anchor='c', mask='auto')
+        except Exception as logo_e:
+            print(f"Error drawing logo in PDF (logic function): {logo_e}", file=sys.stderr)
+            # Optionally draw a placeholder or skip
 
-#     # Horizontal Line
-#     if config.get("show_horizontal_line", True):
-#         line_y = config.get("line_y_position", config.get("page_height", 297) / 2 + 20) # Example position
-#         line_color_hex = config.get("line_color_hex", "#000000")
-#         line_thickness_pt = config.get("line_thickness_pt", 0.5)
+    # Horizontal Line
+    if config.get("show_horizontal_line", True):
+        from reportlab.lib.colors import HexColor
+        line_y_mm = config.get("line_y_position_mm", config.get("page_height", 297) / 2 + 20) # Example position
+        line_color_hex = config.get("line_color_hex", "#000000")
+        line_thickness_pt = config.get("line_thickness_pt", 0.5)
 
-#         c.setStrokeColor(HexColor(line_color_hex))
-#         c.setLineWidth(line_thickness_pt)
+        c.setStrokeColor(HexColor(line_color_hex))
+        c.setLineWidth(line_thickness_pt)
         c.line(config.get("margin_left", 20)*mm, line_y_mm*mm, A4[0] - config.get("margin_right", 20)*mm, line_y_mm*mm)
 
-#     # Footer text (example)
-#     if config.get("footer_text"):
-#         c.setFont(date_version_font_name, config.get("font_size_footer", 8))
+    # Footer text (example)
+    if config.get("footer_text"):
+        date_version_font_name = base_font_to_use # Use same font for simplicity, can be configured
+        c.setFont(date_version_font_name, config.get("font_size_footer", 8))
         c.drawCentredString(A4[0]/2, config.get("margin_bottom", 25)*mm / 2, config.get("footer_text"))
 
-#     c.save()
-#     pdf_bytes = buffer.getvalue()
-#     buffer.close()
-#     return pdf_bytes
+    c.save()
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+    return pdf_bytes
 
 
 # --- Main Execution ---
