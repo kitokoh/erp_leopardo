@@ -36,7 +36,7 @@ def add_template(data: dict, conn: sqlite3.Connection = None, client_id: str = N
     if isinstance(raw_blob, str):
         raw_blob = raw_blob.encode('utf-8')
 
-    sql="""INSERT INTO Templates
+    sql="""INSERT INTO templates
              (template_name, template_type, description, base_file_name, language_code,
               is_default_for_type_lang, category_id, content_definition, email_subject_template,
               email_variables_info, cover_page_config_json, document_mapping_config_json,
@@ -62,7 +62,7 @@ def add_default_template_if_not_exists(data: dict, conn: sqlite3.Connection = No
     name,ttype,lang = data.get('template_name'),data.get('template_type'),data.get('language_code')
 
     try:
-        cursor.execute("SELECT template_id FROM Templates WHERE template_name=? AND template_type=? AND language_code=?",(name,ttype,lang))
+        cursor.execute("SELECT template_id FROM templates WHERE template_name=? AND template_type=? AND language_code=?",(name,ttype,lang))
         ex=cursor.fetchone()
         if ex:
             return ex['template_id']
@@ -148,7 +148,7 @@ def add_default_template_if_not_exists(data: dict, conn: sqlite3.Connection = No
 def get_template_by_id(template_id: int, conn: sqlite3.Connection = None) -> dict | None:
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT * FROM Templates WHERE template_id = ?", (template_id,))
+        cursor.execute("SELECT * FROM templates WHERE template_id = ?", (template_id,))
         row = cursor.fetchone()
         return dict(row) if row else None
     except sqlite3.Error as e:
@@ -159,7 +159,7 @@ def get_template_by_id(template_id: int, conn: sqlite3.Connection = None) -> dic
 def get_templates_by_type(template_type: str, language_code: str = None, client_id: str = None, conn: sqlite3.Connection = None) -> list[dict]:
     cursor = conn.cursor()
     params = [template_type]
-    sql = "SELECT * FROM Templates WHERE template_type = ?"
+    sql = "SELECT * FROM templates WHERE template_type = ?"
 
     if language_code:
         sql += " AND language_code = ?"
@@ -211,7 +211,7 @@ def update_template(template_id: int, template_data: dict, conn: sqlite3.Connect
 
     set_clauses = [f"{key} = ?" for key in data_to_set.keys()]
     params_list = list(data_to_set.values()); params_list.append(template_id)
-    sql = f"UPDATE Templates SET {', '.join(set_clauses)} WHERE template_id = ?"
+    sql = f"UPDATE templates SET {', '.join(set_clauses)} WHERE template_id = ?"
 
     try:
         cursor.execute(sql, params_list)
@@ -224,7 +224,7 @@ def update_template(template_id: int, template_data: dict, conn: sqlite3.Connect
 def delete_template(template_id: int, conn: sqlite3.Connection = None) -> bool:
     cursor = conn.cursor()
     try:
-        cursor.execute("DELETE FROM Templates WHERE template_id = ?", (template_id,))
+        cursor.execute("DELETE FROM templates WHERE template_id = ?", (template_id,))
         return cursor.rowcount > 0
     except sqlite3.Error as e:
         logging.error(f"Failed to delete template {template_id}: {e}")
@@ -234,7 +234,7 @@ def delete_template(template_id: int, conn: sqlite3.Connection = None) -> bool:
 def get_distinct_template_languages(conn: sqlite3.Connection = None) -> list[tuple[str]]:
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT DISTINCT language_code FROM Templates WHERE language_code IS NOT NULL AND language_code != '' ORDER BY language_code")
+        cursor.execute("SELECT DISTINCT language_code FROM templates WHERE language_code IS NOT NULL AND language_code != '' ORDER BY language_code")
         return cursor.fetchall()
     except sqlite3.Error as e:
         logging.error(f"Failed to get distinct template languages: {e}")
@@ -244,7 +244,7 @@ def get_distinct_template_languages(conn: sqlite3.Connection = None) -> list[tup
 def get_distinct_template_types(conn: sqlite3.Connection = None) -> list[tuple[str]]:
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT DISTINCT template_type FROM Templates WHERE template_type IS NOT NULL AND template_type != '' ORDER BY template_type")
+        cursor.execute("SELECT DISTINCT template_type FROM templates WHERE template_type IS NOT NULL AND template_type != '' ORDER BY template_type")
         return cursor.fetchall()
     except sqlite3.Error as e:
         logging.error(f"Failed to get distinct template types: {e}")
@@ -260,7 +260,7 @@ def get_filtered_templates(
     file_extension_filter: str = None, # New parameter
     conn: sqlite3.Connection = None
 ) -> list[dict]:
-    cursor = conn.cursor(); sql = "SELECT * FROM Templates"; where_clauses = []; params = []
+    cursor = conn.cursor(); sql = "SELECT * FROM templates"; where_clauses = []; params = []
 
     if category_id is not None:
         where_clauses.append("category_id = ?")
@@ -304,7 +304,7 @@ def get_filtered_templates(
 def get_template_details_for_preview(template_id: int, conn: sqlite3.Connection = None) -> dict | None:
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT base_file_name, language_code FROM Templates WHERE template_id = ?", (template_id,))
+        cursor.execute("SELECT base_file_name, language_code FROM templates WHERE template_id = ?", (template_id,))
         row = cursor.fetchone()
         return {'base_file_name': row['base_file_name'], 'language_code': row['language_code']} if row else None
     except sqlite3.Error as e:
@@ -315,7 +315,7 @@ def get_template_details_for_preview(template_id: int, conn: sqlite3.Connection 
 def get_template_path_info(template_id: int, conn: sqlite3.Connection = None) -> dict | None:
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT base_file_name, language_code FROM Templates WHERE template_id = ?", (template_id,))
+        cursor.execute("SELECT base_file_name, language_code FROM templates WHERE template_id = ?", (template_id,))
         row = cursor.fetchone()
         return {'file_name': row['base_file_name'], 'language': row['language_code']} if row else None
     except sqlite3.Error as e:
@@ -343,13 +343,13 @@ def set_default_template_by_id(template_id: int, conn: sqlite3.Connection = None
         # These two execute calls should be part of the same transaction
         # Unset other defaults for this type, language, and client (or global if client_id is NULL)
         if template_info.get('client_id'):
-            cursor.execute("UPDATE Templates SET is_default_for_type_lang = 0 WHERE template_type = ? AND language_code = ? AND client_id = ?",
+            cursor.execute("UPDATE templates SET is_default_for_type_lang = 0 WHERE template_type = ? AND language_code = ? AND client_id = ?",
                            (template_info['template_type'], template_info['language_code'], template_info['client_id']))
         else:
-            cursor.execute("UPDATE Templates SET is_default_for_type_lang = 0 WHERE template_type = ? AND language_code = ? AND client_id IS NULL",
+            cursor.execute("UPDATE templates SET is_default_for_type_lang = 0 WHERE template_type = ? AND language_code = ? AND client_id IS NULL",
                            (template_info['template_type'], template_info['language_code']))
 
-        cursor.execute("UPDATE Templates SET is_default_for_type_lang = 1 WHERE template_id = ?", (template_id,))
+        cursor.execute("UPDATE templates SET is_default_for_type_lang = 1 WHERE template_id = ?", (template_id,))
         return True
     except sqlite3.Error as e:
         logging.error(f"Failed to set default template for ID {template_id}, client {template_info.get('client_id')}: {e}")
@@ -362,7 +362,7 @@ def get_template_by_type_lang_default(template_type: str, language_code: str, cl
     # If client_id is provided, look for that client's default OR a global default, prioritizing client.
     # If client_id is None, look for a global default only.
     sql = """
-        SELECT * FROM Templates
+        SELECT * FROM templates
         WHERE template_type = ? AND language_code = ? AND is_default_for_type_lang = TRUE
     """
     params = [template_type, language_code]
@@ -379,7 +379,7 @@ def get_template_by_type_lang_default(template_type: str, language_code: str, cl
         return dict(row) if row else None
     except sqlite3.Error as e:
         logging.error(f"Failed to get default template by type '{template_type}', lang '{language_code}', client '{client_id}': {e}")
-        return None
+        return []
 
 @_manage_conn
 def get_all_templates(
@@ -392,7 +392,7 @@ def get_all_templates(
     conn: sqlite3.Connection = None
 ) -> list[dict]:
     cursor = conn.cursor()
-    sql = "SELECT * FROM Templates"
+    sql = "SELECT * FROM templates"
     params = []
     clauses = []
 
@@ -468,7 +468,7 @@ def get_all_templates(
 def get_distinct_languages_for_template_type(template_type: str, conn: sqlite3.Connection = None) -> list[str]:
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT DISTINCT language_code FROM Templates WHERE template_type = ? ORDER BY language_code ASC", (template_type,))
+        cursor.execute("SELECT DISTINCT language_code FROM templates WHERE template_type = ? ORDER BY language_code ASC", (template_type,))
         return [row['language_code'] for row in cursor.fetchall() if row['language_code']]
     except sqlite3.Error as e:
         logging.error(f"Failed to get distinct languages for template type '{template_type}': {e}")
@@ -477,7 +477,7 @@ def get_distinct_languages_for_template_type(template_type: str, conn: sqlite3.C
 @_manage_conn
 def get_all_file_based_templates(conn: sqlite3.Connection = None) -> list[dict]:
     cursor = conn.cursor()
-    sql = "SELECT template_id, template_name, language_code, base_file_name, description, category_id FROM Templates WHERE base_file_name IS NOT NULL AND base_file_name != '' ORDER BY template_name, language_code"
+    sql = "SELECT template_id, template_name, language_code, base_file_name, description, category_id FROM templates WHERE base_file_name IS NOT NULL AND base_file_name != '' ORDER BY template_name, language_code"
     try:
         cursor.execute(sql)
         return [dict(row) for row in cursor.fetchall()]
@@ -489,7 +489,7 @@ def get_all_file_based_templates(conn: sqlite3.Connection = None) -> list[dict]:
 def get_templates_by_category_id(category_id: int, conn: sqlite3.Connection = None) -> list[dict]:
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT * FROM Templates WHERE category_id = ? ORDER BY template_name, language_code", (category_id,))
+        cursor.execute("SELECT * FROM templates WHERE category_id = ? ORDER BY template_name, language_code", (category_id,))
         return [dict(row) for row in cursor.fetchall()]
     except sqlite3.Error as e:
         logging.error(f"Failed to get templates by category id {category_id}: {e}")
@@ -530,7 +530,7 @@ def get_distinct_template_extensions(conn: sqlite3.Connection = None) -> list[st
     cursor = conn.cursor()
     sql = """
         SELECT DISTINCT LOWER(SUBSTR(base_file_name, INSTR(base_file_name, '.') + 1)) AS extension
-        FROM Templates
+        FROM templates
         WHERE base_file_name IS NOT NULL
           AND INSTR(base_file_name, '.') > 0
           AND LENGTH(SUBSTR(base_file_name, INSTR(base_file_name, '.') + 1)) > 0

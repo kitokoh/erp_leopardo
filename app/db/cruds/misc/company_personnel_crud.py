@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 @_manage_conn
 def add_company_personnel(data: dict, conn: sqlite3.Connection = None) -> int | None:
     cursor=conn.cursor(); now=datetime.utcnow().isoformat()+"Z"
-    sql="INSERT INTO CompanyPersonnel (company_id, name, role, phone, email, created_at) VALUES (?,?,?,?,?,?)"
+    sql="INSERT INTO company_personnel (company_id, name, role, phone, email, created_at) VALUES (?,?,?,?,?,?)"
     params=(data['company_id'], data['name'], data['role'], data.get('phone'), data.get('email'), now)
     try:
         cursor.execute(sql,params)
@@ -26,7 +26,7 @@ def add_company_personnel(data: dict, conn: sqlite3.Connection = None) -> int | 
 
 @_manage_conn
 def get_personnel_for_company(company_id: str, role: str = None, conn: sqlite3.Connection = None) -> list[dict]:
-    cursor=conn.cursor(); sql="SELECT * FROM CompanyPersonnel WHERE company_id = ?"; params=[company_id]
+    cursor=conn.cursor(); sql="SELECT * FROM company_personnel WHERE company_id = ?"; params=[company_id]
     if role: sql+=" AND role = ?"; params.append(role)
     sql+=" ORDER BY name";
     try:
@@ -41,7 +41,7 @@ def update_company_personnel(personnel_id: int, data: dict, conn: sqlite3.Connec
     cursor=conn.cursor(); valid_cols=['name','role','phone','email']; to_set={k:v for k,v in data.items() if k in valid_cols}
     if not to_set: return False
     set_c=[f"{k}=?" for k in to_set.keys()]; params=list(to_set.values()); params.append(personnel_id)
-    sql=f"UPDATE CompanyPersonnel SET {', '.join(set_c)} WHERE personnel_id = ?";
+    sql=f"UPDATE company_personnel SET {', '.join(set_c)} WHERE personnel_id = ?";
     try:
         cursor.execute(sql,params)
         return cursor.rowcount > 0
@@ -53,7 +53,7 @@ def update_company_personnel(personnel_id: int, data: dict, conn: sqlite3.Connec
 def delete_company_personnel(personnel_id: int, conn: sqlite3.Connection = None) -> bool:
     cursor=conn.cursor()
     try:
-        cursor.execute("DELETE FROM CompanyPersonnel WHERE personnel_id = ?", (personnel_id,))
+        cursor.execute("DELETE FROM company_personnel WHERE personnel_id = ?", (personnel_id,))
         return cursor.rowcount > 0
     except sqlite3.Error:
         # logging.error(f"Failed to delete company personnel {personnel_id}: {e}") # Consider logging
@@ -82,7 +82,7 @@ __all__ = [
 def add_personnel_contact(personnel_id: int, contact_data: dict, conn: sqlite3.Connection = None) -> int | None:
     """
     Adds a contact to the central Contacts table and links it to a company personnel
-    in the CompanyPersonnelContacts table.
+    in the company_personnel_contacts table.
     contact_data should contain all fields for the main Contacts table (name, email, etc.)
     AND optionally 'is_primary' and 'can_receive_documents' for the link.
     """
@@ -100,7 +100,7 @@ def add_personnel_contact(personnel_id: int, contact_data: dict, conn: sqlite3.C
     now = datetime.utcnow().isoformat()
 
     sql_link = """
-        INSERT INTO CompanyPersonnelContacts (personnel_id, contact_id, is_primary, can_receive_documents, created_at, updated_at)
+        INSERT INTO company_personnel_contacts (personnel_id, contact_id, is_primary, can_receive_documents, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
     """
     params_link = (personnel_id, central_contact_id, is_primary, can_receive_documents, now, now)
@@ -128,8 +128,8 @@ def get_contacts_for_personnel(personnel_id: int, conn: sqlite3.Connection = Non
     sql = """
         SELECT c.*, cpc.company_personnel_contact_id, cpc.is_primary, cpc.can_receive_documents,
                cpc.created_at AS link_created_at, cpc.updated_at AS link_updated_at
-        FROM Contacts c
-        JOIN CompanyPersonnelContacts cpc ON c.contact_id = cpc.contact_id
+        FROM contacts c
+        JOIN company_personnel_contacts cpc ON c.contact_id = cpc.contact_id
         WHERE cpc.personnel_id = ?
         ORDER BY c.name, c.displayName
     """
@@ -144,7 +144,7 @@ def get_contacts_for_personnel(personnel_id: int, conn: sqlite3.Connection = Non
 def update_personnel_contact_link(company_personnel_contact_id: int, link_data: dict = None, contact_details_data: dict = None, conn: sqlite3.Connection = None) -> bool:
     """
     Updates a personnel-contact link. This can involve updating the central contact details
-    and/or the link-specific details in CompanyPersonnelContacts.
+    and/or the link-specific details in company_personnel_contacts.
     `link_data` is for 'is_primary', 'can_receive_documents'.
     `contact_details_data` is for fields in the main Contacts table.
     """
@@ -157,11 +157,11 @@ def update_personnel_contact_link(company_personnel_contact_id: int, link_data: 
     updated_central = False
     updated_link = False
 
-    # Step 1: Get central_contact_id from CompanyPersonnelContacts
-    cursor.execute("SELECT contact_id FROM CompanyPersonnelContacts WHERE company_personnel_contact_id = ?", (company_personnel_contact_id,))
+    # Step 1: Get central_contact_id from company_personnel_contacts
+    cursor.execute("SELECT contact_id FROM company_personnel_contacts WHERE company_personnel_contact_id = ?", (company_personnel_contact_id,))
     row = cursor.fetchone()
     if not row:
-        logger.error(f"CompanyPersonnelContacts link with ID {company_personnel_contact_id} not found.")
+        logger.error(f"company_personnel_contacts link with ID {company_personnel_contact_id} not found.")
         return False
     central_contact_id = row['contact_id']
 
@@ -176,7 +176,7 @@ def update_personnel_contact_link(company_personnel_contact_id: int, link_data: 
             logger.warning(f"Failed to update central contact details for contact_id {central_contact_id}.")
             # Depending on requirements, one might choose to return False here
 
-    # Step 3: Update CompanyPersonnelContacts link table if link_data is provided
+    # Step 3: Update company_personnel_contacts link table if link_data is provided
     if link_data:
         link_fields_to_update_sql = []
         link_params_sql = []
@@ -193,14 +193,14 @@ def update_personnel_contact_link(company_personnel_contact_id: int, link_data: 
             link_params_sql.append(now)
             link_params_sql.append(company_personnel_contact_id)
 
-            sql_update_link = f"UPDATE CompanyPersonnelContacts SET {', '.join(link_fields_to_update_sql)} WHERE company_personnel_contact_id = ?"
+            sql_update_link = f"UPDATE company_personnel_contacts SET {', '.join(link_fields_to_update_sql)} WHERE company_personnel_contact_id = ?"
             try:
                 cursor.execute(sql_update_link, tuple(link_params_sql))
                 if cursor.rowcount > 0:
-                    logger.info(f"Updated CompanyPersonnelContacts link details for company_personnel_contact_id {company_personnel_contact_id}.")
+                    logger.info(f"Updated company_personnel_contacts link details for company_personnel_contact_id {company_personnel_contact_id}.")
                     updated_link = True
             except sqlite3.Error as e:
-                logger.error(f"Database error updating CompanyPersonnelContacts link for {company_personnel_contact_id}: {e}")
+                logger.error(f"Database error updating company_personnel_contacts link for {company_personnel_contact_id}: {e}")
 
     return updated_central or updated_link
 
@@ -215,8 +215,8 @@ def get_personnel_contact_link_details(company_personnel_contact_id: int, conn: 
         SELECT c.*, cpc.company_personnel_contact_id, cpc.personnel_id,
                cpc.is_primary, cpc.can_receive_documents,
                cpc.created_at AS link_created_at, cpc.updated_at AS link_updated_at
-        FROM Contacts c
-        JOIN CompanyPersonnelContacts cpc ON c.contact_id = cpc.contact_id
+        FROM contacts c
+        JOIN company_personnel_contacts cpc ON c.contact_id = cpc.contact_id
         WHERE cpc.company_personnel_contact_id = ?
     """
     try:
@@ -230,11 +230,11 @@ def get_personnel_contact_link_details(company_personnel_contact_id: int, conn: 
 @_manage_conn
 def unlink_contact_from_personnel(company_personnel_contact_id: int, conn: sqlite3.Connection = None) -> bool:
     """
-    Deletes the link between a company personnel and a contact from CompanyPersonnelContacts.
+    Deletes the link between a company personnel and a contact from company_personnel_contacts.
     Does NOT delete the contact from the central Contacts table.
     """
     cursor = conn.cursor()
-    sql = "DELETE FROM CompanyPersonnelContacts WHERE company_personnel_contact_id = ?"
+    sql = "DELETE FROM company_personnel_contacts WHERE company_personnel_contact_id = ?"
     try:
         cursor.execute(sql, (company_personnel_contact_id,))
         if cursor.rowcount > 0:
@@ -250,12 +250,12 @@ def unlink_contact_from_personnel(company_personnel_contact_id: int, conn: sqlit
 @_manage_conn
 def delete_all_contact_links_for_personnel(personnel_id: int, conn: sqlite3.Connection = None) -> bool:
     """
-    Deletes all contact links for a specific company personnel from CompanyPersonnelContacts.
+    Deletes all contact links for a specific company personnel from company_personnel_contacts.
     Does NOT delete contacts from the central Contacts table.
     Returns True if the operation was successful (even if no rows were deleted).
     """
     cursor = conn.cursor()
-    sql = "DELETE FROM CompanyPersonnelContacts WHERE personnel_id = ?"
+    sql = "DELETE FROM company_personnel_contacts WHERE personnel_id = ?"
     try:
         cursor.execute(sql, (personnel_id,))
         logger.info(f"Attempted deletion of all contact links for personnel_id {personnel_id}. Rows affected: {cursor.rowcount}")
@@ -267,8 +267,8 @@ def delete_all_contact_links_for_personnel(personnel_id: int, conn: sqlite3.Conn
 @_manage_conn
 def get_personnel_linked_to_contact(contact_id: int, conn: sqlite3.Connection = None) -> list[dict]:
     """
-    Retrieves all CompanyPersonnel records linked to a specific contact_id
-    through the CompanyPersonnelContacts table.
+    Retrieves all company_personnel records linked to a specific contact_id
+    through the company_personnel_contacts table.
     Includes link details like is_primary for that personnel.
     """
     cursor = conn.cursor()
@@ -276,8 +276,8 @@ def get_personnel_linked_to_contact(contact_id: int, conn: sqlite3.Connection = 
         SELECT cp.*, cpc.is_primary AS is_primary_for_personnel,
                cpc.can_receive_documents AS can_receive_documents_for_personnel,
                cpc.company_personnel_contact_id
-        FROM CompanyPersonnel cp
-        JOIN CompanyPersonnelContacts cpc ON cp.personnel_id = cpc.personnel_id
+        FROM company_personnel cp
+        JOIN company_personnel_contacts cpc ON cp.personnel_id = cpc.personnel_id
         WHERE cpc.contact_id = ?
         ORDER BY cp.name
     """
@@ -292,9 +292,9 @@ def get_personnel_linked_to_contact(contact_id: int, conn: sqlite3.Connection = 
 @_manage_conn
 def link_existing_contact_to_personnel(personnel_id: int, contact_id: int, is_primary: bool = False, can_receive_documents: bool = True, conn: sqlite3.Connection = None) -> int | None:
     """
-    Links an existing central contact to a company personnel in the CompanyPersonnelContacts table.
+    Links an existing central contact to a company personnel in the company_personnel_contacts table.
     Args:
-        personnel_id: The ID of the CompanyPersonnel record.
+        personnel_id: The ID of the company_personnel record.
         contact_id: The ID of the existing Contact record.
         is_primary: Whether this contact is the primary contact for the personnel.
         can_receive_documents: Whether this contact can receive documents for the personnel.
@@ -304,7 +304,7 @@ def link_existing_contact_to_personnel(personnel_id: int, contact_id: int, is_pr
     """
     now = datetime.utcnow().isoformat()
     sql_link = """
-        INSERT INTO CompanyPersonnelContacts (personnel_id, contact_id, is_primary, can_receive_documents, created_at, updated_at)
+        INSERT INTO company_personnel_contacts (personnel_id, contact_id, is_primary, can_receive_documents, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
     """
     params_link = (personnel_id, contact_id, is_primary, can_receive_documents, now, now)
@@ -317,7 +317,7 @@ def link_existing_contact_to_personnel(personnel_id: int, contact_id: int, is_pr
     except sqlite3.IntegrityError as e:
         # Check if it's a unique constraint violation (personnel_id, contact_id)
         # The specific error message for unique constraint can vary by SQLite version/config.
-        # A common one is "UNIQUE constraint failed: CompanyPersonnelContacts.personnel_id, CompanyPersonnelContacts.contact_id"
+        # A common one is "UNIQUE constraint failed: company_personnel_contacts.personnel_id, company_personnel_contacts.contact_id"
         if "UNIQUE constraint failed" in str(e) and "personnel_id" in str(e) and "contact_id" in str(e):
              logger.warning(f"Failed to link existing contact {contact_id} to personnel {personnel_id}. Link likely already exists.")
         else:

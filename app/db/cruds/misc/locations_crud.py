@@ -2,7 +2,8 @@ import sqlite3
 import logging
 from datetime import datetime
 from sqlalchemy.orm import Session
-from app.models.db.locations import Country, City
+from app.models.db.locations.country import Country
+from app.models.db.locations.city import City
 from ..generic_crud import _manage_conn
 
 # --- Countries CRUD ---
@@ -12,7 +13,7 @@ def get_country_by_name(name: str, conn: sqlite3.Connection = None) -> dict | No
     cursor=conn.cursor()
     try:
         logger_crud.info(f"locations_crud.get_country_by_name: Querying for Name='{name}'")
-        cursor.execute("SELECT * FROM Countries WHERE country_name = ?",(name,))
+        cursor.execute("SELECT * FROM countries WHERE country_name = ?",(name,))
         row=cursor.fetchone()
         if row:
             logger_crud.info(f"locations_crud.get_country_by_name: Found country '{name}' with data: {dict(row)}")
@@ -29,7 +30,7 @@ def get_country_by_name(name: str, conn: sqlite3.Connection = None) -> dict | No
 def get_country_by_id(id: int, conn: sqlite3.Connection = None) -> dict | None:
     cursor=conn.cursor()
     try:
-        cursor.execute("SELECT * FROM Countries WHERE country_id = ?",(id,))
+        cursor.execute("SELECT * FROM countries WHERE country_id = ?",(id,))
         row=cursor.fetchone()
         # return dict(row) if row else None
         return {key: row[key] for key in row.keys()} if row else None
@@ -80,7 +81,7 @@ def add_country(data: dict, conn: sqlite3.Connection = None) -> int | None:
         return existing_country['country_id']
 
     now = datetime.utcnow().isoformat() + "Z"
-    sql = "INSERT INTO Countries (country_name, created_at, updated_at) VALUES (?, ?, ?)"
+    sql = "INSERT INTO countries (country_name, created_at, updated_at) VALUES (?, ?, ?)"
     params = (country_name, now, now)
     cursor = conn.cursor()
     try:
@@ -115,7 +116,7 @@ def get_all_countries(conn: Session = None) -> list[dict]:
 def get_city_by_name_and_country_id(name: str, country_id: int, conn: sqlite3.Connection = None) -> dict | None:
     cursor=conn.cursor()
     try:
-        cursor.execute("SELECT * FROM Cities WHERE city_name = ? AND country_id = ?",(name,country_id))
+        cursor.execute("SELECT * FROM cities WHERE city_name = ? AND country_id = ?",(name,country_id))
         row=cursor.fetchone()
         # return dict(row) if row else None
         return {key: row[key] for key in row.keys()} if row else None
@@ -127,7 +128,7 @@ def get_city_by_name_and_country_id(name: str, country_id: int, conn: sqlite3.Co
 def get_city_by_id(id: int, conn: sqlite3.Connection = None) -> dict | None:
     cursor=conn.cursor()
     try:
-        cursor.execute("SELECT * FROM Cities WHERE city_id = ?",(id,))
+        cursor.execute("SELECT * FROM cities WHERE city_id = ?",(id,))
         row=cursor.fetchone()
         # return dict(row) if row else None
         return {key: row[key] for key in row.keys()} if row else None
@@ -147,7 +148,7 @@ def add_city(data: dict, conn: sqlite3.Connection = None) -> int | None:
 
     # Simplified: direct insert without all fields from original schema example
     now = datetime.utcnow().isoformat() + "Z"
-    sql = "INSERT INTO Cities (city_name, country_id, created_at, updated_at) VALUES (?, ?, ?, ?)"
+    sql = "INSERT INTO cities (city_name, country_id, created_at, updated_at) VALUES (?, ?, ?, ?)"
     params = (data['city_name'], data['country_id'], now, now)
     cursor = conn.cursor()
     try:
@@ -194,7 +195,7 @@ def get_all_cities(country_id: int = None, conn: sqlite3.Connection = None) -> l
     Retrieves all cities, optionally filtered by country_id.
     """
     cursor = conn.cursor()
-    sql = "SELECT * FROM Cities"
+    sql = "SELECT * FROM cities"
     params = []
     if country_id is not None:
         sql += " WHERE country_id = ?"
