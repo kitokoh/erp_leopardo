@@ -8,7 +8,7 @@ from sqlalchemy.engine import Engine, Connection as SQLAlchemyConnection
 from sqlalchemy.sql import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.utils import hash_password as util_hash_password, verify_password as util_verify_password
+from app.utils.auth import hash_password as util_hash_password, verify_password as util_verify_password
 from app.db.generic_crud import _manage_conn
 from app.models.db.users.user import User
 from app.models.db.users.role import Role
@@ -147,22 +147,22 @@ def get_any_user_by_username(db: Session, username: str, logger_passed: logging.
         current_logger.debug(f"Any user (active or not) '{username}' not found.")
     return user_data
 
-def get_user_by_id(db: Session, user_id: str, logger_passed: logging.Logger | None = None) -> dict | None:
+def get_user_by_id(db: Session, user_id: str, logger_passed: logging.Logger | None = None) -> User | None:
+    """
+    Retrieves a user by their ID from the database using the ORM.
+    """
     current_logger = logger_passed if logger_passed else module_logger
-    sql_select_part = "SELECT u.*, r.role_name FROM Users u JOIN Roles r ON u.role_id = r.role_id"
-
-    sql_sqlite = f"{sql_select_part} WHERE u.user_id = ?"
-    sql_sa = text(f"{sql_select_part} WHERE u.user_id = :user_id")
-
-    params_sa = {"user_id": user_id}
-    params_sqlite = (user_id,)
-
-    db_obj, dialect = _get_cursor_and_dialect(db)
-    if not db_obj or not dialect:
-        current_logger.error(f"Unsupported connection type: {type(db)}")
+    try:
+        # Use joinedload to eagerly fetch the Role relationship
+        user = db.query(User).options(joinedload(User.role)).filter(User.user_id == user_id).first()
+        if user:
+            current_logger.debug(f"User with ID '{user_id}' found.")
+        else:
+            current_logger.debug(f"User with ID '{user_id}' not found.")
+        return user
+    except SQLAlchemyError as e:
+        current_logger.error(f"Database error getting user by ID '{user_id}': {e}", exc_info=True)
         return None
-
-    return _fetch_one_as_dict(db_obj, sql_sa, sql_sqlite, params_sa, params_sqlite, dialect, current_logger)
 
 def update_user_role(db: Session, user_id: str, new_role_id: int, logger_passed: logging.Logger | None = None) -> bool:
     current_logger = logger_passed if logger_passed else module_logger

@@ -1,9 +1,27 @@
 import sqlite3
 import functools
 import logging
+from sqlalchemy.engine.row import Row as RowProxy
 from app.db.connection import get_db_connection
+from sqlalchemy.orm import Session
+from sqlalchemy.engine import Engine, Connection as SQLAlchemyConnection
+
 
 logger = logging.getLogger(__name__)
+
+def _is_sqlalchemy_obj(conn):
+    """Checks if the object is a SQLAlchemy Session, Engine, or Connection."""
+    return isinstance(conn, (Session, Engine, SQLAlchemyConnection))
+
+def _convert_to_dict(row):
+    """
+    Converts a SQLAlchemy RowProxy or sqlite3.Row object to a dictionary.
+    """
+    if isinstance(row, RowProxy):
+        return dict(row._mapping)
+    elif isinstance(row, sqlite3.Row):
+        return dict(row)
+    return row
 
 def _manage_conn(func):
     @functools.wraps(func)
