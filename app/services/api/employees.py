@@ -3,10 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
-# Assuming 'api.dependencies' provides 'get_db'
-# Adjust the import path if your project structure is different.
-from app.api.dependencies import get_db
-from app.api.models import EmployeeCreate, EmployeeResponse, EmployeeUpdate
+from app.api.dependencies import get_db_session as get_db
+from .models import EmployeeCreate, EmployeeResponse, EmployeeUpdate
 from app.models.db.employees.employee import Employee
 from app.db.cruds.users import employees_crud
 

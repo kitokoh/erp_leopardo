@@ -12,7 +12,7 @@ def add_product(product_data: dict, conn: sqlite3.Connection = None) -> int | No
     cursor = conn.cursor()
     now = datetime.utcnow().isoformat()
     sql = """
-        INSERT INTO Products (product_name, product_code, description, base_unit_price, is_active, created_at, updated_at, language_code, weight, dimensions)
+        INSERT INTO products (product_name, product_code, description, base_unit_price, is_active, created_at, updated_at, language_code, weight, dimensions)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
     params = (
@@ -37,7 +37,7 @@ def add_product(product_data: dict, conn: sqlite3.Connection = None) -> int | No
 @_manage_conn
 def get_product_by_id(product_id: int, conn: sqlite3.Connection = None, include_deleted: bool = False) -> Optional[Dict[str, Any]]:
     """Fetches a single product by its ID."""
-    query = "SELECT * FROM Products WHERE product_id = ?"
+    query = "SELECT * FROM products WHERE product_id = ?"
     if not include_deleted:
         query += " AND is_deleted = 0"
 
@@ -49,7 +49,7 @@ def get_product_by_id(product_id: int, conn: sqlite3.Connection = None, include_
 @_manage_conn
 def get_product_by_name(product_name: str, conn: sqlite3.Connection = None, include_deleted: bool = False) -> Optional[Dict[str, Any]]:
     """Fetches a single product by its name."""
-    query = "SELECT * FROM Products WHERE product_name = ?"
+    query = "SELECT * FROM products WHERE product_name = ?"
     if not include_deleted:
         query += " AND is_deleted = 0"
 
@@ -61,7 +61,7 @@ def get_product_by_name(product_name: str, conn: sqlite3.Connection = None, incl
 @_manage_conn
 def get_all_products(conn: sqlite3.Connection = None, skip: int = 0, limit: int = 100, include_deleted: bool = False, filters: dict = None) -> List[Dict[str, Any]]:
     """Retrieves all products with pagination and optional filters."""
-    query = "SELECT * FROM Products"
+    query = "SELECT * FROM products"
     conditions = []
     params = []
 
@@ -86,7 +86,7 @@ def get_all_products(conn: sqlite3.Connection = None, skip: int = 0, limit: int 
 @_manage_conn
 def get_products_by_name_pattern(name_pattern: str, conn: sqlite3.Connection = None, include_deleted: bool = False) -> List[Dict[str, Any]]:
     """Fetches products with names matching a pattern."""
-    query = "SELECT * FROM Products WHERE product_name LIKE ?"
+    query = "SELECT * FROM products WHERE product_name LIKE ?"
     if not include_deleted:
         query += " AND is_deleted = 0"
 
@@ -109,7 +109,7 @@ def update_product(product_id: int, update_data: Dict[str, Any], conn: sqlite3.C
     set_clauses = [f"{k} = ?" for k in to_set.keys()]
     params_list = list(to_set.values())
     params_list.append(product_id)
-    sql = f"UPDATE Products SET {', '.join(set_clauses)} WHERE product_id = ?"
+    sql = f"UPDATE products SET {', '.join(set_clauses)} WHERE product_id = ?"
 
     try:
         cursor = conn.cursor()

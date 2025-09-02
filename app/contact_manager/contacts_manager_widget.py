@@ -337,10 +337,9 @@ class ContactsManagerWidget(QWidget):
 
     def _clear_details_panel(self, clear_contact_form=True, clear_linked_entities=True):
         if clear_contact_form:
-           self._clear_layout(self.contact_details_layout)
+            self._clear_layout(self.contact_details_layout)
         if clear_linked_entities:
-           self.linked_entities_table.setRowCount(0)
-        # pass # Removed pass
+            self.linked_entities_table.setRowCount(0)
 
     def on_add_contact(self):
         # Assuming self.current_user_id might be set on this widget if user context is needed

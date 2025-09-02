@@ -176,35 +176,22 @@ def delete_client_document(document_id: str, conn: sqlite3.Connection = None) ->
         logging.error(f"SQLite error soft-deleting client document {document_id}: {e}", exc_info=True)
         return False
 
-@_manage_conn
-def get_document_by_id(document_id: str, conn: sqlite3.Connection = None, include_deleted: bool = False, fetch_only_latest_version: bool = False) -> dict | None:
+from sqlalchemy.orm import Session
+from app.models.db.documents.client_documents import ClientDocument
+
+def get_document_by_id(db: Session, document_id: str, include_deleted: bool = False) -> ClientDocument | None:
     """
-    Retrieves a client document by its document_id.
-    Optionally includes soft-deleted documents.
-    Optionally fetches only the latest version if the given document_id is part of a version history
-    (this part is simplified, true latest version finding might need traversal or a conceptual ID).
-    For now, it respects is_latest_version if fetch_only_latest_version is True.
+    Retrieves a client document by its document_id using the ORM.
     """
-    cursor = conn.cursor()
-    sql = "SELECT * FROM ClientDocuments WHERE document_id = ?"
-    params = [document_id]
-
-    if not include_deleted:
-        sql += " AND (is_deleted = 0 OR is_deleted IS NULL)"
-
-    if fetch_only_latest_version: # This flag might be redundant if get_document_by_id is always for a specific version.
-                                  # Keeping it for now if there's a use case.
-                                  # A better approach for "latest" might be a different function that resolves the latest.
-        sql += " AND (is_latest_version = 1 OR is_latest_version IS NULL)" # Assuming 1 is true, NULL might mean older system data
-
     try:
-        cursor.execute(sql, tuple(params))
-        row = cursor.fetchone()
-        if row:
-            return dict(row)
-        return None
-    except sqlite3.Error as e:
-        logging.error(f"SQLite error getting document by ID {document_id}: {e}", exc_info=True)
+        query = db.query(ClientDocument).filter(ClientDocument.document_id == document_id)
+        if not include_deleted:
+            query = query.filter(ClientDocument.is_deleted == False)
+
+        document = query.first()
+        return document
+    except Exception as e:
+        logging.error(f"Error getting document by ID {document_id}: {e}", exc_info=True)
         return None
 
 
@@ -385,7 +372,18 @@ def get_pdf_documents_for_order(commande_id: str, conn: sqlite3.Connection = Non
         logging.error(f"SQLite error getting PDF documents for order {commande_id}: {e}", exc_info=True)
         return []
 
-# Ensure the new function is added to __all__ if the module uses it.
-# Not strictly necessary for direct calls but good practice for module interface.
-# This requires checking how __all__ is defined or if it's used.
-# For now, assuming direct import/use is fine.
+__all__ = [
+    "add_client_document",
+    "create_new_document_version",
+    "delete_client_document",
+    "get_document_by_id",
+    "get_documents_for_client",
+    "get_documents_for_project",
+    "update_client_document",
+    "get_client_document_notes",
+    "add_client_document_note",
+    "update_client_document_note",
+    "delete_client_document_note",
+    "get_client_document_note_by_id",
+    "get_pdf_documents_for_order",
+]

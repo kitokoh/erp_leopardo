@@ -7,8 +7,11 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import QDate, Qt
 from PyQt5.QtGui import QIcon
-from app.db.cruds import clients_crud, projects_crud, products_crud, client_project_products_crud
 from datetime import datetime, timedelta
+
+from app.db.cruds.clients import client_project_products_crud, clients_crud
+from app.db.cruds.products import products_crud
+from app.db.cruds.projects import projects_crud
 
 class FinalInvoiceDataDialog(QDialog):
     def __init__(self, client_id, project_id=None, company_id=None, parent=None):

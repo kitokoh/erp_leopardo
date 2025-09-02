@@ -11,7 +11,8 @@ from app.product_management.edit_dialog import ProductEditDialog, SUPPORTED_LANG
 from app.db.cruds.products.products_crud import products_crud_instance as products_crud
 from app.db.cruds.products import product_media_links_crud
 from app.media_manager import operations as media_ops # For mocking add_image
-from app.config import MEDIA_FILES_BASE_PATH # For _browse_technical_image path logic
+from app.core.config import CONFIG
+MEDIA_FILES_BASE_PATH = CONFIG.get("media_files_base_path", "app/media_files") # For _browse_technical_image path logic
 
 # app = QApplication.instance() if QApplication.instance() else QApplication(sys.argv)
 

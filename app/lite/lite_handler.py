@@ -7,7 +7,7 @@ from PyQt5.QtCore import QUrl
 # Adjust sys.path to include the parent directory for db and utils
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from app.db import cruds as db_manager # Corrected import
-from app.utils import html_to_pdf as html_to_pdf_util # Corrected import
+from app.utils import html_to_pdf_util
 from app.core.config import CONFIG # Corrected import
 from PyQt5.QtGui import QDesktopServices # Added
 from PyQt5.QtCore import QUrl # Added

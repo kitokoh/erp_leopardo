@@ -26,7 +26,7 @@ class ClientsCRUD(GenericCRUD):
         Initializes the ClientsCRUD class, setting the table name and ID column
         for use with GenericCRUD methods.
         """
-        self.table_name = "Clients"
+        self.table_name = "clients"
         self.id_column = "client_id"
         self.logger = logging.getLogger(__name__) # Add logger instance
 
@@ -215,10 +215,10 @@ class ClientsCRUD(GenericCRUD):
 
         sql_query = text(sql_base)
         try:
-            if _is_sqlalchemy_obj(conn):
-                result = conn.execute(sql_query, params_dict)
+            if _is_sqlalchemy_obj(db):
+                result = db.execute(sql_query, params_dict)
             else:
-                result = conn.execute(str(sql_query), params_dict)
+                result = db.execute(str(sql_query), params_dict)
 
             return [dict(row._mapping) if hasattr(row, '_mapping') else dict(row) for row in result.fetchall()]
         except Exception as e: # Changed to general Exception
@@ -235,7 +235,7 @@ class ClientsCRUD(GenericCRUD):
             return {'success': False, 'error': "No data provided for update."}
 
         try:
-            client = conn.query(Client).filter(Client.client_id == client_id).first()
+            client = db.query(Client).filter(Client.client_id == client_id).first()
             if not client:
                 return {'success': True, 'updated_count': 0}
 
@@ -243,11 +243,11 @@ class ClientsCRUD(GenericCRUD):
                 if hasattr(client, key):
                     setattr(client, key, value)
 
-            conn.commit()
+            db.commit()
             return {'success': True, 'updated_count': 1}
         except Exception as e:
             self.logger.error(f"Failed to update client {client_id}: {e}", exc_info=True)
-            conn.rollback()
+            db.rollback()
             return {'success': False, 'error': str(e)}
 
     def delete_client(self, db: Session, client_id: str) -> dict:
@@ -264,7 +264,7 @@ class ClientsCRUD(GenericCRUD):
                   {'success': False, 'error': '...'} on failure.
         """
         # Circular import guard
-        from status_manager import status_service
+        from app.status_manager import status_service
 
         if not client_id:
             self.logger.warning("delete_client called with no client_id.")
@@ -300,7 +300,7 @@ class ClientsCRUD(GenericCRUD):
 
     def get_all_clients_with_details(self, db: Session, filters: dict = None, limit: int = None, offset: int = 0, include_deleted: bool = False) -> list[dict]:
         """
-        Retrieves all clients along with details from joined tables (Countries, Cities, StatusSettings).
+        Retrieves all clients along with details from joined tables (countries, cities, status_settings).
         Supports pagination and filtering of soft-deleted records.
 
         Args:
@@ -340,11 +340,11 @@ class ClientsCRUD(GenericCRUD):
                co.country_name AS country, ci.city_name AS city,
                s.status_name AS status, s.color_hex AS status_color, s.icon_name AS status_icon_name,
                t.template_name AS default_template_name
-        FROM Clients c
-        LEFT JOIN Countries co ON c.country_id = co.country_id
-        LEFT JOIN Cities ci ON c.city_id = ci.city_id
-        LEFT JOIN StatusSettings s ON c.status_id = s.status_id AND s.status_type = 'Client'
-        LEFT JOIN Templates t ON c.default_template_id = t.template_id
+        FROM clients c
+        LEFT JOIN countries co ON c.country_id = co.country_id
+        LEFT JOIN cities ci ON c.city_id = ci.city_id
+        LEFT JOIN status_settings s ON c.status_id = s.status_id AND s.status_type = 'Client'
+        LEFT JOIN templates t ON c.default_template_id = t.template_id
         """
 
         conditions = []
@@ -409,10 +409,10 @@ class ClientsCRUD(GenericCRUD):
 
         sql_query = text(query_str)
         try:
-            if _is_sqlalchemy_obj(conn):
-                result = conn.execute(sql_query, params_dict)
+            if _is_sqlalchemy_obj(db):
+                result = db.execute(sql_query, params_dict)
             else:
-                result = conn.execute(str(sql_query), params_dict)
+                result = db.execute(str(sql_query), params_dict)
 
             results_list = [dict(row._mapping) if hasattr(row, '_mapping') else dict(row) for row in result.fetchall()]
             logging.info(f"Found {len(results_list)} clients after filtering.")
@@ -423,7 +423,7 @@ class ClientsCRUD(GenericCRUD):
 
     def get_active_clients_count(self, db: Session, include_deleted: bool = False) -> int:
         """
-        Counts active clients. Active status is determined by `StatusSettings.is_archival_status`.
+        Counts active clients. Active status is determined by `status_settings.is_archival_status`.
         Clients with no status are also considered active.
 
         Args:
@@ -435,8 +435,8 @@ class ClientsCRUD(GenericCRUD):
             int: The count of active clients.
         """
         sql_str = """SELECT COUNT(c.client_id) as active_count
-                 FROM Clients c
-                 LEFT JOIN StatusSettings ss ON c.status_id = ss.status_id
+                 FROM clients c
+                 LEFT JOIN status_settings ss ON c.status_id = ss.status_id
                  WHERE ((ss.is_archival_status IS NOT TRUE AND ss.is_archival_status != 1) OR c.status_id IS NULL)"""
 
         params_dict = {}
@@ -446,7 +446,7 @@ class ClientsCRUD(GenericCRUD):
 
         sql_query = text(sql_str)
         try:
-            result = conn.execute(sql_query, params_dict)
+            result = db.execute(sql_query, params_dict)
             count = result.scalar_one_or_none()
             return count if count is not None else 0
         except Exception as e:
@@ -466,8 +466,8 @@ class ClientsCRUD(GenericCRUD):
             list[dict]: A list of {'country_name': name, 'client_count': count}.
         """
         sql_str = """SELECT co.country_name, COUNT(cl.client_id) as client_count
-                 FROM Clients cl
-                 JOIN Countries co ON cl.country_id = co.country_id
+                 FROM clients cl
+                 JOIN countries co ON cl.country_id = co.country_id
               """
         params_dict = {}
         conditions = []
@@ -484,7 +484,7 @@ class ClientsCRUD(GenericCRUD):
 
         sql_query = text(sql_str)
         try:
-            result = conn.execute(sql_query, params_dict)
+            result = db.execute(sql_query, params_dict)
             return [dict(row._mapping) if hasattr(row, '_mapping') else dict(row) for row in result.fetchall()]
         except Exception as e:
             self.logger.error(f"Failed to get client counts by country: {e}", exc_info=True)
@@ -503,9 +503,9 @@ class ClientsCRUD(GenericCRUD):
             list[dict]: A list of {'country_name': c_name, 'city_name': ci_name, 'client_count': count}.
         """
         sql_str = """SELECT co.country_name, ci.city_name, COUNT(cl.client_id) as client_count
-                 FROM Clients cl
-                 JOIN Cities ci ON cl.city_id = ci.city_id
-                 JOIN Countries co ON ci.country_id = co.country_id
+                 FROM clients cl
+                 JOIN cities ci ON cl.city_id = ci.city_id
+                 JOIN countries co ON ci.country_id = co.country_id
               """
         params_dict = {}
         conditions = []
@@ -522,7 +522,7 @@ class ClientsCRUD(GenericCRUD):
 
         sql_query = text(sql_str)
         try:
-            result = conn.execute(sql_query, params_dict)
+            result = db.execute(sql_query, params_dict)
             return [dict(row._mapping) if hasattr(row, '_mapping') else dict(row) for row in result.fetchall()]
         except Exception as e:
             self.logger.error(f"Failed to get client segmentation by city: {e}", exc_info=True)
@@ -546,8 +546,8 @@ class ClientsCRUD(GenericCRUD):
             conditions.append("(cl.is_deleted IS NULL OR cl.is_deleted = 0)")
 
         sql_str = f"""SELECT ss.status_name, COUNT(cl.client_id) as client_count
-                  FROM Clients cl
-                  JOIN StatusSettings ss ON cl.status_id = ss.status_id
+                  FROM clients cl
+                  JOIN status_settings ss ON cl.status_id = ss.status_id
                   WHERE {' AND '.join(conditions)}
                   GROUP BY ss.status_name
                   HAVING COUNT(cl.client_id) > 0
@@ -555,7 +555,7 @@ class ClientsCRUD(GenericCRUD):
 
         sql_query = text(sql_str)
         try:
-            result = conn.execute(sql_query, params_dict)
+            result = db.execute(sql_query, params_dict)
             return [dict(row._mapping) if hasattr(row, '_mapping') else dict(row) for row in result.fetchall()]
         except Exception as e:
             self.logger.error(f"Failed to get client segmentation by status: {e}", exc_info=True)
@@ -579,7 +579,7 @@ class ClientsCRUD(GenericCRUD):
             conditions.append("(cl.is_deleted IS NULL OR cl.is_deleted = 0)")
 
         sql_str = f"""SELECT cl.category, COUNT(cl.client_id) as client_count
-                  FROM Clients cl
+                  FROM clients cl
                   WHERE {' AND '.join(conditions)}
                   GROUP BY cl.category
                   HAVING COUNT(cl.client_id) > 0
@@ -587,7 +587,7 @@ class ClientsCRUD(GenericCRUD):
 
         sql_query = text(sql_str)
         try:
-            result = conn.execute(sql_query, params_dict)
+            result = db.execute(sql_query, params_dict)
             return [dict(row._mapping) if hasattr(row, '_mapping') else dict(row) for row in result.fetchall()]
         except Exception as e:
             self.logger.error(f"Failed to get client segmentation by category: {e}", exc_info=True)
@@ -595,7 +595,7 @@ class ClientsCRUD(GenericCRUD):
 
     def get_clients_by_archival_status(self, db: Session, is_archived: bool, include_null_status_for_active: bool = True, include_deleted: bool = False) -> list[dict]:
         """
-        Retrieves clients based on their archival status (derived from StatusSettings).
+        Retrieves clients based on their archival status (derived from status_settings).
 
         Args:
             is_archived (bool): If True, fetches archived clients. If False, fetches active clients.
@@ -610,18 +610,18 @@ class ClientsCRUD(GenericCRUD):
         """
         params_dict = {}
         try:
-            archival_status_text_query = text("SELECT status_id FROM StatusSettings WHERE status_type = 'Client' AND (is_archival_status = TRUE OR is_archival_status = 1)")
-            archival_status_result = conn.execute(archival_status_text_query)
+            archival_status_text_query = text("SELECT status_id FROM status_settings WHERE status_type = 'Client' AND (is_archival_status = TRUE OR is_archival_status = 1)")
+            archival_status_result = db.execute(archival_status_text_query)
             archival_ids = [row[0] if not hasattr(row, '_mapping') else row.status_id for row in archival_status_result.fetchall()]
 
             base_query_str = """SELECT c.*, co.country_name AS country, ci.city_name AS city,
                                 s.status_name AS status, s.color_hex AS status_color, s.icon_name AS status_icon_name,
                                 t.template_name AS default_template_name
-                                FROM Clients c
-                                LEFT JOIN Countries co ON c.country_id = co.country_id
-                                LEFT JOIN Cities ci ON c.city_id = ci.city_id
-                                LEFT JOIN StatusSettings s ON c.status_id = s.status_id AND s.status_type = 'Client'
-                                LEFT JOIN Templates t ON c.default_template_id = t.template_id"""
+                                FROM clients c
+                                LEFT JOIN countries co ON c.country_id = co.country_id
+                                LEFT JOIN cities ci ON c.city_id = ci.city_id
+                                LEFT JOIN status_settings s ON c.status_id = s.status_id AND s.status_type = 'Client'
+                                LEFT JOIN templates t ON c.default_template_id = t.template_id"""
             conditions = []
 
             if not include_deleted:
@@ -661,7 +661,7 @@ class ClientsCRUD(GenericCRUD):
             sql_final_str = f"{base_query_str} {'WHERE ' + ' AND '.join(conditions) if conditions else ''} ORDER BY c.client_name;"
             sql_query = text(sql_final_str)
 
-            result = conn.execute(sql_query, params_dict)
+            result = db.execute(sql_query, params_dict)
             return [dict(row._mapping) if hasattr(row, '_mapping') else dict(row) for row in result.fetchall()]
         except Exception as e:
             self.logger.error(f"Failed to get clients by archival status (is_archived={is_archived}): {e}", exc_info=True)
@@ -683,8 +683,8 @@ class ClientsCRUD(GenericCRUD):
         clients_by_country_map = {}
         params_dict = {}
         try:
-            archival_status_text_query = text("SELECT status_id FROM StatusSettings WHERE (is_archival_status = TRUE OR is_archival_status = 1) AND status_type = 'Client'")
-            archival_status_result = conn.execute(archival_status_text_query)
+            archival_status_text_query = text("SELECT status_id FROM status_settings WHERE (is_archival_status = TRUE OR is_archival_status = 1) AND status_type = 'Client'")
+            archival_status_result = db.execute(archival_status_text_query)
             archival_ids = [row[0] if not hasattr(row, '_mapping') else row.status_id for row in archival_status_result.fetchall()]
 
             query_parts = [
@@ -692,8 +692,8 @@ class ClientsCRUD(GenericCRUD):
                 "    co.country_name,",
                 "    cl.client_id,",
                 "    cl.client_name",
-                "FROM Clients cl",
-                "JOIN Countries co ON cl.country_id = co.country_id"
+                "FROM clients cl",
+                "JOIN countries co ON cl.country_id = co.country_id"
             ]
 
             conditions = []
@@ -716,7 +716,7 @@ class ClientsCRUD(GenericCRUD):
             sql_query_str = "\n".join(query_parts)
             sql_query = text(sql_query_str)
 
-            result = conn.execute(sql_query, params_dict)
+            result = db.execute(sql_query, params_dict)
 
             for row in result:
                 country = row.country_name if hasattr(row, '_mapping') else row['country_name']
@@ -746,14 +746,14 @@ class ClientsCRUD(GenericCRUD):
         if not client_id or not note_text:
              return {'success': False, 'error': "Client ID and note text are required."}
 
-        sql_query = text("INSERT INTO ClientNotes (client_id, note_text, user_id, timestamp) VALUES (:client_id, :note_text, :user_id, :timestamp)")
+        sql_query = text("INSERT INTO client_notes (client_id, note_text, user_id, timestamp) VALUES (:client_id, :note_text, :user_id, :timestamp)")
         now_utc_iso = datetime.utcnow().isoformat() + "Z"
         params_dict = {
             "client_id": client_id, "note_text": note_text,
             "user_id": user_id, "timestamp": now_utc_iso
         }
         try:
-            result = conn.execute(sql_query, params_dict)
+            result = db.execute(sql_query, params_dict)
             last_id = result.lastrowid
             if last_id is None and hasattr(result, 'inserted_primary_key') and result.inserted_primary_key:
                 last_id = result.inserted_primary_key[0]
@@ -775,16 +775,16 @@ class ClientsCRUD(GenericCRUD):
         Returns:
             list[dict]: A list of note records.
         """
-        sql_query = text("SELECT note_id, client_id, timestamp, note_text, user_id FROM ClientNotes WHERE client_id = :client_id ORDER BY timestamp DESC")
+        sql_query = text("SELECT note_id, client_id, timestamp, note_text, user_id FROM client_notes WHERE client_id = :client_id ORDER BY timestamp DESC")
         try:
-            result = conn.execute(sql_query, {"client_id": client_id})
+            result = db.execute(sql_query, {"client_id": client_id})
             return [dict(row._mapping) if hasattr(row, '_mapping') else dict(row) for row in result.fetchall()]
         except Exception as e:
             self.logger.error(f"Failed to get client notes for client {client_id}: {e}", exc_info=True)
             return []
 
     def get_total_clients_count(self, db: Session, include_deleted: bool = False) -> int:
-        sql_str = "SELECT COUNT(client_id) as total_count FROM Clients"
+        sql_str = "SELECT COUNT(client_id) as total_count FROM clients"
         params_dict = {}
         conditions = []
         if not include_deleted:
@@ -795,7 +795,7 @@ class ClientsCRUD(GenericCRUD):
 
         sql_query = text(sql_str)
         try:
-            result = conn.execute(sql_query, params_dict)
+            result = db.execute(sql_query, params_dict)
             count = result.scalar_one_or_none()
             return count if count is not None else 0
         except Exception as e:
@@ -815,7 +815,7 @@ class ClientsCRUD(GenericCRUD):
         Returns:
             int: The count of clients created within the specified range. Returns 0 on error or if none found.
         """
-        query_str = "SELECT COUNT(client_id) as count FROM Clients WHERE created_at >= :start_date AND created_at <= :end_date"
+        query_str = "SELECT COUNT(client_id) as count FROM clients WHERE created_at >= :start_date AND created_at <= :end_date"
         params_dict = {"start_date": start_date_iso, "end_date": end_date_iso}
 
         if not include_deleted:
@@ -823,7 +823,7 @@ class ClientsCRUD(GenericCRUD):
 
         sql_query = text(query_str)
         try:
-            result = conn.execute(sql_query, params_dict)
+            result = db.execute(sql_query, params_dict)
             count = result.scalar_one_or_none()
             return count if count is not None else 0
         except Exception as e:
@@ -833,14 +833,14 @@ class ClientsCRUD(GenericCRUD):
     def get_total_clients_count_up_to_date(self, db: Session, date_iso_end: str) -> int:
         sql = """
             SELECT COUNT(client_id) as count
-            FROM Clients
+            FROM clients
             WHERE created_at <= :date_iso_end
               AND (is_deleted = 0 OR is_deleted IS NULL OR deleted_at > :date_iso_end OR deleted_at IS NULL)
         """
         params_dict = {"date_iso_end": date_iso_end}
         sql_query = text(sql)
         try:
-            result = conn.execute(sql_query, params_dict)
+            result = db.execute(sql_query, params_dict)
             count = result.scalar_one_or_none()
             self.logger.debug(f"Total clients count up to {date_iso_end}: {count if count is not None else 0}")
             return count if count is not None else 0
@@ -851,8 +851,8 @@ class ClientsCRUD(GenericCRUD):
     def get_active_clients_count_up_to_date(self, db: Session, date_iso_end: str) -> int:
         sql = """
             SELECT COUNT(c.client_id) as count
-            FROM Clients c
-            LEFT JOIN StatusSettings ss ON c.status_id = ss.status_id AND ss.status_type = 'Client'
+            FROM clients c
+            LEFT JOIN status_settings ss ON c.status_id = ss.status_id AND ss.status_type = 'Client'
             WHERE c.created_at <= :date_iso_end
               AND (c.is_deleted = 0 OR c.is_deleted IS NULL OR c.deleted_at > :date_iso_end OR c.deleted_at IS NULL)
               AND ((ss.is_archival_status = 0 OR ss.is_archival_status IS NULL) OR c.status_id IS NULL)
@@ -860,7 +860,7 @@ class ClientsCRUD(GenericCRUD):
         params_dict = {"date_iso_end": date_iso_end}
         sql_query = text(sql)
         try:
-            result = conn.execute(sql_query, params_dict)
+            result = db.execute(sql_query, params_dict)
             count = result.scalar_one_or_none()
             self.logger.debug(f"Active clients count up to {date_iso_end}: {count if count is not None else 0}")
             return count if count is not None else 0
@@ -881,11 +881,11 @@ class ClientsCRUD(GenericCRUD):
                co.country_name AS country, ci.city_name AS city,
                s.status_name AS status, s.color_hex AS status_color, s.icon_name AS status_icon_name,
                t.template_name AS default_template_name
-        FROM Clients c
-        LEFT JOIN Countries co ON c.country_id = co.country_id
-        LEFT JOIN Cities ci ON c.city_id = ci.city_id
-        LEFT JOIN StatusSettings s ON c.status_id = s.status_id AND s.status_type = 'Client'
-        LEFT JOIN Templates t ON c.default_template_id = t.template_id
+        FROM clients c
+        LEFT JOIN countries co ON c.country_id = co.country_id
+        LEFT JOIN cities ci ON c.city_id = ci.city_id
+        LEFT JOIN status_settings s ON c.status_id = s.status_id AND s.status_type = 'Client'
+        LEFT JOIN templates t ON c.default_template_id = t.template_id
         WHERE c.status_id = :status_id
         """
 
@@ -896,7 +896,7 @@ class ClientsCRUD(GenericCRUD):
 
         sql_query = text(query_str)
         try:
-            result = conn.execute(sql_query, params_dict)
+            result = db.execute(sql_query, params_dict)
             return [dict(row._mapping) if hasattr(row, '_mapping') else dict(row) for row in result.fetchall()]
         except Exception as e:
             self.logger.error(f"Failed to get clients for status_id {status_id}: {e}", exc_info=True)
@@ -914,7 +914,7 @@ class ClientsCRUD(GenericCRUD):
         Returns:
             int: The count of clients in the specified country.
         """
-        sql_str = "SELECT COUNT(client_id) as count FROM Clients WHERE country_id = :country_id"
+        sql_str = "SELECT COUNT(client_id) as count FROM clients WHERE country_id = :country_id"
         params_dict = {"country_id": country_id}
 
         if not include_deleted:
@@ -922,7 +922,7 @@ class ClientsCRUD(GenericCRUD):
 
         sql_query = text(sql_str)
         try:
-            result = conn.execute(sql_query, params_dict)
+            result = db.execute(sql_query, params_dict)
             count = result.scalar_one_or_none()
             return count if count is not None else 0
         except Exception as e:
@@ -938,7 +938,7 @@ class ClientsCRUD(GenericCRUD):
 
         sql_query = text("""
             SELECT client_id, client_name, company_name
-            FROM Clients
+            FROM clients
             WHERE (client_name LIKE :query OR company_name LIKE :query)
               AND (is_deleted IS NULL OR is_deleted = 0)
             ORDER BY client_name
@@ -947,7 +947,7 @@ class ClientsCRUD(GenericCRUD):
         params = {"query": f"%{name_query}%", "limit": limit}
 
         try:
-            result = conn.execute(sql_query, params)
+            result = db.execute(sql_query, params)
             return [dict(row._mapping) for row in result.fetchall()]
         except Exception as e:
             self.logger.error(f"Failed to search clients by name '{name_query}': {e}", exc_info=True)

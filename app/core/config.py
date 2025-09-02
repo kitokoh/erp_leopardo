@@ -1,10 +1,12 @@
 import os
 
 # --- Application Root ---
-APP_ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+# Correctly define APP_ROOT_DIR as the 'app' directory, not 'app/core'
+APP_ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # --- Database Settings ---
 DATABASE_NAME = "app_data.db"
+# Place the database inside the 'app' directory for consistency
 DATABASE_PATH = os.path.join(APP_ROOT_DIR, DATABASE_NAME)
 
 # --- Default Admin User Settings (for initial seeding) ---

@@ -702,4 +702,3 @@ router.include_router(router_candidate_progress)
 # Example in api/main.py:
 # from . import recruitment
 # app.include_router(recruitment.router)
-```

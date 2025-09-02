@@ -1,16 +1,17 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, APIRouter
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
-from passlib.context import CryptContext # For password hashing if we were creating them here, not needed for verify_user_password
-from datetime import datetime, timedelta, timezone # Ensure timezone is imported
+from passlib.context import CryptContext
+from datetime import datetime, timedelta, timezone
 from typing import Optional
-import os # Added import
+import os
+from sqlalchemy.orm import Session
 
-import app.db as db_manager # To access user verification
-from .models import TokenData, UserInDB, Token # Import UserInDB and Token from local models
+from app.db.cruds.users import users_crud
+from .models import TokenData, UserInDB, Token
+from app.api.dependencies import get_db_session as get_db
 
-# Configuration (replace with your actual secret key and algorithm)
-SECRET_KEY = os.getenv("API_SECRET_KEY") # IMPORTANT: Change this in a real app!
+SECRET_KEY = os.getenv("API_SECRET_KEY")
 if not SECRET_KEY:
     raise RuntimeError("API_SECRET_KEY environment variable not set. Application cannot start securely.")
 ALGORITHM = "HS256"
@@ -18,30 +19,16 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
 
-# We don't need pwd_context if db_manager.verify_user_password already handles hashing comparison
-# pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-def verify_password(plain_password: str, hashed_password_from_db: str) -> bool:
-    # This function should ideally call db_manager.verify_user_password's logic
-    # or db_manager.verify_user_password should be adapted if it needs raw plain pass.
-    # For now, let's assume db_manager.verify_user_password takes username and plain_password
-    # and returns user details if valid, or None otherwise.
-    # This function itself is not directly used if authenticate_user does the job.
-    # return pwd_context.verify(plain_password, hashed_password_from_db)
-    # This is a placeholder, actual verification happens in authenticate_user via db_manager.
-    return True # Placeholder, logic is in authenticate_user
-
-def get_user(username: str) -> Optional[UserInDB]:
-    db_user = db_manager.get_user_by_username(username)
+def get_user(db: Session, username: str) -> Optional[UserInDB]:
+    db_user = users_crud.get_user_by_username(db=db, username=username)
     if db_user:
-        # Adapt db_user dict to UserInDB model
         return UserInDB(
-            username=db_user.get('username'),
-            email=db_user.get('email'),
-            full_name=db_user.get('full_name'),
-            role=db_user.get('role'),
-            is_active=db_user.get('is_active', False), # Default to False if not present
-            user_id=db_user.get('user_id')
+            username=db_user.username,
+            email=db_user.email,
+            full_name=db_user.full_name,
+            role=db_user.role.role_name,
+            is_active=db_user.is_active,
+            user_id=db_user.user_id
         )
     return None
 
@@ -55,7 +42,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserInDB:
+async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> UserInDB:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -70,7 +57,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserInDB:
     except JWTError:
         raise credentials_exception
 
-    user = get_user(username=token_data.username)
+    user = get_user(db=db, username=token_data.username)
     if user is None:
         raise credentials_exception
     return user
@@ -80,25 +67,15 @@ async def get_current_active_user(current_user: UserInDB = Depends(get_current_u
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
     return current_user
 
-# --- Router for token endpoint ---
-from fastapi import APIRouter
 router = APIRouter(
     prefix="/api/auth",
     tags=["Authentication"]
 )
 
 @router.post("/token", response_model=Token)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    """
-    Logs in a user and returns an access token.
-
-    Processes OAuth2 password flow request form to authenticate the user.
-    On successful authentication, an access token is generated and returned.
-    """
-    # db_manager.verify_user_password expects username and plain password,
-    # and returns user dict if valid, None otherwise.
-    user = db_manager.verify_user_password(username=form_data.username, password=form_data.password)
-    if not user:
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user_data = users_crud.verify_user_password(db=db, username=form_data.username, password=form_data.password)
+    if not user_data:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -106,6 +83,6 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         )
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.get('username')}, expires_delta=access_token_expires
+        data={"sub": user_data.username}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}

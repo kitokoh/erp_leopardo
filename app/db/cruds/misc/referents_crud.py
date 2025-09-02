@@ -13,7 +13,7 @@ class ReferentsCRUD(GenericCRUD):
     """
     def __init__(self):
         """Initializes the ReferentsCRUD class."""
-        super().__init__(table_name="Referents", primary_key="referent_id")
+        super().__init__(table_name="referents", primary_key="referent_id")
 
     @_manage_conn
     def add_referent(self, client_id: str, country_id: int, region_id: int | None,
@@ -43,7 +43,7 @@ class ReferentsCRUD(GenericCRUD):
         now = datetime.utcnow().isoformat() + "Z"
 
         sql = """
-            INSERT INTO Referents (referent_id, client_id, country_id, region_id, city_id,
+            INSERT INTO referents (referent_id, client_id, country_id, region_id, city_id,
                                    notes, created_by_user_id, referent_since, created_at, updated_at, is_active)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
@@ -90,7 +90,7 @@ class ReferentsCRUD(GenericCRUD):
         Returns:
             dict | None: A dictionary representing the referent if found, otherwise None.
         """
-        query = "SELECT * FROM Referents WHERE client_id = ?"
+        query = "SELECT * FROM referents WHERE client_id = ?"
         params = [client_id]
         if not include_inactive:
             query += " AND is_active = TRUE"
@@ -109,7 +109,7 @@ class ReferentsCRUD(GenericCRUD):
                           include_inactive: bool = False, conn: sqlite3.Connection = None) -> list[dict]:
         """
         Retrieves all referents, with optional filtering and pagination.
-        Joins with Clients, Countries, Regions, Cities for more detailed output.
+        Joins with clients, countries, regions, cities for more detailed output.
 
         Args:
             filters (dict, optional): A dictionary of filters.
@@ -131,11 +131,11 @@ class ReferentsCRUD(GenericCRUD):
                 co.country_name,
                 rg.region_name,
                 ci.city_name
-            FROM Referents r
-            JOIN Clients cl ON r.client_id = cl.client_id
-            JOIN Countries co ON r.country_id = co.country_id
-            LEFT JOIN Regions rg ON r.region_id = rg.region_id
-            LEFT JOIN Cities ci ON r.city_id = ci.city_id
+            FROM referents r
+            JOIN clients cl ON r.client_id = cl.client_id
+            JOIN countries co ON r.country_id = co.country_id
+            LEFT JOIN regions rg ON r.region_id = rg.region_id
+            LEFT JOIN cities ci ON r.city_id = ci.city_id
         """
 
         q_params = []

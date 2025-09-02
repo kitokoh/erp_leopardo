@@ -9,7 +9,7 @@ from PyQt5.QtGui import QIcon
 from app.product_management.list_dialog import ProductListDialog
 from app.product_management.edit_dialog import ProductEditDialog
 from app.db.cruds.products.products_crud import products_crud_instance
-from app.utils import html_to_pdf as html_to_pdf_util
+from app.utils import html_to_pdf_util
 
 # Ensure a QApplication instance exists for widget testing, but only one.
 # It's often better to manage this per test class or even per test method if tests interfere.

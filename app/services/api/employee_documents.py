@@ -12,10 +12,9 @@ from starlette.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
-# Project-specific imports
-from app.api.dependencies import get_db
-from app.api.auth import get_current_active_user # Assuming UserInDB is returned
-from app.api.models import (
+from app.api.dependencies import get_db_session as get_db
+from .auth import get_current_active_user
+from .models import (
     UserInDB,
     DocumentCategoryCreate, DocumentCategoryResponse, DocumentCategoryBase,
     EmployeeDocumentCreate, EmployeeDocumentResponse, EmployeeDocumentUpdate

@@ -11,7 +11,8 @@ from PyQt5.QtCore import Qt
 
 # Importer les constantes et CRUD nécessaires
 from app.utils.app_constants import SUPPORTED_LANGUAGES
-from app.db.cruds import template_categories_crud, clients_crud # Pour lister les clients
+from app.db.cruds import template_categories_crud
+from app.db.cruds.clients import clients_crud # Pour lister les clients
 
 class TemplateEditDialog(QDialog):
     def __init__(self, template_data: dict = None, app_root_dir: str = None, config: object = None, parent=None):

@@ -4,18 +4,14 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from datetime import date, datetime # Ensure date is imported
 
-# Project-specific imports
-from app.api.dependencies import get_db
-# Assuming UserInDB is the model for the current user, adjust if different
-# If get_current_active_user is in a different location, adjust this import path
-from app.api.auth import get_current_active_user
-from app.api.models import (
-    UserInDB, # User model for dependency injection
-    Employee, # To check if employee exists
+from app.api.dependencies import get_db_session as get_db
+from .auth import get_current_active_user
+from .models import (
+    UserInDB,
     LeaveType, LeaveTypeCreate, LeaveTypeResponse, LeaveTypeBase,
-    LeaveBalance, LeaveBalanceCreate, LeaveBalanceResponse, LeaveBalanceUpdate,
-    LeaveRequest, LeaveRequestCreate, LeaveRequestResponse, LeaveRequestUpdate,
-    LeaveRequestStatusEnum # Enum for status
+    LeaveBalanceCreate, LeaveBalanceResponse, LeaveBalanceUpdate,
+    LeaveRequestCreate, LeaveRequestResponse, LeaveRequestUpdate,
+    LeaveRequestStatusEnum
 )
 from app.db.cruds.leave import leave_crud
 from app.db.cruds.users import employees_crud

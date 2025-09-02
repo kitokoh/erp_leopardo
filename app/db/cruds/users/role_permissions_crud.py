@@ -7,6 +7,7 @@ from sqlalchemy.sql import text as sqlalchemy_text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.db.cruds.generic_crud import _manage_conn
+from .roles_crud import _get_cursor_and_dialect, _execute_query, _fetch_one_as_dict, _fetch_all_as_dict_list
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +47,8 @@ def remove_permission_from_role(role_id: int, permission_key: str, conn=None) ->
     Returns True if successful or if the assignment didn't exist (rowcount >= 0).
     Returns False on database error.
     """
-    sql_sqlite = "DELETE FROM RolePermissions WHERE role_id = ? AND permission_key = ?"
-    sql_sa = sqlalchemy_text("DELETE FROM RolePermissions WHERE role_id = :role_id AND permission_key = :permission_key")
+    sql_sqlite = "DELETE FROM role_permissions WHERE role_id = ? AND permission_key = ?"
+    sql_sa = sqlalchemy_text("DELETE FROM role_permissions WHERE role_id = :role_id AND permission_key = :permission_key")
 
     params_sqlite = (role_id, permission_key)
     params_sa = {"role_id": role_id, "permission_key": permission_key}
@@ -76,9 +77,9 @@ def get_permissions_for_role(role_id: int, conn=None) -> list[str]:
     Lists all permission keys assigned to a specific role.
     Returns a list of permission_key strings.
     """
-    sql_common = "SELECT permission_key FROM RolePermissions WHERE role_id = :role_id ORDER BY permission_key"
+    sql_common = "SELECT permission_key FROM role_permissions WHERE role_id = :role_id ORDER BY permission_key"
     # For SQLite, ? placeholder
-    sql_sqlite_variant = "SELECT permission_key FROM RolePermissions WHERE role_id = ? ORDER BY permission_key"
+    sql_sqlite_variant = "SELECT permission_key FROM role_permissions WHERE role_id = ? ORDER BY permission_key"
 
     sql_sa_variant = sqlalchemy_text(sql_common)
 
@@ -103,8 +104,8 @@ def check_role_has_permission(role_id: int, permission_key: str, conn=None) -> b
     Checks if a specific role has a specific permission.
     Returns True if the role has the permission, False otherwise.
     """
-    sql_common = "SELECT 1 FROM RolePermissions WHERE role_id = :role_id AND permission_key = :permission_key"
-    sql_sqlite_variant = "SELECT 1 FROM RolePermissions WHERE role_id = ? AND permission_key = ?"
+    sql_common = "SELECT 1 FROM role_permissions WHERE role_id = :role_id AND permission_key = :permission_key"
+    sql_sqlite_variant = "SELECT 1 FROM role_permissions WHERE role_id = ? AND permission_key = ?"
     sql_sa_variant = sqlalchemy_text(sql_common)
 
     params_sqlite = (role_id, permission_key)
@@ -136,8 +137,8 @@ def set_permissions_for_role(role_id: int, permission_keys: list[str], conn=None
 
     try:
         # 1. Delete all existing permissions for the role
-        sql_delete_sqlite = "DELETE FROM RolePermissions WHERE role_id = ?"
-        sql_delete_sa = sqlalchemy_text("DELETE FROM RolePermissions WHERE role_id = :role_id")
+        sql_delete_sqlite = "DELETE FROM role_permissions WHERE role_id = ?"
+        sql_delete_sa = sqlalchemy_text("DELETE FROM role_permissions WHERE role_id = :role_id")
         params_delete_sqlite = (role_id,)
         params_delete_sa = {"role_id": role_id}
 
@@ -152,8 +153,8 @@ def set_permissions_for_role(role_id: int, permission_keys: list[str], conn=None
 
         # 2. Add new permissions
         if permission_keys:
-            sql_insert_sqlite = "INSERT INTO RolePermissions (role_id, permission_key) VALUES (?, ?)"
-            sql_insert_sa = sqlalchemy_text("INSERT INTO RolePermissions (role_id, permission_key) VALUES (:role_id, :permission_key)")
+            sql_insert_sqlite = "INSERT INTO role_permissions (role_id, permission_key) VALUES (?, ?)"
+            sql_insert_sa = sqlalchemy_text("INSERT INTO role_permissions (role_id, permission_key) VALUES (:role_id, :permission_key)")
 
             inserted_count = 0
             for p_key in permission_keys:
