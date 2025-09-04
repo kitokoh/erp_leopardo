@@ -93,44 +93,42 @@ def get_db_connection() -> Session:
 
 # This function will be called from main.py after config is loaded and app_setup is fully initialized
 def initialize_engine_and_session(app_config_param):
+    """
+    Initializes the SQLAlchemy engine and session factory.
+    Raises RuntimeError if initialization fails.
+    """
     global engine, SessionLocal, project_root # Allow modification of module-level globals
 
     if not app_config_param:
-        logging.error("db.connection.initialize_engine_and_session: app_config_param is missing. Cannot initialize SQLAlchemy engine.")
-        return
+        logging.error("db.connection.initialize_engine_and_session: app_config_param is missing.")
+        raise RuntimeError("Application configuration is missing, cannot initialize database.")
 
-    database_path_for_engine = app_config_param.get('database_path')
     database_type_for_engine = app_config_param.get('database_type', 'sqlite')
 
     if database_type_for_engine == 'sqlite':
-        if database_path_for_engine:
-            # Use the module-level project_root defined earlier
-            if not os.path.isabs(database_path_for_engine) and project_root:
-                 database_path_for_engine = os.path.join(project_root, database_path_for_engine)
-            elif not os.path.isabs(database_path_for_engine):
-                 # Fallback if project_root is None or path is relative and project_root couldn't be determined
-                 logging.warning(f"db.connection: project_root not determined or path '{database_path_for_engine}' is relative. Assuming it's relative to CWD or needs to be absolute.")
+        database_path_for_engine = app_config_param.get('database_path')
+        if not database_path_for_engine:
+            logging.error("db.connection: 'database_path' not found in config for SQLAlchemy SQLite engine setup.")
+            raise RuntimeError("'database_path' not found in config for SQLite engine setup.")
 
+        # Use the module-level project_root defined earlier
+        if not os.path.isabs(database_path_for_engine) and project_root:
+                database_path_for_engine = os.path.join(project_root, database_path_for_engine)
+        elif not os.path.isabs(database_path_for_engine):
+                # Fallback if project_root is None or path is relative and project_root couldn't be determined
+                logging.warning(f"db.connection: project_root not determined or path '{database_path_for_engine}' is relative. Assuming it's relative to CWD or needs to be absolute.")
 
-            absolute_db_path = os.path.abspath(database_path_for_engine)
+        absolute_db_path = os.path.abspath(database_path_for_engine)
+        engine_url = f"sqlite:///{absolute_db_path}"
 
-            if sys.platform == "win32" and absolute_db_path[1:3] == ":\\":
-                engine_url = f"sqlite:///{absolute_db_path}"
-            else:
-                engine_url = f"sqlite:///{absolute_db_path}"
-
-            logging.info(f"db.connection: SQLAlchemy engine connecting to absolute path: {absolute_db_path}")
-            logging.info(f"db.connection: SQLAlchemy engine connecting to URL: {engine_url}")
-            try:
-                engine = create_engine(engine_url, connect_args={"check_same_thread": False, "timeout": 30}) # Increased timeout
-                SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-                logging.info("db.connection: SQLAlchemy engine and SessionLocal created successfully for SQLite.")
-            except Exception as e:
-                logging.error(f"db.connection: Failed to create SQLAlchemy engine or SessionLocal: {e}", exc_info=True)
-                # Removed resetting engine and SessionLocal to None on failure to allow retry or inspection.
-                # engine = None
-                # SessionLocal = None
-                # Consider whether this is the desired behavior. If initialization fails, these will remain as they were or None.
+        logging.info(f"db.connection: SQLAlchemy engine connecting to URL: {engine_url}")
+        try:
+            engine = create_engine(engine_url, connect_args={"check_same_thread": False, "timeout": 30})
+            SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+            logging.info("db.connection: SQLAlchemy engine and SessionLocal created successfully for SQLite.")
+        except Exception as e:
+            logging.error(f"db.connection: Failed to create SQLAlchemy engine or SessionLocal for SQLite: {e}", exc_info=True)
+            raise RuntimeError(f"Failed to create SQLAlchemy engine for SQLite: {e}")
 
     elif database_type_for_engine == 'postgresql':
         pg_host = app_config_param.get('postgresql_host', 'localhost')
@@ -143,10 +141,9 @@ def initialize_engine_and_session(app_config_param):
         pg_ssl_clientcert = app_config_param.get('postgresql_ssl_clientcert')
         pg_ssl_clientkey = app_config_param.get('postgresql_ssl_clientkey')
 
-
         if not all([pg_user, pg_dbname]): # Password can be optional for some auth methods
             logging.error("db.connection: Missing PostgreSQL user or database name for SQLAlchemy engine setup.")
-            return
+            raise RuntimeError("Missing PostgreSQL user or database name in config.")
 
         engine_url = f"postgresql+psycopg2://{pg_user}:{pg_password}@{pg_host}:{pg_port}/{pg_dbname}"
 
@@ -163,18 +160,13 @@ def initialize_engine_and_session(app_config_param):
         logging.info(f"db.connection: SQLAlchemy engine connecting to PostgreSQL: {pg_user}@{pg_host}:{pg_port}/{pg_dbname} (SSL: {pg_ssl_mode})")
         try:
             engine = create_engine(engine_url, connect_args=connect_args)
-
             SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
             logging.info("db.connection: SQLAlchemy engine and SessionLocal created successfully for PostgreSQL.")
         except Exception as e:
             logging.error(f"db.connection: Failed to create SQLAlchemy engine or SessionLocal for PostgreSQL: {e}", exc_info=True)
-            engine = None
-            SessionLocal = None
-    elif database_type_for_engine == 'sqlite' and not database_path_for_engine: # Ensure this else is for the sqlite condition
-        logging.error("db.connection: 'database_path' not found in config for SQLAlchemy SQLite engine setup. ORM features unavailable.")
+            raise RuntimeError(f"Failed to create SQLAlchemy engine for PostgreSQL: {e}")
     else:
-        # This 'else' now correctly pairs with the initial 'if/elif' for database_type_for_engine
-        if database_type_for_engine not in ['sqlite', 'postgresql']:
-            logging.warning(f"db.connection: SQLAlchemy engine setup not configured for database_type '{database_type_for_engine}'. ORM features might be limited.")
+        logging.error(f"db.connection: SQLAlchemy engine setup not configured for unsupported database_type '{database_type_for_engine}'.")
+        raise RuntimeError(f"Unsupported database type in config: '{database_type_for_engine}'")
 
 __all__ = ["get_db_connection", "engine", "SessionLocal", "Base", "initialize_engine_and_session"]
