@@ -174,15 +174,14 @@ class StatisticsDashboard(QWidget):
         self.threadpool.start(worker)
 
     def update_customer_segmentation_views(self):
-        data_fetch_map = {
-            "country": get_client_counts_by_country,
-            "city": get_client_segmentation_by_city,
-            "category": get_client_segmentation_by_category,
-            "product_popularity": get_product_usage_counts,
+        data_map = {
+            "country": (get_client_counts_by_country, ["country_name", "client_count"]),
+            "city": (get_client_segmentation_by_city, ["country_name", "city_name", "client_count"]),
+            "category": (get_client_segmentation_by_category, ["category", "client_count"]),
+            "product_popularity": (get_product_usage_counts, ["product_name", "usage_count"]),
         }
-        for key, func in data_fetch_map.items():
-            # The worker will pass the session to _populate_table, which then calls the data fetch func
-            worker = StatsWorker(self._populate_table, db_session_needed=True, table_key=key, data_fetch_func=func, column_keys=...) # column_keys needs to be defined
+        for key, (func, keys) in data_map.items():
+            worker = StatsWorker(self._populate_table, db_session_needed=True, table_key=key, data_fetch_func=func, column_keys=keys)
             self.threadpool.start(worker)
         self._update_status_segmentation_chart()
 
