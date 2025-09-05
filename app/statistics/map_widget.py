@@ -60,46 +60,48 @@ class HomePageMapWidget(QWidget):
         self.interaction_handler.map_view_changed_signal.connect(self._on_map_view_changed)
 
     def _on_map_view_changed(self, lat, lng, zoom):
-        from app.db.cruds.application_settings_crud import get_setting, set_setting
+        from app.db.cruds.misc.application_settings_crud import set_setting
         from app.db.connection import get_db_connection
-        db_session = get_db_connection()
+        db_session = None
         try:
+            db_session = get_db_connection()
             set_setting('map_last_lat', str(lat), db_session)
             set_setting('map_last_lng', str(lng), db_session)
             set_setting('map_last_zoom', str(zoom), db_session)
+        except Exception as e:
+            logging.error(f"Failed to save map view state: {e}", exc_info=True)
         finally:
-            db_session.close()
+            if db_session:
+                db_session.close()
 
     def refresh_map(self):
         logging.info("HomePageMapWidget: Refreshing map...")
+        # It's crucial to manage the database session correctly, especially in a
+        # long-running app. A try/finally ensures the session is closed.
+        from app.db.connection import get_db_connection
+        db_session = None
         try:
-            # 1. Fetch data (simplified for home page map)
-            # This widget will fetch its own data.
-            # For consistency, it should use the same DB functions as StatisticsDashboard.
-            clients_by_country = get_client_counts_by_country()
+            db_session = get_db_connection()
 
-            # For popups, HomePageMapWidget might show simpler info or need fewer details.
-            # For now, we'll pass None for all_clients_details_for_popups, meaning popups will be basic.
-            # A more advanced version could fetch more details if required for home page popups.
-            all_clients_details = None
+            # 1. Fetch data for the map
+            clients_by_country = get_client_counts_by_country(db=db_session)
+            all_clients_details = None # Simplified for home page
 
+            # 2. Get settings for map display
+            from app.db.cruds.misc.application_settings_crud import get_setting
+            scope = get_setting('geographic_scope', 'international', db_session)
+            last_lat = float(get_setting('map_last_lat', '20', db_session))
+            last_lng = float(get_setting('map_last_lng', '0', db_session))
+            last_zoom = int(get_setting('map_last_zoom', '2', db_session))
+
+            # 3. Generate map HTML
             geojson_path = os.path.join(APP_ROOT_DIR, "resources", "assets", "world_countries.geojson")
-
-            # 2. Generate Map HTML using the utility function
-            from app.db.cruds.application_settings_crud import get_setting
-
-            scope = get_setting('geographic_scope', 'international')
-            last_lat = float(get_setting('map_last_lat', '20'))
-            last_lng = float(get_setting('map_last_lng', '0'))
-            last_zoom = int(get_setting('map_last_zoom', '2'))
-
-
             map_html = generate_folium_map_html(
                 geojson_path=geojson_path,
                 clients_by_country_counts=clients_by_country,
-                all_clients_details_for_popups=all_clients_details, # Passing None for simpler popups
+                all_clients_details_for_popups=all_clients_details,
                 app_translator_func=self.app_translator_func,
-                map_interaction_handler_name="pyHomePageMapConnector", # Use the specific handler name
+                map_interaction_handler_name="pyHomePageMapConnector",
                 initial_location=[last_lat, last_lng],
                 initial_zoom=last_zoom,
                 scope=scope
@@ -108,7 +110,7 @@ class HomePageMapWidget(QWidget):
             if map_html:
                 base_url = QUrl.fromLocalFile(APP_ROOT_DIR + os.path.sep)
                 self.map_view.setHtml(map_html, baseUrl=base_url)
-                logging.info(f"HomePageMapWidget: Map HTML content set with base URL {base_url.toString()}. Length: {len(map_html)}")
+                logging.info(f"HomePageMapWidget: Map HTML content set with base URL {base_url.toString()}.")
             else:
                 self._display_error_html("Erreur de génération de la carte pour la page d'accueil.")
                 logging.error("HomePageMapWidget: Failed to generate map HTML.")
@@ -116,6 +118,10 @@ class HomePageMapWidget(QWidget):
         except Exception as e:
             logging.error(f"HomePageMapWidget: Error during map refresh: {e}", exc_info=True)
             self._display_error_html(f"Erreur inattendue: {e}")
+        finally:
+            if db_session:
+                db_session.close()
+                logging.info("HomePageMapWidget: Database session closed.")
 
     def _display_error_html(self, message: str):
         # Simplified error display for the home page map
