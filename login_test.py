@@ -41,10 +41,10 @@ def run_login_only_test():
         )
 
         if success and user_data and user_data.get('username') == CONFIG['default_admin_username']:
-            logging.info(">>> Admin Login Test PASSED <<<")
+            print(">>> Admin Login Test PASSED <<<")
             return True
         else:
-            logging.error(f">>> Admin Login Test FAILED: {message} <<<")
+            print(f">>> Admin Login Test FAILED: {message} <<<")
             return False
 
     except Exception as e:
@@ -52,9 +52,10 @@ def run_login_only_test():
         return False
     finally:
         # Clean up the test database after the final test
-        if os.path.exists(db_path):
-            os.remove(db_path)
-            logging.info(f"Cleaned up test database: {db_path}")
+        # if os.path.exists(db_path):
+        #     os.remove(db_path)
+        #     logging.info(f"Cleaned up test database: {db_path}")
+        pass
 
 
 if __name__ == "__main__":
