@@ -202,7 +202,6 @@ class DocumentManager(QMainWindow):
             if client_data.get('status_id'):
                 status = get_status_setting_by_id(db_session, client_data['status_id'])
                 client_data['status'] = status['status_name'] if status else "N/A"
-            
             # ... (rest of the logic to check for existing tab and create new one) ...
             # This part doesn't need more DB calls, it just uses the fetched client_data.
 
