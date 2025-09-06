@@ -202,7 +202,6 @@ class DocumentManager(QMainWindow):
             if client_data.get('status_id'):
                 status = get_status_setting_by_id(db_session, client_data['status_id'])
                 client_data['status'] = status['status_name'] if status else "N/A"
-
             # ... (rest of the logic to check for existing tab and create new one) ...
             # This part doesn't need more DB calls, it just uses the fetched client_data.
 
@@ -292,14 +291,24 @@ class DocumentManager(QMainWindow):
         # ...
         db_session = None
         try:
-            db_session = get_db_connection()
-            new_filter_id = user_saved_filters_crud.add_saved_filter(db_session, user_id=self.current_user_id, ...)
-            # ...
+            # The CRUD function manages its own session.
+            new_filter_id = user_saved_filters_crud.add_saved_filter(
+                user_id=self.current_user_id,
+                filter_name=filter_name,
+                filter_parameters=parameters_dict
+            )
+            if new_filter_id:
+                self.notify(self.tr("Filtre Sauvegardé"), self.tr("Le filtre '{0}' a été sauvegardé avec succès.").format(filter_name), type='SUCCESS')
+                self.saved_filter_name_input.clear()
+                self.populate_saved_filters_combo() # Refresh the combo box
+                new_idx = self.load_filter_combo.findData(new_filter_id)
+                if new_idx != -1:
+                    self.load_filter_combo.setCurrentIndex(new_idx)
+            else:
+                self.notify(self.tr("Échec Sauvegarde"), self.tr("Impossible de sauvegarder le filtre. Un filtre avec ce nom existe peut-être déjà."), type='ERROR')
         except Exception as e:
-            logging.error(f"Error saving filter: {e}", exc_info=True)
-        finally:
-            if db_session:
-                db_session.close()
+            logging.error(f"Error saving filter '{filter_name}': {e}", exc_info=True)
+            self.notify(self.tr("Erreur Sauvegarde"), self.tr("Une erreur est survenue: {0}").format(str(e)), type='ERROR')
 
     def initialize_telemetry(self):
         # ...
