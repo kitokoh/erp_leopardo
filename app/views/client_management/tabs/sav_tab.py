@@ -12,8 +12,11 @@ from PyQt5.QtCore import Qt, QLocale, QDate, QDateTime
 from app.db.connection import get_db_connection
 from app.db.cruds.misc.status_settings_crud import get_status_setting_by_name
 from app.db.cruds.clients.sav_crud import (
-    get_client_purchase_history, get_sav_tickets_for_client, get_sav_ticket_by_id,
-    update_client_project_product_serial_number
+    get_sav_tickets_for_client, get_sav_ticket_by_id
+)
+from app.db.cruds.clients.client_project_products_crud import (
+    get_client_purchase_history,
+    update_client_project_product
 )
 from app.services.auth.permissions import has_permission, P_MANAGE_CLIENT_DOCUMENTS
 
@@ -95,7 +98,7 @@ class SAVTab(QWidget):
         db_session = None
         try:
             db_session = get_db_connection()
-            if update_client_project_product_serial_number(db_session, cpp_id, new_serial_number):
+            if update_client_project_product(db_session, cpp_id, {'serial_number': new_serial_number}):
                 self.notification_manager.show("Succès", "Numéro de série mis à jour.", type="SUCCESS")
             else:
                 QMessageBox.warning(self, "Erreur DB", "Échec de la mise à jour.")

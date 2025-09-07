@@ -21,7 +21,7 @@ from app.db.cruds.projects import projects_crud
 from app.db.cruds.misc.templates_crud import get_template_by_id
 from app.db.cruds.misc.companies_crud import get_default_company
 from app.db.cruds.invoices import commandes_crud
-from app.db.document_context import get_document_context_data
+from app.db.db_utils import get_document_context_data
 
 from app.excel_editor import ExcelEditor
 from app.views.gui.widgets.html_editor import HtmlEditor
