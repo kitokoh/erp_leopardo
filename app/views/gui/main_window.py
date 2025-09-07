@@ -114,6 +114,7 @@ class DocumentManager(QMainWindow):
     # ... (__init__ and other methods) ...
     def __init__(self, app_root_dir, current_user_info: dict, current_license_info: dict | None, session_manager=None):
         super().__init__()
+        self.config = AppConfig.copy()
         # ... (most of __init__ remains the same) ...
         self.client_controller_instance = ClientController()
         # ...
@@ -129,32 +130,22 @@ class DocumentManager(QMainWindow):
         self.initialize_telemetry()
 
     def _get_setting_with_fallback(self, key, fallback):
-        db_session = None
         try:
-            db_session = get_db_connection()
-            value = application_settings_crud.get_setting(db_session, key)
-            return value if value is not None else fallback
+            value = application_settings_crud.get_setting(key=key, default=fallback)
+            return value
         except Exception as e:
             logging.error(f"Error getting setting '{key}': {e}", exc_info=True)
             return fallback
-        finally:
-            if db_session:
-                db_session.close()
 
     def _load_module_states(self):
         logging.info("Loading module states...")
-        db_session = None
         try:
-            db_session = get_db_connection()
             for module_info in CONFIGURABLE_MODULES:
-                is_enabled_str = application_settings_crud.get_setting(db_session, module_info['key'], default='True')
+                is_enabled_str = application_settings_crud.get_setting(key=module_info['key'], default='True')
                 is_enabled = is_enabled_str.lower() == 'true' if isinstance(is_enabled_str, str) else bool(is_enabled_str)
                 self.module_states[module_info['name']] = is_enabled
         except Exception as e:
             logging.error(f"Error loading module states from DB: {e}", exc_info=True)
-        finally:
-            if db_session:
-                db_session.close()
         logging.info("Module states loaded.")
 
     def save_splitter_state(self, pos, index):
