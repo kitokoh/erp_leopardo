@@ -36,7 +36,8 @@ from app.utils import save_config
 import app.icons_rc
 
 # --- Database CRUD Functions ---
-from app.db.cruds.misc import application_settings_crud, user_saved_filters_crud
+from app.db.cruds.misc import application_settings_crud
+from app.db.cruds.users import user_saved_filters_crud
 from app.db.cruds.misc.locations_crud import get_all_countries, get_country_by_id, get_city_by_id
 from app.db.cruds.misc.status_settings_crud import get_status_setting_by_id
 from app.db.cruds.clients import clients_crud, client_documents_crud
@@ -113,6 +114,7 @@ class DocumentManager(QMainWindow):
     # ... (__init__ and other methods) ...
     def __init__(self, app_root_dir, current_user_info: dict, current_license_info: dict | None, session_manager=None):
         super().__init__()
+        self.config = AppConfig.copy()
         # ... (most of __init__ remains the same) ...
         self.client_controller_instance = ClientController()
         # ...
@@ -128,32 +130,22 @@ class DocumentManager(QMainWindow):
         self.initialize_telemetry()
 
     def _get_setting_with_fallback(self, key, fallback):
-        db_session = None
         try:
-            db_session = get_db_connection()
-            value = application_settings_crud.get_setting(db_session, key)
-            return value if value is not None else fallback
+            value = application_settings_crud.get_setting(key=key, default=fallback)
+            return value
         except Exception as e:
             logging.error(f"Error getting setting '{key}': {e}", exc_info=True)
             return fallback
-        finally:
-            if db_session:
-                db_session.close()
 
     def _load_module_states(self):
         logging.info("Loading module states...")
-        db_session = None
         try:
-            db_session = get_db_connection()
             for module_info in CONFIGURABLE_MODULES:
-                is_enabled_str = application_settings_crud.get_setting(db_session, module_info['key'], default='True')
+                is_enabled_str = application_settings_crud.get_setting(key=module_info['key'], default='True')
                 is_enabled = is_enabled_str.lower() == 'true' if isinstance(is_enabled_str, str) else bool(is_enabled_str)
                 self.module_states[module_info['name']] = is_enabled
         except Exception as e:
             logging.error(f"Error loading module states from DB: {e}", exc_info=True)
-        finally:
-            if db_session:
-                db_session.close()
         logging.info("Module states loaded.")
 
     def save_splitter_state(self, pos, index):
@@ -332,10 +324,42 @@ class DocumentManager(QMainWindow):
         db_session = None
         try:
             db_session = get_db_connection()
-            # ... (build filters dictionary) ...
-            all_matching_clients = clients_crud.get_all_clients_with_details(db_session, filters=temp_filters_for_count, ...)
+            # This method now correctly builds filters and calls the data loading functions.
+            filters_for_crud = {
+                'client_name': self.client_name_filter_input.text().strip(),
+                'company_name': self.company_name_filter_input.text().strip(),
+                'country_id': self.country_filter_combo.currentData(),
+                'status_ids': self.selected_status_ids_filter,
+                'order_by_field': self.sort_combo.currentData(),
+                'order_direction': 'DESC' if self.sort_order_button.isChecked() else 'ASC',
+                'created_at_start': self.start_date_filter.date().toString("yyyy-MM-dd") if self.start_date_filter.date() != QDate(2000, 1, 1) else None,
+                'created_at_end': self.end_date_filter.date().toString("yyyy-MM-dd") if self.end_date_filter.date() != QDate.currentDate() else None,
+            }
+            # Clean up filters: remove None, empty strings, or empty lists
+            filters_for_crud = {k: v for k, v in filters_for_crud.items() if v is not None and v != '' and v != []}
+
+            temp_filters_for_count = filters_for_crud.copy()
+            include_deleted = self.include_deleted_checkbox.isChecked()
+
+            # Call to get total count without pagination
+            all_matching_clients = clients_crud.get_all_clients_with_details(
+                db_session,
+                filters=temp_filters_for_count,
+                include_deleted=include_deleted
+            )
             self.total_filtered_clients = len(all_matching_clients)
-            load_and_display_clients(self, db_session, filters=filters_for_crud, ...) # Pass session to helper
+
+            offset = (self.current_page - 1) * self.clients_per_page
+
+            # Call to load and display the paginated list
+            load_and_display_clients(
+                self,
+                db_session,
+                filters=filters_for_crud,
+                limit=self.clients_per_page,
+                offset=offset,
+                include_deleted=include_deleted
+            )
         except Exception as e:
             logging.error(f"Error loading clients from DB: {e}", exc_info=True)
         finally:
