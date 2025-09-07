@@ -53,7 +53,12 @@ def handle_create_client_execution(doc_manager, db_session, client_data_dict=Non
     # --- Project and Task Creation ---
     try:
         project_status = get_status_setting_by_name(db_session, "Planning", "Project")
-        project_data = { 'client_id': actual_new_client_id, 'status_id': project_status.get('status_id') if project_status else None, ... }
+        project_data = {
+            'client_id': actual_new_client_id,
+            'status_id': project_status.get('status_id') if project_status else None,
+            'project_name': f"Default Project for {client_data_dict.get('client_name', 'Unknown Client')}",
+            'description': 'Default project created automatically upon client creation.'
+        }
         new_project_id = projects_crud.add_project(db_session, project_data)
         if new_project_id:
             # ...
@@ -118,41 +123,57 @@ def handle_open_edit_client_dialog(doc_manager, db_session, client_id):
 def archive_client_status(doc_manager, db_session, client_id):
     try:
         status_archived_obj = get_status_setting_by_name(db_session, 'Archivé', 'Client')
-        # ...
+        if not status_archived_obj:
+            logging.error("Could not find 'Archivé' status.")
+            return
+
+        update_data = {'status_id': status_archived_obj['id']}
         update_result = clients_crud.update_client(db_session, client_id, update_data)
-        # ...
-        activity_logs_crud.add_activity_log(db_session, log_data)
-        # ...
+
+        if update_result and update_result.get('success'):
+            log_data = {
+                'user_id': doc_manager.current_user_id,
+                'action': 'ARCHIVE_CLIENT',
+                'details': f"Client {client_id} status set to Archived."
+            }
+            activity_logs_crud.add_activity_log(db_session, log_data)
     except Exception as e:
-        # ... (error handling)
+        logging.error(f"Error archiving client {client_id}: {e}", exc_info=True)
 
 def permanently_delete_client(doc_manager, db_session, client_id):
-    # ...
+    reply = QMessageBox.question(doc_manager, 'Confirmation',
+                                 "Are you sure you want to permanently delete this client and all related data?",
+                                 QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
     if reply == QMessageBox.Yes:
         try:
             # Note: This function in CRUD should handle all related deletions (cascade)
             # or they must be handled here explicitly within the same session.
             delete_result = clients_crud.hard_delete_client(db_session, client_id)
-            if delete_result['success']:
-                # ... (UI updates) ...
+            if delete_result and delete_result.get('success'):
+                doc_manager.load_clients_from_db_slot()
             else:
-                # ... (error handling) ...
+                QMessageBox.critical(doc_manager, "Error", f"Failed to delete client: {delete_result.get('error')}")
         except Exception as e:
-            # ...
+            logging.error(f"Error permanently deleting client {client_id}: {e}", exc_info=True)
+            QMessageBox.critical(doc_manager, "Error", f"An exception occurred: {e}")
 
-def create_final_invoice_and_update_db(db_session, client_id: str, ...):
+def create_final_invoice_and_update_db(db_session, client_id: str, invoice_data: dict):
     # This function is now also expected to be called with a session
-    # ...
     try:
         client_data = clients_crud.get_client_by_id(db_session, client_id)
-        # ...
+        if not client_data:
+            raise ValueError("Client not found")
+
+        # Assume client_doc_data and invoice_table_data are prepared from invoice_data
+        client_doc_data = {} # Prepare from invoice_data
+        invoice_table_data = {} # Prepare from invoice_data
+
         new_client_doc_id = client_documents_crud.add_client_document(db_session, client_doc_data)
-        # ...
         new_invoice_id = invoices_crud.add_invoice(db_session, invoice_table_data)
-        # ...
+
         return True, new_invoice_id, new_client_doc_id
     except Exception as e:
-        # ...
+        logging.error(f"Error creating final invoice for client {client_id}: {e}", exc_info=True)
         return False, None, None
 
 # filter_and_display_clients does not need a session as it operates on the in-memory doc_manager.clients_data_map
