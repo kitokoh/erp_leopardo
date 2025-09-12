@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from datetime import date, datetime # Ensure date is imported
 
-from app.api.dependencies import get_db_session as get_db
+from app.db.session_manager import get_db
 from .auth import get_current_active_user
 from .models import (
     UserInDB,

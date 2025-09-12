@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.db.cruds.users import users_crud
 from .models import TokenData, UserInDB, Token
-from app.api.dependencies import get_db_session as get_db
+from app.db.session_manager import get_db
 
 SECRET_KEY = os.getenv("API_SECRET_KEY")
 if not SECRET_KEY:

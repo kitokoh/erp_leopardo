@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func, false
-from app.db.connection import Base
+from app.db.session_manager import Base
 
 class Product(Base):
     __tablename__ = 'products'

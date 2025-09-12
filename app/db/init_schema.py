@@ -32,7 +32,8 @@ import sys # Ensure sys is imported for path manipulation
 # Note: main_engine will be None here and needs to be initialized by main.py calling db.connection.initialize_engine_and_session
 try:
     # Import Base and initialize_engine_and_session. We will get 'engine' later, after it's initialized.
-    from app.db.connection import Base as MainBase, initialize_engine_and_session
+    from app.db.session_manager import Base as MainBase
+    from app.db.connection import initialize_engine_and_session
     # Import specific models that use MainBase and need table creation here
     from app.calculator.models import CalculationHistory
     # from other_module.models import OtherModelUsingMainBase # Example for future models

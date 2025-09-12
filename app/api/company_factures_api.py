@@ -13,7 +13,7 @@ from .models import (
 from .auth import get_current_active_user
 from app.core import config
 from app.utils.text_extraction import extract_text_from_pdf, parse_invoice_text
-from app.api.dependencies import get_db_session as get_db
+from app.db.session_manager import get_db
 
 router = APIRouter(
     prefix="/api/company-factures",

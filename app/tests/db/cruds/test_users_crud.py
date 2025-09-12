@@ -9,7 +9,7 @@ from app.utils import hash_password # For creating users
 # Define a global path for a temporary test database file
 TEST_DB_PATH = "test_app_data_users_crud.db"
 
-from app.db.connection import Base
+from db.session_manager import Base
 from app.models.db.users.user import User
 from app.models.db.users.role import Role
 

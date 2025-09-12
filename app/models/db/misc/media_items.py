@@ -1,6 +1,6 @@
 from sqlalchemy import Column, String, Text, JSON, DateTime
 from sqlalchemy.sql import func
-from app.db.connection import Base
+from app.db.session_manager import Base
 
 class MediaItem(Base):
     __tablename__ = 'media_items'

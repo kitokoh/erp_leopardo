@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, REAL
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from app.db.connection import Base
+from app.db.session_manager import Base
 
 class Commande(Base):
     __tablename__ = 'commandes'

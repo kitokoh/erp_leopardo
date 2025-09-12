@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Float
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func, false
-from app.db.connection import Base
+from app.db.session_manager import Base
 from app.models.db.locations.country import Country
 from app.models.db.locations.city import City
 from app.models.db.settings.status_setting import StatusSetting

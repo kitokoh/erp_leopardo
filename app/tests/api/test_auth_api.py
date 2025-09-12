@@ -2,11 +2,11 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
-from app.services.api.main import app
+from app.api.main import app
 from app.db.cruds.users import users_crud as db_manager
-from app.db.connection import Base
+from db.session_manager import Base
 from app.core.config import CONFIG
-from app.api.dependencies import get_db_session
+from app.db.session_manager import get_db as get_db_session
 import logging
 
 # Use a separate test database

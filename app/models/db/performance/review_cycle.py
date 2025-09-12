@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime, Boolean
 from sqlalchemy.sql import func
-from app.db.connection import Base
+from app.db.session_manager import Base
 
 class ReviewCycle(Base):
     __tablename__ = 'review_cycles'

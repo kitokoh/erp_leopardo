@@ -6,7 +6,7 @@ from typing import Generator, List as PyList, Optional
 from datetime import date, datetime
 
 # Adjust imports based on your project structure
-from app.db.connection import Base
+from db.session_manager import Base
 from app.models.db.employees.employee import Employee
 from app.models.db.users.user import User
 from app.models.db.performance.goal import Goal, GoalCreate, GoalUpdate, GoalStatusEnum

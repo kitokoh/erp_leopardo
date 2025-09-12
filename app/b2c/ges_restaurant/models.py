@@ -18,13 +18,13 @@ import os
 # This will require careful handling of imports when integrating with the main app's DB setup.
 
 # For now, to make this file self-contained for definition:
-# from db.connection import Base # This would be the ideal if paths are set up correctly for modules
+from db.session_manager import Base
 # If that fails, we define a local Base and figure out integration later.
 try:
     # Attempt to import the existing Base from the application's db.connection
     # This requires that the Python path is correctly configured when this module is loaded.
     # sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..')) # Add project root
-    from app.db.connection import Base
+    from app.db.session_manager import Base
     from app.models.db.products.product import Product as Products
     print("Successfully imported Base from db.connection in b2c.ges_restaurant.models")
 except ImportError:

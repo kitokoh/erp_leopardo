@@ -40,5 +40,12 @@ class DatabaseSessionManager:
         finally:
             session.close()
 
+def get_db():
+    """
+    Dependency for FastAPI to get a database session.
+    """
+    with session_manager.get_session() as db:
+        yield db
+
 # Global instance of the session manager
 session_manager = DatabaseSessionManager()

@@ -80,7 +80,7 @@ def generate_model_file(table_name, columns, directory):
         f.write("from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Float, REAL, Date\n")
         f.write("from sqlalchemy.orm import relationship\n")
         f.write("from sqlalchemy.sql import func\n")
-        f.write("from db.connection import Base\n\n")
+        f.write("from db.session_manager import Base\n\n")
 
         f.write(f"class {class_name}(Base):\n")
         f.write(f"    __tablename__ = '{to_snake_case(table_name)}'\n")

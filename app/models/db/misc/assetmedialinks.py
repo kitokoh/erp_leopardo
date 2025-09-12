@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from app.db.connection import Base
+from app.db.session_manager import Base
 
 class AssetMediaLink(Base):
     __tablename__ = 'asset_media_links'

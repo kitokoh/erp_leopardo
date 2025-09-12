@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 # Import the FastAPI app
 # Assumes api.main.app is the FastAPI instance
 # Adjust import path if necessary based on actual project structure and how tests are run
-from app.services.api.main import app as fastapi_app
+from app.api.main import app as fastapi_app
 
 # Import functions to initialize schema, potentially from db.init_schema or db.db_seed
 # For tests, we need a way to set up the DB schema in a test database.
@@ -184,8 +184,8 @@ def db_conn_test_memory():
 # This is a common way to handle auth in tests.
 # You'd need to know the exact dependency get_current_active_user uses.
 # For this example, we'll assume UserInDB is the model for the user.
-from app.services.api.models import UserInDB
-from app.services.auth.authentication import get_current_active_user
+from app.api.models import UserInDB
+from app.api.auth import get_current_active_user
 def override_get_current_active_user():
     return UserInDB(username="testuser", email="test@example.com", role="admin", is_active=True, user_id="test_user_uuid_123")
 

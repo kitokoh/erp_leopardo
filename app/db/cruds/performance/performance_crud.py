@@ -6,7 +6,7 @@ from datetime import date, datetime
 
 # Assuming your project structure allows these imports
 # Adjust if your models are located elsewhere
-from app.services.api.models import (
+from app.api.models import (
     GoalBase, GoalCreate, GoalUpdate,
     ReviewCycleBase, ReviewCycleCreate, ReviewCycleUpdate,
     PerformanceReviewBase, PerformanceReviewCreate, PerformanceReviewUpdate,
