@@ -43,7 +43,7 @@ def tearDownModule():
     q_app = None
 
 
-from app.gui.dialogs.statistics_add_client_dialog import StatisticsAddClientDialog
+from views.gui.dialogs.statistics_add_client_dialog import StatisticsAddClientDialog
 
 class TestStatisticsAddClientDialog(unittest.TestCase):
 

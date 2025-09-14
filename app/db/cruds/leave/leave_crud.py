@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 
 # Assuming your project structure allows these imports
 # Adjust if your models are located elsewhere
-from app.services.api.models import (
+from app.api.models import (
     LeaveTypeBase, LeaveBalanceBase, LeaveRequestBase,
     EmployeeBase, UserInDB, # Needed for relationships
     LeaveTypeCreate, LeaveBalanceCreate, LeaveBalanceUpdate, LeaveRequestCreate,

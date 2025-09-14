@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from app.db.connection import Base
+from app.db.session_manager import Base
 
 class RecruitmentStep(Base):
     __tablename__ = 'recruitment_steps'

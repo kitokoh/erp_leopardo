@@ -11,11 +11,8 @@ from app.product_management.edit_dialog import ProductEditDialog
 from app.db.cruds.products.products_crud import products_crud_instance
 from app.utils import html_to_pdf_util
 
-# Ensure a QApplication instance exists for widget testing, but only one.
-# It's often better to manage this per test class or even per test method if tests interfere.
-# For simplicity here, we'll try a global one, but it can be problematic.
-# A better approach for larger test suites is a base test class that handles QApplication.
-app = QApplication.instance() if QApplication.instance() else QApplication(sys.argv)
+# QApplication instance is now managed by pytest-qt's 'qapp' fixture.
+# No need to create it manually here.
 
 # Old setUpModule and tearDownModule are removed as each test now uses an in-memory DB.
 
@@ -107,7 +104,7 @@ class TestProductList(unittest.TestCase):
     @patch('app.product_management.list_dialog.products_crud_instance.get_product_dimension')
     @patch('app.product_management.list_dialog.products_crud_instance.get_equivalent_products')
     @patch('app.product_management.list_dialog.products_crud_instance.get_all_products')
-    def test_product_list_dialog_loads_data_with_new_columns(self, mock_get_all_products, mock_get_equivalent_products, mock_get_product_dimension): # This is a new, enhanced test
+    def test_product_list_dialog_loads_data_with_new_columns(self, mock_get_all_products, mock_get_equivalent_products, mock_get_product_dimension, qapp): # This is a new, enhanced test
         print("\nRunning test_product_list_dialog_loads_data_with_new_columns...")
 
         # Setup mock return values
@@ -180,7 +177,7 @@ class TestProductList(unittest.TestCase):
     @patch('app.product_management.list_dialog.html_to_pdf_util.convert_html_to_pdf')
     @patch('builtins.open', new_callable=unittest.mock.mock_open)
     @patch('app.product_management.list_dialog.products_crud_instance') # Mock the instance
-    def test_pdf_export_with_new_columns(self, mock_crud_instance, mock_file_open, mock_convert_to_pdf, mock_get_save_file_name):
+    def test_pdf_export_with_new_columns(self, mock_crud_instance, mock_file_open, mock_convert_to_pdf, mock_get_save_file_name, qapp):
         print("\nRunning test_pdf_export_with_new_columns...")
 
         dummy_pdf_path = "dummy_path/test_product_list_enhanced.pdf"
@@ -222,7 +219,7 @@ class TestProductList(unittest.TestCase):
 
     @patch('app.product_management.list_dialog.ProductListDialog.apply_filters_and_reload')
     @patch('app.product_management.list_dialog.ProductEditDialog') # Path to ProductEditDialog for mocking
-    def test_add_product_button_opens_dialog(self, MockProductEditDialog, mock_apply_filters_and_reload):
+    def test_add_product_button_opens_dialog(self, MockProductEditDialog, mock_apply_filters_and_reload, qapp):
         print("\nRunning test_add_product_button_opens_dialog...")
         dialog = ProductListDialog()
 
@@ -242,7 +239,7 @@ class TestProductList(unittest.TestCase):
 
     @patch('app.product_management.list_dialog.ProductListDialog.apply_filters_and_reload')
     @patch('app.product_management.list_dialog.ProductEditDialog')
-    def test_edit_product_opens_dialog(self, MockProductEditDialog, mock_apply_filters_and_reload):
+    def test_edit_product_opens_dialog(self, MockProductEditDialog, mock_apply_filters_and_reload, qapp):
         print("\nRunning test_edit_product_opens_dialog...")
         # Add a product to be edited
         test_product = self._add_test_product("EditTest", "en", price=30.0)
@@ -304,7 +301,7 @@ class TestProductList(unittest.TestCase):
     @patch('app.product_management.list_dialog.ProductListDialog.apply_filters_and_reload')
     @patch('app.product_management.list_dialog.products_crud_instance.delete_product')
     @patch('app.product_management.list_dialog.QMessageBox.question')
-    def test_delete_product_button(self, mock_qmessagebox_question, mock_crud_delete_product, mock_apply_filters_and_reload):
+    def test_delete_product_button(self, mock_qmessagebox_question, mock_crud_delete_product, mock_apply_filters_and_reload, qapp):
         print("\nRunning test_delete_product_button...")
         # Add a product to be deleted
         test_product = self._add_test_product("DeleteTest", "en", price=40.0)

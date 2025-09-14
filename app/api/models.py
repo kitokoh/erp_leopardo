@@ -1,7 +1,7 @@
 import uuid
 import enum
 from pydantic import BaseModel, Field, EmailStr
-from app.db.connection import Base
+from app.db.session_manager import Base
 from app.models.db.employees.employee import Employee
 from app.models.db.documents.document_category import DocumentCategory
 from app.models.db.documents.employee_document import EmployeeDocument

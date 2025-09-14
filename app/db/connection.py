@@ -12,12 +12,10 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # --- SQLAlchemy Setup ---
 # Moved SQLAlchemy imports to the top as they are needed by get_db_connection's type hint and logic
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session # Added Session for type hinting
 
 engine = None
 SessionLocal = None # This will be populated by initialize_engine_and_session
-Base = declarative_base()
 
 
 # Module-level configuration placeholder
@@ -169,4 +167,4 @@ def initialize_engine_and_session(app_config_param):
         logging.error(f"db.connection: SQLAlchemy engine setup not configured for unsupported database_type '{database_type_for_engine}'.")
         raise RuntimeError(f"Unsupported database type in config: '{database_type_for_engine}'")
 
-__all__ = ["get_db_connection", "engine", "SessionLocal", "Base", "initialize_engine_and_session"]
+__all__ = ["get_db_connection", "engine", "SessionLocal", "initialize_engine_and_session"]

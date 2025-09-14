@@ -11,7 +11,7 @@ from unittest.mock import patch
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
 # Import the new models
-from app.db.connection import Base
+from db.session_manager import Base
 from app.models.db.clients.client import Client
 from app.models.db.settings.status_setting import StatusSetting
 from app.models.db.users.user import User

@@ -6,7 +6,7 @@ from datetime import datetime
 # Assuming your project structure allows these imports
 from app.models.db.documents.document_category import DocumentCategory
 from app.models.db.documents.employee_document import EmployeeDocument
-from app.services.api.models import (
+from app.api.models import (
     DocumentCategoryCreate, DocumentCategoryBase, # DocumentCategoryBase for update
     EmployeeDocumentCreate, EmployeeDocumentUpdate
 )

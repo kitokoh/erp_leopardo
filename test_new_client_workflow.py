@@ -4,21 +4,22 @@ from PyQt5.QtWidgets import QApplication, QDialog
 from PyQt5.QtCore import QTimer # Import QTimer
 
 # Add project root to Python path to allow imports
-project_root = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
+sys.path.append(os.path.abspath('app/core'))
 
-from app.gui.main_window import DocumentManager
-from app.gui.dialogs import ContactDialog, ProductDialog, CreateDocumentDialog
+from views.gui.main_window import DocumentManager
+from views.gui.dialogs import ContactDialog, ProductDialog, CreateDocumentDialog
 
 # NEW IMPORTS
 from app.db.init_schema import initialize_database
 from app.db.cruds.clients.clients_crud import get_client_by_project_identifier, delete_client
-from app.db.cruds.locations.countries_crud import get_country_by_name, add_country
-from app.db.cruds.locations.cities_crud import get_city_by_name_and_country_id, add_city
+from app.db.cruds.misc.locations_crud import get_country_by_name, add_country
+from app.db.cruds.misc.locations_crud import get_city_by_name_and_country_id, add_city
 from app.db.cruds.projects.projects_crud import get_project_by_client_id, delete_project_and_tasks
 from app.db.connection import get_db_connection, initialize_engine_and_session
-from app.config import Config
+from config import CONFIG
 
 print("Starting test_new_client_workflow.py")
 
@@ -63,20 +64,21 @@ CreateDocumentDialog.exec_ = mock_create_document_dialog_exec
 # --- End Mocking ---
 
 try:
+    country_id = None
+    city_id = None
     # Initialize the database
-    config = Config()
-    initialize_engine_and_session(config)
-    initialize_database(config)
+    initialize_engine_and_session(CONFIG)
+    initialize_database(CONFIG)
     print("Database initialized for test.")
 
-    db_session = next(get_db_connection())
+    db_session = get_db_connection()
 
     # Add a dummy country and city if they don't exist, as they are required for client creation
     country_name = "TestCountry"
     city_name = "TestCity"
-    country = get_country_by_name(db_session, country_name)
+    country = get_country_by_name(country_name)
     if not country:
-        country_obj = add_country(db_session, {'country_name': country_name})
+        country_obj = add_country({'country_name': country_name})
         country_id = country_obj['country_id']
         print(f"Added {country_name} with ID {country_id}")
     else:
@@ -84,9 +86,9 @@ try:
         print(f"{country_name} already exists with ID {country_id}")
 
     if country_id:
-        city = get_city_by_name_and_country_id(db_session, city_name, country_id)
+        city = get_city_by_name_and_country_id(city_name, country_id)
         if not city:
-            city_obj = add_city(db_session, {'country_id': country_id, 'city_name': city_name})
+            city_obj = add_city({'country_id': country_id, 'city_name': city_name})
             city_id = city_obj['city_id']
             print(f"Added {city_name} with ID {city_id} to {country_name}")
         else:
@@ -151,17 +153,17 @@ except Exception as e:
 finally:
     # Clean up: Remove the test client, project, tasks, country, city if created
     # This is important for test idempotency
-    db_session = next(get_db_connection())
+    db_session = get_db_connection()
     try:
-        client = get_client_by_project_identifier(db_session, "AUTO_PROJ_001")
+        client = get_client_by_project_identifier("AUTO_PROJ_001")
         if client:
             print(f"Cleaning up client ID: {client['client_id']}")
             # Delete associated project first if it exists
-            project = get_project_by_client_id(db_session, client['client_id'])
+            project = get_project_by_client_id(client['client_id'])
             if project:
                 print(f"Cleaning up project ID: {project['project_id']}")
-                delete_project_and_tasks(db_session, project['project_id']) # Assumes this function exists or implement task deletion separately
-            delete_client(db_session, client['client_id'])
+                delete_project_and_tasks(project['project_id']) # Assumes this function exists or implement task deletion separately
+            delete_client(client['client_id'])
         else:
             print("Test client AUTO_PROJ_001 not found for cleanup.")
 
@@ -170,14 +172,14 @@ finally:
         # records created by this test run, perhaps by checking IDs more carefully or using specific test markers.
         # Deleting shared test data like "TestCountry" might affect other tests if run concurrently or if not cleaned properly.
         if country_id:
-            city_to_delete = get_city_by_name_and_country_id(db_session, city_name, country_id)
+            city_to_delete = get_city_by_name_and_country_id(city_name, country_id)
             if city_to_delete:
                  # Before deleting city, ensure it's not linked to other clients if that's a concern.
                  # For this test, we assume if the client AUTO_PROJ_001 was deleted, this city is likely specific to it.
                 print(f"Attempting to clean up city ID: {city_to_delete['city_id']}")
                 # delete_city(db_session, city_to_delete['city_id']) # Requires delete_city function
 
-            country_to_delete = get_country_by_name(db_session, country_name)
+            country_to_delete = get_country_by_name(country_name)
             if country_to_delete:
                  # Similar caution for country.
                 print(f"Attempting to clean up country ID: {country_to_delete['country_id']}")

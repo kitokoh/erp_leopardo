@@ -24,7 +24,7 @@ from app.db.cruds.misc.partners_crud import (
     update_partner_interaction, delete_partner_interaction
 )
 from app.db import init_schema as db_schema
-import app.config as db_config
+from core import config as db_config
 
 
 class TestPartnerCRUD(unittest.TestCase):

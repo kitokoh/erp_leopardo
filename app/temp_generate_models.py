@@ -79,7 +79,7 @@ def generate_model_file(table_name, columns):
         f.write("from sqlalchemy import Column, Integer, String, Text, Float, Boolean, DateTime, Date, Numeric, LargeBinary, ForeignKey\n")
         f.write("from sqlalchemy.orm import relationship\n")
         f.write("from sqlalchemy.sql import func\n")
-        f.write("from db.connection import Base\n\n")
+        f.write("from db.session_manager import Base\n\n")
         f.write(f"class {class_name}(Base):\n")
         f.write(f"    __tablename__ = '{table_name.lower()}'\n\n")
 

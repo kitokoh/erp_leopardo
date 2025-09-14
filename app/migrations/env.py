@@ -26,7 +26,7 @@ if project_root not in sys.path:
 
 # Now you can import your app's modules
 from app.core.config import CONFIG
-from app.db.connection import Base
+from app.db.session_manager import Base
 
 # Explicitly import all modules containing SQLAlchemy models
 print("Alembic env.py: Importing all application models for metadata detection...")

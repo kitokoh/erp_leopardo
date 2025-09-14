@@ -8,7 +8,7 @@ from sqlalchemy.engine import Engine, Connection as SQLAlchemyConnection
 from sqlalchemy.sql import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.utils import hash_password as util_hash_password, verify_password as util_verify_password
+from app.utils.auth import hash_password as util_hash_password, verify_password as util_verify_password
 from app.db.generic_crud import _manage_conn
 from app.models.db.users.user import User
 from app.models.db.users.role import Role

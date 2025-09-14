@@ -5,9 +5,7 @@ from PyQt5.QtGui import QFont # Keep if used, though my new test doesn't directl
 import sys
 import os
 
-# Adjust path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from app.gui.dialogs.create_document_dialog import CreateDocumentDialog
+from views.gui.dialogs.create_document_dialog import CreateDocumentDialog
 
 # Ensure QApplication instance exists
 app = None

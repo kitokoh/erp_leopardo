@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, Text, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
-from app.db.connection import Base
+from app.db.session_manager import Base
 
 class Clientnotes(Base):
     __tablename__ = 'client_notes'

@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, validator
 from fastapi import APIRouter
@@ -332,7 +332,6 @@ if __name__ == "__main__": # pragma: no cover
 
 # --- Report Execution Models & Endpoint ---
 
-from typing import Any # For ReportResults data_rows
 from ..db.database_manager import get_db_connection # For direct DB access in report execution
 
 class ReportResults(BaseModel):

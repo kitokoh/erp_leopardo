@@ -12,7 +12,7 @@ from datetime import date, datetime
 # Adjust imports based on your actual project structure
 from app.accounting import models as acc_models
 from app.accounting import cruds as acc_cruds
-from app.db.connection import Base as MainBase
+from app.db.session_manager import Base as MainBase
 
 # Use an in-memory SQLite database for testing
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"

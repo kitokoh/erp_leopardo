@@ -13,44 +13,16 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from app.services.api.main import app
-from app.services.auth.authentication import get_current_active_user
-from app.services.api.models import User as UserModelFromApi
+from app.api.main import app
+from app.api.auth import get_current_active_user
+from app.models.db.users.user import User as UserModelFromApi
 from app.db.init_schema import initialize_database
 from app.core import config # To override DATABASE_PATH for tests
 
-# Mock user for dependency override
-mock_user_data = {
-    "user_id": str(uuid.uuid4()), "username": "testapiclient",
-    "email": "testapi@example.com", "role": "admin", "is_active": True,
-    "full_name": "Test API User", "password_hash": "hashed_password", "salt": "salt",
-    "created_at": datetime.now(timezone.utc).isoformat(),
-    "updated_at": datetime.now(timezone.utc).isoformat()
-}
-# Ensure UserModelFromApi can be instantiated with this data
-# Adjust if your User model from api.models has different field requirements or uses Pydantic's `model_construct`
-try:
-    # If UserModelFromApi is Pydantic and uses from_attributes or similar:
-    mock_user_obj = UserModelFromApi(**mock_user_data)
-except Exception:
-    # Fallback or adjust if direct instantiation is different.
-    # This is tricky if User model has complex dependencies or expects specific ORM features not present here.
-    # For testing API layer, the exactness of mock_user_obj fields might only matter up to what get_current_active_user consumers use.
-    # Let's assume a simple Pydantic model or a class that can take these args.
-    mock_user_obj = UserModelFromApi(
-        user_id=mock_user_data["user_id"],
-        username=mock_user_data["username"],
-        email=mock_user_data["email"],
-        role=mock_user_data["role"],
-        is_active=mock_user_data["is_active"],
-        # Add other fields as required by your User model constructor or validation
-        # For example, if it's an ORM model, this might not work directly.
-        # full_name=mock_user_data["full_name"], # etc.
-    )
-
-
 async def override_get_current_active_user():
-    return mock_user_obj
+    # This function will be overridden in the test setup.
+    # This is just a placeholder.
+    pass
 
 class TestAssetsAPI(unittest.TestCase):
     original_db_path = None
@@ -66,7 +38,29 @@ class TestAssetsAPI(unittest.TestCase):
 
         initialize_database() # Uses the now overridden config.DATABASE_PATH
 
-        app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+        # Mock user for dependency override
+        mock_user_data = {
+            "user_id": str(uuid.uuid4()), "username": "testapiclient",
+            "email": "testapi@example.com", "is_active": True,
+            "full_name": "Test API User", "hashed_password": "hashed_password",
+        }
+        # This is still tricky because of the 'role' relationship.
+        # A real User needs a Role object.
+        # For now, we create a dictionary-like object that has the attributes the API expects.
+        # This avoids the SQLAlchemy error during test collection.
+        class MockUser:
+            def __init__(self, **kwargs):
+                self.__dict__.update(kwargs)
+                # Add a mock role object
+                self.role = type('MockRole', (), {'role_name': 'admin'})()
+
+
+        cls.mock_user_obj = MockUser(**mock_user_data)
+
+        async def override_get_current_active_user_for_test():
+            return cls.mock_user_obj
+
+        app.dependency_overrides[get_current_active_user] = override_get_current_active_user_for_test
         cls.client = TestClient(app)
 
     @classmethod
