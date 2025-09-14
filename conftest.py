@@ -8,6 +8,11 @@ def pytest_configure(config):
     This hook is called for every plugin and initial conftest file
     after command line options have been parsed.
     """
+    # Add project root to path to allow absolute imports
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__)))
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+
     # Set a dummy secret key for the tests to run
     os.environ['API_SECRET_KEY'] = 'test_secret_key_for_jules'
     os.environ['ALGORITHM'] = 'HS256'

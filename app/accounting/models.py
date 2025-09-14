@@ -4,17 +4,14 @@ from sqlalchemy import (
     create_engine, Column, String, Integer, Float, DateTime, Text, ForeignKey,
     Enum as SQLAlchemyEnum, UniqueConstraint, Boolean, Date, Table, Numeric
 )
-from sqlalchemy.orm import relationship, declarative_base
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from pydantic import BaseModel, Field, EmailStr, model_validator
 from typing import Optional, List, Dict, Any
 from datetime import date, datetime
 
-# SQLAlchemy Base for accounting module
-# It's good practice to have a Base per module if they are somewhat independent,
-# or use a shared Base from a central location (e.g., app.db.base.Base)
-# For now, let's define it here. If a central Base exists, this should be updated.
-from db.connection import Base # Use the central Base
+# Use the central Base from the session_manager
+from app.db.session_manager import Base
 
 # --- Enum Definitions ---
 

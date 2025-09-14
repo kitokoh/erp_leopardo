@@ -18,31 +18,29 @@ from app.telemetry import init_telemetry
 
 def main():
     """Main function to run the application."""
-    # 1. Setup Logging
+    # 1. Initialize QApplication FIRST. This is crucial.
+    app = QApplication(sys.argv)
+
+    # 2. Setup Logging
     setup_logging()
     logging.info("Application starting up...")
 
-    # 2. Initialize Database (This now handles everything: config, migrations, seeding)
+    # 3. Initialize Database (This now handles everything: config, migrations, seeding)
     try:
         initialize_database(CONFIG, APP_ROOT_DIR)
         logging.info("Database initialization process completed successfully.")
-    except SystemExit as e:
+    except SystemExit:
         # The initializer calls sys.exit on critical errors, so we just let it exit.
         logging.critical("Application startup aborted due to critical error during database initialization.")
         return # Exit the main function
     except Exception as e:
         logging.critical(f"An unhandled exception occurred during database initialization: {e}", exc_info=True)
-        # Create a temporary app to show the message box if the main app hasn't started
-        temp_app = QApplication.instance() or QApplication(sys.argv)
         QMessageBox.critical(None, "Database Error", f"A critical error occurred during database setup: {e}")
         return
 
-    # 2.5 Initialize Telemetry
+    # 4. Initialize Telemetry
     init_telemetry()
     logging.info("Telemetry manager initialized.")
-
-    # 3. Initialize QApplication
-    app = QApplication(sys.argv)
 
     # Set a global exception handler
     def excepthook(exc_type, exc_value, exc_tb):
@@ -52,7 +50,7 @@ def main():
 
     sys.excepthook = excepthook
 
-    # 4. Handle Login
+    # 5. Handle Login
     login_dialog = LoginDialog()
     if login_dialog.exec_() == QDialog.Accepted:
         # After a successful login, the user info is stored globally in the authentication service
@@ -62,7 +60,7 @@ def main():
         if current_user:
             logging.info(f"Login successful for user: {current_user.get('username')}")
 
-            # 5. Instantiate and show the Main Window
+            # 6. Instantiate and show the Main Window
             try:
                 main_window = DocumentManager(
                     app_root_dir=APP_ROOT_DIR,
@@ -72,13 +70,12 @@ def main():
                 main_window.show()
                 logging.info("Main window (DocumentManager) shown.")
 
-                # 6. Start Event Loop
+                # 7. Start Event Loop
                 sys.exit(app.exec_())
             except Exception as e:
                 logging.critical(f"Failed to create or show main window: {e}", exc_info=True)
                 QMessageBox.critical(None, "Application Error", f"Failed to create the main application window: {e}")
         else:
-            # This case might occur if the dialog is accepted but the global user is not set (e.g., an error).
             logging.error("Login dialog was accepted, but no user is authenticated. Exiting.")
             QMessageBox.critical(None, "Login Error", "Login failed for an unknown reason.")
     else:
