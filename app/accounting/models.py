@@ -14,7 +14,7 @@ from datetime import date, datetime
 # It's good practice to have a Base per module if they are somewhat independent,
 # or use a shared Base from a central location (e.g., app.db.base.Base)
 # For now, let's define it here. If a central Base exists, this should be updated.
-from db.session_manager import Base
+from app.db.session_manager import Base
 
 # --- Enum Definitions ---
 

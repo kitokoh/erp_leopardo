@@ -88,8 +88,8 @@ sys.modules['db_main_manager'] = db_manager_mock # If used directly
 
 
 # Now import the classes to be tested
-from app.gui.dialogs import CreateDocumentDialog, ProductDialog
-from app.client_management.ui.client_main_widget import ClientMainWidget as ClientWidget # Alias for convenience if tests use ClientWidget
+from views.gui.dialogs import CreateDocumentDialog, ProductDialog
+from views.client_management.ui.client_main_widget import ClientMainWidget as ClientWidget # Alias for convenience if tests use ClientWidget
 # from db.db_seed import seed_initial_data # For testing db_seed.py if needed
 # from db.cruds import locations_crud # For testing locations_crud.py if needed
 

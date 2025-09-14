@@ -11,8 +11,7 @@ from app.models.db.employees.employee import Employee
 from app.models.db.users.user import User
 from app.models.db.performance.goal import Goal, GoalCreate, GoalUpdate, GoalStatusEnum
 from app.models.db.performance.review_cycle import ReviewCycle, ReviewCycleCreate, ReviewCycleUpdate
-from app.models.db.performance.performance_review import PerformanceReview, PerformanceReviewCreate, PerformanceReviewUpdate, PerformanceReviewStatusEnum
-from app.models.db.performance.performance_review_goal_link import performance_review_goals_link
+from app.models.db.performance.performance_review import PerformanceReview, PerformanceReviewCreate, PerformanceReviewUpdate, PerformanceReviewStatusEnum, performance_review_goals_link
 from app.db.cruds.performance import performance_crud
 from app.db.cruds.users import employees_crud
 

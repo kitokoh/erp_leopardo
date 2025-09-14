@@ -9,7 +9,7 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from app import config as db_config
+from core import config as db_config
 from app.db.init_schema import initialize_database
 from app.db.cruds.projects import projects_crud
 from app.db.cruds.projects import tasks_crud

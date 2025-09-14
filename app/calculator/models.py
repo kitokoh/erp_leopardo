@@ -1,14 +1,13 @@
 # Database models for the calculator module
 
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
-from sqlalchemy.orm import declarative_base # Using modern declarative_base
 import datetime
 
 # Attempt to import Base from the project's existing DB setup
 # This path might need adjustment based on your project structure.
 # If 'db.connection.Base' is standard, this should work.
 # Otherwise, we might need to define a local Base or get it passed.
-from db.session_manager import Base
+from app.db.session_manager import Base
 
 
 class CalculationHistory(Base):

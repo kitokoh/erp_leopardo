@@ -15,8 +15,8 @@ from PyQt5.QtWidgets import QApplication, QDialog
 #     app = None
 
 # Adjust the import path based on your project structure
-from app.client_management.ui.client_main_widget import ClientMainWidget
-from app.client_management.tabs.products_tab import ProductsTab # The class whose methods we'll test
+from views.client_management.ui.client_main_widget import ClientMainWidget
+from views.client_management.tabs.products_tab import ProductsTab # The class whose methods we'll test
 
 # Mock external dependencies.
 # db_manager is passed from ClientMainWidget to ProductsTab.

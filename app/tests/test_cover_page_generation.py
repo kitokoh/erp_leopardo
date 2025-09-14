@@ -4,31 +4,32 @@ import shutil
 from datetime import datetime
 
 # Add project root to sys.path
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
+sys.path.append(os.path.abspath('app/core'))
+
 
 # Import what we need to test
 from app.document_generator.cover_page_generator import generate_cover_page_html
 from app.db.cruds.clients.clients_crud import add_client, get_client_by_id, delete_client
 from app.db.cruds.projects.projects_crud import add_project, get_project_by_id, delete_project
-from app.db.cruds.misc.company_crud import add_company, get_company_by_id, delete_company, set_default_company, get_default_company
-from app.db.cruds.locations.countries_crud import add_country, get_country_by_name
-from app.db.cruds.locations.cities_crud import add_city, get_city_by_name_and_country_id
+from app.db.cruds.misc.companies_crud import add_company, get_company_by_id, delete_company, set_default_company, get_default_company
+from app.db.cruds.misc.locations_crud import add_country, get_country_by_name, add_city, get_city_by_name_and_country_id
 from app.db.init_schema import initialize_database
 from app.db.connection import initialize_engine_and_session, get_db_connection
-from app.config import Config
+from config import CONFIG
 
 def setup_test_environment():
     print("--- 1. Setting up Test Environment ---")
-    config = Config()
+    config = CONFIG.copy()
     # Override config for test
-    config.data['database_path'] = 'test_cover_page.db'
-    config.data['templates_dir'] = 'templates_test'
-    config.data['company_logo_dir'] = 'company_logos_test'
+    config['database_path'] = 'test_cover_page.db'
+    config['templates_dir'] = 'templates_test'
+    config['company_logo_dir'] = 'company_logos_test'
 
-    initialize_engine_and_session(config.data)
-    initialize_database(config.data)
+    initialize_engine_and_session(config)
+    initialize_database(config)
     print("Database initialized.")
 
     # Use paths from config

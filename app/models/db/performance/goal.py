@@ -3,12 +3,42 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Enum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.session_manager import Base
+from pydantic import BaseModel
+from typing import Optional
+from datetime import date, datetime
+
 
 class GoalStatusEnum(enum.Enum):
     OPEN = "open"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
+
+# Pydantic Models
+class GoalBase(BaseModel):
+    employee_id: str
+    title: str
+    description: Optional[str] = None
+    due_date: Optional[date] = None
+    status: Optional[GoalStatusEnum] = GoalStatusEnum.OPEN
+    set_by_id: Optional[str] = None
+
+class GoalCreate(GoalBase):
+    pass
+
+class GoalUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    due_date: Optional[date] = None
+    status: Optional[GoalStatusEnum] = None
+
+class GoalInDBBase(GoalBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        orm_mode = True
 
 class Goal(Base):
     __tablename__ = 'goals'

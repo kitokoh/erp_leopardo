@@ -2083,9 +2083,9 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_invoices_issue_date ON Invoices(issue_date)") # Added
 
     # TeamMembers (Assuming TeamMembers is NOT primarily an Alembic/SQLAlchemy model for now)
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_teammembers_user_id ON TeamMembers(user_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_teammembers_is_active ON TeamMembers(is_active)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_teammembers_department ON TeamMembers(department)")
+    # cursor.execute("CREATE INDEX IF NOT EXISTS idx_teammembers_user_id ON TeamMembers(user_id)")
+    # cursor.execute("CREATE INDEX IF NOT EXISTS idx_teammembers_is_active ON TeamMembers(is_active)")
+    # cursor.execute("CREATE INDEX IF NOT EXISTS idx_teammembers_department ON TeamMembers(department)")
 
     # ClientContacts (Assuming ClientContacts is NOT primarily an Alembic/SQLAlchemy model for now)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientcontacts_contact_id ON ClientContacts(contact_id)")
@@ -2145,8 +2145,8 @@ CREATE TABLE IF NOT EXISTS user_motivational_messages (
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clientfreightforwarders_forwarder_id ON Client_FreightForwarders(forwarder_id)")
 
     # CompanyPersonnelContacts (Assuming CompanyPersonnelContacts is NOT an Alembic/SQLAlchemy model for now)
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_companypersonnelcontacts_personnel_id ON CompanyPersonnelContacts(personnel_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_companypersonnelcontacts_contact_id ON CompanyPersonnelContacts(contact_id)")
+    # cursor.execute("CREATE INDEX IF NOT EXISTS idx_companypersonnelcontacts_personnel_id ON CompanyPersonnelContacts(personnel_id)")
+    # cursor.execute("CREATE INDEX IF NOT EXISTS idx_companypersonnelcontacts_contact_id ON CompanyPersonnelContacts(contact_id)")
 
 
     # Partner Tables (Assuming these are NOT primarily Alembic/SQLAlchemy models for now)

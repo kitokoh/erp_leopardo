@@ -69,8 +69,8 @@ class ClientsCRUD(GenericCRUD):
         db.add(new_client)
 
         # Create default order and project
-        default_order_status = status_service.get_default_status_for_commande_creation(db)
-        default_project_status = status_service.get_default_status_for_type(db, status_models.StatusType.PROJECT, preferred_name="Planning")
+        default_order_status = status_service.get_default_status_for_commande_creation(db=db)
+        default_project_status = status_service.get_default_status_for_type(status_type=status_models.StatusType.PROJECT, preferred_name="Planning", db=db)
 
         if default_order_status and default_project_status:
             new_commande = Commande(
@@ -115,7 +115,8 @@ class ClientsCRUD(GenericCRUD):
         """
         try:
             import os
-            from app_setup import APP_ROOT_DIR
+            from app.core.config import CONFIG
+            APP_ROOT_DIR = CONFIG['app_root_dir']
             sane_client_name = "".join(c if c.isalnum() else "_" for c in client_name)
             folder_name = f"{sane_client_name}_{client_id[:8]}"
             relative_folder_path = os.path.join("clients", folder_name)

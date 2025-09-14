@@ -92,6 +92,9 @@ pyvirtualdisplay = "^3.0"
 schedule = "^1.2.2"
 
 
+[tool.pytest.ini_options]
+norecursedirs = ["app/b2c", "app/tests"]
+
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"

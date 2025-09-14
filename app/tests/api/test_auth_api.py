@@ -9,33 +9,6 @@ from app.core.config import CONFIG
 from app.db.session_manager import get_db as get_db_session
 import logging
 
-# Use a separate test database
-TEST_SQLALCHEMY_DATABASE_URL = CONFIG["database_url"] + "_test"
-engine = create_engine(TEST_SQLALCHEMY_DATABASE_URL)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Override the get_db_session dependency for testing
-def override_get_db_session():
-    try:
-        db = TestingSessionLocal()
-        yield db
-    finally:
-        db.close()
-
-app.dependency_overrides[get_db_session] = override_get_db_session
-
-# Fixture for the database session
-@pytest.fixture(scope="module")
-def db_session() -> Session:
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-        Base.metadata.drop_all(bind=engine)
-
 client = TestClient(app)
 
 # Test user credentials
@@ -90,6 +63,18 @@ def test_login_for_access_token_invalid_username():
     assert response.status_code == 401
     json_response = response.json()
     assert json_response["detail"] == "Incorrect username or password"
+
+
+def get_auth_token(username: str = TEST_USERNAME, password: str = TEST_PASSWORD) -> str:
+    """
+    Helper function to get an authentication token for a given user.
+    """
+    response = client.post(
+        "/api/auth/token",
+        data={"username": username, "password": password},
+    )
+    response.raise_for_status()
+    return response.json()["access_token"]
 
 def test_login_for_access_token_invalid_password():
     response = client.post(

@@ -12,7 +12,6 @@ from app.models.db.users.user import User
 from app.models.db.leave.leave_type import LeaveType, LeaveTypeCreate, LeaveTypeBase
 from app.models.db.leave.leave_balance import LeaveBalance, LeaveBalanceCreate, LeaveBalanceUpdate
 from app.models.db.leave.leave_request import LeaveRequest, LeaveRequestCreate, LeaveRequestStatusEnum
-from app.api.models import GoalStatusEnum
 from app.db.cruds.leave import leave_crud
 from app.db.cruds.users import employees_crud, users_crud
 from pydantic import ValidationError

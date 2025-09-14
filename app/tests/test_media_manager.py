@@ -18,7 +18,7 @@ from app.media_manager import operations, models
 from app.db.init_schema import initialize_database
 from app.db.connection import get_db_connection, initialize_engine_and_session
 from app.db.cruds.users import users_crud
-from app.config import CONFIG
+from core.config import CONFIG
 
 @pytest.fixture(scope="module")
 def event_loop():

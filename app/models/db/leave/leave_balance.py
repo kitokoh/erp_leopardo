@@ -1,6 +1,23 @@
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.db.session_manager import Base
+from pydantic import BaseModel
+from typing import Optional
+
+# Pydantic Models
+class LeaveBalanceBase(BaseModel):
+    employee_id: str
+    leave_type_id: int
+    year: int
+    entitled_days: float
+    used_days: float = 0.0
+
+class LeaveBalanceCreate(LeaveBalanceBase):
+    pass
+
+class LeaveBalanceUpdate(BaseModel):
+    entitled_days: Optional[float] = None
+    used_days: Optional[float] = None
 
 class LeaveBalance(Base):
     __tablename__ = 'leave_balances'

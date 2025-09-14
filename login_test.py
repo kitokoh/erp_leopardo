@@ -26,13 +26,11 @@ def run_login_only_test():
         session_manager.initialize(db_url)
 
         # The login function will now be refactored to accept a session
-        with session_manager.get_session() as session:
-            success, message, user_data, license_details = login(
-                session, # Pass the session
-                username=CONFIG['default_admin_username'],
-                password=CONFIG['default_admin_password'],
-                remember_me=False
-            )
+        success, message, user_data, license_details = login(
+            username=CONFIG['default_admin_username'],
+            password=CONFIG['default_admin_password'],
+            remember_me=False
+        )
 
         if success and user_data and user_data.get('username') == CONFIG['default_admin_username']:
             print(">>> Admin Login Test PASSED <<<")
