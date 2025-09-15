@@ -8,7 +8,7 @@ import datetime
 # This path might need adjustment based on your project structure.
 # If 'db.connection.Base' is standard, this should work.
 # Otherwise, we might need to define a local Base or get it passed.
-from db.connection import Base # Assuming your project uses a Base like this
+from app.db.connection import Base # Assuming your project uses a Base like this
 
 
 class CalculationHistory(Base):

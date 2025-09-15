@@ -20,16 +20,8 @@ import os
 # For now, to make this file self-contained for definition:
 # from db.connection import Base # This would be the ideal if paths are set up correctly for modules
 # If that fails, we define a local Base and figure out integration later.
-try:
-    # Attempt to import the existing Base from the application's db.connection
-    # This requires that the Python path is correctly configured when this module is loaded.
-    # sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..')) # Add project root
-    from app.db.connection import Base
-    from app.models.db.products.product import Product as Products
-    print("Successfully imported Base from db.connection in b2c.ges_restaurant.models")
-except ImportError:
-    print("Failed to import Base from db.connection in b2c.ges_restaurant.models. Using a local Base.")
-    Base = declarative_base()
+from app.db.connection import Base
+from app.models.db.products.product import Product as Products
 
 
 class RestaurantTable(Base):

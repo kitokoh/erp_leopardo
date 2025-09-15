@@ -7,7 +7,7 @@ from typing import Generator, Optional, Any, Dict, Callable, List as PyList
 from datetime import date, datetime
 
 # Adjust these imports based on your project structure
-from app.models.db.base import Base
+from app.db.connection import Base
 from app.models.db.users.user import User
 from app.models.db.users.employee import Employee
 from app.models.db.performance.goal import Goal, GoalStatusEnum

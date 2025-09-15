@@ -94,7 +94,7 @@ from app.utils.document_manager_logic import (
     permanently_delete_client
 )
 from app.utils.app_constants import CONFIGURABLE_MODULES
-from app.voice_input_service import VoiceInputService
+# from app.voice_input_service import VoiceInputService
 from app.services.download_monitor_service import DownloadMonitorService
 from app.license_management import manager as license_manager
 from app.license_management import (
@@ -127,6 +127,7 @@ class DocumentManager(QMainWindow):
         self.init_or_update_download_monitor()
         self.populate_saved_filters_combo()
         # ...
+        # self.voice_input_service = VoiceInputService(self)
         self.initialize_telemetry()
 
     def _get_setting_with_fallback(self, key, fallback):
