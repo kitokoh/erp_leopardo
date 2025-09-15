@@ -14,7 +14,7 @@ def tearDownModule():
     global app
     app = None
 
-from app.gui.dialogs.send_email_dialog import SendEmailDialog
+from views.gui.dialogs.send_email_dialog import SendEmailDialog
 # Assuming templates_crud is also used directly or via db_manager by SendEmailDialog
 # For consistency, we'll patch db_manager where SendEmailDialog uses it.
 
@@ -40,8 +40,8 @@ class TestSendEmailDialog(unittest.TestCase):
         self.EMAIL_TEMPLATE_TYPES = ['EMAIL_BODY_HTML', 'EMAIL_BODY_TXT']
 
 
-    @patch('app.gui.dialogs.send_email_dialog.db_manager')
-    @patch('app.gui.dialogs.send_email_dialog.clients_crud_instance') # If get_client_by_id is called
+    @patch('views.gui.dialogs.send_email_dialog.db_manager')
+    @patch('views.gui.dialogs.send_email_dialog.clients_crud_instance') # If get_client_by_id is called
     def test_load_email_templates_successful_load(self, mock_clients_crud, mock_db_manager):
         """Test load_email_templates populates combo box correctly."""
         mock_clients_crud.get_client_by_id.return_value = self.mock_client_info
@@ -73,8 +73,8 @@ class TestSendEmailDialog(unittest.TestCase):
         self.assertEqual(dialog.template_combo.itemText(2), 'Text Update FR')
         self.assertEqual(dialog.template_combo.itemData(2), 't_txt_1')
 
-    @patch('app.gui.dialogs.send_email_dialog.db_manager')
-    @patch('app.gui.dialogs.send_email_dialog.clients_crud_instance')
+    @patch('views.gui.dialogs.send_email_dialog.db_manager')
+    @patch('views.gui.dialogs.send_email_dialog.clients_crud_instance')
     def test_load_email_templates_no_templates_for_language(self, mock_clients_crud, mock_db_manager):
         """Test load_email_templates when no templates exist for the selected language."""
         mock_clients_crud.get_client_by_id.return_value = self.mock_client_info
@@ -91,10 +91,10 @@ class TestSendEmailDialog(unittest.TestCase):
         self.assertEqual(dialog.template_combo.count(), 1) # Only "--- Aucun Modèle ---"
         self.assertEqual(dialog.template_combo.itemText(0), dialog.tr("--- Aucun Modèle ---"))
 
-    @patch('app.gui.dialogs.send_email_dialog.os.path.exists')
-    @patch('app.gui.dialogs.send_email_dialog.open', new_callable=unittest.mock.mock_open, read_data="Test HTML Body {{client.client_name}}")
-    @patch('app.gui.dialogs.send_email_dialog.db_manager')
-    @patch('app.gui.dialogs.send_email_dialog.clients_crud_instance')
+    @patch('views.gui.dialogs.send_email_dialog.os.path.exists')
+    @patch('views.gui.dialogs.send_email_dialog.open', new_callable=unittest.mock.mock_open, read_data="Test HTML Body {{client.client_name}}")
+    @patch('views.gui.dialogs.send_email_dialog.db_manager')
+    @patch('views.gui.dialogs.send_email_dialog.clients_crud_instance')
     def test_on_template_selected_html_template(self, mock_clients_crud, mock_db_manager, mock_file_open, mock_path_exists):
         """Test selecting an HTML email template."""
         mock_clients_crud.get_client_by_id.return_value = self.mock_client_info
@@ -132,10 +132,10 @@ class TestSendEmailDialog(unittest.TestCase):
         self.assertTrue(dialog.body_edit.isReadOnly())
         self.assertEqual(dialog.active_template_type, 'EMAIL_BODY_HTML')
 
-    @patch('app.gui.dialogs.send_email_dialog.os.path.exists')
-    @patch('app.gui.dialogs.send_email_dialog.open', new_callable=unittest.mock.mock_open, read_data="Test Text Body {{client.client_name}}")
-    @patch('app.gui.dialogs.send_email_dialog.db_manager')
-    @patch('app.gui.dialogs.send_email_dialog.clients_crud_instance')
+    @patch('views.gui.dialogs.send_email_dialog.os.path.exists')
+    @patch('views.gui.dialogs.send_email_dialog.open', new_callable=unittest.mock.mock_open, read_data="Test Text Body {{client.client_name}}")
+    @patch('views.gui.dialogs.send_email_dialog.db_manager')
+    @patch('views.gui.dialogs.send_email_dialog.clients_crud_instance')
     def test_on_template_selected_txt_template(self, mock_clients_crud, mock_db_manager, mock_file_open, mock_path_exists):
         """Test selecting a TXT email template."""
         mock_clients_crud.get_client_by_id.return_value = self.mock_client_info

@@ -1,8 +1,8 @@
 import sqlite3
 from typing import List, Optional, Dict, Any
 from .models import CompanyCalendarSettings, UserCalendarEvent # Pydantic models
-from db.connection import get_db_connection # Assuming similar connection management
-from db.cruds.generic_crud import GenericCRUD, _manage_conn # For consistency
+from app.db.connection import get_db_connection # Assuming similar connection management
+from app.db.cruds.generic_crud import GenericCRUD, _manage_conn # For consistency
 import logging
 from datetime import date
 

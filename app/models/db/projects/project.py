@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, REAL, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy import Boolean
 from sqlalchemy.sql import func, false
-from app.db.connection import Base
+from app.db.session_manager import Base
 
 class Project(Base):
     __tablename__ = 'projects'

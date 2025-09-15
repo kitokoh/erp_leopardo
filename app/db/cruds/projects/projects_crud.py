@@ -44,6 +44,11 @@ def get_projects_by_client_id(db: Session, client_id: str) -> list[dict]:
     """Retrieves all projects for a given client_id, ordered by creation date."""
     return [p.__dict__ for p in db.query(Project).filter(Project.client_id == client_id).order_by(Project.created_at.desc()).all()]
 
+def get_project_by_client_id(db: Session, client_id: str) -> dict | None:
+    """Retrieves the first project for a given client_id."""
+    project = db.query(Project).filter(Project.client_id == client_id).first()
+    return project.__dict__ if project else None
+
 def update_project(db: Session, project_id: str, project_data: dict) -> bool:
     """
     Updates an existing project.
@@ -63,6 +68,29 @@ def update_project(db: Session, project_id: str, project_data: dict) -> bool:
         return True
     except Exception as e:
         logger.error(f"Database error updating project {project_id}: {e}", exc_info=True)
+        db.rollback()
+        return False
+
+from app.models.db.misc.tasks import Task
+
+def delete_project_and_tasks(db: Session, project_id: str) -> bool:
+    """Deletes all tasks for a project and then deletes the project itself."""
+    project = db.query(Project).filter(Project.project_id == project_id).first()
+    if not project:
+        return False
+
+    try:
+        # Delete associated tasks first
+        db.query(Task).filter(Task.project_id == project_id).delete(synchronize_session=False)
+
+        # Then delete the project
+        db.delete(project)
+
+        db.commit()
+        logger.info(f"Project {project_id} and its tasks deleted successfully.")
+        return True
+    except Exception as e:
+        logger.error(f"Database error deleting project {project_id} and its tasks: {e}", exc_info=True)
         db.rollback()
         return False
 
@@ -145,8 +173,10 @@ __all__ = [
     "add_project",
     "get_project_by_id",
     "get_projects_by_client_id",
+    "get_project_by_client_id",
     "update_project",
     "delete_project",
+    "delete_project_and_tasks",
     "get_all_projects",
     "get_total_projects_count",
     "get_active_projects_count",
@@ -163,7 +193,7 @@ def get_overdue_tasks_count(db: Session) -> int:
     Counts the number of overdue tasks.
     A task is considered overdue if its due_date has passed and it is not completed.
     """
-    from db.models.projects.tasks import Task
+    from app.models.db.misc.tasks import Task
     current_date = datetime.now(timezone.utc)
     try:
         count = (

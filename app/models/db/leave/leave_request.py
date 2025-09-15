@@ -2,24 +2,34 @@ import enum
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Float, Enum as SQLAlchemyEnum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from app.db.connection import Base
+from app.db.session_manager import Base
 from ..employees.employee import Employee
 from .leave_type import LeaveType
 from ..users.user import User
-import enum
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Float, Enum as SQLAlchemyEnum
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-from app.db.connection import Base
-from ..employees.employee import Employee
-from .leave_type import LeaveType
-from ..users.user import User
+from pydantic import BaseModel
+from typing import Optional
+from datetime import date
 
 class LeaveRequestStatusEnum(str, enum.Enum):
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"
     CANCELLED = "cancelled"
+
+# Pydantic Models
+class LeaveRequestBase(BaseModel):
+    leave_type_id: int
+    start_date: date
+    end_date: date
+    num_days: float
+    reason: Optional[str] = None
+
+class LeaveRequestCreate(LeaveRequestBase):
+    pass
+
+class LeaveRequestUpdate(BaseModel):
+    status: Optional[LeaveRequestStatusEnum] = None
+    comments: Optional[str] = None
 
 class LeaveRequest(Base):
     __tablename__ = 'leave_requests'

@@ -6,7 +6,7 @@ import logging # Added
 
 # Assuming models are in api.models
 # Adjust import path if models are located elsewhere (e.g., directly in db.models if that's the project structure)
-from app.services.api.models import ProformaInvoiceBase as ProformaInvoice, ProformaInvoiceItem, ProformaInvoiceStatusEnum, Client, Project, Company, Product, ClientDocument
+from app.api.models import ProformaInvoiceBase as ProformaInvoice, ProformaInvoiceItem, ProformaInvoiceStatusEnum, Client, Project, Company, Product, ClientDocument
 
 # Placeholder for get_db_session - this should come from your actual db setup (e.g., db.py or db_context_extensions.py)
 # For this subtask, we'll assume it's available globally or passed in.

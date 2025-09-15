@@ -1,6 +1,25 @@
 from sqlalchemy import Column, Integer, String, DateTime, Boolean
 from sqlalchemy.sql import func
-from app.db.connection import Base
+from app.db.session_manager import Base
+from pydantic import BaseModel
+from typing import Optional
+from datetime import date
+
+# Pydantic Models
+class ReviewCycleBase(BaseModel):
+    name: str
+    start_date: date
+    end_date: date
+    is_active: bool = True
+
+class ReviewCycleCreate(ReviewCycleBase):
+    pass
+
+class ReviewCycleUpdate(BaseModel):
+    name: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    is_active: Optional[bool] = None
 
 class ReviewCycle(Base):
     __tablename__ = 'review_cycles'

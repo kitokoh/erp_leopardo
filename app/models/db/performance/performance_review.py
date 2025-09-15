@@ -2,13 +2,43 @@ import enum
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Enum as SQLAlchemyEnum, Table
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from app.db.connection import Base
+from app.db.session_manager import Base
+from pydantic import BaseModel
+from typing import Optional, List
+from datetime import date
 
 class PerformanceReviewStatusEnum(enum.Enum):
     DRAFT = "draft"
     PENDING_EMPLOYEE_REVIEW = "pending_employee_review"
     PENDING_MANAGER_REVIEW = "pending_manager_review"
     COMPLETED = "completed"
+
+# Pydantic Models
+class PerformanceReviewBase(BaseModel):
+    employee_id: str
+    reviewer_id: str
+    review_cycle_id: int
+    review_date: Optional[date] = None
+    overall_rating: Optional[int] = None
+    strengths: Optional[str] = None
+    areas_for_improvement: Optional[str] = None
+    employee_comments: Optional[str] = None
+    manager_comments: Optional[str] = None
+    status: PerformanceReviewStatusEnum = PerformanceReviewStatusEnum.DRAFT
+
+class PerformanceReviewCreate(PerformanceReviewBase):
+    pass
+
+class PerformanceReviewUpdate(BaseModel):
+    review_date: Optional[date] = None
+    overall_rating: Optional[int] = None
+    strengths: Optional[str] = None
+    areas_for_improvement: Optional[str] = None
+    employee_comments: Optional[str] = None
+    manager_comments: Optional[str] = None
+    status: Optional[PerformanceReviewStatusEnum] = None
+    goal_ids_to_link: Optional[List[int]] = None
+    goal_ids_to_unlink: Optional[List[int]] = None
 
 performance_review_goals_link = Table('performance_review_goals_link', Base.metadata,
     Column('performance_review_id', Integer, ForeignKey('performance_reviews.id'), primary_key=True),

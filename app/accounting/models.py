@@ -47,6 +47,7 @@ class FiscalYearStatusEnum(enum.Enum):
 
 class ChartOfAccounts(Base):
     __tablename__ = "acc_chart_of_accounts"
+    __table_args__ = {'extend_existing': True}
     # __table_args__ = {'schema': 'accounting'} # Removed for SQLite compatibility
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -68,6 +69,7 @@ class ChartOfAccounts(Base):
 
 class JournalEntry(Base):
     __tablename__ = "acc_journal_entries"
+    __table_args__ = {'extend_existing': True}
     # __table_args__ = {'schema': 'accounting'} # Removed for SQLite compatibility
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -107,7 +109,7 @@ class JournalItem(Base):
 
     __table_args__ = (
         UniqueConstraint('journal_entry_id', 'account_id', 'debit_amount', 'credit_amount', name='uq_journal_item_detail'),
-        # {'schema': 'accounting'} # Removed schema for SQLite
+        {'extend_existing': True},
     )
 
     def __repr__(self):
@@ -115,6 +117,7 @@ class JournalItem(Base):
 
 class FinancialStatement(Base):
     __tablename__ = "acc_financial_statements"
+    __table_args__ = {'extend_existing': True}
     # __table_args__ = {'schema': 'accounting'} # Removed for SQLite compatibility
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -136,6 +139,7 @@ class FinancialStatement(Base):
 
 class TaxRate(Base):
     __tablename__ = "acc_tax_rates"
+    __table_args__ = {'extend_existing': True}
     # __table_args__ = {'schema': 'accounting'} # Removed for SQLite compatibility
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -154,6 +158,7 @@ class TaxRate(Base):
 
 class Currency(Base):
     __tablename__ = "acc_currencies"
+    __table_args__ = {'extend_existing': True}
     # __table_args__ = {'schema': 'accounting'} # Removed for SQLite compatibility
 
     code = Column(String(3), primary_key=True) # e.g., "USD", "EUR", "JPY"
@@ -170,6 +175,7 @@ class Currency(Base):
 
 class FiscalYear(Base):
     __tablename__ = "acc_fiscal_years"
+    __table_args__ = {'extend_existing': True}
     # __table_args__ = {'schema': 'accounting'} # Removed for SQLite compatibility
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))

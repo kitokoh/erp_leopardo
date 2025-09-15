@@ -7,7 +7,7 @@ import uuid
 import os
 import datetime
 
-from app.api.dependencies import get_db_session as get_db
+from app.db.session_manager import get_db
 from app.utils.html_to_pdf_util import render_html_template, convert_html_to_pdf, WeasyPrintError
 from .models import DocumentGenerationRequest, DocumentGenerationResponse, UserInDB
 from .auth import get_current_active_user

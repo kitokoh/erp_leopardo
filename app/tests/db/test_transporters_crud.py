@@ -14,9 +14,7 @@ from app.db.cruds.misc.transporters_crud import (
 )
 from app.db.connection import get_db_connection # Used by CRUDs, not directly in test usually
 from app.db.init_schema import initialize_database
-
-from app.tests.mocks import mock_config
-sys.modules['config'] = mock_config
+from app.tests.mocks.config_testing_data import CONFIG
 
 
 class TestTransportersCrud(unittest.TestCase):
@@ -28,20 +26,20 @@ class TestTransportersCrud(unittest.TestCase):
         This involves ensuring a clean test database file is used.
         """
         # Ensure any old test database is removed
-        if os.path.exists(MockConfig.DATABASE_PATH):
-            os.remove(MockConfig.DATABASE_PATH)
+        if os.path.exists(CONFIG['database_path']):
+            os.remove(CONFIG['database_path'])
 
         # Initialize the database schema
         # initialize_database() will use the MockConfig.DATABASE_PATH
-        initialize_database()
+        initialize_database(CONFIG)
 
     @classmethod
     def tearDownClass(cls):
         """
         Clean up by removing the test database file after all tests are run.
         """
-        if os.path.exists(MockConfig.DATABASE_PATH):
-            os.remove(MockConfig.DATABASE_PATH)
+        if os.path.exists(CONFIG['database_path']):
+            os.remove(CONFIG['database_path'])
 
     def setUp(self):
         """
@@ -51,7 +49,7 @@ class TestTransportersCrud(unittest.TestCase):
         """
         conn = None
         try:
-            conn = sqlite3.connect(MockConfig.DATABASE_PATH)
+            conn = sqlite3.connect(CONFIG['database_path'])
             cursor = conn.cursor()
             cursor.execute("DELETE FROM Transporters")
             # Add other DELETES if there are foreign key relations from Transporters

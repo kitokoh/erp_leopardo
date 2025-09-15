@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Text, DateTime, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func, false
-from app.db.connection import Base
+from app.db.session_manager import Base
 
 class ClientOrderMoneyTransferAgent(Base):
     __tablename__ = 'client_order_money_transfer_agents'

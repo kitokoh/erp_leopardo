@@ -11,10 +11,10 @@ from fastapi.testclient import TestClient
 APP_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(APP_ROOT)
 
-from app.api.main import app # The FastAPI application
-from app.db import init_schema
-from app.db import db_config
-from app.api import models # For Pydantic models if needed for request construction hints
+from api.main import app # The FastAPI application
+from db import init_schema
+from core import config as db_config
+from api import models # For Pydantic models if needed for request construction hints
 
 # Hold the original DATABASE_PATH
 ORIGINAL_DB_PATH_API_TEST = None # Use a unique name to avoid clashes if run in same session as other tests

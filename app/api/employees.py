@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
-from app.api.dependencies import get_db_session as get_db
+from app.db.session_manager import get_db
 from .models import EmployeeCreate, EmployeeResponse, EmployeeUpdate
 from app.models.db.employees.employee import Employee
 from app.db.cruds.users import employees_crud

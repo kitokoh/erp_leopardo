@@ -2,11 +2,11 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
-from app.services.api.main import app as fastapi_app
+from app.api.main import app as fastapi_app
 from app.db.cruds.users import users_crud, permissions_crud, role_permissions_crud
-from app.db.connection import Base
+from db.session_manager import Base
 from app.core.config import CONFIG
-from app.api.dependencies import get_db_session
+from app.db.session_manager import get_db as get_db_session
 import app.db.import_all_models
 from unittest.mock import patch, MagicMock
 import os
@@ -103,12 +103,12 @@ def test_generate_document_api_success(auth_headers, db_session_module):
     mock_generated_doc_id = "generated_doc_uuid_123"
     mock_saved_relative_path = "generated/document.pdf"
 
-    with patch('app.services.api.documents.templates_crud.get_template_by_id', return_value=mock_template_data) as mock_get_tpl, \
-         patch('app.services.api.documents.get_document_context_data', return_value=mock_context_data) as mock_get_ctx, \
-         patch('app.services.api.documents.render_html_template', return_value="<html></html>") as mock_render, \
-         patch('app.services.api.documents.convert_html_to_pdf', return_value=b'pdf_bytes') as mock_gen_pdf, \
-         patch('app.services.api.documents.client_documents_crud.add_client_document', return_value=mock_generated_doc_id) as mock_add_doc, \
-         patch('app.services.api.documents._save_generated_pdf', return_value=mock_saved_relative_path) as mock_save:
+    with patch('app.api.documents.templates_crud.get_template_by_id', return_value=mock_template_data) as mock_get_tpl, \
+         patch('app.api.documents.get_document_context_data', return_value=mock_context_data) as mock_get_ctx, \
+         patch('app.api.documents.render_html_template', return_value="<html></html>") as mock_render, \
+         patch('app.api.documents.convert_html_to_pdf', return_value=b'pdf_bytes') as mock_gen_pdf, \
+         patch('app.api.documents.client_documents_crud.add_client_document', return_value=mock_generated_doc_id) as mock_add_doc, \
+         patch('app.api.documents._save_generated_pdf', return_value=mock_saved_relative_path) as mock_save:
 
         response = client.post("/api/documents/generate", json=request_payload, headers=auth_headers)
 
@@ -118,7 +118,7 @@ def test_generate_document_api_success(auth_headers, db_session_module):
         assert json_response["document_id"] == mock_generated_doc_id
 
 def test_generate_document_template_not_found(auth_headers):
-    with patch('app.services.api.documents.templates_crud.get_template_by_id', return_value=None):
+    with patch('app.api.documents.templates_crud.get_template_by_id', return_value=None):
         response = client.post("/api/documents/generate", json={
             "template_id": 999, "client_id": "c1", "company_id": "comp1", "target_language_code": "en"
         }, headers=auth_headers)
@@ -136,10 +136,10 @@ def test_download_document_api_success(auth_headers):
     mock_client_meta = MagicMock()
     mock_client_meta.default_base_folder_path = '/fake/client/folder'
 
-    with patch('app.services.api.documents.client_documents_crud.get_document_by_id', return_value=mock_doc_meta), \
-         patch('app.services.api.documents.clients_crud.get_client_by_id', return_value=mock_client_meta), \
+    with patch('app.api.documents.client_documents_crud.get_document_by_id', return_value=mock_doc_meta), \
+         patch('app.api.documents.clients_crud.get_client_by_id', return_value=mock_client_meta), \
          patch('os.path.exists', return_value=True), \
-         patch('app.services.api.documents.FileResponse') as MockFileResponse:
+         patch('app.api.documents.FileResponse') as MockFileResponse:
 
         response = client.get(f"/api/documents/{doc_id}/download", headers=auth_headers)
 
@@ -149,7 +149,7 @@ def test_download_document_api_success(auth_headers):
         assert kwargs.get('filename') == mock_doc_meta.file_name_on_disk
 
 def test_download_document_not_found(auth_headers):
-    with patch('app.services.api.documents.client_documents_crud.get_document_by_id', return_value=None):
+    with patch('app.api.documents.client_documents_crud.get_document_by_id', return_value=None):
         response = client.get("/api/documents/non_existent_doc_id/download", headers=auth_headers)
         assert response.status_code == 404
         assert "Document not found" in response.json()["detail"]
@@ -164,8 +164,8 @@ def test_download_document_file_not_on_server(auth_headers):
     mock_client_meta = MagicMock()
     mock_client_meta.default_base_folder_path = '/fake/path'
 
-    with patch('app.services.api.documents.client_documents_crud.get_document_by_id', return_value=mock_doc_meta), \
-         patch('app.services.api.documents.clients_crud.get_client_by_id', return_value=mock_client_meta), \
+    with patch('app.api.documents.client_documents_crud.get_document_by_id', return_value=mock_doc_meta), \
+         patch('app.api.documents.clients_crud.get_client_by_id', return_value=mock_client_meta), \
          patch('os.path.exists', return_value=False):
         response = client.get(f"/api/documents/{doc_id}/download", headers=auth_headers)
         assert response.status_code == 404

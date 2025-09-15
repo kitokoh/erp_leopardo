@@ -1,5 +1,6 @@
 import logging
 from typing import List, Optional
+from sqlalchemy.orm import Session
 
 # Attempt to import CRUD functions from the existing db module
 try:
@@ -48,7 +49,7 @@ def get_status_by_id(status_id: int) -> Optional[Status]:
         logger.error(f"Error in get_status_by_id for ID {status_id}: {e}", exc_info=True)
         return None
 
-def get_statuses_by_type(status_type: StatusType, type_filter_string: Optional[str] = None) -> List[Status]:
+def get_statuses_by_type(status_type: StatusType, type_filter_string: Optional[str] = None, db: Session = None) -> List[Status]:
     """
     Retrieves all statuses of a specific type.
     Can accept StatusType enum or a string for type_filter_string for flexibility.
@@ -60,7 +61,7 @@ def get_statuses_by_type(status_type: StatusType, type_filter_string: Optional[s
     type_val_to_filter = type_filter_string if type_filter_string else status_type.value
 
     try:
-        db_rows = get_all_status_settings(type_filter=type_val_to_filter)
+        db_rows = get_all_status_settings(type_filter=type_val_to_filter, conn=db)
         statuses = [_map_db_row_to_status_object(row) for row in db_rows if row]
         return [s for s in statuses if s] # Filter out None objects from mapping errors
     except Exception as e:
@@ -291,13 +292,13 @@ def delete_status(status_id: int) -> bool:
 
 # --- Utility functions ---
 
-def get_default_status_for_type(status_type: StatusType, preferred_name: Optional[str] = None) -> Optional[Status]:
+def get_default_status_for_type(status_type: StatusType, preferred_name: Optional[str] = None, db: Session = None) -> Optional[Status]:
     """
     Gets a default status for a given type.
     If preferred_name is provided, it tries to find that first.
     Otherwise, it typically returns the first status by sort_order.
     """
-    statuses = get_statuses_by_type(status_type)
+    statuses = get_statuses_by_type(status_type, db=db)
     if not statuses:
         logger.warning(f"No statuses found for type {status_type.value} when seeking default.")
         return None
@@ -326,9 +327,9 @@ def get_default_status_for_client_creation() -> Optional[Status]:
     return get_default_status_for_type(StatusType.CLIENT)
 
 
-def get_default_status_for_commande_creation() -> Optional[Status]:
+def get_default_status_for_commande_creation(db: Session) -> Optional[Status]:
     """Gets the default status for new commandes (e.g., 'Brouillon')."""
-    return get_default_status_for_type(StatusType.COMMANDE, preferred_name="Brouillon")
+    return get_default_status_for_type(StatusType.COMMANDE, preferred_name="Brouillon", db=db)
 
 def get_archived_status_for_client() -> Optional[Status]:
     """Gets the designated 'Archivé' status for clients."""

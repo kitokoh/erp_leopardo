@@ -2,7 +2,7 @@ import enum
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Float, REAL, Date, Enum as SQLAlchemyEnum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from app.db.connection import Base
+from app.db.session_manager import Base
 from ..clients.client import Client
 from ..projects.project import Project
 from ..misc.companies import Company
