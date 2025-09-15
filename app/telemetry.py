@@ -8,6 +8,7 @@ from queue import Queue, Empty
 from datetime import datetime, timezone
 from ._version import __version__
 from app.db.cruds.misc.application_settings_crud import get_setting, set_setting
+from app.db.session_manager import session_manager
 
 # A placeholder for the telemetry server endpoint
 TELEMETRY_ENDPOINT = "https://example.com/telemetry"
@@ -54,12 +55,16 @@ class TelemetryManager:
         """
         Retrieves the anonymous user ID from settings, or creates a new one.
         """
-        user_id = get_setting('telemetry_user_id')
-        if not user_id:
-            user_id = str(uuid.uuid4())
-            set_setting('telemetry_user_id', user_id)
-            logging.info(f"Generated new telemetry user ID: {user_id}")
-        return user_id
+        db_session = session_manager.get_session()
+        try:
+            user_id = get_setting(key='telemetry_user_id', conn=db_session)
+            if not user_id:
+                user_id = str(uuid.uuid4())
+                set_setting(key='telemetry_user_id', value=user_id, conn=db_session)
+                logging.info(f"Generated new telemetry user ID: {user_id}")
+            return user_id
+        finally:
+            db_session.close()
 
     def track_event(self, event_name, properties=None):
         """

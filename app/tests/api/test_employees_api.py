@@ -6,7 +6,8 @@ from sqlalchemy.orm import sessionmaker, Session
 from typing import Generator
 
 # Adjust these imports based on your project structure
-from app.api.models import Base, Employee, EmployeeCreate, EmployeeResponse, EmployeeUpdate # SQLAlchemy model for direct checks
+from app.db.connection import Base
+from app.api.models import Employee, EmployeeCreate, EmployeeResponse, EmployeeUpdate # SQLAlchemy model for direct checks
 from app.api.employees import router as employees_router
 from app.api.dependencies import get_db # The actual dependency to be overridden
 

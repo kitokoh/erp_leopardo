@@ -7,11 +7,6 @@ from PyQt5.QtWidgets import QMessageBox, QApplication
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt, QLibraryInfo, QTranslator, QLocale
 
-# Manually add project root to sys.path to fix import errors
-project_root_for_imports = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if project_root_for_imports not in sys.path:
-    sys.path.insert(0, project_root_for_imports)
-
 from app.db.session_manager import session_manager
 from app.db.db_seed import seed_all_data
 
@@ -57,12 +52,14 @@ def initialize_database(config, project_root):
             "Une erreur critique est survenue lors de la migration de la base de données.",
             f"Alembic Error:\n{e.stderr}"
         )
+    except FileNotFoundError:
+        handle_critical_error("Commande de migration non trouvée.", "sys.executable ou le module alembic est introuvable.")
     except Exception as e:
         handle_critical_error("Une erreur inattendue est survenue lors des migrations.", str(e))
 
-    # 2. Initialize the SQLAlchemy engine and session
+    # 2. Initialize the SQLAlchemy engine and session for the application
     try:
-        session_manager.initialize(config['database_url'])
+        session_manager.initialize_engine_and_session(config['database_path'])
         logging.info("SQLAlchemy engine and session have been initialized.")
     except Exception as e:
         handle_critical_error("Une erreur critique est survenue lors de l'initialisation de la connexion à la base de données.", str(e))
@@ -71,11 +68,15 @@ def initialize_database(config, project_root):
     if not db_exists:
         logging.info("Database was newly created. Running initial data seeding...")
         try:
-            with session_manager.get_session() as db_session:
-                seed_all_data(db_session)
-                logging.info("Data seeding process completed.")
+            db_session = session_manager.get_session()
+            seed_all_data(db_session)
+            logging.info("Data seeding process completed.")
         except Exception as e_seed:
             logging.error(f"An error occurred during data seeding: {e_seed}", exc_info=True)
+        finally:
+            if db_session:
+                db_session.close()
+                logging.info("Seeding database session closed.")
 
     # 4. Initialize the user profile management database
     from app.user_profile_management.database_setup import create_tables as create_user_profile_tables, seed_data as seed_user_profile_data

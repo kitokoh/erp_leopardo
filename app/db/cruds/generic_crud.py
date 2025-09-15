@@ -25,13 +25,18 @@ from sqlalchemy.exc import SQLAlchemyError # For SQLAlchemy specific errors
 def _is_sqlalchemy_obj(conn_obj):
     return hasattr(conn_obj, 'execute') and not hasattr(conn_obj, 'cursor')
 
+from app.db.session_manager import session_manager
+
 # Helper to manage connection lifecycle for CRUD functions
 def _manage_conn(func):
     def wrapper(*args, **kwargs):
-        from ..connection import get_db_connection
         conn_passed = kwargs.get('conn')
         conn_is_external = conn_passed is not None
-        conn_to_use = conn_passed if conn_is_external else get_db_connection()
+
+        if conn_is_external:
+            conn_to_use = conn_passed
+        else:
+            conn_to_use = session_manager.get_session()
 
         try:
             kwargs_for_func = {**kwargs, 'conn': conn_to_use}

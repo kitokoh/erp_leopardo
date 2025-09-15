@@ -3,8 +3,11 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 import datetime
 
-# Use the central Base from the session_manager
-from app.db.session_manager import Base
+# Attempt to import Base from the project's existing DB setup
+# This path might need adjustment based on your project structure.
+# If 'db.connection.Base' is standard, this should work.
+# Otherwise, we might need to define a local Base or get it passed.
+from app.db.connection import Base # Assuming your project uses a Base like this
 
 
 class CalculationHistory(Base):

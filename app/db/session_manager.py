@@ -1,51 +1,46 @@
+import os
 import logging
-from contextlib import contextmanager
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.ext.declarative import declarative_base
-
-Base = declarative_base()
 
 class DatabaseSessionManager:
-    def __init__(self):
-        self._engine = None
-        self._session_maker = None
-        self.db_url = None
+    _instance = None
 
-    def initialize(self, db_url: str):
-        if self.db_url == db_url and self._engine is not None:
-            logging.info("Database engine is already initialized with the same URL.")
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(DatabaseSessionManager, cls).__new__(cls)
+        return cls._instance
+
+    def __init__(self):
+        if hasattr(self, '_initialized') and self._initialized:
             return
 
-        self.db_url = db_url
-        logging.info(f"Initializing database engine with URL: {self.db_url}")
-        self._engine = create_engine(self.db_url, echo=False)
-        self._session_maker = sessionmaker(autocommit=False, autoflush=False, bind=self._engine)
-        logging.info("Database engine and session maker initialized.")
+        self.engine = None
+        self.SessionLocal = None
+        self._initialized = True
 
-    @contextmanager
+    def initialize_engine_and_session(self, db_path: str):
+        if self.engine is None:
+            try:
+                db_url = f"sqlite:///{db_path}"
+                self.engine = create_engine(db_url, connect_args={"check_same_thread": False})
+                self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+                logging.info(f"Database engine and session initialized for path: {db_path}")
+            except Exception as e:
+                logging.critical(f"Failed to initialize database engine: {e}", exc_info=True)
+                raise
+
     def get_session(self) -> Session:
-        """Provide a transactional scope around a series of operations."""
-        if self._session_maker is None:
-            raise Exception("Session manager has not been initialized. Call initialize() first.")
+        if self.SessionLocal is None:
+            logging.error("SessionLocal not initialized. Call initialize_engine_and_session first.")
+            raise RuntimeError("Database session factory is not initialized.")
+        return self.SessionLocal()
 
-        session = self._session_maker()
-        try:
-            yield session
-            session.commit()
-        except Exception as e:
-            logging.error(f"Session rollback due to exception: {e}", exc_info=True)
-            session.rollback()
-            raise
-        finally:
-            session.close()
+    def get_engine(self):
+        if self.engine is None:
+            logging.error("Engine not initialized. Call initialize_engine_and_session first.")
+            raise RuntimeError("Database engine is not initialized.")
+        return self.engine
 
-def get_db():
-    """
-    Dependency for FastAPI to get a database session.
-    """
-    with session_manager.get_session() as db:
-        yield db
-
-# Global instance of the session manager
+# Singleton instance
 session_manager = DatabaseSessionManager()

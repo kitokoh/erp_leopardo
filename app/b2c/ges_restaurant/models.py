@@ -1,7 +1,26 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from app.db.session_manager import Base
+import sys
+import os
+
+# Adjust path to import from the root 'db' module for Base and engine configuration
+# This assumes 'b2c' is at the same level as 'db', 'gui', etc.
+# PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# if PROJECT_ROOT not in sys.path:
+#    sys.path.insert(0, PROJECT_ROOT)
+
+# Instead of trying to re-import Base from db.connection,
+# we should use the application's existing Base.
+# For now, let's define a new Base for this module if it's meant to be semi-independent
+# or potentially part of a different DB.
+# However, the request implies integration, so ideally we would use the existing Base.
+# This will require careful handling of imports when integrating with the main app's DB setup.
+
+# For now, to make this file self-contained for definition:
+# from db.connection import Base # This would be the ideal if paths are set up correctly for modules
+# If that fails, we define a local Base and figure out integration later.
+from app.db.connection import Base
 from app.models.db.products.product import Product as Products
 
 

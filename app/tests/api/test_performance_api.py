@@ -3,7 +3,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from typing import Dict
 
-# Corrected, absolute imports
+# Adjust these imports based on your project structure
+from app.db.connection import Base
 from app.models.db.users.user import User
 from app.models.db.performance.goal import GoalStatusEnum
 from app.api.models import GoalCreate
