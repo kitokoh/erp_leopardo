@@ -65,6 +65,35 @@ def generate_cover_page_pdf(
     db_conn=None
 ) -> bool:
     pass
+
+def generate_cover_page_html(db_session, context_data):
+    """
+    Generates an HTML cover page.
+    This is a placeholder implementation to satisfy the test.
+    """
+    from app.db.cruds.clients.clients_crud import get_client_by_id
+    from app.db.cruds.projects.projects_crud import get_project_by_id
+    from app.db.cruds.misc.companies_crud import get_default_company
+
+    client_id = context_data.get("client_id")
+    project_id = context_data.get("project_id")
+    document_title = context_data.get("document_title")
+
+    client = get_client_by_id(db=db_session, client_id=client_id)
+    project = get_project_by_id(db=db_session, project_id=project_id)
+    exporter = get_default_company(db=db_session)
+
+    html = f"""
+    <html>
+        <body>
+            <h1>{document_title}</h1>
+            <h2>Exporter: {exporter['company_name']}</h2>
+            <h2>Client: {client.client_name}</h2>
+            <h3>Project: {project.get('project_name')}</h3>
+        </body>
+    </html>
+    """
+    return html
 #     """
 #     Generates a PDF cover page using ReportLab logic via pagedegrde module.
 

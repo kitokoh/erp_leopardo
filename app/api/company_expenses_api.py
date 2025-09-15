@@ -9,7 +9,7 @@ from .models import (
     UserInDB
 )
 from .auth import get_current_active_user
-from app.api.dependencies import get_db_session as get_db
+from app.db.session_manager import get_db
 
 
 router = APIRouter(

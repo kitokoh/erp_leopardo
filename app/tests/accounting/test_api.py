@@ -9,11 +9,11 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 # Adjust imports based on your project structure
-from app.services.api.main import app
-from app.services.api.dependencies import get_db_session
+from app.api.main import app
+from app.api.dependencies import get_db
 from app.accounting import models as acc_pydantic_models
 from app.accounting import cruds as acc_cruds
-from app.db.connection import Base as MainBase
+from app.db.session_manager import Base as MainBase
 
 # Use the same in-memory SQLite setup as in test_cruds.py
 from .test_cruds import SQLALCHEMY_DATABASE_URL, TestingSessionLocal, engine
@@ -26,7 +26,7 @@ def override_get_db_session() -> Generator[Session, None, None]:
     finally:
         db.close()
 
-app.dependency_overrides[get_db_session] = override_get_db_session
+app.dependency_overrides[get_db] = override_get_db_session
 
 class TestAccountingAPI(unittest.TestCase):
     def setUp(self):

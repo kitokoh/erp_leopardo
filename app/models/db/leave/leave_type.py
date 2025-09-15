@@ -1,5 +1,17 @@
 from sqlalchemy import Column, Integer, String
-from app.db.connection import Base
+from app.db.session_manager import Base
+from pydantic import BaseModel
+from typing import Optional
+
+class LeaveTypeBase(BaseModel):
+    name: str
+    default_days_entitled: Optional[int] = None
+
+    class Config:
+        orm_mode = True
+
+class LeaveTypeCreate(LeaveTypeBase):
+    pass
 
 class LeaveType(Base):
     __tablename__ = 'leave_types'

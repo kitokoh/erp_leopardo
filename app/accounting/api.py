@@ -5,7 +5,7 @@ from decimal import Decimal
 from datetime import date
 
 from . import cruds, models # models here refers to Pydantic models from accounting.models
-from app.api.dependencies import get_db_session # Assuming a general DB session dependency
+from app.db.session_manager import get_db as get_db_session # Assuming a general DB session dependency
 
 router = APIRouter(
     prefix="/accounting",

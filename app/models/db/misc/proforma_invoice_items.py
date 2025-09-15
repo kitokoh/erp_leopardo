@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, REAL
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from app.db.connection import Base
+from app.db.session_manager import Base
 from app.models.db.products.product import Product
 
 class ProformaInvoiceItem(Base):

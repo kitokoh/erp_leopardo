@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Text
-from app.db.connection import Base
+from app.db.session_manager import Base
 
 class DocumentCategory(Base):
     __tablename__ = 'document_categories'

@@ -17,20 +17,21 @@ def handle_critical_error(message, details=""):
         print(f"CRITICAL ERROR: {message}\n{details}")
         sys.exit(1)
     else:
+        # Ensure QApplication exists before showing a message box
+        app = QApplication.instance()
+        if not app:
+            app = QApplication(sys.argv)
         QMessageBox.critical(None, "Erreur Critique", f"{message}\n{details}")
         sys.exit(1)
 
 def initialize_database(config, project_root):
     """
     Handles the entire database setup process in a robust, cross-platform way.
-    - Runs Alembic migrations in a separate process to avoid silent exits.
-    - Sets up the SQLAlchemy engine and session.
-    - Seeds the database if it was newly created.
     """
     db_path = config.get('database_path')
     db_exists = os.path.exists(db_path) if db_path else False
 
-    # 1. Run Alembic migrations using subprocess to ensure it completes
+    # 1. Run Alembic migrations
     try:
         logging.info("Running Alembic migrations via subprocess...")
         alembic_command = [sys.executable, "-m", "alembic", "upgrade", "head"]
@@ -42,8 +43,6 @@ def initialize_database(config, project_root):
             alembic_command,
             check=True, capture_output=True, text=True, cwd=project_root, env=env
         )
-        import time
-        time.sleep(2) # HACK: Wait for file system to catch up
         logging.info("Alembic stdout:\n" + result.stdout)
         if result.stderr:
             logging.warning("Alembic stderr:\n" + result.stderr)
@@ -68,7 +67,6 @@ def initialize_database(config, project_root):
     # 3. Seed the database if it was newly created
     if not db_exists:
         logging.info("Database was newly created. Running initial data seeding...")
-        db_session = None
         try:
             db_session = session_manager.get_session()
             seed_all_data(db_session)
@@ -80,7 +78,7 @@ def initialize_database(config, project_root):
                 db_session.close()
                 logging.info("Seeding database session closed.")
 
-    # 4. Initialize the user profile management database (separate logic)
+    # 4. Initialize the user profile management database
     from app.user_profile_management.database_setup import create_tables as create_user_profile_tables, seed_data as seed_user_profile_data
     try:
         logging.info("Initializing user profile management database...")

@@ -9,7 +9,7 @@ from datetime import date, datetime
 # Adjust these imports based on your project structure
 from app.db.connection import Base
 from app.models.db.users.user import User
-from app.models.db.users.employee import Employee
+from app.models.db.employees.employee import Employee
 from app.models.db.leave.leave_type import LeaveType
 from app.models.db.leave.leave_balance import LeaveBalance
 from app.models.db.leave.leave_request import LeaveRequest, LeaveRequestStatusEnum
@@ -20,7 +20,7 @@ from app.api.models import (
     LeaveRequestCreate, LeaveRequestResponse, LeaveRequestUpdate
 )
 from app.api.leave import router as leave_router # The router to test
-from app.api.dependencies import get_db         # The actual DB dependency
+from app.db.session_manager import get_db         # The actual DB dependency
 from app.api.auth import get_current_active_user # The actual auth dependency
 
 from app.db.cruds.users import employees_crud

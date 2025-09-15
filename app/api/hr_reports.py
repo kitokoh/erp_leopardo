@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from datetime import datetime, date # Ensure both are imported
 
-from app.api.dependencies import get_db_session as get_db
+from app.db.session_manager import get_db
 from .auth import get_current_active_user
 from .models import (
     UserInDB,

@@ -3,6 +3,7 @@ from sqlalchemy.engine.row import RowProxy
 from sqlalchemy.sql import text
 from ...connection import get_db_connection
 import logging
+from app.db.generic_crud import _manage_conn
 
 def _convert_to_dict(row):
     """
@@ -78,10 +79,8 @@ def get_status_setting_by_id(id: int, conn = None) -> dict | None:
         if not conn_is_external and conn:
             conn.close()
 
+@_manage_conn
 def get_all_status_settings(type_filter: str = None, conn = None) -> list[dict]:
-    conn_is_external = conn is not None
-    if not conn_is_external:
-        conn = get_db_connection()
     """
     Retrieves all status settings, optionally filtered by type.
     """
@@ -112,9 +111,6 @@ def get_all_status_settings(type_filter: str = None, conn = None) -> list[dict]:
     except Exception as e: # Changed to general Exception
         logging.error(f"Database error in get_all_status_settings (filter: {type_filter}): {e}", exc_info=True)
         return []
-    finally:
-        if not conn_is_external and conn:
-            conn.close()
 
 
 def add_status_setting(status_name: str, status_type: str, color_hex: str = None, sort_order: int = 0, conn = None) -> int | bool:

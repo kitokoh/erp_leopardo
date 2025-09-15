@@ -1,11 +1,9 @@
 from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Text, DateTime
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
 
-# DATABASE_URL = "sqlite:///./botpress_integration.db"  # Example SQLite URL - Should be managed centrally
-
-from app.db.connection import Base, engine # Use the central Base
+# Use the central Base from the session_manager
+from app.db.session_manager import Base
 
 class UserBotpressSettings(Base):
     __tablename__ = "user_botpress_settings"

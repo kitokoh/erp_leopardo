@@ -1,7 +1,6 @@
 # Database models for the calculator module
 
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
-from sqlalchemy.orm import declarative_base # Using modern declarative_base
 import datetime
 
 # Attempt to import Base from the project's existing DB setup

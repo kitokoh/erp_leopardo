@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 from app.api.products import router as products_router
 from app.api.auth import get_current_active_user # Import the dependency
 from app.db.cruds.products import products_crud
-from models import ProductCreate, ProductResponse, ProductUpdate, UserInDB # Pydantic models
+from api.models import ProductCreate, ProductResponse, ProductUpdate, UserInDB
 
 # Global variable for the database connection
 DATABASE_URL = ":memory:"

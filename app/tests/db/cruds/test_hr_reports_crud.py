@@ -5,7 +5,7 @@ from typing import Generator, List as PyList, Optional
 from datetime import date, datetime, timedelta
 
 # Adjust imports based on your project structure
-from app.db.connection import Base
+from db.session_manager import Base
 from app.models.db.employees.employee import Employee
 from app.models.db.leave.leave_type import LeaveType
 from app.models.db.leave.leave_request import LeaveRequest, LeaveRequestStatusEnum

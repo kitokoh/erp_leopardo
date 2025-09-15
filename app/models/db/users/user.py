@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Foreign
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func, true, false
 from app.models.db.users.role import Role
-from app.db.connection import Base
+from app.db.session_manager import Base
 
 class User(Base):
     __tablename__ = 'users'

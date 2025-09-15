@@ -4,17 +4,14 @@ from sqlalchemy import (
     create_engine, Column, String, Integer, Float, DateTime, Text, ForeignKey,
     Enum as SQLAlchemyEnum, UniqueConstraint, Boolean, Date, Table, Numeric
 )
-from sqlalchemy.orm import relationship, declarative_base
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from pydantic import BaseModel, Field, EmailStr, model_validator
 from typing import Optional, List, Dict, Any
 from datetime import date, datetime
 
-# SQLAlchemy Base for accounting module
-# It's good practice to have a Base per module if they are somewhat independent,
-# or use a shared Base from a central location (e.g., app.db.base.Base)
-# For now, let's define it here. If a central Base exists, this should be updated.
-from db.connection import Base # Use the central Base
+# Use the central Base from the session_manager
+from app.db.session_manager import Base
 
 # --- Enum Definitions ---
 
@@ -50,6 +47,7 @@ class FiscalYearStatusEnum(enum.Enum):
 
 class ChartOfAccounts(Base):
     __tablename__ = "acc_chart_of_accounts"
+    __table_args__ = {'extend_existing': True}
     # __table_args__ = {'schema': 'accounting'} # Removed for SQLite compatibility
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -71,6 +69,7 @@ class ChartOfAccounts(Base):
 
 class JournalEntry(Base):
     __tablename__ = "acc_journal_entries"
+    __table_args__ = {'extend_existing': True}
     # __table_args__ = {'schema': 'accounting'} # Removed for SQLite compatibility
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -110,7 +109,7 @@ class JournalItem(Base):
 
     __table_args__ = (
         UniqueConstraint('journal_entry_id', 'account_id', 'debit_amount', 'credit_amount', name='uq_journal_item_detail'),
-        # {'schema': 'accounting'} # Removed schema for SQLite
+        {'extend_existing': True},
     )
 
     def __repr__(self):
@@ -118,6 +117,7 @@ class JournalItem(Base):
 
 class FinancialStatement(Base):
     __tablename__ = "acc_financial_statements"
+    __table_args__ = {'extend_existing': True}
     # __table_args__ = {'schema': 'accounting'} # Removed for SQLite compatibility
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -139,6 +139,7 @@ class FinancialStatement(Base):
 
 class TaxRate(Base):
     __tablename__ = "acc_tax_rates"
+    __table_args__ = {'extend_existing': True}
     # __table_args__ = {'schema': 'accounting'} # Removed for SQLite compatibility
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -157,6 +158,7 @@ class TaxRate(Base):
 
 class Currency(Base):
     __tablename__ = "acc_currencies"
+    __table_args__ = {'extend_existing': True}
     # __table_args__ = {'schema': 'accounting'} # Removed for SQLite compatibility
 
     code = Column(String(3), primary_key=True) # e.g., "USD", "EUR", "JPY"
@@ -173,6 +175,7 @@ class Currency(Base):
 
 class FiscalYear(Base):
     __tablename__ = "acc_fiscal_years"
+    __table_args__ = {'extend_existing': True}
     # __table_args__ = {'schema': 'accounting'} # Removed for SQLite compatibility
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))

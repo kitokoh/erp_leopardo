@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean
-from app.db.connection import Base
+from app.db.session_manager import Base
 
 class StatusSetting(Base):
     __tablename__ = 'status_settings'

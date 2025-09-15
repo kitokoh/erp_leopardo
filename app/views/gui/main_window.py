@@ -117,6 +117,7 @@ class DocumentManager(QMainWindow):
         self.config = AppConfig.copy()
         # ... (most of __init__ remains the same) ...
         self.client_controller_instance = ClientController()
+        self.module_states = {}
         # ...
         self._load_module_states()
         # ...
@@ -125,6 +126,165 @@ class DocumentManager(QMainWindow):
         self.setup_ui_main()
         # ...
         self.init_or_update_download_monitor()
+
+    def setup_ui_main(self):
+        self.setWindowTitle("Client Document Manager")
+        self.setGeometry(100, 100, 1400, 900)
+        try:
+            self.setWindowIcon(QIcon(":/icons/app_icon.png"))
+        except Exception as e:
+            logging.warning(f"Could not load app icon: {e}")
+
+        # Central Widget and Main Layout
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        main_layout = QVBoxLayout(central_widget)
+
+        # Main Splitter
+        self.main_splitter = QSplitter(Qt.Horizontal)
+        main_layout.addWidget(self.main_splitter)
+
+        # --- Left Pane ---
+        left_pane = QWidget()
+        left_layout = QVBoxLayout(left_pane)
+        self.main_splitter.addWidget(left_pane)
+
+        # Filter GroupBox
+        filter_groupbox = QGroupBox("Filters")
+        filter_layout = QFormLayout(filter_groupbox)
+
+        self.client_name_filter_input = QLineEdit()
+        self.client_name_filter_input.setPlaceholderText("Search by client name...")
+        filter_layout.addRow("Client Name:", self.client_name_filter_input)
+
+        self.company_name_filter_input = QLineEdit()
+        self.company_name_filter_input.setPlaceholderText("Search by company name...")
+        filter_layout.addRow("Company Name:", self.company_name_filter_input)
+
+        self.country_filter_combo = QComboBox()
+        filter_layout.addRow("Country:", self.country_filter_combo)
+
+        self.status_filter_button = QPushButton("Filter by Status")
+        filter_layout.addRow(self.status_filter_button)
+
+        date_filter_layout = QHBoxLayout()
+        self.start_date_filter = QDateEdit(QDate.currentDate().addYears(-1))
+        self.start_date_filter.setCalendarPopup(True)
+        self.end_date_filter = QDateEdit(QDate.currentDate())
+        self.end_date_filter.setCalendarPopup(True)
+        date_filter_layout.addWidget(QLabel("From:"))
+        date_filter_layout.addWidget(self.start_date_filter)
+        date_filter_layout.addWidget(QLabel("To:"))
+        date_filter_layout.addWidget(self.end_date_filter)
+        filter_layout.addRow("Date Range:", date_filter_layout)
+
+        self.include_deleted_checkbox = QCheckBox("Include Archived")
+        filter_layout.addRow(self.include_deleted_checkbox)
+
+        sort_layout = QHBoxLayout()
+        self.sort_combo = QComboBox()
+        self.sort_combo.addItem("Creation Date", "created_at")
+        self.sort_combo.addItem("Name", "client_name")
+        self.sort_combo.addItem("Company", "company_name")
+
+        self.sort_order_button = QPushButton("ASC")
+        self.sort_order_button.setCheckable(True)
+        self.sort_order_button.clicked.connect(lambda checked: self.sort_order_button.setText("DESC" if checked else "ASC"))
+
+        sort_layout.addWidget(self.sort_combo)
+        sort_layout.addWidget(self.sort_order_button)
+        filter_layout.addRow("Sort by:", sort_layout)
+
+        left_layout.addWidget(filter_groupbox)
+
+        # Saved Filters GroupBox
+        saved_filters_groupbox = QGroupBox("Saved Filters")
+        saved_filters_layout = QVBoxLayout(saved_filters_groupbox)
+
+        self.load_filter_combo = QComboBox()
+        saved_filters_layout.addWidget(self.load_filter_combo)
+
+        save_filter_layout = QHBoxLayout()
+        self.saved_filter_name_input = QLineEdit()
+        self.saved_filter_name_input.setPlaceholderText("New filter name...")
+        self.save_filter_button = QPushButton("Save Current Filter")
+        save_filter_layout.addWidget(self.saved_filter_name_input)
+        save_filter_layout.addWidget(self.save_filter_button)
+        saved_filters_layout.addLayout(save_filter_layout)
+
+        self.manage_filters_button = QPushButton("Manage Saved Filters")
+        saved_filters_layout.addWidget(self.manage_filters_button)
+        left_layout.addWidget(saved_filters_groupbox)
+
+        # Client List
+        self.client_list_widget = QListWidget()
+        self.client_list_widget.setAlternatingRowColors(True)
+        left_layout.addWidget(self.client_list_widget)
+
+        # Pagination
+        pagination_layout = QHBoxLayout()
+        self.prev_page_button = QPushButton("<< Previous")
+        self.page_label = QLabel("Page 1 / 1")
+        self.next_page_button = QPushButton("Next >>")
+        pagination_layout.addWidget(self.prev_page_button)
+        pagination_layout.addStretch()
+        pagination_layout.addWidget(self.page_label)
+        pagination_layout.addStretch()
+        pagination_layout.addWidget(self.next_page_button)
+        left_layout.addLayout(pagination_layout)
+
+        self.client_count_label = QLabel("0 clients found.")
+        self.client_count_label.setAlignment(Qt.AlignCenter)
+        left_layout.addWidget(self.client_count_label)
+
+        # Client Actions
+        client_actions_layout = QHBoxLayout()
+        self.add_client_button = QPushButton(QIcon.fromTheme("list-add"), "Add Client")
+        self.archive_client_button = QPushButton(QIcon.fromTheme("edit-delete"), "Archive Client")
+        self.delete_client_button = QPushButton(QIcon.fromTheme("user-trash"), "Delete Client")
+        client_actions_layout.addWidget(self.add_client_button)
+        client_actions_layout.addWidget(self.archive_client_button)
+        client_actions_layout.addWidget(self.delete_client_button)
+        left_layout.addLayout(client_actions_layout)
+
+        # --- Right Pane ---
+        self.client_tabs_widget = QTabWidget()
+        self.client_tabs_widget.setTabsClosable(True)
+        self.client_tabs_widget.setMovable(True)
+        self.main_splitter.addWidget(self.client_tabs_widget)
+
+        # Set splitter sizes
+        self.main_splitter.setSizes([400, 1000])
+
+        # --- Connect Signals and Slots ---
+        self.client_name_filter_input.textChanged.connect(self.load_clients_from_db_slot)
+        self.company_name_filter_input.textChanged.connect(self.load_clients_from_db_slot)
+        self.country_filter_combo.currentIndexChanged.connect(self.load_clients_from_db_slot)
+        self.status_filter_button.clicked.connect(self.open_multi_select_status_dialog)
+        self.start_date_filter.dateChanged.connect(self.load_clients_from_db_slot)
+        self.end_date_filter.dateChanged.connect(self.load_clients_from_db_slot)
+        self.include_deleted_checkbox.stateChanged.connect(self.load_clients_from_db_slot)
+        self.sort_combo.currentIndexChanged.connect(self.load_clients_from_db_slot)
+        self.sort_order_button.clicked.connect(self.load_clients_from_db_slot)
+
+        self.load_filter_combo.currentIndexChanged.connect(self.apply_saved_filter_slot)
+        self.save_filter_button.clicked.connect(self.save_current_filter_slot)
+
+        self.client_list_widget.itemDoubleClicked.connect(lambda item: self.open_client_tab_by_id(item.data(Qt.UserRole)))
+
+        self.client_tabs_widget.tabCloseRequested.connect(self.client_tabs_widget.removeTab)
+
+        self.main_splitter.splitterMoved.connect(self.save_splitter_state)
+
+        # Initialize some values
+        self.current_page = 1
+        self.clients_per_page = 50
+        self.selected_status_ids_filter = []
+        self.total_filtered_clients = 0
+
+        # Load initial data
+        self.load_countries_into_filter_combo()
+        self.load_clients_from_db_slot()
         self.populate_saved_filters_combo()
         # ...
         # self.voice_input_service = VoiceInputService(self)

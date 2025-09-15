@@ -8,21 +8,19 @@ from ..generic_crud import _manage_conn
 
 # --- Countries CRUD ---
 @_manage_conn
-def get_country_by_name(name: str, conn: sqlite3.Connection = None) -> dict | None:
+def get_country_by_name(name: str, conn: Session = None) -> dict | None:
     logger_crud = logging.getLogger(__name__) # Use specific logger for this CRUD
-    cursor=conn.cursor()
     try:
         logger_crud.info(f"locations_crud.get_country_by_name: Querying for Name='{name}'")
-        cursor.execute("SELECT * FROM countries WHERE country_name = ?",(name,))
-        row=cursor.fetchone()
-        if row:
-            logger_crud.info(f"locations_crud.get_country_by_name: Found country '{name}' with data: {dict(row)}")
-            return {key: row[key] for key in row.keys()}
+        country = conn.query(Country).filter(Country.country_name == name).first()
+        if country:
+            logger_crud.info(f"locations_crud.get_country_by_name: Found country '{name}' with data: {country.__dict__}")
+            return country.__dict__
         else:
             logger_crud.warning(f"locations_crud.get_country_by_name: Country '{name}' NOT found.")
             return None
 
-    except sqlite3.Error as e:
+    except Exception as e:
         logging.error(f"Error getting country by name '{name}': {e}")
         return None
 
@@ -66,7 +64,7 @@ def get_or_add_country(country_name: str, db: Session) -> Country | None:
         return None
 
 @_manage_conn
-def add_country(data: dict, conn: sqlite3.Connection = None) -> int | None:
+def add_country(data: dict, conn: Session = None) -> int | None:
     """
     Adds a new country. Expects data['country_name'].
     This is a simplified version. Consider using get_or_add_country for more robust addition.
@@ -80,16 +78,10 @@ def add_country(data: dict, conn: sqlite3.Connection = None) -> int | None:
     if existing_country:
         return existing_country['country_id']
 
-    now = datetime.utcnow().isoformat() + "Z"
-    sql = "INSERT INTO countries (country_name, created_at, updated_at) VALUES (?, ?, ?)"
-    params = (country_name, now, now)
-    cursor = conn.cursor()
-    try:
-        cursor.execute(sql, params)
-        return cursor.lastrowid
-    except sqlite3.Error as e:
-        logging.error(f"Database error in add_country for '{country_name}': {e}")
-        return None
+    new_country = Country(country_name=country_name)
+    conn.add(new_country)
+    conn.commit()
+    return new_country.country_id
 
 @_manage_conn
 def get_all_countries(conn: Session = None) -> list[dict]:
@@ -113,14 +105,13 @@ def get_all_countries(conn: Session = None) -> list[dict]:
 
 # --- Cities CRUD ---
 @_manage_conn
-def get_city_by_name_and_country_id(name: str, country_id: int, conn: sqlite3.Connection = None) -> dict | None:
-    cursor=conn.cursor()
+def get_city_by_name_and_country_id(name: str, country_id: int, conn: Session = None) -> dict | None:
     try:
-        cursor.execute("SELECT * FROM cities WHERE city_name = ? AND country_id = ?",(name,country_id))
-        row=cursor.fetchone()
-        # return dict(row) if row else None
-        return {key: row[key] for key in row.keys()} if row else None
-    except sqlite3.Error as e:
+        city = conn.query(City).filter(City.city_name == name, City.country_id == country_id).first()
+        if city:
+            return city.__dict__
+        return None
+    except Exception as e:
         logging.error(f"Error getting city by name '{name}' and country_id {country_id}: {e}")
         return None
 
@@ -137,7 +128,7 @@ def get_city_by_id(id: int, conn: sqlite3.Connection = None) -> dict | None:
         return None
 
 @_manage_conn
-def add_city(data: dict, conn: sqlite3.Connection = None) -> int | None:
+def add_city(data: dict, conn: Session = None) -> int | None:
     """
     Adds a new city to the Cities table.
     Expects data['city_name'] and data['country_id'].
@@ -146,21 +137,14 @@ def add_city(data: dict, conn: sqlite3.Connection = None) -> int | None:
         logging.error("add_city requires 'city_name' and 'country_id'.")
         return None
 
-    # Simplified: direct insert without all fields from original schema example
-    now = datetime.utcnow().isoformat() + "Z"
-    sql = "INSERT INTO cities (city_name, country_id, created_at, updated_at) VALUES (?, ?, ?, ?)"
-    params = (data['city_name'], data['country_id'], now, now)
-    cursor = conn.cursor()
-    try:
-        cursor.execute(sql, params)
-        return cursor.lastrowid
-    except sqlite3.IntegrityError:
-        logging.warning(f"City '{data['city_name']}' likely already exists for country_id {data['country_id']}.")
-        existing_city = get_city_by_name_and_country_id(data['city_name'], data['country_id'], conn=conn)
-        return existing_city['city_id'] if existing_city else None
-    except sqlite3.Error as e:
-        logging.error(f"Database error in add_city for '{data['city_name']}': {e}")
-        return None
+    existing_city = get_city_by_name_and_country_id(data['city_name'], data['country_id'], conn=conn)
+    if existing_city:
+        return existing_city['city_id']
+
+    new_city = City(city_name=data['city_name'], country_id=data['country_id'])
+    conn.add(new_city)
+    conn.commit()
+    return new_city.city_id
 
 def get_or_add_city(city_name: str, country_id: int, db: Session) -> City | None:
     if not city_name or not country_id:
