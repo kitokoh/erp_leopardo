@@ -65,6 +65,7 @@ def generate_cover_page_pdf(
     db_conn=None
 ) -> bool:
     pass
+
 def generate_cover_page_html(db_session, context_data):
     """
     Generates an HTML cover page.
@@ -80,7 +81,7 @@ def generate_cover_page_html(db_session, context_data):
 
     client = get_client_by_id(db=db_session, client_id=client_id)
     project = get_project_by_id(db=db_session, project_id=project_id)
-    exporter = get_default_company(conn=db_session)
+    exporter = get_default_company(db=db_session)
 
     html = f"""
     <html>
@@ -93,19 +94,6 @@ def generate_cover_page_html(db_session, context_data):
     </html>
     """
     return html
-
-
-def generate_cover_page_pdf(
-    client_id: int,
-    company_id: int, # Seller company ID
-    language_code: str,
-    output_pdf_path: str,
-    project_id: int = None,
-    document_type_for_context: str = None, # e.g., "Proforma Invoice", "Technical Proposal"
-    additional_context_overrides: dict = None, # For overriding specific config_dict fields
-    db_conn=None
-) -> bool:
-    pass
 #     """
 #     Generates a PDF cover page using ReportLab logic via pagedegrde module.
 

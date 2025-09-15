@@ -9,14 +9,12 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 # Mock PyQt5 classes before they are imported by the application
-# This is crucial to prevent the "QWidget: Must construct a QApplication before a QWidget" error
-# in a non-GUI test environment.
 mock_q_application = MagicMock()
 mock_q_dialog = MagicMock()
 mock_q_main_window = MagicMock()
 
 # We need to return QDialog.Accepted from login_dialog.exec_() to proceed to the main window part.
-mock_q_dialog.exec_ = MagicMock(return_value=1) # QDialog.Accepted is 1
+mock_q_dialog.exec_.return_value = 1 # QDialog.Accepted is 1
 mock_login_dialog_instance = MagicMock()
 mock_login_dialog_instance.exec_.return_value = 1
 
@@ -43,10 +41,13 @@ class TestStartup(unittest.TestCase):
         patcher_main_window.stop()
 
         # Clean up the test database file if it was created
-        if os.path.exists('app_data_test.db'):
-            os.remove('app_data_test.db')
-        if os.path.exists('user_profiles_test.db'):
-            os.remove('user_profiles_test.db')
+        db_path = os.path.join(project_root, 'app', 'app_data.db')
+        if os.path.exists(db_path):
+            os.remove(db_path)
+
+        user_db_path = os.path.join(project_root, 'user_profile_data.db')
+        if os.path.exists(user_db_path):
+            os.remove(user_db_path)
 
     def test_application_startup_sequence(self):
         """
