@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %} {# Si Crispy Forms est utilisé pour le ClientFilterForm #}
+{% load static %} {# Pour les URLs statiques si besoin #}
+
+{% block title %}
+    Liste des Clients {{ block.super }}
+    {% if request.session.active_company_name %}
+        ({{ request.session.active_company_name }})
+    {% endif %}
+{% endblock title %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>
+            Liste des Clients
+            {% if request.session.active_company_name %}
+                <small class="text-muted fs-5">- {{ request.session.active_company_name }}</small>
+            {% endif %}
+        </h2>
+        <a href="{% url 'clients:create' %}" class="btn btn-primary">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-plus-circle-fill" viewBox="0 0 16 16">
+                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8.5 4.5a.5.5 0 0 0-1 0v3h-3a.5.5 0 0 0 0 1h3v3a.5.5 0 0 0 1 0v-3h3a.5.5 0 0 0 0-1h-3v-3z"/>
+            </svg>
+            Ajouter un Client
+        </a>
+    </div>
+
+    <!-- Formulaire de Filtre et Recherche -->
+    <form method="get" action="{% url 'clients:list' %}" id="client-filter-form"
+          hx-get="{% url 'clients:list' %}"
+          hx-target="#client-table-container"
+          hx-swap="outerHTML"
+          hx-indicator="#loading-indicator"
+          class="mb-3 p-3 bg-light rounded border">
+        {% csrf_token %} {# Pas nécessaire pour GET, mais ne fait pas de mal #}
+        <div class="row g-2 align-items-end">
+            <div class="col-md-5">
+                {# {{ filter_form.search_query|as_crispy_field }} #}
+                <label for="{{ filter_form.search_query.id_for_label }}" class="form-label">{{ filter_form.search_query.label }}</label>
+                {{ filter_form.search_query }}
+            </div>
+            <div class="col-md-4">
+                {# {{ filter_form.is_active|as_crispy_field }} #}
+                <label for="{{ filter_form.is_active.id_for_label }}" class="form-label">{{ filter_form.is_active.label }}</label>
+                {{ filter_form.is_active }}
+            </div>
+            {# Si on ajoute le tri:
+            <div class="col-md-3">
+                {{ filter_form.ordering|as_crispy_field }}
+            </div>
+            #}
+            <div class="col-md-3 d-grid">
+                <button type="submit" class="btn btn-outline-primary">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16">
+                        <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+                    </svg>
+                    Filtrer
+                </button>
+            </div>
+        </div>
+    </form>
+
+    <div id="loading-indicator" class="htmx-indicator text-center my-3">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Chargement...</span>
+        </div>
+    </div>
+
+    <!-- Conteneur pour la table des clients (cible de HTMX) -->
+    <div id="client-table-container">
+        {% include 'clients/partials/_client_list_table.html' %}
+    </div>
+
+</div>
+{% endblock content %}
+
+{% block extra_scripts %}
+{# Scripts JS spécifiques à cette page si nécessaire #}
+<script>
+    // document.addEventListener('htmx:beforeRequest', function(evt) {
+    //     console.log('HTMX Before Request:', evt.detail.requestConfig);
+    // });
+    // document.addEventListener('htmx:afterSwap', function(evt) {
+    //     console.log('HTMX After Swap. Target:', evt.detail.target.id);
+    // });
+</script>
+{% endblock extra_scripts %}

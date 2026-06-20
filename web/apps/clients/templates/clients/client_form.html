@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}
+    {{ page_title|default:"Gérer Client" }} - {{ block.super }}
+    {% if active_company_name %}
+        ({{ active_company_name }})
+    {% endif %}
+{% endblock title %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-10 col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">{{ page_title|default:"Gérer Client" }}</h4>
+                </div>
+                <div class="card-body">
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger" role="alert">
+                            {% for error in form.non_field_errors %}
+                                <p class="mb-0">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+
+                        {# Rendu avec Crispy Forms #}
+                        {{ form|crispy }}
+
+                        {# Exemple de rendu manuel si on n'utilise pas Crispy Forms pour tous les champs
+                           ou pour plus de contrôle sur la mise en page.
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.client_name|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.email|as_crispy_field }}
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.phone|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.is_active|as_crispy_field }}
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                             {{ form.address|as_crispy_field }}
+                        </div>
+                        <hr>
+                        <h5>Contact Principal</h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.contact_person_name|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.contact_person_email|as_crispy_field }}
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            {{ form.contact_person_phone|as_crispy_field }}
+                        </div>
+                        <hr>
+                        <div class="mb-3">
+                            {{ form.notes|as_crispy_field }}
+                        </div>
+                        #}
+
+                        <div class="mt-4 d-flex justify-content-end">
+                            <a href="{% url 'clients:list' %}" class="btn btn-outline-secondary me-2">Annuler</a>
+                            <button type="submit" class="btn btn-primary">
+                                {{ submit_button_text|default:"Enregistrer" }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

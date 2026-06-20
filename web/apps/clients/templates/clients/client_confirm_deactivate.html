@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {{ page_title|default:"Confirmer la Désactivation" }} - {{ block.super }}
+{% endblock title %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            {% if client %}
+                <div class="card shadow-sm">
+                    <div class="card-header bg-warning text-dark">
+                        <h4 class="mb-0">{{ page_title }}</h4>
+                    </div>
+                    <div class="card-body">
+                        <p>Êtes-vous sûr de vouloir désactiver le client suivant ?</p>
+                        <h5 class="text-center my-3">"{{ client.client_name }}"</h5>
+                        <p>
+                            Le client ne sera plus visible dans les listes actives et ne pourra plus être
+                            sélectionné pour de nouveaux documents. Ses données existantes seront conservées.
+                        </p>
+                        <form method="post" action="{% url 'clients:deactivate' client_id=client.id %}">
+                            {% csrf_token %}
+                            <div class="d-flex justify-content-end mt-4">
+                                <a href="{% url 'clients:detail' client_id=client.id %}" class="btn btn-outline-secondary me-2">Annuler</a>
+                                <button type="submit" class="btn btn-warning">Confirmer la Désactivation</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            {% else %}
+                <div class="alert alert-danger" role="alert">
+                    Impossible de charger les informations du client pour la confirmation.
+                    Veuillez <a href="{% url 'clients:list' %}" class="alert-link">retourner à la liste</a> et réessayer.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock content %}
